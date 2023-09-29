@@ -6,4 +6,4 @@
 Copyright 2023 [Cii](https://twitter.com/cii0000)
 
 ## Acknowledgments
-[Acknowledgments](Acknowledgments.txt)
+[Acknowledgments](Rasen/Acknowledgments.txt)
