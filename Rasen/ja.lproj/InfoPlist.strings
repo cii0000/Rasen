@@ -1,0 +1,5 @@
+"Rasen Document" = "Rasen書類";
+"Rasen Document with History" = "Rasen履歴付き書類";
+"Rasen Data" = "Rasen データ";
+CFBundleDisplayName = "Rasen";
+CFBundleName = "Rasen";

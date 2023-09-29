@@ -1,0 +1,3477 @@
+// Copyright 2023 Cii
+//
+// This file is part of Rasen.
+//
+// Rasen is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Rasen is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
+
+import struct Foundation.UUID
+import struct Foundation.URL
+import struct Foundation.Data
+
+final class KeyframePreviousMover: InputKeyEditor {
+    let document: Document
+    let isEditingSheet: Bool
+    
+    init(_ document: Document) {
+        self.document = document
+        isEditingSheet = document.isEditingSheet
+    }
+    
+    private var sheetView: SheetView?
+    
+    func send(_ event: InputKeyEvent) {
+        guard isEditingSheet else {
+            document.stop(with: event)
+            return
+        }
+        if document.isPlaying(with: event) {
+            document.stopPlaying(with: event)
+        }
+        
+        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+            ?? event.screenPoint
+        let p = document.convertScreenToWorld(sp)
+        switch event.phase {
+        case .began:
+            sheetView = document.sheetView(at: p)
+            move(from: sheetView, at: p)
+            
+            sheetView?.showTimeframeTimeNodeFromMainBeat()
+            
+            document.cursor = document.cursor(from: sheetView?.currentTimeString() ?? SheetView.timeString(time: 0, frameRate: 0))
+        case .changed:
+            if event.isRepeat, let sheetView {
+                move(from: sheetView, at: p)
+                sheetView.showTimeframeTimeNodeFromMainBeat()
+                
+                document.cursor = .circle(string: sheetView.currentTimeString())
+            }
+        case .ended:
+            sheetView?.hideTimeframeTimeNode()
+            
+            document.cursor = Document.defaultCursor
+        }
+    }
+    
+    func move(from sheetView: SheetView?, at sp: Point) {
+        sheetView?.movePreviousInterKeyframe()
+        document.updateEditorNode()
+        document.updateSelects()
+    }
+}
+
+final class KeyframeNextMover: InputKeyEditor {
+    let document: Document
+    let isEditingSheet: Bool
+    
+    init(_ document: Document) {
+        self.document = document
+        isEditingSheet = document.isEditingSheet
+    }
+    
+    private var sheetView: SheetView?
+    
+    func send(_ event: InputKeyEvent) {
+        guard isEditingSheet else {
+            document.stop(with: event)
+            return
+        }
+        if document.isPlaying(with: event) {
+            document.stopPlaying(with: event)
+        }
+        
+        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+        ?? event.screenPoint
+        
+        let p = document.convertScreenToWorld(sp)
+        switch event.phase {
+        case .began:
+            sheetView = document.sheetView(at: p)
+            move(from: sheetView, at: p)
+            
+            sheetView?.showTimeframeTimeNodeFromMainBeat()
+            
+            document.cursor = document.cursor(from: sheetView?.currentTimeString() ?? SheetView.timeString(time: 0, frameRate: 0))
+        case .changed:
+            if event.isRepeat, let sheetView {
+                move(from: sheetView, at: p)
+                sheetView.showTimeframeTimeNodeFromMainBeat()
+                
+                document.cursor = document.cursor(from: sheetView.currentTimeString())
+            }
+        case .ended:
+            sheetView?.hideTimeframeTimeNode()
+            
+            document.cursor = Document.defaultCursor
+        }
+    }
+    
+    func move(from sheetView: SheetView?, at sp: Point) {
+        sheetView?.moveNextInterKeyframe()
+        document.updateEditorNode()
+        document.updateSelects()
+    }
+}
+
+final class TimePreviousMover: InputKeyEditor {
+    let document: Document
+    let isEditingSheet: Bool
+    
+    init(_ document: Document) {
+        self.document = document
+        isEditingSheet = document.isEditingSheet
+    }
+    
+    private var sheetView: SheetView?
+    
+    func send(_ event: InputKeyEvent) {
+        guard isEditingSheet else {
+            document.stop(with: event)
+            return
+        }
+        if document.isPlaying(with: event) {
+            document.stopPlaying(with: event)
+        }
+        
+        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+            ?? event.screenPoint
+        let p = document.convertScreenToWorld(sp)
+        switch event.phase {
+        case .began:
+            sheetView = document.sheetView(at: p)
+            move(from: sheetView, at: p)
+            
+            sheetView?.showTimeframeTimeNodeFromMainBeat()
+            
+            document.cursor = document.cursor(from: sheetView?.currentTimeString() ?? SheetView.timeString(time: 0, frameRate: 0))
+        case .changed:
+            if event.isRepeat, let sheetView {
+                move(from: sheetView, at: p)
+                sheetView.showTimeframeTimeNodeFromMainBeat()
+                
+                document.cursor = document.cursor(from: sheetView.currentTimeString())
+            }
+        case .ended:
+            sheetView?.hideTimeframeTimeNode()
+            
+            document.cursor = Document.defaultCursor
+        }
+    }
+    
+    func move(from sheetView: SheetView?, at sp: Point) {
+        sheetView?.movePreviousTime()
+        document.updateEditorNode()
+        document.updateSelects()
+    }
+}
+
+final class TimeNextMover: InputKeyEditor {
+    let document: Document
+    let isEditingSheet: Bool
+    
+    init(_ document: Document) {
+        self.document = document
+        isEditingSheet = document.isEditingSheet
+    }
+    
+    private var sheetView: SheetView?
+    
+    func send(_ event: InputKeyEvent) {
+        guard isEditingSheet else {
+            document.stop(with: event)
+            return
+        }
+        if document.isPlaying(with: event) {
+            document.stopPlaying(with: event)
+        }
+        
+        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+        ?? event.screenPoint
+        
+        let p = document.convertScreenToWorld(sp)
+        switch event.phase {
+        case .began:
+            sheetView = document.sheetView(at: p)
+            move(from: sheetView, at: p)
+            
+            sheetView?.showTimeframeTimeNodeFromMainBeat()
+            
+            document.cursor = document.cursor(from: sheetView?.currentTimeString() ?? SheetView.timeString(time: 0, frameRate: 0))
+        case .changed:
+            if event.isRepeat, let sheetView {
+                move(from: sheetView, at: p)
+                sheetView.showTimeframeTimeNodeFromMainBeat()
+                
+                document.cursor = document.cursor(from: sheetView.currentTimeString())
+            }
+        case .ended:
+            sheetView?.hideTimeframeTimeNode()
+            
+            document.cursor = Document.defaultCursor
+        }
+    }
+    
+    func move(from sheetView: SheetView?, at sp: Point) {
+        sheetView?.moveNextTime()
+        document.updateEditorNode()
+        document.updateSelects()
+    }
+}
+
+final class KeyframeSwiper: SwipeEditor {
+    let document: Document
+    let isEditingSheet: Bool
+    
+    init(_ document: Document) {
+        self.document = document
+        isEditingSheet = document.isEditingSheet
+    }
+    
+    private let indexInterval = 10.0
+    
+    private var sheetView: SheetView?
+    private var interpolatedNode = Node(), interpolatedRootIndex: Int?
+    private var oldDeltaI: Int?
+    private var beganSP = Point(),
+                beganRootBeat = Rational(0), beganRootInterIndex = 0,
+                beganRootIndex = 0, beganSelectedFrameIndexes = [Int](),
+                beganEventTime = 0.0
+    private var allDp = Point()
+    private var snapInterRootIndex: Int?, snapEventT: Double?
+    private var lastRootIs = [(sec: Double, rootI: Int)](capacity: 128)
+    private var minLastSec = 1 / 12.0
+    
+    func send(_ event: SwipeEvent) {
+        guard isEditingSheet else {
+            document.stop(with: event)
+            return
+        }
+        if document.isPlaying(with: event) {
+            document.stopPlaying(with: event)
+        }
+        
+        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+            ?? event.screenPoint
+        let p = document.convertScreenToWorld(sp)
+        switch event.phase {
+        case .began:
+            beganSP = event.screenPoint
+            beganEventTime = event.time
+            sheetView = document.sheetView(at: p)
+            if let sheetView {
+                let animationView = sheetView.animationView
+                beganRootBeat = animationView.rootBeat
+                beganRootInterIndex = animationView.model.rootInterIndex
+                beganRootIndex = animationView.model.rootIndex
+                lastRootIs.append((event.time, beganRootIndex))
+                beganSelectedFrameIndexes = animationView.selectedFrameIndexes
+                animationView.shownInterTypeKeyframeIndex = animationView.model.index
+                oldDeltaI = nil
+                
+                document.cursor = document.cursor(from: sheetView.currentTimeString())
+            } else {
+                document.cursor = document.cursor(from: SheetView.timeString(time: 0, frameRate: 0))
+            }
+            
+            sheetView?.showTimeframeTimeNodeFromMainBeat()
+        case .changed:
+            if let sheetView {
+                let animationView = sheetView.animationView
+                allDp += event.scrollDeltaPoint * 0.5
+                let dp = allDp
+                if event.time - beganEventTime < 0.2
+                    && abs(dp.x) < indexInterval * 3 { return }
+                let deltaI = Int((dp.x / indexInterval).rounded())
+                
+                let ni = beganRootInterIndex.addingReportingOverflow(deltaI).partialValue
+                let nRootI = animationView.model.rootIndex(atRootInter: ni)
+                
+                let ii = Double(beganRootInterIndex) + (dp.x - indexInterval / 2) / indexInterval
+                let iit = ii - ii.rounded(.down)
+                let si = nRootI
+                let ei = animationView.model.rootIndex(atRootInter: ni + 1)
+                let nni = Int.linear(si, ei, t: iit)
+                if nni != interpolatedRootIndex {
+                    interpolatedRootIndex = nni
+                    let nnni = animationView.model.index(atRoot: nni)
+                    if !animationView.model.keyframes[nnni].isEmptyNotKey {
+                        let node = animationView.elementViews[nnni].linesView.node.clone
+                        node.children.forEach { $0.lineType = .color(.subInterpolated) }
+                        interpolatedNode.children = [node]
+                        if interpolatedNode.parent == nil {
+                            sheetView.node.append(child: interpolatedNode)
+                        }
+                    } else {
+                        interpolatedNode.children = []
+                    }
+                }
+                
+                if deltaI != oldDeltaI {
+                    oldDeltaI = deltaI
+                    
+                    let oldKI = animationView.model.index
+                    
+                    if nRootI != animationView.model.rootIndex {
+                        if sheetView.isPlaying {
+                            sheetView.stop()
+                        }
+                        sheetView.rootKeyframeIndex = nRootI
+                        
+                        lastRootIs.append((event.time, nRootI))
+                        for (i, v) in lastRootIs.enumerated().reversed() {
+                            if event.time - v.sec > minLastSec {
+                                if i > 0 {
+                                    lastRootIs.removeFirst(i - 1)
+                                }
+                                break
+                            }
+                        }
+                        
+                        sheetView.showTimeframeTimeNodeFromMainBeat()
+                        
+                        document.updateEditorNode()
+                        document.updateSelects()
+                        if oldKI != animationView.model.index {
+                            animationView.shownInterTypeKeyframeIndex = animationView.model.index
+                        }
+                        
+                        document.cursor = document.cursor(from: sheetView.currentTimeString())
+                    }
+                }
+            }
+        case .ended:
+            document.cursor = Document.defaultCursor
+            
+            interpolatedNode.removeFromParent()
+            if let sheetView {
+                let animationView = sheetView.animationView
+                animationView.shownInterTypeKeyframeIndex = nil
+                
+                sheetView.hideTimeframeTimeNode()
+                
+                for (sec, rootI) in lastRootIs.reversed() {
+                    if event.time - sec > minLastSec {
+                        sheetView.rootKeyframeIndex = rootI
+                        document.updateEditorNode()
+                        document.updateSelects()
+                        break
+                    }
+                }
+            }
+        }
+    }
+}
+final class KeyframeSlider: DragEditor {
+    let document: Document
+    let isEditingSheet: Bool
+    
+    init(_ document: Document) {
+        self.document = document
+        isEditingSheet = document.isEditingSheet
+    }
+    
+    private let indexInterval = 10.0
+    
+    private var sheetView: SheetView?
+    private var interpolatedNode = Node(), interpolatedRootIndex: Int?
+    private var oldDeltaI: Int?
+    private var beganSP = Point(),
+                beganRootBeat = Rational(0), beganRootInterIndex = 0,
+                beganRootIndex = 0, beganSelectedFrameIndexes = [Int](),
+                beganEventTime = 0.0
+    private var snapInterRootIndex: Int?, snapEventT: Double?
+    private var lastRootIs = [(sec: Double, rootI: Int)](capacity: 128)
+    private var minLastSec = 1 / 12.0
+    
+    func send(_ event: DragEvent) {
+        guard isEditingSheet else {
+            document.stop(with: event)
+            return
+        }
+        if document.isPlaying(with: event) {
+            document.stopPlaying(with: event)
+        }
+        
+        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+            ?? event.screenPoint
+        let p = document.convertScreenToWorld(sp)
+        switch event.phase {
+        case .began:
+            document.cursor = .arrow
+            
+            beganSP = event.screenPoint
+            beganEventTime = event.time
+            sheetView = document.sheetView(at: p)
+            if let sheetView {
+                let animationView = sheetView.animationView
+                beganRootBeat = animationView.rootBeat
+                beganRootInterIndex = animationView.model.rootInterIndex
+                beganRootIndex = animationView.model.rootIndex
+                lastRootIs.append((event.time, beganRootIndex))
+                beganSelectedFrameIndexes = animationView.selectedFrameIndexes
+                animationView.shownInterTypeKeyframeIndex = animationView.model.index
+                oldDeltaI = nil
+                
+                document.cursor = document.cursor(from: sheetView.currentTimeString())
+            } else {
+                document.cursor = document.cursor(from: SheetView.timeString(time: 0, frameRate: 0))
+            }
+            
+            sheetView?.showTimeframeTimeNodeFromMainBeat()
+        case .changed:
+            if let sheetView {
+                let animationView = sheetView.animationView
+                let dp = event.screenPoint - beganSP
+                if event.time - beganEventTime < 0.2
+                    && abs(dp.x) < indexInterval * 3 { return }
+                let deltaI = Int((dp.x / indexInterval).rounded())
+                
+                let ni = beganRootInterIndex.addingReportingOverflow(deltaI).partialValue
+                let nRootI = animationView.model.rootIndex(atRootInter: ni)
+                
+                let ii = Double(beganRootInterIndex) + (dp.x - indexInterval / 2) / indexInterval
+                let iit = ii - ii.rounded(.down)
+                let si = nRootI
+                let ei = animationView.model.rootIndex(atRootInter: ni + 1)
+                let nni = Int.linear(si, ei, t: iit)
+                if nni != interpolatedRootIndex {
+                    interpolatedRootIndex = nni
+                    let nnni = animationView.model.index(atRoot: nni)
+                    if !animationView.model.keyframes[nnni].isEmptyNotKey {
+                        let node = animationView.elementViews[nnni].linesView.node.clone
+                        node.children.forEach { $0.lineType = .color(.subInterpolated) }
+                        interpolatedNode.children = [node]
+                        if interpolatedNode.parent == nil {
+                            sheetView.node.append(child: interpolatedNode)
+                        }
+                    } else {
+                        interpolatedNode.children = []
+                    }
+                }
+                
+                if deltaI != oldDeltaI {
+                    oldDeltaI = deltaI
+                    
+                    let oldKI = animationView.model.index
+                    
+                    if nRootI != animationView.model.rootIndex {
+                        if sheetView.isPlaying {
+                            sheetView.stop()
+                        }
+                        sheetView.rootKeyframeIndex = nRootI
+                        
+                        lastRootIs.append((event.time, nRootI))
+                        for (i, v) in lastRootIs.enumerated().reversed() {
+                            if event.time - v.sec > minLastSec {
+                                if i > 0 {
+                                    lastRootIs.removeFirst(i - 1)
+                                }
+                                break
+                            }
+                        }
+                        
+                        sheetView.showTimeframeTimeNodeFromMainBeat()
+                        
+                        document.updateEditorNode()
+                        document.updateSelects()
+                        if oldKI != animationView.model.index {
+                            animationView.shownInterTypeKeyframeIndex = animationView.model.index
+                        }
+                        
+                        document.cursor = document.cursor(from: sheetView.currentTimeString())
+                    }
+                }
+            }
+        case .ended:
+            document.cursor = Document.defaultCursor
+            
+            interpolatedNode.removeFromParent()
+            if let sheetView {
+                let animationView = sheetView.animationView
+                animationView.shownInterTypeKeyframeIndex = nil
+                
+                sheetView.hideTimeframeTimeNode()
+                
+                for (sec, rootI) in lastRootIs.reversed() {
+                    if event.time - sec > minLastSec {
+                        sheetView.rootKeyframeIndex = rootI
+                        document.updateEditorNode()
+                        document.updateSelects()
+                        break
+                    }
+                }
+            }
+        }
+    }
+}
+
+final class FrameSelecter: DragEditor {
+    let editor: FrameEditor
+    
+    init(_ document: Document) {
+        editor = FrameEditor(document)
+    }
+    
+    func send(_ event: DragEvent) {
+        editor.selectFrame(with: event, isMultiple: false)
+    }
+    func updateNode() {
+        editor.updateNode()
+    }
+}
+final class MultiFrameSelecter: DragEditor {
+    let editor: FrameEditor
+    
+    init(_ document: Document) {
+        editor = FrameEditor(document)
+    }
+    
+    func send(_ event: DragEvent) {
+        editor.selectFrame(with: event, isMultiple: true)
+    }
+    func updateNode() {
+        editor.updateNode()
+    }
+}
+final class FrameEditor: Editor {
+    let document: Document
+    let isEditingSheet: Bool
+    
+    init(_ document: Document) {
+        self.document = document
+        isEditingSheet = document.isEditingSheet
+    }
+    
+    private let indexInterval = 2.0
+    private let snapDeltaIndex = 4, snapDeltaEventTime = 0.075
+    
+    private var isPit = false
+    private var sheetView: SheetView?, animationIndex: Int?,
+                textI: Int?, noteI: Int?, pitI: Int?,
+                beganScore: Score?, beganPit: Pit?, beganPitbend: Pitbend?
+    private var beganSP = Point(),
+                beganRootBeat = Rational(0), beganBeat = Rational(0),
+                beganSelectedFrameIndexes = [Int](), beganEventTime = 0.0
+    private var preMoveEventTime: Double?
+    private var snapRootBeat: Rational?, snapEventTime: Double?
+    private var lastRootBeats = [(sec: Double, rootBeat: Rational)](capacity: 128)
+    private var minLastSec = 1 / 12.0
+    
+    func selectFrame(with event: DragEvent, isMultiple: Bool) {
+        guard isEditingSheet else {
+            document.stop(with: event)
+            return
+        }
+        if document.isPlaying(with: event) {
+            document.stopPlaying(with: event)
+        }
+        
+        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+            ?? event.screenPoint
+        let p = document.convertScreenToWorld(sp)
+        switch event.phase {
+        case .began:
+            document.cursor = .arrow
+            
+            beganSP = event.screenPoint
+            beganEventTime = event.time
+            sheetView = document.sheetView(at: p)
+            if let sheetView {
+                let inP = sheetView.convertFromWorld(p)
+                isPit = false
+                if let (ti, _) = sheetView.timeframeTuple(at: inP) {
+                    let textView = sheetView.textsView.elementViews[ti]
+                
+                    let inTP = textView.convert(inP, from: sheetView.node)
+                    let maxD = textView.nodeRatio
+                    * 5.0 * document.screenToWorldScale
+                    if textView.containsScore(inTP),
+                       let (ni, pitI, pit, pitbend) = textView.pitbendTuple(at: inTP,
+                                                              maxDistance: maxD) {
+                        
+                        self.textI = ti
+                        self.noteI = ni
+                        self.pitI = pitI
+                        beganScore = textView.model.timeframe?.score
+                        beganPit = pit
+                        beganPitbend = pitbend
+                        isPit = true
+                    }
+                }
+                if !isPit, sheetView.model.enabledAnimation {
+                    let animationView = sheetView.animationView
+                    beganRootBeat = animationView.rootBeat
+                    lastRootBeats.append((event.time, beganRootBeat))
+                    beganBeat = animationView.model.localBeat
+                    beganSelectedFrameIndexes = animationView.selectedFrameIndexes
+                    animationView.shownInterTypeKeyframeIndex = sheetView.model.animation.index
+                }
+            }
+            document.cursor = document.cursor(from: sheetView?.currentTimeString() ?? SheetView.timeString(time: 0, frameRate: 0))
+            
+            sheetView?.showTimeframeTimeNodeFromMainBeat()
+        case .changed:
+            if let sheetView {
+                if isPit {
+                    if let textI, textI < sheetView.textsView.elementViews.count {
+                        
+                        let textView = sheetView.textsView.elementViews[textI]
+                        if let score = textView.model.timeframe?.score,
+                           let noteI, noteI < score.notes.count,
+                           let pitI, let beganPit, let beganPitbend,
+                           pitI < beganPitbend.pits.count {
+                            
+                            let dp = sp - beganSP
+                            var pitbend = beganPitbend
+                            var pit = pitbend.pits[pitI]
+                            pit.t = (beganPit.t + dp.x / 100)
+                                .clipped(min: pitI > 0 ? pitbend.pits[pitI - 1].t : 0,
+                                         max: pitI + 1 < pitbend.pits.count ? pitbend.pits[pitI + 1].t : 1)
+                            pit.pitch = beganPit.pitch + dp.y / 100
+                            pitbend.pits[pitI] = pit
+
+                            textView.model.timeframe?.score?.notes[noteI].pitbend = pitbend
+                        }
+                    }
+                } else if sheetView.model.enabledAnimation {
+                    let animationView = sheetView.animationView
+                    
+                    let dp = event.screenPoint - beganSP
+                    let i = Int((dp.x / indexInterval).rounded())
+                    let deltaTime = Rational(i, animationView.frameRate)
+                    let oldKI = animationView.model.index
+                    let nRootBeat = Rational.saftyAdd(beganRootBeat, deltaTime)
+                    if animationView.rootBeat != nRootBeat {
+                        if sheetView.isPlaying {
+                            sheetView.stop()
+                        }
+                        if let preMoveEventTime {
+                            if event.time - preMoveEventTime > 0.25 {
+                                snapRootBeat = animationView.rootBeat
+                                snapEventTime = event.time
+                            }
+                        }
+                        preMoveEventTime = event.time
+                        sheetView.rootBeat = nRootBeat
+                        document.updateEditorNode()
+                        document.updateSelects()
+                        
+                        lastRootBeats.append((event.time, nRootBeat))
+                        for (i, v) in lastRootBeats.enumerated().reversed() {
+                            if event.time - v.sec > minLastSec {
+                                if i > 0 {
+                                    lastRootBeats.removeFirst(i - 1)
+                                }
+                                break
+                            }
+                        }
+                        
+                        if oldKI != animationView.model.index {
+                            animationView.shownInterTypeKeyframeIndex = sheetView.model.animation.index
+                            if isMultiple {
+                                var isSelects = [Bool](repeating: false, count: animationView.model.keyframes.count)
+                                let beganRootIndex = animationView.model.rootIndex(atRootBeat: beganRootBeat)
+                                let ni = animationView.model.rootIndex(atRootBeat: nRootBeat)
+                                let range = beganRootIndex <= ni ? beganRootIndex ... ni : ni ... beganRootIndex
+                                for i in range {
+                                    let ki = animationView.model.index(atRoot: i)
+                                    isSelects[ki] = true
+                                }
+                                beganSelectedFrameIndexes.forEach { isSelects[$0] = true }
+                                let fis = isSelects.enumerated().compactMap { $0.element ? $0.offset : nil }
+                                animationView.selectedFrameIndexes = fis
+                            }
+                        }
+                        
+                        document.cursor = document.cursor(from: sheetView.currentTimeString())
+                        sheetView.showTimeframeTimeNodeFromMainBeat()
+                    }
+                }
+            }
+        case .ended:
+            document.cursor = Document.defaultCursor
+            
+            if let sheetView {
+                if isPit {
+                    if let textI, textI < sheetView.textsView.elementViews.count {
+                        
+                        let textView = sheetView.textsView.elementViews[textI]
+                        if let score = textView.model.timeframe?.score,
+                           score != beganScore {
+                            
+                            sheetView.newUndoGroup()
+                            sheetView.captureScore(score, old: beganScore,
+                                                   at: textI)
+                        }
+                    }
+                } else {
+                    let animationView = sheetView.animationView
+                    animationView.shownInterTypeKeyframeIndex = nil
+                    sheetView.hideTimeframeTimeNode()
+                    
+                    for (sec, rootBeat) in lastRootBeats.reversed() {
+                        if event.time - sec > minLastSec {
+                            sheetView.rootBeat = rootBeat
+                            document.updateEditorNode()
+                            document.updateSelects()
+                            break
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+final class Player: InputKeyEditor {
+    let document: Document
+    let isEditingSheet: Bool
+    
+    init(_ document: Document) {
+        self.document = document
+        isEditingSheet = document.isEditingSheet
+    }
+    
+    private var sheetView: SheetView?
+    private var isEndStop = false
+    
+    func send(_ event: InputKeyEvent) {
+        guard isEditingSheet else {
+            document.stop(with: event)
+            return
+        }
+        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+            ?? event.screenPoint
+        let p = document.convertScreenToWorld(sp)
+        switch event.phase {
+        case .began:
+            document.cursor = .arrow
+            
+            sheetView = document.sheetView(at: p)
+            let shp = document.sheetPosition(at: p)
+            if let sheetView = document.sheetView(at: shp) {
+                for (_, v) in document.sheetViewValues {
+                    if sheetView != v.view {
+                        v.view?.stop()
+                    }
+                }
+                
+                if let aSheetView = document.sheetView(at: SheetPosition(shp.x - 1, shp.y)),
+                   aSheetView.model.enabledTimetrack {
+                    
+                    sheetView.previousSheetView = aSheetView
+                    if let aaSheetView = document.sheetView(at: SheetPosition(shp.x - 1, shp.y - 1)),
+                       aaSheetView.model.enabledTimetrack {
+                        aSheetView.bottomSheetView = aaSheetView
+                    }
+                    if let aaSheetView = document.sheetView(at: SheetPosition(shp.x - 1, shp.y + 1)),
+                       aaSheetView.model.enabledTimetrack {
+                        aSheetView.topSheetView = aaSheetView
+                    }
+                }
+                if let aSheetView = document.sheetView(at: SheetPosition(shp.x + 1, shp.y)),
+                   aSheetView.model.enabledTimetrack {
+                    
+                    sheetView.nextSheetView = aSheetView
+                    if let aaSheetView = document.sheetView(at: SheetPosition(shp.x + 1, shp.y - 1)),
+                       aaSheetView.model.enabledTimetrack {
+                        aSheetView.bottomSheetView = aaSheetView
+                    }
+                    if let aaSheetView = document.sheetView(at: SheetPosition(shp.x + 1, shp.y + 1)),
+                       aaSheetView.model.enabledTimetrack {
+                        aSheetView.topSheetView = aaSheetView
+                    }
+                }
+                if let aSheetView = document.sheetView(at: SheetPosition(shp.x, shp.y - 1)),
+                   aSheetView.model.enabledTimetrack {
+                    sheetView.bottomSheetView = aSheetView
+                }
+                if let aSheetView = document.sheetView(at: SheetPosition(shp.x, shp.y + 1)),
+                   aSheetView.model.enabledTimetrack {
+                    sheetView.topSheetView = aSheetView
+                }
+                
+                if !document.containsScoreOrAnimation(with: event) {
+                    sheetView.play()
+                } else {
+                    let sheetP = sheetView.convertFromWorld(p)
+                    var ids = Set<UUID>()
+                    var secRange: Range<Rational>?
+                    var sec: Rational = sheetView.animationView.sec(atX: sheetP.x)
+                    if let (ti, timeframe) = sheetView.timeframeTuple(at: sheetP) {
+                        let textView = sheetView.textsView.elementViews[ti]
+                        let textP = textView.convert(sheetP, from: sheetView.node)
+                        if textView.containsScore(textP),
+                           let ni = textView.noteIndex(at: textP,
+                                                                          
+                                                       maxDistance: 10.0 * document.screenToWorldScale),
+                           let id = textView.model.timeframe?.id,
+                           let score = textView.model.timeframe?.score {
+                            
+                            let beat = score.notes[ni].beatRange.start
+                            + timeframe.beatRange.start + timeframe.localStartBeat
+                            sec = timeframe.sec(fromBeat: beat)
+                            - Rational(1, 16)
+                            secRange = timeframe.secRange
+                            ids.insert(id)
+                        }
+                    }
+                    if secRange != nil {
+                        sheetView.previousSheetView = nil
+                        sheetView.nextSheetView = nil
+                    }
+                    sheetView.play(atSec: sec, inSec: secRange,
+                                   timeframeIDs: ids)
+                }
+            }
+        case .changed:
+            break
+        case .ended:
+            if isEndStop {
+                sheetView?.stop()
+            }
+            document.cursor = Document.defaultCursor
+        }
+    }
+}
+
+final class TimeSlider: DragEditor {
+    let editor: FrameSlideEditor
+    
+    init(_ document: Document) {
+        editor = FrameSlideEditor(document)
+    }
+    
+    func send(_ event: DragEvent) {
+        editor.slideFrame(with: event, isMultiple: false)
+    }
+    func updateNode() {
+        editor.updateNode()
+    }
+}
+final class MultiFrameSlider: DragEditor {
+    let editor: FrameSlideEditor
+    
+    init(_ document: Document) {
+        editor = FrameSlideEditor(document)
+    }
+    
+    func send(_ event: DragEvent) {
+        editor.slideFrame(with: event, isMultiple: true)
+    }
+    func updateNode() {
+        editor.updateNode()
+    }
+}
+final class FrameSlideEditor: Editor {
+    let document: Document
+    let isEditingSheet: Bool
+    
+    init(_ document: Document) {
+        self.document = document
+        isEditingSheet = document.isEditingSheet
+    }
+    
+    private var sheetView: SheetView?
+    private var beganRootBeatPosition = Animation.RootBeatPosition(),
+                movedBeganRootBeatPosition = Animation.RootBeatPosition(),
+                beganSelectedRootBeat = Rational(0),
+                beganSelectedFrameIndexes = [Int]()
+    private var lastRootBeats = [(sec: Double, rootBeat: Rational)](capacity: 128)
+    private var minLastSec = 1 / 12.0
+    
+    private func updateSelected(fromRootBeeat nRootBeat: Rational,
+                                in animationView: AnimationView) {
+        var isSelects = [Bool](repeating: false, count: animationView.model.keyframes.count)
+        let beganRootIndex = animationView.model.nearestRootIndex(atRootBeat: beganSelectedRootBeat)
+        let ni = animationView.model.nearestRootIndex(atRootBeat: nRootBeat)
+        let range = beganRootIndex <= ni ?
+        beganRootIndex ... ni : ni ... beganRootIndex
+        for i in range {
+            let ki = animationView.model.index(atRoot: i)
+            isSelects[ki] = true
+        }
+        beganSelectedFrameIndexes.forEach { isSelects[$0] = true }
+        let fis = isSelects.enumerated()
+            .compactMap { $0.element ? $0.offset : nil }
+        animationView.selectedFrameIndexes = fis
+    }
+    
+    func slideFrame(with event: DragEvent, isMultiple: Bool) {
+        guard isEditingSheet else {
+            document.stop(with: event)
+            return
+        }
+        if document.isPlaying(with: event) {
+            document.stopPlaying(with: event)
+        }
+        
+        let p = document.convertScreenToWorld(event.screenPoint)
+        switch event.phase {
+        case .began:
+            document.cursor = .arrow
+            if let sheetView = document.sheetView(at: p),
+               sheetView.containsTimeline(sheetView.convertFromWorld(p)) {
+                
+                self.sheetView = sheetView
+                let animationView = sheetView.animationView
+                beganRootBeatPosition = sheetView.rootBeatPosition
+                
+                var rbp = movedBeganRootBeatPosition
+                rbp.beat = animationView.beat(atX: sheetView.convertFromWorld(p).x)
+                let nRootBeat = animationView.model.rootBeat(at: rbp)
+                if animationView.rootBeat != nRootBeat {
+                    sheetView.rootBeat = nRootBeat
+                    document.updateEditorNode()
+                    document.updateSelects()
+                }
+                animationView.shownInterTypeKeyframeIndex = animationView.model.index
+                
+                if isMultiple {
+                    movedBeganRootBeatPosition = sheetView.rootBeatPosition
+                    beganSelectedFrameIndexes = animationView.selectedFrameIndexes
+                    beganSelectedRootBeat = nRootBeat
+                    lastRootBeats.append((event.time, beganSelectedRootBeat))
+                    var isSelects = [Bool](repeating: false,
+                                           count: animationView.model.keyframes.count)
+                    let beganRootIndex = animationView.model.nearestRootIndex(atRootBeat: beganSelectedRootBeat)
+                    let ni = animationView.model.nearestRootIndex(atRootBeat: nRootBeat)
+                    let range = beganRootIndex <= ni ?
+                    beganRootIndex ... ni : ni ... beganRootIndex
+                    
+                    for i in range {
+                        let ki = animationView.model.index(atRoot: i)
+                        isSelects[ki] = true
+                    }
+                    beganSelectedFrameIndexes.forEach { isSelects[$0] = true }
+                    let fis = isSelects.enumerated()
+                        .compactMap { $0.element ? $0.offset : nil }
+                    animationView.selectedFrameIndexes = fis
+                }
+            }
+        case .changed:
+            if let sheetView {
+                let animationView = sheetView.animationView
+                let oldKI = animationView.model.index
+                var bp = movedBeganRootBeatPosition
+                bp.beat = animationView.beat(atX: sheetView.convertFromWorld(p).x)
+                let nRootBeat = animationView.model.rootBeat(at: bp)
+                
+                if sheetView.rootBeat != nRootBeat {
+                    sheetView.rootBeat = nRootBeat
+                    document.updateEditorNode()
+                    document.updateSelects()
+                    
+                    lastRootBeats.append((event.time, nRootBeat))
+                    for (i, v) in lastRootBeats.enumerated().reversed() {
+                        if event.time - v.sec > minLastSec {
+                            if i > 0 {
+                                lastRootBeats.removeFirst(i - 1)
+                            }
+                            break
+                        }
+                    }
+                    
+                    if oldKI != animationView.model.index {
+                        animationView.shownInterTypeKeyframeIndex = animationView.model.index
+                        
+                        if isMultiple {
+                            updateSelected(fromRootBeeat: nRootBeat, in: animationView)
+                        }
+                    }
+                }
+            }
+        case .ended:
+            if let sheetView {
+                let animationView = sheetView.animationView
+                animationView.shownInterTypeKeyframeIndex = nil
+            }
+            
+            if isMultiple, let sheetView {
+                sheetView.rootBeatPosition = beganRootBeatPosition
+                
+                for (sec, rootBeat) in lastRootBeats.reversed() {
+                    if event.time - sec > minLastSec {
+                        let animationView = sheetView.animationView
+                        updateSelected(fromRootBeeat: rootBeat, in: animationView)
+                        break
+                    }
+                }
+            }
+            
+            document.cursor = Document.defaultCursor
+        }
+    }
+}
+
+final class AnimationSlider: DragEditor {
+    let document: Document
+    let isEditingSheet: Bool
+    
+    init(_ document: Document) {
+        self.document = document
+        isEditingSheet = document.isEditingSheet
+    }
+    
+    enum SlideType {
+        case key, startBeat, tempo, all, none
+    }
+    
+    private let indexInterval = 10.0
+    private let editableTempoInterval = 10.0
+    
+    private var node = Node()
+    private var sheetView: SheetView?,
+                animationIndex = 0, keyframeIndex = 0
+    private var type = SlideType.key
+    private var beganSP = Point(), beganInP = Point(),
+                beganAnimationOption: AnimationOption?,
+                beganTimeframes = [Int: Timeframe](), beganTimelineX = 0.0,
+                beganTempo: Rational = 120, oldTempo: Rational = 1,
+                beganKeyframeBeatDuration = Rational(0)
+    private var lastBeats = [(sec: Double, rootBeat: Rational)](capacity: 128)
+    private var minLastSec = 1 / 12.0
+    
+    func send(_ event: DragEvent) {
+        guard isEditingSheet else {
+            document.stop(with: event)
+            return
+        }
+        if document.isPlaying(with: event) {
+            document.stopPlaying(with: event)
+        }
+        
+        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+            ?? event.screenPoint
+        let p = document.convertScreenToWorld(sp)
+        
+        switch event.phase {
+        case .began:
+            document.cursor = .arrow
+            
+            if let sheetView = document.sheetView(at: p), sheetView.model.enabledAnimation {
+                beganSP = sp
+                self.sheetView = sheetView
+                let inP = sheetView.convertFromWorld(p)
+                beganInP = inP
+                beganTimelineX = sheetView.animationView.x(atBeat: sheetView.animationView.model.beatRange.start)
+                if sheetView.containsTimeline(inP) {
+                    let animationView = sheetView.animationView
+                    
+                    if let minI = sheetView.animationView
+                        .slidableKeyframeIndex(at: inP,
+                                               maxDistance: 15.0 * document.screenToWorldScale,
+                                               enabledKeyOnly: true) {
+                        
+                        type = .key
+                        keyframeIndex = minI
+                        let keyframe = animationView.model.keyframes[keyframeIndex]
+                        beganKeyframeBeatDuration = keyframe.beatDuration
+                        
+                        lastBeats.append((event.time, animationView.model.localBeat(at: minI) + keyframe.beatDuration))
+                    } else if animationView.isStartBeat(at: inP, scale: document.screenToWorldScale) {
+                        
+                        type = .all
+                        
+                        beganAnimationOption = sheetView.model.animation.option
+                        lastBeats.append((event.time, beganAnimationOption!.startBeat))
+                    } else if animationView.tempoPositionBeat(inP,
+                                                 maxDistance: 15.0 * document.screenToWorldScale) != nil {
+                        type = .tempo
+                        
+                        beganTempo = animationView.tempo
+                        oldTempo = beganTempo
+                        
+                        beganTimeframes = sheetView.textsView.elementViews.enumerated().reduce(into: [Int: Timeframe]()) { (dic, v) in
+                            if beganTempo == v.element.model.timeframe?.tempo {
+                                dic[v.offset] = v.element.model.timeframe
+                            }
+                        }
+                        if beganTempo == sheetView.model.animation.tempo {
+                            beganAnimationOption = sheetView.model.animation.option
+                        }
+                        
+                        document.cursor = .arrowWith(string: sheetView.tempoString(from: animationView))
+                    } else {
+                        type = .none
+                    }
+                }
+            }
+        case .changed:
+            if let sheetView = sheetView {
+                let animationView = sheetView.animationView
+                let inP = sheetView.convertFromWorld(p)
+//                let dp = inP - beganInP
+                
+                switch type {
+                case .tempo:
+                    let di = (sp.x - beganSP.x) / editableTempoInterval
+                    let tempo = Rational(Double(beganTempo) - di,
+                                         intervalScale: Rational(1, 4))
+                        .clipped(Music.tempoRange)
+                    if tempo != oldTempo {
+                        beganTimeframes.forEach {
+                            sheetView.textsView.elementViews[$0.key].model.timeframe?.tempo = tempo
+                        }
+                        if beganAnimationOption != nil {
+                            sheetView.animationView.tempo = tempo
+                        }
+                        
+                        document.cursor = .arrowWith(string: sheetView.tempoString(from: animationView))
+                        
+                        oldTempo = tempo
+                    }
+                case .all:
+                    let nh = ScoreLayout.noteHeight
+                    let px = beganTimelineX + inP.x - beganInP.x
+                    let py = ((beganAnimationOption?.timelineY ?? 0) + inP.y - beganInP.y)
+                        .interval(scale: nh)
+                    let interval = document
+                        .currentKeyframeTimeInterval(fromScale: 1)
+                    let beat = animationView.beat(atX: px,
+                                                  interval: interval) + sheetView.model.animation.startBeat
+                    if py != sheetView.animationView.timelineY
+                        || beat != sheetView.model.animation.startBeat {
+                        
+                        sheetView.binder[keyPath: sheetView.keyPath]
+                            .animation.startBeat = beat
+                        sheetView.binder[keyPath: sheetView.keyPath]
+                            .animation.timelineY = py
+                        sheetView.animationView.updateTimeline()
+                        
+                        lastBeats.append((event.time, beat))
+                        for (i, v) in lastBeats.enumerated().reversed() {
+                            if event.time - v.sec > minLastSec {
+                                if i > 0 {
+                                    lastBeats.removeFirst(i - 1)
+                                }
+                                break
+                            }
+                        }
+                    }
+                case .startBeat:
+                    let interval = document
+                        .currentKeyframeTimeInterval(fromScale: 1)
+                    let beat = animationView.beat(atX: inP.x,
+                                                  interval: interval) + sheetView.model.animation.startBeat
+                    if beat != sheetView.model.animation.startBeat {
+                        sheetView.binder[keyPath: sheetView.keyPath]
+                            .animation.startBeat = beat
+                        
+                        sheetView.animationView.updateTimeline()
+                        
+                        lastBeats.append((event.time, beat))
+                        for (i, v) in lastBeats.enumerated().reversed() {
+                            if event.time - v.sec > minLastSec {
+                                if i > 0 {
+                                    lastBeats.removeFirst(i - 1)
+                                }
+                                break
+                            }
+                        }
+                    }
+                case .key:
+//                    let dSec = animationView.secDuration(atWidth: dp.x)
+                    let interval = document
+                        .currentKeyframeTimeInterval(fromScale: 1)
+                    let dBeat = animationView.beat(atX: inP.x,
+                                                   interval: interval)
+                    let nDur = dBeat - animationView.model.localBeat(at: keyframeIndex)
+//
+//                    let dBeat = animationView.model.beat(fromSec: dSec,
+//                                                         beatRate: animationView.frameRate)
+                    let dur = max(nDur, Keyframe.minBeatDuration)
+                    let oldDur = animationView.model.keyframes[keyframeIndex].beatDuration
+                    if oldDur != dur {
+                        let rootBeatIndex = animationView.model.rootBeatIndex
+                        
+                        sheetView.binder[keyPath: sheetView.keyPath]
+                            .animation.keyframes[keyframeIndex]
+                            .beatDuration = dur
+                        
+                        sheetView.rootBeatIndex = rootBeatIndex
+                        sheetView.animationView.updateTimeline()
+                        
+                        let beat = dur
+                        lastBeats.append((event.time, beat))
+                        for (i, v) in lastBeats.enumerated().reversed() {
+                            if event.time - v.sec > minLastSec {
+                                if i > 0 {
+                                    lastBeats.removeFirst(i - 1)
+                                }
+                                break
+                            }
+                        }
+                    }
+                case .none: break
+                }
+            }
+        case .ended:
+            node.removeFromParent()
+            
+            if let sheetView = sheetView {
+                var isNewUndoGroup = false
+                func updateUndoGroup() {
+                    if !isNewUndoGroup {
+                        sheetView.newUndoGroup()
+                        isNewUndoGroup = true
+                    }
+                }
+                switch type {
+                case .all, .startBeat:
+                    for (sec, beat) in lastBeats.reversed() {
+                        if event.time - sec > minLastSec {
+                            if beat != sheetView.model.animation.startBeat {
+                                sheetView.binder[keyPath: sheetView.keyPath]
+                                    .animation.startBeat = beat
+                                
+                                sheetView.animationView.updateTimeline()
+                            }
+                            break
+                        }
+                    }
+                    
+                    if let beganAnimationOption, sheetView.model.animation.option != beganAnimationOption {
+                        updateUndoGroup()
+                        sheetView.capture(option: sheetView.model.animation.option,
+                                          oldOption: beganAnimationOption)
+                    }
+                case .key:
+                    let beat = sheetView.animationView.model.keyframes[keyframeIndex].beatDuration
+                    for (sec, nBeat) in lastBeats.reversed() {
+                        if event.time - sec > minLastSec {
+                            if nBeat != beat {
+                                sheetView.animationView.model.keyframes[keyframeIndex].beatDuration = nBeat
+                            }
+                            break
+                        }
+                    }
+                    
+                    let animationView = sheetView.animationView
+                    let keyframe = animationView.model.keyframes[keyframeIndex]
+                    if keyframe.beatDuration != beganKeyframeBeatDuration {
+                        updateUndoGroup()
+                        sheetView.capture(beatDuration: keyframe.beatDuration,
+                                          oldBeatDuration: beganKeyframeBeatDuration,
+                                          at: keyframeIndex)
+                    }
+                case .tempo:
+                    if let beganAnimationOption, sheetView.model.animation.option != beganAnimationOption {
+                        updateUndoGroup()
+                        sheetView.capture(option: sheetView.model.animation.option,
+                                          oldOption: beganAnimationOption)
+                    }
+                    if !beganTimeframes.isEmpty {
+                        for (ti, beganTimeframe) in beganTimeframes {
+                            guard ti < sheetView.model.texts.count else { continue }
+                            let text = sheetView.textsView.elementViews[ti].model
+                            if text.timeframe != beganTimeframe {
+                                var beganText = text
+                                beganText.timeframe = beganTimeframe
+                                updateUndoGroup()
+                                sheetView.captureText(text, old: beganText, at: ti)
+                            }
+                        }
+                    }
+                case .none: break
+                }
+            }
+            
+            document.cursor = Document.defaultCursor
+        }
+    }
+}
+
+final class LineSlider: DragEditor {
+    let document: Document
+    let isEditingSheet: Bool
+
+    init(_ document: Document) {
+        self.document = document
+        isEditingSheet = document.isEditingSheet
+    }
+
+    private var sheetView: SheetView?,
+                lineIndex = 0, pointIndex = 0
+    private var beganLine = Line(), beganMainP = Point(), beganInP = Point(),
+                isPressure = false
+    private var pressures = [(time: Double, pressure: Double)]()
+    
+    func send(_ event: DragEvent) {
+        guard isEditingSheet else {
+            document.stop(with: event)
+            return
+        }
+        if document.isPlaying(with: event) {
+            document.stopPlaying(with: event)
+        }
+
+        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+            ?? event.screenPoint
+        let p = document.convertScreenToWorld(sp)
+
+        switch event.phase {
+        case .began:
+            document.cursor = .arrow
+
+            if let sheetView = document.sheetView(at: p) {
+                let inP = sheetView.convertFromWorld(p)
+                if let (lineView, li) = sheetView.lineTuple(at: inP,
+                                                            isSmall: false,
+                                                            scale: document.screenToWorldScale),
+                   let pi = lineView.model.mainPointSequence.nearestIndex(at: inP) {
+                    
+                    self.sheetView = sheetView
+                    beganLine = lineView.model
+                    lineIndex = li
+                    pointIndex = pi
+                    beganMainP = beganLine.mainPoint(at: pi)
+                    beganInP = inP
+                    let pressure = event.pressure
+                        .clipped(min: 0.4, max: 1, newMin: 0, newMax: 1)
+                    pressures.append((event.time, pressure))
+                }
+            }
+        case .changed:
+            if let sheetView = sheetView,
+               lineIndex < sheetView.linesView.elementViews.count {
+                let lineView = sheetView.linesView.elementViews[lineIndex]
+                
+                var line = lineView.model
+                if pointIndex < line.mainPointCount {
+                    let inP = sheetView.convertFromWorld(p)
+                    let op = inP - beganInP + beganMainP
+                    let np = line.mainPoint(withMainCenterPoint: op,
+                                            at: pointIndex)
+                    let pressure = event.pressure
+                        .clipped(min: 0.4, max: 1, newMin: 0, newMax: 1)
+                    pressures.append((event.time, pressure))
+                    
+                    line.controls[pointIndex].point = np
+                    
+                    if isPressure || (!isPressure && (event.time - (pressures.first?.time ?? 0) > 1 && !pressures.contains(where: { $0.pressure > 0.5 }))) {
+                        isPressure = true
+                        
+                        let nPressures = pressures
+                            .filter { (0.04 ..< 0.4).contains(event.time - $0.time) }
+                        let nPressure = nPressures.isEmpty ?
+                            pressures.first!.pressure :
+                            nPressures.mean { $0.pressure }
+                        line.controls[pointIndex].pressure = nPressure
+                    }
+                    
+                    lineView.model = line
+                }
+            }
+        case .ended:
+            if let sheetView = sheetView,
+               lineIndex < sheetView.linesView.elementViews.count {
+                
+                let line = sheetView.linesView.elementViews[lineIndex].model
+                if line != beganLine {
+                    sheetView.newUndoGroup()
+                    sheetView.captureLine(line, old: beganLine,
+                                          at: lineIndex)
+                }
+            }
+
+            document.cursor = Document.defaultCursor
+        }
+    }
+}
+
+final class TimeframeSlider: DragEditor {
+    let document: Document
+    let isEditingSheet: Bool
+    
+    init(_ document: Document) {
+        self.document = document
+        isEditingSheet = document.isEditingSheet
+    }
+    
+    enum SlideType {
+        case all, startBeat, endBeat, startBeatOrOctave,
+             volume, pan, reverb, isShownSpectrogram,
+             pitchStart, pitchLength,
+             startNote, endNote, moveNote,
+             octave,
+             attack, decayAndSustain, release,
+             pitchDecay,
+             overtone, formant,
+             tempo
+    }
+    
+    private let editableInterval = 5.0
+    private let editableTempoInterval = 10.0
+    
+    private var node = Node()
+    private var notePlayer: NotePlayer?
+    private var sheetView: SheetView?, textIndex: Int?
+    private var type = SlideType.all
+    private var formantType = SpectlopeType.fqSmp, isFormantLast = false
+    private var overtoneType = OvertoneType.evenScale
+    private var beganSP = Point(), beganTime = Rational(0),
+                beganTimeframeTime = Rational(0), beganText: Text?,
+                beganTimeframe: Timeframe?,
+                beganInP = Point(), beganTextOrigin = Point()
+    private var beganOctave = Rational(0), secIndex = 0,
+                noteIndex: Int?, beganNoteBeatRange: Range<Rational>?,
+                noteIndexes = [Int](), currentBeatNoteIndexes = [Int](),
+                beganScore: Score?, beganDeltaNoteBeat = Rational(),
+                oldNotePitch: Rational?, oldNoteBeat: Rational?,
+                minScorePitch = Rational(0), maxScorePitch = Rational(0)
+    private var beganStartBeat = Rational(0)
+    private var beganVolume = Volume(), beganPan = 0.0, oldPan = 0.0,
+                beganReverb = 0.0, oldReverb = 0.0,
+                beganIsShownSpectrogram = false, oldIsShownSpectrogram = false,
+                beganEnvelope = Envelope(), beganPitchbend = Pitchbend()
+    private var beganPitch: Rational?
+    private var beganOvertone = Overtone()
+    private var beganFormantIndex = 0, beganSpectlope = Spectlope()
+    private var beganAnimationOption: AnimationOption?
+    private var beganTimeframes = [Int: Timeframe]()
+    private var beganTempo: Rational = 1, oldTempo: Rational = 1
+    
+    func send(_ event: DragEvent) {
+        guard isEditingSheet else {
+            document.stop(with: event)
+            return
+        }
+        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+            ?? event.screenPoint
+        let p = document.convertScreenToWorld(sp)
+        switch event.phase {
+        case .began:
+            document.cursor = .arrow
+            
+            if let sheetView = document.sheetView(at: p) {
+                let inP = sheetView.convertFromWorld(p)
+                if let (ti, timeframe) = sheetView.timeframeTuple(at: inP) {
+                    let textView = sheetView.textsView.elementViews[ti]
+                    
+                    beganSP = sp
+                    self.sheetView = sheetView
+                    textIndex = ti
+                    beganTime = sheetView.animationView.beat(atX: inP.x)
+                    beganTimeframe = timeframe
+                    beganScore = timeframe.score
+                    beganEnvelope = timeframe.score?.tone.envelope ?? .init()
+                    beganPitchbend = timeframe.score?.tone.pitchbend ?? .init()
+                    beganText = textView.model
+                    beganTimeframeTime = timeframe.beatRange.start
+                    beganInP = inP
+                    beganTextOrigin = textView.model.origin
+                    
+                    let maxD = textView.nodeRatio
+                    * 15.0 * document.screenToWorldScale
+                    let maxMD = textView.nodeRatio
+                    * 10.0 * document.screenToWorldScale
+                    
+                    let inTP = textView.convert(inP, from: sheetView.node)
+                    if textView.containsScore(inTP),
+                       let timeframe = textView.model.timeframe,
+                       let score = timeframe.score,
+                       let pitch = document.pitch(from: textView, at: inTP),
+                       let ni = textView.noteIndex(at: inTP,
+                                                   maxDistance: maxD) {
+                        
+                        let note = score.notes[ni]
+                        let nf = textView.noteFrame(from: note,
+                                                    score, timeframe)
+                        let nfsw = nf.width * document.worldToScreenScale
+                        let dx = nfsw.clipped(min: 3, max: 30,
+                                              newMin: 1, newMax: 10)
+                            * document.screenToWorldScale
+                        if abs(inTP.x - nf.minX) < dx {
+                            type = .startNote
+                        } else if abs(inTP.x - nf.maxX) < dx {
+                            type = .endNote
+                        } else {
+                            type = .moveNote
+                        }
+                        noteIndex = ni
+                        noteIndexes = document.isSelectSelectedNoneCursor(at: p) ?
+                        document.selectedNoteIndexes(from: textView) :
+                            [ni]
+                        beganScore = score
+                        beganPitch = pitch
+                        let interval = document
+                            .currentNoteTimeInterval(from: textView.model)
+                        let nsBeat = textView.beat(atX: inP.x,
+                                                   interval: interval)
+                        - timeframe.beatRange.start - timeframe.localStartBeat
+                        
+                        currentBeatNoteIndexes = noteIndexes.filter {  score.notes[$0].beatRange.contains(note.beatRange.center) }
+                        
+                        beganStartBeat = nsBeat
+                        let dBeat = note.beatRange.start + timeframe.beatRange.start + timeframe.localStartBeat
+                        - (note.beatRange.start + timeframe.beatRange.start + timeframe.localStartBeat).interval(scale: interval)
+                        beganDeltaNoteBeat = -dBeat
+                        beganNoteBeatRange = note.beatRange
+                        oldNotePitch = note.pitch
+                        
+                        let volume = sheetView.isPlaying ?
+                        score.volume * 0.1 : score.volume
+                        if let notePlayer = sheetView.notePlayer {
+                            self.notePlayer = notePlayer
+                            notePlayer.notes = currentBeatNoteIndexes.map { score.convertPitchToWorld(score.notes[$0]) }
+                            notePlayer.tone = score.tone
+                            notePlayer.volume = volume
+                        } else {
+                            notePlayer = try? NotePlayer(notes: currentBeatNoteIndexes.map { score.convertPitchToWorld(score.notes[$0]) },
+                                                         score.tone,
+                                                         volume: volume,
+                                                         pan: score.pan,
+                                                         tempo: Double(timeframe.tempo),
+                                                         reverb: timeframe.reverb ??  Audio.defaultReverb)
+                            sheetView.notePlayer = notePlayer
+                        }
+                        notePlayer?.play()
+                    } else if textView.containsScore(inTP),
+                              textView.tempoPositionBeat(inTP,
+                                                 maxDistance: maxD) != nil,
+                              let timeframe = textView.model.timeframe {
+                        type = .tempo
+                        
+                        beganTempo = timeframe.tempo
+                        oldTempo = beganTempo
+                        
+                        beganTimeframes = sheetView.textsView.elementViews.enumerated().reduce(into: [Int: Timeframe]()) { (dic, v) in
+                            if beganTempo == v.element.model.timeframe?.tempo {
+                                dic[v.offset] = v.element.model.timeframe
+                            }
+                        }
+                        if beganTempo == sheetView.model.animation.tempo {
+                            beganAnimationOption = sheetView.model.animation.option
+                        }
+                        
+                        document.cursor = .arrowWith(string: SheetView.tempoString(fromTempo: timeframe.tempo))
+                    } else if textView.containsVolume(inTP),
+                              let volume = textView.model.timeframe?.volume {
+                        type = .volume
+                        beganVolume = volume
+                        
+                        let fs = document.selections
+                            .map { $0.rect }
+                            .map { sheetView.convertFromWorld($0) }
+                        beganTimeframes = sheetView.textsView.elementViews.enumerated().reduce(into: [Int: Timeframe]()) { (dic, v) in
+                            if fs.contains(where: { v.element.transformedScoreFrame.intersects($0) }),
+                               let timeframe = v.element.model.timeframe,
+                               timeframe.volume != nil {
+                                dic[v.offset] = timeframe
+                            }
+                        }
+                    } else if textView.containsPan(inTP),
+                              let pan = textView.model.timeframe?.pan {
+                        type = .pan
+                        beganPan = pan
+                        oldPan = pan
+                        
+                        let fs = document.selections
+                            .map { $0.rect }
+                            .map { sheetView.convertFromWorld($0) }
+                        beganTimeframes = sheetView.textsView.elementViews.enumerated().reduce(into: [Int: Timeframe]()) { (dic, v) in
+                            if fs.contains(where: { v.element.transformedScoreFrame.intersects($0) }),
+                               let timeframe = v.element.model.timeframe,
+                               timeframe.pan != nil {
+                                dic[v.offset] = timeframe
+                            }
+                        }
+                    } else if textView.containsReverb(inTP),
+                              let reverb = textView.model.timeframe?.reverb {
+                        type = .reverb
+                        beganReverb = reverb
+                        oldReverb = reverb
+                        
+                        let fs = document.selections
+                            .map { $0.rect }
+                            .map { sheetView.convertFromWorld($0) }
+                        beganTimeframes = sheetView.textsView.elementViews.enumerated().reduce(into: [Int: Timeframe]()) { (dic, v) in
+                            if fs.contains(where: { v.element.transformedScoreFrame.intersects($0) }),
+                               let timeframe = v.element.model.timeframe,
+                               timeframe.reverb != nil {
+                                dic[v.offset] = timeframe
+                            }
+                        }
+                    } else if textView.containsIsShownSpectrogram(inTP),
+                              let isShownSpectrogram = textView.model.timeframe?.isShownSpectrogram {
+                        type = .isShownSpectrogram
+                        beganIsShownSpectrogram = isShownSpectrogram
+                        oldIsShownSpectrogram = isShownSpectrogram
+                    } else if let (i, formantType, isLast) = textView.spectlopeType(at: inTP, maxDistance: 25.0 * document.screenToWorldScale),
+                               let tone = textView.model.timeframe?.score?.tone {
+                        type = .formant
+                        self.beganFormantIndex = i
+                        self.beganSpectlope = tone.spectlope
+                        self.formantType = formantType
+                        self.isFormantLast = isLast
+                    } else if textView.containsOctave(inTP),
+                              let score = textView.model.timeframe?.score,
+                              let pitch = document.pitch(from: textView, at: inTP) {
+                        type = .octave
+                        
+                        beganPitch = pitch
+                        beganScore = score
+                        beganOctave = score.octave
+                    } else if textView.containsAttack(inTP) {
+                        type = .attack
+                    } else if textView.containsDecayAndSustain(inTP) {
+                        type = .decayAndSustain
+                    } else if textView.containsRelease(inTP) {
+                        type = .release
+                    } else if textView.containsPitchDecay(inTP) {
+                        type = .pitchDecay
+                    } else if abs(inTP.x - textView.x(atBeat: timeframe.beatRange.start)) < maxMD {
+                        
+                        type = .startBeatOrOctave
+                        let inTP = textView.convertFromWorld(p)
+                        if let score = timeframe.score,
+                           let pitch = document.pitch(from: textView,
+                                                      at: inTP) {
+                            beganPitch = pitch
+                            beganScore = score
+                            beganOctave = score.octave
+                        }
+                    } else if abs(inTP.x - textView.x(atBeat: timeframe.beatRange.end)) < maxMD {
+                        type = .endBeat
+                    } else if let score = textView.model.timeframe?.score,
+                              let pitch = document.pitch(from: textView, at: inTP),
+                              let sf = textView.scoreFrame,
+                              abs(inTP.y - sf.minY) < maxMD {
+                        type = .pitchStart
+                        
+                        beganPitch = pitch
+                        minScorePitch = score.pitchRange.start
+                        maxScorePitch = score.pitchRange.end
+                    } else if let score = textView.model.timeframe?.score,
+                              let pitch = document.pitch(from: textView, at: inTP),
+                              let sf = textView.scoreFrame,
+                              abs(inTP.y - sf.maxY) < maxMD {
+                        type = .pitchLength
+                        
+                        minScorePitch = pitch - score.pitchRange.length
+                    } else if let aOvertoneType = textView.overtoneType(at: inTP),
+                               let tone = textView.model.timeframe?.score?.tone {
+                        type = .overtone
+                        overtoneType = aOvertoneType
+                        
+                        beganOvertone = tone.overtone
+                    } else {
+                        type = .all
+                    }
+                } else if let (textView, ti, _, _) = sheetView.textTuple(at: inP) {
+                    
+                    type = .all
+                    
+                    beganSP = sp
+                    self.sheetView = sheetView
+                    beganText = textView.model
+                    textIndex = ti
+                    beganInP = inP
+                    beganTextOrigin = textView.model.origin
+                }
+            }
+        case .changed:
+            if let sheetView = sheetView,
+               let ti = textIndex, ti < sheetView.model.texts.count,
+               let timeframe = sheetView.textsView.elementViews[ti].model.timeframe {
+               
+                let textView = sheetView.textsView.elementViews[ti]
+                let inP = sheetView.convertFromWorld(p)
+                
+                switch type {
+                case .all:
+                    let nh = ScoreLayout.noteHeight * textView.nodeRatio
+                    let px = (beganTextOrigin.x + inP.x - beganInP.x)
+                    let py = (beganTextOrigin.y + inP.y - beganInP.y)
+                        .interval(scale: nh)
+                    
+                    let interval = document
+                        .currentNoteTimeInterval(from: textView.model)
+                    let beat = textView.beat(atX: px,
+                                             interval: interval)
+                    if beat != timeframe.beatRange.start
+                        || py != textView.model.origin.y {
+                        
+                        var text = textView.model
+                        text.timeframe?.beatRange.start = beat
+                        text.origin.x = sheetView.animationView
+                            .x(atSec: timeframe.sec(fromBeat: beat))
+                        text.origin.y = py
+                        sheetView.textsView.elementViews[ti].model = text
+                        if textView.model.timeframe?.score != nil {
+                            sheetView.updateOtherNotes()
+                        }
+                        document.updateSelects()
+                    }
+                case .volume:
+                    let dSmp = (sp.y - beganSP.y)
+                        * (document.screenToWorldScale / 50 / textView.nodeRatio)
+                    let smp = (beganVolume.smp + dSmp)
+                        .clipped(min: 0, max: Volume.maxSmp)
+                    let volume = Volume(smp: smp)
+                    
+                    if !beganTimeframes.isEmpty {
+                        let scale = beganVolume.amp == 0 ?
+                            1 : volume.amp / beganVolume.amp
+                        for (ti, textView) in sheetView.textsView.elementViews.enumerated() {
+                            guard let beganTimeframeVolume = beganTimeframes[ti]?.volume else { continue }
+                            
+                            let volume: Volume
+                            if beganVolume.amp == 0 {
+                                let smp = (beganTimeframeVolume.smp + dSmp)
+                                    .clipped(min: 0, max: Volume.maxSmp)
+                                volume = Volume(smp: smp)
+                            } else {
+                                let amp = (beganTimeframeVolume.amp * scale)
+                                    .clipped(min: 0, max: Volume.maxAmp)
+                                volume = Volume(amp: amp)
+                            }
+                            
+                            textView.model.timeframe?.volume = volume
+                            
+                            if textView.model.timeframe?.content == nil {
+                                textView.isUpdatedAudioCache = false
+                            }
+                            
+                            if let timeframe = textView.model.timeframe {
+                                sheetView.sequencer?.mixings[timeframe.id]?
+                                    .volume = Float(volume.amp)
+                            }
+                        }
+                    } else {
+                        textView.model.timeframe?.volume = volume
+                        
+                        if textView.model.timeframe?.content == nil {
+                            textView.isUpdatedAudioCache = false
+                        }
+                        
+                        if let timeframe = textView.model.timeframe {
+                            sheetView.sequencer?.mixings[timeframe.id]?
+                                .volume = Float(volume.amp)
+                        }
+                    }
+                case .pan:
+                    let dPan = (sp.x - beganSP.x)
+                        * (document.screenToWorldScale / 50 / textView.nodeRatio)
+                    let oPan = (beganPan + dPan)
+                        .clipped(min: -1, max: 1)
+                    let pan: Double
+                    if oldPan < 0 && oPan > 0 {
+                        pan = oPan > 0.05 ? oPan - 0.05 : 0
+                    } else if oldPan > 0 && oPan < 0 {
+                        pan = oPan < -0.05 ? oPan + 0.05 : 0
+                    } else {
+                        pan = oPan
+                        oldPan = pan
+                    }
+                    
+                    if !beganTimeframes.isEmpty {
+                        for (ti, textView) in sheetView.textsView.elementViews.enumerated() {
+                            guard let beganTimeframePan = beganTimeframes[ti]?.pan else { continue }
+                            
+                            let pan = (beganTimeframePan + dPan)
+                                    .clipped(min: -1, max: 1)
+                            
+                            textView.model.timeframe?.pan = pan
+                            
+                            if textView.model.timeframe?.content == nil {
+                                textView.isUpdatedAudioCache = false
+                            }
+                            
+                            if let timeframe = textView.model.timeframe {
+                                sheetView.sequencer?.mixings[timeframe.id]?
+                                    .pan = Float(pan)
+                            }
+                        }
+                    } else {
+                        textView.model.timeframe?.pan = pan
+                        
+                        if textView.model.timeframe?.content == nil {
+                            textView.isUpdatedAudioCache = false
+                        }
+                        
+                        if let timeframe = textView.model.timeframe {
+                            sheetView.sequencer?.mixings[timeframe.id]?
+                                .pan = Float(pan)
+                        }
+                    }
+                case .reverb:
+                    let dReverb = (sp.y - beganSP.y)
+                        * (document.screenToWorldScale / 50 / textView.nodeRatio)
+                    let reverb = (beganReverb.squareRoot() + dReverb)
+                        .clipped(min: 0, max: 1).squared
+                    
+                    if !beganTimeframes.isEmpty {
+                        for (ti, textView) in sheetView.textsView.elementViews.enumerated() {
+                            guard let beganTimeframeReverb = beganTimeframes[ti]?.reverb else { continue }
+                            
+                            let reverb = (beganTimeframeReverb.squareRoot() + dReverb)
+                                    .clipped(min: 0, max: 1).squared
+                            
+                            textView.model.timeframe?.reverb = reverb
+                            
+                            if textView.model.timeframe?.content == nil {
+                                textView.isUpdatedAudioCache = false
+                            }
+                            
+                            if let timeframe = textView.model.timeframe {
+                                sheetView.sequencer?.reverbs[timeframe.id]?
+                                    .wetDryMix = Float(reverb) * 100
+                            }
+                        }
+                    } else {
+                        textView.model.timeframe?.reverb = reverb
+                        
+                        if textView.model.timeframe?.content == nil {
+                            textView.isUpdatedAudioCache = false
+                        }
+                        
+                        if let timeframe = textView.model.timeframe {
+                            sheetView.sequencer?.reverbs[timeframe.id]?
+                                .wetDryMix = Float(reverb) * 100
+                        }
+                    }
+                case .isShownSpectrogram:
+                    let inTP = textView.convertFromWorld(p)
+                    let isShownSpectrogram = inTP.y > (textView.isShownSpectrogramFrame?.midY ?? 0)
+                    textView.isShownSpectrogram = isShownSpectrogram
+                case .octave:
+                    let inTP = textView.convertFromWorld(p)
+//                    let di = Rational((sp.y - beganSP.y) / 20,
+//                                      intervalScale: Rational(1, 12))
+                    if var score = beganScore, let beganPitch,
+                       let pitch = document.pitch(from: textView, at: inTP) {
+                        let dph = pitch - beganPitch
+                        
+                        let octave = (beganOctave - dph / 12)
+                            .clipped(min: Score.minOctave,
+                                     max: Score.maxOctave)
+                        if octave != textView.model.timeframe?.score?.octave {
+                            
+                            score.octave = octave
+                            
+                            textView.model.timeframe?.score = score
+                            
+                            sheetView.updateOtherNotes()
+                        }
+                    }
+                case .tempo:
+                    let di = (sp.x - beganSP.x) / editableTempoInterval
+                    let tempo = Rational(Double(beganTempo) - di,
+                                         intervalScale: Rational(1, 4))
+                        .clipped(Music.tempoRange)
+                    if tempo != oldTempo {
+                        beganTimeframes.forEach {
+                            sheetView.textsView.elementViews[$0.key].model.timeframe?.tempo = tempo
+                        }
+                        if beganAnimationOption != nil {
+                            sheetView.animationView.tempo = tempo
+                        }
+                        sheetView.updateOtherNotes()
+                        
+                        document.updateSelects()
+                        
+                        document.cursor = .arrowWith(string: SheetView.tempoString(fromTempo: tempo))
+                        
+                        oldTempo = tempo
+                    }
+                case .attack:
+                    if let score = timeframe.score,
+                       let ti = textIndex {
+                       
+                        let screenScale = document.screenToWorldScale
+                        / 50 / textView.nodeRatio
+                        let attack = (-(sp.x - beganSP.x) * screenScale
+                                        + beganEnvelope.attack.squareRoot())
+                            .clipped(min: 0, max: 1).squared
+                        if attack != score.tone.envelope.attack {
+                            var timeframe = timeframe
+                            timeframe.score?.tone.envelope.attack = attack
+                            sheetView.textsView.elementViews[ti].model.timeframe = timeframe
+                            sheetView.sequencer?.scoreNoders[timeframe.id]?.tone.envelope.attack = attack
+                        }
+                    }
+                case .decayAndSustain:
+                    if let score = timeframe.score,
+                       var tone = timeframe.score?.tone,
+                       let ti = textIndex {
+                       
+                        let screenScale = document.screenToWorldScale
+                        / 50 / textView.nodeRatio
+                        let decay = ((sp.x - beganSP.x) * screenScale
+                                        + beganEnvelope.decay.squareRoot())
+                            .clipped(min: 0, max: 1).squared
+                        let nSmp = ((sp.y - beganSP.y) * screenScale
+                                    + Volume(amp: beganEnvelope.sustain).smp)
+                            .clipped(min: 0, max: 1)
+                        let sustain = Volume(smp: nSmp).amp
+                        if decay != score.tone.envelope.decay
+                            || sustain != score.tone.envelope.sustain {
+                            
+                            var timeframe = timeframe
+                            tone.envelope.decay = decay
+                            tone.envelope.sustain = sustain
+                            timeframe.score?.tone = tone
+                            sheetView.textsView.elementViews[ti].model.timeframe = timeframe
+                            
+                            sheetView.sequencer?.scoreNoders[timeframe.id]?.startSec = Double(sheetView.playingSec ?? 0)
+                            sheetView.sequencer?.scoreNoders[timeframe.id]?.tone = tone
+                        }
+                    }
+                case .release:
+                    if let score = timeframe.score,
+                       let ti = textIndex {
+                       
+                        let screenScale = document.screenToWorldScale
+                        / 50 / textView.nodeRatio
+                        let release = ((sp.x - beganSP.x) * screenScale
+                                        + beganEnvelope.release.squareRoot())
+                            .clipped(min: 0, max: 1).squared
+                        if release != score.tone.envelope.release {
+                            var timeframe = timeframe
+                            timeframe.score?.tone.envelope.release = release
+                            sheetView.textsView.elementViews[ti].model.timeframe = timeframe
+                            sheetView.sequencer?.scoreNoders[timeframe.id]?.tone.envelope.release = release
+                        }
+                    }
+                case .pitchDecay:
+                    if let score = timeframe.score,
+                       var tone = timeframe.score?.tone,
+                       let ti = textIndex {
+                       
+                        let screenScale = document.screenToWorldScale
+                        / 50 / textView.nodeRatio
+                        let otd = (-(sp.x - beganSP.x) * screenScale
+                                        + beganPitchbend.decay.squareRoot())
+                            .clipped(min: -0.15, max: 1)
+                        let td = otd.clipped(min: 0, max: 1).squared
+                        let ts = ((sp.y - beganSP.y) * screenScale * Pitchbend.maxPitchLog
+                                  + beganPitchbend.pitchLog)
+                            .clipped(min: -Pitchbend.maxPitchLog,
+                                     max: Pitchbend.maxPitchLog)
+                        if td != score.tone.pitchbend.decay
+                            || ts != score.tone.pitchbend.pitchLog {
+                            
+                            var timeframe = timeframe
+                            if otd < 0 {
+                                tone.pitchbend = Pitchbend()
+                            } else {
+                                tone.pitchbend.decay = td
+                                tone.pitchbend.pitchLog = ts
+                            }
+                            timeframe.score?.tone = tone
+                            sheetView.textsView.elementViews[ti].model.timeframe = timeframe
+                            
+                            sheetView.sequencer?.scoreNoders[timeframe.id]?.startSec = Double(sheetView.playingSec ?? 0)
+                            sheetView.sequencer?.scoreNoders[timeframe.id]?.tone = tone
+                        }
+                    }
+                case .overtone:
+                    if let score = timeframe.score,
+                       let ti = textIndex {
+                       
+                        var tone = score.tone
+                        switch overtoneType {
+                        case .evenScale:
+                            let y = (sp.y - beganSP.y) / 5 * 0.0625
+                            let v = (y + beganOvertone.evenScale).clipped(min: 0, max: 1)
+                            tone.overtone.evenScale = v
+                        case .oddScale:
+                            let y = (sp.y - beganSP.y) / 5 * 0.0625
+                            let v = (y + beganOvertone.oddScale).clipped(min: 0, max: 1)
+                            tone.overtone.oddScale = v
+                        }
+                        
+                        var timeframe = timeframe
+                        timeframe.score?.tone = tone
+                        sheetView.textsView.elementViews[ti].model.timeframe = timeframe
+                        
+                        sheetView.sequencer?.scoreNoders[timeframe.id]?.startSec = Double(sheetView.playingSec ?? 0)
+                        sheetView.sequencer?.scoreNoders[timeframe.id]?.tone = tone
+                    }
+                case .formant:
+                    if let score = timeframe.score,
+                       let ti = textIndex {
+                        
+                        let ndp = sp - beganSP
+                        var tone = score.tone
+                        if isFormantLast {
+                            let scale = ndp.x.clipped(min: -200, max: 200, newMin: -2, newMax: 2) + 1
+                            tone.spectlope = beganSpectlope.multiplyFq(scale)
+                        } else {
+                            let firstV = beganSpectlope[beganFormantIndex, formantType]
+
+                            let nx = (ndp.x * 4 + firstV.x)
+                                .clipped(min: 0, max: 30000)
+                            let ny = (ndp.y / 100 + firstV.y)
+                                .clipped(min: 0, max: 1)
+                            let ntp = Point(nx, ny)
+                            if ntp != score.tone.spectlope[beganFormantIndex, formantType] {
+                                tone.spectlope[beganFormantIndex, formantType] = ntp
+                            }
+                        }
+                        
+                        var timeframe = timeframe
+                        timeframe.score?.tone = tone
+                        sheetView.textsView.elementViews[ti].model.timeframe = timeframe
+                        
+                        sheetView.sequencer?.scoreNoders[timeframe.id]?.startSec = Double(sheetView.playingSec ?? 0)
+                        sheetView.sequencer?.scoreNoders[timeframe.id]?.tone = tone
+                    }
+                case .startBeatOrOctave:
+                    let inTP = textView.convertFromWorld(p)
+                    var isOctave = false
+                    if let beganOctave = textView.model.timeframe?.score?.octave, let beganPitch,
+                       let pitch = document.pitch(from: textView, at: inTP) {
+                        let dph = pitch - beganPitch
+                        
+                        let octave = (beganOctave - dph / 12)
+                            .clipped(min: Score.minOctave,
+                                     max: Score.maxOctave)
+                        if octave != beganOctave {
+                            isOctave = true
+                        }
+                    }
+                    let interval = document
+                        .currentNoteTimeInterval(from: textView.model)
+                    let beat = min(textView.beat(atX: inP.x,
+                                                 interval: interval),
+                                   timeframe.beatRange.end)
+                    var isStartBeat = false
+                    if beat != timeframe.beatRange.start {
+                        isStartBeat = true
+                    }
+                    
+                    if isOctave || isStartBeat {
+                        let isNStartBeat: Bool
+                        if isOctave && isStartBeat {
+                            isNStartBeat = abs(sp.x - beganSP.x) > abs(sp.y - beganSP.y)
+                        } else {
+                            isNStartBeat = !isOctave
+                        }
+                        
+                        if isNStartBeat {
+                            type = .startBeat
+                            self.send(event)
+                        } else {
+                            type = .octave
+                            self.send(event)
+                        }
+                    }
+                case .startBeat:
+                    let interval = document
+                        .currentNoteTimeInterval(from: textView.model)
+                    let beat = min(textView.beat(atX: inP.x,
+                                                 interval: interval),
+                                   timeframe.beatRange.end)
+                    if beat != timeframe.beatRange.start {
+                        let dBeat = timeframe.beatRange.start - beat
+                        var text = textView.model
+                        text.timeframe?.localStartBeat += dBeat
+                        text.timeframe?.beatRange.start -= dBeat
+                        text.timeframe?.beatRange.length += dBeat
+                        text.origin.x = sheetView.animationView
+                            .x(atSec: timeframe.sec(fromBeat: beat))
+                        sheetView.textsView.elementViews[ti].model = text
+                        if textView.model.timeframe?.score != nil {
+                            sheetView.updateOtherNotes()
+                        }
+                        document.updateSelects()
+                    }
+                case .endBeat:
+                    let interval = document
+                        .currentNoteTimeInterval(from: textView.model)
+                    let beat = max(textView.beat(atX: inP.x,
+                                                 interval: interval),
+                                   timeframe.beatRange.start)
+                    if beat != timeframe.beatRange.end {
+                        var timeframe = timeframe
+                        timeframe.beatRange.end = beat
+                        sheetView.textsView.elementViews[ti].model
+                            .timeframe = timeframe
+                        if textView.model.timeframe?.score != nil {
+                            sheetView.updateOtherNotes()
+                        }
+                        document.updateSelects()
+                    }
+                case .pitchStart:
+                    let dph = textView.pitch(fromHeight: inP.y - beganInP.y,
+                                             interval: Rational(1, 60))
+                    let nPitch = (minScorePitch + dph)
+                        .interval(scale: 1)
+                        .clipped(min: -100, max: maxScorePitch)
+                    let range = nPitch ..< maxScorePitch
+                    let dPitch = nPitch - minScorePitch
+                    
+                    var text = textView.model
+                    text.timeframe?.score?.pitchRange = range
+                    text.origin.y = beganTextOrigin.y
+                        + textView.height(fromPitch: dPitch)
+                    sheetView.textsView.elementViews[ti].model = text
+                    sheetView.updateOtherNotes()
+                case .pitchLength:
+                    let inTP = textView.convertFromWorld(p)
+                    if let pitch = document.pitch(from: textView, at: inTP) {
+                        let phl = (pitch - minScorePitch)
+                            .clipped(min: 1, max: 100)
+                        if phl != timeframe.score?.pitchRange.length {
+                            sheetView.textsView.elementViews[ti].model.timeframe?.score?.pitchRange.length = phl
+                            sheetView.updateOtherNotes()
+                        }
+                    }
+                case .startNote:
+                    let inTP = textView.convertFromWorld(p)
+                    if let timeframe = textView.model.timeframe,
+                       let score = textView.model.timeframe?.score,
+                       let beganPitch = beganPitch,
+                       let beganScore = beganScore,
+                       let beganBeatRange = beganNoteBeatRange,
+                       let ni = noteIndex, ni < score.notes.count,
+                       let pitch = document.pitch(from: textView, at: inTP) {
+                        
+                        let interval = document
+                            .currentNoteTimeInterval(from: textView.model)
+                        let nsBeat = textView.beat(atX: inP.x,
+                                                   interval: interval)
+                        - timeframe.beatRange.start
+                        - timeframe.localStartBeat
+                        
+                        let dBeat = nsBeat - beganBeatRange.start
+                        
+                        let neBeat = beganBeatRange.end
+                        let beatRange = nsBeat < neBeat ?
+                            nsBeat ..< neBeat : neBeat ..< nsBeat
+                        var timeframe = timeframe
+                        timeframe.score?.notes[ni].beatRange = beatRange
+                        timeframe.score?.notes[ni].pitch = pitch
+                        
+                        let dPitch = pitch - beganPitch
+                        for i in noteIndexes {
+                            if i < score.notes.count {
+                                let beganNote = beganScore.notes[i]
+                                timeframe.score?.notes[i].pitch = dPitch + beganNote.pitch
+                                
+                                let nsBeat = beganNote.beatRange.start + dBeat
+                                let neBeat = beganNote.beatRange.end
+                                let beatRange = nsBeat < neBeat ? nsBeat ..< neBeat : neBeat ..< nsBeat
+                                timeframe.score?.notes[i].beatRange = beatRange
+                            }
+                        }
+                        
+                        if pitch != oldNotePitch || nsBeat != oldNoteBeat {
+                            sheetView.textsView.elementViews[ti]
+                                .model.timeframe = timeframe
+                            sheetView.updateOtherNotes()
+                            oldNoteBeat = nsBeat
+                            
+                            if pitch != oldNotePitch {
+                                notePlayer?.notes = currentBeatNoteIndexes.map { timeframe.score!
+                                    .convertPitchToWorld(timeframe.score!.notes[$0]) }
+                                oldNotePitch = pitch
+                            }
+                            document.updateSelects()
+                        }
+                    }
+                case .endNote:
+                    let inTP = textView.convertFromWorld(p)
+                    if let timeframe = textView.model.timeframe,
+                       let score = textView.model.timeframe?.score,
+                       let beganBeatRange = beganNoteBeatRange,
+                       let beganPitch = beganPitch,
+                       let beganScore = beganScore,
+                       let ni = noteIndex, ni < score.notes.count,
+                       let pitch = document.pitch(from: textView, at: inTP) {
+                        
+                        let interval = document
+                            .currentNoteTimeInterval(from: textView.model)
+                        let neBeat = textView.beat(atX: inP.x,
+                                                   interval: interval)
+                        - timeframe.beatRange.start
+                        - timeframe.localStartBeat
+                        
+                        let dBeat = neBeat - beganBeatRange.end
+                        
+                        let nsBeat = beganBeatRange.start
+                        let beatRange = nsBeat < neBeat ?
+                            nsBeat ..< neBeat : neBeat ..< nsBeat
+                        var timeframe = timeframe
+                        timeframe.score?.notes[ni].beatRange = beatRange
+                        timeframe.score?.notes[ni].pitch = pitch
+                        
+                        let dph = pitch - beganPitch
+                        for i in noteIndexes {
+                            if i < score.notes.count {
+                                let beganNote = beganScore.notes[i]
+                                timeframe.score?.notes[i].pitch = dph + beganNote.pitch
+                                
+                                let nsBeat = beganNote.beatRange.start
+                                let neBeat = beganNote.beatRange.end + dBeat
+                                let beatRange = nsBeat < neBeat ? nsBeat ..< neBeat : neBeat ..< nsBeat
+                                timeframe.score?.notes[i].beatRange = beatRange
+                            }
+                        }
+                        
+                        if pitch != oldNotePitch || neBeat != oldNoteBeat {
+                            sheetView.textsView.elementViews[ti].model.timeframe = timeframe
+                            sheetView.updateOtherNotes()
+                            oldNoteBeat = neBeat
+                            
+                            if pitch != oldNotePitch {
+                                notePlayer?.notes = currentBeatNoteIndexes.map { timeframe.score!
+                                    .convertPitchToWorld(timeframe.score!.notes[$0]) }
+                                oldNotePitch = pitch
+                            }
+                            document.updateSelects()
+                        }
+                    }
+                case .moveNote:
+                    let inTP = textView.convertFromWorld(p)
+                    if let timeframe = textView.model.timeframe,
+                       let score = textView.model.timeframe?.score,
+                       let ni = noteIndex, ni < score.notes.count,
+                       let beganBeatRange = beganNoteBeatRange,
+                       let beganPitch = beganPitch,
+                       let beganScore = beganScore,
+                       let pitch = document.pitch(from: textView, at: inTP) {
+                       
+                        let interval = document
+                            .currentNoteTimeInterval(from: textView.model)
+                        let nsBeat = textView.beat(atX: inP.x,
+                                                   interval: interval)
+                        - timeframe.beatRange.start
+                        - timeframe.localStartBeat
+                        
+                        let dBeat = nsBeat - beganStartBeat + beganDeltaNoteBeat
+                        
+                        var timeframe = timeframe
+                        timeframe.score?.notes[ni].beatRange.start = dBeat + beganBeatRange.start
+                        timeframe.score?.notes[ni].pitch = pitch
+                        
+                        let dph = pitch - beganPitch
+                        for i in noteIndexes {
+                            if i < score.notes.count {
+                                let beganNote = beganScore.notes[i]
+                                timeframe.score?.notes[i].pitch = dph + beganNote.pitch
+                                timeframe.score?.notes[i].beatRange.start = dBeat + beganNote.beatRange.start
+                            }
+                        }
+                        
+                        if pitch != oldNotePitch || nsBeat != oldNoteBeat {
+                            sheetView.textsView.elementViews[ti].model.timeframe = timeframe
+                            sheetView.updateOtherNotes()
+                            oldNoteBeat = nsBeat
+                            
+                            if pitch != oldNotePitch {
+                                notePlayer?.notes = currentBeatNoteIndexes.map { timeframe.score!
+                                    .convertPitchToWorld(timeframe.score!.notes[$0]) }
+                                oldNotePitch = pitch
+                            }
+                            document.updateSelects()
+                        }
+                        
+//                        node = textView
+                    }
+                }
+            }
+        case .ended:
+            notePlayer?.stop()
+            node.removeFromParent()
+            
+            if type == .startBeat || type == .endBeat
+                || type == .startNote || type == .endNote
+                || type == .moveNote
+                || type == .octave
+                || type == .all {
+                
+                sheetView?.updatePlaying()
+            }
+            
+            if type == .all || type == .pitchStart
+                || type == .startBeat || type == .endBeat
+                || (type == .volume && beganScore == nil) {
+                
+                if let sheetView = sheetView,
+                    let ti = textIndex, ti < sheetView.model.texts.count,
+                    let beganText = beganText {
+                    
+                    let text = sheetView.textsView.elementViews[ti].model
+                    if text != beganText {
+                        sheetView.newUndoGroup()
+                        sheetView.captureText(text, old: beganText, at: ti)
+                    }
+                }
+            } else if let sheetView {
+                var isNewUndoGroup = false
+                func updateUndoGroup() {
+                    if !isNewUndoGroup {
+                        sheetView.newUndoGroup()
+                        isNewUndoGroup = true
+                    }
+                }
+                if let beganAnimationOption, sheetView.model.animation.option != beganAnimationOption {
+                    updateUndoGroup()
+                    sheetView.capture(option: sheetView.model.animation.option,
+                                      oldOption: beganAnimationOption)
+                }
+                if !beganTimeframes.isEmpty {
+                    for (ti, beganTimeframe) in beganTimeframes {
+                        guard ti < sheetView.model.texts.count else { continue }
+                        if type != .tempo, let beganScore = beganTimeframe.score {
+                           let score = sheetView.textsView.elementViews[ti].model.timeframe?.score
+                           if score != beganScore {
+                               updateUndoGroup()
+                               sheetView.captureScore(score, old: beganScore, at: ti)
+                           }
+                        } else {
+                            let text = sheetView.textsView.elementViews[ti].model
+                            if text.timeframe != beganTimeframe {
+                                var beganText = text
+                                beganText.timeframe = beganTimeframe
+                                updateUndoGroup()
+                                sheetView.captureText(text, old: beganText, at: ti)
+                            }
+                        }
+                    }
+                } else if let ti = textIndex,
+                            ti < sheetView.model.texts.count,
+                            let beganScore = beganScore {
+                    let score = sheetView.textsView.elementViews[ti].model.timeframe?.score
+                    if score != beganScore {
+                        updateUndoGroup()
+                        sheetView.captureScore(score, old: beganScore, at: ti)
+                    }
+                }
+            }
+            
+            document.cursor = Document.defaultCursor
+        }
+    }
+}
+
+final class Slider: DragEditor {
+    let document: Document
+    
+    init(_ document: Document) {
+        self.document = document
+    }
+    
+    enum SlideType {
+        case keyframe(KeyframeSlider)
+        case animation(AnimationSlider)
+        case timeframe(TimeframeSlider)
+        case none
+    }
+    private var type = SlideType.none
+    
+    func updateNode() {
+        switch type {
+        case .keyframe(let keyframeSlider): keyframeSlider.updateNode()
+        case .animation(let keyframeDurationSlider): keyframeDurationSlider.updateNode()
+        case .timeframe(let timeframeSlider): timeframeSlider.updateNode()
+        case .none: break
+        }
+    }
+    
+    func send(_ event: DragEvent) {
+        if event.phase == .began {
+            let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+                ?? event.screenPoint
+            let p = document.convertScreenToWorld(sp)
+            
+            if let sheetView = document.sheetView(at: p) {
+                let inP = sheetView.convertFromWorld(p)
+                if sheetView.containsTimeframe(inP)
+                    || sheetView.textTuple(at: inP) != nil {
+                    
+                    type = .timeframe(TimeframeSlider(document))
+                } else if sheetView.containsTimeline(inP) {
+                    type = .animation(AnimationSlider(document))
+                } else {
+                    type = .keyframe(KeyframeSlider(document))
+                }
+            }
+        }
+        
+        switch type {
+        case .keyframe(let keyframeSlider):
+            keyframeSlider.send(event)
+        case .animation(let keyframeDurationSlider):
+            keyframeDurationSlider.send(event)
+        case .timeframe(let timeframeSlider):
+            timeframeSlider.send(event)
+        case .none: break
+        }
+    }
+}
+
+final class KeyframeInserter: InputKeyEditor {
+    let document: Document
+    let isEditingSheet: Bool
+    
+    init(_ document: Document) {
+        self.document = document
+        isEditingSheet = document.isEditingSheet
+    }
+    
+    private var linesNode = Node()
+    
+    func send(_ event: InputKeyEvent) {
+        guard isEditingSheet else {
+            document.stop(with: event)
+            return
+        }
+        if document.isPlaying(with: event) {
+            document.stopPlaying(with: event)
+        }
+        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+            ?? event.screenPoint
+        let p = document.convertScreenToWorld(sp)
+        switch event.phase {
+        case .began:
+            document.cursor = .arrow
+            
+            if let sheetView = document.madeSheetView(at: p) {
+                let inP = sheetView.convertFromWorld(p)
+                
+                sheetView.selectedFrameIndexes = []
+                
+                if sheetView.containsTimeline(inP) {
+                    let animationView = sheetView.animationView
+                    let animation = animationView.model
+                    
+                    let interval = document
+                        .currentNoteTimeInterval(fromScale: 1)
+                    let oBeat = animationView.beat(atX: inP.x,
+                                                   interval: interval)
+                    let beat = (oBeat - animation.beatRange.start)
+                        .clipped(min: 0, max: animation.beatRange.length)
+                    + animation.beatRange.start
+                    
+                    var rootBP = animation.rootBeatPosition
+                    rootBP.beat = beat
+                    if let (i, iBeat) = animation
+                        .indexAndInternalBeat(atRootBeat: beat) {
+                        let i = iBeat != 0 ?
+                        i :
+                        (animationView.beat(atX: inP.x, interval: Rational(1, 60)) < beat ? i - 1 : i)
+                        let iBeat = {
+                            if iBeat != 0 {
+                                return iBeat
+                            } else {
+                                let nextBeat = animation.keyframes[i].containsInterpolated ?
+                                animation.localBeat(at: animation.index(atInter: animation.interIndex(at: i) + 1)) :
+                                animation.localBeat(at: i + 1)
+                                let nb = nextBeat - animation.localBeat(at: i)
+                                return switch nb {
+                                case Rational(1, 4): Rational(1, 12)
+                                case Rational(1, 6): Rational(1, 12)
+                                default: nb / 2
+                                }
+                            }
+                        } ()
+                        if iBeat != 0 && !animation.keyframes[i].containsInterpolated {
+                            let nBeatDur = animation.keyframes[i].beatDuration - iBeat
+                            let keyframe = Keyframe(beatDuration: nBeatDur)
+                            animationView.selectedFrameIndexes = []
+                            sheetView.newUndoGroup(enabledKeyframeIndex: false)
+                            sheetView.set(beatDuration: iBeat, at: i)
+                            sheetView.insert([IndexValue(value: keyframe, index: i + 1)])
+                        } else if animation.keyframes[i].containsInterpolated {
+                            let idivs: [IndexValue<InterOption>] = (0 ..< animation.keyframes[i].picture.lines.count).compactMap {
+                                
+                                let option = animation.keyframes[i]
+                                    .picture.lines[$0].interOption
+                                if option.interType == .interpolated {
+                                    let nOption = option.with(.key)
+                                    return IndexValue(value: nOption,
+                                                      index: $0)
+                                } else {
+                                    return nil
+                                }
+                            }
+                            guard !idivs.isEmpty else { return }
+                            
+                            sheetView.rootKeyframeIndex = i
+                            sheetView.newUndoGroup()
+                            sheetView.set([IndexValue(value: idivs, index: i)])
+                            
+                            let ids = idivs.map { $0.value.id }
+                            sheetView.interpolation(ids.map { ($0, [$0]) },
+                                                    rootKeyframeIndex: i,
+                                                    isNewUndoGroup: false)
+                            animationView.updateTimeline()
+                        }
+                    }
+                } else if let (ti, timeframe) = sheetView.timeframeTuple(at: inP) {
+                    
+                    let textView = sheetView.textsView.elementViews[ti]
+                    
+                    let maxD = textView.nodeRatio
+                    * 15.0 * document.screenToWorldScale
+                    let inTP = textView.convert(inP, from: sheetView.node)
+                    if textView.containsScore(inTP),
+                       let score = timeframe.score,
+                       let (ni, pitT) = textView.pitT(at: inTP,
+                                                      maxDistance: maxD) {
+                        var pitbend = textView
+                            .pitbend(from: score.notes[ni],
+                                     at: ni, score, timeframe)
+                        let pit = pitbend.pit(atT: pitT)
+                        pitbend.pits.append(pit)
+                        pitbend.pits.sort(by: { $0.t < $1.t })
+                        var score = score
+                        score.notes[ni].pitbend = pitbend
+                        
+                        sheetView.newUndoGroup()
+                        sheetView.replaceScore(score, at: ti)
+                        
+                        sheetView.updatePlaying()
+                    }
+                } else if !sheetView.model.enabledAnimation {
+                    sheetView.newUndoGroup(enabledKeyframeIndex: false)
+                    sheetView.set(beatDuration: Animation.defaultBeatDuration,
+                                  at: 0)
+                    var option = sheetView.model.animation.option
+                    option.enabled = true
+                    sheetView.set(option)
+                }
+                
+                document.updateEditorNode()
+                document.updateSelects()
+            }
+        case .changed:
+            break
+        case .ended:
+            linesNode.removeFromParent()
+            
+            document.cursor = Document.defaultCursor
+        }
+    }
+}
+
+final class KeyframeCutter: InputKeyEditor {
+    let document: Document
+    let isEditingSheet: Bool
+    
+    init(_ document: Document) {
+        self.document = document
+        isEditingSheet = document.isEditingSheet
+    }
+    
+    private var linesNode = Node()
+    
+    func send(_ event: InputKeyEvent) {
+        guard isEditingSheet else {
+            document.stop(with: event)
+            return
+        }
+        if document.isPlaying(with: event) {
+            document.stopPlaying(with: event)
+        }
+        switch event.phase {
+        case .began:
+            document.cursor = .arrow
+            
+        case .changed:
+            break
+        case .ended:
+            linesNode.removeFromParent()
+            
+            document.cursor = Document.defaultCursor
+        }
+    }
+}
+
+final class ScoreAdder: InputKeyEditor {
+    let document: Document
+    let isEditingSheet: Bool
+    
+    init(_ document: Document) {
+        self.document = document
+        isEditingSheet = document.isEditingSheet
+    }
+    
+    func send(_ event: InputKeyEvent) {
+        guard isEditingSheet else {
+            document.stop(with: event)
+            return
+        }
+        if document.isPlaying(with: event) {
+            document.stopPlaying(with: event)
+        }
+        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+            ?? event.screenPoint
+        let p = document.convertScreenToWorld(sp)
+        switch event.phase {
+        case .began:
+            document.cursor = .arrow
+            
+            if let sheetView = document.madeSheetView(at: p) {
+                var inP = sheetView.convertFromWorld(p)
+                inP.y = inP.y.interval(scale: ScoreLayout.noteHeight)
+                
+                let beat = sheetView.animationView.beat(atX: inP.x).rounded()
+                let maxBeat = sheetView.animationView.beat(atX: sheetView.model.bounds.maxX - Sheet.textPadding.width)
+                let nBeatDur = min(max(1, (maxBeat - beat).rounded()),
+                                   Timeframe.defaultBeatDuration)
+                let beatRange = Range(start: beat, length: nBeatDur)
+                let score = Score()
+                let tempo = sheetView.nearestTempo(at: inP)
+                    ?? Music.defaultTempo
+                let timeframe = Timeframe(beatRange: beatRange, score: score,
+                                          tempo: tempo)
+                let text = Text(string: "_", origin: inP, timeframe: timeframe)
+                
+                sheetView.newUndoGroup()
+                sheetView.append(text)
+                
+                document.updateEditorNode()
+                document.updateSelects()
+            }
+        case .changed:
+            break
+        case .ended:
+            document.cursor = Document.defaultCursor
+        }
+    }
+}
+
+final class Interpolater: InputKeyEditor {
+    let document: Document
+    let isEditingSheet: Bool
+    
+    init(_ document: Document) {
+        self.document = document
+        isEditingSheet = document.isEditingSheet
+    }
+    
+    private var linesNode = Node()
+    
+    func send(_ event: InputKeyEvent) {
+        guard isEditingSheet else {
+            document.stop(with: event)
+            return
+        }
+        if document.isPlaying(with: event) {
+            document.stopPlaying(with: event)
+        }
+        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+            ?? event.screenPoint
+        let p = document.convertScreenToWorld(sp)
+        switch event.phase {
+        case .began:
+            document.cursor = .arrow
+            
+            let cos = Pasteboard.shared.copiedObjects
+            for co in cos {
+                if case .sheetValue(let v) = co,
+                   v.lines.isEmpty,
+                    let oUUColor = v.planes.first?.uuColor {
+                    
+                    let nUUColor = document.uuColor(at: p)
+                    if let sheetView = document.sheetView(at: p),
+                       sheetView.id == v.id {
+                        
+                        let animationView = sheetView.animationView
+                        let orki = v.rootKeyframeIndex,
+                            nrki = animationView.rootKeyframeIndex
+                        if orki != nrki {
+                            var filledIs = Set<Int>()
+                            var vs = [(ki: Int, pis: [Int], color: Color)]()
+                            let di = abs(nrki - orki)
+                            for dri in 0 ... di {
+                                let t = Double(dri) / Double(di)
+                                let ri = orki < nrki ?
+                                    orki + dri : orki - dri
+                                let ki = sheetView.model.animation.index(atRoot: ri)
+                                guard !filledIs.contains(ki) else { continue }
+                                let color = Color.linear(oUUColor.value, nUUColor.value, t: t)
+                                
+                                let pis = sheetView.model.animation.keyframes[ki].picture.planes.enumerated().compactMap {
+                                    $0.element.uuColor == oUUColor || $0.element.uuColor == nUUColor ? $0.offset : nil
+                                }
+                                
+                                if !pis.isEmpty {
+                                    vs.append((ki, pis, color))
+                                    filledIs.insert(ki)
+                                }
+                            }
+                            
+                            let svs = vs.sorted(by: { $0.ki < $1.ki })
+                            let cv = ColorValue(
+                                uuColor: oUUColor,
+                                planeIndexes: [],
+                                isBackground: false,
+                                value: svs.map { .init(value: $0.pis, index: $0.ki) },
+                                valueColors: svs.map { $0.color }
+                            )
+                            let ocv = ColorValue(
+                                uuColor: oUUColor,
+                                planeIndexes: [],
+                                isBackground: false,
+                                value: svs.map { .init(value: $0.pis, index: $0.ki) },
+                                valueColors: svs.map {
+                                    sheetView.model.animation.keyframes[$0.ki].picture.planes[$0.pis.first!].uuColor.value
+                                }
+                            )
+                            sheetView.newUndoGroup()
+                            sheetView.set(cv, oldColorValue: ocv)
+                        }
+                    }
+                    return
+                }
+            }
+            guard let o = cos.first else { return }
+            
+            let sheetID: SheetID, ios: [InterOption], oldRootKeyframeIndex: Int
+            switch o {
+            case .sheetValue(let v):
+                sheetID = v.id
+                ios = v.lines.map { $0.interOption.with(.key) }
+                oldRootKeyframeIndex = v.rootKeyframeIndex
+            case .ids(let v):
+                sheetID = v.sheetID
+                ios = v.ids.map { $0.with(.key) }
+                oldRootKeyframeIndex = v.rootKeyframeIndex
+            default: return
+            }
+            
+            if let sheetView = document.sheetView(at: p),
+               sheetView.id == sheetID {
+                
+                let animationView = sheetView.animationView
+                var isNewUndoGroup = false
+                if oldRootKeyframeIndex != animationView.rootKeyframeIndex {
+                    let beat = animationView.model.localBeat
+                    let count = ((animationView.rootBeat - beat) / animationView.model.localBeatDuration).rounded(.towardZero)
+                    
+                    let oneT = Rational(1, animationView.frameRate)
+                    
+                    let ki0 = animationView.model.index(atRoot: oldRootKeyframeIndex)
+                    let ki1 = animationView.model.index(atRoot: animationView.rootKeyframeIndex)
+                    let nki0 = min(ki0, ki1), nki1 = max(ki0, ki1)
+                    let ranges = (oldRootKeyframeIndex < animationView.rootKeyframeIndex ? ki0 < ki1 : ki1 < ki0) ? [nki0 ..< nki1] : [0 ..< nki0, nki1 ..< animationView.model.keyframes.count]
+                    
+                    var nj = 0
+                    for range in ranges {
+                        for j in range {
+                            let k = animationView.model.keyframes[j + nj]
+                            let tl = k.beatDuration
+                            if tl >= oneT {
+                                if !isNewUndoGroup {
+                                    sheetView.newUndoGroup()
+                                    isNewUndoGroup = true
+                                }
+                                
+                                sheetView.set(beatDuration: oneT, at: j + nj)
+                                let count = Int(tl / oneT) - 1
+                                sheetView.insert((0 ..< count).map { k in
+                                    IndexValue(value: Keyframe(beatDuration: oneT),
+                                               index: k + j + nj + 1)
+                                })
+                                nj += count
+                            }
+                        }
+                    }
+                    sheetView.rootBeat = animationView.model.localBeatDuration * count + beat
+                    document.updateEditorNode()
+                    document.updateSelects()
+                }
+                
+                let lis: [Int]
+                if document.isSelectNoneCursor(at: p), !document.isSelectedText {
+                    lis = sheetView.lineIndexes(from: document.selections)
+                } else {
+                    if let li = sheetView.lineTuple(at: sheetView.convertFromWorld(p), scale: 1 / document.worldToScreenScale)?.lineIndex {
+                        lis = [li]
+                    } else {
+                        lis = []
+                    }
+                }
+                
+                let maxCount = min(ios.count, lis.count)
+                guard maxCount > 0 else { return }
+                let idSet = Set(ios.map { $0.id })
+                let lineIDSet = Set(animationView.currentKeyframe.picture.lines.map { $0.id })
+                let idivs: [IndexValue<InterOption>] = (0 ..< maxCount).compactMap {
+                    let line = animationView.currentKeyframe.picture.lines[lis[$0]]
+                    var interOption: InterOption
+                    if idSet.contains(line.interOption.id) {
+                        interOption = line.interOption
+                    } else {
+                        if lineIDSet.contains(ios[$0].id) {
+                            return nil
+                        }
+                        interOption = ios[$0]
+                    }
+                    if interOption.interType == .interpolated {
+                        interOption.interType = .key
+                    }
+                    return IndexValue(value: interOption, index: lis[$0])
+                }
+                
+                var noNodes = [Node]()
+                let nidivs = idivs.filter { idiv in
+                    let line = animationView.currentKeyframe.picture.lines[idiv.index]
+                    let idLines = animationView.currentKeyframe.picture.lines.filter { $0.id == idiv.value.id }
+                    if ((oldRootKeyframeIndex == animationView.model.rootIndex
+                        || !animationView.isInterpolated(atLineIndex: idiv.index))
+                        && idLines.isEmpty)
+                        || idLines.count == 1 && idLines[0] == line {
+                        return true
+                    } else if idLines.isEmpty
+                                && animationView.isInterpolated(atLineIndex: idiv.index) {
+                        let lw = Line.defaultLineWidth
+                        let scale = 1 / document.worldToScreenScale
+                        let blw = max(lw * 1.5, lw * 2.5 * scale, 1 * scale)
+                        let nLine = sheetView.convertToWorld(line)
+                        noNodes.append(Node(path: Path(nLine),
+                                       lineWidth: blw,
+                                       lineType: .color(.warning)))
+                        return true
+                    } else {
+                        let lw = Line.defaultLineWidth
+                        let scale = 1 / document.worldToScreenScale
+                        let blw = max(lw * 1.5, lw * 2.5 * scale, 1 * scale)
+                        let nLine = sheetView.convertToWorld(line)
+                        noNodes.append(Node(path: Path(nLine),
+                                       lineWidth: blw,
+                                       lineType: .color(.removing)))
+                        for line in idLines {
+                            let nLine = sheetView.convertToWorld(line)
+                            noNodes.append(Node(path: Path(nLine),
+                                           lineWidth: blw,
+                                           lineType: .color(.removing)))
+                        }
+                        return false
+                    }
+                }
+                
+                if !nidivs.isEmpty {
+                    if !isNewUndoGroup {
+                        sheetView.newUndoGroup()
+                        isNewUndoGroup = true
+                    }
+                    sheetView.set([IndexValue(value: idivs, index: animationView.model.index)])
+                    
+                    let nids = idivs.map { $0.value.id }
+                    sheetView.interpolation(nids.enumerated().map { (i, v) in (v, [v]) },
+                                            rootKeyframeIndex: oldRootKeyframeIndex,
+                                            isNewUndoGroup: false)
+                    
+                    let scale = 1 / document.worldToScreenScale
+                    let iNodes = animationView.interpolationNodes(from: nids, scale: scale)
+                    linesNode.children = iNodes + noNodes
+                    
+                    sheetView.setRootKeyframeIndex(rootKeyframeIndex: animationView.rootKeyframeIndex)
+                    
+                    animationView.updateTimeline()
+                } else {
+                    linesNode.children = noNodes
+                }
+                
+                document.rootNode.append(child: linesNode)
+            }
+        case .changed:
+            break
+        case .ended:
+            linesNode.removeFromParent()
+            
+            document.cursor = Document.defaultCursor
+        }
+    }
+}
+extension SheetView {
+    func interpolation(_ ids: [(mainID: UUID, replaceIDs: [UUID])],
+                       rootKeyframeIndex: Int,
+                       isNewUndoGroup: Bool) {
+        var appLIVs = [Int: [Line]]()
+        var repLIVs = [Int: [IndexValue<Line>]]()
+        for (id, repIDs) in ids {
+            let repIDSet = Set(repIDs)
+            
+            var time = Rational(0)
+            let kts: [(keyframe: Keyframe, time: Rational)]
+                = model.animation.keyframes.map {
+                    let t = time
+                    time += $0.beatDuration
+                    return ($0, t)
+            }
+            let duration = time
+            
+            let rki = self.rootKeyframeIndex
+            let lki = model.animation.index
+            var keyAndIs = [(i: Int, key: Interpolation<Line>.Key)]()
+            var keyIDic = [Int: Int]()
+            for (i, kt) in kts.enumerated() {
+                var nLine: Line?
+                for line in kt.keyframe.picture.lines {
+                    if line.id == id
+                        && line.interType != .interpolated {
+                        nLine = line
+                        break
+                    }
+                }
+                if let nLine = nLine {
+                    let key = Interpolation.Key(value: nLine,
+                                                time: Double(kt.time),
+                                                type: .spline)
+                    keyAndIs.append((i, key))
+                    keyIDic[i] = keyAndIs.count - 1
+                }
+            }
+            
+            guard keyAndIs.count > 1 else {
+                if var l = keyAndIs.first?.key.value {
+                    l.interType = .interpolated
+                    for (i, kt) in kts.enumerated() {
+                        guard i != lki else { continue }
+                        var isRep = false
+                        for (li, line) in kt.keyframe.picture.lines.enumerated() {
+                            if line.id == id {
+                                if line != l {
+                                    let iv = IndexValue(value: l,
+                                                        index: li)
+                                    if repLIVs[i] == nil {
+                                        repLIVs[i] = [iv]
+                                    } else {
+                                        repLIVs[i]?.append(iv)
+                                    }
+                                }
+                                isRep = true
+                                break
+                            }
+                        }
+                        if !isRep {
+                            if appLIVs[i] == nil {
+                                appLIVs[i] = [l]
+                            } else {
+                                appLIVs[i]?.append(l)
+                            }
+                        }
+                    }
+                }
+                continue
+            }
+            
+            var fki = 0
+            for (i, k) in keyAndIs.enumerated().reversed() {
+                if lki >= k.i {
+                    fki = i
+                    break
+                }
+            }
+            
+            let loopI: Int, preFKI: Int
+            var firstI: Int
+            if rootKeyframeIndex > rki {
+                preFKI = fki + 1 < keyAndIs.count ? fki + 1 : 0
+                loopI = keyAndIs[preFKI].i
+                firstI = keyAndIs[fki].i
+            } else if rootKeyframeIndex < rki {
+                loopI = keyAndIs[fki].i
+                preFKI = fki - 1 >= 0 ? fki - 1 : keyAndIs.count - 1
+                firstI = keyAndIs[preFKI].i
+            } else {
+                preFKI = fki
+                loopI = keyAndIs[fki].i
+                firstI = keyAndIs[preFKI].i
+            }
+            var j = firstI - 1 >= 0 ? firstI - 1 : kts.count - 1
+            while j != loopI {
+                guard let line =  kts[j].keyframe.picture.lines.first(where: { $0.id == id }) else {
+                    
+                    break
+                }
+                if line.interType != .interpolated {
+                    firstI = j
+                }
+                j = j - 1 >= 0 ? j - 1 : kts.count - 1
+            }
+            
+            var di = 0
+            let ranges: [Range<Int>]
+            func moveToFirst(count: Int) {
+                di += 1
+                if keyAndIs.count >= count {
+                    var k = keyAndIs[keyAndIs.count - count]
+                    k.key.time -= Double(duration)
+                    keyAndIs.insert(k, at: 0)
+                }
+            }
+            func moveToLast(count: Int) {
+                if keyAndIs.count >= count {
+                    var k = keyAndIs[count - 1]
+                    k.key.time += Double(duration)
+                    keyAndIs.append(k)
+                }
+            }
+            if j == loopI {
+                moveToFirst(count: 1)
+                moveToFirst(count: 2)
+                moveToLast(count: 3)
+                moveToLast(count: 4)
+                ranges = [0 ..< kts.count]
+            } else {
+                var lastI = loopI
+                var j = loopI + 1 < kts.count ? loopI + 1 : 0
+                while j != loopI {
+                    guard let line =  kts[j].keyframe.picture.lines.first(where: { $0.id == id }) else {
+                        
+                        break
+                    }
+                    if line.interType != .interpolated {
+                        lastI = j
+                    }
+                    j = j + 1 < kts.count ? j + 1 : 0
+                }
+                let firstKI = keyIDic[firstI]!, lastKI = keyIDic[lastI]!
+                if lastI < firstI {
+                    var c = 1
+                    moveToFirst(count: c)
+                    if keyAndIs.count - firstKI > 1 {
+                        c += 1
+                        moveToFirst(count: c)
+                    }
+                    c += 1
+                    moveToLast(count: c)
+                    if lastKI >= 1 {
+                        c += 1
+                        moveToLast(count: c)
+                    }
+                    ranges = [0 ..< (lastI + 1),
+                              firstI ..< kts.count]
+                } else {
+                    ranges = [firstI ..< (lastI + 1)]
+                }
+                for (ki, v) in keyAndIs.enumerated() {
+                    if v.i == lastI {
+                        keyAndIs[ki].key.type = .step
+                    }
+                }
+            }
+            
+            for (ki, v) in keyAndIs.enumerated() {
+                let nextKI = ki + 1 >= keyAndIs.count ? 0 : ki + 1
+                let dki = keyAndIs[nextKI].i - v.i
+                if dki > 0 ?
+                    dki <= 1 :
+                    kts.count - v.i + keyAndIs[nextKI].i <= 1 {
+                    keyAndIs[ki].key.type = .step
+                }
+            }
+            
+            var line = keyAndIs[.last].key.value
+            for (i, key) in keyAndIs.enumerated() {
+                let nLine = key.key.value
+                let nnLine = nLine.noCrossLine(line)
+                keyAndIs[i].key.value = nnLine
+                line = nnLine
+            }
+            
+            let interpolation = Interpolation(keys: keyAndIs.map { $0.key },
+                                              duration: Double(duration))
+            for range in ranges {
+                for i in range {
+                    let kt = kts[i]
+                    
+                    if let oki = keyIDic[i] {
+                        let ki = oki + di
+                        if let li = kt.keyframe.picture.lines
+                            .firstIndex(where: { $0.id == id }) {
+                            let oLine = kt.keyframe.picture.lines[li]
+                            var kLine = keyAndIs[ki].key.value
+                            kLine.id = id
+                            kLine.interType = .key
+                            if oLine != kLine {
+                                let iv = IndexValue(value: kLine,
+                                                    index: li)
+                                if repLIVs[i] == nil {
+                                    repLIVs[i] = [iv]
+                                } else {
+                                    repLIVs[i]?.append(iv)
+                                }
+                            }
+                        }
+                        continue
+                    }
+                    
+                    if var line = interpolation
+                        .monoValue(withTime: Double(kt.time)) {
+                        
+                        line.id = id
+                        line.interType = .interpolated
+                        
+                        if let li = kt.keyframe.picture.lines
+                            .firstIndex(where: { repIDSet.contains($0.id) }) {
+                            if kt.keyframe.picture.lines[li] != line {
+                                let iv = IndexValue(value: line,
+                                                    index: li)
+                                if repLIVs[i] == nil {
+                                    repLIVs[i] = [iv]
+                                } else {
+                                    repLIVs[i]?.append(iv)
+                                }
+                            }
+                        } else {
+                            if appLIVs[i] == nil {
+                                appLIVs[i] = [line]
+                            } else {
+                                appLIVs[i]?.append(line)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let appendValues = appLIVs.sorted(by: { $0.key < $1.key }).map {
+            IndexValue(value: $0.value, index: $0.key)
+        }
+        let repValues = repLIVs.sorted(by: { $0.key < $1.key }).map {
+            IndexValue(value: $0.value.sorted(by: { $0.index < $1.index }),
+                       index: $0.key)
+        }
+        if !appendValues.isEmpty || !repValues.isEmpty {
+            if isNewUndoGroup {
+                newUndoGroup()
+            }
+            if !repValues.isEmpty {
+                replaceKeyLines(repValues)
+            }
+            if !appendValues.isEmpty {
+                appendKeyLines(appendValues)
+            }
+        }
+    }
+}
+
+final class CrossEraser: InputKeyEditor {
+    let document: Document
+    let isEditingSheet: Bool
+    
+    init(_ document: Document) {
+        self.document = document
+        isEditingSheet = document.isEditingSheet
+    }
+    
+    private var linesNode = Node()
+    
+    func send(_ event: InputKeyEvent) {
+        guard isEditingSheet else {
+            document.stop(with: event)
+            return
+        }
+        if document.isPlaying(with: event) {
+            document.stopPlaying(with: event)
+        }
+        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+            ?? event.screenPoint
+        let p = document.convertScreenToWorld(sp)
+        switch event.phase {
+        case .began:
+            document.cursor = .arrow
+            
+            let (_, sheetView, _, _) = document.sheetViewAndFrame(at: p)
+            if let sheetView = sheetView {
+                let inP = sheetView.convertFromWorld(p)
+                let lis: [Int], isSelected: Bool
+                if document.isSelectNoneCursor(at: p), !document.isSelectedText {
+                    lis = sheetView.lineIndexes(from: document.selections)
+                    isSelected = true
+                } else {
+                    if let li = sheetView.lineTuple(at: inP, scale: 1 / document.worldToScreenScale)?.lineIndex {
+                        lis = [li]
+                    } else {
+                        lis = []
+                    }
+                    isSelected = false
+                }
+                let d = 2 / document.worldToScreenScale
+                let ids = lis.map { sheetView.model.picture.lines[$0].id }
+                if ids.count == 1 && !isSelected {
+                    func splitLineIndexValues(with lineView0: SheetLineView, index i0: Int,
+                                              lineViews: [SheetLineView]) -> [(iv: LineIndexValue, index: Int)] {
+                        var iivs = [(iv: LineIndexValue, index: Int)]()
+                        let line0 = lineView0.model
+                        iivs += line0.selfIndexValues(extensionLength: Line.defaultLineWidth).compactMap {
+                            if line0.length(with: LineRange(startIndexValue: line0.firstIndexValue,
+                                                            endIndexValue: $0)) >= d
+                                && line0.length(with: LineRange(startIndexValue: $0,
+                                                                endIndexValue:line0.lastIndexValue)) >= d {
+                                return ($0, i0)
+                            } else {
+                                return nil
+                            }
+                        }
+                        guard let b0 = lineView0.node.bounds else { return [] }
+                        for (i1, lineView1) in lineViews.enumerated() {
+                            guard i1 != i0 else { continue }
+                            guard let b1 = lineView1.node.bounds, b0.intersects(b1) else { continue }
+                            let line1 = lineView1.model
+                            let line1e = line1.extensionWith(length: Line.defaultLineWidth)
+                            let ivs = line0.indexValues(with: line1e)
+                            iivs += ivs.compactMap {
+                                if line0.length(with: LineRange(startIndexValue: line0.firstIndexValue,
+                                                                endIndexValue: $0.l0)) >= d
+                                    && line0.length(with: LineRange(startIndexValue: $0.l0,
+                                                                    endIndexValue:line0.lastIndexValue)) >= d {
+                                    return ($0.l0, i1)
+                                } else {
+                                    return nil
+                                }
+                            }
+                        }
+                        guard !iivs.isEmpty else { return [] }
+                        iivs.sort(by: { $0.iv < $1.iv })
+                        return iivs
+                    }
+                    
+                    let id = ids[0], li = lis[0]
+                    let lines = sheetView.model.picture.lines
+                    let line = lines[li]
+                    let iivs = splitLineIndexValues(with: sheetView.linesView.elementViews[li], index: li,
+                                                    lineViews: sheetView.linesView.elementViews)
+                    let iv = line.nearestIndexValue(at: inP)
+                    
+                    enum RangeType {
+                        case none, first, mid, last
+                    }
+                    var rangeType = RangeType.none
+                    var splitLineIDs = [UUID]()
+                    for (i, iiv) in iivs.enumerated() {
+                        if iv < iiv.iv {
+                            if i == 0 {
+                                rangeType = .first
+                                let l0 = lines[iiv.index]
+                                splitLineIDs = [l0.id]
+                                break
+                            } else {
+                                rangeType = .mid
+                                let preIIV = iivs[i - 1]
+                                let l0 = lines[preIIV.index]
+                                let l1 = lines[iiv.index]
+                                splitLineIDs = [l0.id, l1.id]
+                                break
+                            }
+                        }
+                    }
+                    if splitLineIDs.isEmpty, let iiv = iivs.last {
+                        rangeType = .last
+                        let l0 = lines[iiv.index]
+                        splitLineIDs = [l0.id]
+                    }
+                    
+                    let newLineIDs = splitLineIDs.enumerated().map {
+                        $0.offset == 0 ? id : UUID()
+                    }
+                    var values = [IndexValue<[IndexValue<Line>]>]()
+                    var appendValues = [IndexValue<[Line]>]()
+                    var removeValues = [IndexValue<[Int]>]()
+                    var nodes = [Node]()
+                    func append(at ki: Int) -> Bool {
+                        let keyframe = keyframes[ki]
+                        guard let mli = keyframe.picture.lines.firstIndex(where: { $0.id == id }) else { return false }
+                        let mLine = keyframe.picture.lines[mli]
+                        let keyframeView = sheetView.animationView.elementViews[ki]
+                        let nsivs = splitLineIndexValues(with: keyframeView.linesView.elementViews[mli], index: mli,
+                                                         lineViews: keyframeView.linesView.elementViews)
+                        let nLines: [Line]
+                        switch rangeType {
+                        case .none:
+                            guard nsivs.isEmpty else { return false }
+                            
+                            removeValues.append(IndexValue(value: [mli], index: ki))
+                            nLines = []
+                        case .first:
+                            guard !nsivs.isEmpty && splitLineIDs[0] == keyframe.picture.lines[nsivs[0].index].id else { return false }
+                            
+                            let lr = LineRange(startIndexValue: nsivs[0].iv,
+                                               endIndexValue: mLine.lastIndexValue)
+                            var nLine = mLine.splited(with: lr)
+                            nLine.id = newLineIDs[0]
+                            nLine.interType = mLine.interType
+                            let value = [IndexValue(value: nLine, index: mli)]
+                            values.append(IndexValue(value: value, index: ki))
+                            nLines = [nLine]
+                        case .mid:
+                            var ansiv0, ansiv1: (iv: LineIndexValue, index: Int)?
+                            for (i, nsiv0) in nsivs.enumerated() {
+                                if splitLineIDs[0] == keyframe.picture.lines[nsiv0.index].id {
+                                    ansiv0 = nsiv0
+                                    if i + 1 < nsivs.count {
+                                        let nsiv1 = nsivs[i + 1]
+                                        if splitLineIDs[1] == keyframe.picture.lines[nsiv1.index].id {
+                                            ansiv1 = nsiv1
+                                        }
+                                    }
+                                    break
+                                }
+                            }
+                            guard let nnsiv0 = ansiv0, let nnsiv1 = ansiv1 else { return false }
+                            
+                            let lr0 = LineRange(startIndexValue: mLine.firstIndexValue,
+                                                endIndexValue: nnsiv0.iv)
+                            let lr1 = LineRange(startIndexValue: nnsiv1.iv,
+                                                endIndexValue: mLine.lastIndexValue)
+                            var nLine0 = mLine.splited(with: lr0)
+                            var nLine1 = mLine.splited(with: lr1)
+                            nLine0.id = newLineIDs[0]
+                            nLine0.interType = mLine.interType
+                            nLine1.id = newLineIDs[1]
+                            nLine1.interType = mLine.interType
+                            removeValues.append(IndexValue(value: [mli], index: ki))
+                            appendValues.append(IndexValue(value: [nLine0, nLine1], index: ki))
+                            nLines = [nLine0, nLine1]
+                        case .last:
+                            guard !nsivs.isEmpty && splitLineIDs[0] == keyframe.picture.lines[nsivs.last!.index].id else { return false }
+                            
+                            let lr = LineRange(startIndexValue: mLine.firstIndexValue,
+                                               endIndexValue: nsivs.last!.iv)
+                            var nLine = mLine.splited(with: lr)
+                            nLine.id = newLineIDs[0]
+                            nLine.interType = mLine.interType
+                            let value = IndexValue(value: nLine, index: mli)
+                            values.append(IndexValue(value: [value], index: ki))
+                            nLines = [nLine]
+                        }
+                        
+                        let line = sheetView.convertToWorld(keyframe.picture.lines[mli])
+                        nodes.append(Node(path: Path(line),
+                                          lineWidth: 1,
+                                          lineType: .color(.removing)))
+                        
+                        for nLine in nLines {
+                            let nnLine = sheetView.convertToWorld(nLine)
+                            nodes.append(Node(path: Path(nnLine),
+                                              lineWidth: 1,
+                                              lineType: .color(.selected)))
+                        }
+                        
+                        return true
+                    }
+                    
+                    let ki = sheetView.model.animation.index
+                    let keyframes = sheetView.model.animation.keyframes
+                    _ = append(at: ki)
+                    var nki = ki + 1 < keyframes.count ? ki + 1 : 0
+                    while nki != ki {
+                        if !append(at: nki) { break }
+                        nki = nki + 1 < keyframes.count ? nki + 1 : 0
+                    }
+                    if nki != ki {
+                        let oki = nki
+                        nki = ki - 1 >= 0 ? ki - 1 : keyframes.count - 1
+                        while nki != ki && nki != oki {
+                            if !append(at: nki) { break }
+                            nki = nki - 1 >= 0 ? nki - 1 : keyframes.count - 1
+                        }
+                    }
+                    
+                    if !values.isEmpty || !removeValues.isEmpty || !appendValues.isEmpty {
+                        sheetView.newUndoGroup()
+                        if !values.isEmpty {
+                            values.sort(by: { $0.index < $1.index })
+                            sheetView.replaceKeyLines(values)
+                        }
+                        if !removeValues.isEmpty {
+                            removeValues.sort(by: { $0.index < $1.index })
+                            sheetView.removeKeyLines(removeValues)
+                        }
+                        if !appendValues.isEmpty {
+                            appendValues.sort(by: { $0.index < $1.index })
+                            sheetView.appendKeyLines(appendValues)
+                        }
+                    }
+                    
+                    linesNode.children = nodes
+                    document.rootNode.append(child: linesNode)
+                    
+                    document.updateEditorNode()
+                    document.updateSelects()
+                } else if ids.count >= 1 {
+                    let keyframes = sheetView.model.animation.keyframes
+                    var nodes = [Node]()
+                    var livs = [Int: [Int]]()
+                    for id in ids {
+                        var ranges = [Range<Int>](), fi: Int?
+                        for (i, keyframe) in keyframes.enumerated() {
+                            if keyframe.picture.lines
+                                .contains(where: { $0.id == id }) {
+                                if fi == nil {
+                                    fi = i
+                                }
+                            } else if let nfi = fi {
+                                ranges.append(nfi ..< i)
+                                fi = nil
+                            }
+                        }
+                        if let fi = fi {
+                            ranges.append(fi ..< keyframes.count)
+                        }
+                        
+                        let ki = sheetView.model.animation.index
+                        for range in ranges {
+                            guard range.contains(ki) else { continue }
+                            for i in range {
+                                let keyframe = keyframes[i]
+                                let lis = keyframe.picture.lines.enumerated()
+                                    .compactMap { $0.element.id == id ? $0.offset : nil }
+                                if !lis.isEmpty {
+                                    for i in lis {
+                                        let line = sheetView
+                                            .convertToWorld(keyframe.picture.lines[i])
+                                        nodes.append(Node(path: Path(line),
+                                                          lineWidth: 1,
+                                                          lineType: .color(.removing)))
+                                    }
+                                    if livs[i] == nil {
+                                        livs[i] = lis
+                                    } else {
+                                        livs[i]? += lis
+                                    }
+                                }
+                            }
+                            break
+                        }
+                    }
+                    
+                    for key in livs.keys {
+                        livs[key]?.sort()
+                    }
+                    let values = livs.sorted(by: { $0.key < $1.key }).map {
+                        IndexValue(value: $0.value, index: $0.key)
+                    }
+                    
+                    if !values.isEmpty {
+                        sheetView.newUndoGroup()
+                        sheetView.removeKeyLines(values)
+                    }
+                    
+                    linesNode.children = nodes
+                    document.rootNode.append(child: linesNode)
+                    
+                    document.updateEditorNode()
+                    document.updateSelects()
+                }
+            }
+        case .changed:
+            break
+        case .ended:
+            linesNode.removeFromParent()
+            
+            document.cursor = Document.defaultCursor
+        }
+    }
+}

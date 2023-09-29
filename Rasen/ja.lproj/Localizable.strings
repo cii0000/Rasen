@@ -1,0 +1,415 @@
+"Shikishi" = "シキシ";
+
+"Click" = "クリック";
+"SubClick" = "副クリック";
+"KeyInput" = "キー入力";
+"Tap" = "タップ";
+"Indicate" = "指し示す";
+"Drag" = "ドラッグ";
+"SubDrag" = "副ドラッグ";
+"Scroll" = "スクロール";
+"Pinch" = "ピンチ";
+"Rotate" = "回転";
+"LookUpOperate" = "調べる操作";
+"Zoom" = "ズーム";
+"Scroll" = "スクロール";
+
+"V Pinch" = "V ピンチ";
+"Resize Paste" = "リサイズペースト";
+
+"Draw Line" = "線を引く";
+"Draw Straight Line" = "直線を引く";
+
+"Change to Draft" = "下書きに変更";
+"Cut Draft" = "下書きをカット";
+
+"Make Faces" = "面を作成";
+"Cut Faces" = "面をカット";
+"Change Lightness" = "輝度を変更";
+"Change Tint" = "色合いを変更";
+
+"Input Character" = "文字を入力";
+"New Wrap" = "新規折り返し";
+"Delete Wrap" = "折り返しを削除";
+"Look Up" = "調べる";
+"Change to Superscript" = "上付き文字に変更";
+"Change to Subscript" = "下付き文字に変更";
+"Change to Vertical Text" = "縦書きに変更";
+"Change to Horizontal Text" = "横書きに変更";
+
+"Find" = "検索";
+"Lasso Cut" = "囲みカット";
+"Select by Range" = "範囲選択";
+"Unselect" = "選択解除";
+"Cut" = "カット";
+"Copy" = "コピー";
+"Paste" = "ペースト";
+
+"Undo" = "取り消す";
+"Redo" = "やり直す";
+"Select Version" = "バージョンを選択";
+
+"Run" = "実行";
+"Open Menu" = "メニューを開く";
+
+"Slide" = "スライド";
+"Select Time" = "時間を選択";
+"Play" = "再生";
+
+"Insert Keyframe" = "キーフレームを追加";
+"Cut Keyframe" = "キーフレームをカット";
+
+"Interpolate" = "補間";
+"Cross Erase" = "交差消去";
+
+"Add Score" = "楽譜を追加";
+
+"Score" = "楽譜";
+"Music Scale" = "音階";
+
+"Making Faces" = "面を作成中";
+
+"Line" = "線";
+"Length" = "長さ";
+"Text" = "テキスト";
+"Border" = "ボーダー";
+"Face" = "面";
+"Area" = "面積";
+"Sheet" = "シート";
+"Root" = "全体";
+"File Size" = "ファイルサイズ";
+
+"Major" = "メジャー";
+"Minor" = "マイナー";
+"Hexa Major" = "ヘキサメジャー";
+"Hexa Minor" = "ヘキサマイナー";
+"Penta Major" = "ペンタメジャー";
+"Penta Minor" = "ペンタマイナー";
+"Dorian" = "ドリアン";
+"Octatonic" = "八音音階";
+"Whole Tone" = "全音階";
+"Chromatic" = "半音階";
+"Other" = "その他";
+
+"Max Prime Factor" = "最大素因数";
+
+"Wave" = "波";
+"Voice" = "声";
+
+"Frequency" = "周波数";
+
+"Exclamation mark" = "びっくり\n　感嘆符。";
+"Question mark" = "はてな\n　疑問符。";
+
+"Update Date" = "更新日";
+"Created Date" = "作成日";
+
+"Sound" = "サウンド";
+"Loudness" = "ラウドネス";
+"Sample Peak" = "サンプルピーク";
+
+"Export as Image..." = "画像として書き出す...";
+"Export as PDF..." = "PDFとして書き出す...";
+"Export as GIF..." = "GIFとして書き出す...";
+"Export as Movie..." = "動画として書き出す...";
+"Export as 4K Movie..." = "4K動画として書き出す...";
+"Export as High Quality Movie..." = "高品質動画として書き出す...";
+"Export as Sound..." = "サウンドとして書き出す...";
+"Export as Lyrics..." = "歌詞として書き出す...";
+"Export as CC Movie..." = "CC動画として書き出す...";
+"Export as Caption..." = "キャプションとして書き出す...";
+"Export as Document..." = "書類として書き出す...";
+"Export as Document with History..." = "履歴付き書類として書き出す...";
+"Import Document..." = "書類を読み込む...";
+"Clear History..." = "履歴を消去...";
+"Show About Run" = "実行について表示";
+
+"Do you want to replace the \"%2$@\" written on the %1$d sheets with the \"%3$@\"?" = "%1$d枚のシートに書き込まれた「%2$@」を「%3$@」に置換えますか？";
+"This operation can be undone for each sheet, but not for all sheets at once." = "この操作はそれぞれのシートでは取り消せますが、一括では取り消せません。";
+"Replacing sheets" = "シートを置き換え中";
+
+"Import" = "読み込む";
+"Export As" = "書き出し名";
+"Save" = "保存";
+"Format" = "フォーマット";
+"PNGs" = "連番PNG";
+"Document" = "書類";
+"%1$@ Document" = "%1$@書類";
+"%1$@ Document with History" = "%1$@履歴付き書類";
+"File Size" = "ファイルサイズ";
+"Calculating Size..." = "サイズを計算中...";
+"Exporting Images" = "画像を書き出し中";
+"Exporting PDF" = "PDFを書き出し中";
+"Exporting Movie" = "動画を書き出し中";
+"Exporting Sound" = "サウンドを書き出し中";
+"Exporting Lyrics" = "歌詞を書き出し中";
+"Exporting CC Movie" = "CC動画を書き出し中";
+"Exporting Caption" = "キャプションを書き出し中";
+"Exporting Document" = "書類を書き出し中";
+"Exporting Document with History" = "履歴付き書類を書き出し中";
+
+"Enable the run button" = "実行ボタンを有効にする";
+"Disable the run button" = "実行ボタンを有効にしない";
+
+"Do you want to import %1$d sheets?" = "%1$d枚のシートを読み込みますか？";
+"Do you want to import $1$d sheets and replace the %2$d existing sheets?" = "%1$d枚のシートを読み込み、%2$d枚の既存のシートを置き換えますか？";
+"Do you want to import a total of %2$d sheets from %1$d documents?" = "%1$d個の書類から、合計%2$d枚のシートを読み込みますか？";
+"Do you want to import a total of $2$d sheets from %1$d documents, replacing %3$d existing sheets?" = "%1$d個の書類から、合計%2$d枚のシートを読み込み、%3$d枚の既存のシートを置き換えますか？";
+"This operation can be undone when in root mode, but the data will remain until the root history is cleared." = "この操作は全体モード時に取り消すことができますが、データは全体履歴を消去するまで残り続けます。";
+
+"Do you want to clear history of this sheet?" = "このシートの履歴を消去しますか？";
+"Do you want to clear %d historys?" = "%d個のシートの履歴を消去しますか？";
+"Do you want to clear root history?" = "全体履歴を消去しますか？";
+"You can’t undo this action. \nHistory is what is used in \"Undo\", \"Redo\" or \"Select Version\", and if you clear it, you will not be able to return to the previous work." = "この操作は取り消せません。\n履歴は「取り消す」や「やり直す」や「バージョンを選択」で使用されるものであり、消去すると過去の作業に戻れなくなります。";
+"You can’t undo this action. \nRoot history is what is used in \"Undo\", \"Redo\" or \"Select Version\" when in root operation, and if you clear it, you will not be able to return to the previous work." = "この操作は取り消せません。\n全体履歴は全体操作時に「取り消す」や「やり直す」や「バージョンを選択」で使用されるものであり、消去すると過去の作業に戻れなくなります。";
+"Clear History" = "履歴を消去";
+"Clearing Historys" = "履歴を消去中";
+"Clear Root History" = "全体履歴を消去";
+"Clearing Root History" = "全体履歴を消去中";
+"Cancel" = "キャンセル";
+
+"Do you want to replace %@?" = "%@を置き換えますか？";
+"Replace %@..." = "%@を置き換える...";
+"Replace %@" = "%@を置き換える";
+"You can’t undo this action. \n%1$@ is all the data written to this %2$@, if you replace %1$@ with new %1$@, all old %1$@ will be moved to the Trash." = "この操作は取り消せません。\n%1$@とはこの%2$@に書き込まれたすべてのデータのことであり、置き換えると古い%1$@はすべてゴミ箱へ移動します。";
+"Replace" = "置き換える";
+"Replacing %@" = "%@を置き換え中";
+"Do you want to reset the %@?" = "%@を初期化しますか？";
+"You can’t undo this action. \n%1$@ is all the data written to this %2$@, if you reset %1$@, all %1$@ will be moved to the Trash." = "この操作は取り消せません。\n%1$@とはこの%2$@に書き込まれたすべてのデータのことであり、初期化すると%1$@はすべてゴミ箱へ移動します。";
+"Reset %@" = "%@を初期化";
+"Resetting %@" = "%@を初期化中";
+"Exporting %@" = "%@を書き出し中";
+
+"There are sheets added in the upper right corner because the positions data is not found." = "位置データが見つからないため、右上に追加したシートがあります。";
+"Failed to load" = "読み込みに失敗しました";
+"Saving" = "保存中";
+
+"About %@" = "%@について";
+"%@ Data" = "%@データ";
+"Clear Root History..." = "全体履歴を消去...";
+"Replace..." = "置き換える...";
+"Export..." = "書き出す...";
+"Reset..." = "初期化...";
+"Services" = "サービス";
+"Hide %@" = "%@を非表示";
+"Hide Others" = "ほかを非表示";
+"Show All" = "すべてを表示";
+"Quit %@" = "%@を終了";
+"File" = "ファイル";
+"Edit" = "編集";
+"Action" = "アクション";
+"Shown Action List" = "アクション一覧を表示";
+"Hidden Action List" = "アクション一覧を非表示";
+"Shown Trackpad Alternative" = "トラックパッド代替を表示";
+"Hidden Trackpad Alternative" = "トラックパッド代替を非表示";
+"Disabled Animation Editing" = "アニメーション編集を無効化";
+"Enabled Animation Editing" = "アニメーション編集を有効化";
+"Window" = "ウインドウ";
+"Close" = "閉じる";
+"Minimize" = "しまう";
+"Help" = "ヘルプ";
+"About Action" = "アクションについて";
+"Acknowledgments" = "謝辞";
+
+
+
+
+
+
+
+"'%1$@' overlaps with multiplication by multiple single character variables" = "「%1$@」は一文字の変数による乗算と重複しています";
+"'%1$@' is unknown literal" = "「%1$@」は不明な記述です";
+"The same function name as '%1$@' exists, but the arguments do not match" = "「%1$@」と同じ関数名は存在しますが、引数が合いません";
+"Function syntax error" = "関数の構文エラー";
+"Conditional function syntax error" = "条件分岐関数の構文エラー";
+"Unterminated function literal ')'" = "関数記述の終端「)」がありません";
+"Unterminated string literal '\"'" = "文字列記述の終端「\"」がありません";
+
+"Calculating" = "計算中";
+"Stack has exceeded the limit %d" = "スタックが上限%dを超えました";
+"No free memory" = "空きメモリがありません";
+"Not support more than %1$@ in total" = "合計 %1$@ 以上はサポートしていません";
+"'%1$@' is out of bounds" = "「%1$@」が範囲外です";
+"Line is out of bounds" = "線が範囲外です";
+"Text is out of bounds" = "テキストが範囲外です";
+
+"Undefined" = "未定義";
+"-! value" = "-!値";
+"Arguments count should be %1$d, not %2$d" = "引数の個数は%2$dではなく%1$dである必要があります";
+"Arguments count for argument $1 must be %1$d, not %2$d" = "引数$1の引数の個数は%2$dではなく%1$dである必要があります";
+"Array count for argument $1 must be %1$d, not %2$d" = "引数$1の配列の個数は%2$dではなく%1$dである必要があります";
+"'%1$@' is not '%2$@'" = "「%1$@」は「%2$@」ではありません";
+"'%1$d' is out of bounds array range 0 ..< %2$d" = "「%1$d」は配列範囲の0 ..< %2$dを超えています";
+"'%1$d' is out of bounds array range 0 ... %2$d" = "「%1$d」は配列範囲の0 ... %2$dを超えています";
+"'%1$@' is out of bounds dictionary range" = "「%1$@」は辞書範囲を超えています";
+"Argument $0 must be sheet, not '%1$@'" = "引数$0は「%1$@」ではなくシートである必要があります";
+
+"'%1$@' is not positive real" = "「%1$@」は正の実数ではありません";
+"'%1$@' is not complex point" = "「%1$@」は複素座標ではありません";
+"'%1$@' is not 0 or positive integer" = "「%1$@」は0または正の整数ではありません";
+"'%1$@' does not exist" = "「%1$@」が存在しません";
+"Return value is not bool" = "返り値がブールではありません";
+"'%1$@' %2$@ '%3$@' is false" = "「%1$@」 %2$@ 「%3$@」が偽です";
+"'%1$@' >= 0 is false" = "「%1$@」 >= 0 が偽です";
+"Empty key" = "キーが空です";
+"'%1$@' is empty" = "「%1$@」は空です";
+"'%1$@' is not string" = "「%1$@」は文字列ではありません";
+"'%1$@' is not integer" = "「%1$@」は整数ではありません";
+"'%1$@' is not range" = "「%1$@」は範囲ではありません";
+"'%1$@' is invalid range" = "「%1$@」は無効な範囲です";
+"'%1$@' is not horizontal or vertical" = "「%1$@」は横または縦ではありません";
+
+
+"About run" = "実行について";
+"To show all definitions, run the following statement" = "すべての定義を表示するには下記の文を実行します";
+"Literal" = "記述";
+"Bool" = "ブール";
+"String" = "文字列";
+"Function" = "関数";
+"Block function" = "ブロック関数";
+"Conditional function" = "条件分岐関数";
+"Integer number (64bit)" = "整数（64bit）";
+"Real number (64bit)" = "実数（64bit）";
+"Infinity" = "無限大";
+"Key input" = "キー入力";
+"∞: Positive infinity (Key input: ⌥ 5)" = "∞: 正の無限大（キー入力: ⌥ 5）";
+"+∞: Positive infinity" = "+∞: 正の無限大";
+"-∞: Negative infinity" = "-∞: 負の無限大";
+"Array" = "配列";
+"Dictionary" = "辞書";
+"Set" = "集合";
+
+"Empty" = "空";
+"Whole number" = "0を含む自然数";
+"Natural number" = "0を含まない自然数";
+"Integer number" = "整数";
+"Even number" = "偶数";
+"Odd number" = "奇数";
+"Rational number" = "有理数";
+"Real number" = "実数";
+"Imaginary number" = "虚数";
+"Complex number" = "複素数";
+"Matrix" = "行列";
+"All" = "すべて";
+
+"Syntax sugars" = "シンタックスシュガー";
+"Lines bracket" = "行括弧";
+"Omit multiplication sign" = "乗算記号の省略";
+"Separator" = "分離";
+"Union" = "結合";
+"Separator character" = "分離文字";
+"Pow" = "冪乗";
+"Get" = "取得";
+"Split" = "分割";
+"Sheet bond" = "シート結合";
+"Put '+' string beside the frame of the sheet you want to connect." = "繋げたいシートの枠の傍に「＋」文字列を置く。";
+"Show all definitions" = "すべての定義を表示";
+
+
+"Definition name" = "定義名";
+"Precedence" = "優先順位";
+"Associaticity" = "結合法則";
+"Left" = "左";
+"Right" = "右";
+"None" = "なし";
+"Description ($0: zeroth argument, $1: First argument, ...)" = "説明（$0: 第0引数, $1: 第1引数, ...）";
+
+"Constant" = "定数";
+"Basic binary operation" = "基本二項演算";
+"Basic unary operation" = "基本単項演算";
+"Range" = "範囲";
+"Array or set" = "配列や集合";
+"Orientation" = "方向";
+"Sheet" = "シート";
+"Other" = "その他";
+"Custom" = "カスタム";
+
+"Archimedes' constant. Key input: ⌥ p" = "円周率。キー入力: ⌥ p";
+"Euler's number. Key input: ⌥ 3" = "ネイピア数。キー入力: ⌥ 3";
+"Imaginary unit. Key input: ⌥ 1" = "虚数単位。キー入力: ⌥ 1";
+
+"False. Boolean algebra 0." = "偽。ブール代数0。";
+"True. Boolean algebra 1." = "真。ブール代数1。";
+
+"Horizontal." = "横。";
+"Vertical." = "縦。";
+
+"Exponentiation (Principal value). a ** b = abͬ" = "冪乗（主値）。 a ** b = abͬ";
+"Logarithm (Principal value). b */ a = loga᷊b" = "対数（主値）。 b */ a = loga᷊b";
+"Multiply." = "乗算。";
+"Division." = "除算。";
+"Modulo." = "剰余。";
+"Distance function." = "距離函数。";
+"Dot product." = "ドット積。";
+"Cross product." = "クロス積。";
+"Add." = "加算。";
+"Subtract." = "減算。";
+"Equal." = "等号。";
+"Not equal." = "等号否定。";
+"Logical multiply. Short circuit evaluation." = "論理積。短絡評価。";
+"Logical add. Short circuit evaluation." = "論理和。短絡評価。";
+"Binomial coefficients." = "二項係数。";
+
+"Factorial." = "階乗。";
+"Hash function." = "ハッシュ関数。";
+"Convert number to complex coordinates." = "数を複素座標に変換。";
+"Convert number from complex coordinates." = "複素座標を数に変換。";
+"Negation." = "論理否定。";
+"Plus." = "正。";
+"Minus." = "負。";
+"Absolute value function." = "絶対値関数。";
+"Square root (Principal value)." = "平方根（主値）。";
+"Natural logarithm (Principal value)." = "自然対数（主値）。";
+"Sine." = "サイン関数。";
+"Cosine." = "コサイン関数。";
+"Tangent." = "タンジェント関数。";
+"Arcsine (Principal value)." = "逆サイン関数（主値）。";
+"Arccosine (Principal value)." = "逆コサイン関数（主値）。";
+"Arctangent (Principal value)." = "逆タンジェント関数（主値）。";
+"Arctangent2 (Principal value)." = "アークタンジェント2（主値）。";
+"Floor function." = "床関数。";
+"Rounding function." = "丸め関数。";
+"Ceiling function." = "天井関数。";
+"Transpose." = "転置。";
+"Determinant." = "行列式。";
+"Gamma function." = "ガンマ関数。";
+"Riemann zeta function." = "リーマンゼータ関数。";
+
+"Change spacing between elements, e.g. 0 ..< 10 __ 2 = (0 2 4 6 8)" = "要素同士の間隔を変更。例: 0 ..< 10 __ 2 = (0 2 4 6 8)";
+
+"Get count." = "個数を取得。";
+"Get, e.g. (3 4 5).2 = 5" = "取得。例: (3 4 5).2 = 5";
+"Select." = "選択。";
+"Replace, e.g. (3 4 5)/.1 <- 2 = (3 2 5)" = "置き換え。例: (3 4 5)/.1 <- 2 = (3 2 5)";
+"Append, e.g. (3 4)/.1 ++ 5 = (3 5 4), (3 4) ++ 5 = (3 4 5)" = "追加。例: (3 4)/.1 ++ 5 = (3 5 4), (3 4) ++ 5 = (3 4 5)";
+"Remove, e.g. (3 4 5)/.1 -- = (3 5)" = "削除。例: (3 4 5)/.1 -- = (3 5)";
+"Map function, e.g. (3 4 5) map (x | x + 2) = (5 6 7)" = "マップ関数。例: (3 4 5) map (x | x + 2) = (5 6 7)";
+"Filter function, e.g. (3 4 5 6) filter (x | x % 2 != 0) = (3 5)" = "フィルター関数。例: (3 4 5 6) filter (x | x % 2 != 0) = (3 5)";
+"Reduce function, e.g. (3 4 5) reduce 0 (y x | y + x) = 12" = "リデュース関数。例: (3 4 5) reduce 0 (y x | y + x) = 12";
+"Summation, e.g. (3 4 5) ∑ (x | x) = 12, Key input: ⌥ w" = "総和。例: (3 4 5) ∑ (x | x) = 12, キー入力: ⌥ w";
+"Product, e.g. (3 4 5) ∏ (x | x) = 60, Key input: ⇧⌥ p" = "総乗。例: (3 4 5) ∏ (x | x) = 60, キー入力: ⇧⌥ p";
+"Random, e.g. (3 4 5) random = 4" = "ランダム。例: (3 4 5) random = 4";
+
+"Make label." = "ラベルを作成。";
+
+"Make string." = "文字列を作成。";
+"Make error." = "エラーを作成。";
+"Error check." = "エラーチェック。";
+"Error coalescing. Short circuit evaluation, e.g. (0 1).2 ?? 3 = 3" = "エラー結合。短絡評価。例: (0 1).2 ?? 3 = 3";
+
+"Sheets dictionary where key is coordinates. Key of the sheet at the cursor position is the origin (0 0). The keys on the other sheets are relative to the origin."
+=
+"キーが座標のシート辞書。カーソル位置にあるシートのキーは原点(0 0)です。他のシートのキーは原点からの相対座標になります。";
+"Sheet at the cursor position." = "カーソル位置にあるシート。";
+"Sheet size." = "シートサイズ。";
+"Cursor position." = "カーソル位置。";
+"Display position of the execution result." = "実行結果の表示位置。";
+"Show all definitions." = "すべての定義を表示。";
+"Draw points $0 on sheet, e.g. draw ((100 100) (200 200))" = "シートに座標配列$0を描画。例: draw ((100 100) (200 200))";
+"Draw axes on the sheet with $0 as the base scale, $1 as the x axis name, $2 as the y axis name, and the center of the sheet as the origin,\ne.g. drawAxes base: 1 \"X\" \"Y\"" = "ベーススケールを$0、X軸名を$1、Y軸名を$2、シートの中心を原点としてシートに座標軸を描画。\n例: drawAxes base: 1 \"X\" \"Y\"";
+"Plot points $1 on the sheet with $0 as the base scale, center of the sheet as the origin,\ne.g. plot base: 1 ((0 0) (1 1))" = "ベーススケールを$0、シートの中心を原点としてシートに座標配列$1を描画。\n例: plot base: 1 ((0 0) (1 1))";
+"Plot complex points $1 on the sheet with $0 as the base scale, center of the sheet as the origin,\ne.g. plotRI base: 2 ((1 + 2¡) (-1))" = "ベーススケールを$0、シートの中心を原点としてシートに複素座標配列$1を描画。\n例: plotRI base: 2 ((1 + 2¡) (-1))";
+"Flip sheet based on $0, e.g. flip horizontal" = "シートを$0を基準にして反転。例: flip horizontal";
+
+"Send $1 to $0. $+$ send (a b) = a + b" = "$0に$1を送る。 $+$ send (a b) = a + b";
+"Get arguments." = "引数を取得。";

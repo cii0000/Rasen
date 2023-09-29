@@ -1,0 +1,635 @@
+// Copyright 2023 Cii
+//
+// This file is part of Rasen.
+//
+// Rasen is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// Rasen is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
+
+syntax = "proto3";
+
+// $ cd [directory]
+// $ protoc --swift_out=. Protobuf.proto
+
+message PBRational {
+    int64 p = 1;
+    int64 q = 2;
+}
+
+message PBIntRange {
+    int64 lowerBound = 1;
+    int64 upperBound = 2;
+}
+message PBRationalRange {
+    PBRational lowerBound = 1;
+    PBRational upperBound = 2;
+}
+
+message PBPoint {
+    double x = 1;
+    double y = 2;
+}
+message PBIntPoint {
+    int64 x = 1;
+    int64 y = 2;
+}
+message PBSize {
+    double width = 1;
+    double height = 2;
+}
+message PBRect {
+    PBPoint origin = 1;
+    PBSize size = 2;
+}
+
+message PBAttitude {
+    PBPoint position = 1;
+    PBSize scale = 2;
+    double rotation = 3;
+}
+
+enum PBRGBColorSpace {
+    sRGB = 0;
+    sRGBLinear = 4;
+    sRGBHDR = 1;
+    sRGBHDRLinear = 5;
+    p3 = 2;
+    p3Linear = 6;
+    p3HDR = 3;
+    p3HDRLinear = 7;
+}
+message PBLCHA {
+    double l = 1;
+    double c = 2;
+    double h = 3;
+    double a = 4;
+}
+message PBRGBA {
+    float r = 1;
+    float g = 2;
+    float b = 3;
+    float a = 4;
+}
+message PBColor {
+    PBLCHA lcha = 1;
+    PBRGBA rgba = 2;
+    PBRGBColorSpace rgbColorSpace = 3;
+}
+
+message PBUUID {
+    string value = 1;
+    bytes data = 2;
+}
+message PBUUColor {
+    PBColor value = 1;
+    PBUUID id = 2;
+}
+
+enum PBInterType {
+    none = 0;
+    key = 1;
+    interpolated = 2;
+}
+message PBInterOption {
+    PBUUID id = 1;
+    PBInterType interType = 2;
+}
+
+message PBLine {
+    message PBControl {
+        PBPoint point = 1;
+        double weight = 2;
+        double pressure = 3;
+    }
+    repeated PBControl controls = 1;
+    double size = 2;
+    PBUUID id = 4;
+    PBInterType interType = 7;
+    bytes controlsData = 6;
+}
+
+message PBPolygon {
+    repeated PBPoint points = 1;
+    bytes pointsData = 2;
+}
+message PBTopolygon {
+    PBPolygon polygon = 1;
+    repeated PBPolygon holePolygons = 2;
+}
+message PBPlane {
+    PBTopolygon topolygon = 4;
+    PBPolygon polygon = 3;
+    PBUUColor uuColor = 2;
+}
+
+message PBPicture {
+    repeated PBLine lines = 1;
+    repeated PBPlane planes = 2;
+}
+
+enum PBOrientation {
+    horizontal = 0;
+    vertical = 1;
+}
+
+message PBDate {
+    double timestamp = 1;
+}
+
+message PBContent {
+    string name = 5;
+    double volumeAmp = 2;
+    double pan = 3;
+    double reverb = 4;
+}
+
+message PBPit {
+    double t = 1;
+    double pitch = 2;
+    double amp = 3;
+}
+message PBPitbend {
+    repeated PBPit pits = 1;
+}
+
+message PBNote {
+    PBRational pitch = 7;
+    PBPitbend pitbend = 8;
+    PBRationalRange beatRange = 2;
+    double volumeAmp = 3;
+    string lyric = 4;
+    bool isBreath = 5;
+    bool isVibrato = 6;
+}
+
+enum PBMusicScaleType {
+    major = 0;
+    minor = 1;
+    hexaMajor = 2;
+    hexaMinor = 3;
+    pentaMajor = 4;
+    pentaMinor = 5;
+    dorian = 6;
+    wholeTone = 7;
+    chromatic = 8;
+    aNone = 9;
+}
+
+message PBEnvelope {
+    double attack = 1;
+    double decay = 2;
+    double sustain = 3;
+    double release = 4;
+}
+message PBPitchbend {
+    double decay = 1;
+    double pitchLog = 2;
+}
+
+message PBFormant {
+    double sdFq = 1;
+    double sFq = 2;
+    double eFq = 3;
+    double edFq = 4;
+    double amp = 5;
+    double noiseT = 6;
+    double edAmp = 7;
+    double edNoiseT = 8;
+}
+message PBSpectlope {
+    repeated PBFormant formants = 1;
+}
+
+message PBOvertone {
+    double evenScale = 1;
+    double oddScale = 2;
+}
+
+message PBTone {
+    PBEnvelope envelope = 1;
+    PBPitchbend pitchbend = 2;
+    PBOvertone overtone = 3;
+    PBSpectlope spectlope = 4;
+    PBUUID id = 6;
+}
+
+message PBScore {
+    PBTone tone = 1;
+    repeated PBNote notes = 2;
+    double volumeAmp = 8;
+    double pan = 11;
+    double reverb = 12;
+    PBRational octave = 10;
+    PBRationalRange pitchRange = 9;
+}
+
+message PBTimeframe {
+    PBRationalRange beatRange = 1;
+    oneof contentOptional {
+        PBContent content = 2;
+    }
+    oneof scoreOptional {
+        PBScore score = 3;
+    }
+    PBRational tempo = 5;
+    PBRational localStartBeat = 6;
+    bool isShownSpectrogram = 7;
+}
+
+message PBAudio {
+    bytes pcmData = 1;
+}
+
+message PBLocale {
+    string identifier = 1;
+}
+
+message PBText {
+    string string = 1;
+    PBOrientation orientation = 2;
+    double size = 3;
+    double widthCount = 4;
+    PBPoint origin = 5;
+    oneof timeframeOptional {
+        PBTimeframe timeframe = 6;
+    }
+    PBLocale locale = 7;
+}
+
+message PBBorder {
+    double location = 1;
+    PBOrientation orientation = 2;
+}
+
+message PBIntPointStringDic {
+    map<string, PBIntPoint> value = 1;
+}
+message PBStringIntPointDicElement {
+    PBIntPoint key = 1;
+    string value = 2;
+}
+message PBStringIntPointDic {
+    repeated PBStringIntPointDicElement value = 1;
+}
+
+message PBKeyframe {
+    PBPicture picture = 1;
+    PBPicture draftPicture = 2;
+    PBRational beatDuration = 3;
+    PBPreviousNext previousNext = 4;
+}
+
+message PBKeyframeKey {
+    repeated int64 lineIs = 1;
+    repeated int64 planeIs = 2;
+    repeated int64 draftLineIs = 3;
+    repeated int64 draftPlaneIs = 4;
+    PBRational beatDuration = 5;
+    PBPreviousNext previousNext = 6;
+}
+message PBAnimationZipper {
+    repeated PBKeyframeKey keys = 1;
+    repeated PBLine lines = 2;
+    repeated PBPlane planes = 3;
+    repeated PBLine draftLines = 4;
+    repeated PBPlane draftPlanes = 5;
+}
+
+message PBAnimationOption {
+    PBRational startBeat = 1;
+    PBRational tempo = 2;
+    double timelineY = 3;
+    bool enabled = 4;
+}
+message PBAnimation {
+    repeated PBKeyframe keyframes = 1;
+    PBAnimationZipper zipper = 8;
+    PBRational rootBeat = 2;
+    PBRational startBeat = 3;
+    PBRational tempo = 4;
+    bool isPlaying = 5;
+    double timelineY = 6;
+    bool enabled = 7;
+}
+
+message PBSheetOption {
+    PBRational beatDuration = 1;
+}
+
+enum PBPreviousNext {
+    off = 0;
+    previous = 1;
+    next = 2;
+    previousAndNext = 3;
+}
+
+message PBSheet {
+    PBAnimation animation = 6;
+    PBPicture picture = 1;
+    PBPicture draftPicture = 2;
+    repeated PBText texts = 3;
+    repeated PBBorder borders = 4;
+    repeated PBRect rects = 9;
+    PBUUColor backgroundUUColor = 5;
+}
+
+message PBWorld {
+    PBIntPointStringDic sheetPositions = 1;
+}
+
+enum PBRectCorner {
+    minXMinY = 0;
+    minXMaxY = 1;
+    maxXMinY = 2;
+    maxXMaxY = 3;
+}
+message PBCornerRectValue {
+    PBRect rect = 1;
+    PBRectCorner rectCorner = 2;
+}
+message PBCornerRectValueArray {
+    repeated PBCornerRectValue value = 1;
+}
+
+message PBFinding {
+    PBPoint worldPosition = 1;
+    string string = 2;
+}
+
+message PBKeyframeOption {
+    PBRational beatDuration = 1;
+    PBPreviousNext previousNext = 2;
+}
+
+message PBIntIndexValue {
+    int64 value = 1;
+    int64 index = 2;
+}
+message PBLineIndexValue {
+    PBLine value = 1;
+    int64 index = 2;
+}
+message PBInterOptionIndexValue {
+    PBInterOption value = 1;
+    int64 index = 2;
+}
+message PBPlaneIndexValue {
+    PBPlane value = 1;
+    int64 index = 2;
+}
+message PBTextIndexValue {
+    PBText value = 1;
+    int64 index = 2;
+}
+message PBBorderIndexValue {
+    PBBorder value = 1;
+    int64 index = 2;
+}
+message PBKeyframeIndexValue {
+    PBKeyframe value = 1;
+    int64 index = 2;
+}
+message PBKeyframeOptionIndexValue {
+    PBKeyframeOption value = 1;
+    int64 index = 2;
+}
+message PBContentIndexValue {
+    PBContent value = 1;
+    int64 index = 2;
+}
+
+message PBColorValue {
+    PBUUColor uuColor = 1;
+    repeated int64 planeIndexes = 3;
+    PBIntArrayIndexValueArray value = 6;
+    repeated PBColor valueColors = 7;
+    bool isBackground = 5;
+}
+message PBPlaneValue {
+    repeated PBPlane planes = 1;
+    repeated PBIntIndexValue moveIndexValues = 2;
+    int64 index = 3;
+}
+message PBTextValue {
+    string string = 1;
+    PBIntRange replacedRange = 2;
+    oneof originOptional {
+        PBPoint origin = 3;
+    }
+    oneof sizeOptional {
+        double size = 4;
+    }
+    oneof widthCountOptional {
+        double widthCount = 5;
+    }
+}
+message PBTextValueIndexValue {
+    PBTextValue value = 1;
+    int64 index = 2;
+}
+message PBScoreIndexValue {
+    oneof valueOptional {
+        PBScore value = 1;
+    }
+    int64 index = 2;
+}
+message PBSheetValue {
+    repeated PBLine lines = 1;
+    repeated PBPlane planes = 2;
+    repeated PBText texts = 3;
+    PBPoint origin = 4;
+    PBUUID id = 5;
+    int64 rootKeyframeIndex = 6;
+    repeated PBKeyframe keyframes = 7;
+    int64 keyframeBeganIndex = 8;
+}
+message PBInt64Array {
+    repeated int64 value = 1;
+}
+message PBIntArrayIndexValue {
+    PBInt64Array value = 1;
+    int64 index = 2;
+}
+message PBIntArrayIndexValueArray {
+    repeated PBIntArrayIndexValue value = 1;
+}
+message PBLineArray {
+    repeated PBLine value = 1;
+}
+message PBPlaneArray {
+    repeated PBPlane value = 1;
+}
+message PBIntPointArray {
+    repeated PBIntPoint value = 1;
+}
+message PBIntIndexValueArray {
+    repeated PBIntIndexValue value = 1;
+}
+message PBLineIndexValueArray {
+    repeated PBLineIndexValue value = 1;
+}
+message PBLineIndexValueArrayIndexValue {
+    repeated PBLineIndexValue value = 1;
+    int64 index = 2;
+}
+message PBLineIndexValueArrayIndexValueArray {
+    repeated PBLineIndexValueArrayIndexValue value = 1;
+}
+message PBPlaneIndexValueArrayIndexValue {
+    repeated PBPlaneIndexValue value = 1;
+    int64 index = 2;
+}
+message PBPlaneIndexValueArrayIndexValueArray {
+    repeated PBPlaneIndexValueArrayIndexValue value = 1;
+}
+message PBInterOptionIndexValueArray {
+    repeated PBInterOptionIndexValue value = 1;
+}
+message PBInterOptionIndexValueArrayIndexValue {
+    repeated PBInterOptionIndexValue value = 1;
+    int64 index = 2;
+}
+message PBInterOptionIndexValueArrayIndexValueArray {
+    repeated PBInterOptionIndexValueArrayIndexValue value = 1;
+}
+message PBPlaneIndexValueArray {
+    repeated PBPlaneIndexValue value = 1;
+}
+message PBTextIndexValueArray {
+    repeated PBTextIndexValue value = 1;
+}
+message PBBorderIndexValueArray {
+    repeated PBBorderIndexValue value = 1;
+}
+message PBKeyframeIndexValueArray {
+    repeated PBKeyframeIndexValue value = 1;
+}
+message PBKeyframeOptionIndexValueArray {
+    repeated PBKeyframeOptionIndexValue value = 1;
+}
+message PBContentIndexValueArray {
+    repeated PBContentIndexValue value = 1;
+}
+
+message PBSheetUndoItem {
+    oneof value {
+        PBLine appendLine = 1;
+        PBLineArray appendLines = 2;
+        PBPlaneArray appendPlanes = 3;
+        int64 removeLastLines = 4;
+        int64 removeLastPlanes = 5;
+        PBLineIndexValueArray insertLines = 6;
+        PBPlaneIndexValueArray insertPlanes = 7;
+        PBInt64Array removeLines = 8;
+        PBInt64Array removePlanes = 9;
+        PBPlaneValue setPlaneValue = 10;
+        bool changeToDraft = 11;
+        PBPicture setPicture = 12;
+        PBLineIndexValueArray insertDraftLines = 13;
+        PBPlaneIndexValueArray insertDraftPlanes = 14;
+        PBInt64Array removeDraftLines = 15;
+        PBInt64Array removeDraftPlanes = 16;
+        PBPicture setDraftPicture = 17;
+        PBTextIndexValueArray insertTexts = 18;
+        PBInt64Array removeTexts = 19;
+        PBTextValueIndexValue replaceString = 20;
+        PBColorValue changedColors = 21;
+        PBBorderIndexValueArray insertBorders = 22;
+        PBInt64Array removeBorders = 23;
+        int64 setRootKeyframeIndex = 24;
+        PBKeyframeIndexValueArray insertKeyframes = 25;
+        PBInt64Array removeKeyframes = 26;
+        PBKeyframeOptionIndexValueArray setKeyframeOptions = 27;
+        PBLineIndexValueArrayIndexValueArray insertKeyLines = 28;
+        PBLineIndexValueArrayIndexValueArray replaceKeyLines = 29;
+        PBIntArrayIndexValueArray removeKeyLines = 30;
+        PBPlaneIndexValueArrayIndexValueArray insertKeyPlanes = 34;
+        PBPlaneIndexValueArrayIndexValueArray replaceKeyPlanes = 41;
+        PBIntArrayIndexValueArray removeKeyPlanes = 35;
+        PBLineIndexValueArrayIndexValueArray insertDraftKeyLines = 36;
+        PBIntArrayIndexValueArray removeDraftKeyLines = 37;
+        PBPlaneIndexValueArrayIndexValueArray insertDraftKeyPlanes = 38;
+        PBIntArrayIndexValueArray removeDraftKeyPlanes = 39;
+        PBInterOptionIndexValueArrayIndexValueArray setLineIDs = 31;
+        PBScoreIndexValue replaceScore = 33;
+        PBAnimationOption setAnimationOption = 40;
+    }
+}
+message PBWorldUndoItem {
+    oneof value {
+        PBStringIntPointDic insertSheets = 1;
+        PBIntPointArray removeSheets = 2;
+    }
+}
+
+message PBUndoDataValue {
+    bytes undoItemData = 1;
+    bytes redoItemData = 2;
+}
+message PBUndoGroup {
+    repeated PBUndoDataValue values = 1;
+    bool isFirstReverse = 2;
+    PBDate date = 3;
+}
+message PBBranch {
+    repeated PBUndoGroup groups = 1;
+    int64 childrenCount = 2;
+    oneof selectedChildIndexOptional {
+        int64 selectedChildIndex = 3;
+    }
+}
+message PBBranchCoder {
+    repeated PBBranch allBranches = 1;
+}
+message PBHistory {
+    PBBranchCoder branchCoder = 1;
+    int64 currentVersionIndex = 2;
+}
+
+message PBCopiedSheetsValue {
+    PBPoint deltaPoint = 1;
+    PBStringIntPointDic sheetIDs = 2;
+}
+message PBPlanesValue {
+    repeated PBPlane planes = 1;
+}
+message PBNotesValue {
+    repeated PBNote notes = 1;
+}
+message PBInterOptionsValue {
+    repeated PBInterOption ids = 1;
+    PBUUID sheetID = 2;
+    int64 rootKeyframeIndex = 3;
+}
+message PBPastableObject {
+    oneof value {
+        PBCopiedSheetsValue copiedSheetsValue = 1;
+        PBSheetValue sheetValue = 2;
+        PBBorder border = 3;
+        PBText text = 4;
+        string string = 5;
+        PBPicture picture = 6;
+        PBPlanesValue planesValue = 7;
+        PBUUColor uuColor = 8;
+        PBAnimation animation = 9;
+        PBInterOptionsValue ids = 10;
+        PBTimeframe timeframe = 11;
+        PBRationalRange beatRange = 12;
+        double normalizationValue = 13;
+        PBRational normalizationRationalValue = 16;
+        PBNotesValue notesValue = 14;
+        PBTone tone = 15;
+        PBPitchbend pitchbend = 18;
+        PBEnvelope envelope = 19;
+        PBFormant formant = 20;
+    }
+}
