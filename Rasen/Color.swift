@@ -330,6 +330,41 @@ extension Color: Interpolatable {
                      f1.rgbColorSpace)
     }
 }
+extension Color: MonoInterpolatable {
+    static func firstMonospline(_ f1: Color, _ f2: Color, _ f3: Color,
+                                with ms: Monospline) -> Color {
+        let lightness = Double.firstMonospline(f1.lightness,
+                                               f2.lightness, f3.lightness, with: ms)
+        let a = Double.firstMonospline(f1.a, f2.a, f3.a, with: ms)
+        let b = Double.firstMonospline(f1.b, f2.b, f3.b, with: ms)
+        let opacity = Double.firstMonospline(f1.opacity,
+                                         f2.opacity, f3.opacity, with: ms)
+        return Color(lightness: lightness, a: a, b: b, opacity: opacity,
+                     f1.rgbColorSpace)
+    }
+    static func monospline(_ f0: Color, _ f1: Color, _ f2: Color, _ f3: Color,
+                           with ms: Monospline) -> Color {
+        let lightness = Double.monospline(f0.lightness, f1.lightness,
+                                          f2.lightness, f3.lightness, with: ms)
+        let a = Double.monospline(f0.a, f1.a, f2.a, f3.a, with: ms)
+        let b = Double.monospline(f0.b, f1.b, f2.b, f3.b, with: ms)
+        let opacity = Double.monospline(f0.opacity, f1.opacity,
+                                    f2.opacity, f3.opacity, with: ms)
+        return Color(lightness: lightness, a: a, b: b, opacity: opacity,
+                     f1.rgbColorSpace)
+    }
+    static func lastMonospline(_ f0: Color, _ f1: Color, _ f2: Color,
+                           with ms: Monospline) -> Color {
+        let lightness = Double.lastMonospline(f0.lightness, f1.lightness,
+                                          f2.lightness, with: ms)
+        let a = Double.lastMonospline(f0.a, f1.a, f2.a, with: ms)
+        let b = Double.lastMonospline(f0.b, f1.b, f2.b, with: ms)
+        let opacity = Double.lastMonospline(f0.opacity, f1.opacity,
+                                        f2.opacity, with: ms)
+        return Color(lightness: lightness, a: a, b: b, opacity: opacity,
+                     f1.rgbColorSpace)
+    }
+}
 extension Color: Codable {
     enum CodingKeys: String, CodingKey {
         case lcha, rgba, rgbColorSpace = "cs"

@@ -1335,7 +1335,7 @@ final class LineEditor: Editor {
             let tempLineNode = Node(attitude: Attitude(position: centerOrigin),
                                     path: Path(),
                                     lineWidth: document.sheetLineWidth,
-                                    lineType: .color(tempLine.autoColor(from: .content)))
+                                    lineType: .color(tempLine.uuColor.value))
             self.tempLineNode = tempLineNode
             document.rootNode.insert(child: tempLineNode,
                                      at: document.accessoryNodeIndex)
@@ -1364,8 +1364,6 @@ final class LineEditor: Editor {
             break
         case .changed:
             tempLineNode?.path = Path(tempLine)
-            
-            tempLineNode?.lineType = .color(tempLine.autoColor(from: .content))
         case .ended:
             guard let lb = tempLine.bounds else {
                 tempLineNode?.removeFromParent()

@@ -3320,7 +3320,8 @@ final class Document {
                         color: Color, subColor: Color) -> ColorPathValue {
         if let sheetView = sheetView(at: p) {
             let inP = sheetView.convertFromWorld(p)
-            return sheetView.sheetColorOwner(at: inP)
+            return sheetView.sheetColorOwner(at: inP, 
+                                             scale: screenToWorldScale)
                 .colorPathValue(toColor: toColor, color: color, subColor: subColor)
         } else {
             let shp = sheetPosition(at: p)
@@ -3332,7 +3333,8 @@ final class Document {
     func uuColor(at p: Point) -> UUColor {
         if let sheetView = sheetView(at: p) {
             let inP = sheetView.convertFromWorld(p)
-            return sheetView.sheetColorOwner(at: inP).uuColor
+            return sheetView.sheetColorOwner(at: inP, 
+                                             scale: screenToWorldScale).uuColor
         } else {
             return Sheet.defalutBackgroundUUColor
         }
@@ -3342,15 +3344,18 @@ final class Document {
             return []
         }
         let inP = sheetView.convertFromWorld(p)
-        return [sheetView.sheetColorOwner(at: inP)]
+        return [sheetView.sheetColorOwner(at: inP,
+                                          scale: screenToWorldScale)]
     }
     func madeColorOwnersWithSelection(at p: Point) -> (firstUUColor: UUColor,
                                                        owners: [SheetColorOwner])? {
         guard let sheetView = madeSheetView(at: p) else {
             return nil
         }
+        
         let inP = sheetView.convertFromWorld(p)
-        let topOwner = sheetView.sheetColorOwner(at: inP)
+        let topOwner = sheetView.sheetColorOwner(at: inP,
+                                                 scale: screenToWorldScale)
         let uuColor = topOwner.uuColor
         
         if isSelect(at: p), !isSelectedText {
@@ -3362,8 +3367,12 @@ final class Document {
                     if ssFrame.intersects(f),
                        let sheetView = self.sheetView(at: shp) {
                         
+                        let isLine = sheetView
+                            .lineTuple(at: sheetView.convertFromWorld(p),
+                                       scale: screenToWorldScale) != nil
                         let b = sheetView.convertFromWorld(f)
-                        for co in sheetView.sheetColorOwner(at: b) {
+                        for co in sheetView.sheetColorOwner(at: b,
+                                                            isLine: isLine) {
                             colorOwners.append(co)
                         }
                     }
@@ -3396,7 +3405,8 @@ final class Document {
             return []
         }
         let inP = sheetView.convertFromWorld(p)
-        let uuColor = sheetView.sheetColorOwner(at: inP).uuColor
+        let uuColor = sheetView.sheetColorOwner(at: inP,
+                                                scale: screenToWorldScale).uuColor
         if let co = sheetView.sheetColorOwner(with: uuColor) {
             return [co]
         } else {
@@ -3408,12 +3418,14 @@ final class Document {
             return []
         }
         let inP = sheetView.convertFromWorld(p)
-        return [sheetView.sheetColorOwner(at: inP)]
+        return [sheetView.sheetColorOwner(at: inP,
+                                          scale: screenToWorldScale)]
     }
     func isDefaultUUColor(at p: Point) -> Bool {
         if let sheetView = sheetView(at: p) {
             let inP = sheetView.convertFromWorld(p)
-            return sheetView.sheetColorOwner(at: inP).uuColor
+            return sheetView.sheetColorOwner(at: inP,
+                                             scale: screenToWorldScale).uuColor
                 == Sheet.defalutBackgroundUUColor
         } else {
             return true
@@ -3795,6 +3807,7 @@ final class Document {
         case .slide: Slider(self)
         case .selectTime: FrameSelecter(self)
         case .slideLine: LineSlider(self)
+        case .slideLineZ: LineZSlider(self)
         case .selectVersion: VersionSelector(self)
         default: nil
         }
@@ -3907,6 +3920,7 @@ final class Document {
         switch quasimode {
         case .cut: Cutter(self)
         case .copy: Copier(self)
+        case .copyLineColor: LineColorCopier(self)
         case .paste: Paster(self)
         case .undo: Undoer(self)
         case .redo: Redoer(self)

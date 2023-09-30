@@ -660,24 +660,67 @@ struct PBLine {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var controls: [PBLine.PBControl] = []
+  var controls: [PBLine.PBControl] {
+    get {return _storage._controls}
+    set {_uniqueStorage()._controls = newValue}
+  }
 
-  var size: Double = 0
+  var size: Double {
+    get {return _storage._size}
+    set {_uniqueStorage()._size = newValue}
+  }
 
   var id: PBUUID {
-    get {return _id ?? PBUUID()}
-    set {_id = newValue}
+    get {return _storage._id ?? PBUUID()}
+    set {_uniqueStorage()._id = newValue}
   }
   /// Returns true if `id` has been explicitly set.
-  var hasID: Bool {return self._id != nil}
+  var hasID: Bool {return _storage._id != nil}
   /// Clears the value of `id`. Subsequent reads from it will return its default value.
-  mutating func clearID() {self._id = nil}
+  mutating func clearID() {_uniqueStorage()._id = nil}
 
-  var interType: PBInterType = .none
+  var interType: PBInterType {
+    get {return _storage._interType}
+    set {_uniqueStorage()._interType = newValue}
+  }
 
-  var controlsData: Data = Data()
+  var controlsData: Data {
+    get {return _storage._controlsData}
+    set {_uniqueStorage()._controlsData = newValue}
+  }
+
+  var uuColorOptional: OneOf_UuColorOptional? {
+    get {return _storage._uuColorOptional}
+    set {_uniqueStorage()._uuColorOptional = newValue}
+  }
+
+  var uuColor: PBUUColor {
+    get {
+      if case .uuColor(let v)? = _storage._uuColorOptional {return v}
+      return PBUUColor()
+    }
+    set {_uniqueStorage()._uuColorOptional = .uuColor(newValue)}
+  }
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  enum OneOf_UuColorOptional: Equatable {
+    case uuColor(PBUUColor)
+
+  #if !swift(>=4.1)
+    static func ==(lhs: PBLine.OneOf_UuColorOptional, rhs: PBLine.OneOf_UuColorOptional) -> Bool {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch (lhs, rhs) {
+      case (.uuColor, .uuColor): return {
+        guard case .uuColor(let l) = lhs, case .uuColor(let r) = rhs else { preconditionFailure() }
+        return l == r
+      }()
+      }
+    }
+  #endif
+  }
 
   struct PBControl {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
@@ -706,7 +749,7 @@ struct PBLine {
 
   init() {}
 
-  fileprivate var _id: PBUUID? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 struct PBPolygon {
@@ -1958,35 +2001,57 @@ struct PBColorValue {
   // methods supported on all messages.
 
   var uuColor: PBUUColor {
-    get {return _uuColor ?? PBUUColor()}
-    set {_uuColor = newValue}
+    get {return _storage._uuColor ?? PBUUColor()}
+    set {_uniqueStorage()._uuColor = newValue}
   }
   /// Returns true if `uuColor` has been explicitly set.
-  var hasUuColor: Bool {return self._uuColor != nil}
+  var hasUuColor: Bool {return _storage._uuColor != nil}
   /// Clears the value of `uuColor`. Subsequent reads from it will return its default value.
-  mutating func clearUuColor() {self._uuColor = nil}
+  mutating func clearUuColor() {_uniqueStorage()._uuColor = nil}
 
-  var planeIndexes: [Int64] = []
-
-  var value: PBIntArrayIndexValueArray {
-    get {return _value ?? PBIntArrayIndexValueArray()}
-    set {_value = newValue}
+  var planeIndexes: [Int64] {
+    get {return _storage._planeIndexes}
+    set {_uniqueStorage()._planeIndexes = newValue}
   }
-  /// Returns true if `value` has been explicitly set.
-  var hasValue: Bool {return self._value != nil}
-  /// Clears the value of `value`. Subsequent reads from it will return its default value.
-  mutating func clearValue() {self._value = nil}
 
-  var valueColors: [PBColor] = []
+  var lineIndexes: [Int64] {
+    get {return _storage._lineIndexes}
+    set {_uniqueStorage()._lineIndexes = newValue}
+  }
 
-  var isBackground: Bool = false
+  var planeAnimationIndexes: PBIntArrayIndexValueArray {
+    get {return _storage._planeAnimationIndexes ?? PBIntArrayIndexValueArray()}
+    set {_uniqueStorage()._planeAnimationIndexes = newValue}
+  }
+  /// Returns true if `planeAnimationIndexes` has been explicitly set.
+  var hasPlaneAnimationIndexes: Bool {return _storage._planeAnimationIndexes != nil}
+  /// Clears the value of `planeAnimationIndexes`. Subsequent reads from it will return its default value.
+  mutating func clearPlaneAnimationIndexes() {_uniqueStorage()._planeAnimationIndexes = nil}
+
+  var lineAnimationIndexes: PBIntArrayIndexValueArray {
+    get {return _storage._lineAnimationIndexes ?? PBIntArrayIndexValueArray()}
+    set {_uniqueStorage()._lineAnimationIndexes = newValue}
+  }
+  /// Returns true if `lineAnimationIndexes` has been explicitly set.
+  var hasLineAnimationIndexes: Bool {return _storage._lineAnimationIndexes != nil}
+  /// Clears the value of `lineAnimationIndexes`. Subsequent reads from it will return its default value.
+  mutating func clearLineAnimationIndexes() {_uniqueStorage()._lineAnimationIndexes = nil}
+
+  var animationColors: [PBColor] {
+    get {return _storage._animationColors}
+    set {_uniqueStorage()._animationColors = newValue}
+  }
+
+  var isBackground: Bool {
+    get {return _storage._isBackground}
+    set {_uniqueStorage()._isBackground = newValue}
+  }
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
 
-  fileprivate var _uuColor: PBUUColor? = nil
-  fileprivate var _value: PBIntArrayIndexValueArray? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 struct PBPlaneValue {
@@ -3576,6 +3641,7 @@ extension PBUUID: @unchecked Sendable {}
 extension PBUUColor: @unchecked Sendable {}
 extension PBInterOption: @unchecked Sendable {}
 extension PBLine: @unchecked Sendable {}
+extension PBLine.OneOf_UuColorOptional: @unchecked Sendable {}
 extension PBLine.PBControl: @unchecked Sendable {}
 extension PBPolygon: @unchecked Sendable {}
 extension PBTopolygon: @unchecked Sendable {}
@@ -4337,53 +4403,113 @@ extension PBLine: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
     4: .same(proto: "id"),
     7: .same(proto: "interType"),
     6: .same(proto: "controlsData"),
+    8: .same(proto: "uuColor"),
   ]
 
+  fileprivate class _StorageClass {
+    var _controls: [PBLine.PBControl] = []
+    var _size: Double = 0
+    var _id: PBUUID? = nil
+    var _interType: PBInterType = .none
+    var _controlsData: Data = Data()
+    var _uuColorOptional: PBLine.OneOf_UuColorOptional?
+
+    static let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _controls = source._controls
+      _size = source._size
+      _id = source._id
+      _interType = source._interType
+      _controlsData = source._controlsData
+      _uuColorOptional = source._uuColorOptional
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.controls) }()
-      case 2: try { try decoder.decodeSingularDoubleField(value: &self.size) }()
-      case 4: try { try decoder.decodeSingularMessageField(value: &self._id) }()
-      case 6: try { try decoder.decodeSingularBytesField(value: &self.controlsData) }()
-      case 7: try { try decoder.decodeSingularEnumField(value: &self.interType) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeRepeatedMessageField(value: &_storage._controls) }()
+        case 2: try { try decoder.decodeSingularDoubleField(value: &_storage._size) }()
+        case 4: try { try decoder.decodeSingularMessageField(value: &_storage._id) }()
+        case 6: try { try decoder.decodeSingularBytesField(value: &_storage._controlsData) }()
+        case 7: try { try decoder.decodeSingularEnumField(value: &_storage._interType) }()
+        case 8: try {
+          var v: PBUUColor?
+          var hadOneofValue = false
+          if let current = _storage._uuColorOptional {
+            hadOneofValue = true
+            if case .uuColor(let m) = current {v = m}
+          }
+          try decoder.decodeSingularMessageField(value: &v)
+          if let v = v {
+            if hadOneofValue {try decoder.handleConflictingOneOf()}
+            _storage._uuColorOptional = .uuColor(v)
+          }
+        }()
+        default: break
+        }
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.controls.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.controls, fieldNumber: 1)
-    }
-    if self.size != 0 {
-      try visitor.visitSingularDoubleField(value: self.size, fieldNumber: 2)
-    }
-    try { if let v = self._id {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-    } }()
-    if !self.controlsData.isEmpty {
-      try visitor.visitSingularBytesField(value: self.controlsData, fieldNumber: 6)
-    }
-    if self.interType != .none {
-      try visitor.visitSingularEnumField(value: self.interType, fieldNumber: 7)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._controls.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._controls, fieldNumber: 1)
+      }
+      if _storage._size != 0 {
+        try visitor.visitSingularDoubleField(value: _storage._size, fieldNumber: 2)
+      }
+      try { if let v = _storage._id {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+      } }()
+      if !_storage._controlsData.isEmpty {
+        try visitor.visitSingularBytesField(value: _storage._controlsData, fieldNumber: 6)
+      }
+      if _storage._interType != .none {
+        try visitor.visitSingularEnumField(value: _storage._interType, fieldNumber: 7)
+      }
+      try { if case .uuColor(let v)? = _storage._uuColorOptional {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: PBLine, rhs: PBLine) -> Bool {
-    if lhs.controls != rhs.controls {return false}
-    if lhs.size != rhs.size {return false}
-    if lhs._id != rhs._id {return false}
-    if lhs.interType != rhs.interType {return false}
-    if lhs.controlsData != rhs.controlsData {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._controls != rhs_storage._controls {return false}
+        if _storage._size != rhs_storage._size {return false}
+        if _storage._id != rhs_storage._id {return false}
+        if _storage._interType != rhs_storage._interType {return false}
+        if _storage._controlsData != rhs_storage._controlsData {return false}
+        if _storage._uuColorOptional != rhs_storage._uuColorOptional {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -6734,56 +6860,112 @@ extension PBColorValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "uuColor"),
     3: .same(proto: "planeIndexes"),
-    6: .same(proto: "value"),
-    7: .same(proto: "valueColors"),
+    8: .same(proto: "lineIndexes"),
+    6: .same(proto: "planeAnimationIndexes"),
+    9: .same(proto: "lineAnimationIndexes"),
+    7: .same(proto: "animationColors"),
     5: .same(proto: "isBackground"),
   ]
 
+  fileprivate class _StorageClass {
+    var _uuColor: PBUUColor? = nil
+    var _planeIndexes: [Int64] = []
+    var _lineIndexes: [Int64] = []
+    var _planeAnimationIndexes: PBIntArrayIndexValueArray? = nil
+    var _lineAnimationIndexes: PBIntArrayIndexValueArray? = nil
+    var _animationColors: [PBColor] = []
+    var _isBackground: Bool = false
+
+    static let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _uuColor = source._uuColor
+      _planeIndexes = source._planeIndexes
+      _lineIndexes = source._lineIndexes
+      _planeAnimationIndexes = source._planeAnimationIndexes
+      _lineAnimationIndexes = source._lineAnimationIndexes
+      _animationColors = source._animationColors
+      _isBackground = source._isBackground
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._uuColor) }()
-      case 3: try { try decoder.decodeRepeatedInt64Field(value: &self.planeIndexes) }()
-      case 5: try { try decoder.decodeSingularBoolField(value: &self.isBackground) }()
-      case 6: try { try decoder.decodeSingularMessageField(value: &self._value) }()
-      case 7: try { try decoder.decodeRepeatedMessageField(value: &self.valueColors) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._uuColor) }()
+        case 3: try { try decoder.decodeRepeatedInt64Field(value: &_storage._planeIndexes) }()
+        case 5: try { try decoder.decodeSingularBoolField(value: &_storage._isBackground) }()
+        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._planeAnimationIndexes) }()
+        case 7: try { try decoder.decodeRepeatedMessageField(value: &_storage._animationColors) }()
+        case 8: try { try decoder.decodeRepeatedInt64Field(value: &_storage._lineIndexes) }()
+        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._lineAnimationIndexes) }()
+        default: break
+        }
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._uuColor {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    if !self.planeIndexes.isEmpty {
-      try visitor.visitPackedInt64Field(value: self.planeIndexes, fieldNumber: 3)
-    }
-    if self.isBackground != false {
-      try visitor.visitSingularBoolField(value: self.isBackground, fieldNumber: 5)
-    }
-    try { if let v = self._value {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
-    } }()
-    if !self.valueColors.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.valueColors, fieldNumber: 7)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      try { if let v = _storage._uuColor {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+      } }()
+      if !_storage._planeIndexes.isEmpty {
+        try visitor.visitPackedInt64Field(value: _storage._planeIndexes, fieldNumber: 3)
+      }
+      if _storage._isBackground != false {
+        try visitor.visitSingularBoolField(value: _storage._isBackground, fieldNumber: 5)
+      }
+      try { if let v = _storage._planeAnimationIndexes {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+      } }()
+      if !_storage._animationColors.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._animationColors, fieldNumber: 7)
+      }
+      if !_storage._lineIndexes.isEmpty {
+        try visitor.visitPackedInt64Field(value: _storage._lineIndexes, fieldNumber: 8)
+      }
+      try { if let v = _storage._lineAnimationIndexes {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: PBColorValue, rhs: PBColorValue) -> Bool {
-    if lhs._uuColor != rhs._uuColor {return false}
-    if lhs.planeIndexes != rhs.planeIndexes {return false}
-    if lhs._value != rhs._value {return false}
-    if lhs.valueColors != rhs.valueColors {return false}
-    if lhs.isBackground != rhs.isBackground {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._uuColor != rhs_storage._uuColor {return false}
+        if _storage._planeIndexes != rhs_storage._planeIndexes {return false}
+        if _storage._lineIndexes != rhs_storage._lineIndexes {return false}
+        if _storage._planeAnimationIndexes != rhs_storage._planeAnimationIndexes {return false}
+        if _storage._lineAnimationIndexes != rhs_storage._lineAnimationIndexes {return false}
+        if _storage._animationColors != rhs_storage._animationColors {return false}
+        if _storage._isBackground != rhs_storage._isBackground {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

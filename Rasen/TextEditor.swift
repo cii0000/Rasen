@@ -53,7 +53,7 @@ final class Finder: InputKeyEditor {
                     }
                 }
             } else {
-                let topOwner = sheetView.sheetColorOwner(at: inP)
+                let topOwner = sheetView.sheetColorOwner(at: inP, scale: document.screenToWorldScale)
                 let uuColor = topOwner.uuColor
                 if uuColor != Sheet.defalutBackgroundUUColor {
                     let string = uuColor.id.uuidString

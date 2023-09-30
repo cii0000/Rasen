@@ -33,15 +33,26 @@ final class LineView<T: BinderProtocol>: View {
         
         node = Node(path: Path(binder[keyPath: keyPath]),
                     lineWidth: binder[keyPath: keyPath].size,
-                    lineType: .color(binder[keyPath: keyPath].autoColor(from: .content)))
+                    lineType: .color(binder[keyPath: keyPath].uuColor.value))
     }
     
     func updateWithModel() {
+        updateColor()
         updatePath()
         node.lineWidth = model.size
     }
+    func updateColor() {
+        node.lineType = .color(model.uuColor.value)
+    }
     func updatePath() {
         node.path = Path(model)
+    }
+    var uuColor: UUColor {
+        get { model.uuColor }
+        set {
+            binder[keyPath: keyPath].uuColor = newValue
+            updateColor()
+        }
     }
     func intersects(_ otherRect: Rect) -> Bool {
         guard let b = node.bounds else { return false }
@@ -173,7 +184,6 @@ final class KeyframeView: View {
                                planesView.node, linesView.node])
         
         updateDraft()
-        updateLineColors()
     }
     
     func updateWithModel() {
@@ -183,7 +193,6 @@ final class KeyframeView: View {
         draftPlanesView.updateWithModel()
         
         updateDraft()
-        updateLineColors()
     }
     func updateDraft() {
         if !draftLinesView.model.isEmpty {
@@ -196,95 +205,6 @@ final class KeyframeView: View {
                 $0.node.fillType = .color(Sheet.draftPlaneColor(from: $0.model.uuColor.value,
                                                                 fillColor: .background))
             }
-        }
-    }
-    
-    static func lineColorPoints(from ps: [Point],
-                                distance d: Double = 16) -> Set<Point> {
-        var ns = Set<Point>()
-        for p in ps {
-            ns.insert((p * d).rounded())
-        }
-        return ns
-    }
-    func planeTuples(minDistance d: Double = 2) -> [(planeColor: Color,
-                                                     frame: Rect, path: Path,
-                                                     points: Set<Point>)] {
-        let planes = planesView.model
-        return planesView.elementViews.enumerated().compactMap {
-            if let b = $0.element.node.bounds?.outset(by: d) {
-                let plane = planes[$0.offset]
-                return (plane.uuColor.value, b, $0.element.node.path,
-                        Self.lineColorPoints(from: plane.topolygon.allPoints))
-            } else {
-                return nil
-            }
-        }
-    }
-    func updateLineColors(minDistance d: Double = 2) {
-        let planeTuples = planeTuples(minDistance: d)
-        linesView.elementViews.forEach {
-            updateLineColor(in: $0, from: planeTuples, minDistance: d)
-        }
-    }
-    func updateLineColor(in lineView: SheetLineView,
-                         minDistance d: Double = 2) {
-        updateLineColor(in: lineView,
-                        from: planeTuples(minDistance: d),
-                        minDistance: d)
-    }
-    func updateLineColor(in lineView: SheetLineView,
-                         from planeTuples: [(planeColor: Color,
-                                             frame: Rect, path: Path,
-                                             points: Set<Point>)],
-                         minDistance d: Double = 2) {
-        let color = KeyframeView.lineColor(in: lineView, from: planeTuples,
-                                           minDistance: d)
-        if case .color(let oColor) = lineView.node.lineType {
-            if oColor != color {
-                lineView.node.lineType = .color(color)
-            }
-        }
-    }
-    static func lineColor(in lineView: SheetLineView,
-                          from planeTuples: [(planeColor: Color,
-                                              frame: Rect, path: Path,
-                                              points: Set<Point>)],
-                          minDistance d: Double = 2) -> Color {
-        guard !planeTuples.isEmpty,
-              let lb = lineView.node.bounds else {
-            return lineView.model.autoColor(from: .content)
-        }
-//        let dd = d * d
-        let line = lineView.model
-        let linePoints = line.points(fromBezierCount: 4)
-        var color: Color?
-        for (planeColor, pb, path, ps) in planeTuples {
-            if lb.intersects(pb)// {
-//                || (planeView.model.topolygon.distanceSquared(line.pointEdges) < dd
-                && (linePoints.contains(where: { ps.contains($0) })
-                    || path.contains(line.firstPoint)
-                    || path.contains(line.lastPoint)) {
-                color = color == nil ?
-                    planeColor :
-                    color!.rgbaBlend(planeColor)
-            }
-        }
-        
-        if let color {
-            let t = line.autoMainColorT(from: .content,
-                                        maxPrssure: line.maxPressure)
-            var color = color
-            color.chroma = (color.chroma * color.chroma.clipped(min: Color.minChroma, max: 50, newMin: 2, newMax: 1))
-                .clipped(min: Color.minChroma, max: Color.maxChroma)
-            let nLightness = color.lightness
-                .clipped(min: 0, max: 20,
-                         newMin: 0, newMax: Color.content.lightness)
-            color.lightness = .linear(color.lightness, nLightness, t: t)
-            return color
-        } else {
-            return line.autoMainColor(from: .content,
-                                      maxPrssure: line.maxPressure)
         }
     }
 }
@@ -966,7 +886,7 @@ final class AnimationView: View {
             guard shownInterTypeKeyframeIndex != oldValue else { return }
             if let oldValue = oldValue, oldValue < elementViews.count {
                 elementViews[oldValue].linesView.elementViews.forEach {
-                    $0.node.lineType = .color($0.captureColor ?? $0.model.autoColor(from: .content))
+                    $0.node.lineType = .color($0.captureColor ?? $0.model.uuColor.value)
                     $0.captureColor = nil
                 }
             }
@@ -978,12 +898,12 @@ final class AnimationView: View {
                         nColor = color
                     } else {
                         $0.captureColor = nil
-                        nColor = .content
+                        nColor = $0.model.uuColor.value
                     }
                     
-                    switch $0.model.interType {
-                    case .interpolated: $0.node.lineType = .color($0.model.autoColor(from: .interpolated))
-                    case .key, .none: $0.node.lineType = .color($0.model.autoColor(from: nColor))
+                    $0.node.lineType = switch $0.model.interType {
+                    case .interpolated: .color(.interpolated)
+                    case .key, .none: .color(nColor)
                     }
                 }
             }
@@ -1813,7 +1733,7 @@ final class SheetView: View {
 //                draftLinesView.node.isHidden = true
 //                draftPlanesView.node.isHidden = true
             
-            playingFrameRate = Rational(model.mainFrameRate)
+            playingFrameRate = Rational(60)
             let timeInterval = Double(1 / playingFrameRate)
             playingTimer = DispatchSource.scheduledTimer(withTimeInterval: timeInterval) { [weak self] in
                 DispatchQueue.main.async {
@@ -2142,11 +2062,11 @@ final class SheetView: View {
             for pi in colorValue.planeIndexes {
                 planesView.elementViews[pi].updateColor()
             }
-        } else if !colorValue.value.isEmpty {
+        } else if !colorValue.planeAnimationIndexes.isEmpty {
             var keyframes = model.animation.keyframes
-            if colorValue.valueColors.count == colorValue.value.count {
-                for (ki, v) in colorValue.value.enumerated() {
-                    let uuColor = UUColor(colorValue.valueColors[ki],
+            if colorValue.animationColors.count == colorValue.planeAnimationIndexes.count {
+                for (ki, v) in colorValue.planeAnimationIndexes.enumerated() {
+                    let uuColor = UUColor(colorValue.animationColors[ki],
                                           id: colorValue.uuColor.id)
                     for i in v.value {
                         keyframes[v.index].picture.planes[i]
@@ -2154,19 +2074,55 @@ final class SheetView: View {
                     }
                 }
             } else {
-                for v in colorValue.value {
+                for v in colorValue.planeAnimationIndexes {
                     for i in v.value {
                         keyframes[v.index].picture.planes[i].uuColor = colorValue.uuColor
                     }
                 }
             }
             binder.value.animation.keyframes = keyframes
-            for v in colorValue.value {
+            for v in colorValue.planeAnimationIndexes {
                 for i in v.value {
                     animationView.elementViews[v.index].planesView.elementViews[i].updateColor()
                 }
             }
         }
+        
+        if !colorValue.lineIndexes.isEmpty {
+            var picture = model.picture
+            for li in colorValue.lineIndexes {
+                picture.lines[li].uuColor = colorValue.uuColor
+            }
+            binder.value.picture = picture
+            for li in colorValue.lineIndexes {
+                linesView.elementViews[li].updateColor()
+            }
+        } else if !colorValue.lineAnimationIndexes.isEmpty {
+            var keyframes = model.animation.keyframes
+            if colorValue.animationColors.count == colorValue.lineAnimationIndexes.count {
+                for (ki, v) in colorValue.lineAnimationIndexes.enumerated() {
+                    let uuColor = UUColor(colorValue.animationColors[ki],
+                                          id: colorValue.uuColor.id)
+                    for i in v.value {
+                        keyframes[v.index].picture.lines[i]
+                            .uuColor = uuColor
+                    }
+                }
+            } else {
+                for v in colorValue.lineAnimationIndexes {
+                    for i in v.value {
+                        keyframes[v.index].picture.lines[i].uuColor = colorValue.uuColor
+                    }
+                }
+            }
+            binder.value.animation.keyframes = keyframes
+            for v in colorValue.lineAnimationIndexes {
+                for i in v.value {
+                    animationView.elementViews[v.index].linesView.elementViews[i].updateColor()
+                }
+            }
+        }
+        
         if colorValue.isBackground {
             backgroundUUColor = colorValue.uuColor
         }
@@ -2191,9 +2147,9 @@ final class SheetView: View {
                                       lineType: .color(color),
                                       fillType: .color(subColor))
             }
-        } else if !colorValue.value.isEmpty {
+        } else if !colorValue.planeAnimationIndexes.isEmpty {
             var paths = [Path]()
-            for v in colorValue.value {
+            for v in colorValue.planeAnimationIndexes {
                 if v.index == model.animation.index {
                     let planes = model.animation.keyframes[v.index].picture.planes
                     for i in v.value {
@@ -2254,75 +2210,162 @@ final class SheetView: View {
             return nil
         }
     }
-    func sheetColorOwner(at p: Point) -> SheetColorOwner {
+    func sheetColorOwner(at p: Point, scale: Double) -> SheetColorOwner {
+        if let (lineView, li) = lineTuple(at: p,
+                                          scale: scale) {
+            let uuColor = lineView.model.uuColor
+            
+            if model.enabledAnimation {
+                if !selectedFrameIndexes.isEmpty {
+                    return sheetColorOwnerFromAnimation(with: uuColor)
+                } else {
+                    let cv = ColorValue(uuColor: uuColor,
+                                        planeIndexes: [], lineIndexes: [],
+                                        isBackground: false,
+                                        planeAnimationIndexes: [],
+                                        lineAnimationIndexes: [IndexValue(value: [li],
+                                                               index: model.animation.index)],
+                                        animationColors: [])
+                    return SheetColorOwner(sheetView: self, colorValue: cv)
+                }
+            } else {
+                let cv = ColorValue(uuColor: uuColor,
+                                    planeIndexes: [],
+                                    lineIndexes: [li],
+                                    isBackground: false,
+                                    planeAnimationIndexes: [],
+                                    lineAnimationIndexes: [],
+                                    animationColors: [])
+                return SheetColorOwner(sheetView: self, colorValue: cv)
+            }
+        } else {
+            return sheetColorOwnerFromPlane(at: p)
+        }
+    }
+    func sheetColorOwnerFromAnimation(with uuColor: UUColor) -> SheetColorOwner {
+        let value: [IndexValue<[Int]>] = selectedFrameIndexes.compactMap {
+            let pis = animationView.elementViews[$0].planesView.elementViews.enumerated().filter { $0.element.model.uuColor == uuColor }
+                .map { $0.offset }
+            if pis.isEmpty {
+                return nil
+            } else {
+                return IndexValue(value: pis, index: $0)
+            }
+        }
+        let lineValue: [IndexValue<[Int]>] = selectedFrameIndexes.compactMap {
+            let lis = animationView.elementViews[$0].linesView.elementViews.enumerated().filter { $0.element.model.uuColor == uuColor }
+                .map { $0.offset }
+            if lis.isEmpty {
+                return nil
+            } else {
+                return IndexValue(value: lis, index: $0)
+            }
+        }
+        let cv = ColorValue(uuColor: uuColor,
+                            planeIndexes: [], lineIndexes: [],
+                            isBackground: false,
+                            planeAnimationIndexes: value,
+                            lineAnimationIndexes: lineValue,
+                            animationColors: [])
+        return SheetColorOwner(sheetView: self, colorValue: cv)
+    }
+    func sheetColorOwnerFromPlane(at p: Point) -> SheetColorOwner {
         if let pi = planesView.firstIndex(at: p) {
             if model.enabledAnimation {
                 if !selectedFrameIndexes.isEmpty {
                     let uuColor = model.picture.planes[pi].uuColor
-                    
-                    let value: [IndexValue<[Int]>] = selectedFrameIndexes.compactMap {
-                        
-                        let pis = animationView.elementViews[$0].planesView.elementViews.enumerated().filter { $0.element.model.uuColor == uuColor }
-                            .map { $0.offset }
-                        if pis.isEmpty {
-                            return nil
-                        } else {
-                            return IndexValue(value: pis, index: $0)
-                        }
-                    }
-                    let cv = ColorValue(uuColor: uuColor,
-                                        planeIndexes: [], isBackground: false,
-                                        value: value,
-                                        valueColors: [])
-                    return SheetColorOwner(sheetView: self, colorValue: cv)
+                    return sheetColorOwnerFromAnimation(with: uuColor)
                 } else {
                     let cv = ColorValue(uuColor: model.picture.planes[pi].uuColor,
-                                        planeIndexes: [], isBackground: false,
-                                        value: [IndexValue(value: [pi],
+                                        planeIndexes: [], lineIndexes: [],
+                                        isBackground: false,
+                                        planeAnimationIndexes: [IndexValue(value: [pi],
                                                            index: model.animation.index)],
-                                        valueColors: [])
+                                        lineAnimationIndexes: [],
+                                        animationColors: [])
                     return SheetColorOwner(sheetView: self, colorValue: cv)
                 }
             } else {
                 let cv = ColorValue(uuColor: model.picture.planes[pi].uuColor,
-                                    planeIndexes: [pi], isBackground: false,
-                                    value: [],
-                                    valueColors: [])
+                                    planeIndexes: [pi], lineIndexes: [],
+                                    isBackground: false,
+                                    planeAnimationIndexes: [], lineAnimationIndexes: [],
+                                    animationColors: [])
                 return SheetColorOwner(sheetView: self, colorValue: cv)
             }
         } else {
             let cv = ColorValue(uuColor: model.backgroundUUColor,
-                                planeIndexes: [], isBackground: true,
-                                value: [],
-                                valueColors: [])
+                                planeIndexes: [], lineIndexes: [],
+                                isBackground: true,
+                                planeAnimationIndexes: [], lineAnimationIndexes: [],
+                                animationColors: [])
             return SheetColorOwner(sheetView: self, colorValue: cv)
         }
     }
-    func sheetColorOwner(at r: Rect) -> [SheetColorOwner] {
-        let piDic = planesView.elementViews.enumerated().reduce(into: [UUColor: [Int]]()) {
-            if $1.element.node.path.intersects(r) {
-                let uuColor = $1.element.model.uuColor
-                if $0[uuColor] != nil {
-                    $0[uuColor]?.append($1.offset)
-                } else {
-                    $0[uuColor] = [$1.offset]
+    func sheetColorOwner(at r: Rect,
+                         isLine: Bool = false) -> [SheetColorOwner] {
+        if isLine {
+            let liDic = linesView.elementViews.enumerated().reduce(into: [UUColor: [Int]]()) {
+                if $1.element.node.path.intersects(r) {
+                    let uuColor = $1.element.model.uuColor
+                    if $0[uuColor] != nil {
+                        $0[uuColor]?.append($1.offset)
+                    } else {
+                        $0[uuColor] = [$1.offset]
+                    }
                 }
             }
-        }
-        return piDic.map {
-            if model.enabledAnimation {
-                let cv = ColorValue(uuColor: $0.key,
-                                    planeIndexes: [], isBackground: false,
-                                    value: [IndexValue(value: $0.value,
-                                                       index: model.animation.index)],
-                                    valueColors: [])
-                return SheetColorOwner(sheetView: self, colorValue: cv)
-            } else {
-                let cv = ColorValue(uuColor: $0.key,
-                                    planeIndexes: $0.value, isBackground: false,
-                                    value: [],
-                                    valueColors: [])
-                return SheetColorOwner(sheetView: self, colorValue: cv)
+            return liDic.map {
+                if model.enabledAnimation {
+                    let cv = ColorValue(uuColor: $0.key,
+                                        planeIndexes: [], lineIndexes: [],
+                                        isBackground: false,
+                                        planeAnimationIndexes: [],
+                                        lineAnimationIndexes: [IndexValue(value: $0.value,
+                                                           index: model.animation.index)],
+                                        animationColors: [])
+                    return SheetColorOwner(sheetView: self, colorValue: cv)
+                } else {
+                    let cv = ColorValue(uuColor: $0.key,
+                                        planeIndexes: [],
+                                        lineIndexes: $0.value,
+                                        isBackground: false,
+                                        planeAnimationIndexes: [],
+                                        lineAnimationIndexes: [],
+                                        animationColors: [])
+                    return SheetColorOwner(sheetView: self, colorValue: cv)
+                }
+            }
+        } else {
+            let piDic = planesView.elementViews.enumerated().reduce(into: [UUColor: [Int]]()) {
+                if $1.element.node.path.intersects(r) {
+                    let uuColor = $1.element.model.uuColor
+                    if $0[uuColor] != nil {
+                        $0[uuColor]?.append($1.offset)
+                    } else {
+                        $0[uuColor] = [$1.offset]
+                    }
+                }
+            }
+            return piDic.map {
+                if model.enabledAnimation {
+                    let cv = ColorValue(uuColor: $0.key,
+                                        planeIndexes: [], lineIndexes: [],
+                                        isBackground: false,
+                                        planeAnimationIndexes: [IndexValue(value: $0.value,
+                                                           index: model.animation.index)],
+                                        lineAnimationIndexes: [],
+                                        animationColors: [])
+                    return SheetColorOwner(sheetView: self, colorValue: cv)
+                } else {
+                    let cv = ColorValue(uuColor: $0.key,
+                                        planeIndexes: $0.value,
+                                        lineIndexes: [],
+                                        isBackground: false,
+                                        planeAnimationIndexes: [], lineAnimationIndexes: [],
+                                        animationColors: [])
+                    return SheetColorOwner(sheetView: self, colorValue: cv)
+                }
             }
         }
     }
@@ -2338,29 +2381,43 @@ final class SheetView: View {
                     return IndexValue(value: planeIndexes, index: i)
                 }
             }
+            let liivs: [IndexValue<[Int]>] = model.animation.keyframes.enumerated().compactMap { (i, kf) in
+                let lineIndexes = kf.picture.lines.enumerated().compactMap {
+                    $0.element.uuColor == uuColor ? $0.offset : nil
+                }
+                if lineIndexes.isEmpty {
+                    return nil
+                } else {
+                    return IndexValue(value: lineIndexes, index: i)
+                }
+            }
             let isBackground = model.backgroundUUColor == uuColor
-            guard !iivs.isEmpty || isBackground else {
+            guard !iivs.isEmpty || !liivs.isEmpty || isBackground else {
                 return nil
             }
             let cv = ColorValue(uuColor: uuColor,
-                                planeIndexes: [],
+                                planeIndexes: [], lineIndexes: [],
                                 isBackground: isBackground,
-                                value: iivs,
-                                valueColors: [])
+                                planeAnimationIndexes: iivs, lineAnimationIndexes: liivs,
+                                animationColors: [])
             return SheetColorOwner(sheetView: self, colorValue: cv)
         } else {
             let planeIndexes = model.picture.planes.enumerated().compactMap {
                 $0.element.uuColor == uuColor ? $0.offset : nil
             }
+            let lineIndexes = model.picture.lines.enumerated().compactMap {
+                $0.element.uuColor == uuColor ? $0.offset : nil
+            }
             let isBackground = model.backgroundUUColor == uuColor
-            guard !planeIndexes.isEmpty || isBackground else {
+            guard !planeIndexes.isEmpty || !lineIndexes.isEmpty || isBackground else {
                 return nil
             }
             let cv = ColorValue(uuColor: uuColor,
                                 planeIndexes: planeIndexes,
+                                lineIndexes: lineIndexes,
                                 isBackground: isBackground,
-                                value: [],
-                                valueColors: [])
+                                planeAnimationIndexes: [], lineAnimationIndexes: [],
+                                animationColors: [])
             return SheetColorOwner(sheetView: self, colorValue: cv)
         }
     }
@@ -2385,7 +2442,6 @@ final class SheetView: View {
         case .appendLine(let line):
             stop()
             let lineView = appendNode(line)
-            keyframeView.updateLineColor(in: lineView)
             animationView.updateTimelineAtCurrentKeyframe()
             if isMakeRect {
                 return (lineView.node.bounds, [])
@@ -2393,9 +2449,6 @@ final class SheetView: View {
         case .appendLines(let lines):
             stop()
             appendNode(lines)
-            for lineView in linesView.elementViews[(linesView.elementViews.count - lines.count)...] {
-                keyframeView.updateLineColor(in: lineView)
-            }
             animationView.updateTimelineAtCurrentKeyframe()
             if isMakeRect {
                 let rect = linesView.elementViews[(linesView.elementViews.count - lines.count)...]
@@ -2405,7 +2458,6 @@ final class SheetView: View {
         case .appendPlanes(let planes):
             stop()
             appendNode(planes)
-            keyframeView.updateLineColors()
             if isMakeRect {
                 let rect = planesView.elementViews[(planesView.elementViews.count - planes.count)...]
                     .reduce(into: Rect?.none) { $0 += $1.node.bounds }
@@ -2429,19 +2481,13 @@ final class SheetView: View {
                 let rect = planesView.elementViews[(planesView.elementViews.count - count)...]
                     .reduce(into: Rect?.none) { $0 += $1.node.bounds }
                 removeLastsPlaneNode(count: count)
-                keyframeView.updateLineColors()
                 return (rect, [])
             } else {
                 removeLastsPlaneNode(count: count)
-                keyframeView.updateLineColors()
             }
         case .insertLines(let livs):
             stop()
             insertNode(livs)
-            
-            for liv in livs {
-                keyframeView.updateLineColor(in: linesView.elementViews[liv.index])
-            }
             
             animationView.updateTimelineAtCurrentKeyframe()
             if isMakeRect {
@@ -2453,7 +2499,6 @@ final class SheetView: View {
         case .insertPlanes(let pivs):
             stop()
             insertNode(pivs)
-            keyframeView.updateLineColors()
             if isMakeRect {
                 let rect = pivs.reduce(into: Rect?.none) {
                     $0 += planesView.elementViews[$1.index].node.bounds
@@ -2480,11 +2525,9 @@ final class SheetView: View {
                     $0 += planesView.elementViews[$1].node.bounds
                 }
                 removePlanesNode(at: planeIndexes)
-                keyframeView.updateLineColors()
                 return (rect, [])
             } else {
                 removePlanesNode(at: planeIndexes)
-                keyframeView.updateLineColors()
             }
         case .setPlaneValue(let planeValue):
             stop()
@@ -2496,11 +2539,9 @@ final class SheetView: View {
                 let rect = planesView.elementViews
                     .reduce(into: Rect?.none) { $0 += $1.node.bounds }
                 insertNode(planeIndexes)
-                keyframeView.updateLineColors()
                 return (rect, [])
             } else {
                 insertNode(planeIndexes)
-                keyframeView.updateLineColors()
             }
         case .changeToDraft(let isReverse):
             stop()
@@ -2519,7 +2560,6 @@ final class SheetView: View {
                     setNode([Plane]())
                 }
             }
-            keyframeView.updateLineColors()
             updateTimeline()
             if isMakeRect {
                 return (node.bounds, [])
@@ -2528,7 +2568,6 @@ final class SheetView: View {
             stop()
             setNode(picture.lines)
             setNode(picture.planes)
-            keyframeView.updateLineColors()
             animationView.updateTimelineAtCurrentKeyframe()
             if isMakeRect {
                 return (node.bounds, [])
@@ -2657,17 +2696,11 @@ final class SheetView: View {
         case .changedColors(let colorValue):
             changeColorsNode(colorValue)
             
-            if !colorValue.planeIndexes.isEmpty {
-                keyframeView.updateLineColors()
-            } else if !colorValue.value.isEmpty {
-                for v in colorValue.value {
-                    animationView.elementViews[v.index].updateLineColors()
-                }
-            }
-            
             if isMakeRect {
                 let rect = colorValue.planeIndexes.reduce(into: Rect?.none) {
                     $0 += planesView.elementViews[$1].node.bounds
+                } + colorValue.lineIndexes.reduce(into: Rect?.none) {
+                    $0 += linesView.elementViews[$1].node.bounds
                 }
                 return (rect, [])
             }
@@ -2783,7 +2816,6 @@ final class SheetView: View {
                 let lw = Line.defaultLineWidth * 1.5
                 for kv in kvs {
                     animationView.elementViews[kv.index].linesView.insert(kv.value)
-                    animationView.elementViews[kv.index].updateLineColors()
                     
                     rect += kv.value.reduce(into: Rect?.none) {
                         let line = binder[keyPath: keyPath].animation.keyframes[kv.index]
@@ -2801,7 +2833,6 @@ final class SheetView: View {
             } else {
                 for kv in kvs {
                     animationView.elementViews[kv.index].linesView.insert(kv.value)
-                    animationView.elementViews[kv.index].updateLineColors()
                 }
                 updateWithKeyframeIndex()
                 updateTimeline()
@@ -2816,7 +2847,6 @@ final class SheetView: View {
                         binder[keyPath: keyPath].animation.keyframes[kv.index]
                             .picture.lines[liv.index] = liv.value
                         animationView.elementViews[kv.index].linesView.elementViews[liv.index].updateWithModel()
-                        animationView.elementViews[kv.index].updateLineColors()
                     }
                     
                     rect += kv.value.reduce(into: Rect?.none) {
@@ -2838,7 +2868,6 @@ final class SheetView: View {
                         binder[keyPath: keyPath].animation.keyframes[kv.index]
                             .picture.lines[liv.index] = liv.value
                         animationView.elementViews[kv.index].linesView.elementViews[liv.index].updateWithModel()
-                        animationView.elementViews[kv.index].updateLineColors()
                     }
                 }
                 updateWithKeyframeIndex()
@@ -2880,7 +2909,6 @@ final class SheetView: View {
                 var rect: Rect?, nodes = [Node]()
                 for kv in kvs {
                     animationView.elementViews[kv.index].planesView.insert(kv.value)
-                    animationView.elementViews[kv.index].updateLineColors()
                     
                     rect += kv.value.reduce(into: Rect?.none) {
                         let plane = binder[keyPath: keyPath].animation.keyframes[kv.index]
@@ -2894,7 +2922,6 @@ final class SheetView: View {
             } else {
                 for kv in kvs {
                     animationView.elementViews[kv.index].planesView.insert(kv.value)
-                    animationView.elementViews[kv.index].updateLineColors()
                 }
                 updateWithKeyframeIndex()
             }
@@ -2907,7 +2934,6 @@ final class SheetView: View {
                         binder[keyPath: keyPath].animation.keyframes[kv.index]
                             .picture.planes[liv.index] = liv.value
                         animationView.elementViews[kv.index].planesView.elementViews[liv.index].updateWithModel()
-                        animationView.elementViews[kv.index].updateLineColors()
                     }
                     
                     rect += kv.value.reduce(into: Rect?.none) {
@@ -2926,7 +2952,6 @@ final class SheetView: View {
                         binder[keyPath: keyPath].animation.keyframes[kv.index]
                             .picture.planes[piv.index] = piv.value
                         animationView.elementViews[kv.index].planesView.elementViews[piv.index].updateWithModel()
-                        animationView.elementViews[kv.index].updateLineColors()
                     }
                 }
                 updateWithKeyframeIndex()
@@ -2945,7 +2970,6 @@ final class SheetView: View {
                     }
                     
                     animationView.elementViews[iv.index].planesView.remove(at: iv.value)
-                    animationView.elementViews[iv.index].updateLineColors()
                 }
                 updateWithKeyframeIndex()
                 
@@ -2953,7 +2977,6 @@ final class SheetView: View {
             } else {
                 for iv in iivs {
                     animationView.elementViews[iv.index].planesView.remove(at: iv.value)
-                    animationView.elementViews[iv.index].updateLineColors()
                 }
                 updateWithKeyframeIndex()
             }
@@ -3255,10 +3278,10 @@ final class SheetView: View {
             colorValue.planeIndexes.forEach {
                 planesView.elementViews[$0].uuColor = colorValue.uuColor
             }
-        } else if !colorValue.value.isEmpty {
-            if colorValue.valueColors.count == colorValue.value.count {
-                for (ki, v) in colorValue.value.enumerated() {
-                    let uuColor = UUColor(colorValue.valueColors[ki],
+        } else if !colorValue.planeAnimationIndexes.isEmpty {
+            if colorValue.animationColors.count == colorValue.planeAnimationIndexes.count {
+                for (ki, v) in colorValue.planeAnimationIndexes.enumerated() {
+                    let uuColor = UUColor(colorValue.animationColors[ki],
                                           id: colorValue.uuColor.id)
                     for i in v.value {
                         animationView.elementViews[v.index].planesView.elementViews[i]
@@ -3266,13 +3289,37 @@ final class SheetView: View {
                     }
                 }
             } else {
-                for v in colorValue.value {
+                for v in colorValue.planeAnimationIndexes {
                     for i in v.value {
                         animationView.elementViews[v.index].planesView.elementViews[i].uuColor = colorValue.uuColor
                     }
                 }
             }
         }
+        
+        if !colorValue.lineIndexes.isEmpty {
+            colorValue.lineIndexes.forEach {
+                linesView.elementViews[$0].uuColor = colorValue.uuColor
+            }
+        } else if !colorValue.lineAnimationIndexes.isEmpty {
+            if colorValue.animationColors.count == colorValue.lineAnimationIndexes.count {
+                for (ki, v) in colorValue.lineAnimationIndexes.enumerated() {
+                    let uuColor = UUColor(colorValue.animationColors[ki],
+                                          id: colorValue.uuColor.id)
+                    for i in v.value {
+                        animationView.elementViews[v.index].linesView.elementViews[i]
+                            .uuColor = uuColor
+                    }
+                }
+            } else {
+                for v in colorValue.lineAnimationIndexes {
+                    for i in v.value {
+                        animationView.elementViews[v.index].linesView.elementViews[i].uuColor = colorValue.uuColor
+                    }
+                }
+            }
+        }
+        
         if colorValue.isBackground {
             backgroundUUColor = colorValue.uuColor
         }
@@ -4142,6 +4189,7 @@ final class SheetView: View {
                 history[result.version]
                     .values[result.valueIndex].error()
             }
+            
             if !colorUndoValue.planeIndexes.isEmpty {
                 let maxPISI = colorUndoValue.planeIndexes.max { $0 < $1 }
                 if let maxPISI = maxPISI, maxPISI < model.picture.planes.count {
@@ -4154,8 +4202,8 @@ final class SheetView: View {
                 } else {
                     error()
                 }
-            } else if !colorUndoValue.value.isEmpty {
-                loop: for k in colorUndoValue.value {
+            } else if !colorUndoValue.planeAnimationIndexes.isEmpty {
+                loop: for k in colorUndoValue.planeAnimationIndexes {
                     if k.index >= model.animation.keyframes.count {
                         error()
                         break loop
@@ -4173,6 +4221,39 @@ final class SheetView: View {
                     }
                 }
             }
+            
+            if !colorUndoValue.lineIndexes.isEmpty {
+                let maxLISI = colorUndoValue.lineIndexes.max { $0 < $1 }
+                if let maxLISI, maxLISI < model.picture.lines.count {
+                    for i in colorUndoValue.lineIndexes {
+                        if model.picture.lines[i].uuColor != colorUndoValue.uuColor {
+                            error()
+                            break
+                        }
+                    }
+                } else {
+                    error()
+                }
+            } else if !colorUndoValue.lineAnimationIndexes.isEmpty {
+                loop: for k in colorUndoValue.lineAnimationIndexes {
+                    if k.index >= model.animation.keyframes.count {
+                        error()
+                        break loop
+                    }
+                    let lines = model.animation.keyframes[k.index].picture.lines
+                    for li in k.value {
+                        if li >= lines.count {
+                            error()
+                            break loop
+                        }
+                        if lines[li].uuColor != colorUndoValue.uuColor {
+                            error()
+                            break loop
+                        }
+                    }
+                }
+            }
+            
             if colorUndoValue.isBackground && model.backgroundUUColor != colorUndoValue.uuColor {
                 error()
             }
@@ -4822,13 +4903,13 @@ final class SheetView: View {
                     colorUndoValue.planeIndexes = pis
                     isChanged = true
                 }
-            } else if !colorUndoValue.value.isEmpty {
+            } else if !colorUndoValue.planeAnimationIndexes.isEmpty {
                 func error() {
                     history[result.version]
                         .values[result.valueIndex].error()
                     isError = true
                 }
-                loop: for k in colorUndoValue.value {
+                loop: for k in colorUndoValue.planeAnimationIndexes {
                     if k.index >= model.animation.keyframes.count {
                         error()
                         break loop
@@ -4843,24 +4924,76 @@ final class SheetView: View {
                 }
             }
             
+            if !colorUndoValue.lineIndexes.isEmpty {
+                let lis = colorUndoValue.lineIndexes.filter {
+                    $0 < model.picture.lines.count
+                }
+                if colorUndoValue.lineIndexes != lis {
+                    colorUndoValue.lineIndexes = lis
+                    isChanged = true
+                }
+            } else if !colorUndoValue.lineAnimationIndexes.isEmpty {
+                func error() {
+                    history[result.version]
+                        .values[result.valueIndex].error()
+                    isError = true
+                }
+                loop: for k in colorUndoValue.lineAnimationIndexes {
+                    if k.index >= model.animation.keyframes.count {
+                        error()
+                        break loop
+                    }
+                    let lines = model.animation.keyframes[k.index].picture.lines
+                    for i in k.value {
+                        if i >= lines.count {
+                            error()
+                            break loop
+                        }
+                    }
+                }
+            }
+            
             if !isError {
                 var oColorUndoValue = colorUndoValue
+                var isBackground = true
                 if let pi = oColorUndoValue.planeIndexes.first {
                     oColorUndoValue.uuColor = model.picture.planes[pi].uuColor
-                } else if let piv = oColorUndoValue.value.first,
+                    isBackground = false
+                } else if let piv = oColorUndoValue.planeAnimationIndexes.first,
                           let pi = piv.value.first {
-                    if oColorUndoValue.value.count == oColorUndoValue.valueColors.count {
+                    if oColorUndoValue.planeAnimationIndexes.count == oColorUndoValue.animationColors.count {
                         
-                        oColorUndoValue.valueColors = oColorUndoValue.value.map {
+                        oColorUndoValue.animationColors = oColorUndoValue.planeAnimationIndexes.map {
                             model.animation.keyframes[$0.index].picture.planes[$0.value.first!].uuColor.value
                         }
                     } else {
                         oColorUndoValue.uuColor
-                            = model.animation.keyframes[piv.index].picture.planes[pi].uuColor
+                        = model.animation.keyframes[piv.index].picture.planes[pi].uuColor
                     }
-                } else {
+                    isBackground = false
+                }
+                
+                if let li = oColorUndoValue.lineIndexes.first {
+                    oColorUndoValue.uuColor = model.picture.lines[li].uuColor
+                    isBackground = false
+                } else if let liv = oColorUndoValue.lineAnimationIndexes.first,
+                          let li = liv.value.first {
+                    if oColorUndoValue.lineAnimationIndexes.count == oColorUndoValue.animationColors.count {
+                        
+                        oColorUndoValue.animationColors = oColorUndoValue.lineAnimationIndexes.map {
+                            model.animation.keyframes[$0.index].picture.lines[$0.value.first!].uuColor.value
+                        }
+                    } else {
+                        oColorUndoValue.uuColor
+                        = model.animation.keyframes[liv.index].picture.lines[li].uuColor
+                    }
+                    isBackground = false
+                }
+                
+                if isBackground {
                     oColorUndoValue.uuColor = model.backgroundUUColor
                 }
+                
                 if isChanged {
                     history[result.version].values[result.valueIndex].saveUndoItemValue
                         = UndoItemValue(undoItem: .changedColors(oColorUndoValue),
@@ -5316,7 +5449,7 @@ final class SheetView: View {
                    scale: Double) -> (lineView: SheetLineView,
                                       lineIndex: Int)? {
         let isSmall = ois ??
-            (sheetColorOwner(at: p).uuColor != Sheet.defalutBackgroundUUColor || textTuple(at: p) != nil)
+            (sheetColorOwnerFromPlane(at: p).uuColor != Sheet.defalutBackgroundUUColor || textTuple(at: p) != nil)
         let ds = Line.defaultLineWidth * 3 * scale
         
         var minI: Int?, minDSquared = Double.infinity
@@ -6165,13 +6298,17 @@ final class SheetView: View {
             }
             if isRemoveBackground {
                 let ncv = ColorValue(uuColor: Sheet.defalutBackgroundUUColor,
-                                     planeIndexes: [],
-                                     isBackground: true, value: [],
-                                     valueColors: [])
+                                     planeIndexes: [], lineIndexes: [],
+                                     isBackground: true,
+                                     planeAnimationIndexes: [],
+                                     lineAnimationIndexes: [],
+                                     animationColors: [])
                 let ocv = ColorValue(uuColor: model.backgroundUUColor,
-                                     planeIndexes: [],
-                                     isBackground: true, value: [],
-                                     valueColors: [])
+                                     planeIndexes: [], lineIndexes: [],
+                                     isBackground: true, 
+                                     planeAnimationIndexes: [],
+                                     lineAnimationIndexes: [],
+                                     animationColors: [])
                 backgroundUUColor = ncv.uuColor
                 capture(ncv, oldColorValue: ocv)
             }
@@ -6202,14 +6339,6 @@ final class SheetColorOwner {
             sheetView.newUndoGroup()
         }
         sheetView.capture(colorValue, oldColorValue: oldColorValue)
-        
-        if !colorValue.planeIndexes.isEmpty {
-            sheetView.keyframeView.updateLineColors()
-        } else if !colorValue.value.isEmpty {
-            for v in colorValue.value {
-                sheetView.animationView.elementViews[v.index].updateLineColors()
-            }
-        }
     }
     func colorPathValue(toColor: Color?,
                         color: Color, subColor: Color) -> ColorPathValue {

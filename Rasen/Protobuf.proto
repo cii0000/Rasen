@@ -115,6 +115,9 @@ message PBLine {
     PBUUID id = 4;
     PBInterType interType = 7;
     bytes controlsData = 6;
+    oneof uuColorOptional {
+        PBUUColor uuColor = 8;
+    }
 }
 
 message PBPolygon {
@@ -410,8 +413,10 @@ message PBContentIndexValue {
 message PBColorValue {
     PBUUColor uuColor = 1;
     repeated int64 planeIndexes = 3;
-    PBIntArrayIndexValueArray value = 6;
-    repeated PBColor valueColors = 7;
+    repeated int64 lineIndexes = 8;
+    PBIntArrayIndexValueArray planeAnimationIndexes = 6;
+    PBIntArrayIndexValueArray lineAnimationIndexes = 9;
+    repeated PBColor animationColors = 7;
     bool isBackground = 5;
 }
 message PBPlaneValue {

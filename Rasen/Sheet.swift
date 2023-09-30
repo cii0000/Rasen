@@ -73,24 +73,29 @@ extension PlaneValue: Codable {}
 
 struct ColorValue {
     var uuColor: UUColor
-    var planeIndexes: [Int], isBackground: Bool
-    var value: [IndexValue<[Int]>]
-    var valueColors: [Color]
+    var planeIndexes: [Int], lineIndexes: [Int], isBackground: Bool
+    var planeAnimationIndexes: [IndexValue<[Int]>]
+    var lineAnimationIndexes: [IndexValue<[Int]>]
+    var animationColors: [Color]
 }
 extension ColorValue: Protobuf {
     init(_ pb: PBColorValue) throws {
         uuColor = try .init(pb.uuColor)
         planeIndexes = pb.planeIndexes.map { max(.init($0), 0) }
-        value = try .init(pb.value)
-        valueColors = pb.valueColors.compactMap { try? .init($0) }
+        lineIndexes = pb.lineIndexes.map { max(.init($0), 0) }
+        planeAnimationIndexes = try .init(pb.planeAnimationIndexes)
+        lineAnimationIndexes = try .init(pb.lineAnimationIndexes)
+        animationColors = pb.animationColors.compactMap { try? .init($0) }
         isBackground = pb.isBackground
     }
     var pb: PBColorValue {
         .with {
             $0.uuColor = uuColor.pb
             $0.planeIndexes = planeIndexes.map { .init($0) }
-            $0.value = value.pb
-            $0.valueColors = valueColors.map { $0.pb }
+            $0.lineIndexes = lineIndexes.map { .init($0) }
+            $0.planeAnimationIndexes = planeAnimationIndexes.pb
+            $0.lineAnimationIndexes = lineAnimationIndexes.pb
+            $0.animationColors = animationColors.map { $0.pb }
             $0.isBackground = isBackground
         }
     }
@@ -1283,46 +1288,12 @@ extension Line {
     var node: Node {
         Node(path: Path(self),
              lineWidth: size,
-             lineType: .color(autoColor(from: .content)))
+             lineType: .color(uuColor.value))
     }
     func node(from color: Color) -> Node {
         Node(path: Path(self),
              lineWidth: size,
              lineType: .color(color))
-    }
-    
-    func autoColor(from color: Color) -> Color {
-        autoColor(from: color, maxPrssure: maxPressure)
-    }
-    static let autoColorPressure = 0.6
-    func autoColor(from color: Color, maxPrssure: Double) -> Color {
-        let t = autoColorT(from: color, maxPrssure: maxPrssure)
-        return t == 1 ? color : color.with(opacity: t)
-    }
-    func autoColorT(from color: Color, maxPrssure: Double) -> Double {
-        if maxPressure > Line.autoColorPressure {
-            return 1
-        } else {
-            return maxPressure.clipped(min: 0.125, max: Line.autoColorPressure,
-                                       newMin: 0.3, newMax: 1)
-        }
-    }
-    
-    func autoMainColor(from color: Color) -> Color {
-        autoMainColor(from: color, maxPrssure: maxPressure)
-    }
-    static let autoMainColorPressure = 0.6
-    func autoMainColor(from color: Color, maxPrssure: Double) -> Color {
-        let t = autoMainColorT(from: color, maxPrssure: maxPrssure)
-        return t == 1 ? color : Color.linear(.background, color, t: t)
-    }
-    func autoMainColorT(from color: Color, maxPrssure: Double) -> Double {
-        if maxPressure > Line.autoMainColorPressure {
-            return 1
-        } else {
-            return maxPressure.clipped(min: 0.125, max: Line.autoMainColorPressure,
-                                       newMin: 0.03125, newMax: 1)
-        }
     }
 }
 extension Plane {
@@ -2211,72 +2182,6 @@ extension Sheet {
         let planeNodes = picture.planes.map { $0.node }
         let textNodes = texts.map { $0.node }
         let borderNodes = isBorder ? borders.map { $0.node(with: bounds) } : []
-        
-        //
-        func updateLineColors() {
-            guard !planeNodes.isEmpty else { return }
-            lineNodes.enumerated().forEach { updateLineColor(in: $0.element,
-                                                             line: picture.lines[$0.offset]) }
-        }
-        func updateLineColor(in lineNode: Node, line: Line,
-                             minDistance d: Double = 2) {
-            guard !planeNodes.isEmpty,
-                  let lb = lineNode.bounds else {
-                if case .color(let oColor) = lineNode.lineType {
-                    let nColor = line.autoColor(from: .content,
-                                                maxPrssure: line.maxPressure)
-                    if oColor != nColor {
-                        lineNode.lineType = .color(nColor)
-                    }
-                }
-                return
-            }
-            
-    //        let dd = d * d
-            let linePoints = line.points(fromBezierCount: 4)
-            var color: Color?
-            for (pi, planeNode) in planeNodes.enumerated() {
-                guard let pb = planeNode.bounds?.outset(by: d) else { continue }
-                let plane =  picture.planes[pi]
-                let planeColor = plane.uuColor.value
-                let path = planeNode.path
-                let ps = KeyframeView.lineColorPoints(from: plane.topolygon.allPoints)
-                
-                if lb.intersects(pb)// {
-    //                || (planeView.model.topolygon.distanceSquared(line.pointEdges) < dd
-                    && (linePoints.contains(where: { ps.contains($0) })
-                        || path.contains(line.firstPoint)
-                        || path.contains(line.lastPoint)) {
-                    color = color == nil ?
-                        planeColor :
-                        color!.minLightnessBlend(planeColor)
-                }
-            }
-            
-            let nColor: Color
-            if let color {
-                let t = line.autoMainColorT(from: .content,
-                                            maxPrssure: line.maxPressure)
-                var color = color
-                color.chroma = (color.chroma * color.chroma.clipped(min: Color.minChroma, max: 50, newMin: 2, newMax: 1))
-                    .clipped(min: Color.minChroma, max: Color.maxChroma)
-                color.lightness = .linear(color.lightness,
-                                          color.lightness.clipped(min: 0, max: 20,
-                                                                  newMin: 0,
-                                                                  newMax: Color.content.lightness),
-                                          t: t)
-                nColor = color
-            } else {
-                nColor = line.autoMainColor(from: .content,
-                                            maxPrssure: line.maxPressure)
-            }
-            if case .color(let oColor) = lineNode.lineType {
-                if oColor != nColor {
-                    lineNode.lineType = .color(nColor)
-                }
-            }
-        }
-        updateLineColors()
         
         let draftLineNodes: [Node]
         if !draftPicture.lines.isEmpty {

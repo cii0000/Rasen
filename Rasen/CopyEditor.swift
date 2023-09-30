@@ -1340,9 +1340,9 @@ final class CopyEditor: Editor {
                         }
                         $0.sheetView.removePlanes(at: $0.colorValue.planeIndexes)
                     }
-                    if !$0.colorValue.value.isEmpty {
+                    if !$0.colorValue.planeAnimationIndexes.isEmpty {
                         let ki = $0.sheetView.model.animation.index
-                        for v in $0.colorValue.value {
+                        for v in $0.colorValue.planeAnimationIndexes {
                             if ki == v.index {
                                 if !v.value.isEmpty {
                                     if !nug.contains($0.sheetView) {
@@ -2911,5 +2911,86 @@ final class CopyEditor: Editor {
             
             document.cursor = Document.defaultCursor
         }
+    }
+}
+
+final class LineColorCopier: InputKeyEditor {
+    let document: Document
+    let isEditingSheet: Bool
+    
+    init(_ document: Document) {
+        self.document = document
+        isEditingSheet = document.isEditingSheet
+    }
+    
+    var selectingLineNode = Node(lineWidth: 1.5)
+    var firstScale = 1.0, editingP = Point(), editingSP = Point()
+    
+    func updateNode() {
+        if selectingLineNode.children.isEmpty {
+            selectingLineNode.lineWidth = document.worldLineWidth
+        } else {
+            let w = document.worldLineWidth
+            for node in selectingLineNode.children {
+                node.lineWidth = w
+            }
+        }
+        if isEditingSheet {
+            updateWithCopy(for: editingP, isSendPasteboard: true,
+                                       isCutColor: false)
+        }
+    }
+    
+    func send(_ event: InputKeyEvent) {
+        guard isEditingSheet else {
+            return
+        }
+        let sp = document.selectedScreenPositionNoneCursor
+            ?? event.screenPoint
+        switch event.phase {
+        case .began:
+            document.cursor = .arrow
+            
+            firstScale = document.worldToScreenScale
+            editingSP = sp
+            editingP = document.convertScreenToWorld(sp)
+            updateWithCopy(for: editingP,
+                           isSendPasteboard: true, isCutColor: false)
+            document.rootNode.append(child: selectingLineNode)
+        case .changed:
+            break
+        case .ended:
+            selectingLineNode.removeFromParent()
+            
+            document.cursor = Document.defaultCursor
+        }
+    }
+    
+    @discardableResult
+    func updateWithCopy(for p: Point, isSendPasteboard: Bool, isCutColor: Bool) -> Bool {
+        if let sheetView = document.sheetView(at: p),
+           let lineView = sheetView.lineTuple(at: sheetView.convertFromWorld(p),
+                                              scale: 1 / document.worldToScreenScale)?.lineView {
+            
+            if isSendPasteboard {
+                Pasteboard.shared.copiedObjects = [.uuColor(lineView.model.uuColor)]
+            }
+            
+            let scale = 1 / document.worldToScreenScale
+            let lw = Line.defaultLineWidth
+            let selectedNode = Node(path: lineView.node.path * sheetView.node.localTransform,
+                                    lineWidth: max(lw * 1.5, lw * 2.5 * scale, 1 * scale),
+                                    lineType: .color(.subSelected))
+            if sheetView.model.enabledAnimation {
+                selectingLineNode.children = [selectedNode]
+                + sheetView.animationView.interpolationNodes(from: [lineView.model.id], scale: scale)
+                + sheetView.interporatedTimelineNodes(from: [lineView.model.id])
+            } else {
+                selectingLineNode.children = [selectedNode]
+            }
+            
+            return true
+        }
+        return false
     }
 }

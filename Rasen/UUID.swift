@@ -111,3 +111,20 @@ extension UU: Interpolatable where Value: Interpolatable {
         return Self(value)
     }
 }
+extension UU: MonoInterpolatable where Value: MonoInterpolatable {
+    static func firstMonospline(_ f1: Self, _ f2: Self, _ f3: Self,
+                                with ms: Monospline) -> Self {
+        let value = Value.firstMonospline(f1.value, f2.value, f3.value, with: ms)
+        return Self(value)
+    }
+    static func monospline(_ f0: Self, _ f1: Self, _ f2: Self, _ f3: Self,
+                           with ms: Monospline) -> Self {
+        let value = Value.monospline(f0.value, f1.value, f2.value, f3.value, with: ms)
+        return Self(value)
+    }
+    static func lastMonospline(_ f0: Self, _ f1: Self, _ f2: Self,
+                               with ms: Monospline) -> Self {
+        let value = Value.lastMonospline(f0.value, f1.value, f2.value, with: ms)
+        return Self(value)
+    }
+}

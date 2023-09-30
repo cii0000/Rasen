@@ -1540,13 +1540,9 @@ extension AVAudioPCMBuffer {
     }
     
     static func from(url: URL) throws -> AVAudioPCMBuffer {
-        guard url.startAccessingSecurityScopedResource() else {
-            throw AVAudioPCMBufferError()
-        }
         let file = try AVAudioFile(forReading: url,
                                    commonFormat: .pcmFormatFloat32,
                                    interleaved: false)
-        url.stopAccessingSecurityScopedResource()
         
         let afCount = AVAudioFrameCount(file.length)
         let format = file.processingFormat

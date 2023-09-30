@@ -1728,9 +1728,9 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     var oldTouchPoints = [TouchID: Point]()
     var touchedIDs = [TouchID]()
     
-    var isEnabledScroll = false
-    var isEnabledPinch = false
-    var isEnabledRotate = false
+    var isEnabledScroll = true
+    var isEnabledPinch = true
+    var isEnabledRotate = true
     var isEnabledSwipe = false
     var isEnabledPlay = false
     
@@ -1996,7 +1996,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     override func touchesEnded(with event: NSEvent) {
         if oldTouchPoints.count == 4 {
-            if isPreparePlay {
+            if isEnabledPlay && isPreparePlay {
                 var event = inputKeyEventWith(event, .click, .began)
                 event.inputKeyType = .control
                 let player = Player(document)

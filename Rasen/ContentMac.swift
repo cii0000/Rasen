@@ -276,20 +276,13 @@ struct Content: Hashable, Codable {
         return volumeValues
     }
     static func duration(from url: URL) -> Double {
-        guard url.startAccessingSecurityScopedResource() else {
-            return 0
-        }
-        let d: Double
         if let file = try? AVAudioFile(forReading: url,
                                        commonFormat: .pcmFormatFloat32,
                                        interleaved: false) {
-            d = Double(file.length) / file.fileFormat.sampleRate
+            Double(file.length) / file.fileFormat.sampleRate
         } else {
-            d = 0
+            0
         }
-        url.stopAccessingSecurityScopedResource()
-        
-        return d
     }
     
     var pcmBuffer: PCMBuffer? {
@@ -338,14 +331,10 @@ final class ContentPlayer {
     init(_ content: Content) throws {
         self.content = content
         
-        guard content.url.startAccessingSecurityScopedResource() else {
-            throw URL.BookmarkError()
-        }
         player = try AVAudioPlayer(contentsOf: content.url)
         if content.volume.amp != 1 {
             player.volume = Float(content.volume.amp)
         }
-        content.url.stopAccessingSecurityScopedResource()
     }
     deinit {
         player.stop()

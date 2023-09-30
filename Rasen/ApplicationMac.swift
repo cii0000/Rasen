@@ -1022,7 +1022,7 @@ struct System {
     
     static let version = Bundle.main
         .object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-        ?? "1.0"
+        ?? "0.0"
     static let isVersion3 = version >= "3.0"
     
     static var usedMemory: UInt64? {

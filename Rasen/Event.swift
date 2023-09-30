@@ -216,6 +216,7 @@ extension Quasimode {
     static let moveNextTime = Quasimode(modifier: [.control, .option], .x)
     static let selectTime = Quasimode(modifier: [.control, .option], .drag)
     static let slideLine = Quasimode(modifier: [.control, .option, .command], .drag)
+    static let slideLineZ = Quasimode(modifier: [.control, .command, .command], .drag)
     static let slide = Quasimode(modifier: [.control], .drag)
     static let selectMultiFrame = Quasimode(modifier: [.control, .shift, .command], .drag)
     static let playDrag = Quasimode(.otherDrag)
@@ -242,6 +243,7 @@ extension Quasimode {
     static let copy = Quasimode(modifier: [.command], .c)
     static let paste = Quasimode(modifier: [.command], .v)
     static let scalingPaste = Quasimode(modifier: [.command], .vPinch)
+    static let copyLineColor = Quasimode(modifier: [.option, .command], .c)
     
     static let find = Quasimode(modifier: [.command], .f)
     

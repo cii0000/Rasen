@@ -1391,6 +1391,115 @@ final class LineSlider: DragEditor {
     }
 }
 
+final class LineZSlider: DragEditor {
+    let document: Document
+    let isEditingSheet: Bool
+
+    init(_ document: Document) {
+        self.document = document
+        isEditingSheet = document.isEditingSheet
+    }
+
+    private var sheetView: SheetView?, lineNode = Node(),
+    crossIndexes = [Int](), crossLineIndex = 0,
+    lineIndex = 0, lineView: SheetLineView?, oldSP = Point()
+    
+    func send(_ event: DragEvent) {
+        guard isEditingSheet else {
+            document.stop(with: event)
+            return
+        }
+        if document.isPlaying(with: event) {
+            document.stopPlaying(with: event)
+        }
+
+        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+            ?? event.screenPoint
+        let p = document.convertScreenToWorld(sp)
+
+        switch event.phase {
+        case .began:
+            document.cursor = .arrow
+
+            if let sheetView = document.sheetView(at: p) {
+                let inP = sheetView.convertFromWorld(p)
+                if let (lineView, li) = sheetView.lineTuple(at: inP,
+                                                            isSmall: false,
+                                                            scale: document.screenToWorldScale) {
+                    
+                    self.sheetView = sheetView
+                    lineIndex = li
+                    lineView.node.isHidden = true
+                    self.lineView = lineView
+                    
+                    let line = lineView.model
+                    if let lb = lineView.node.path.bounds?.outset(by: line.size / 2) {
+                        crossIndexes = sheetView.linesView.elementViews.enumerated().compactMap {
+                            let nLine = $0.element.model
+                            return if $0.offset == li {
+                                li
+                            } else if let nb = $0.element.node.path.bounds,
+                                      nb.outset(by: nLine.size / 2).intersects(lb) {
+                                nLine.minDistanceSquared(line) < (line.size / 2 + nLine.size / 2).squared ?
+                                $0.offset : nil
+                            } else {
+                                nil
+                            }
+                        }
+                        if let lastI = crossIndexes.last {
+                            crossIndexes.append(lastI + 1)
+                        }
+                        crossLineIndex = crossIndexes.firstIndex(of: li)!
+                    }
+                    
+                    oldSP = sp
+                    lineNode.path = Path(lineView.model)
+                    lineNode.lineType = lineView.node.lineType
+                    lineNode.lineWidth = lineView.node.lineWidth
+                    sheetView.linesView.node.children.insert(lineNode, at: li)
+                }
+            }
+        case .changed:
+            if let sheetView = sheetView,
+               lineIndex < sheetView.linesView.elementViews.count {
+                
+                guard !crossIndexes.isEmpty else { return }
+                
+                let cli = (Int((sp.y - oldSP.y) / 10) + crossLineIndex)
+                    .clipped(min: 0, max: crossIndexes.count - 1)
+                let li = crossIndexes[cli]
+                    .clipped(min: 0,
+                             max: sheetView.linesView.elementViews.count)
+                lineNode.removeFromParent()
+                sheetView.linesView.node.children.insert(lineNode, at: li)
+            }
+        case .ended:
+            lineNode.removeFromParent()
+            lineView?.node.isHidden = false
+            
+            if let sheetView = sheetView,
+               lineIndex < sheetView.linesView.elementViews.count {
+                
+                guard !crossIndexes.isEmpty else { return }
+                
+                let cli = (Int((sp.y - oldSP.y) / 10) + crossLineIndex)
+                    .clipped(min: 0, max: crossIndexes.count - 1)
+                let li = crossIndexes[cli]
+                    .clipped(min: 0,
+                             max: sheetView.linesView.elementViews.count)
+                let line = sheetView.linesView.elementViews[lineIndex].model
+                if lineIndex != li {
+                    sheetView.newUndoGroup()
+                    sheetView.removeLines(at: [lineIndex])
+                    sheetView.insert([.init(value: line, index: li > lineIndex ? li - 1 : li)])
+                }
+            }
+
+            document.cursor = Document.defaultCursor
+        }
+    }
+}
+
 final class TimeframeSlider: DragEditor {
     let document: Document
     let isEditingSheet: Bool
@@ -2712,17 +2821,19 @@ final class Interpolater: InputKeyEditor {
                             let svs = vs.sorted(by: { $0.ki < $1.ki })
                             let cv = ColorValue(
                                 uuColor: oUUColor,
-                                planeIndexes: [],
+                                planeIndexes: [], lineIndexes: [],
                                 isBackground: false,
-                                value: svs.map { .init(value: $0.pis, index: $0.ki) },
-                                valueColors: svs.map { $0.color }
+                                planeAnimationIndexes: svs.map { .init(value: $0.pis, index: $0.ki) },
+                                lineAnimationIndexes: [],
+                                animationColors: svs.map { $0.color }
                             )
                             let ocv = ColorValue(
                                 uuColor: oUUColor,
-                                planeIndexes: [],
+                                planeIndexes: [], lineIndexes: [],
                                 isBackground: false,
-                                value: svs.map { .init(value: $0.pis, index: $0.ki) },
-                                valueColors: svs.map {
+                                planeAnimationIndexes: svs.map { .init(value: $0.pis, index: $0.ki) },
+                                lineAnimationIndexes: [],
+                                animationColors: svs.map {
                                     sheetView.model.animation.keyframes[$0.ki].picture.planes[$0.pis.first!].uuColor.value
                                 }
                             )
