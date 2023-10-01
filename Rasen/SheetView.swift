@@ -5473,11 +5473,15 @@ final class SheetView: View {
         linesView.elementViews.enumerated().compactMap { (li, lineView) in
             if selections.contains(where: {
                 lineView.intersects(convertFromWorld($0.rect))
-            }) {
-                return li
-            } else {
-                return nil
-            }
+            }) { li } else { nil }
+        }
+    }
+    func planeIndexes(from selections: [Selection]) -> [Int] {
+        planesView.elementViews.enumerated().compactMap { (pi, planeView) in
+            if selections.contains(where: {
+                Path(convertFromWorld($0.rect))
+                    .contains(planeView.node.path)
+            }) { pi } else { nil }
         }
     }
     
@@ -5930,19 +5934,23 @@ final class SheetView: View {
             }
         }
     }
-    func changeToDraft(with lis: [Int]) {
-        let lines = lis.map { model.picture.lines[$0] }
-        removeLines(at: lis)
-        let li = model.draftPicture.lines.count
-        insertDraft(lines.enumerated().map {
-            IndexValue(value: $0.element, index: li + $0.offset)
-        })
-//        if !value.planes.isEmpty {
-//            let pi = model.draftPicture.planes.count
-//            insertDraft(value.planes.enumerated().map {
-//                IndexValue(value: $0.element, index: pi + $0.offset)
-//            })
-//        }
+    func changeToDraft(withLineInexes lis: [Int], planeInexes pis: [Int]) {
+        if !lis.isEmpty {
+            let lines = model.picture.lines[lis]
+            removeLines(at: lis)
+            let li = model.draftPicture.lines.count
+            insertDraft(lines.enumerated().map {
+                IndexValue(value: $0.element, index: li + $0.offset)
+            })
+        }
+        if !pis.isEmpty {
+            let planes = model.picture.planes[pis]
+            removePlanes(at: pis)
+            let pi = model.draftPicture.planes.count
+            insertDraft(planes.enumerated().map {
+                IndexValue(value: $0.element, index: pi + $0.offset)
+            })
+        }
     }
     func changeToDraft(with line: Line?) {
         if let line = line {

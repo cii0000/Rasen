@@ -318,9 +318,11 @@ final class DraftEditor: Editor {
                        let sheetView = document.sheetView(at: shp) {
                         
                         let lis = sheetView.lineIndexes(from: document.selections)
+                        let pis = sheetView.planeIndexes(from: document.selections)
                         if !lis.isEmpty {
                             sheetView.newUndoGroup()
-                            sheetView.changeToDraft(with: lis)
+                            sheetView.changeToDraft(withLineInexes: lis,
+                                                    planeInexes: pis)
                             document.updateSelects()
                         }
                     }

@@ -654,7 +654,7 @@ extension Line: AppliableTransform {
 extension Line {
     static let defaultLineWidth = 1.0
     static let maxLineWidth = 1000000.0
-    static let defaultUUColor = UU(Color.content, id: .zero)
+    static let defaultUUColor = UU(Color.content, id: .one)
 }
 extension Line {
     init(edge: Edge, pressures: [Double] = [],
