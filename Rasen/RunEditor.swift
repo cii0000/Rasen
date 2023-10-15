@@ -18,6 +18,7 @@
 import Dispatch
 import struct Foundation.Date
 import struct Foundation.UUID
+import struct Foundation.URL
 
 final class Runner: InputKeyEditor {
     let editor: RunEditor
@@ -259,6 +260,10 @@ final class RunEditor: InputKeyEditor {
             
             if let (textView, ti, _, _) = sheetView.textTuple(at: inP) {
                 let text = textView.model
+                
+                if URL(webString: text.string)?.openInBrowser() ?? false {
+                    return
+                }
                 
                 if text.string == "Waveform draw" {
                     var nti: Int?, minD = Double.infinity

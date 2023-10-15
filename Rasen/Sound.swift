@@ -48,6 +48,19 @@ extension Pitch {
     func lyricsUnison(isSharp: Bool) -> LyricsUnison {
         LyricsUnison(unison: Int(unison.rounded()), isSharp: isSharp)
     }
+    var octaveString: String {
+        let octavePitch = value / 12
+        let iPart = octavePitch.rounded(.down)
+        let dPart = (octavePitch - iPart) * 12
+        let dPartStr = String(format: "%02d", Int(dPart))
+        if dPart.decimalPart == 0 {
+            return "C\(iPart).\(dPartStr)"
+        } else {
+            let ddPart = dPart.decimalPart * 12
+            let ddPartStr = ddPart.decimalPart == 0 ? String(format: "%02d", Int(ddPart)) : "\(ddPart.decimalPart)"
+            return "C\(iPart).\(dPartStr).\(ddPartStr)"
+        }
+    }
 }
 
 enum MusicScaleType: Int32, Hashable, Codable, CaseIterable {
@@ -474,12 +487,7 @@ extension Note {
     }
     
     var octavePitchString: String {
-        let octavePitch = pitch / 12
-        let iPart = octavePitch.rounded(.down)
-        let dPart = (octavePitch - iPart) * 12
-        let dPartStr = String(format: "%02d", Int(dPart))
-            + (dPart.decimalPart == 0 ? "" : ".\(dPart.decimalPart)")
-        return "C\(iPart).\(dPartStr)"
+        Pitch(value: pitch).octaveString
     }
 }
 

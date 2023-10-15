@@ -521,7 +521,16 @@ final class Document {
         var baseThumbnailDatas = [SheetID: Texture.BytesData]()
         sheetRecorders.forEach {
             guard let data = $0.value.thumbnail4Record.decodedData else { return }
-            baseThumbnailDatas[$0.key] = Texture.bytesData(with: data)
+            if let bytesData = Texture.bytesData(with: data) {
+                baseThumbnailDatas[$0.key] = bytesData
+            } else if let image = Image(size: Size(width: 4, height: 4),
+                                        color: .init(red: 1.0, green: 0, blue: 0)) {
+                $0.value.thumbnail4Record.value = image
+                $0.value.thumbnail4Record.isWillwrite = true
+                baseThumbnailDatas[$0.key] = Texture.bytesData(with: image)
+            } else {
+                baseThumbnailDatas[$0.key] = nil
+            }
         }
         self.baseThumbnailDatas = baseThumbnailDatas
         
@@ -1052,7 +1061,7 @@ final class Document {
     static let maxSheetCount = 10000
     static let maxSheetAABB = AABB(maxValueX: Double(maxSheetCount) * Sheet.width,
                                    maxValueY: Double(maxSheetCount) * Sheet.height)
-    static let minCameraLog2Scale = -12.0, maxCameraLog2Scale = 8.0
+    static let minCameraLog2Scale = -12.0, maxCameraLog2Scale = 10.0
     static func clippedCameraPosition(from p: Point) -> Point {
         var p = p
         if p.x < maxSheetAABB.minX {
@@ -1250,22 +1259,30 @@ final class Document {
         }
     }
     func updateSelects() {
-        guard !selections.isEmpty else { return }
+        guard !selections.isEmpty else { 
+            for key in selectedLineNodes.keys {
+                selectedLineNodes[key]?.removeFromParent()
+                selectedLineNodes[key] = nil
+            }
+            return
+        }
         let centerSHPs = Set(self.centerSHPs)
         var rectsSet = Set<Rect>()
         var rects = [Rect](), isSelectedText = false, selectedCount = 0
         var firstOrientation = Orientation.horizontal, lineNodes = [Node]()
         var sLines = [Line](),sNotes = [Rect]()
+        var addedLineIndexes = Set<IntPoint>()
         var cr: Rect?, oldRect: Rect?
         for selection in selections {
             let rect = selection.rect
             if isEditingSheet {
-                sheetViewValues.forEach {
-                    guard let shp = sheetPosition(at: $0.value.sheetID),
+                sheetViewValues.enumerated().forEach { (si, svv) in
+                    guard let shp = sheetPosition(at: svv.value.sheetID),
                           centerSHPs.contains(shp) else { return }
                     let frame = sheetFrame(with: shp)
                     guard let inFrame = rect.intersection(frame) else { return }
-                    guard let sheetView = $0.value.view else { return }
+                    guard let sheetView = svv.value.view else { return }
+                    let rectInSheet = sheetView.convertFromWorld(selection.rect)
                     cr = cr == nil ? inFrame : cr!.union(inFrame)
                     for textView in sheetView.textsView.elementViews {
                         let nRect = textView.convertFromWorld(rect)
@@ -1293,12 +1310,18 @@ final class Document {
                     }
                     
                     //
-                    for lineView in sheetView.linesView.elementViews {
-                        if selections.contains(where: {
-                            lineView.intersects(sheetView.convertFromWorld($0.rect))
-                        }) {
-                            let nLine = sheetView.convertToWorld(lineView.model)
-                            sLines.append(nLine)
+                    for (li, lineView) in sheetView.linesView.elementViews.enumerated() {
+                        let sli = IntPoint(si, li)
+                        if !addedLineIndexes.contains(sli),
+                            lineView.intersects(rectInSheet) {
+                            if case .line(let line) =  lineView.node.path.pathlines.first?.elements.first,
+                               case .color(let color) = lineView.node.lineType {//
+                                
+                                var nLine = sheetView.convertToWorld(line)
+                                nLine.uuColor.value = color//
+                                sLines.append(nLine)
+                                addedLineIndexes.insert(sli)
+                            }
                         }
                     }
                     
@@ -1311,9 +1334,7 @@ final class Document {
                                     .map { textView.noteFrame(from: score.notes[$0], score, timeframe) }
                                     .map { textView.convertToWorld($0) }
                                 for rect in rects {
-                                    if selections.contains(where: {
-                                        rect.intersects($0.rect)
-                                    }) {
+                                    if rect.intersects(selection.rect) {
                                         sNotes.append(rect)
                                     }
                                 }
@@ -1387,7 +1408,7 @@ final class Document {
             if selectedLineNodes[sLine] == nil {
                 let node = Node(path: Path(sLine),
                                 lineWidth: sLine.size * 1.5,
-                               lineType: .color(.selected))
+                                lineType: .color(.linear(.selected, sLine.uuColor.value, t: sLine.uuColor.value.lightness / 100 * 0.5)))
                 selectedLineNodes[sLine] = node
                 selectedLinesNode?.append(child: node)
             }
@@ -2058,6 +2079,8 @@ final class Document {
                               fillType: .color(.content))
     func updateTextCursor(isMove: Bool = false) {
         func close() {
+            textEditor.isIndicated = false
+            
             if textCursorNode.parent != nil {
                 textCursorNode.removeFromParent()
             }
@@ -2080,6 +2103,8 @@ final class Document {
                 let vp = sheetView.convertFromWorld(cp)
                 if let textView = sheetView.selectedTextView,
                    let i = textView.selectedRange?.lowerBound {
+                    
+                    textEditor.isIndicated = true
                     
                     if textMaxTypelineWidthNode.parent == nil {
                         rootNode.append(child: textMaxTypelineWidthNode)
@@ -2105,6 +2130,8 @@ final class Document {
                     let mPath = textView.typesetter.maxTypelineWidthPath
                     textMaxTypelineWidthNode.path = textView.convertToWorld(mPath)
                 } else if let (textView, _, _, cursorIndex) = sheetView.textTuple(at: vp) {
+                    textEditor.isIndicated = true
+                    
                     if textMaxTypelineWidthNode.parent == nil {
                         rootNode.append(child: textMaxTypelineWidthNode)
                     }
@@ -2802,7 +2829,7 @@ final class Document {
                             historyRecord?.value = sheetView.history
                             historyRecord?.isPreparedWrite = true
                             self?.makeThumbnailRecord(at: sid, with: sheetView,
-                                                      isPreparedWrite: true)
+                                                      isPreparedWrite: true)// -> write
                         }
                     }
                     
@@ -2883,7 +2910,7 @@ final class Document {
                 sheetHistoryRecord?.value = sheetView.history
                 sheetHistoryRecord?.isPreparedWrite = true
                 self?.makeThumbnailRecord(at: sid, with: sheetView,
-                                          isPreparedWrite: true)
+                                          isPreparedWrite: true)// -> write
             }
         }
         
@@ -3062,7 +3089,7 @@ final class Document {
                 sheetHistoryRecord?.value = sheetView.history
                 sheetHistoryRecord?.isPreparedWrite = true
                 self?.makeThumbnailRecord(at: sid, with: sheetView,
-                                          isPreparedWrite: true)
+                                          isPreparedWrite: true)// -> write
             }
         }
         
@@ -3384,7 +3411,7 @@ final class Document {
         if let sheetView = sheetView(at: p) {
             let inP = sheetView.convertFromWorld(p)
             return sheetView.sheetColorOwner(at: inP, 
-                                             scale: screenToWorldScale)
+                                             scale: screenToWorldScale).value
                 .colorPathValue(toColor: toColor, color: color, subColor: subColor)
         } else {
             let shp = sheetPosition(at: p)
@@ -3397,7 +3424,7 @@ final class Document {
         if let sheetView = sheetView(at: p) {
             let inP = sheetView.convertFromWorld(p)
             return sheetView.sheetColorOwner(at: inP, 
-                                             scale: screenToWorldScale).uuColor
+                                             scale: screenToWorldScale).value.uuColor
         } else {
             return Sheet.defalutBackgroundUUColor
         }
@@ -3410,7 +3437,7 @@ final class Document {
         let inP = sheetView.convertFromWorld(p)
         return [sheetView.sheetColorOwner(at: inP,
                                           removingUUColor: removingUUColor,
-                                          scale: screenToWorldScale)]
+                                          scale: screenToWorldScale).value]
     }
     func madeColorOwnersWithSelection(at p: Point) -> (firstUUColor: UUColor,
                                                        owners: [SheetColorOwner])? {
@@ -3419,8 +3446,8 @@ final class Document {
         }
         
         let inP = sheetView.convertFromWorld(p)
-        let topOwner = sheetView.sheetColorOwner(at: inP,
-                                                 scale: screenToWorldScale)
+        let (isLine, topOwner) = sheetView.sheetColorOwner(at: inP,
+                                                           scale: screenToWorldScale)
         let uuColor = topOwner.uuColor
         
         if isSelect(at: p), !isSelectedText {
@@ -3432,9 +3459,6 @@ final class Document {
                     if ssFrame.intersects(f),
                        let sheetView = self.sheetView(at: shp) {
                         
-                        let isLine = sheetView
-                            .lineTuple(at: sheetView.convertFromWorld(p),
-                                       scale: screenToWorldScale) != nil
                         let b = sheetView.convertFromWorld(f)
                         for co in sheetView.sheetColorOwner(at: b,
                                                             isLine: isLine) {
@@ -3471,7 +3495,7 @@ final class Document {
         }
         let inP = sheetView.convertFromWorld(p)
         let uuColor = sheetView.sheetColorOwner(at: inP,
-                                                scale: screenToWorldScale).uuColor
+                                                scale: screenToWorldScale).value.uuColor
         if let co = sheetView.sheetColorOwner(with: uuColor) {
             return [co]
         } else {
@@ -3484,13 +3508,13 @@ final class Document {
         }
         let inP = sheetView.convertFromWorld(p)
         return [sheetView.sheetColorOwner(at: inP,
-                                          scale: screenToWorldScale)]
+                                          scale: screenToWorldScale).value]
     }
     func isDefaultUUColor(at p: Point) -> Bool {
         if let sheetView = sheetView(at: p) {
             let inP = sheetView.convertFromWorld(p)
             return sheetView.sheetColorOwner(at: inP,
-                                             scale: screenToWorldScale).uuColor
+                                             scale: screenToWorldScale).value.uuColor
                 == Sheet.defalutBackgroundUUColor
         } else {
             return true
@@ -3546,11 +3570,12 @@ final class Document {
         }
     }
     
-    let mapWidth = Sheet.width * 10, mapHeight = Sheet.height * 10
+    static let mapScale = 16
+    let mapWidth = Sheet.width * Double(mapScale), mapHeight = Sheet.height * Double(mapScale)
     private var mapIntPositions = Set<IntPoint>()
     func mapIntPosition(at p: IntPoint) -> IntPoint {
-        let x = (Rational(p.x) / 10).rounded(.down).integralPart
-        let y = (Rational(p.y) / 10).rounded(.down).integralPart
+        let x = (Rational(p.x) / Rational(Self.mapScale)).rounded(.down).integralPart
+        let y = (Rational(p.y) / Rational(Self.mapScale)).rounded(.down).integralPart
         return .init(x, y)
     }
     func mapPosition(at ip: IntPoint) -> Point {
@@ -3651,7 +3676,8 @@ final class Document {
     }
     func updateGrid(with transform: Transform, in bounds: Rect) {
         let bounds = bounds * transform, lw = gridNode.lineWidth
-        let w = Sheet.width, h = Sheet.height
+        let scale = isEditingSheet ? 1.0 : Double(Self.mapScale)
+        let w = Sheet.width * scale, h = Sheet.height * scale
         let cp = Point()
         var pathlines = [Pathline]()
         let minXIndex = Int(((bounds.minX - cp.x - lw) / w).rounded(.down))
@@ -3707,7 +3733,6 @@ final class Document {
             if oldMapType != .hidden {
                 mapNode.isHidden = true
                 backgroundColor = .background
-                gridNode.lineType = .color(.border)
                 mapNode.lineType = .color(.border)
                 currentMapNode.lineType = .color(.border)
             }
@@ -3719,7 +3744,6 @@ final class Document {
                 if oldMapType == .hidden {
                     mapNode.isHidden = false
                     backgroundColor = .disabled
-                    gridNode.lineType = .color(.subBorder)
                     mapNode.lineType = .color(.subBorder)
                     currentMapNode.lineType = .color(.subBorder)
                 }

@@ -132,8 +132,12 @@ final class Node {
         case none, wait, update
     }
     
-    var path = Path() {
-        didSet {
+    private var aPath = Path()
+    var path: Path {
+        get { aPath }
+        set {
+            aPath = newValue
+            
             if lineWidth > 0 {
                 if lineType != nil {
                     linePathDataUpdateType = .update
@@ -186,6 +190,37 @@ final class Node {
     private var linePathBufferVertexCounts = [Int]()
     private var linePathBufferUpdateType = UpdateType.none
     private var linePathBuffer: Buffer?
+    func update(path: Path,
+                withLinePathData linePathData: [Float],
+                bufferVertexCounts: [Int]) {
+        aPath = path
+        
+        if lineWidth > 0 {
+            if lineType != nil {
+                self.linePathData = linePathData
+                linePathBufferVertexCounts = bufferVertexCounts
+                updateLinePathBuffer()
+                
+                linePathDataUpdateType = .none
+                linePathBufferUpdateType = .none
+                
+                if lineColorBufferUpdateType == .wait {
+                    lineColorBufferUpdateType = .update
+                }
+                setNeedsDisplay()
+            } else if path.isEmpty {
+                self.linePathData = []
+                linePathBufferVertexCounts = []
+                updateLinePathBuffer()
+                
+                linePathDataUpdateType = .none
+                linePathBufferUpdateType = .none
+                setNeedsDisplay()
+            } else {
+                linePathDataUpdateType = .wait
+            }
+        }
+    }
     private func updateLinePathData() {
         if !path.isEmpty {
             (linePathData, linePathBufferVertexCounts) = path.linePointsDataWith(lineWidth: lineWidth)
@@ -418,7 +453,7 @@ final class Node {
         self.name = name
         backingChildren = children
         self.isHidden = isHidden
-        self.path = path
+        self.aPath = path
         self.attitude = attitude
         self.localTransform = attitude.transform
         self.isIdentityFromLocal = localTransform.isIdentity
@@ -473,7 +508,7 @@ final class Node {
         self.isIdentityFromLocal = isIdentityFromLocal
         self.localScale = localScale
         self.worldTransform = worldTransform
-        self.path = path
+        self.aPath = path
         self.lineWidth = lineWidth
         self.linePathDataUpdateType = linePathDataUpdateType
         self.linePathData = linePathData

@@ -100,6 +100,7 @@ enum PastableObject {
     case animation(_ animation: Animation)
     case ids(_ ids: InteroptionsValue)
     case timeframe(_ timeframe: Timeframe)
+    case image(_ image: Image)
     case beatRange(_ beatRange: Range<Rational>)
     case normalizationValue(_ normalizationValue: Double)
     case normalizationRationalValue(_ normalizationRationalValue: Rational)
@@ -148,6 +149,8 @@ extension PastableObject {
              PastableObject.typeName(with: ids)
         case .timeframe(let timeframe):
              PastableObject.typeName(with: timeframe)
+        case .image(let image):
+             PastableObject.typeName(with: image)
         case .beatRange(let beatRange):
              PastableObject.typeName(with: beatRange)
         case .normalizationValue(let normalizationValue):
@@ -195,6 +198,8 @@ extension PastableObject {
             self = .ids(try InteroptionsValue(serializedData: data))
         case PastableObject.objectTypeName(with: Timeframe.self):
             self = .timeframe(try Timeframe(serializedData: data))
+        case PastableObject.objectTypeName(with: Image.self):
+            self = .image(try Image(serializedData: data))
         case PastableObject.objectTypeName(with: Range<Rational>.self):
             self = .beatRange(try RationalRange(serializedData: data).value)
         case PastableObject.objectTypeName(with: Double.self):
@@ -239,6 +244,8 @@ extension PastableObject {
              try? ids.serializedData()
         case .timeframe(let timeframe):
              try? timeframe.serializedData()
+        case .image(let image):
+             try? image.serializedData()
         case .beatRange(let beatRange):
              try? RationalRange(value: beatRange).serializedData()
         case .normalizationValue(let normalizationValue):
@@ -286,6 +293,8 @@ extension PastableObject: Protobuf {
             self = .ids(try InteroptionsValue(ids))
         case .timeframe(let timeframe):
             self = .timeframe(try Timeframe(timeframe))
+        case .image(let image):
+            self = .image(try Image(image))
         case .beatRange(let beatRange):
             self = .beatRange(try RationalRange(beatRange).value)
         case .normalizationValue(let normalizationValue):
@@ -329,6 +338,8 @@ extension PastableObject: Protobuf {
                 $0.value = .ids(ids.pb)
             case .timeframe(let timeframe):
                 $0.value = .timeframe(timeframe.pb)
+            case .image(let image):
+                $0.value = .image(image.pb)
             case .beatRange(let beatRange):
                 $0.value = .beatRange(RationalRange(value: beatRange).pb)
             case .normalizationValue(let normalizationValue):
@@ -362,6 +373,7 @@ extension PastableObject: Codable {
         case animation = "8"
         case ids = "9"
         case timeframe = "10"
+        case image = "20"
         case beatRange = "11"
         case normalizationValue = "12"
         case normalizationRationalValue = "15"
@@ -397,6 +409,8 @@ extension PastableObject: Codable {
             self = .ids(try container.decode(InteroptionsValue.self))
         case .timeframe:
             self = .timeframe(try container.decode(Timeframe.self))
+        case .image:
+            self = .image(try container.decode(Image.self))
         case .beatRange:
             self = .beatRange(try container.decode(Range<Rational>.self))
         case .normalizationValue:
@@ -451,6 +465,9 @@ extension PastableObject: Codable {
         case .timeframe(let timeframe):
             try container.encode(CodingTypeKey.timeframe)
             try container.encode(timeframe)
+        case .image(let image):
+            try container.encode(CodingTypeKey.image)
+            try container.encode(image)
         case .beatRange(let beatRange):
             try container.encode(CodingTypeKey.beatRange)
             try container.encode(beatRange)
@@ -1392,7 +1409,8 @@ final class CopyEditor: Editor {
         }
     }
     
-    private var oldScale: Double?, firstRotation = 0.0, oldSnapP: Point?,
+    private var oldScale: Double?, firstRotation = 0.0,
+                oldSnapP: Point?, oldFillSnapP: Point?,
                 textNode: Node?, imageNode: Node?, textFrame: Rect?, textScale = 1.0
     var snapDistance = 1.0
     
@@ -1422,7 +1440,9 @@ final class CopyEditor: Editor {
                 selectingLineNode.children = [node0, node1, snapNode]
 //                selectingLineNode.children = planeNodes + lineNodes + textNodes
             }
-            selectingLineNode.path = Path()
+            if !selectingLineNode.path.isEmpty {
+                selectingLineNode.path = Path()
+            }
             
             let nSnapP: Point?, np: Point
             if !(sheetView?.id == value.id && sheetView?.rootKeyframeIndex == value.rootKeyframeIndex) {
@@ -1432,16 +1452,16 @@ final class CopyEditor: Editor {
                     snapP : p
                 let isSnapped = np == snapP
                 if isSnapped {
-                    if oldSnapP != np {
+                    if oldFillSnapP != np {
                         selectingLineNode.children.last?.fillType = .color(.selected)
                         Feedback.performAlignment()
                     }
                 } else {
-                    if oldSnapP != np {
+                    if oldFillSnapP != np {
                         selectingLineNode.children.last?.fillType = .color(.border)
                     }
                 }
-                oldSnapP = np
+                oldFillSnapP = np
             } else {
                 np = p
                 nSnapP = nil
@@ -1464,12 +1484,16 @@ final class CopyEditor: Editor {
                     }
                 }
                 
-                if let snapP = nSnapP {
-                    selectingLineNode.children[2].path = Path(circleRadius: isSnapped ? 5 : 3)
-                    selectingLineNode.children[2].attitude = Attitude(position: snapP, scale: Size(square: document.screenToWorldScale))
-                } else {
-                    selectingLineNode.children[2].path = Path()
+                if nSnapP != oldSnapP {
+                    if let nSnapP {
+                        selectingLineNode.children[2].path = Path(circleRadius: isSnapped ? 5 : 3)
+                        selectingLineNode.children[2].attitude = Attitude(position: nSnapP, scale: Size(square: document.screenToWorldScale))
+                    } else {
+                        selectingLineNode.children[2].path = Path()
+                    }
                 }
+                
+                oldSnapP = nSnapP
             }
         }
         func updateWithText(_ text: Text) {
@@ -1787,6 +1811,8 @@ final class CopyEditor: Editor {
         case .ids(let ids):
             updateIDs(ids.ids)
         case .timeframe:
+            break
+        case .image:
             break
         case .beatRange:
             break
@@ -2307,6 +2333,7 @@ final class CopyEditor: Editor {
                         $0.captureUUColor(isNewUndoGroup: true)
                     }
                 }
+                document.updateSelects()
                 return
             }
             
@@ -2328,6 +2355,7 @@ final class CopyEditor: Editor {
                     }
                 }
             }
+            document.updateSelects()
         case .animation(let animation):
             guard !animation.keyframes.isEmpty,
                   let sheetView = document.sheetView(at: shp),
@@ -2383,6 +2411,36 @@ final class CopyEditor: Editor {
                 sheetView.newUndoGroup()
                 sheetView.replace([IndexValue(value: text, index: ti)])
             }
+        case .image(let image):
+            guard let sheetView = document.madeSheetView(at: shp) else { return }
+            let np = sheetView.convertFromWorld(p)
+            
+            let tempo = sheetView.tempo(at: np) ?? Music.defaultTempo
+            let filename = ""
+            let name = UUID().uuidString + ".tiff"
+            
+            try? image.write(.tiff, to: document.contentsDirectory.url.appending(component: name))
+            
+            let content = Content(name: name)
+            let interval = document
+                .currentNoteTimeInterval(fromScale: 1)
+            let startBeat = sheetView.animationView
+                .beat(atX: np.x, interval: interval)
+            let beatDur = Timeframe.beat(fromSec: content.secDuration,
+                                         tempo: tempo,
+                                         beatRate: Keyframe.defaultFrameRate,
+                                         rounded: .up)
+            let beatRange = Range(start: startBeat, length: beatDur)
+            var text = Text(string: filename,
+                            timeframe: Timeframe(beatRange: beatRange, content: content, tempo: tempo))
+            
+            let nnp = text.origin + np
+            let log10Scale: Double = .log10(document.worldToScreenScale)
+            let clipScale = max(0.0, log10Scale)
+            let decimalPlaces = Int(clipScale + 2)
+            text.origin = nnp.rounded(decimalPlaces: decimalPlaces)
+            sheetView.newUndoGroup()
+            sheetView.append(text)
         case .beatRange(let beatRange):
             guard let sheetView = document.sheetView(at: shp) else { return }
             let np = sheetView.convertFromWorld(p)
@@ -2575,6 +2633,7 @@ final class CopyEditor: Editor {
         case .animation: true
         case .ids: true
         case .timeframe: false
+        case .image: true
         case .beatRange: false
         case .normalizationValue: false
         case .normalizationRationalValue: false
@@ -2816,17 +2875,15 @@ final class CopyEditor: Editor {
             for (shp, _) in csv.sheetIDs {
                 var sf = document.sheetFrame(with: shp)
                 sf.origin += p - csv.deltaPoint
-                let nshp = document.sheetPosition(at: Point(Sheet.width / 2, 0) + sf.origin)
-                if document.sheetID(at: nshp) == nil {
-                    let sf = Rect(origin: document.sheetFrame(with: nshp).origin,
-                                  size: sf.size)
-                    let lw = Line.defaultLineWidth / document.worldToScreenScale
-                    children.append(Node(attitude: Attitude(position: sf.origin),
-                                         path: Path(Rect(size: sf.size)),
-                                         lineWidth: lw,
-                                         lineType: selectingLineNode.lineType,
-                                         fillType: selectingLineNode.fillType))
-                }
+                let nshp = document.sheetPosition(at: Point(Sheet.width / 2, Sheet.height / 2) + sf.origin)
+                let nsf = Rect(origin: document.sheetFrame(with: nshp).origin,
+                              size: sf.size)
+                let lw = Line.defaultLineWidth / document.worldToScreenScale
+                children.append(Node(attitude: Attitude(position: nsf.origin),
+                                     path: Path(Rect(size: nsf.size)),
+                                     lineWidth: lw,
+                                     lineType: selectingLineNode.lineType,
+                                     fillType: selectingLineNode.fillType))
             }
             selectingLineNode.children = children
             
@@ -2842,7 +2899,7 @@ final class CopyEditor: Editor {
             for (shp, sid) in csv.sheetIDs {
                 var sf = document.sheetFrame(with: shp)
                 sf.origin += p - csv.deltaPoint
-                var nshp = document.sheetPosition(at: Point(Sheet.width / 2, 0) + sf.origin)
+                var nshp = document.sheetPosition(at: Point(Sheet.width / 2, Sheet.height / 2) + sf.origin)
                 nshp.isRight = shp.isRight
                 
                 if document.sheetID(at: nshp) != nil {

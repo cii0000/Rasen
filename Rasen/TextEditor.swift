@@ -53,7 +53,7 @@ final class Finder: InputKeyEditor {
                     }
                 }
             } else {
-                let topOwner = sheetView.sheetColorOwner(at: inP, scale: document.screenToWorldScale)
+                let topOwner = sheetView.sheetColorOwner(at: inP, scale: document.screenToWorldScale).value
                 let uuColor = topOwner.uuColor
                 if uuColor != Sheet.defalutBackgroundUUColor {
                     let string = uuColor.id.uuidString
@@ -230,14 +230,16 @@ final class Looker: InputKeyEditor {
             
             return true
         } else if let sheetView = document.sheetView(at: p),
-                  let (node, maxMel, _) = sheetView.spectrogramNode(at: sheetView.convertFromWorld(p)) {
-            let inP = sheetView.convertFromWorld(p)
-            let y = node.convertFromWorld(p).y - 0.5
+                  let (node, maxMel, textView) = sheetView.spectrogramNode(at: sheetView.convertFromWorld(p)) {
+            let y = node.convertFromWorld(p).y - 0.5 * textView.nodeRatio
             let h = node.path.bounds?.height ?? 0
             let mel = y.clipped(min: 0, max: h, newMin: 0, newMax: maxMel)
-            let fq = Int(Mel.fq(fromMel: mel))
-            let sec: Rational = sheetView.animationView.sec(atX: inP.x)
-            document.show("\(Double(sec).string(digitsCount: 4)) sec, \(fq) Hz", at: p)
+            let fq = Mel.fq(fromMel: mel)
+            let pitch = Pitch.pitch(fromFq: fq)
+            let pitchRat = Rational(pitch, intervalScale: .init(1, 12))
+            let nfq = Pitch(value: pitchRat).fq
+            let fqStr = "\(Pitch(value: pitchRat).octaveString) (\(nfq.string(digitsCount: 3)) Hz)".localized
+            document.show(fqStr, at: p)
             return true
         } else if let sheetView = document.sheetView(at: p),
                   let buffer = sheetView.model.pcmBuffer {
@@ -617,6 +619,7 @@ final class TextEditor: Editor {
             }
         }
     }
+    var isIndicated = false
     
     var isMovedCursor = true
     
@@ -4067,6 +4070,7 @@ extension TextView {
             return
         }
         
+        TextInputContext.update()
         if str.isEmpty {
             let i = model.string.intIndex(from: rRange.lowerBound)
             binder[keyPath: keyPath].string.removeSubrange(rRange)
@@ -4086,7 +4090,6 @@ extension TextView {
             replacedRange = imsi ..< imei
             selectedRange = di ..< di
         }
-        TextInputContext.update()
         updateLyrics()
         updateTypesetter()
         updateSelectedLineLocation()

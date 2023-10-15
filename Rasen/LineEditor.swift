@@ -15,6 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
+import Dispatch
+
 final class RangeSelector: DragEditor {
     let document: Document
     
@@ -184,8 +186,9 @@ final class LineEditor: Editor {
     }
     var temps = [Temp](), times = [Double]()
     var firstPoint = Point(), oldPoint = Point(), tempDistance = 0.0
-    var firstChangedTime: Double?, oldTime = 0.0, lastSpeed = 0.0, oldTempTime = 0.0
+    var oldFirstChangedTime: Double?, oldTime = 0.0, lastSpeed = 0.0, oldTempTime = 0.0
     var oldPressure = 1.0, firstTime = 0.0
+    var prs = [Double](), snapDC: Line.Control?, snapSize = 0.0, isStopFirstPressure = false
     
     var isSnapStraight = false {
         didSet {
@@ -251,7 +254,7 @@ final class LineEditor: Editor {
         }
     }
     
-    func joinControlWith(_ line: Line,
+    private static func joinControlWith(_ line: Line,
                          lastControl lc: Line.Control,
                          lowAngle: Double = 0.8 * (.pi / 2),
                          angle: Double = 1.0 * (.pi / 2)) -> Line.Control? {
@@ -273,7 +276,7 @@ final class LineEditor: Editor {
         }
     }
     
-    static func speed(from temps: [Temp], at i: Int,
+    private static func speed(from temps: [Temp], at i: Int,
                       delta: Int = 2) -> Double {
         var allSpeed = 0.0, count = 0
         for temp in temps[max(0, i - delta) ..< i] {
@@ -295,7 +298,7 @@ final class LineEditor: Editor {
         }
     }
     
-    func isAppendPointWith(distance: Double, deltaTime: Double,
+    private static func isAppendPointWith(distance: Double, deltaTime: Double,
                            _ temps: [Temp], lastBezier lb: Bezier,
                            scale: Double,
                            minSpeed: Double = 300.0,
@@ -355,7 +358,7 @@ final class LineEditor: Editor {
         }
     }
     
-    func revision(pressure: Double,
+    private static func revision(pressure: Double,
                   minPressure: Double = 0.3,
                   revisonMinPressure: Double = 0.125) -> Double {
         if pressure < minPressure {
@@ -368,7 +371,7 @@ final class LineEditor: Editor {
         }
     }
     
-    func clipPoint(_ op: Point, old oldP: Point?, from node: Node) -> Point {
+    private static func clipPoint(_ op: Point, old oldP: Point?, from node: Node) -> Point {
         let cp = node.convertFromWorld(op)
         let sBounds = node.bounds ?? Rect()
         if let oldP = oldP, let np = sBounds.intersection(Edge(oldP, cp)).first {
@@ -378,20 +381,27 @@ final class LineEditor: Editor {
         }
     }
     
-    func snap(_ fol: FirstOrLast, _ line: Line,
-              isSnapSelf: Bool = true) -> Line.Control? {
+    private static func snap(_ fol: FirstOrLast, _ line: Line,
+                     isSnapSelf: Bool = true,
+                     worldToScreenScale: Double,
+                     screenToWorldScale: Double,
+                     from lines: [Line]) -> Line.Control? {
         snap(line.controls[fol],
              isSnapSelf ? line.controls[fol.reversed] : nil,
-             size: line.size * line.controls[fol].pressure)?.control
+             size: line.size * line.controls[fol].pressure,
+             worldToScreenScale: worldToScreenScale,
+             screenToWorldScale: screenToWorldScale, from: lines)?.control
     }
-    func snap(_ c: Line.Control, _ nc: Line.Control?,
-              size: Double) -> (size: Double, control: Line.Control)? {
-        guard let sheetView = document.madeSheetView(at: centerSHP) else { return nil }
-        let dq = document.screenToWorldScale.clipped(min: 0.06, max: 2,
-                                                     newMin: 0.5, newMax: 2)
+    private static func snap(_ c: Line.Control, _ nc: Line.Control?,
+                     size: Double,
+                     worldToScreenScale: Double,
+                     screenToWorldScale: Double,
+                     from lines: [Line]) -> (size: Double, control: Line.Control)? {
+        let dq = screenToWorldScale.clipped(min: 0.06, max: 2,
+                                            newMin: 0.5, newMax: 2)
         let dd = size / 2
-        let lines = sheetView.model.picture.lines
-        var minDSQ = Double.infinity, minP: Line.Control?, preMinDSQ = Double.infinity
+        var minDSQ = Double.infinity, minP: Line.Control?,
+            preMinDSQ = Double.infinity
         var minSize = size
         func update(_ oc: Line.Control, _ oSize: Double) {
             let ond = dq * (dd + oSize / 2)
@@ -412,482 +422,532 @@ final class LineEditor: Editor {
         if let nc = nc {
             update(nc, size)
         }
-        if minDSQ.distance(to: preMinDSQ) * document.worldToScreenScale <= 5 {
+        if minDSQ.distance(to: preMinDSQ) * worldToScreenScale <= 5 {
             return nil
         }
-        if let minP = minP {
-            return (minSize, minP)
+        return if let minP {
+            (minSize, minP)
         } else {
-            return nil
+            nil
         }
     }
     
-    var prs = [Double](), snapDC: Line.Control?, snapSize = 0.0, isStopFirstPressure = false
-    
-    func drawLine(for p: Point, sp: Point, pressure: Double,
-                  time: Double, isClip: Bool = true,
-                  isSnap: Bool = true, _ phase: Phase) {
-        let wtsScale = document.worldToScreenScale
-        var p = p.rounded(decimalPlaces: Int(max(0, .log10(wtsScale)) + 2))
-        let pressure = revision(pressure: pressure).rounded(decimalPlaces: 2)
+    static func line(from events: [DrawLineEvent],
+                     isClip: Bool = true,
+                     isSnap: Bool = true,
+                     firstSnapLines: [Line], lastSnapLines: [Line],
+                     clipBounds: Rect, isStraight: Bool) -> (line: Line, isSnapStraight: Bool) {
+        isStraight ?
+        straightLine(from: events, isClip: isClip, isSnap: isSnap,
+                     firstSnapLines: firstSnapLines,
+                     lastSnapLines: lastSnapLines,
+                     clipBounds: clipBounds) :
+        (line(from: events, isClip: isClip, isSnap: isSnap,
+             firstSnapLines: firstSnapLines,
+             lastSnapLines: lastSnapLines,
+             clipBounds: clipBounds), false)
+    }
+    static func line(from events: [DrawLineEvent],
+                     isClip: Bool = true,
+                     isSnap: Bool = true,
+                     firstSnapLines: [Line], lastSnapLines: [Line],
+                     clipBounds: Rect) -> Line {
+        var nLine = Line()
         
-        switch phase {
-        case .began:
-            document.cursor = Document.defaultCursor
+        var temps = [Temp](), times = [Double]()
+        var oldPoint = Point(), tempDistance = 0.0
+        var oldFirstChangedTime: Double?, oldTime = 0.0, oldTempTime = 0.0
+        var prs = [Double](), snapDC: Line.Control?, snapSize = 0.0, isStopFirstPressure = false
+        var tempLineWidth = Line.defaultLineWidth
+        
+        func drawLine(for p: Point, sp: Point, pressure: Double,
+                      time: Double, isClip: Bool = true,
+                      isSnap: Bool = true,
+                      worldToScreenScale: Double,
+                      screenToWorldScale: Double,
+                      sheetLineWidth: Double,
+                      _ phase: Phase) {
+            let wtsScale = worldToScreenScale
+            var p = p.rounded(decimalPlaces: Int(max(0, .log10(wtsScale)) + 2))
+            let pressure = revision(pressure: pressure).rounded(decimalPlaces: 2)
             
-            if isClip {
-                p = clipBounds.clipped(p)
-            }
-            tempLineWidth = document.sheetLineWidth
-            var fc = Line.Control(point: p, weight: 0.5, pressure: pressure)
-            if isSnap,
-               let (snapSize, snapC) = snap(fc, nil, size: tempLineWidth) {
-                snapDC = Line.Control(point: snapC.point - fc.point,
-                                      weight: 0,
-                                      pressure: snapC.pressure)
-                self.snapSize = snapSize
-                fc.point = snapC.point
-            }
-            let line = Line(controls: [fc, fc, fc, fc],
-                            size: tempLineWidth)
-            self.tempLine = line
-            times = [time, time, time, time]
-            firstPoint = p
-            firstTime = time
-            oldPoint = p
-            oldTime = time
-            lastSpeed = 0
-            oldTempTime = time
-            tempDistance = 0
-            temps = [Temp(control: fc, distance: 0, speed: 0,
-                          time: time, position: fc.point, length: 0)]
-            oldPressure = pressure
-        case .changed:
-            //
-//            document.rootNode.append(child: Node(attitude: Attitude(position: centerOrigin + p),
-//                                                 path: Path(circleRadius: 0.25),
-//                                                 fillType: .color(.border)))
-            
-            let firstChangedTime: Double
-            if let aTime = self.firstChangedTime {
-                firstChangedTime = aTime
-            } else {
-                self.firstChangedTime = time
-                firstChangedTime = time
-            }
-            
-            if isClip, let snapDC = snapDC {
-                if !snapDC.isEmpty && time - firstChangedTime < 0.08 {
-                    self.snapDC?.point *= 0.75
-                    p += snapDC.point * 0.75
-                    
-                    p = p.rounded(decimalPlaces: Int(max(0, .log10(wtsScale)) + 2))
+            switch phase {
+            case .began:
+                if isClip {
+                    p = clipBounds.clipped(p)
                 }
-                p = clipBounds.clipped(p)
-            }
-            
-            guard p != oldPoint && time > oldTime
-                    && tempLine.controls.count >= 4 else { return }
-            var line = tempLine
-            let d = p.distance(oldPoint)
-            tempDistance += d
-            
-            prs.append(pressure)
-            
-            let speed = d / (time - oldTime)
-            let lc = Line.Control(point: p, weight: 0.5, pressure: pressure)
-            var lb = line.bezier(at: line.maxBezierIndex - 1)
-            lb.p1 = lb.cp.mid(lc.point)
-            temps.append(Temp(control: lc, distance: tempDistance, speed: speed,
-                              time: time, position: lb.p1, length: lb.length()))
-            
-            if !isStopFirstPressure {
-                let pre: Double
-                if isClip, let snapDC = snapDC {
-                    if (line.size * pressure).absRatio(snapSize) < 1.5 {
-                        pre = snapDC.pressure
-                    } else {
-                        pre = pressure
-                    }
-                } else {
-                    pre = pressure
+                tempLineWidth = sheetLineWidth
+                var fc = Line.Control(point: p, weight: 0.5, pressure: pressure)
+                if isSnap,
+                   let (nSnapSize, snapC) = snap(fc, nil, size: tempLineWidth,
+                                                 worldToScreenScale: worldToScreenScale,
+                                                 screenToWorldScale: screenToWorldScale,
+                                                 from: firstSnapLines) {
+                    snapDC = Line.Control(point: snapC.point - fc.point,
+                                          weight: 0,
+                                          pressure: snapC.pressure)
+                    snapSize = nSnapSize
+                    fc.point = snapC.point
                 }
-                if line.controls[.first].pressure < pre {
-                    for i in 0 ..< line.controls.count {
-                        line.controls[i].pressure = pre
-                    }
-                    temps = temps.map {
-                        var temp = $0
-                        temp.control.pressure = pre
-                        return temp
-                    }
-                }
-            }
-            if time - firstChangedTime > 0.075 {
-                 isStopFirstPressure = true
-            }
-            
-            if line.controls.count == 4, temps.count >= 2 {
-                var maxL = 0.0
-                for i in 0 ..< (temps.count - 1) {
-                    let edge = Edge(temps[i].control.point,
-                                    temps[i + 1].control.point)
-                    maxL += edge.length
-                }
-                let d = maxL / 4
-                var l = 0.0, maxP = line.firstPoint
-                for i in 0 ..< (temps.count - 1) {
-                    let edge = Edge(temps[i].control.point,
-                                    temps[i + 1].control.point)
-                    let el = edge.length
-                    if el > 0 && d >= l && d < l + el {
-                        maxP = edge.position(atT: (d - l) / el)
-                    }
-                    l += el
-                }
-                line.controls[line.controls.count - 3].point = maxP
-            }
-            
-            let mp = lc.point.mid(temps[temps.count - 1].control.point)
-            let mpr = lc.pressure.mid(temps[temps.count - 1].control.pressure)
-            let mlc = Line.Control(point: mp, weight: 0.5, pressure: mpr)
-            if var jc = joinControlWith(line, lastControl: mlc) {
-                if time - firstChangedTime < 0.02 {
-                    jc.weight = 0.5
-                    line.controls = [jc, jc, jc, jc]
-                    times = [time, time, time, time]
-                } else {
-                    //
-//                    document.rootNode.append(child: Node(attitude: Attitude(position: centerOrigin + jc.point),
-//                                                         path: Path(circleRadius: 1),
-//                                                         fillType: .color(.selected)))
-                    
-                    line.controls[line.controls.count - 3].weight = 0.5
-                    jc.weight = 1
-                    
-                    line.controls.insert(jc, at: line.controls.count - 2)
-                    times.insert(time, at: times.count - 2)
-                }
-                let lb = tempLine.bezier(at: tempLine.maxBezierIndex - 1)
-                temps = [Temp(control: lc, distance: 0, speed: speed,
-                              time: time, position: lb.p1, length: lb.length())]
+                nLine = Line(controls: [fc, fc, fc, fc],
+                                size: tempLineWidth)
+                times = [time, time, time, time]
+                oldPoint = p
+                oldTime = time
                 oldTempTime = time
                 tempDistance = 0
-            } else if isAppendPointWith(distance: tempDistance,
-                                        deltaTime: time - oldTempTime,
-                                        temps, lastBezier: lb,
-                                        scale: wtsScale) {
-                line.controls[line.controls.count - 3].weight = 0.5
-                let prp = line.controls[line.controls.count - 1]
-                line.controls[line.controls.count - 2] = prp
-                line.controls[line.controls.count - 2].weight = 1
-                
-                line.controls.insert(prp, at: line.controls.count - 1)
-                times.insert(times[times.count - 1], at: times.count - 1)
-                
+                temps = [Temp(control: fc, distance: 0, speed: 0,
+                              time: time, position: fc.point, length: 0)]
+            case .changed:
                 //
-//                document.rootNode.append(child: Node(attitude: Attitude(position: centerOrigin + prp.point),
-//                                                     path: Path(circleRadius: 0.5),
-//                                                     fillType: .color(.selected)))
+    //            document.rootNode.append(child: Node(attitude: Attitude(position: centerOrigin + p),
+    //                                                 path: Path(circleRadius: 0.25),
+    //                                                 fillType: .color(.border)))
+                let tempLine = nLine
                 
-                let lb = line.bezier(at: line.maxBezierIndex - 1)
-                temps = [Temp(control: lc, distance: 0, speed: speed,
-                              time: time, position: lb.p1, length: lb.length())]
-                oldTempTime = time
-                tempDistance = 0
-            }
-            
-            line.controls[line.controls.count - 3].weight = 1
-            line.controls[line.controls.count - 2]
-                = line.controls[line.controls.count - 3].mid(lc)
-            line.controls[line.controls.count - 2].weight = 0.5
-            line.controls[.last] = lc
-            times[times.count - 2] = time
-            times[.last] = time
-            
-            self.tempLine = line
-            lastSpeed = p.distance(oldPoint) / (time - oldTime)
-            oldTime = time
-            oldPoint = p
-            oldPressure = pressure
-        case .ended:
-            document.cursor = Document.defaultCursor
-            
-            guard tempLine.controls.count >= 4 else { return }
-            
-            var line = tempLine
-            line.controls[line.controls.count - 3].weight = 0.5
-            line.controls[line.controls.count - 2] = line.controls.last!
-            line.controls.removeLast()
-            times.removeLast()
-            
-            if line.controls.count == times.count && line.controls.count >= 3 {
-                var fi = times.count
-                for (i, oldTime) in times.enumerated().reversed() {
-                    fi = i
-                    if time - oldTime > 0.04 { break }
-                }
-                fi = min(max(1, line.controls.count - 3), fi)
-                let fpre = line.controls[fi].pressure
-                for i in (fi + 1) ..< line.controls.count {
-                    line.controls[i].pressure = fpre
+                let firstChangedTime: Double
+                if let aTime = oldFirstChangedTime {
+                    firstChangedTime = aTime
+                } else {
+                    oldFirstChangedTime = time
+                    firstChangedTime = time
                 }
                 
-                if line.controls.count > 2 {
-                    var oldC = line.controls.first!
-                    let ll = line.controls.reduce(0.0) {
-                        let n = $0 + $1.point.distance(oldC.point)
-                        oldC = $1
-                        return n
+                if isClip, let nSnapDC = snapDC {
+                    if !nSnapDC.isEmpty && time - firstChangedTime < 0.08 {
+                        snapDC?.point *= 0.75
+                        p += nSnapDC.point * 0.75
+                        
+                        p = p.rounded(decimalPlaces: Int(max(0, .log10(wtsScale)) + 2))
                     }
-                    oldC = line.controls.last!
-                    var l = 0.0
-                    for i in (2 ..< line.controls.count).reversed() {
-                        let p0 = line.controls[i].point,
-                            p1 = line.controls[i - 1].point,
-                            p2 = line.controls[i - 2].point
-                        l += p0.distance(oldC.point)
-                        oldC = line.controls[i]
-                        if time - times[i] > 0.1
-                            || l * wtsScale > 6
-                            || l / ll > 0.05 {
-                            break
+                    p = clipBounds.clipped(p)
+                }
+                
+                guard p != oldPoint && time > oldTime
+                        && tempLine.controls.count >= 4 else { return }
+                let d = p.distance(oldPoint)
+                tempDistance += d
+                
+                prs.append(pressure)
+                
+                let speed = d / (time - oldTime)
+                let lc = Line.Control(point: p, weight: 0.5, pressure: pressure)
+                var lb = nLine.bezier(at: nLine.maxBezierIndex - 1)
+                lb.p1 = lb.cp.mid(lc.point)
+                temps.append(Temp(control: lc, distance: tempDistance, speed: speed,
+                                  time: time, position: lb.p1, length: lb.length()))
+                
+                if !isStopFirstPressure {
+                    let pre: Double
+                    if isClip, let snapDC = snapDC {
+                        if (nLine.size * pressure).absRatio(snapSize) < 1.5 {
+                            pre = snapDC.pressure
+                        } else {
+                            pre = pressure
                         }
-                        let dr = abs(Point.differenceAngle(p0, p1, p2))
-                        if dr > .pi * 0.3 {
-                            let nCount = line.controls.count - i
-                            line.controls.removeLast(nCount)
-                            times.removeLast(nCount)
-                            break
-                        }
-                    }
-                }
-            }
-            
-            if isSnap, let nc = snap(.last, line) {
-                line.controls[.last] = nc
-            }
-            
-            let edge = Edge(line.firstPoint, line.lastPoint)
-            let length = edge.length
-            if length > 0 {
-                let lScale = length.clipped(min: 20 * document.screenToWorldScale,
-                                            max: 200 * document.screenToWorldScale,
-                                            newMin: 0, newMax: 0.5)
-                if line.straightDistance() * wtsScale < lScale {
-                    line.controls = [line.controls.first!, line.controls.last!]
-                    let pd = line.controls.first!.pressure
-                        .distance(line.controls.last!.pressure)
-                    if pd < 0.1 {
-                        let pres = max(line.controls.first!.pressure,
-                                       line.controls.last!.pressure)
-                        line.controls[.first].pressure = pres
-                        line.controls[.last].pressure = pres
-                    }
-                }
-            }
-            
-            self.tempLine = line
-        }
-    }
-    
-    func drawStraightLine(for p: Point, sp: Point, pressure: Double,
-                          time: Double, isClip: Bool = true,
-                          isSnap: Bool = true, _ phase: Phase) {
-        let wtsScale = document.worldToScreenScale
-        var p = p.rounded(decimalPlaces: Int(max(0, .log10(wtsScale)) + 2))
-        let pressure = revision(pressure: pressure).rounded(decimalPlaces: 2)
-        
-        switch phase {
-        case .began:
-            document.cursor = Document.defaultCursor
-            
-            if isClip {
-                p = clipBounds.clipped(p)
-            }
-            tempLineWidth = document.sheetLineWidth
-            var fc = Line.Control(point: p, weight: 0.5, pressure: pressure)
-            if isSnap,
-               let (snapSize, snapC) = snap(fc, nil, size: tempLineWidth) {
-                snapDC = Line.Control(point: snapC.point - fc.point,
-                                      weight: 0,
-                                      pressure: snapC.pressure)
-                fc.point = snapC.point
-                self.snapSize = snapSize
-            }
-            let line = Line(controls: [fc, fc],
-                            size: tempLineWidth)
-            self.tempLine = line
-            times = [time, time]
-            firstPoint = p
-            firstTime = time
-            oldPoint = p
-            oldTime = time
-            lastSpeed = 0
-            oldTempTime = time
-            tempDistance = 0
-            temps = [Temp(control: fc, distance: 0, speed: 0,
-                          time: time, position: fc.point, length: 0)]
-            prs = [pressure]
-            oldPressure = pressure
-            isSnapStraight = false
-        case .changed:
-            let firstChangedTime: Double
-            if let aTime = self.firstChangedTime {
-                firstChangedTime = aTime
-            } else {
-                self.firstChangedTime = time
-                firstChangedTime = time
-            }
-            
-            if isClip, let snapDC = snapDC {
-                if !snapDC.isEmpty && time - firstChangedTime < 0.08 {
-                    self.snapDC?.point *= 0.75
-                    p += snapDC.point * 0.75
-                    
-                    p = p.rounded(decimalPlaces: Int(max(0, .log10(wtsScale)) + 2))
-                }
-                p = clipBounds.clipped(p)
-            }
-            
-            guard p != oldPoint && time > oldTime else { return }
-            var line = tempLine
-            let d = p.distance(oldPoint)
-            tempDistance += d
-            
-            prs.append(pressure)
-            
-            let speed = d / (time - oldTime)
-            let lc = Line.Control(point: p, weight: 0.5, pressure: pressure)
-            var lb = line.bezier(at: line.maxBezierIndex - 1)
-            lb.p1 = lb.cp.mid(lc.point)
-            temps.append(Temp(control: lc, distance: tempDistance, speed: speed,
-                              time: time, position: lb.p1, length: lb.length()))
-            
-            if time - firstChangedTime < 0.1 {
-                let pre: Double
-                if isClip, let snapDC = snapDC {
-                    if (line.size * pressure).absRatio(snapSize) < 1.5 {
-                        pre = snapDC.pressure
                     } else {
                         pre = pressure
                     }
-                } else {
-                    pre = pressure
-                }
-                if line.controls[.first].pressure < pre {
-                    for i in 0 ..< line.controls.count {
-                        line.controls[i].pressure = pre
+                    if nLine.controls[.first].pressure < pre {
+                        for i in 0 ..< nLine.controls.count {
+                            nLine.controls[i].pressure = pre
+                        }
+                        temps = temps.map {
+                            var temp = $0
+                            temp.control.pressure = pre
+                            return temp
+                        }
                     }
                 }
-            }
-            
-            line.controls[.last] = lc
-            
-            let fp = line.firstPoint, lp = lc.point
-            let llp: Point
-            let ls = line.size / 2 * wtsScale
-            let maxAxisD = max(ls, 2.5), maxD = 50.0, snapSpeed = 100.0
-            let dp = lp - fp
-            if abs(dp.x) > abs(dp.y) {
-                let dx = abs(dp.x * wtsScale).clipped(min: 0, max: maxD,
-                                                      newMin: 0, newMax: maxAxisD)
-                if abs(dp.y) * wtsScale < dx && LineEditor.speed(from: temps, at: temps.count - 1) * wtsScale < snapSpeed, time - firstChangedTime > 0.1 {
-                    llp = Point(lp.x, fp.y)
-                    isSnapStraight = true
-                    lastSnapStraightTime = time
-                } else if time - lastSnapStraightTime < 0.1 {
-                    llp = Point(lp.x, fp.y)
-                } else {
-                    llp = lp
-                    isSnapStraight = false
+                if time - firstChangedTime > 0.075 {
+                     isStopFirstPressure = true
                 }
-            } else {
-                let dy = abs(dp.y * wtsScale).clipped(min: 0, max: maxD,
-                                                      newMin: 0, newMax: maxAxisD)
-                if abs(dp.x) * wtsScale < dy && LineEditor.speed(from: temps, at: temps.count - 1) * wtsScale < snapSpeed, time - firstChangedTime > 0.1 {
-                    llp = Point(fp.x, lp.y)
-                    isSnapStraight = true
-                    lastSnapStraightTime = time
-                }  else if time - lastSnapStraightTime < 0.1 {
-                    llp = Point(fp.x, lp.y)
-                } else {
-                    llp = lp
-                    isSnapStraight = false
+                
+                if nLine.controls.count == 4, temps.count >= 2 {
+                    var maxL = 0.0
+                    for i in 0 ..< (temps.count - 1) {
+                        let edge = Edge(temps[i].control.point,
+                                        temps[i + 1].control.point)
+                        maxL += edge.length
+                    }
+                    let d = maxL / 4
+                    var l = 0.0, maxP = nLine.firstPoint
+                    for i in 0 ..< (temps.count - 1) {
+                        let edge = Edge(temps[i].control.point,
+                                        temps[i + 1].control.point)
+                        let el = edge.length
+                        if el > 0 && d >= l && d < l + el {
+                            maxP = edge.position(atT: (d - l) / el)
+                        }
+                        l += el
+                    }
+                    nLine.controls[nLine.controls.count - 3].point = maxP
                 }
-            }
-            
-            if prs.count == temps.count {
-                var fpre = prs.last!
-                for (i, oldTemp) in temps.enumerated().reversed() {
-                    if time - oldTemp.time < 0.3 {
-                        fpre = max(fpre, prs[i])
+                
+                let mp = lc.point.mid(temps[temps.count - 1].control.point)
+                let mpr = lc.pressure.mid(temps[temps.count - 1].control.pressure)
+                let mlc = Line.Control(point: mp, weight: 0.5, pressure: mpr)
+                if var jc = joinControlWith(nLine, lastControl: mlc) {
+                    if time - firstChangedTime < 0.02 {
+                        jc.weight = 0.5
+                        nLine.controls = [jc, jc, jc, jc]
+                        times = [time, time, time, time]
                     } else {
-                        break
+                        //
+    //                    document.rootNode.append(child: Node(attitude: Attitude(position: centerOrigin + jc.point),
+    //                                                         path: Path(circleRadius: 1),
+    //                                                         fillType: .color(.selected)))
+                        
+                        nLine.controls[nLine.controls.count - 3].weight = 0.5
+                        jc.weight = 1
+                        
+                        nLine.controls.insert(jc, at: nLine.controls.count - 2)
+                        times.insert(time, at: times.count - 2)
+                    }
+                    let lb = tempLine.bezier(at: tempLine.maxBezierIndex - 1)
+                    temps = [Temp(control: lc, distance: 0, speed: speed,
+                                  time: time, position: lb.p1, length: lb.length())]
+                    oldTempTime = time
+                    tempDistance = 0
+                } else if isAppendPointWith(distance: tempDistance,
+                                            deltaTime: time - oldTempTime,
+                                            temps, lastBezier: lb,
+                                            scale: wtsScale) {
+                    nLine.controls[nLine.controls.count - 3].weight = 0.5
+                    let prp = nLine.controls[nLine.controls.count - 1]
+                    nLine.controls[nLine.controls.count - 2] = prp
+                    nLine.controls[nLine.controls.count - 2].weight = 1
+                    
+                    nLine.controls.insert(prp, at: nLine.controls.count - 1)
+                    times.insert(times[times.count - 1], at: times.count - 1)
+                    
+                    //
+    //                document.rootNode.append(child: Node(attitude: Attitude(position: centerOrigin + prp.point),
+    //                                                     path: Path(circleRadius: 0.5),
+    //                                                     fillType: .color(.selected)))
+                    
+                    let lb = nLine.bezier(at: nLine.maxBezierIndex - 1)
+                    temps = [Temp(control: lc, distance: 0, speed: speed,
+                                  time: time, position: lb.p1, length: lb.length())]
+                    oldTempTime = time
+                    tempDistance = 0
+                }
+                
+                nLine.controls[nLine.controls.count - 3].weight = 1
+                nLine.controls[nLine.controls.count - 2]
+                    = nLine.controls[nLine.controls.count - 3].mid(lc)
+                nLine.controls[nLine.controls.count - 2].weight = 0.5
+                nLine.controls[.last] = lc
+                times[times.count - 2] = time
+                times[.last] = time
+                
+                oldTime = time
+                oldPoint = p
+            case .ended:
+                guard nLine.controls.count >= 4 else { return }
+                
+                nLine.controls[nLine.controls.count - 3].weight = 0.5
+                nLine.controls[nLine.controls.count - 2] = nLine.controls.last!
+                nLine.controls.removeLast()
+                times.removeLast()
+                
+                if nLine.controls.count == times.count && nLine.controls.count >= 3 {
+                    var fi = times.count
+                    for (i, oldTime) in times.enumerated().reversed() {
+                        fi = i
+                        if time - oldTime > 0.04 { break }
+                    }
+                    fi = min(max(1, nLine.controls.count - 3), fi)
+                    let fpre = nLine.controls[fi].pressure
+                    for i in (fi + 1) ..< nLine.controls.count {
+                        nLine.controls[i].pressure = fpre
+                    }
+                    
+                    if nLine.controls.count > 2 {
+                        var oldC = nLine.controls.first!
+                        let ll = nLine.controls.reduce(0.0) {
+                            let n = $0 + $1.point.distance(oldC.point)
+                            oldC = $1
+                            return n
+                        }
+                        oldC = nLine.controls.last!
+                        var l = 0.0
+                        for i in (2 ..< nLine.controls.count).reversed() {
+                            let p0 = nLine.controls[i].point,
+                                p1 = nLine.controls[i - 1].point,
+                                p2 = nLine.controls[i - 2].point
+                            l += p0.distance(oldC.point)
+                            oldC = nLine.controls[i]
+                            if time - times[i] > 0.1
+                                || l * wtsScale > 6
+                                || l / ll > 0.05 {
+                                break
+                            }
+                            let dr = abs(Point.differenceAngle(p0, p1, p2))
+                            if dr > .pi * 0.3 {
+                                let nCount = nLine.controls.count - i
+                                nLine.controls.removeLast(nCount)
+                                times.removeLast(nCount)
+                                break
+                            }
+                        }
                     }
                 }
-                line.controls[.last].pressure = fpre
+                
+                if isSnap, let nc = snap(.last, nLine,
+                                         worldToScreenScale: worldToScreenScale,
+                                         screenToWorldScale: screenToWorldScale,
+                                         from: lastSnapLines) {
+                    nLine.controls[.last] = nc
+                }
+                
+                let edge = Edge(nLine.firstPoint, nLine.lastPoint)
+                let length = edge.length
+                if length > 0 {
+                    let lScale = length.clipped(min: 20 * screenToWorldScale,
+                                                max: 200 * screenToWorldScale,
+                                                newMin: 0, newMax: 0.5)
+                    if nLine.straightDistance() * wtsScale < lScale {
+                        nLine.controls = [nLine.controls.first!, nLine.controls.last!]
+                        let pd = nLine.controls.first!.pressure
+                            .distance(nLine.controls.last!.pressure)
+                        if pd < 0.1 {
+                            let pres = max(nLine.controls.first!.pressure,
+                                           nLine.controls.last!.pressure)
+                            nLine.controls[.first].pressure = pres
+                            nLine.controls[.last].pressure = pres
+                        }
+                    }
+                }
             }
+        }
+        
+        for event in events {
+            drawLine(for: event.p, sp: event.sp, pressure: event.pressure,
+                     time: event.time, isClip: isClip, isSnap: isSnap,
+                     worldToScreenScale: event.worldToScreenScale,
+                     screenToWorldScale: event.screenToWorldScale, sheetLineWidth: tempLineWidth,
+                     event.phase)
+        }
+        
+        return nLine
+    }
+    
+    static func straightLine(from events: [DrawLineEvent],
+                             isClip: Bool = true,
+                             isSnap: Bool = true,
+                             firstSnapLines: [Line], lastSnapLines: [Line],
+                             clipBounds: Rect) -> (line: Line, snapStraight: Bool) {
+        var nLine = Line()
+        
+        var temps = [Temp]()
+        var oldPoint = Point(), tempDistance = 0.0
+        var oldFirstChangedTime: Double?, oldTime = 0.0
+        var prs = [Double](), snapDC: Line.Control?, snapSize = 0.0
+        var tempLineWidth = Line.defaultLineWidth
+        var isSnapStraight = false
+        var lastSnapStraightTime = 0.0
+        
+        func drawLine(for p: Point, sp: Point, pressure: Double,
+                      time: Double, isClip: Bool = true,
+                      isSnap: Bool = true,
+                      worldToScreenScale: Double,
+                      screenToWorldScale: Double,
+                      sheetLineWidth: Double,
+                      _ phase: Phase) {
+            let wtsScale = worldToScreenScale
+            var p = p.rounded(decimalPlaces: Int(max(0, .log10(wtsScale)) + 2))
+            let pressure = Self.revision(pressure: pressure).rounded(decimalPlaces: 2)
             
-            if let aLine = snapStraightLine(with: line, fp: fp, lp: llp) {
-                line = aLine
-            }
-            
-            self.tempLine = line
-            lastSpeed = p.distance(oldPoint) / (time - oldTime)
-            oldTime = time
-            oldPoint = p
-            oldPressure = pressure
-        case .ended:
-            document.cursor = Document.defaultCursor
-            
-            guard tempLine.controls.count == 2 else { return }
-            
-            var line = tempLine
-            
-            if prs.count == temps.count {
-                var fpre = prs.last!
-                for (i, oldTemp) in temps.enumerated().reversed() {
-                    if time - oldTemp.time < 0.3 {
-                        fpre = max(fpre, prs[i])
+            switch phase {
+            case .began:
+                if isClip {
+                    p = clipBounds.clipped(p)
+                }
+                tempLineWidth = sheetLineWidth
+                var fc = Line.Control(point: p, weight: 0.5, pressure: pressure)
+                if isSnap,
+                   let (nSnapSize, snapC) = Self.snap(fc, nil, size: tempLineWidth,
+                                                     worldToScreenScale: worldToScreenScale,
+                                                     screenToWorldScale: screenToWorldScale,
+                                                     from: firstSnapLines) {
+                    snapDC = Line.Control(point: snapC.point - fc.point,
+                                          weight: 0,
+                                          pressure: snapC.pressure)
+                    fc.point = snapC.point
+                    snapSize = nSnapSize
+                }
+                nLine = Line(controls: [fc, fc],
+                             size: tempLineWidth)
+                oldPoint = p
+                oldTime = time
+                tempDistance = 0
+                temps = [Temp(control: fc, distance: 0, speed: 0,
+                              time: time, position: fc.point, length: 0)]
+                prs = [pressure]
+                isSnapStraight = false
+            case .changed:
+                let firstChangedTime: Double
+                if let aTime = oldFirstChangedTime {
+                    firstChangedTime = aTime
+                } else {
+                    oldFirstChangedTime = time
+                    firstChangedTime = time
+                }
+                
+                if isClip, let nSnapDC = snapDC {
+                    if !nSnapDC.isEmpty && time - firstChangedTime < 0.08 {
+                        snapDC?.point *= 0.75
+                        p += nSnapDC.point * 0.75
+                        
+                        p = p.rounded(decimalPlaces: Int(max(0, .log10(wtsScale)) + 2))
+                    }
+                    p = clipBounds.clipped(p)
+                }
+                
+                guard p != oldPoint && time > oldTime else { return }
+                let d = p.distance(oldPoint)
+                tempDistance += d
+                
+                prs.append(pressure)
+                
+                let speed = d / (time - oldTime)
+                let lc = Line.Control(point: p, weight: 0.5, pressure: pressure)
+                var lb = nLine.bezier(at: nLine.maxBezierIndex - 1)
+                lb.p1 = lb.cp.mid(lc.point)
+                temps.append(Temp(control: lc, distance: tempDistance, speed: speed,
+                                  time: time, position: lb.p1, length: lb.length()))
+                
+                if time - firstChangedTime < 0.1 {
+                    let pre: Double
+                    if isClip, let snapDC = snapDC {
+                        if (nLine.size * pressure).absRatio(snapSize) < 1.5 {
+                            pre = snapDC.pressure
+                        } else {
+                            pre = pressure
+                        }
                     } else {
-                        break
+                        pre = pressure
+                    }
+                    if nLine.controls[.first].pressure < pre {
+                        for i in 0 ..< nLine.controls.count {
+                            nLine.controls[i].pressure = pre
+                        }
                     }
                 }
-                if abs(line.controls.first!.pressure - fpre) < 0.2 {
-                    fpre = line.controls.first!.pressure
-                }
-                line.controls[.last].pressure = fpre
-            }
-            
-            if isSnap, let nc = snap(.last, line) {
-                line.controls[.last] = nc
-                if let nLine = snapStraightLine(with: line,
-                                                fp: line.firstPoint,
-                                                lp: nc.point) {
-                    line = nLine
-                }
-            }
-            
-            if time - lastSnapStraightTime < 0.2 {
-                let fp = line.firstPoint, lp = line.lastPoint
+                
+                nLine.controls[.last] = lc
+                
+                let fp = nLine.firstPoint, lp = lc.point
                 let llp: Point
+                let ls = nLine.size / 2 * wtsScale
+                let maxAxisD = max(ls, 2.5), maxD = 50.0, snapSpeed = 100.0
                 let dp = lp - fp
                 if abs(dp.x) > abs(dp.y) {
-                    llp = Point(lp.x, fp.y)
+                    let dx = abs(dp.x * wtsScale).clipped(min: 0, max: maxD,
+                                                          newMin: 0, newMax: maxAxisD)
+                    if abs(dp.y) * wtsScale < dx && LineEditor.speed(from: temps, at: temps.count - 1) * wtsScale < snapSpeed, time - firstChangedTime > 0.1 {
+                        llp = Point(lp.x, fp.y)
+                        isSnapStraight = true
+                        lastSnapStraightTime = time
+                    } else if time - lastSnapStraightTime < 0.1 {
+                        llp = Point(lp.x, fp.y)
+                    } else {
+                        llp = lp
+                        isSnapStraight = false
+                    }
                 } else {
-                    llp = Point(fp.x, lp.y)
+                    let dy = abs(dp.y * wtsScale).clipped(min: 0, max: maxD,
+                                                          newMin: 0, newMax: maxAxisD)
+                    if abs(dp.x) * wtsScale < dy && LineEditor.speed(from: temps, at: temps.count - 1) * wtsScale < snapSpeed, time - firstChangedTime > 0.1 {
+                        llp = Point(fp.x, lp.y)
+                        isSnapStraight = true
+                        lastSnapStraightTime = time
+                    }  else if time - lastSnapStraightTime < 0.1 {
+                        llp = Point(fp.x, lp.y)
+                    } else {
+                        llp = lp
+                        isSnapStraight = false
+                    }
                 }
-                if let aLine = snapStraightLine(with: line, fp: fp, lp: llp) {
-                    line = aLine
+                
+                if prs.count == temps.count {
+                    var fpre = prs.last!
+                    for (i, oldTemp) in temps.enumerated().reversed() {
+                        if time - oldTemp.time < 0.3 {
+                            fpre = max(fpre, prs[i])
+                        } else {
+                            break
+                        }
+                    }
+                    nLine.controls[.last].pressure = fpre
+                }
+                
+                if let aLine = snapStraightLine(with: nLine, fp: fp, lp: llp) {
+                    nLine = aLine
+                }
+                
+                oldTime = time
+                oldPoint = p
+            case .ended:
+                guard nLine.controls.count == 2 else { return }
+                
+                if prs.count == temps.count {
+                    var fpre = prs.last!
+                    for (i, oldTemp) in temps.enumerated().reversed() {
+                        if time - oldTemp.time < 0.3 {
+                            fpre = max(fpre, prs[i])
+                        } else {
+                            break
+                        }
+                    }
+                    if abs(nLine.controls.first!.pressure - fpre) < 0.2 {
+                        fpre = nLine.controls.first!.pressure
+                    }
+                    nLine.controls[.last].pressure = fpre
+                }
+                
+                if isSnap, let nc = Self.snap(.last, nLine,
+                                              worldToScreenScale: worldToScreenScale,
+                                              screenToWorldScale: screenToWorldScale,
+                                              from: lastSnapLines) {
+                    nLine.controls[.last] = nc
+                    if let nnLine = snapStraightLine(with: nLine,
+                                                    fp: nLine.firstPoint,
+                                                    lp: nc.point) {
+                        nLine = nnLine
+                    }
+                }
+                
+                if time - lastSnapStraightTime < 0.2 {
+                    let fp = nLine.firstPoint, lp = nLine.lastPoint
+                    let llp: Point
+                    let dp = lp - fp
+                    if abs(dp.x) > abs(dp.y) {
+                        llp = Point(lp.x, fp.y)
+                    } else {
+                        llp = Point(fp.x, lp.y)
+                    }
+                    if let aLine = snapStraightLine(with: nLine, fp: fp, lp: llp) {
+                        nLine = aLine
+                    }
                 }
             }
-            
-            self.tempLine = line
         }
+        
+        for event in events {
+            drawLine(for: event.p, sp: event.sp, pressure: event.pressure,
+                     time: event.time, isClip: isClip, isSnap: isSnap,
+                     worldToScreenScale: event.worldToScreenScale,
+                     screenToWorldScale: event.screenToWorldScale, sheetLineWidth: tempLineWidth,
+                     event.phase)
+        }
+        
+        return (nLine, isSnapStraight)
     }
     
-    func snapStraightLine(with line: Line, fp: Point, lp: Point) -> Line? {
+    static func snapStraightLine(with line: Line,
+                                 fp: Point, lp: Point) -> Line? {
         let ol = line.pointsLength
         guard ol > 0 else {
             return nil
@@ -1333,10 +1393,24 @@ final class LineEditor: Editor {
         ?? Line.defaultUUColor
     }
     
+    struct DrawLineEvent {
+        var p: Point,
+            sp: Point, pressure: Double,
+            time: Double, isClip: Bool = true,
+            isSnap: Bool = true,
+            worldToScreenScale: Double, screenToWorldScale: Double,
+            phase: Phase
+    }
+    var drawLineTimer: DispatchSourceTimer?, oldDrawLineEventsCount = 0
+    var drawLineEvents = [DrawLineEvent](), drawLineEventsCount = 0, snapLines = [Line]()
     var textView: SheetTextView?
+    
     func drawLine(with event: DragEvent, isStraight: Bool) {
         let p = document.convertScreenToWorld(event.screenPoint)
-        if event.phase == .began {
+        switch event.phase {
+        case .began:
+            document.cursor = Document.defaultCursor
+            
             updateClipBoundsAndIndexRange(at: p)
             let tempLineNode = Node(attitude: Attitude(position: centerOrigin),
                                     path: Path(),
@@ -1346,31 +1420,78 @@ final class LineEditor: Editor {
             document.rootNode.insert(child: tempLineNode,
                                      at: document.accessoryNodeIndex)
             
+            snapLines = document.sheetView(at: centerSHP)?
+                .model.picture.lines ?? []
+            
+            drawLineEvents.append(.init(p: p - centerOrigin,
+                                        sp: event.screenPoint, pressure: event.pressure, 
+                                        time: event.time,
+                                        worldToScreenScale: document.worldToScreenScale,
+                                        screenToWorldScale: document.screenToWorldScale,
+                                        phase: .began))
+            
             if isStraight {
                 let isStraightNode = Node(fillType: .color(.subSelected))
                 self.isStraightNode = isStraightNode
                 document.rootNode.insert(child: isStraightNode,
                                          at: document.accessoryNodeIndex + 1)
-            }
-        }
-        if isStraight {
-            drawStraightLine(for: p - centerOrigin, sp: event.screenPoint,
-                             pressure: event.pressure,
-                             time: event.time, event.phase)
-        } else {
-            drawLine(for: p - centerOrigin, sp: event.screenPoint,
-                     pressure: event.pressure,
-                     time: event.time, event.phase)
-        }
-        switch event.phase {
-        case .began:
-            if isStraight {
+                firstPoint = (p - centerOrigin).rounded(decimalPlaces: Int(max(0, .log10(document.worldToScreenScale)) + 2))
                 updateStraightNode()
+            }
+            
+            drawLineTimer = DispatchSource.scheduledTimer(withTimeInterval: 1 / 60) { [weak self] in
+                DispatchQueue.main.async {
+                    guard let self, !(self.drawLineTimer?.isCancelled ?? true) else { return }
+                    if self.drawLineEvents.count != self.oldDrawLineEventsCount {
+                        let events = self.drawLineEvents
+                        self.oldDrawLineEventsCount = events.count
+                        let snapLines = self.snapLines, clipBounds = self.clipBounds
+                        DispatchQueue.global().async {
+                            let (tempLine, isSnapStraight) = Self.line(from: events,
+                                                                       firstSnapLines: snapLines,
+                                                                       lastSnapLines: snapLines,
+                                                                       clipBounds: clipBounds,
+                                                                       isStraight: isStraight)
+                            let path = Path(tempLine)
+                            let (linePathData, linePathBufferVertexCounts) = path.linePointsDataWith(lineWidth: tempLine.size)
+                            DispatchQueue.main.async { [weak self] in
+                                guard let self, !(self.drawLineTimer?.isCancelled ?? true),
+                                        events.count > self.drawLineEventsCount else { return }
+                                self.tempLineNode?.update(path: path,
+                                                          withLinePathData: linePathData,
+                                                          bufferVertexCounts: linePathBufferVertexCounts)
+                                self.isSnapStraight = isSnapStraight
+                                self.drawLineEventsCount = events.count
+                            }
+                        }
+                    }
+                }
             }
             break
         case .changed:
-            tempLineNode?.path = Path(tempLine)
+            drawLineEvents.append(.init(p: p - centerOrigin,
+                                        sp: event.screenPoint, pressure: event.pressure,
+                                        time: event.time,
+                                        worldToScreenScale: document.worldToScreenScale,
+                                        screenToWorldScale: document.screenToWorldScale,
+                                        phase: .changed))
         case .ended:
+            document.cursor = Document.defaultCursor
+            
+            drawLineTimer?.cancel()
+            
+            drawLineEvents.append(.init(p: p - centerOrigin,
+                                        sp: event.screenPoint, pressure: event.pressure, 
+                                        time: event.time,
+                                        worldToScreenScale: document.worldToScreenScale,
+                                        screenToWorldScale: document.screenToWorldScale,
+                                        phase: .ended))
+            var tempLine = Self.line(from: drawLineEvents,
+                                     firstSnapLines: snapLines,
+                                     lastSnapLines: snapLines,
+                                     clipBounds: clipBounds,
+                                     isStraight: isStraight).line
+            
             guard let lb = tempLine.bounds else {
                 tempLineNode?.removeFromParent()
                 tempLineNode = nil
@@ -1380,6 +1501,7 @@ final class LineEditor: Editor {
                 }
                 return
             }
+            
             tempLine.uuColor = lineUUColor(atWorld: p)
             if centerBounds.contains(lb),
                let sheetView = document.madeSheetView(at: centerSHP) {
@@ -1442,6 +1564,8 @@ final class LineEditor: Editor {
         let p = document.convertScreenToWorld(event.screenPoint)
         switch event.phase {
         case .began:
+            document.cursor = Document.defaultCursor
+            
             var isScore = false
             if let sheetView = document.sheetView(at: p) {
                 if sheetView.model.texts.contains(where: { $0.timeframe?.score != nil }) {
@@ -1490,27 +1614,82 @@ final class LineEditor: Editor {
                 document.rootNode.append(child: rectNode)
             }
             
-            drawLine(for: p - centerOrigin, sp: event.screenPoint,
-                     pressure: event.pressure,
-                     time: event.time, isClip: isEditingSheet, isSnap: false, event.phase)
-        case .changed:
-            drawLine(for: p - centerOrigin, sp: event.screenPoint,
-                     pressure: event.pressure,
-                     time: event.time, isClip: isEditingSheet, isSnap: false, event.phase)
+            drawLineEvents.append(.init(p: p - centerOrigin,
+                                        sp: event.screenPoint, 
+                                        pressure: event.pressure,
+                                        time: event.time,
+                                        isClip: isEditingSheet,
+                                        isSnap: false, 
+                                        worldToScreenScale: document.worldToScreenScale,
+                                        screenToWorldScale: document.screenToWorldScale,
+                                        phase: .began))
             
-            let path = tempLine.path(isClosed: true, isPolygon: false)
-            outlineLassoNode?.path = path
-            lassoNode?.path = path
+            snapLines = document.sheetView(at: centerSHP)?
+                .model.picture.lines ?? []
             
-            if isEditingSheet {
-                updateSelectingText()
-            } else {
-                updateSelectingSheetNodes(with: tempLine)
+            drawLineTimer = DispatchSource.scheduledTimer(withTimeInterval: 1 / 60) { [weak self] in
+                DispatchQueue.main.async {
+                    guard let self, !(self.drawLineTimer?.isCancelled ?? true) else { return }
+                    if self.drawLineEvents.count != self.oldDrawLineEventsCount {
+                        let events = self.drawLineEvents
+                        self.oldDrawLineEventsCount = events.count
+                        let snapLines = self.snapLines, clipBounds = self.clipBounds
+                        DispatchQueue.global().async {
+                            let (tempLine, _) = Self.line(from: events,
+                                                                       firstSnapLines: snapLines,
+                                                                       lastSnapLines: snapLines,
+                                                                       clipBounds: clipBounds,
+                                                                       isStraight: false)
+                            let path = tempLine.path(isClosed: true, isPolygon: false)
+                            DispatchQueue.main.async { [weak self] in
+                                guard let self, !(self.drawLineTimer?.isCancelled ?? true),
+                                        events.count > self.drawLineEventsCount else { return }
+                                
+                                self.outlineLassoNode?.path = path
+                                self.lassoNode?.path = path
+                                
+                                if self.isEditingSheet {
+                                    self.updateSelectingText()
+                                } else {
+                                    self.updateSelectingSheetNodes(with: tempLine)
+                                }
+                                
+                                self.drawLineEventsCount = events.count
+                            }
+                        }
+                    }
+                }
             }
+        case .changed:
+            drawLineEvents.append(.init(p: p - centerOrigin,
+                                        sp: event.screenPoint, 
+                                        pressure: event.pressure,
+                                        time: event.time,
+                                        isClip: isEditingSheet,
+                                        isSnap: false, 
+                                        worldToScreenScale: document.worldToScreenScale,
+                                        screenToWorldScale: document.screenToWorldScale,
+                                        phase: .changed))
         case .ended:
-            drawLine(for: p - centerOrigin, sp: event.screenPoint,
-                     pressure: event.pressure,
-                     time: event.time, isClip: isEditingSheet, isSnap: false, event.phase)
+            document.cursor = Document.defaultCursor
+            
+            drawLineTimer?.cancel()
+            
+            drawLineEvents.append(.init(p: p - centerOrigin,
+                                        sp: event.screenPoint,
+                                        pressure: event.pressure,
+                                        time: event.time,
+                                        isClip: isEditingSheet,
+                                        isSnap: false,
+                                        worldToScreenScale: document.worldToScreenScale,
+                                        screenToWorldScale: document.screenToWorldScale,
+                                        phase: .ended))
+            
+            tempLine = Self.line(from: drawLineEvents,
+                                 firstSnapLines: snapLines,
+                                 lastSnapLines: snapLines,
+                                 clipBounds: clipBounds,
+                                 isStraight: false).line
             
             switch type {
             case .cut:

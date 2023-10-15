@@ -317,6 +317,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     let renderstate = Renderstate.sampleCount4!
     
     var isShownDebug = false
+    var isShownClock = false
     private var updateDebugCount = 0
     private let debugNode = Node(attitude: Attitude(position: Point(5, 5)),
                                  fillType: .color(.content))
@@ -1823,10 +1824,10 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 let nPinchDistance = nps0.distance(nps1)
                 let nRotateAngle = nps0.angle(nps1)
                 let nScrollPosition = nps0.mid(nps1)
-                
                 if isEnabledPinch
                     && !isBeganScroll && !isBeganPinch && !isBeganRotate
-                    && abs(nPinchDistance - oldPinchDistance) > 8
+                    && abs(Edge(ops0, ps0).angle(Edge(ops1, ps1))) > .pi / 2
+                    && abs(nPinchDistance - oldPinchDistance) > 6
                     && nScrollPosition.distance(oldScrollPosition) <= 5 {
                     
                     isBeganPinch = true
@@ -1854,7 +1855,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 } else if isEnabledScroll
                             && !isBeganScroll && !isBeganPinch
                             && !isBeganRotate
-                            && abs(nPinchDistance - oldPinchDistance) <= 8
+                            && abs(nPinchDistance - oldPinchDistance) <= 6
                             && nScrollPosition.distance(oldScrollPosition) > 5 {
                     
                     isBeganScroll = true
@@ -1915,7 +1916,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 } else if isEnabledRotate
                             && !isBeganScroll && !isBeganPinch && !isBeganRotate
                             && nPinchDistance > 120
-                            && abs(nPinchDistance - oldPinchDistance) <= 8
+                            && abs(nPinchDistance - oldPinchDistance) <= 6
                             && nScrollPosition.distance(oldScrollPosition) <= 5
                             && abs(nRotateAngle.differenceRotation(oldRotateAngle)) > .pi * 0.02 {
                     
@@ -2449,7 +2450,7 @@ extension SubMTKView {
             let wtsScale = document.worldToScreenScale
             document.rootNode.draw(with: wtvTransform, scale: wtsScale, in: ctx)
             
-            if isShownDebug {
+            if isShownDebug || isShownClock {
                 drawDebugNode(in: ctx)
             }
             if !isHiddenActionList {
@@ -2471,8 +2472,10 @@ extension SubMTKView {
             let debugGPUSize = Int(Double(size) / (1024 * 1024))
             let maxSize = Renderer.shared.device.recommendedMaxWorkingSetSize
             let debugMaxGPUSize = Int(Double(maxSize) / (1024 * 1024))
-            let string = "GPU Memory: \(debugGPUSize) / \(debugMaxGPUSize) MB"
-            debugNode.path = Text(string: string).typesetter.path()
+            let string0 = isShownClock ? "\(Date().defaultString)" : ""
+            let string1 = isShownDebug ? "GPU Memory: \(debugGPUSize) / \(debugMaxGPUSize) MB" : ""
+            print(string0)
+            debugNode.path = Text(string: string0 + (isShownClock && isShownDebug ? " " : "") + string1).typesetter.path()
         }
         let t = document.screenToViewportTransform
         debugNode.draw(with: t, scale: 1, in: context)
@@ -3486,13 +3489,18 @@ struct Texture {
         guard let cgImage = CGImageSourceCreateImageAtIndex(cgImageSource, 0, nil) else {
             return nil
         }
+        return bytesData(with: cgImage)
+    }
+    static func bytesData(with Image: Image) -> BytesData? {
+        bytesData(with: Image.cg)
+    }
+    static func bytesData(with cgImage: CGImage) -> BytesData? {
         guard let dp = cgImage.dataProvider, let nData = dp.data else {
             return nil
         }
         return BytesData(data: nData as Data,
                          width: cgImage.width, height: cgImage.height,
                          bytesPerRow: cgImage.bytesPerRow)
-        
     }
     init?(bytesData: BytesData, isOpaque: Bool) {
         let colorSpace = Renderer.shared.imageColorSpace

@@ -842,6 +842,18 @@ struct PBDate {
   init() {}
 }
 
+struct PBImage {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var data: Data = Data()
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 struct PBContent {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -3443,6 +3455,14 @@ struct PBPastableObject {
     set {value = .timeframe(newValue)}
   }
 
+  var image: PBImage {
+    get {
+      if case .image(let v)? = value {return v}
+      return PBImage()
+    }
+    set {value = .image(newValue)}
+  }
+
   var beatRange: PBRationalRange {
     get {
       if case .beatRange(let v)? = value {return v}
@@ -3521,6 +3541,7 @@ struct PBPastableObject {
     case animation(PBAnimation)
     case ids(PBInterOptionsValue)
     case timeframe(PBTimeframe)
+    case image(PBImage)
     case beatRange(PBRationalRange)
     case normalizationValue(Double)
     case normalizationRationalValue(PBRational)
@@ -3578,6 +3599,10 @@ struct PBPastableObject {
       }()
       case (.timeframe, .timeframe): return {
         guard case .timeframe(let l) = lhs, case .timeframe(let r) = rhs else { preconditionFailure() }
+        return l == r
+      }()
+      case (.image, .image): return {
+        guard case .image(let l) = lhs, case .image(let r) = rhs else { preconditionFailure() }
         return l == r
       }()
       case (.beatRange, .beatRange): return {
@@ -3649,6 +3674,7 @@ extension PBTopolygon: @unchecked Sendable {}
 extension PBPlane: @unchecked Sendable {}
 extension PBPicture: @unchecked Sendable {}
 extension PBDate: @unchecked Sendable {}
+extension PBImage: @unchecked Sendable {}
 extension PBContent: @unchecked Sendable {}
 extension PBPit: @unchecked Sendable {}
 extension PBPitbend: @unchecked Sendable {}
@@ -4720,6 +4746,38 @@ extension PBDate: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
 
   static func ==(lhs: PBDate, rhs: PBDate) -> Bool {
     if lhs.timestamp != rhs.timestamp {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension PBImage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = "PBImage"
+  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "data"),
+  ]
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBytesField(value: &self.data) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.data.isEmpty {
+      try visitor.visitSingularBytesField(value: self.data, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: PBImage, rhs: PBImage) -> Bool {
+    if lhs.data != rhs.data {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -9170,6 +9228,7 @@ extension PBPastableObject: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
     9: .same(proto: "animation"),
     10: .same(proto: "ids"),
     11: .same(proto: "timeframe"),
+    21: .same(proto: "image"),
     12: .same(proto: "beatRange"),
     13: .same(proto: "normalizationValue"),
     16: .same(proto: "normalizationRationalValue"),
@@ -9423,6 +9482,19 @@ extension PBPastableObject: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
           self.value = .formant(v)
         }
       }()
+      case 21: try {
+        var v: PBImage?
+        var hadOneofValue = false
+        if let current = self.value {
+          hadOneofValue = true
+          if case .image(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.value = .image(v)
+        }
+      }()
       default: break
       }
     }
@@ -9509,6 +9581,10 @@ extension PBPastableObject: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
     case .formant?: try {
       guard case .formant(let v)? = self.value else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 20)
+    }()
+    case .image?: try {
+      guard case .image(let v)? = self.value else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 21)
     }()
     case nil: break
     }

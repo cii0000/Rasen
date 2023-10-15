@@ -793,6 +793,7 @@ extension Path {
         }
         return false
     }
+    // line bug
     func intersects(_ other: Path) -> Bool {
         guard bounds.intersects(other.bounds) else { return false }
         for oPathline in other.pathlines {

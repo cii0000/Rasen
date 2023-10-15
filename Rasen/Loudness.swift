@@ -142,19 +142,23 @@ struct IIRfilter {
 }
 
 struct Loudness {
+    private static let ps = [Point(60, 70),
+                             Point(80, 60),
+                             Point(200, 50),
+                             Point(1000, 40),
+                             Point(1400, 45),
+                             Point(1600, 45),
+                             Point(3000, 35),
+                             Point(4000, 35),
+                             Point(9000, 55),
+                             Point(12500, 55),
+                             Point(15000, 52)]
+    static func db40PhonScale(fromFq fq: Double) -> Double {
+        db40Phon(fromFq: fq) / 70
+    }
     static func db40Phon(fromFq fq: Double) -> Double {
-        let ps = [Point(60, 70),
-                  Point(80, 60),
-                  Point(200, 50),
-                  Point(1000, 40),
-                  Point(1400, 45),
-                  Point(1600, 45),
-                  Point(3000, 35),
-                  Point(4000, 35),
-                  Point(9000, 55),
-                  Point(12500, 55),
-                  Point(15000, 52)]
         var preFq = 0.0, preDb = ps.last!.y
+        
         for p in ps {
             if fq < p.x {
                 let t = (fq - preFq) / (p.x - preFq)

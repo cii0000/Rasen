@@ -3571,8 +3571,8 @@ final class CrossEraser: InputKeyEditor {
                         }
                     }
                     
-                    for key in livs.keys {
-                        livs[key]?.sort()
+                    for (key, v) in livs {
+                        livs[key] = Set(v).sorted()
                     }
                     let values = livs.sorted(by: { $0.key < $1.key }).map {
                         IndexValue(value: $0.value, index: $0.key)

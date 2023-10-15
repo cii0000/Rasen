@@ -535,7 +535,7 @@ extension OKey: CustomStringConvertible {
 }
 
 struct Argument: Hashable {
-    var inKey: OKey?, outKey: OKey
+    var inKey: OKey?, outKey = OKey("")
 }
 final class FMemo {
 //    static var initCount = 0

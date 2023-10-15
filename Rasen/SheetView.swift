@@ -2218,7 +2218,7 @@ final class SheetView: View {
     }
     func sheetColorOwner(at p: Point,
                          removingUUColor: UUColor? = nil,
-                         scale: Double) -> SheetColorOwner {
+                         scale: Double) -> (isLine: Bool, value: SheetColorOwner) {
         if let (lineView, li) = lineTuple(at: p,
                                           removingUUColor: removingUUColor,
                                           scale: scale) {
@@ -2226,7 +2226,7 @@ final class SheetView: View {
             
             if model.enabledAnimation {
                 if !selectedFrameIndexes.isEmpty {
-                    return sheetColorOwnerFromAnimation(with: uuColor)
+                    return (true, sheetColorOwnerFromAnimation(with: uuColor, isLine: true))
                 } else {
                     let cv = ColorValue(uuColor: uuColor,
                                         planeIndexes: [], lineIndexes: [],
@@ -2235,7 +2235,7 @@ final class SheetView: View {
                                         lineAnimationIndexes: [IndexValue(value: [li],
                                                                index: model.animation.index)],
                                         animationColors: [])
-                    return SheetColorOwner(sheetView: self, colorValue: cv)
+                    return (true, SheetColorOwner(sheetView: self, colorValue: cv))
                 }
             } else {
                 let cv = ColorValue(uuColor: uuColor,
@@ -2245,14 +2245,15 @@ final class SheetView: View {
                                     planeAnimationIndexes: [],
                                     lineAnimationIndexes: [],
                                     animationColors: [])
-                return SheetColorOwner(sheetView: self, colorValue: cv)
+                return (true, SheetColorOwner(sheetView: self, colorValue: cv))
             }
         } else {
-            return sheetColorOwnerFromPlane(at: p)
+            return (false, sheetColorOwnerFromPlane(at: p))
         }
     }
-    func sheetColorOwnerFromAnimation(with uuColor: UUColor) -> SheetColorOwner {
-        let value: [IndexValue<[Int]>] = selectedFrameIndexes.compactMap {
+    func sheetColorOwnerFromAnimation(with uuColor: UUColor,
+                                      isLine: Bool = false) -> SheetColorOwner {
+        let planeValue: [IndexValue<[Int]>] = !isLine ? [] : selectedFrameIndexes.compactMap {
             let pis = animationView.elementViews[$0].planesView.elementViews.enumerated().filter { $0.element.model.uuColor == uuColor }
                 .map { $0.offset }
             if pis.isEmpty {
@@ -2273,7 +2274,7 @@ final class SheetView: View {
         let cv = ColorValue(uuColor: uuColor,
                             planeIndexes: [], lineIndexes: [],
                             isBackground: false,
-                            planeAnimationIndexes: value,
+                            planeAnimationIndexes: planeValue,
                             lineAnimationIndexes: lineValue,
                             animationColors: [])
         return SheetColorOwner(sheetView: self, colorValue: cv)
@@ -2315,7 +2316,7 @@ final class SheetView: View {
                          isLine: Bool = false) -> [SheetColorOwner] {
         if isLine {
             let liDic = linesView.elementViews.enumerated().reduce(into: [UUColor: [Int]]()) {
-                if $1.element.node.path.intersects(r) {
+                if $1.element.intersects(r) {
                     let uuColor = $1.element.model.uuColor
                     if $0[uuColor] != nil {
                         $0[uuColor]?.append($1.offset)
@@ -3123,9 +3124,9 @@ final class SheetView: View {
                 
                 updateTimeline()
                 
-                let rect = kvs.reduce(into: Rect?.none) {
-                    $0 += $1.value.reduce(into: Rect?.none) {
-                        $0 += binder[keyPath: keyPath].animation.keyframes[$1.index]
+                let rect = kvs.reduce(into: Rect?.none) { (n, kv) in
+                    n += kv.value.reduce(into: Rect?.none) {
+                        $0 += binder[keyPath: keyPath].animation.keyframes[kv.index]
                             .picture.lines[$1.index].bounds
                     }
                 }

@@ -144,6 +144,10 @@ message PBDate {
     double timestamp = 1;
 }
 
+message PBImage {
+    bytes data = 1;
+}
+
 message PBContent {
     string name = 5;
     double volumeAmp = 2;
@@ -629,6 +633,7 @@ message PBPastableObject {
         PBAnimation animation = 9;
         PBInterOptionsValue ids = 10;
         PBTimeframe timeframe = 11;
+        PBImage image = 21;
         PBRationalRange beatRange = 12;
         double normalizationValue = 13;
         PBRational normalizationRationalValue = 16;

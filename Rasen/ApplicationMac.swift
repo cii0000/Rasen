@@ -22,8 +22,10 @@ import AVFoundation
 @objc(SubNSApplication)
 final class SubNSApplication: NSApplication {
     override func sendEvent(_ event: NSEvent) {
-        if event.type == .keyUp && event.modifierFlags.contains(.command) {
-            keyWindow?.sendEvent(event)
+        if event.type == .gesture {
+            event.window?.sendEvent(event)
+        } else if event.type == .keyUp && event.modifierFlags.contains(.command) {
+            event.window?.sendEvent(event)
         } else {
             super.sendEvent(event)
         }
@@ -985,6 +987,16 @@ extension URL {
         let resourceValues = try? self.resourceValues(forKeys: Set([.typeIdentifierKey]))
         return resourceValues?.typeIdentifier
     }
+    
+    init?(webString: String) {
+        guard webString.hasPrefix("http") else { return nil }
+        self.init(string: webString)
+    }
+    
+    @discardableResult
+    func openInBrowser() -> Bool {
+        NSWorkspace.shared.open(self)
+    }
 }
 
 struct Sleep {
@@ -1114,7 +1126,10 @@ extension NSPasteboard {
     var copiedObjects: [PastableObject] {
         var copiedObjects = [PastableObject]()
         func append(with data: Data, type: NSPasteboard.PasteboardType) {
-            if let object = try? PastableObject(data: data, typeName: type.rawValue) {
+            if type == .tiff || type == .png,
+               let image = Image(data: data) {
+                copiedObjects.append(.image(image))
+            } else if let object = try? PastableObject(data: data, typeName: type.rawValue) {
                 copiedObjects.append(object)
             }
         }
@@ -1777,48 +1792,60 @@ struct Image {
     init(cgImage: CGImage) {
         self.cg = cgImage
     }
+    init?(data: Data) {
+        guard let cgImageSource
+                = CGImageSourceCreateWithData(data as CFData, nil) else {
+            return nil
+        }
+        guard let cg
+                = CGImageSourceCreateImageAtIndex(cgImageSource, 0, nil) else {
+            return nil
+        }
+        self.cg = cg
+    }
     init?(url: URL) {
         let dic = [kCGImageSourceShouldCacheImmediately: kCFBooleanTrue]
         guard let s = CGImageSourceCreateWithURL(url as CFURL,
                                                  dic as CFDictionary),
-              let image = CGImageSourceCreateImageAtIndex(s, 0, dic as CFDictionary),
+              let cgImage = CGImageSourceCreateImageAtIndex(s, 0, dic as CFDictionary),
               let cs = CGColorSpace.sRGBColorSpace else { return nil }
-        if image.colorSpace?.name == cs.name 
-            && ((image.bitmapInfo.rawValue & CGImageAlphaInfo.premultipliedLast.rawValue) != 0
-                || (image.bitmapInfo.rawValue & CGImageAlphaInfo.noneSkipLast.rawValue) != 0) {
-            cg = image
+        
+        if cgImage.colorSpace?.name == cs.name
+            && ((cgImage.bitmapInfo.rawValue & CGImageAlphaInfo.premultipliedLast.rawValue) != 0
+                || (cgImage.bitmapInfo.rawValue & CGImageAlphaInfo.noneSkipLast.rawValue) != 0) {
+            cg = cgImage
         } else {
-            let isNoneAlpha = (image.bitmapInfo.rawValue & CGImageAlphaInfo.noneSkipLast.rawValue) != 0
-            || (image.bitmapInfo.rawValue & CGImageAlphaInfo.noneSkipFirst.rawValue) != 0
-            || (image.bitmapInfo.rawValue & CGImageAlphaInfo.none.rawValue) != 0
+            let isNoneAlpha = (cgImage.bitmapInfo.rawValue & CGImageAlphaInfo.noneSkipLast.rawValue) != 0
+            || (cgImage.bitmapInfo.rawValue & CGImageAlphaInfo.noneSkipFirst.rawValue) != 0
+            || (cgImage.bitmapInfo.rawValue & CGImageAlphaInfo.none.rawValue) != 0
             let bitmapInfo = CGBitmapInfo(rawValue: isNoneAlpha ?
                                           CGImageAlphaInfo.noneSkipLast.rawValue : CGImageAlphaInfo.premultipliedLast.rawValue)
-            guard let data = image.dataProvider,
-                  let colorSpace = image.colorSpace,
-                  let nImage = CGImage(width: image.width, 
-                                       height: image.height,
-                                       bitsPerComponent: image.bitsPerComponent,
-                                       bitsPerPixel: image.bitsPerPixel,
-                                       bytesPerRow: image.bytesPerRow,
+            guard let data = cgImage.dataProvider,
+                  let colorSpace = cgImage.colorSpace,
+                  let nCGImage = CGImage(width: cgImage.width, 
+                                       height: cgImage.height,
+                                       bitsPerComponent: cgImage.bitsPerComponent,
+                                       bitsPerPixel: cgImage.bitsPerPixel,
+                                       bytesPerRow: cgImage.bytesPerRow,
                                        space: colorSpace,
-                                       bitmapInfo: image.bitmapInfo,
+                                       bitmapInfo: cgImage.bitmapInfo,
                                        provider: data, 
                                        decode: nil,
                                        shouldInterpolate: false, 
                                        intent: .absoluteColorimetric),
                   let ctx = CGContext(data: nil,
-                                      width: image.width,
-                                      height: image.height,
+                                      width: cgImage.width,
+                                      height: cgImage.height,
                                       bitsPerComponent: 8,
-                                      bytesPerRow: 4 * image.width,
+                                      bytesPerRow: 4 * cgImage.width,
                                       space: cs,
                                       bitmapInfo: bitmapInfo.rawValue) else { return nil }
-            ctx.draw(nImage, in: CGRect(x: 0,
-                                        y: 0,
-                                        width: nImage.width,
-                                        height: nImage.height))
-            guard let nnImage = ctx.makeImage() else { return nil }
-            cg = nnImage
+            ctx.draw(nCGImage, in: CGRect(x: 0,
+                                          y: 0,
+                                          width: nCGImage.width,
+                                          height: nCGImage.height))
+            guard let nnCGImage = ctx.makeImage() else { return nil }
+            cg = nnCGImage
         }
     }
     init?(size: Size, color: Color) {
@@ -2005,6 +2032,16 @@ extension Image {
         CGImageDestinationAddImage(des, cg, metadata as CFDictionary)
         CGImageDestinationFinalize(des)
     }
+    
+    var fileType: FileType {
+        switch cg.utType as? String {
+        case UniformTypeIdentifiers.UTType.jpeg.identifier: .jpeg
+        case UniformTypeIdentifiers.UTType.png.identifier: .png
+        case UniformTypeIdentifiers.UTType.tiff.identifier: .tiff
+        case UniformTypeIdentifiers.UTType.gif.identifier: .gif
+        default: .jpeg
+        }
+    }
 }
 extension Image: Hashable {}
 extension Image: Codable {
@@ -2012,19 +2049,14 @@ extension Image: Codable {
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         let data = try container.decode(Data.self)
-        guard let cgImageSource
-                = CGImageSourceCreateWithData(data as CFData, nil) else {
+        guard let aSelf = Image(data: data) else {
             throw CodableError()
         }
-        guard let cg
-                = CGImageSourceCreateImageAtIndex(cgImageSource, 0, nil) else {
-            throw CodableError()
-        }
-        self.cg = cg
+        self = aSelf
     }
     func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
-        if let data = data(.jpeg) {
+        if let data = data(fileType) {
             try container.encode(data)
         } else {
             throw CodableError()
@@ -2045,10 +2077,24 @@ extension Image: Serializable {
         self.cg = cg
     }
     func serializedData() throws -> Data {
-        if let data = data(.jpeg) {
+        if let data = data(fileType) {
             return data
         } else {
             throw SerializableError()
+        }
+    }
+}
+extension Image: Protobuf {
+    struct DecodeError: Error {}
+    init(_ pb: PBImage) throws {
+        guard let aSelf = Image(data: pb.data) else {
+            throw DecodeError()
+        }
+        self = aSelf
+    }
+    var pb: PBImage {
+        .with {
+            $0.data = data(fileType) ?? .init()
         }
     }
 }

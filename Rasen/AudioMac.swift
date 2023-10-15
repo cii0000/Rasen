@@ -1208,6 +1208,8 @@ struct Spectrogram {
         
         let inputIs = [Double](repeating: 0, count: windowSize)
         
+        maxFq = sampleRate / 2
+        
         func unionSsmps(_ ssmpss: [[SSMP]]) -> [SSMP] {
             if buffer.channelCount == 2 {
                 return (0 ..< ssmpCount).map {
@@ -1246,11 +1248,24 @@ struct Spectrogram {
                     let outputs = dft.transform(real: inputRs,
                                                 imaginary: inputIs)
                     
-                    return (0 ..< ssmpCount).map {
+                    var nAmps = (0 ..< ssmpCount).map {
                         $0 == 0 ?
+                            0 :
+                            Double.hypot(outputs.real[$0] / 2,
+                                         outputs.imaginary[$0] / 2) * nd
+                    }
+                    for x in (1 ..< ssmpCount).reversed() {
+                        for y in stride(from: x * 2, to: ssmpCount - 1, by: x) {
+                            nAmps[x] += nAmps[x] * nAmps[y]
+                        }
+                    }
+                    
+                    return (0 ..< ssmpCount).map {
+                        let fq =  Double($0) / Double(ssmpCount) * maxFq
+                        let db = Loudness.db40Phon(fromFq: fq)
+                        return $0 == 0 ?
                             .init() :
-                        SSMP(smp: Volume(amp: .hypot(outputs.real[$0] / 2,
-                                                     outputs.imaginary[$0] / 2) * nd).smp,
+                        SSMP(smp: db * Volume(amp: nAmps[$0]).smp,
                              pan: 0)
                     }
                 }
@@ -1309,8 +1324,8 @@ struct Spectrogram {
             }
             
             let filterBankCount = 512
-            let filterBank = filterBank(minFq: 20,
-                                        maxFq: 20000,
+            let filterBank = filterBank(minFq: 0,
+                                        maxFq: maxFq,
                                         sampleCount: ssmpCount,
                                         filterBankCount: filterBankCount)
             
@@ -1326,16 +1341,23 @@ struct Spectrogram {
                     let outputs = dft.transform(real: inputRs,
                                                 imaginary: inputIs)
                     
-                    var nAmps = (0 ..< ssmpCount).map {
+                    let nAmps = (0 ..< ssmpCount).map {
                         $0 == 0 ?
-                            0 :
-                            Double.hypot(outputs.real[$0] / 2,
-                                         outputs.imaginary[$0] / 2) * nd
+                        0 :
+                        Double.hypot(outputs.real[$0] / 2,
+                                     outputs.imaginary[$0] / 2) * nd
+                    }
+                    
+                    var nSmps = nAmps.map { $0 == 0 ? 0 : Volume(amp: $0).smp }
+                    nSmps = (0 ..< ssmpCount).map {
+                        let fq =  Double($0) / Double(ssmpCount) * maxFq
+                        let db = Loudness.db40PhonScale(fromFq: fq)
+                        return db * nSmps[$0]
                     }
                     
                     let nf = [Double](unsafeUninitializedCapacity: filterBankCount) { buffer, initializedCount in
                         
-                        nAmps.withUnsafeBufferPointer { nPtr in
+                        nSmps.withUnsafeBufferPointer { nPtr in
                             filterBank.withUnsafeBufferPointer { fPtr in
                                 cblas_dgemm(CblasRowMajor,
                                             CblasTrans, CblasTrans,
@@ -1359,13 +1381,9 @@ struct Spectrogram {
                                             count: nf.count)
                     vDSP.linearInterpolate(values: nf,
                                            atIndices: indices,
-                                           result: &nAmps)
+                                           result: &nSmps)
                     
-                    return (0 ..< ssmpCount).map {
-                        $0 == 0 ?
-                            SSMP() :
-                            SSMP(smp: Volume(amp: nAmps[$0]).smp, pan: 0)
-                    }
+                    return nSmps.map { SSMP(smp: $0, pan: 0) }
                 }
                 
                 let nssmps = unionSsmps(ssmpss)
@@ -1387,13 +1405,12 @@ struct Spectrogram {
         
         self.frames = frames
         ampCount = ssmpCount
-        maxFq = sampleRate / 2
         secDuration = Double(frameCount) / sampleRate
     }
     
     static let (redRatio, greenRatio) = {
-        var redColor = Color(red: 0.125, green: 0, blue: 0)
-        var greenColor = Color(red: 0, green: 0.125, blue: 0)
+        var redColor = Color(red: 0.0625, green: 0, blue: 0)
+        var greenColor = Color(red: 0, green: 0.0625, blue: 0)
         if redColor.lightness < greenColor.lightness {
             greenColor.lightness = redColor.lightness
         } else {
@@ -1416,7 +1433,7 @@ struct Spectrogram {
         for x in 0 ..< width {
             for y in 0 ..< h {
                 let ssmp = frames[x + xi].ssmps[h - 1 - y]
-                let alpha = rgamma(ssmp.smp)
+                let alpha = rgamma(ssmp.smp > 0.5 ? ssmp.smp.clipped(min: 0.5, max: 1, newMin: 0.95, newMax: 1) : ssmp.smp * 0.95 / 0.5)
                 guard !alpha.isNaN else {
                     print("NaN:", ssmp.smp)
                     continue
@@ -1427,6 +1444,7 @@ struct Spectrogram {
                 bitmap[x, y, 3] = UInt8(alpha * Double(UInt8.max))
             }
         }
+        
         return bitmap.image
     }
 }

@@ -1536,8 +1536,7 @@ final class IOEditor: Editor {
                                          duration: duration, 
                                          frameRate: frameRate) { (sec) -> (Image?) in
                             //tempo -> startTime
-                            let beat = sheet.animation.beat(fromSec: Double(sec),
-                                                  beatRate: Keyframe.defaultFrameRate)
+                            let beat = sheet.animation.beat(fromSec: sec)
                             let node: Node
                             if !bottomSheets.isEmpty || !topSheets.isEmpty {
                                 var children = [Node]()
