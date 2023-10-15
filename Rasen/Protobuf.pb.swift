@@ -426,20 +426,6 @@ struct PBPoint {
   init() {}
 }
 
-struct PBIntPoint {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  var x: Int64 = 0
-
-  var y: Int64 = 0
-
-  var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  init() {}
-}
-
 struct PBSize {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -1373,12 +1359,12 @@ struct PBBorder {
   init() {}
 }
 
-struct PBIntPointStringDic {
+struct PBSheetposStringDic {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var value: Dictionary<String,PBIntPoint> = [:]
+  var value: Dictionary<String,PBSheetpos> = [:]
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1390,8 +1376,8 @@ struct PBStringIntPointDicElement {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var key: PBIntPoint {
-    get {return _key ?? PBIntPoint()}
+  var key: PBSheetpos {
+    get {return _key ?? PBSheetpos()}
     set {_key = newValue}
   }
   /// Returns true if `key` has been explicitly set.
@@ -1405,7 +1391,7 @@ struct PBStringIntPointDicElement {
 
   init() {}
 
-  fileprivate var _key: PBIntPoint? = nil
+  fileprivate var _key: PBSheetpos? = nil
 }
 
 struct PBStringIntPointDic {
@@ -1692,13 +1678,29 @@ struct PBSheet {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
+struct PBSheetpos {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var x: Int64 = 0
+
+  var y: Int64 = 0
+
+  var isRight: Bool = false
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 struct PBWorld {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var sheetPositions: PBIntPointStringDic {
-    get {return _sheetPositions ?? PBIntPointStringDic()}
+  var sheetPositions: PBSheetposStringDic {
+    get {return _sheetPositions ?? PBSheetposStringDic()}
     set {_sheetPositions = newValue}
   }
   /// Returns true if `sheetPositions` has been explicitly set.
@@ -1710,7 +1712,7 @@ struct PBWorld {
 
   init() {}
 
-  fileprivate var _sheetPositions: PBIntPointStringDic? = nil
+  fileprivate var _sheetPositions: PBSheetposStringDic? = nil
 }
 
 struct PBCornerRectValue {
@@ -2354,12 +2356,12 @@ struct PBPlaneArray {
   init() {}
 }
 
-struct PBIntPointArray {
+struct PBSheetposArray {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var value: [PBIntPoint] = []
+  var value: [PBSheetpos] = []
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -3113,10 +3115,10 @@ struct PBWorldUndoItem {
     set {value = .insertSheets(newValue)}
   }
 
-  var removeSheets: PBIntPointArray {
+  var removeSheets: PBSheetposArray {
     get {
       if case .removeSheets(let v)? = value {return v}
-      return PBIntPointArray()
+      return PBSheetposArray()
     }
     set {value = .removeSheets(newValue)}
   }
@@ -3125,7 +3127,7 @@ struct PBWorldUndoItem {
 
   enum OneOf_Value: Equatable {
     case insertSheets(PBStringIntPointDic)
-    case removeSheets(PBIntPointArray)
+    case removeSheets(PBSheetposArray)
 
   #if !swift(>=4.1)
     static func ==(lhs: PBWorldUndoItem.OneOf_Value, rhs: PBWorldUndoItem.OneOf_Value) -> Bool {
@@ -3630,7 +3632,6 @@ extension PBRational: @unchecked Sendable {}
 extension PBIntRange: @unchecked Sendable {}
 extension PBRationalRange: @unchecked Sendable {}
 extension PBPoint: @unchecked Sendable {}
-extension PBIntPoint: @unchecked Sendable {}
 extension PBSize: @unchecked Sendable {}
 extension PBRect: @unchecked Sendable {}
 extension PBAttitude: @unchecked Sendable {}
@@ -3667,7 +3668,7 @@ extension PBLocale: @unchecked Sendable {}
 extension PBText: @unchecked Sendable {}
 extension PBText.OneOf_TimeframeOptional: @unchecked Sendable {}
 extension PBBorder: @unchecked Sendable {}
-extension PBIntPointStringDic: @unchecked Sendable {}
+extension PBSheetposStringDic: @unchecked Sendable {}
 extension PBStringIntPointDicElement: @unchecked Sendable {}
 extension PBStringIntPointDic: @unchecked Sendable {}
 extension PBKeyframe: @unchecked Sendable {}
@@ -3677,6 +3678,7 @@ extension PBAnimationOption: @unchecked Sendable {}
 extension PBAnimation: @unchecked Sendable {}
 extension PBSheetOption: @unchecked Sendable {}
 extension PBSheet: @unchecked Sendable {}
+extension PBSheetpos: @unchecked Sendable {}
 extension PBWorld: @unchecked Sendable {}
 extension PBCornerRectValue: @unchecked Sendable {}
 extension PBCornerRectValueArray: @unchecked Sendable {}
@@ -3706,7 +3708,7 @@ extension PBIntArrayIndexValue: @unchecked Sendable {}
 extension PBIntArrayIndexValueArray: @unchecked Sendable {}
 extension PBLineArray: @unchecked Sendable {}
 extension PBPlaneArray: @unchecked Sendable {}
-extension PBIntPointArray: @unchecked Sendable {}
+extension PBSheetposArray: @unchecked Sendable {}
 extension PBIntIndexValueArray: @unchecked Sendable {}
 extension PBLineIndexValueArray: @unchecked Sendable {}
 extension PBLineIndexValueArrayIndexValue: @unchecked Sendable {}
@@ -3952,44 +3954,6 @@ extension PBPoint: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
   }
 
   static func ==(lhs: PBPoint, rhs: PBPoint) -> Bool {
-    if lhs.x != rhs.x {return false}
-    if lhs.y != rhs.y {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension PBIntPoint: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = "PBIntPoint"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "x"),
-    2: .same(proto: "y"),
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularInt64Field(value: &self.x) }()
-      case 2: try { try decoder.decodeSingularInt64Field(value: &self.y) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.x != 0 {
-      try visitor.visitSingularInt64Field(value: self.x, fieldNumber: 1)
-    }
-    if self.y != 0 {
-      try visitor.visitSingularInt64Field(value: self.y, fieldNumber: 2)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: PBIntPoint, rhs: PBIntPoint) -> Bool {
     if lhs.x != rhs.x {return false}
     if lhs.y != rhs.y {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -5687,8 +5651,8 @@ extension PBBorder: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationB
   }
 }
 
-extension PBIntPointStringDic: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = "PBIntPointStringDic"
+extension PBSheetposStringDic: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = "PBSheetposStringDic"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "value"),
   ]
@@ -5699,7 +5663,7 @@ extension PBIntPointStringDic: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,PBIntPoint>.self, value: &self.value) }()
+      case 1: try { try decoder.decodeMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,PBSheetpos>.self, value: &self.value) }()
       default: break
       }
     }
@@ -5707,12 +5671,12 @@ extension PBIntPointStringDic: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
     if !self.value.isEmpty {
-      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,PBIntPoint>.self, value: self.value, fieldNumber: 1)
+      try visitor.visitMapField(fieldType: SwiftProtobuf._ProtobufMessageMap<SwiftProtobuf.ProtobufString,PBSheetpos>.self, value: self.value, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: PBIntPointStringDic, rhs: PBIntPointStringDic) -> Bool {
+  static func ==(lhs: PBSheetposStringDic, rhs: PBSheetposStringDic) -> Bool {
     if lhs.value != rhs.value {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -6248,6 +6212,50 @@ extension PBSheet: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
       }
       if !storagesAreEqual {return false}
     }
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension PBSheetpos: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = "PBSheetpos"
+  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "x"),
+    2: .same(proto: "y"),
+    3: .same(proto: "isRight"),
+  ]
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularInt64Field(value: &self.x) }()
+      case 2: try { try decoder.decodeSingularInt64Field(value: &self.y) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.isRight) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.x != 0 {
+      try visitor.visitSingularInt64Field(value: self.x, fieldNumber: 1)
+    }
+    if self.y != 0 {
+      try visitor.visitSingularInt64Field(value: self.y, fieldNumber: 2)
+    }
+    if self.isRight != false {
+      try visitor.visitSingularBoolField(value: self.isRight, fieldNumber: 3)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: PBSheetpos, rhs: PBSheetpos) -> Bool {
+    if lhs.x != rhs.x {return false}
+    if lhs.y != rhs.y {return false}
+    if lhs.isRight != rhs.isRight {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -7445,8 +7453,8 @@ extension PBPlaneArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
   }
 }
 
-extension PBIntPointArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = "PBIntPointArray"
+extension PBSheetposArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = "PBSheetposArray"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "value"),
   ]
@@ -7470,7 +7478,7 @@ extension PBIntPointArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: PBIntPointArray, rhs: PBIntPointArray) -> Bool {
+  static func ==(lhs: PBSheetposArray, rhs: PBSheetposArray) -> Bool {
     if lhs.value != rhs.value {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -8736,7 +8744,7 @@ extension PBWorldUndoItem: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
         }
       }()
       case 2: try {
-        var v: PBIntPointArray?
+        var v: PBSheetposArray?
         var hadOneofValue = false
         if let current = self.value {
           hadOneofValue = true

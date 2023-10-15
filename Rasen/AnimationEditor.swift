@@ -759,59 +759,72 @@ final class Player: InputKeyEditor {
             document.cursor = .arrow
             
             sheetView = document.sheetView(at: p)
-            let shp = document.sheetPosition(at: p)
-            if let sheetView = document.sheetView(at: shp) {
+            let cip = document.intPosition(at: p)
+            let cshp = document.sheetPosition(at: cip)
+            if let cSheetView = document.sheetView(at: cshp) {
                 for (_, v) in document.sheetViewValues {
-                    if sheetView != v.view {
+                    if cSheetView != v.view {
                         v.view?.stop()
                     }
                 }
                 
-                if let aSheetView = document.sheetView(at: SheetPosition(shp.x - 1, shp.y)),
-                   aSheetView.model.enabledTimetrack {
+                var filledShps = Set<Sheetpos>()
+                func sheetView(at ip: IntPoint) -> SheetView? {
+                    let shp = document.sheetPosition(at: ip)
+                    if !filledShps.contains(shp),
+                       let aSheetView = document.sheetView(at: shp),
+                       aSheetView.model.enabledTimetrack {
+                        
+                        filledShps.insert(shp)
+                        return aSheetView
+                    } else {
+                        return nil
+                    }
+                }
+                
+                let preX = cshp == document.world.sheetpos(at: .init(cip.x - 1, cip.y))
+                ? cip.x - 2 : cip.x - 1
+                
+                let nextX = cshp == document.world.sheetpos(at: .init(cip.x + 1, cip.y))
+                ? cip.x + 2 : cip.x + 1
+                
+                if let aSheetView = sheetView(at: .init(preX, cip.y)) {
+                    cSheetView.previousSheetView = aSheetView
                     
-                    sheetView.previousSheetView = aSheetView
-                    if let aaSheetView = document.sheetView(at: SheetPosition(shp.x - 1, shp.y - 1)),
-                       aaSheetView.model.enabledTimetrack {
+                    if let aaSheetView = sheetView(at: .init(preX, cip.y - 1)) {
                         aSheetView.bottomSheetView = aaSheetView
                     }
-                    if let aaSheetView = document.sheetView(at: SheetPosition(shp.x - 1, shp.y + 1)),
-                       aaSheetView.model.enabledTimetrack {
+                    if let aaSheetView = sheetView(at: .init(preX, cip.y + 1)) {
                         aSheetView.topSheetView = aaSheetView
                     }
                 }
-                if let aSheetView = document.sheetView(at: SheetPosition(shp.x + 1, shp.y)),
-                   aSheetView.model.enabledTimetrack {
+                if let aSheetView = sheetView(at: .init(nextX, cip.y)) {
+                    cSheetView.nextSheetView = aSheetView
                     
-                    sheetView.nextSheetView = aSheetView
-                    if let aaSheetView = document.sheetView(at: SheetPosition(shp.x + 1, shp.y - 1)),
-                       aaSheetView.model.enabledTimetrack {
+                    if let aaSheetView = sheetView(at: .init(nextX, cip.y - 1)) {
                         aSheetView.bottomSheetView = aaSheetView
                     }
-                    if let aaSheetView = document.sheetView(at: SheetPosition(shp.x + 1, shp.y + 1)),
-                       aaSheetView.model.enabledTimetrack {
+                    if let aaSheetView = sheetView(at: .init(nextX, cip.y + 1)) {
                         aSheetView.topSheetView = aaSheetView
                     }
                 }
-                if let aSheetView = document.sheetView(at: SheetPosition(shp.x, shp.y - 1)),
-                   aSheetView.model.enabledTimetrack {
-                    sheetView.bottomSheetView = aSheetView
+                if let aSheetView = sheetView(at: .init(cip.x, cip.y - 1)) {
+                    cSheetView.bottomSheetView = aSheetView
                 }
-                if let aSheetView = document.sheetView(at: SheetPosition(shp.x, shp.y + 1)),
-                   aSheetView.model.enabledTimetrack {
-                    sheetView.topSheetView = aSheetView
+                if let aSheetView = sheetView(at: .init(cip.x, cip.y + 1)) {
+                    cSheetView.topSheetView = aSheetView
                 }
                 
                 if !document.containsScoreOrAnimation(with: event) {
-                    sheetView.play()
+                    cSheetView.play()
                 } else {
-                    let sheetP = sheetView.convertFromWorld(p)
+                    let sheetP = cSheetView.convertFromWorld(p)
                     var ids = Set<UUID>()
                     var secRange: Range<Rational>?
-                    var sec: Rational = sheetView.animationView.sec(atX: sheetP.x)
-                    if let (ti, timeframe) = sheetView.timeframeTuple(at: sheetP) {
-                        let textView = sheetView.textsView.elementViews[ti]
-                        let textP = textView.convert(sheetP, from: sheetView.node)
+                    var sec: Rational = cSheetView.animationView.sec(atX: sheetP.x)
+                    if let (ti, timeframe) = cSheetView.timeframeTuple(at: sheetP) {
+                        let textView = cSheetView.textsView.elementViews[ti]
+                        let textP = textView.convert(sheetP, from: cSheetView.node)
                         if textView.containsScore(textP),
                            let ni = textView.noteIndex(at: textP,
                                                                           
@@ -828,10 +841,10 @@ final class Player: InputKeyEditor {
                         }
                     }
                     if secRange != nil {
-                        sheetView.previousSheetView = nil
-                        sheetView.nextSheetView = nil
+                        cSheetView.previousSheetView = nil
+                        cSheetView.nextSheetView = nil
                     }
-                    sheetView.play(atSec: sec, inSec: secRange,
+                    cSheetView.play(atSec: sec, inSec: secRange,
                                    timeframeIDs: ids)
                 }
             }
@@ -2732,7 +2745,7 @@ final class ScoreAdder: InputKeyEditor {
                 inP.y = inP.y.interval(scale: ScoreLayout.noteHeight)
                 
                 let beat = sheetView.animationView.beat(atX: inP.x).rounded()
-                let maxBeat = sheetView.animationView.beat(atX: sheetView.model.bounds.maxX - Sheet.textPadding.width)
+                let maxBeat = sheetView.animationView.beat(atX: sheetView.bounds.maxX - Sheet.textPadding.width)
                 let nBeatDur = min(max(1, (maxBeat - beat).rounded()),
                                    Timeframe.defaultBeatDuration)
                 let beatRange = Range(start: beat, length: nBeatDur)

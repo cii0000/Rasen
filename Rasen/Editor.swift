@@ -152,9 +152,7 @@ final class Scroller: ScrollEditor {
     private let updateSpeed = 1000.0
     private var isHighSpeed = false, oldTime = 0.0, oldDeltaPoint = Point()
     private var oldSpeedTime = 0.0, oldSpeedDistance = 0.0,
-                oldSpeed = 0.0, fps = 0.0
-    private var ps = [(d: Double, t: Double, speed: Double)](),
-                eventTimes = [Double]()
+                oldSpeed = 0.0
     private var isMoveTime = false, timeMover: FrameSelecter?
     func send(_ event: ScrollEvent) {
         switch event.phase {
@@ -164,8 +162,6 @@ final class Scroller: ScrollEditor {
             oldDeltaPoint = Point()
             oldSpeedDistance = 0.0
             oldSpeed = 0.0
-            fps = 20
-            eventTimes.append(event.time)
         case .changed:
             guard !event.scrollDeltaPoint.isEmpty else { return }
             let dt = event.time - oldTime
@@ -174,58 +170,10 @@ final class Scroller: ScrollEditor {
                 dp = dp * Transform(rotation: document.camera.rotation)
             }
             
-            let d = event.scrollDeltaPoint.distance(oldDeltaPoint)
-            ps = ps.filter { event.time - $0.t < 2 }
-            if d > 0 {
-                ps.append((d, event.time, d / dt))
-            }
-            eventTimes = eventTimes.filter { event.time - $0 < 2 }
-            if event.touchPhase == .began {
-                eventTimes.append(event.time)
-            }
-            if ps.count >= 2 {
-                let speed = (ps.reduce(0.0) { $0 + $1.d })
-                    / (ps.last!.t - ps.first!.t)
-                fps = speed > 2300 && eventTimes.count >= 8 ? 60 : 20
-            }
-            
-            func isUnclipAngle(_ angle: Double) -> Bool {
-                if document.snappedCameraType != .none {
-                    return false
-                }
-                let a = angle * 16
-                if a > .pi && a < 7 * .pi { return true }
-                if a > 9 * .pi && a < 15 * .pi { return true }
-                if a > -7 * .pi && a < -.pi { return true }
-                if a > -15 * .pi && a < -9 * .pi { return true }
-                return false
-            }
-            
             oldDeltaPoint = event.scrollDeltaPoint
             
-            let angle = dp.angle(), length = dp.length()
-            
+            let length = dp.length()
             let lengthDt = length / dt
-            if !isUnclipAngle(angle) //&& ls > -2 && ls < 2
-                && lengthDt > updateSpeed && max(dp.x, dp.y) > 50 {
-                
-                let s0 = document.worldToScreenScale
-                let s = s0 > 0.6 ? s0 : s0.clipped(min: 0.6, max: 0.25,
-                                                   newMin: 0.6, newMax: 1)
-                if abs(dp.x) > abs(dp.y) {
-                    let speed = abs(dp.x) / dt
-                    let sv = document.snappableCameraX * fps * s
-                    if speed > sv {
-                        dp.y = 0
-                    }
-                } else {
-                    let speed = abs(dp.y) / dt
-                    let sv = document.snappableCameraY * fps * s
-                    if speed > sv {
-                        dp.x = 0
-                    }
-                }
-            }
             
             var transform = document.camera.transform
             let newPoint = dp * correction * transform.absXScale
@@ -236,8 +184,7 @@ final class Scroller: ScrollEditor {
             transform.translate(by: newP)
             document.camera = Camera(transform)
             
-            document.isUpdateWithCursorPosition =
-                document.snappedCameraType == .none && lengthDt < updateSpeed / 2
+            document.isUpdateWithCursorPosition = lengthDt < updateSpeed / 2
             document.updateWithCursorPosition()
             if !document.isUpdateWithCursorPosition {
                 document.textCursorNode.isHidden = true
@@ -249,11 +196,6 @@ final class Scroller: ScrollEditor {
             if !document.isUpdateWithCursorPosition {
                 document.isUpdateWithCursorPosition = true
             }
-            if let snappedCamera = document.snappedCamera {
-                document.camera = snappedCamera
-                document.updateWithCursorPosition()
-            }
-            document.snappedCameraType = .none
             break
         }
     }
@@ -762,10 +704,10 @@ final class IOEditor: Editor {
         }
         document.updateSelectedColor(isMain: true)
     }
-    func name(from shp: SheetPosition) -> String {
+    func name(from shp: Sheetpos) -> String {
         return "\(shp.x)_\(shp.y)"
     }
-    func name(from shps: [SheetPosition]) -> String {
+    func name(from shps: [Sheetpos]) -> String {
         if shps.isEmpty {
             return "Empty"
         } else if shps.count == 1 {
@@ -806,7 +748,7 @@ final class IOEditor: Editor {
     }
     
     @discardableResult
-    func beginImport(at sp: Point) -> SheetPosition {
+    func beginImport(at sp: Point) -> Sheetpos {
         fp = document.convertScreenToWorld(sp)
         selectingLineNode.lineWidth = document.worldLineWidth
         selectingLineNode.fillType = .color(.subSelected)
@@ -823,9 +765,9 @@ final class IOEditor: Editor {
         
         return shp
     }
-    func `import`(from urls: [URL], at shp: SheetPosition) {
+    func `import`(from urls: [URL], at shp: Sheetpos) {
         var mshp = shp
-        var nSHPs = [SheetPosition](), willremoveSHPs = [SheetPosition]()
+        var nSHPs = [Sheetpos](), willremoveSHPs = [Sheetpos]()
         for url in urls {
             let importedDocument = Document(url: url)
             
@@ -883,7 +825,7 @@ final class IOEditor: Editor {
         
         let contentURLs = urls.filter { Content.type(from: $0) != .none }
         if !contentURLs.isEmpty {
-            var dshp = SheetPosition()
+            var dshp = Sheetpos()
             let xCount = max(1, Int(Double(contentURLs.count).squareRoot()))
             for url in contentURLs {
                 if let sheetView = document.madeSheetView(at: shp + dshp) {
@@ -961,11 +903,11 @@ final class IOEditor: Editor {
                       okClosure: ok, cancelClosure: cancel)
         }
     }
-    func load(from urls: [URL], at shp: SheetPosition) {
+    func load(from urls: [URL], at shp: Sheetpos) {
         var mshp = shp
-        var nSIDs = [SheetPosition: SheetID](), willremoveSHPs = [SheetPosition]()
+        var nSIDs = [Sheetpos: SheetID](), willremoveSHPs = [Sheetpos]()
         var resetSIDs = Set<SheetID>()
-        for url in urls {            
+        for url in urls {
             let importedDocument = Document(url: url)
             
             var maxX = mshp.x
@@ -982,7 +924,7 @@ final class IOEditor: Editor {
                 nSIDs[nshp] = document.appendSheet(from: osrr)
                 
                 if nshp.x > maxX {
-                    maxX = nshp.x
+                    maxX = nshp.x + (oshp.isRight ? 1 : 0)
                 }
             }
             mshp.x = maxX + 2
@@ -1028,7 +970,7 @@ final class IOEditor: Editor {
     }
     
     struct SelectingValue {
-        var shp: SheetPosition, bounds: Rect
+        var shp: Sheetpos, bounds: Rect
     }
     
     enum ExportType {
@@ -1061,7 +1003,7 @@ final class IOEditor: Editor {
                                                       bounds: nf)
                             } else {
                                 return SelectingValue(shp: shp,
-                                                      bounds: Sheet.defaultBounds)
+                                                      bounds: frame.bounds)
                             }
                         } else {
                             return nil
@@ -1150,7 +1092,7 @@ final class IOEditor: Editor {
                                                   bounds: nf)
                         } else {
                             return SelectingValue(shp: shp,
-                                                  bounds: Sheet.defaultBounds)
+                                                  bounds: frame.bounds)
                         }
                     } else {
                         return nil
@@ -1166,7 +1108,7 @@ final class IOEditor: Editor {
             unionFrame = nil
             let (shp, sheetView, frame, _) = document.sheetViewAndFrame(at: p)
             if let sheetView = sheetView {
-                let bounds = sheetView.model.boundsTuple(at: sheetView.convertFromWorld(p)).bounds.integral
+                let bounds = sheetView.model.boundsTuple(at: sheetView.convertFromWorld(p), in: document.sheetFrame(with: shp).bounds).bounds.integral
                 nvs.append(SelectingValue(shp: shp, bounds: bounds))
             } else {
                 let bounds = Rect(size: frame.size)
@@ -1199,7 +1141,7 @@ final class IOEditor: Editor {
                 let nSize = size.snapped(Size(width: 800, height: 1200)).rounded()
                 self.exportGIF(from: nvs, size: nSize, at: ioResult)
             case .movie:
-                let nSize = size == Size(width: 426, height: 240) ?
+                let nSize = size == Size(width: 426, height: 240) || size == Size(width: 800, height: 450) ?
                     Size(width: 1920, height: 1080) :
                 (size == Size(width: 426, height: 320) ?
                         Size(width: 1440, height: 1080) :
@@ -1213,7 +1155,7 @@ final class IOEditor: Editor {
             case .caption:
                 self.exportCaption(from: nvs, at: ioResult)
             case .highQualityMovie:
-                let nSize = size == Size(width: 426, height: 240) ?
+                let nSize = size == Size(width: 426, height: 240) || size == Size(width: 800, height: 450) ?
                     Size(width: 3840, height: 2160) :
                 (size == Size(width: 426, height: 320) ?
                         Size(width: 2880, height: 2160) :
@@ -1267,7 +1209,7 @@ final class IOEditor: Editor {
                 }
             case .gif, .movie, .highQualityMovie, .caption: break
             case .document:
-                let sids = nvs.reduce(into: [SheetPosition: SheetID]()) {
+                let sids = nvs.reduce(into: [Sheetpos: SheetID]()) {
                     $0[$1.shp] = self.document.sheetID(at: $1.shp)
                 }
                 let csv = CopiedSheetsValue(deltaPoint: Point(), sheetIDs: sids)
@@ -1282,7 +1224,7 @@ final class IOEditor: Editor {
             case .sound: break
             case .lyrics: break
             case .documentWithHistory:
-                let sids = nvs.reduce(into: [SheetPosition: SheetID]()) {
+                let sids = nvs.reduce(into: [Sheetpos: SheetID]()) {
                     $0[$1.shp] = self.document.sheetID(at: $1.shp)
                 }
                 let csv = CopiedSheetsValue(deltaPoint: Point(), sheetIDs: sids)
@@ -1297,27 +1239,27 @@ final class IOEditor: Editor {
             }
             return nil
         }
-        let fType: FileTypeProtocol
-        switch type {
+        
+        let fType: FileTypeProtocol = switch type {
         case .image:
-            fType = nvs.count > 1 && unionFrame == nil ?
+            nvs.count > 1 && unionFrame == nil ?
                 Image.FileType.pngs : Image.FileType.png
         case .gif:
-            fType = Image.FileType.gif
+            Image.FileType.gif
         case .pdf:
-            fType = PDF.FileType.pdf
+            PDF.FileType.pdf
         case .movie, .highQualityMovie:
-            fType = Movie.FileType.mp4
+            Movie.FileType.mp4
         case .sound:
-            fType = Content.FileType.wav
+            Content.FileType.wav
         case .lyrics:
-            fType = Lyrics.FileType.musicxml
+            Lyrics.FileType.musicxml
         case .caption:
-            fType = Caption.FileType.scc
+            Caption.FileType.scc
         case .document:
-            fType = Document.FileType.rasendoc
+            Document.FileType.rasendoc
         case .documentWithHistory:
-            fType = Document.FileType.rasendoch
+            Document.FileType.rasendoch
         }
         
         URL.export(name: name(from: nvs.map { $0.shp }),
@@ -1545,31 +1487,39 @@ final class IOEditor: Editor {
                                       colorSpace: colorSpace)
                 var isStop = false, t = 0.0
                 let isMainFrame = !self.document.isEditingSheet
+                var filledShps = Set<Sheetpos>()
                 for v in vs {
                     if let sid = self.document.sheetID(at: v.shp),
                        let sheet = self.document.renderableSheet(at: sid) {
                         
+                        let sheetBounds = self.document.sheetFrame(with: v.shp).bounds
                         var frameRate = sheet.mainFrameRate
-                        var bottomSheets = [Sheet]()
+                        var bottomSheets = [(sheet: Sheet, bounds: Rect)]()
                         var shp = v.shp
                         shp.y -= 1
                         while let sid = self.document.sheetID(at: shp),
                               let sheet = self.document.renderableSheet(at: sid),
                               sheet.enabledAnimation {
                             
-                            bottomSheets.append(sheet)
+                            guard filledShps.contains(shp) else { continue }
+                            filledShps.insert(shp)
+                            let sheetBounds = self.document.sheetFrame(with: shp).bounds
+                            bottomSheets.append((sheet, sheetBounds))
                             frameRate = max(frameRate, sheet.mainFrameRate)
                             shp.y -= 1
                         }
                         
-                        var topSheets = [Sheet]()
+                        var topSheets = [(sheet: Sheet, bounds: Rect)]()
                         shp = v.shp
                         shp.y += 1
                         while let sid = self.document.sheetID(at: shp),
                               let sheet = self.document.renderableSheet(at: sid),
                            sheet.enabledAnimation {
                             
-                            topSheets.append(sheet)
+                            guard filledShps.contains(shp) else { continue }
+                            filledShps.insert(shp)
+                            let sheetBounds = self.document.sheetFrame(with: shp).bounds
+                            topSheets.append((sheet, sheetBounds))
                             frameRate = max(frameRate, sheet.mainFrameRate)
                             shp.y += 1
                         }
@@ -1591,23 +1541,27 @@ final class IOEditor: Editor {
                             let node: Node
                             if !bottomSheets.isEmpty || !topSheets.isEmpty {
                                 var children = [Node]()
-                                for bottomSheet in bottomSheets.reversed() {
+                                for (bottomSheet, sheetBounds) in bottomSheets.reversed() {
                                     children.append(bottomSheet.node(isBorder: false, atRootBeat: beat,
                                                                      renderingCaptionFrame: b,
-                                                                     isBackground: false))
+                                                                     isBackground: false,
+                                                                     in: sheetBounds))
                                 }
                                 children.append(sheet.node(isBorder: false, atRootBeat: beat,
                                                            renderingCaptionFrame: b,
-                                                           isBackground: false))
-                                for topSheet in topSheets {
+                                                           isBackground: false, 
+                                                           in: sheetBounds))
+                                for (topSheet, sheetBounds) in topSheets {
                                     children.append(topSheet.node(isBorder: false, atRootBeat: beat,
                                                                   renderingCaptionFrame: b,
-                                                                  isBackground: false))
+                                                                  isBackground: false,
+                                                                  in: sheetBounds))
                                 }
-                                node = Node(children: children, path: Path(sheet.bounds))
+                                node = Node(children: children, path: Path(sheetBounds))
                             } else {
                                 node = sheet.node(isBorder: false, atRootBeat: beat,
-                                                      renderingCaptionFrame: b)
+                                                      renderingCaptionFrame: b,
+                                                  in: sheetBounds)
                             }
                             node.attitude.position = origin
                            
@@ -1967,12 +1921,13 @@ final class IOEditor: Editor {
             for v in vs {
                 if let sid = self.document.sheetID(at: v.shp),
                    let sheet = self.document.renderableSheet(at: sid) {
-                    let origin = self.document.sheetFrame(with: v.shp).origin
+                    let sheetBounds = self.document.sheetFrame(with: v.shp).bounds
                     let ot = t
                     var time = Rational(0)
                     for (i, k) in sheet.animation.keyframes.enumerated() {
-                        let node = sheet.node(isBorder: false, atRootBeat: time)
-                        node.attitude.position = origin
+                        let node = sheet.node(isBorder: false, atRootBeat: time, 
+                                              in: sheetBounds)
+                        node.attitude.position = sheetBounds.origin
                         if let image = node.image(in: v.bounds, size: size,
                                                   backgroundColor: .background, colorSpace: .sRGB) {
                             images.append((image, k.beatDuration))
@@ -2046,7 +2001,7 @@ final class IOEditor: Editor {
         func export(progressHandler: (Double, inout Bool) -> ()) throws {
             try ioResult.remove()
             
-            let sids = vs.reduce(into: [SheetPosition: SheetID]()) {
+            let sids = vs.reduce(into: [Sheetpos: SheetID]()) {
                 $0[$1.shp - shp0] = document.sheetID(at: $1.shp)
             }
             let csv = CopiedSheetsValue(deltaPoint: Point(), sheetIDs: sids)

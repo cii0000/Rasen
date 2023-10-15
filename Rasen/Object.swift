@@ -19,6 +19,7 @@ typealias Real1 = Double
 
 struct OSheet {
     var value: Sheet
+    var bounds: Rect
     var undos: [UndoItemValue<SheetUndoItem>]
 }
 extension OSheet: Hashable {
@@ -31,8 +32,9 @@ extension OSheet: Hashable {
     }
 }
 extension OSheet {
-    init(_ v: Sheet) {
+    init(_ v: Sheet, bounds: Rect) {
         self.value = v
+        self.bounds = bounds
         undos = []
     }
 //    static func undoed(from os: Sheet, to ns: Sheet) -> OSheet {
@@ -1091,7 +1093,7 @@ extension O {
     init(_ p: Point) {
         self = .array(OArray([O(p.x), O(p.y)]))
     }
-    init(_ shp: SheetPosition) {
+    init(_ shp: Sheetpos) {
         self = .array(OArray([O(shp.x), O(shp.y)]))
     }
     static let pointName = "point"

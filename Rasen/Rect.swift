@@ -162,6 +162,10 @@ extension Rect {
         }
     }
     
+    var bounds: Self {
+        .init(size: size)
+    }
+    
     var minX: Double {
         origin.x
     }

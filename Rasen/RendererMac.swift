@@ -1495,7 +1495,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         guard window?.isMainWindow ?? false else { return }
         
         let event = inputKeyEventWith(drag: nsEvent, .began)
-        document.updateLastEditedSheetPosition(from: event)
+        document.updateLastEditedSheetpos(from: event)
         let menu = NSMenu()
         if menuEditor != nil {
             menuEditor?.editor.end()

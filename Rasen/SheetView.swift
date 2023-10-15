@@ -132,7 +132,12 @@ final class BorderView<T: BinderProtocol>: View {
     var keyPath: BinderKeyPath
     let node: Node
     
-    var bounds = Sheet.defaultBounds
+    var bounds = Sheet.defaultBounds {
+        didSet {
+            guard bounds != oldValue else { return }
+            updateWithModel()
+        }
+    }
     
     init(binder: Binder, keyPath: BinderKeyPath) {
         self.binder = binder
@@ -1147,12 +1152,13 @@ final class SheetView: View {
         animationView.updateTimeline()
     }
     
-    var bounds: Rect? {
-        get { node.bounds }
+    var bounds: Rect {
+        get { node.bounds ?? Sheet.defaultBounds }
         set {
-            node.path = newValue == nil ? .init() : .init(newValue!)
+            node.path = .init(newValue)
             textsView.elementViews.forEach { $0.updateClippingNode() }
-            animationView.updateClippingNode()
+            animationView.bounds = newValue
+            bordersView.elementViews.forEach { $0.bounds = newValue }
         }
     }
     var backgroundUUColor: UUColor {
@@ -1206,14 +1212,14 @@ final class SheetView: View {
     func leftTimeSliderRect(atSec sec: Rational) -> Rect {
         let bt = Double(sec / model.allSecDuration).clipped(min: 0, max: 1)
         let knobW = 2.0, knobH = 6.0
-        return Rect(x: model.bounds.width / 2 * bt,
+        return Rect(x: bounds.width / 2 * bt,
                     y: 0,
                     width: knobW, height: knobH)
     }
     func rightTimeSliderRect(atSec sec: Rational) -> Rect {
         let bt = Double(sec / model.allSecDuration).clipped(min: 0, max: 1)
         let knobW = 2.0, knobH = 6.0
-        return Rect(x: model.bounds.midX + model.bounds.width / 2 * bt,
+        return Rect(x: bounds.midX + bounds.width / 2 * bt,
                     y: 0,
                     width: knobW, height: knobH)
     }
@@ -1222,7 +1228,7 @@ final class SheetView: View {
                              from sheetView: SheetView) -> Rect {
         let btx = animationView.x(atBeat: beat)
         let knobW = 2.0, knobH = animationView.paddingTimelineBounds?.height ?? 0
-        let nb = model.bounds.insetBy(dx: Sheet.textPadding.width, dy: 0)
+        let nb = bounds.insetBy(dx: Sheet.textPadding.width, dy: 0)
         let tlY = nb.minY
         return Rect(x: btx - knobW / 2, y: tlY - knobH / 2,
                     width: knobW, height: knobH)
@@ -1609,7 +1615,7 @@ final class SheetView: View {
             let caption = model.caption(atBeat: beat)
             playingCaption = caption
             if let caption = caption {
-                let nodes = caption.nodes(in: model.mainFrame ?? model.bounds)
+                let nodes = caption.nodes(in: model.mainFrame ?? bounds)
                 playingCaptionNodes = nodes
                 animationView.timeNode.children = timeSliders + nodes
             } else {
@@ -1629,10 +1635,10 @@ final class SheetView: View {
             if let sheetView = previousSheetView {
                 var timetrack = sheetView.model.timetrack
                 if let aTimetrack = sheetView.bottomSheetView?.model.timetrack {
-                    timetrack += aTimetrack.moved(Point(0, -model.bounds.height))
+                    timetrack += aTimetrack.moved(Point(0, -bounds.height))
                 }
                 if let aTimetrack = sheetView.topSheetView?.model.timetrack {
-                    timetrack += aTimetrack.moved(Point(0, model.bounds.height))
+                    timetrack += aTimetrack.moved(Point(0, bounds.height))
                 }
                 if playingTimeframeIDs.isEmpty {
                     timetrack.timeframes
@@ -1651,10 +1657,10 @@ final class SheetView: View {
             
             var timetrack = model.timetrack
             if let aTimetrack = bottomSheetView?.model.timetrack {
-                timetrack += aTimetrack.moved(Point(0, -model.bounds.height))
+                timetrack += aTimetrack.moved(Point(0, -bounds.height))
             }
             if let aTimetrack = topSheetView?.model.timetrack {
-                timetrack += aTimetrack.moved(Point(0, model.bounds.height))
+                timetrack += aTimetrack.moved(Point(0, bounds.height))
             }
             if playingTimeframeIDs.isEmpty {
                 timetrack.timeframes
@@ -1671,10 +1677,10 @@ final class SheetView: View {
             if let sheetView = nextSheetView {
                 var timetrack = sheetView.model.timetrack
                 if let aTimetrack = sheetView.bottomSheetView?.model.timetrack {
-                    timetrack += aTimetrack.moved(Point(0, -model.bounds.height))
+                    timetrack += aTimetrack.moved(Point(0, -bounds.height))
                 }
                 if let aTimetrack = sheetView.topSheetView?.model.timetrack {
-                    timetrack += aTimetrack.moved(Point(0, model.bounds.height))
+                    timetrack += aTimetrack.moved(Point(0, bounds.height))
                 }
                 if playingTimeframeIDs.isEmpty {
                     timetrack.timeframes
@@ -1844,7 +1850,7 @@ final class SheetView: View {
             if caption != playingCaption {
                 playingCaption = caption
                 if let caption = caption {
-                    let nodes = caption.nodes(in: sheetView.model.mainFrame ?? sheetView.model.bounds)
+                    let nodes = caption.nodes(in: sheetView.model.mainFrame ?? sheetView.bounds)
                     playingCaptionNodes = nodes
                     animationView.timeNode.children = timeSliders + nodes
                 } else {
@@ -3329,6 +3335,10 @@ final class SheetView: View {
     }
     private func insertNode(_ bivs: [IndexValue<Border>]) {
         bordersView.insert(bivs)
+        let bounds = self.bounds
+        bivs.forEach {
+            bordersView.elementViews[$0.index].bounds = bounds
+        }
     }
     private func removeBordersNode(at borderIndexes: [Int]) {
         bordersView.remove(at: borderIndexes)
@@ -5880,7 +5890,7 @@ final class SheetView: View {
                         let range = os
                             .intRange(from: os.startIndex ..< os.endIndex)
                         
-                        let sb = model.bounds.inset(by: Sheet.textPadding)
+                        let sb = bounds.inset(by: Sheet.textPadding)
                         let origin: Point?
                         if let textFrame = text.frame,
                            !sb.contains(textFrame) {
@@ -6117,7 +6127,7 @@ final class SheetView: View {
         if !selectedFrameIndexes.isEmpty {
             let indexes = selectedFrameIndexes.sorted()
             var nPolyses = [[Topolygon]](repeating: [], count: indexes.count)
-            let b = model.bounds, borders = model.borders
+            let b = bounds, borders = model.borders
             let pictures = model.animation.keyframes[indexes].map { $0.picture }
             
             func makeTopolygons(handler: @escaping (Double, inout Bool) -> ()) {
@@ -6183,7 +6193,7 @@ final class SheetView: View {
     }
     func makeFacesFromKeyframeIndex(with path: Path?, isSelection: Bool,
                                     isNewUndoGroup: Bool = true) {
-        let topolygons = model.picture.makePolygons(inFrame: model.bounds,
+        let topolygons = model.picture.makePolygons(inFrame: bounds,
                                                     clipingPath: path,
                                                     borders: model.borders,
                                                     isSelection: isSelection)
@@ -6210,7 +6220,7 @@ final class SheetView: View {
             }
             return Double(i) / Double(lines1.count - 1) > 0.25
         }
-        let b = model.bounds
+        let b = bounds
         let result: Picture.AutoFillResult
         if model.enabledAnimation {
             func otherPlanes() -> [Plane]? {

@@ -24,12 +24,12 @@ struct ColorPathValue {
 
 struct CopiedSheetsValue: Equatable {
     var deltaPoint = Point()
-    var sheetIDs = [SheetPosition: SheetID]()
+    var sheetIDs = [Sheetpos: SheetID]()
 }
 extension CopiedSheetsValue: Protobuf {
     init(_ pb: PBCopiedSheetsValue) throws {
         deltaPoint = try Point(pb.deltaPoint)
-        sheetIDs = try [SheetPosition: SheetID](pb.sheetIds)
+        sheetIDs = try [Sheetpos: SheetID](pb.sheetIds)
     }
     var pb: PBCopiedSheetsValue {
         .with {
@@ -574,23 +574,44 @@ final class CopyEditor: Editor {
     
     func snappableBorderLocations(from orientation: Orientation,
                                   with sb: Rect) -> [Double] {
-        switch orientation {
-        case .horizontal:
-             [sb.height / 4,
-              202,
-              242,
-              sb.height / 2,
-              sb.height - 242,
-              sb.height - 202,
-              3 * sb.height / 4]
-        case .vertical:
-             [43,
-              sb.width / 4,
-              sb.width / 3,
-              sb.width / 2,
-              2 * sb.width / 3,
-              3 * sb.width / 4,
-              sb.width - 43]
+        if sb.width < sb.height {
+            switch orientation {
+            case .horizontal:
+                 [202,
+                  sb.height - 202,
+                  (sb.height / 4).rounded(),
+                  (sb.height / 3).rounded(),
+                  (sb.height / 2).rounded(),
+                  (2 * sb.height / 3).rounded(),
+                  (3 * sb.height / 4).rounded()].sorted()
+            case .vertical:
+                 [43,
+                  sb.width - 43,
+                  (sb.width / 4).rounded(),
+                  (sb.width / 3).rounded(),
+                  (sb.width / 2).rounded(),
+                  (2 * sb.width / 3).rounded(),
+                  (3 * sb.width / 4).rounded()].sorted()
+            }
+        } else {
+            switch orientation {
+            case .horizontal:
+                 [137,
+                  sb.height - 137,
+                  (sb.height / 4).rounded(),
+                  (sb.height / 3).rounded(),
+                  (sb.height / 2).rounded(),
+                  (2 * sb.height / 3).rounded(),
+                  (3 * sb.height / 4).rounded()].sorted()
+            case .vertical:
+                 [112,
+                  sb.width - 112,
+                  (sb.width / 4).rounded(),
+                  (sb.width / 3).rounded(),
+                  (sb.width / 2).rounded(),
+                  (2 * sb.width / 3).rounded(),
+                  (3 * sb.width / 4).rounded()].sorted()
+            }
         }
     }
     func borderSnappedPoint(_ p: Point, with sb: Rect, distance d: Double,
@@ -1286,7 +1307,7 @@ final class CopyEditor: Editor {
                 if text.widthCount != widthCount {
                     text.widthCount = widthCount
                     
-                    let sb = sheetView.model.bounds.inset(by: Sheet.textPadding)
+                    let sb = sheetView.bounds.inset(by: Sheet.textPadding)
                     if let textFrame = text.frame,
                        !sb.contains(textFrame) {
                        
@@ -1506,7 +1527,7 @@ final class CopyEditor: Editor {
                        let texture = Texture(image: image, isOpaque: false,
                                              colorSpace: .sRGB) {
                         let size = (image.size / 2)
-                            .snapped(Sheet.defaultBounds.size * 0.95)
+                            .snapped((sheetView?.bounds.size ?? Sheet.defaultBounds.size) * 0.95)
                         * s
                         let imageNode = Node(name: "content",
                                              attitude: .init(position: ntext.origin),
@@ -1790,8 +1811,8 @@ final class CopyEditor: Editor {
         let shp = document.sheetPosition(at: p)
         
         var isRootNewUndoGroup = true
-        var isUpdateUndoGroupSet = Set<SheetPosition>()
-        func updateUndoGroup(with nshp: SheetPosition) {
+        var isUpdateUndoGroupSet = Set<Sheetpos>()
+        func updateUndoGroup(with nshp: Sheetpos) {
             if !isUpdateUndoGroupSet.contains(nshp),
                let sheetView = document.sheetView(at: nshp) {
                 
@@ -1839,10 +1860,15 @@ final class CopyEditor: Editor {
             let rx = min(maxXMinYSHP.x, shp.x + 1)
             let by = max(minXMinYSHP.y, shp.y - 1)
             let ty = min(minXMaxYSHP.y, shp.y + 1)
+            var filledShps = Set<Sheetpos>()
             if lx <= rx && by <= ty {
                 for xi in lx ... rx {
                     for yi in by ... ty {
-                        let nshp = SheetPosition(xi, yi)
+                        let nshp = document
+                            .sheetPosition(at: IntPoint(xi, yi))
+                        guard !filledShps.contains(nshp) else { continue }
+                        filledShps.insert(nshp)
+                        
                         let frame = document.sheetFrame(with: nshp)
                         let t = transform(in: frame, at: p)
                         let oLines: [Line] = lines.map {
@@ -1887,10 +1913,15 @@ final class CopyEditor: Editor {
             let rx = min(maxXMinYSHP.x, shp.x + 1)
             let by = max(minXMinYSHP.y, shp.y - 1)
             let ty = min(minXMaxYSHP.y, shp.y + 1)
+            var filledShps = Set<Sheetpos>()
             if lx <= rx && by <= ty {
                 for xi in lx ... rx {
                     for yi in by ... ty {
-                        let nshp = SheetPosition(xi, yi)
+                        let nshp = document
+                            .sheetPosition(at: IntPoint(xi, yi))
+                        guard !filledShps.contains(nshp) else { continue }
+                        filledShps.insert(nshp)
+                        
                         let frame = document.sheetFrame(with: nshp)
                         let t = transform(in: frame, at: p)
                         let nPlanes = Sheet.clipped(planes.map { $0 * t },
@@ -1928,7 +1959,7 @@ final class CopyEditor: Editor {
                     .madeSheetViewIsNew(at: nshp,
                                           isNewUndoGroup:
                                             isRootNewUndoGroup) {
-                    let sb = sheetView.model.bounds.inset(by: Sheet.textPadding)
+                    let sb = sheetView.bounds.inset(by: Sheet.textPadding)
                     if let textFrame = nText.frame,
                        !sb.contains(textFrame) {
                        
@@ -1987,7 +2018,7 @@ final class CopyEditor: Editor {
                         let ti = textView.model.string.intIndex(from: ati)
                         rRange = ti ..< ti
                     }
-                    let sb = sheetView.model.bounds.inset(by: Sheet.textPadding)
+                    let sb = sheetView.bounds.inset(by: Sheet.textPadding)
                     var nText = textView.model
                     nText.replaceSubrange(text.string, from: rRange,
                                           clipFrame: sb)
@@ -2049,7 +2080,7 @@ final class CopyEditor: Editor {
                             rRange = ei ..< ei
                         }
                         if let rRange = rRange {
-                            let sb = sheetView.model.bounds.inset(by: Sheet.textPadding)
+                            let sb = sheetView.bounds.inset(by: Sheet.textPadding)
                             var nText = textView.model
                             nText.replaceSubrange(str, from: rRange,
                                                   clipFrame: sb)
@@ -2081,7 +2112,7 @@ final class CopyEditor: Editor {
                 let decimalPlaces = Int(clipScale + 2)
                 text.origin = nnp.rounded(decimalPlaces: decimalPlaces)
                 text.size = text.size * scale
-                let sb = sheetView.model.bounds.inset(by: Sheet.textPadding)
+                let sb = sheetView.bounds.inset(by: Sheet.textPadding)
                 if let textFrame = text.frame, !sb.contains(textFrame) {
                     let nFrame = sb.clipped(textFrame)
                     text.origin += nFrame.origin - textFrame.origin
@@ -2235,7 +2266,7 @@ final class CopyEditor: Editor {
                     if text.widthCount != widthCount {
                         text.widthCount = widthCount
                         
-                        let sb = sheetView.model.bounds.inset(by: Sheet.textPadding)
+                        let sb = sheetView.bounds.inset(by: Sheet.textPadding)
                         if let textFrame = text.frame, !sb.contains(textFrame) {
                             let nFrame = sb.clipped(textFrame)
                             text.origin += nFrame.origin - textFrame.origin
@@ -2661,7 +2692,7 @@ final class CopyEditor: Editor {
                           ti >= textView.model.string.startIndex else { return }
                     let text = textView.model
                     let nti = text.string.intIndex(from: ti)
-                    let sb = sheetView.model.bounds.inset(by: Sheet.textPadding)
+                    let sb = sheetView.bounds.inset(by: Sheet.textPadding)
                     var nText = text
                     nText.replaceSubrange(str, from: nti ..< nti,
                                           clipFrame: sb)
@@ -2727,7 +2758,7 @@ final class CopyEditor: Editor {
     }
     
     struct Value {
-        var shp: SheetPosition, frame: Rect
+        var shp: Sheetpos, frame: Rect
     }
     func values(at p: Point, isCut: Bool) -> [Value] {
         if document.isSelectSelectedNoneCursor(at: p), !document.isSelectedText {
@@ -2785,9 +2816,10 @@ final class CopyEditor: Editor {
             for (shp, _) in csv.sheetIDs {
                 var sf = document.sheetFrame(with: shp)
                 sf.origin += p - csv.deltaPoint
-                let nshp = document.sheetPosition(at: sf.centerPoint)
+                let nshp = document.sheetPosition(at: Point(Sheet.width / 2, 0) + sf.origin)
                 if document.sheetID(at: nshp) == nil {
-                    let sf = document.sheetFrame(with: nshp)
+                    let sf = Rect(origin: document.sheetFrame(with: nshp).origin,
+                                  size: sf.size)
                     let lw = Line.defaultLineWidth / document.worldToScreenScale
                     children.append(Node(attitude: Attitude(position: sf.origin),
                                          path: Path(Rect(size: sf.size)),
@@ -2805,12 +2837,13 @@ final class CopyEditor: Editor {
         document.cursorPoint = sp
         let p = document.convertScreenToWorld(sp)
         if case .copiedSheetsValue(let csv) = pasteObject {
-            var nIndexes = [SheetPosition: SheetID]()
-            var removeIndexes = [SheetPosition]()
+            var nIndexes = [Sheetpos: SheetID]()
+            var removeIndexes = [Sheetpos]()
             for (shp, sid) in csv.sheetIDs {
                 var sf = document.sheetFrame(with: shp)
                 sf.origin += p - csv.deltaPoint
-                let nshp = document.sheetPosition(at: sf.centerPoint)
+                var nshp = document.sheetPosition(at: Point(Sheet.width / 2, 0) + sf.origin)
+                nshp.isRight = shp.isRight
                 
                 if document.sheetID(at: nshp) != nil {
                     removeIndexes.append(nshp)

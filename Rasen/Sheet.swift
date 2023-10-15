@@ -2022,10 +2022,11 @@ extension Sheet {
     var bounds: Rect {
         Sheet.defaultBounds
     }
-    func boundsTuple(at p: Point) -> (bounds: Rect, isAll: Bool) {
-        let b = Sheet.defaultBounds
-        guard !borders.isEmpty else { return (b, true) }
-        var aabb = AABB(b)
+    
+    func boundsTuple(at p: Point,
+                     in bounds: Rect) -> (bounds: Rect, isAll: Bool) {
+        guard !borders.isEmpty else { return (bounds, true) }
+        var aabb = AABB(bounds)
         borders.forEach {
             switch $0.orientation {
             case .horizontal:
@@ -2044,7 +2045,7 @@ extension Sheet {
         }
         return (aabb.rect, false)
     }
-    var borderFrames: [Rect] {
+    func borderFrames(in bounds: Rect) -> [Rect] {
         guard !borders.isEmpty else { return [] }
         var xs = Set<Double>(), ys = Set<Double>()
         borders.forEach {
@@ -2055,15 +2056,15 @@ extension Sheet {
                 xs.insert($0.location)
             }
         }
-        let b = Sheet.defaultBounds
-        xs.insert(b.width)
-        ys.insert(b.height)
+        
+        xs.insert(bounds.width)
+        ys.insert(bounds.height)
         let nxs = xs.sorted(), nys = ys.sorted()
         var frames = [Rect]()
         frames.reserveCapacity(nxs.count * nys.count)
-        var oldX = b.minX
+        var oldX = bounds.minX
         for x in nxs {
-            var oldY = b.minY
+            var oldY = bounds.minY
             for y in nys {
                 frames.append(Rect(x: oldX, y: oldY,
                                    width: x - oldX, height: y - oldY))
@@ -2163,13 +2164,16 @@ extension Sheet {
         Color.rgbLinear(fillColor, color, t: 0.05)
     }
     
-    func node(isBorder: Bool, isBackground: Bool = true) -> Node {
+    func node(isBorder: Bool, isBackground: Bool = true,
+              in bounds: Rect) -> Node {
         node(isBorder: isBorder, picture: picture, draftPicture: draftPicture,
-             isBackground: isBackground)
+             isBackground: isBackground,
+             in: bounds)
     }
     func node(isBorder: Bool, atRootBeat rootBeat: Rational,
               renderingCaptionFrame: Rect? = nil,
-              isBackground: Bool = true) -> Node {
+              isBackground: Bool = true, 
+              in bounds: Rect) -> Node {
         let captionNodes: [Node]
         if let renderingCaptionFrame = renderingCaptionFrame,
            let caption = captions.first(where: { $0.beatRange.contains(rootBeat) }) {
@@ -2181,11 +2185,13 @@ extension Sheet {
         let k = animation.keyframe(atRootBeat: rootBeat)
         return node(isBorder: isBorder, captionNodes: captionNodes,
                     picture: k.picture, draftPicture: k.draftPicture,
-                    isBackground: isBackground)
+                    isBackground: isBackground,
+                    in: bounds)
     }
     func node(isBorder: Bool, captionNodes: [Node] = [],
               picture: Picture, draftPicture: Picture,
-              isBackground: Bool) -> Node {
+              isBackground: Bool,
+              in bounds: Rect) -> Node {
         let lineNodes = picture.lines.map { $0.node }
         let planeNodes = picture.planes.map { $0.node }
         let textNodes = texts.map { $0.node }
@@ -2321,10 +2327,10 @@ extension Sheet {
         }
     }
     
-    init(message: String) {
+    init(message: String, in bounds: Rect = Sheet.defaultBounds) {
         var text = Text(string: message)
-        if let bounds = text.bounds {
-            text.origin = Sheet.defaultBounds.centerPoint - bounds.centerPoint
+        if let textBounds = text.bounds {
+            text.origin = bounds.centerPoint - textBounds.centerPoint
         }
         self.init(texts: [text])
     }

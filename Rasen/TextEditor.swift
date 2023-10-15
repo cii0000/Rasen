@@ -329,7 +329,27 @@ final class TextOrientationEditor: Editor {
     }
     func changeTextOrientation(_ orientation: Orientation, with event: InputKeyEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            switch event.phase {
+            case .began:
+                document.cursor = .arrow
+                
+                let p = document.convertScreenToWorld(event.screenPoint)
+                var shp = document.sheetPosition(at: p)
+                let isRight = orientation == .horizontal
+                if let sid = document.sheetID(at: shp),
+                   shp.isRight != isRight {
+                   
+                    shp.isRight = isRight
+                    document.history.newUndoGroup()
+                    document.removeSheets(at: [shp])
+                    document.append([shp: sid])
+                }
+            case .changed:
+                break
+            case .ended:
+                document.cursor = Document.defaultCursor
+            }
+            
             return
         }
         switch event.phase {
@@ -379,7 +399,7 @@ final class TextOrientationEditor: Editor {
                     if text.orientation != orientation {
                         text.orientation = orientation
                         
-                        let sb = sheetView.model.bounds.inset(by: Sheet.textPadding)
+                        let sb = sheetView.bounds.inset(by: Sheet.textPadding)
                         if let textFrame = text.frame, !sb.contains(textFrame) {
                             let nFrame = sb.clipped(textFrame)
                             text.origin += nFrame.origin - textFrame.origin
@@ -1036,7 +1056,7 @@ final class TextEditor: Editor {
         editingSheetView = sheetView
         textView.removeCharacters(in: removeRange)
         textView.unmark()
-        let sb = sheetView.model.bounds.inset(by: Sheet.textPadding)
+        let sb = sheetView.bounds.inset(by: Sheet.textPadding)
         if let textFrame = textView.model.frame,
            !sb.contains(textFrame) {
            
@@ -1937,8 +1957,23 @@ extension TextView {
             if let image = content.image,
                let texture = Texture(image: image, isOpaque: false,
                                      colorSpace: .sRGB) {
+                var parent: Node?
+                node.allParents { node, stop in
+                    if node.bounds != nil {
+                        parent = node
+                        stop = true
+                    }
+                }
+                
+                let parentSize: Size =
+                if let parent, let pb = parent.bounds {
+                    pb.size
+                } else {
+                    Sheet.defaultBounds.size
+                }
+                
                 let size = (image.size / 2)
-                    .snapped(Sheet.defaultBounds.size * 0.95)
+                    .snapped(parentSize * 0.95)
                 * textSize / Font.defaultSize
                 boxNodes.append(Node(name: "content",
                                      path: Path(Rect(size: size)),

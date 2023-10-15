@@ -28,26 +28,6 @@ struct IntPoint {
     }
 }
 extension IntPoint: Hashable {}
-extension IntPoint: Protobuf {
-    init(_ pb: PBIntPoint) throws {
-        x = Int(pb.x)
-        y = Int(pb.y)
-    }
-    var pb: PBIntPoint {
-        .with {
-            $0.x = Int64(x)
-            $0.y = Int64(y)
-        }
-    }
-}
-extension Array where Element == IntPoint {
-    init(_ pb: PBIntPointArray) throws {
-        self = try pb.value.map { try IntPoint($0) }
-    }
-    var pb: PBIntPointArray {
-        .with { $0.value = map { $0.pb } }
-    }
-}
 extension IntPoint: Codable {
     init(from decoder: Decoder) throws {
         var container = try decoder.unkeyedContainer()
@@ -76,16 +56,6 @@ extension IntPoint {
     func distanceSquared(_ other: IntPoint) -> Int {
         let x = self.x - other.x, y = self.y - other.y
         return x * x + y * y
-    }
-    var arounds: [IntPoint] {
-        [IntPoint(x - 1, y - 1),
-         IntPoint(x, y - 1),
-         IntPoint(x + 1, y - 1),
-         IntPoint(x - 1, y),
-         IntPoint(x + 1, y),
-         IntPoint(x - 1, y + 1),
-         IntPoint(x, y + 1),
-         IntPoint(x + 1, y + 1)]
     }
 }
 

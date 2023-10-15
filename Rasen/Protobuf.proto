@@ -38,10 +38,6 @@ message PBPoint {
     double x = 1;
     double y = 2;
 }
-message PBIntPoint {
-    int64 x = 1;
-    int64 y = 2;
-}
 message PBSize {
     double width = 1;
     double height = 2;
@@ -273,11 +269,11 @@ message PBBorder {
     PBOrientation orientation = 2;
 }
 
-message PBIntPointStringDic {
-    map<string, PBIntPoint> value = 1;
+message PBSheetposStringDic {
+    map<string, PBSheetpos> value = 1;
 }
 message PBStringIntPointDicElement {
-    PBIntPoint key = 1;
+    PBSheetpos key = 1;
     string value = 2;
 }
 message PBStringIntPointDic {
@@ -345,8 +341,13 @@ message PBSheet {
     PBUUColor backgroundUUColor = 5;
 }
 
+message PBSheetpos {
+    int64 x = 1;
+    int64 y = 2;
+    bool isRight = 3;
+}
 message PBWorld {
-    PBIntPointStringDic sheetPositions = 1;
+    PBSheetposStringDic sheetPositions = 1;
 }
 
 enum PBRectCorner {
@@ -473,8 +474,8 @@ message PBLineArray {
 message PBPlaneArray {
     repeated PBPlane value = 1;
 }
-message PBIntPointArray {
-    repeated PBIntPoint value = 1;
+message PBSheetposArray {
+    repeated PBSheetpos value = 1;
 }
 message PBIntIndexValueArray {
     repeated PBIntIndexValue value = 1;
@@ -572,7 +573,7 @@ message PBSheetUndoItem {
 message PBWorldUndoItem {
     oneof value {
         PBStringIntPointDic insertSheets = 1;
-        PBIntPointArray removeSheets = 2;
+        PBSheetposArray removeSheets = 2;
     }
 }
 

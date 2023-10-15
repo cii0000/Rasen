@@ -30,7 +30,7 @@ extension O {
     static func showAllDefinitions(_ ao: O, _ oDic: inout [OKey: O],
                                    enableCustom: Bool = true) -> O {
         guard case .sheet(var sheet) = ao else { return O(OError(String(format: "Argument $0 must be sheet, not '%1$@'".localized, ao.name))) }
-        let b = sheet.value.bounds
+        let b = sheet.bounds
         
         let customGroup = OKeyInfo.Group(name: "Custom".localized, index: -1)
         
@@ -222,7 +222,7 @@ extension O {
         guard case .sheet(var sheet)? = oDic[OKey(sheetName)] else { return O(OError(String(format: "'%1$@' does not exist".localized, sheetName))) }
         let xName = xo.asTextBasedString, yName = yo.asTextBasedString
         
-        let b = sheet.value.bounds
+        let b = sheet.bounds
         let cp = b.centerPoint, r = 200.0, d = 5.0
         let ex = Edge(cp + Point(-r, 0), cp + Point(r, 0))
         let ey = Edge(cp + Point(0, -r), cp + Point(0, r))
@@ -288,7 +288,7 @@ extension O {
                           _ oDic: inout [OKey: O]) -> O {
         guard case .sheet(var sheet)? = oDic[OKey(sheetName)] else { return O(OError(String(format: "'%1$@' does not exist".localized, sheetName))) }
         
-        let b = sheet.value.bounds
+        let b = sheet.bounds
         let xs = String(intBased: np.x), ys = String(intBased: np.y)
         if b.inset(by: Line.defaultLineWidth).contains(np) {
             let line = Line.circle(centerPosition: np, radius: 1)
@@ -306,7 +306,7 @@ extension O {
         
         if l.controls.count >= 2 {
             let l = l.controls.count > 10000 ? Line(controls: Array(l.controls[0 ..< 10000])) : l
-            let b = sheet.value.bounds
+            let b = sheet.bounds
             let newLines = Sheet.clipped([l],
                                          in: b.inset(by: Line.defaultLineWidth))
             if !newLines.isEmpty {
@@ -319,7 +319,7 @@ extension O {
     static func drawText(_ t: Text, _ oDic: inout [OKey: O]) -> O {
         guard case .sheet(var sheet)? = oDic[OKey(sheetName)] else { return O(OError(String(format: "'%1$@' does not exist".localized, sheetName))) }
         
-        let b = sheet.value.bounds
+        let b = sheet.bounds
         if let frame = t.frame, b.intersects(frame) {
             sheet.append(t)
             return O(sheet)
@@ -353,15 +353,15 @@ extension O {
         switch orientation {
         case .horizontal:
             var t = Transform.identity
-            t.translate(by: -sheet.value.bounds.centerPoint)
+            t.translate(by: -sheet.bounds.centerPoint)
             t.scaleBy(x: -1, y: 1)
-            t.translate(by: sheet.value.bounds.centerPoint)
+            t.translate(by: sheet.bounds.centerPoint)
             sheet.append(lines.map { $0 * t })
         case .vertical:
             var t = Transform.identity
-            t.translate(by: -sheet.value.bounds.centerPoint)
+            t.translate(by: -sheet.bounds.centerPoint)
             t.scaleBy(x: 1, y: -1)
-            t.translate(by: sheet.value.bounds.centerPoint)
+            t.translate(by: sheet.bounds.centerPoint)
             sheet.append(lines.map { $0 * t })
         }
         return O(sheet)

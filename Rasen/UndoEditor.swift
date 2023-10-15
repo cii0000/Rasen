@@ -628,10 +628,8 @@ final class HistoryCleaner: InputKeyEditor {
             break
         case .ended:
             if document.isSelectNoneCursor(at: p), !document.isSelectedText {
-                let shps: [SheetPosition] = document.world.sheetIDs.keys.compactMap {
-                    document.multiSelection
-                        .intersects(document.sheetFrame(with: $0)) ? $0 : nil
-                }
+                
+                let shps = document.sheetposWithSelection()
                 
                 let ok: () -> () = {
                     func clearHistorys(progressHandler: (Double, inout Bool) -> ()) throws {

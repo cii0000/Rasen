@@ -281,7 +281,7 @@ final class RunEditor: InputKeyEditor {
                         
                         let eSec = 0.0
                         let eW = textView.width(atSecDuration: eSec)
-                        let allW = sheetView.model.bounds.width - Sheet.textPadding.width * 2
+                        let allW = sheetView.bounds.width - Sheet.textPadding.width * 2
                         let tW = textView.width(atBeatDuration: timeframe.localBeatRange?.length ?? 0) + eW * 2
                         
                         let dx = text.origin.x
@@ -417,34 +417,36 @@ extension RunEditor {
     }
     func send(_ currentP: Point,
               from text: Text, ti: Int,
-              _ shp: SheetPosition, _ sheetView: SheetView) {
+              _ shp: Sheetpos, _ sheetView: SheetView) {
         runText = text
         runTypobute = text.typobute
-        let shpp = document.sheetFrame(with: shp).origin
-        var ssDic = [O: O](), tsss = [([Text], SheetPosition, Sheet)]()
-        var shps = Set<SheetPosition>(), shpStack = Stack<SheetPosition>()
+        let sf = document.sheetFrame(with: shp)
+        let shpp = sf.origin
+        var ssDic = [O: O](), tsss = [([Text], Sheetpos, Sheet)]()
+        var shps = Set<Sheetpos>(), shpStack = Stack<Sheetpos>()
         shps.insert(shp)
         shpStack.push(shp)
         while let nshp = shpStack.pop() {
             guard let sid = document.sheetID(at: nshp) else { continue }
             guard let sheet = document.readSheet(at: sid) else { continue }
+            let sheetBounds = document.sheetFrame(with: nshp).bounds
             let dshp = nshp - shp
-            ssDic[O(dshp)] = O(OSheet(sheet))
+            ssDic[O(dshp)] = O(OSheet(sheet, bounds: sheetBounds))
             
             let texts = sheet.texts
             var nTexts = [Text]()
             nTexts.reserveCapacity(texts.count)
             for t in texts {
-                func shpFromPlus(at t: Text) -> SheetPosition? {
+                func shpFromPlus(at t: Text) -> Sheetpos? {
                     guard t.string == "+", let f = t.frame else { return nil }
                     let s = max(f.width, f.height), p = f.centerPoint
-                    guard !sheet.bounds.inset(by: s).contains(p),
-                        let lrtb = sheet.bounds.lrtb(at: p) else { return nil }
+                    guard !sheetBounds.inset(by: s).contains(p),
+                        let lrtb = sheetBounds.lrtb(at: p) else { return nil }
                     return switch lrtb {
-                    case .left: SheetPosition(nshp.x - 1, nshp.y)
-                    case .right: SheetPosition(nshp.x + 1, nshp.y)
-                    case .top: SheetPosition(nshp.x, nshp.y + 1)
-                    case .bottom: SheetPosition(nshp.x, nshp.y - 1)
+                    case .left: .init(x: nshp.x - 1, y: nshp.y)
+                    case .right: .init(x: nshp.x + 1, y: nshp.y)
+                    case .top: .init(x: nshp.x, y: nshp.y + 1)
+                    case .bottom: .init(x: nshp.x, y: nshp.y - 1)
                     }
                 }
                 if let nnshp = shpFromPlus(at: t) {
@@ -462,7 +464,8 @@ extension RunEditor {
         let printOrigin = nodePoint(from: text)
         self.printOrigin = sheetView.convertToWorld(printOrigin)
         
-        var oDic = O.defaultDictionary(with: sheetView.model,
+        var oDic = O.defaultDictionary(with: sheetView.model, 
+                                       bounds: sf.bounds,
                                        ssDic: ssDic,
                                        cursorP: currentP, printP: printOrigin)
         
@@ -607,7 +610,7 @@ extension RunEditor {
     }
     func draw(_ o: O, from text: Text, time: Double,
               errorID: ID?,
-              in sheetView: SheetView, _ shp: SheetPosition) {
+              in sheetView: SheetView, _ shp: Sheetpos) {
 //        var isUp = false
         func drawO(_ o: O) {
             let s = o.description
@@ -625,13 +628,13 @@ extension RunEditor {
         }
         switch o {
         case .dic(let a):
-            var ssDic = [SheetPosition: OSheet]()
+            var ssDic = [Sheetpos: OSheet]()
             for (key, value) in a {
                 if case .array(let idxs) = key, idxs.count == 2,
                     case .int(let x) = idxs[0], case .int(let y) = idxs[1],
                     case .sheet(let sheet) = value {
                     
-                    let nshp = SheetPosition(x, y) + shp
+                    let nshp = Sheetpos(x: x, y: y) + shp
                     ssDic[nshp] = sheet
                 }
             }
@@ -661,7 +664,7 @@ extension RunEditor {
 //            drawTime(time, from: text, isUp: isUp, in: sheetView, shp)
 //        }
     }
-    func draw(_ ss: OSheet, from text: Text, at shp: SheetPosition) {
+    func draw(_ ss: OSheet, from text: Text, at shp: Sheetpos) {
         guard let sheetView = document.readSheetView(at: shp) else { return }
         sheetView.newUndoGroup()
         func lineCount(_ line: Line) -> Int {
@@ -726,7 +729,7 @@ extension RunEditor {
     }
     func drawTime(_ t: Double, from text: Text, isUp: Bool,
                   isNewUndoGroup: Bool = true,
-                  in sheetView: SheetView, _ shp: SheetPosition) {
+                  in sheetView: SheetView, _ shp: Sheetpos) {
         let size = text.typesetter.typoBounds?.size ?? Size()
         let padding = runTypobute.font.size * 2 * 2 / 3
         let p = Point(text.origin.x + padding + size.width,
@@ -868,8 +871,8 @@ final class AnimationMaker {
         
         
         var oSheetView: SheetView?
-        for nshp in shp.arounds {
-            if let nSheetView = document.sheetView(at: nshp) {
+        for niv in document.aroundSheetpos(atCenter: shp.int()) {
+            if let nSheetView = document.sheetView(at: niv.shp) {
                 oSheetView = nSheetView
                 break
             }
@@ -1302,7 +1305,7 @@ final class AboutRunShower: InputKeyEditor {
                 s1 += xyzwS + "\n\n"
                 s1 += sheetBondS
                 
-                let b = sheetView.model.bounds
+                let b = sheetView.bounds
                 let lPadding = 20.0
                 
                 var p = Point(0, -lPadding), allSize = Size()

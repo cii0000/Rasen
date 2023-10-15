@@ -16,7 +16,7 @@
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
 extension O {
-    static func defaultDictionary(with sheet: Sheet,
+    static func defaultDictionary(with sheet: Sheet, bounds: Rect,
                                   ssDic: [O: O],
                                   cursorP: Point, printP: Point) -> [OKey: O] {
         var oDic = [OKey : O]()
@@ -166,9 +166,9 @@ extension O {
         append(OKey(sheetDicName, OKeyInfo(sheetGroup, "Sheets dictionary where key is coordinates. Key of the sheet at the cursor position is the origin (0 0). The keys on the other sheets are relative to the origin.".localized)),
                O(ssDic))
         append(OKey(sheetName, OKeyInfo(sheetGroup, "Sheet at the cursor position.".localized)),
-               O(OSheet(sheet)))
+               O(OSheet(sheet, bounds: bounds)))
         append(OKey(sheetSizeName, OKeyInfo(sheetGroup, "Sheet size.".localized)),
-               O([O("width"): O(sheet.bounds.width), O("height"): O(sheet.bounds.height)]))
+               O([O("width"): O(bounds.width), O("height"): O(bounds.height)]))
         append(OKey(cursorPName, OKeyInfo(sheetGroup, "Cursor position.".localized)),
                O(cursorP))
         append(OKey(printPName, OKeyInfo(sheetGroup, "Display position of the execution result.".localized)),
@@ -616,6 +616,7 @@ extension O {
         case .array(let a):
             switch bo {
             case .array(let b):
+                print(a, b)
                 guard a.dimension == b.dimension else {
                     return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
                 }

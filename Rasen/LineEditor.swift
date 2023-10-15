@@ -198,10 +198,8 @@ final class LineEditor: Editor {
     }
     var lastSnapStraightTime = 0.0
     
-    var maxSheetCount = 1
     var centerOrigin = Point(), centerBounds = Rect(), clipBounds = Rect()
-    var centerSHP = SheetPosition()
-    var minX = 0, maxX = 0, minY = 0, maxY = 0
+    var centerSHP = Sheetpos(), nearestShps = [Sheetpos]()
     var tempLine = Line()
     
     func updateNode() {
@@ -224,23 +222,21 @@ final class LineEditor: Editor {
         }
     }
     func updateClipBoundsAndIndexRange(at p: Point) {
-        let shp = document.sheetPosition(at: p)
-        var minSHP = shp, maxSHP = shp
-        minSHP.x -= maxSheetCount
-        minSHP.y -= maxSheetCount
-        maxSHP.x += maxSheetCount
-        maxSHP.y += maxSheetCount
-        let minB = document.sheetFrame(with: minSHP)
-        let maxB = document.sheetFrame(with: maxSHP)
+        let ip = document.intPosition(at: p)
+        let shp = document.sheetPosition(at: ip)
+        let aroundShps = document.aroundSheetpos(atCenter: ip).map { $0.shp }
+        nearestShps = [shp] + aroundShps
+        
+        let nearestB = nearestShps.reduce(into: document.sheetFrame(with: shp)) {
+            $0.formUnion(document.sheetFrame(with: $1))
+        }
+        
         let cb = document.sheetFrame(with: shp)
         centerOrigin = cb.origin
         centerBounds = Rect(origin: Point(), size: cb.size)
-        clipBounds = minB.union(maxB).inset(by: document.sheetLineWidth) - cb.origin
+        
+        clipBounds = nearestB.inset(by: document.sheetLineWidth) - cb.origin
         centerSHP = shp
-        minX = minSHP.x
-        maxX = maxSHP.x
-        minY = minSHP.y
-        maxY = maxSHP.y
     }
     
     private(set) var outlineLassoNode: Node?
@@ -1332,7 +1328,7 @@ final class LineEditor: Editor {
         document.sheetView(at: wp)?.model.mainLineUUColor
         ?? Line.defaultUUColor
     }
-    func lineUUColor(at sheetP: SheetPosition) -> UUColor {
+    func lineUUColor(at sheetP: Sheetpos) -> UUColor {
         document.sheetView(at: sheetP)?.model.mainLineUUColor
         ?? Line.defaultUUColor
     }
@@ -1395,33 +1391,30 @@ final class LineEditor: Editor {
 //                }
             } else {
                 var isWorldNewUndoGroup = true
-                for yi in minY ... maxY {
-                    for xi in minX ... maxX {
-                        let shp = SheetPosition(xi, yi)
-                        let b = document.sheetFrame(with: shp) - centerOrigin
-                        if lb.intersects(b),
-                           let sheetView = document.madeSheetView(at: shp, isNewUndoGroup: isWorldNewUndoGroup) {
-                            isWorldNewUndoGroup = false
-                            let nLine = tempLine
-                                * Transform(translation: -b.origin)
-                            let uuColor = lineUUColor(at: shp)
-                            if let b = sheetView.node.bounds {
-                                var nLines = Sheet.clipped([nLine], in: b).filter {
-                                    if let b = $0.bounds {
-                                        return max(b.width, b.height)
-                                        > document.worldLineWidth * 4
-                                    } else {
-                                        return true
-                                    }
-                                }.map {
-                                    var line = $0
-                                    line.uuColor = uuColor
-                                    return line
+                for shp in nearestShps {
+                    let b = document.sheetFrame(with: shp) - centerOrigin
+                    if lb.intersects(b),
+                       let sheetView = document.madeSheetView(at: shp, isNewUndoGroup: isWorldNewUndoGroup) {
+                        isWorldNewUndoGroup = false
+                        let nLine = tempLine
+                        * Transform(translation: -b.origin)
+                        let uuColor = lineUUColor(at: shp)
+                        if let b = sheetView.node.bounds {
+                            let nLines = Sheet.clipped([nLine], in: b).filter {
+                                if let b = $0.bounds {
+                                    return max(b.width, b.height)
+                                    > document.worldLineWidth * 4
+                                } else {
+                                    return true
                                 }
-                                if !nLines.isEmpty {
-                                    sheetView.newUndoGroup()
-                                    sheetView.append(nLines)
-                                }
+                            }.map {
+                                var line = $0
+                                line.uuColor = uuColor
+                                return line
+                            }
+                            if !nLines.isEmpty {
+                                sheetView.newUndoGroup()
+                                sheetView.append(nLines)
                             }
                         }
                     }
@@ -1611,16 +1604,13 @@ final class LineEditor: Editor {
             }
         } else {
             var paths = [Path]()
-            for yi in minY ... maxY {
-                for xi in minX ... maxX {
-                    let shp = SheetPosition(xi, yi)
-                    let b = document.sheetFrame(with: shp)
-                    if lb.intersects(b),
-                       let sheetView = document.sheetView(at: shp) {
-                        
-                        let nLine = tempLine * Transform(translation: -b.origin)
-                        paths += selectingTextPaths(with: nLine, with: sheetView)
-                    }
+            for shp in nearestShps {
+                let b = document.sheetFrame(with: shp)
+                if lb.intersects(b),
+                   let sheetView = document.sheetView(at: shp) {
+                    
+                    let nLine = tempLine * Transform(translation: -b.origin)
+                    paths += selectingTextPaths(with: nLine, with: sheetView)
                 }
             }
             
@@ -1667,29 +1657,27 @@ final class LineEditor: Editor {
             }
         } else {
             var value = SheetValue()
-            for yi in minY ... maxY {
-                for xi in minX ... maxX {
-                    let shp = SheetPosition(xi, yi)
-                    let b = document.sheetFrame(with: shp) - centerOrigin
-                    if lb.intersects(b),
-                       let sheetView = document.sheetView(at: shp) {
-                        
-                        let nLine = tempLine
-                            * Transform(translation: -b.origin)
-                        if let aValue
-                            = sheetView.lassoErase(with: Lasso(line: nLine),
-                                                   isSplitLine: isSplitLine,
-                                                   isRemove: isRemove,
-                                                   isEnableLine: isEnableLine,
-                                                   isEnablePlane: isEnablePlane,
-                                                   isEnableText: isEnableText,
-                                                   selections: selections) {
-                            let t = Transform(translation: -sheetView.convertFromWorld(p))
-                            value += aValue * t
-                        }
+            for shp in nearestShps {
+                let b = document.sheetFrame(with: shp) - centerOrigin
+                if lb.intersects(b),
+                   let sheetView = document.sheetView(at: shp) {
+                    
+                    let nLine = tempLine
+                        * Transform(translation: -b.origin)
+                    if let aValue
+                        = sheetView.lassoErase(with: Lasso(line: nLine),
+                                               isSplitLine: isSplitLine,
+                                               isRemove: isRemove,
+                                               isEnableLine: isEnableLine,
+                                               isEnablePlane: isEnablePlane,
+                                               isEnableText: isEnableText,
+                                               selections: selections) {
+                        let t = Transform(translation: -sheetView.convertFromWorld(p))
+                        value += aValue * t
                     }
                 }
             }
+            
             if !value.isEmpty {
                 if let s = value.string {
                     Pasteboard.shared.copiedObjects
@@ -1728,26 +1716,23 @@ final class LineEditor: Editor {
             }
         } else {
             var value = SheetValue()
-            for yi in minY ... maxY {
-                for xi in minX ... maxX {
-                    let shp = SheetPosition(xi, yi)
-                    let b = document.sheetFrame(with: shp) - centerOrigin
-                    if lb.intersects(b),
-                       let sheetView = document.sheetView(at: shp) {
-                        
-                        let nLine = tempLine
-                            * Transform(translation: -b.origin)
-                        if let aValue
-                            = sheetView.lassoErase(with: Lasso(line: nLine),
-                                                   isSplitLine: isSplitLine,
-                                                   isRemove: isRemove,
-                                                   isEnableLine: isEnableLine,
-                                                   isEnablePlane: isEnablePlane,
-                                                   isEnableText: isEnableText,
-                                                   selections: selections) {
-                            let t = Transform(translation: -sheetView.convertFromWorld(p))
-                            value += aValue * t
-                        }
+            for shp in nearestShps {
+                let b = document.sheetFrame(with: shp) - centerOrigin
+                if lb.intersects(b),
+                   let sheetView = document.sheetView(at: shp) {
+                    
+                    let nLine = tempLine
+                        * Transform(translation: -b.origin)
+                    if let aValue
+                        = sheetView.lassoErase(with: Lasso(line: nLine),
+                                               isSplitLine: isSplitLine,
+                                               isRemove: isRemove,
+                                               isEnableLine: isEnableLine,
+                                               isEnablePlane: isEnablePlane,
+                                               isEnableText: isEnableText,
+                                               selections: selections) {
+                        let t = Transform(translation: -sheetView.convertFromWorld(p))
+                        value += aValue * t
                     }
                 }
             }
@@ -1759,7 +1744,7 @@ final class LineEditor: Editor {
     var rectNode: Node?
     
     struct Value {
-        var shp: SheetPosition, frame: Rect
+        var shp: Sheetpos, frame: Rect
     }
     func values(with line: Line) -> [Value] {
         guard let rect = line.bounds else { return [] }
@@ -1832,32 +1817,29 @@ final class LineEditor: Editor {
                 })
             }
         } else {
-            for yi in minY ... maxY {
-                for xi in minX ... maxX {
-                    let shp = SheetPosition(xi, yi)
-                    let b = document.sheetFrame(with: shp)
-                    if b.contains(lb),
-                       let sheetView = document.sheetView(at: shp),
-                       !sheetView.model.picture.isEmpty {
-                        
-                        sheetView.newUndoGroup()
-                        sheetView.changeToDraft()
-                    } else if lb.intersects(b),
-                              let sheetView = document.sheetView(at: shp) {
-                        let nLine = tempLine * Transform(translation: -b.origin)
-                        
-                        if let value = sheetView.lassoErase(with: Lasso(line: nLine),
-                                                       isRemove: true,
-                                                       isEnableText: false) {
-                            let li = sheetView.model.draftPicture.lines.count
-                            sheetView.insertDraft(value.lines.enumerated().map {
-                                IndexValue(value: $0.element, index: li + $0.offset)
-                            })
-                            let pi = sheetView.model.draftPicture.planes.count
-                            sheetView.insertDraft(value.planes.enumerated().map {
-                                IndexValue(value: $0.element, index: pi + $0.offset)
-                            })
-                        }
+            for shp in nearestShps {
+                let b = document.sheetFrame(with: shp)
+                if b.contains(lb),
+                   let sheetView = document.sheetView(at: shp),
+                   !sheetView.model.picture.isEmpty {
+                    
+                    sheetView.newUndoGroup()
+                    sheetView.changeToDraft()
+                } else if lb.intersects(b),
+                          let sheetView = document.sheetView(at: shp) {
+                    let nLine = tempLine * Transform(translation: -b.origin)
+                    
+                    if let value = sheetView.lassoErase(with: Lasso(line: nLine),
+                                                   isRemove: true,
+                                                   isEnableText: false) {
+                        let li = sheetView.model.draftPicture.lines.count
+                        sheetView.insertDraft(value.lines.enumerated().map {
+                            IndexValue(value: $0.element, index: li + $0.offset)
+                        })
+                        let pi = sheetView.model.draftPicture.planes.count
+                        sheetView.insertDraft(value.planes.enumerated().map {
+                            IndexValue(value: $0.element, index: pi + $0.offset)
+                        })
                     }
                 }
             }
@@ -1878,20 +1860,17 @@ final class LineEditor: Editor {
             }
         } else {
             var value = SheetValue()
-            for yi in minY ... maxY {
-                for xi in minX ... maxX {
-                    let shp = SheetPosition(xi, yi)
-                    let b = document.sheetFrame(with: shp)
-                    if lb.intersects(b),
-                       let sheetView = document.sheetView(at: shp) {
-                        let nLine = tempLine * Transform(translation: -b.origin)
-                        if let aValue = sheetView.lassoErase(with: Lasso(line: nLine),
-                                                        isRemove: true,
-                                                        isEnableText: false,
-                                                        isDraft: true) {
-                            let t = Transform(translation: -sheetView.convertFromWorld(p))
-                            value += aValue * t
-                        }
+            for shp in nearestShps {
+                let b = document.sheetFrame(with: shp)
+                if lb.intersects(b),
+                   let sheetView = document.sheetView(at: shp) {
+                    let nLine = tempLine * Transform(translation: -b.origin)
+                    if let aValue = sheetView.lassoErase(with: Lasso(line: nLine),
+                                                    isRemove: true,
+                                                    isEnableText: false,
+                                                    isDraft: true) {
+                        let t = Transform(translation: -sheetView.convertFromWorld(p))
+                        value += aValue * t
                     }
                 }
             }
@@ -1910,18 +1889,15 @@ final class LineEditor: Editor {
             let path = Path(nLine)
             sheetView.makeFaces(with: path, isSelection: true)
         } else {
-            for yi in minY ... maxY {
-                for xi in minX ... maxX {
-                    let shp = SheetPosition(xi, yi)
-                    let b = document.sheetFrame(with: shp)
-                    if lb.intersects(b),
-                       let sheetView = document.sheetView(at: shp) {
-                        
-                        let nLine = tempLine * Transform(translation: -b.origin)
-                        
-                        let path = Path(nLine)
-                        sheetView.makeFaces(with: path, isSelection: true)
-                    }
+            for shp in nearestShps {
+                let b = document.sheetFrame(with: shp)
+                if lb.intersects(b),
+                   let sheetView = document.sheetView(at: shp) {
+                    
+                    let nLine = tempLine * Transform(translation: -b.origin)
+                    
+                    let path = Path(nLine)
+                    sheetView.makeFaces(with: path, isSelection: true)
                 }
             }
         }

@@ -21,7 +21,6 @@ import struct Foundation.URL
 import struct Foundation.UUID
 
 typealias Camera = Attitude
-typealias SheetPosition = IntPoint
 typealias Thumbnail = Image
 typealias SheetID = UUID
 
@@ -130,7 +129,7 @@ extension Finding: Codable {}
 
 
 private struct Road {
-    var shp0: SheetPosition, shp1: SheetPosition
+    var shp0: IntPoint, shp1: IntPoint
 }
 extension Road {
     func pathlineWith(width: Double, height: Double) -> Pathline? {
@@ -207,8 +206,8 @@ extension Road {
 }
 
 enum WorldUndoItem {
-    case insertSheets(_ sids: [SheetPosition: SheetID])
-    case removeSheets(_ shps: [SheetPosition])
+    case insertSheets(_ sids: [Sheetpos: SheetID])
+    case removeSheets(_ shps: [Sheetpos])
 }
 extension WorldUndoItem: UndoItem {
     var type: UndoItemType {
@@ -233,9 +232,9 @@ extension WorldUndoItem: Protobuf {
         }
         switch value {
         case .insertSheets(let sids):
-            self = .insertSheets(try [IntPoint: SheetID](sids))
+            self = .insertSheets(try [Sheetpos: SheetID](sids))
         case .removeSheets(let shps):
-            self = .removeSheets(try [SheetPosition](shps))
+            self = .removeSheets(try [Sheetpos](shps))
         }
     }
     var pb: PBWorldUndoItem {
@@ -259,9 +258,9 @@ extension WorldUndoItem: Codable {
         let key = try container.decode(CodingTypeKey.self)
         switch key {
         case .insertSheets:
-            self = .insertSheets(try container.decode([SheetPosition: SheetID].self))
+            self = .insertSheets(try container.decode([Sheetpos: SheetID].self))
         case .removeSheets:
-            self = .removeSheets(try container.decode([SheetPosition].self))
+            self = .removeSheets(try container.decode([Sheetpos].self))
         }
     }
     func encode(to encoder: Encoder) throws {
@@ -277,18 +276,18 @@ extension WorldUndoItem: Codable {
     }
 }
 
-extension Dictionary where Key == SheetID, Value == SheetPosition {
-    init(_ pb: PBIntPointStringDic) throws {
-        var shps = [SheetID: SheetPosition]()
+extension Dictionary where Key == SheetID, Value == Sheetpos {
+    init(_ pb: PBSheetposStringDic) throws {
+        var shps = [SheetID: Sheetpos]()
         for e in pb.value {
             if let sid = SheetID(uuidString: e.key) {
-                shps[sid] = try SheetPosition(e.value)
+                shps[sid] = try Sheetpos(e.value)
             }
         }
         self = shps
     }
-    var pb: PBIntPointStringDic {
-        var pbips = [String: PBIntPoint]()
+    var pb: PBSheetposStringDic {
+        var pbips = [String: PBSheetpos]()
         for (sid, shp) in self {
             pbips[sid.uuidString] = shp.pb
         }
@@ -297,9 +296,9 @@ extension Dictionary where Key == SheetID, Value == SheetPosition {
         }
     }
 }
-extension Dictionary where Key == SheetPosition, Value == SheetID {
+extension Dictionary where Key == Sheetpos, Value == SheetID {
     init(_ pb: PBStringIntPointDic) throws {
-        var sids = [SheetPosition: SheetID]()
+        var sids = [Sheetpos: SheetID]()
         for e in pb.value {
             sids[try .init(e.key)] = SheetID(uuidString: e.value)
         }
@@ -319,13 +318,60 @@ extension Dictionary where Key == SheetPosition, Value == SheetID {
     }
 }
 
+struct Sheetpos: Hashable, Codable {
+    var x = 0, y = 0, isRight = false
+}
+extension Sheetpos: Protobuf {
+    init(_ pb: PBSheetpos) throws {
+        x = Int(pb.x)
+        y = Int(pb.y)
+        isRight = pb.isRight
+    }
+    var pb: PBSheetpos {
+        .with {
+            $0.x = Int64(x)
+            $0.y = Int64(y)
+            $0.isRight = isRight
+        }
+    }
+}
+extension Sheetpos {
+    func int() -> IntPoint {
+        .init(x, y)
+    }
+    func double() -> Point {
+        .init(x, y)
+    }
+    func cross(_ other: Self) -> Int {
+        x * other.y - y * other.x
+    }
+    static func + (lhs: Self, rhs: Self) -> Self {
+        .init(x: lhs.x + rhs.x, y: lhs.y + rhs.y, isRight: lhs.isRight)
+    }
+    static func - (lhs: Self, rhs: Self) -> Self {
+        .init(x: lhs.x - rhs.x, y: lhs.y - rhs.y, isRight: lhs.isRight)
+    }
+    func distanceSquared(_ other: Self) -> Int {
+        let x = self.x - other.x, y = self.y - other.y
+        return x * x + y * y
+    }
+}
+extension Array where Element == Sheetpos {
+    init(_ pb: PBSheetposArray) throws {
+        self = try pb.value.map { try Sheetpos($0) }
+    }
+    var pb: PBSheetposArray {
+        .with { $0.value = map { $0.pb } }
+    }
+}
+
 struct World {
-    var sheetIDs = [SheetPosition: SheetID]()
-    var sheetPositions = [SheetID: SheetPosition]()
+    var sheetIDs = [Sheetpos: SheetID]()
+    var sheetPositions = [SheetID: Sheetpos]()
 }
 extension World: Protobuf {
     init(_ pb: PBWorld) throws {
-        let shps = try [SheetID: SheetPosition](pb.sheetPositions)
+        let shps = try [SheetID: Sheetpos](pb.sheetPositions)
         self.sheetIDs = World.sheetIDs(with: shps)
         self.sheetPositions = shps
     }
@@ -337,27 +383,47 @@ extension World: Protobuf {
 }
 extension World: Codable {}
 extension World {
-    static func sheetIDs(with shps: [SheetID: SheetPosition]) -> [SheetPosition: SheetID] {
-        var sids = [SheetPosition: SheetID]()
+    func sheetID(at p: IntPoint) -> SheetID? {
+        let leftShp = Sheetpos(x: p.x - 1, y: p.y, isRight: true)
+        return if let sid = sheetIDs[leftShp] {
+            sid
+        } else {
+            sheetIDs[Sheetpos(x: p.x, y: p.y, isRight: true)]
+            ?? sheetIDs[Sheetpos(x: p.x, y: p.y, isRight: false)]
+        }
+    }
+    func sheetpos(at p: IntPoint) -> Sheetpos {
+        let leftShp = Sheetpos(x: p.x - 1, y: p.y, isRight: true)
+        if sheetIDs[leftShp] != nil {
+            return leftShp
+        } else {
+            let rightShp = Sheetpos(x: p.x, y: p.y, isRight: true)
+            return Sheetpos(x: p.x, y: p.y, 
+                            isRight: sheetIDs[rightShp] != nil)
+        }
+    }
+    
+    static func sheetIDs(with shps: [SheetID: Sheetpos]) -> [Sheetpos: SheetID] {
+        var sids = [Sheetpos: SheetID]()
         sids.reserveCapacity(shps.count)
         for (sid, shp) in shps {
             sids[shp] = sid
         }
         return sids
     }
-    static func sheetPositions(with sids: [SheetPosition: SheetID]) -> [SheetID: SheetPosition] {
-        var shps = [SheetID: SheetPosition]()
+    static func sheetPositions(with sids: [Sheetpos: SheetID]) -> [SheetID: Sheetpos] {
+        var shps = [SheetID: Sheetpos]()
         shps.reserveCapacity(sids.count)
         for (shp, sid) in sids {
             shps[sid] = shp
         }
         return shps
     }
-    init(_ sids: [SheetPosition: SheetID] = [:]) {
+    init(_ sids: [Sheetpos: SheetID] = [:]) {
         self.sheetIDs = sids
         self.sheetPositions = World.sheetPositions(with: sids)
     }
-    init(_ shps: [SheetID: SheetPosition] = [:]) {
+    init(_ shps: [SheetID: Sheetpos] = [:]) {
         self.sheetIDs = World.sheetIDs(with: shps)
         self.sheetPositions = shps
     }
@@ -683,6 +749,7 @@ final class Document {
                     }
                 }
                 updateMap()
+                updateGrid(with: screenToWorldTransform, in: screenBounds)
                 updateWithCursorPosition()
                 return rect
             case .removeSheets(let shps):
@@ -705,6 +772,7 @@ final class Document {
                     world.sheetIDs[shp] = nil
                 }
                 updateMap()
+                updateGrid(with: screenToWorldTransform, in: screenBounds)
                 updateWithCursorPosition()
                 return rect
             }
@@ -741,14 +809,14 @@ final class Document {
             }
         }
     }
-    func append(_ sids: [SheetPosition: SheetID], enableNode: Bool = true) {
+    func append(_ sids: [Sheetpos: SheetID], enableNode: Bool = true) {
         let undoItem = WorldUndoItem.removeSheets(sids.map { $0.key })
         let redoItem = WorldUndoItem.insertSheets(sids)
         append(undo: undoItem, redo: redoItem)
         set(redoItem, enableNode: enableNode)
     }
-    func removeSheets(at shps: [SheetPosition]) {
-        var sids = [SheetPosition: SheetID]()
+    func removeSheets(at shps: [Sheetpos]) {
+        var sids = [Sheetpos: SheetID]()
         shps.forEach {
             sids[$0] = world.sheetIDs[$0]
         }
@@ -846,9 +914,9 @@ final class Document {
         let fxi = (world.sheetPositions.values.max { $0.x < $1.x }?.x ?? 0) + 2
         var dxi = 0
         var yi = (world.sheetPositions.values.max { $0.y < $1.y }?.y ?? 0) + 2
-        var newSIDs = [SheetPosition: SheetID]()
+        var newSIDs = [Sheetpos: SheetID]()
         for sid in sids {
-            let shp = SheetPosition(fxi + dxi, yi)
+            let shp = Sheetpos(x: fxi + dxi, y: yi, isRight: false)
             newSIDs[shp] = sid
             dxi += 1
             if dxi >= xCount {
@@ -869,12 +937,13 @@ final class Document {
             guard handler("\(i) / \(sheetRecorders.count - 1)") else { return }
             autoreleasepool {
                 let record = sheetRecorder.sheetRecord
-                guard let sheet = record.decodedValue else { return }
+                guard let sheet = record.decodedValue,
+                      let shp = sheetPosition(at: sheetID) else { return }
                 let sheetBinder = RecordBinder(value: sheet,
                                                record: record)
                 let sheetView = SheetView(binder: sheetBinder,
-                                            keyPath: \SheetBinder.value)
-                sheetView.bounds = Sheet.defaultBounds
+                                          keyPath: \SheetBinder.value)
+                sheetView.bounds = sheetFrame(with: shp)
                 sheetView.node.allChildrenAndSelf { $0.updateDatas() }
                 
                 makeThumbnailRecord(at: sheetID, with: sheetView)
@@ -1022,45 +1091,9 @@ final class Document {
     var cameraNotifications = [((Document, Camera) -> ())]()
     var camera = Document.defaultCamera {
         didSet {
-            if snappedCameraType != .none {
-                snapCamera()
-            } else {
-                updateTransformsWithCamera()
-            }
+            updateTransformsWithCamera()
             cameraRecord.isWillwrite = true
             cameraNotifications.forEach { $0(self, camera) }
-        }
-    }
-    enum SnappedCameraType {
-        case x, y, none
-    }
-    var snappedCameraType = SnappedCameraType.none {
-        didSet {
-            guard snappedCameraType != oldValue else { return }
-            if snappedCameraType != .none {
-                snapCamera()
-            } else {
-                snappedCamera = nil
-            }
-        }
-    }
-    var snappableCameraX = Sheet.defaultBounds.width / 3
-    var snappableCameraY = Sheet.defaultBounds.height / 4
-    func snapCamera() {
-        var camera = self.camera
-        if snappedCameraType == .x {
-            camera.position.x = camera.position.x.interval(scale: snappableCameraX)
-        }
-        if snappedCameraType == .y {
-            camera.position.y = camera.position.y.interval(scale: snappableCameraY)
-        }
-        snappedCamera = camera
-    }
-    private(set) var snappedCamera: Camera? {
-        didSet {
-            if snappedCamera != oldValue {
-                updateTransformsWithCamera()
-            }
         }
     }
     var drawableSize = Size() {
@@ -1086,7 +1119,6 @@ final class Document {
     private(set) var screenToViewportTransform = Transform.identity
     private(set) var worldToViewportTransform = Transform.identity
     private func updateTransformsWithCamera() {
-        let camera = snappedCamera ?? self.camera
         screenToWorldTransform = centeringCameraTransform * camera.transform
         worldToScreenTransform = screenToWorldTransform.inverted()
         worldToScreenScale = worldToScreenTransform.absXScale
@@ -1149,6 +1181,12 @@ final class Document {
     }
     var multiSelection: MultiSelection {
         MultiSelection(selections: selections)
+    }
+    func sheetposWithSelection() -> [Sheetpos] {
+        world.sheetIDs.keys.compactMap {
+            multiSelection
+                .intersects(sheetFrame(with: $0)) ? $0 : nil
+        }
     }
     private(set) var selectedNode: Node?, selectedOrientationNode: Node?
     private(set) var selectedFrames = [Rect](), selectedFramesNode: Node?
@@ -1214,6 +1252,7 @@ final class Document {
     func updateSelects() {
         guard !selections.isEmpty else { return }
         let centerSHPs = Set(self.centerSHPs)
+        var rectsSet = Set<Rect>()
         var rects = [Rect](), isSelectedText = false, selectedCount = 0
         var firstOrientation = Orientation.horizontal, lineNodes = [Node]()
         var sLines = [Line](),sNotes = [Rect]()
@@ -1241,7 +1280,11 @@ final class Document {
                               let li = textView.characterIndexWithOutOfBounds(for: tlp) else { continue }
                         let range = fi < li ? fi ..< li : li ..< fi
                         for nf in textView.transformedPaddingRects(with: range) {
-                            rects.append(sheetView.convertToWorld(nf))
+                            let frame = sheetView.convertToWorld(nf)
+                            if !rectsSet.contains(frame) {
+                                rects.append(frame)
+                                rectsSet.insert(frame)
+                            }
                         }
                         if selectedCount == 0 {
                             firstOrientation = textView.model.orientation
@@ -1312,7 +1355,10 @@ final class Document {
                 world.sheetIDs.keys.forEach {
                     let frame = sheetFrame(with: $0)
                     guard rect.intersects(frame) else { return }
-                    rects.append(frame)
+                    if !rectsSet.contains(frame) {
+                        rects.append(frame)
+                        rectsSet.insert(frame)
+                    }
                 }
             }
             if let oldRect = oldRect, let pathline = selection.rect.minLine(oldRect) {
@@ -1474,7 +1520,7 @@ final class Document {
         }
     }
     private var findingNode: Node?
-    private(set) var findingNodes = [SheetPosition: Node]()
+    private(set) var findingNodes = [Sheetpos: Node]()
     let findingSplittedWidth
         = (Double.hypot(Sheet.width / 2, Sheet.height / 2) * 1.25).rounded()
     var findingLineWidth: Double {
@@ -1513,7 +1559,7 @@ final class Document {
         
         let isSelected = isSelect(at: finding.worldPosition)
         var nodes = [Node]()
-        var findingNodes = [SheetPosition: Node]()
+        var findingNodes = [Sheetpos: Node]()
         for sr in sheetRecorders {
             guard let shp = sheetPosition(at: sr.key) else { continue }
             if isSelected && !isSelect(at: sheetFrame(with: shp)) { continue }
@@ -1544,7 +1590,7 @@ final class Document {
               let shp = sheetPosition(from: sheetView) else { return }
         updateFindingNodes(at: shp)
     }
-    func sheetPosition(from sheetView: SheetView) -> SheetPosition? {
+    func sheetPosition(from sheetView: SheetView) -> Sheetpos? {
         for svv in sheetViewValues {
             if sheetView == svv.value.view {
                 return svv.key
@@ -1552,7 +1598,7 @@ final class Document {
         }
         return nil
     }
-    private func updateFindingNodes(at shp: SheetPosition) {
+    private func updateFindingNodes(at shp: Sheetpos) {
         guard let node = findingNodes[shp] else { return }
         
         let sf = sheetFrame(with: shp)
@@ -1688,7 +1734,7 @@ final class Document {
                         isNewUndoGroup = false
                     }
                 }
-                let sb = sheetView.model.bounds.inset(by: Sheet.textPadding)
+                let sb = sheetView.bounds.inset(by: Sheet.textPadding)
                 for (i, textView) in sheetView.textsView.elementViews.enumerated() {
                     var text = textView.model
                     if text.string.contains(fromStr) {
@@ -1734,7 +1780,7 @@ final class Document {
                                                                record: record)
                                 let sheetView = SheetView(binder: sheetBinder,
                                                             keyPath: \SheetBinder.value)
-                                sheetView.bounds = Sheet.defaultBounds
+                                sheetView.bounds = self.sheetFrame(with: shp)
                                 sheetView.node.allChildrenAndSelf { $0.updateDatas() }
                                 
                                 if make(sheetView) {
@@ -2199,8 +2245,8 @@ final class Document {
     }
     private(set) var sheetRecorders: [SheetID: SheetRecorder]
     private(set) var baseThumbnailDatas: [SheetID: Texture.BytesData]
-    private(set) var sheetViewValues = [SheetPosition: SheetViewValue]()
-    private(set) var thumbnailNodeValues = [SheetPosition: ThumbnailNodeValue]()
+    private(set) var sheetViewValues = [Sheetpos: SheetViewValue]()
+    private(set) var thumbnailNodeValues = [Sheetpos: ThumbnailNodeValue]()
     
     let queue = DispatchQueue(label: System.id + ".queue",
                               qos: .userInteractive)
@@ -2228,7 +2274,7 @@ final class Document {
     func remove(_ srr: SheetRecorder) {
         try? sheetsDirectory.remove(srr.directory)
     }
-    func removeUndo(at shp: SheetPosition) {
+    func removeUndo(at shp: Sheetpos) {
         if let sid = sheetID(at: shp), let srr = sheetRecorders[sid] {
             try? srr.directory.remove(srr.sheetHistoryRecord)
         }
@@ -2368,7 +2414,7 @@ final class Document {
                            isPreparedWrite: isPreparedWrite)
     }
     func thumbnailMipmap(from sheetView: SheetView) -> ThumbnailMipmap? {
-        var size = Sheet.defaultBounds.size * (2.0 ** 1)
+        var size = sheetView.bounds.size * (2.0 ** 1)
         let bColor = sheetView.model.backgroundUUColor.value
         let baseImage = sheetView.node.imageInBounds(size: size, backgroundColor: bColor,
                                                      colorSpace: colorSpace.noHDR)
@@ -2411,11 +2457,11 @@ final class Document {
             srr.thumbnail1024Record.isWillwrite = true
         }
     }
-    func emptyNode(at shp: SheetPosition) -> Node {
+    func emptyNode(at shp: Sheetpos) -> Node {
         let ssFrame = sheetFrame(with: shp)
         return Node(path: Path(ssFrame), fillType: baseFillType(at: shp))
     }
-    func baseFillType(at shp: SheetPosition) -> Node.FillType {
+    func baseFillType(at shp: Sheetpos) -> Node.FillType {
         guard let sid = sheetID(at: shp), let bytesData = baseThumbnailDatas[sid] else {
             return .color(.disabled)
         }
@@ -2451,30 +2497,12 @@ final class Document {
         if let sheetView = sheetView(at: p), sheetView.isPlaying {
             return true
         }
-        let shp = sheetPosition(at: p)
-        if let sheetView = sheetView(at: SheetPosition(shp.x - 1, shp.y)), sheetView.isPlaying {
-            return true
-        }
-        if let sheetView = sheetView(at: SheetPosition(shp.x - 1, shp.y - 1)), sheetView.isPlaying {
-            return true
-        }
-        if let sheetView = sheetView(at: SheetPosition(shp.x - 1, shp.y + 1)), sheetView.isPlaying {
-            return true
-        }
-        if let sheetView = sheetView(at: SheetPosition(shp.x + 1, shp.y)), sheetView.isPlaying {
-            return true
-        }
-        if let sheetView = sheetView(at: SheetPosition(shp.x + 1, shp.y - 1)), sheetView.isPlaying {
-            return true
-        }
-        if let sheetView = sheetView(at: SheetPosition(shp.x + 1, shp.y + 1)), sheetView.isPlaying {
-            return true
-        }
-        if let sheetView = sheetView(at: SheetPosition(shp.x, shp.y - 1)), sheetView.isPlaying {
-            return true
-        }
-        if let sheetView = sheetView(at: SheetPosition(shp.x, shp.y + 1)), sheetView.isPlaying {
-            return true
+        for shp in aroundSheetpos(atCenter: intPosition(at: p)) {
+            if let sheetView = sheetView(at: shp.shp),
+                sheetView.isPlaying {
+                
+                return true
+            }
         }
         return false
     }
@@ -2486,35 +2514,54 @@ final class Document {
 //            updateCursorNode()
         }
     }
-    var cursorSHP = SheetPosition()
-    var centerSHPs = [SheetPosition]()
+    func aroundSheetpos(atCenter cip: IntPoint) -> [(shp: Sheetpos, isCorner: Bool)] {
+        var shpSet = Set<Sheetpos>(), shps = [(shp: Sheetpos, isCorner: Bool)]()
+        let centerShp = world.sheetpos(at: cip)
+        func append(_ ip: IntPoint, isCorner: Bool) {
+            let shp = world.sheetpos(at: ip)
+            if centerShp != shp, !shpSet.contains(shp) {
+                shpSet.insert(shp)
+                shps.append((shp, isCorner))
+            }
+        }
+        if centerShp == world.sheetpos(at: .init(cip.x + 1, cip.y)) {
+            append(.init(cip.x + 2, cip.y), isCorner: false)
+        }
+        append(.init(cip.x + 1, cip.y), isCorner: false)
+        append(.init(cip.x - 1, cip.y), isCorner: false)
+        if centerShp == world.sheetpos(at: .init(cip.x - 1, cip.y)) {
+            append(.init(cip.x - 2, cip.y), isCorner: false)
+        }
+        append(.init(cip.x, cip.y + 1), isCorner: false)
+        append(.init(cip.x, cip.y - 1), isCorner: false)
+        append(.init(cip.x + 1, cip.y + 1), isCorner: true)
+        append(.init(cip.x + 1, cip.y - 1), isCorner: true)
+        append(.init(cip.x - 1, cip.y - 1), isCorner: true)
+        append(.init(cip.x - 1, cip.y + 1), isCorner: true)
+        return shps
+    }
+    
+    var cursorSHP = Sheetpos()
+    var centerSHPs = [Sheetpos]()
     func updateWithCursorPosition() {
         if isUpdateWithCursorPosition {
             updateWithCursorPositionAlways()
         }
     }
     private func updateWithCursorPositionAlways() {
-        var shps = [SheetPosition]()
-        let shp = sheetPosition(at: convertScreenToWorld(cursorPoint))
+        var shps = [Sheetpos]()
+        let ip = intPosition(at: convertScreenToWorld(cursorPoint))
+        let shp = sheetPosition(at: ip)
         cursorSHP = shp
         shps.append(shp)
-        shps.append(SheetPosition(shp.x + 1, shp.y))
-        shps.append(SheetPosition(shp.x - 1, shp.y))
-        shps.append(SheetPosition(shp.x, shp.y + 1))
-        shps.append(SheetPosition(shp.x, shp.y - 1))
-        shps.append(SheetPosition(shp.x + 1, shp.y + 1))
-        shps.append(SheetPosition(shp.x + 1, shp.y - 1))
-        shps.append(SheetPosition(shp.x - 1, shp.y - 1))
-        shps.append(SheetPosition(shp.x - 1, shp.y + 1))
+        let aroundShps = aroundSheetpos(atCenter: ip)
+        shps += aroundShps.map { $0.shp }
         centerSHPs = shps
-        if let leshp = lastEditedSheetPosition {
+        if let leshp = lastEditedSheetpos {
             shps.append(leshp)
         }
         
-        let utilitySHPs = Set([SheetPosition(shp.x + 1, shp.y + 1),
-                               SheetPosition(shp.x + 1, shp.y - 1),
-                               SheetPosition(shp.x - 1, shp.y - 1),
-                               SheetPosition(shp.x - 1, shp.y + 1)])
+        let utilitySHPs = Set(aroundShps.compactMap { $0.isCorner ? $0.shp : nil })
         
         var nshps = sheetViewValues
         let oshps = nshps
@@ -2567,7 +2614,7 @@ final class Document {
         }
     }
     private func set(_ type: ThumbnailType?, in tv: ThumbnailNodeValue,
-                     at sid: SheetID, _ shp: SheetPosition) {
+                     at sid: SheetID, _ shp: Sheetpos) {
         if sheetViewValues[shp]?.view != nil { return }
         if let type = type {
             if let oldType = tv.type {
@@ -2588,7 +2635,7 @@ final class Document {
             }
         }
     }
-    func openThumbnail(at shp: SheetPosition, _ sid: SheetID, _ node: Node?,
+    func openThumbnail(at shp: Sheetpos, _ sid: SheetID, _ node: Node?,
                        _ type: ThumbnailType) {
         let node = node ?? emptyNode(at: shp)
         guard type != .w4 else {
@@ -2624,7 +2671,7 @@ final class Document {
         sheetsNode.append(child: node)
     }
     
-    func close(from shps: [SheetPosition]) {
+    func close(from shps: [Sheetpos]) {
         shps.forEach {
             if let sid = sheetID(at: $0) {
                 readAndClose(.none, qos: .default, at: sid, $0)
@@ -2639,7 +2686,7 @@ final class Document {
         }
     }
     private func updateThumbnail(_ sheetViewValue: SheetViewValue,
-                                 at shp: SheetPosition, _ sid: SheetID) {
+                                 at shp: Sheetpos, _ sid: SheetID) {
         if let sheetView = sheetViewValue.view {
             if let texture = sheetView.node.cacheTexture {
                 if let tv = thumbnailNodeValues[shp], let tNode = tv.node {
@@ -2664,7 +2711,7 @@ final class Document {
         }
     }
     private func readAndClose(_ type: NodeType, qos: DispatchQoS = .default,
-                              at sid: SheetID, _ shp: SheetPosition) {
+                              at sid: SheetID, _ shp: Sheetpos) {
         switch type {
         case .none:
             if let sheetViewValue = sheetViewValues[shp] {
@@ -2709,6 +2756,8 @@ final class Document {
             }
             updateSelects()
         case .sheet:
+            if sheetViewValues.contains(where: { $0.value.sheetID == sid }) { return }
+            
             var item: DispatchWorkItem!
             item = DispatchWorkItem(qos: qos) { [weak self] in
                 defer { item = nil }
@@ -2787,7 +2836,8 @@ final class Document {
         guard let shp = sheetPosition(at: sid) else { return nil }
         guard let sheet = sheetRecorders[sid]?
                 .sheetRecord.decodedValue else { return nil }
-        let node = sheet.node(isBorder: false)
+        let bounds = sheetFrame(with: shp).bounds
+        let node = sheet.node(isBorder: false, in: bounds)
         node.attitude.position = sheetFrame(with: shp).origin
         return node
     }
@@ -2796,7 +2846,7 @@ final class Document {
         guard let shp = sheetPosition(at: sid) else { return nil }
         return sheetView(at: shp) ?? readSheetView(at: sid, shp)
     }
-    func readSheetView(at shp: SheetPosition) -> SheetView? {
+    func readSheetView(at shp: Sheetpos) -> SheetView? {
         if let sheetView = sheetView(at: shp) {
             sheetView
         } else if let sid = sheetID(at: shp) {
@@ -2808,7 +2858,7 @@ final class Document {
     func readSheetView(at p: Point) -> SheetView? {
         readSheetView(at: sheetPosition(at: p))
     }
-    func readSheetView(at sid: SheetID, _ shp: SheetPosition,
+    func readSheetView(at sid: SheetID, _ shp: Sheetpos,
                        isUpdateNode: Bool = false) -> SheetView? {
         guard let sheetRecorder = sheetRecorders[sid] else { return nil }
         let sheetRecord = sheetRecorder.sheetRecord
@@ -2850,36 +2900,40 @@ final class Document {
         return sheetView
     }
     
-    func firstTimetracks(from shp: SheetPosition) -> [Timetrack] {
+    func firstTimetracks(from shp: Sheetpos) -> [Timetrack] {
         guard let sheetView = sheetViewValue(at: shp)?.view else { return [] }
         var firstTimetracks = [Timetrack]()
-        var nshp = SheetPosition((sheetView.previousSheetView != nil ? -2 : -1) + shp.x, shp.y)
+        var nip = IntPoint((sheetView.previousSheetView != nil ? -2 : -1) + shp.x, shp.y)
         while true {
-            if let id = sheetID(at: nshp),
+            let shp = sheetPosition(at: nip)
+            if shp.isRight { nip.x -= 1 }
+            if let id = sheetID(at: shp),
                let sr = sheetRecorders[id],
                let sheet = sr.sheetRecord.decodedValue {
                 
                 firstTimetracks.append(sheet.timetrack)
                 
-                nshp.x -= 1
+                nip.x -= 1
             } else {
                 break
             }
         }
         return firstTimetracks
     }
-    func lastTimetracks(from shp: SheetPosition) -> [Timetrack] {
+    func lastTimetracks(from shp: Sheetpos) -> [Timetrack] {
         guard let sheetView = sheetViewValue(at: shp)?.view else { return [] }
         var lastTimetracks = [Timetrack]()
-        var nshp = SheetPosition((sheetView.nextSheetView != nil ? 2 : 1) + shp.x, shp.y)
+        var nip = IntPoint((sheetView.nextSheetView != nil ? 2 : 1) + shp.x, shp.y)
         while true {
-            if let id = sheetID(at: nshp),
+            let shp = sheetPosition(at: nip)
+            if shp.isRight { nip.x += 1 }
+            if let id = sheetID(at: shp),
                let sr = sheetRecorders[id],
                let sheet = sr.sheetRecord.decodedValue {
                 
                 lastTimetracks.append(sheet.timetrack)
                 
-                nshp.x += 1
+                nip.x += 1
             } else {
                 break
             }
@@ -2887,33 +2941,40 @@ final class Document {
         return lastTimetracks
     }
     
-    func sheetPosition(at sid: SheetID) -> SheetPosition? {
+    func sheetPosition(at sid: SheetID) -> Sheetpos? {
         world.sheetPositions[sid]
     }
-    func sheetID(at shp: SheetPosition) -> SheetID? {
+    func sheetID(at shp: Sheetpos) -> SheetID? {
         world.sheetIDs[shp]
     }
-    func sheetPosition(at p: Point) -> SheetPosition {
+    func intPosition(at p: Point) -> IntPoint {
         let p = Document.maxSheetAABB.clippedPoint(with: p)
-        return SheetPosition(Int((p.x / Sheet.width).rounded(.down)),
-                             Int((p.y / Sheet.height).rounded(.down)))
+        let x = Int((p.x / Sheet.width).rounded(.down))
+        let y = Int((p.y / Sheet.height).rounded(.down))
+        return .init(x, y)
     }
-    func sheetFrame(with shp: SheetPosition) -> Rect {
+    func sheetPosition(at p: IntPoint) -> Sheetpos {
+        world.sheetpos(at: p)
+    }
+    func sheetPosition(at p: Point) -> Sheetpos {
+        world.sheetpos(at: intPosition(at: p))
+    }
+    func sheetFrame(with shp: Sheetpos) -> Rect {
         Rect(x: Double(shp.x) * Sheet.width,
              y: Double(shp.y) * Sheet.height,
-             width: Sheet.width,
+             width: shp.isRight ? Sheet.width * 2 : Sheet.width,
              height: Sheet.height)
     }
     func sheetView(at p: Point) -> SheetView? {
         sheetViewValues[sheetPosition(at: p)]?.view
     }
-    func sheetViewValue(at shp: SheetPosition) -> SheetViewValue? {
+    func sheetViewValue(at shp: Sheetpos) -> SheetViewValue? {
         sheetViewValues[shp]
     }
-    func sheetView(at shp: SheetPosition) -> SheetView? {
+    func sheetView(at shp: Sheetpos) -> SheetView? {
         sheetViewValues[shp]?.view
     }
-    func thumbnailNode(at shp: SheetPosition) -> Node? {
+    func thumbnailNode(at shp: Sheetpos) -> Node? {
         thumbnailNodeValues[shp]?.node
     }
     
@@ -2936,7 +2997,7 @@ final class Document {
         madeSheetView(at: sheetPosition(at: p), isNewUndoGroup: isNewUndoGroup)
     }
     @discardableResult
-    func madeSheetView(at shp: SheetPosition,
+    func madeSheetView(at shp: Sheetpos,
                        isNewUndoGroup: Bool = true) -> SheetView? {
         if let sheetView = sheetView(at: shp) { return sheetView }
         if sheetID(at: shp) != nil { return nil }
@@ -2946,7 +3007,7 @@ final class Document {
                       isNewUndoGroup: isNewUndoGroup)
     }
     @discardableResult
-    func madeSheetViewIsNew(at shp: SheetPosition,
+    func madeSheetViewIsNew(at shp: Sheetpos,
                             isNewUndoGroup: Bool = true) -> (SheetView,
                                                              isNew: Bool)? {
         if let sheetView = sheetView(at: shp) { return (sheetView, false) }
@@ -2959,7 +3020,7 @@ final class Document {
     @discardableResult
     func madeSheetView(with sheet: Sheet,
                        history: SheetHistory?,
-                       at shp: SheetPosition,
+                       at shp: Sheetpos,
                        isNewUndoGroup: Bool = true) -> SheetView? {
         if let sheetView = sheetView(at: shp) {
             sheetView.node.removeFromParent()
@@ -2972,7 +3033,7 @@ final class Document {
     }
     @discardableResult
     func append(_ sheet: Sheet, history: SheetHistory?,
-                at sid: SheetID, at shp: SheetPosition,
+                at sid: SheetID, at shp: Sheetpos,
                 isNewUndoGroup: Bool = true) -> SheetView {
         if isNewUndoGroup {
             newUndoGroup()
@@ -3087,7 +3148,7 @@ final class Document {
         append(nsrr, at: nsid)
         return nsid
     }
-    func removeSheet(at sid: SheetID, for shp: SheetPosition) {
+    func removeSheet(at sid: SheetID, for shp: Sheetpos) {
         if let sheetRecorder = sheetRecorders[sid] {
             remove(sheetRecorder)
             sheetRecorders[sid] = nil
@@ -3099,10 +3160,10 @@ final class Document {
         updateMap()
     }
     
-    private(set) var lastEditedSheetPosition: SheetPosition?
+    private(set) var lastEditedSheetpos: Sheetpos?
     private var lastEditedSheetNode: Node?
-    func updateLastEditedSheetPosition(from event: Event) {
-        lastEditedSheetPosition
+    func updateLastEditedSheetpos(from event: Event) {
+        lastEditedSheetpos
             = sheetPosition(at: convertScreenToWorld(event.screenPoint))
     }
     var isShownLastEditedSheet = false {
@@ -3111,7 +3172,7 @@ final class Document {
             lastEditedSheetNode?.removeFromParent()
             lastEditedSheetNode = nil
             if isShownLastEditedSheet {
-                if let shp = lastEditedSheetPosition {
+                if let shp = lastEditedSheetpos {
                     let f = sheetFrame(with: shp)
                     var isSelection = false
                     for selection in selections {
@@ -3137,8 +3198,8 @@ final class Document {
         }
     }
     var isNoneCursor = false
-    private var lastEditedSheetPositionInView: SheetPosition? {
-        if let shp = lastEditedSheetPosition {
+    private var lastEditedSheetposInView: Sheetpos? {
+        if let shp = lastEditedSheetpos {
             let f = sheetFrame(with: shp)
             if worldBounds.intersects(f) {
                 if !selections.isEmpty {
@@ -3156,16 +3217,16 @@ final class Document {
         }
         return nil
     }
-    var lastEditedSheetPositionNoneCursor: SheetPosition? {
+    var lastEditedSheetposNoneCursor: Sheetpos? {
         guard isNoneCursor else { return nil }
-        return lastEditedSheetPositionInView
+        return lastEditedSheetposInView
     }
     func isSelectNoneCursor(at p: Point) -> Bool {
-        (isNoneCursor && lastEditedSheetPositionNoneCursor == nil)
+        (isNoneCursor && lastEditedSheetposNoneCursor == nil)
             || isSelect(at: p)
     }
     var lastEditedSheetWorldCenterPositionNoneCursor: Point? {
-        if let shp = lastEditedSheetPositionNoneCursor {
+        if let shp = lastEditedSheetposNoneCursor {
             sheetFrame(with: shp).centerPoint
         } else {
             nil
@@ -3181,7 +3242,7 @@ final class Document {
     var selectedScreenPositionNoneCursor: Point? {
         guard isNoneCursor else { return nil }
         if !selections.isEmpty {
-            if let shp = lastEditedSheetPosition {
+            if let shp = lastEditedSheetpos {
                 let f = sheetFrame(with: shp)
                 for selection in selections {
                     if worldBounds.intersects(f), selection.rect.intersects(f) {
@@ -3198,7 +3259,7 @@ final class Document {
     }
     var selectedSheetViewNoneCursor: SheetView? {
         guard isNoneCursor else { return nil }
-        return if let shp = lastEditedSheetPosition {
+        return if let shp = lastEditedSheetpos {
             readSheetView(at: shp)
         } else {
             nil
@@ -3206,7 +3267,7 @@ final class Document {
     }
     var lastEditedSheetWorldCenterPositionNoneSelectedNoneCursor: Point? {
         guard isNoneCursor else { return nil }
-        if let shp = lastEditedSheetPosition {
+        if let shp = lastEditedSheetpos {
             let f = sheetFrame(with: shp)
             if worldBounds.intersects(f) {
                 return f.centerPoint
@@ -3223,7 +3284,7 @@ final class Document {
     }
     var isSelectedNoneCursor: Bool {
         guard isNoneCursor else { return false }
-        if lastEditedSheetPositionInView != nil {
+        if lastEditedSheetposInView != nil {
             return true
         } else if !selections.isEmpty {
             var isIntersects = false
@@ -3241,7 +3302,7 @@ final class Document {
     var isSelectedOnlyNoneCursor: Bool {
         guard isNoneCursor else { return false }
         if !selections.isEmpty {
-            if let shp = lastEditedSheetPosition {
+            if let shp = lastEditedSheetpos {
                 let f = sheetFrame(with: shp)
                 if worldBounds.intersects(f), multiSelection.intersects(f) {
                     return true
@@ -3251,7 +3312,7 @@ final class Document {
         return false
     }
     
-    func sheetViewAndFrame(at p: Point) -> (shp: SheetPosition,
+    func sheetViewAndFrame(at p: Point) -> (shp: Sheetpos,
                                               sheetView: SheetView?,
                                               frame: Rect,
                                               isAll: Bool) {
@@ -3261,7 +3322,9 @@ final class Document {
             if !isEditingSheet {
                 return (shp, sheetView, frame, true)
             } else {
-                let (bounds, isAll) = sheetView.model.boundsTuple(at: sheetView.convertFromWorld(p))
+                let (bounds, isAll) = sheetView.model
+                    .boundsTuple(at: sheetView.convertFromWorld(p),
+                                 in: frame.bounds)
                 return (shp, sheetView, bounds + frame.origin, isAll)
             }
         } else {
@@ -3484,34 +3547,37 @@ final class Document {
     }
     
     let mapWidth = Sheet.width * 10, mapHeight = Sheet.height * 10
-    private var mapSheetPositions = Set<SheetPosition>()
-    func mapSheetPosition(at shp: SheetPosition) -> SheetPosition {
-        let x = (Rational(shp.x) / 10).rounded(.down).integralPart
-        let y = (Rational(shp.y) / 10).rounded(.down).integralPart
-        return SheetPosition(x, y)
+    private var mapIntPositions = Set<IntPoint>()
+    func mapIntPosition(at p: IntPoint) -> IntPoint {
+        let x = (Rational(p.x) / 10).rounded(.down).integralPart
+        let y = (Rational(p.y) / 10).rounded(.down).integralPart
+        return .init(x, y)
     }
-    func mapPosition(at shp: SheetPosition) -> Point {
-        Point(Double(shp.x) * mapWidth + mapWidth / 2,
-              Double(shp.y) * mapHeight + mapHeight / 2)
+    func mapPosition(at ip: IntPoint) -> Point {
+        Point(Double(ip.x) * mapWidth + mapWidth / 2,
+              Double(ip.y) * mapHeight + mapHeight / 2)
     }
-    func mapFrame(at shp: SheetPosition) -> Rect {
+    func mapFrame(at shp: Sheetpos) -> Rect {
         Rect(x: Double(shp.x) * mapWidth,
              y: Double(shp.y) * mapHeight,
              width: mapWidth, height: mapHeight)
     }
     private var roads = [Road]()
     func updateMap() {
-        mapSheetPositions = Set(sheetRecorders.keys.compactMap {
-            if let shp = sheetPosition(at: $0) {
-                return mapSheetPosition(at: shp)
-            } else {
-                return nil
+        mapIntPositions = Set(sheetRecorders.keys.reduce(into: [IntPoint]()) {
+            if let shp = sheetPosition(at: $1) {
+                if shp.isRight {
+                    $0 += [mapIntPosition(at: IntPoint(shp.x, shp.y)),
+                           mapIntPosition(at: IntPoint(shp.x + 1, shp.y))]
+                } else {
+                    $0.append(mapIntPosition(at: IntPoint(shp.x, shp.y)))
+                }
             }
         })
         var roads = [Road]()
         
-        var xSHPs = [Int: [SheetPosition]]()
-        for mSHP in mapSheetPositions {
+        var xSHPs = [Int: [IntPoint]]()
+        for mSHP in mapIntPositions {
             if xSHPs[mSHP.y] != nil {
                 xSHPs[mSHP.y]?.append(mSHP)
             } else {
@@ -3519,7 +3585,7 @@ final class Document {
             }
         }
         let sortedSHPs = xSHPs.sorted { $0.key < $1.key }
-        var previousSHPs = [SheetPosition]()
+        var previousSHPs = [IntPoint]()
         for shpV in sortedSHPs {
             let sortedXSHPs = shpV.value.sorted { $0.x < $1.x }
             if sortedXSHPs.count > 1 {
@@ -3530,7 +3596,7 @@ final class Document {
             }
             if !previousSHPs.isEmpty {
                 roads.append(Road(shp0: previousSHPs[0],
-                                                    shp1: sortedXSHPs[0]))
+                                  shp1: sortedXSHPs[0]))
             }
             previousSHPs = sortedXSHPs
         }
@@ -3561,10 +3627,10 @@ final class Document {
         
         let worldCP = screenBounds.centerPoint * screenToWorldTransform
         
-        let currentSHP = sheetPosition(at: worldCP)
-        let mapSHP = mapSheetPosition(at: currentSHP)
-        var minMSHP: SheetPosition?, minDSquared = Int.max
-        for mshp in mapSheetPositions {
+        let currentIP = intPosition(at: worldCP)
+        let mapSHP = mapIntPosition(at: currentIP)
+        var minMSHP: IntPoint?, minDSquared = Int.max
+        for mshp in mapIntPositions {
             let dSquared = mshp.distanceSquared(mapSHP)
             if dSquared < minDSquared {
                 minDSquared = dSquared
@@ -3590,16 +3656,33 @@ final class Document {
         var pathlines = [Pathline]()
         let minXIndex = Int(((bounds.minX - cp.x - lw) / w).rounded(.down))
         let maxXIndex = Int(((bounds.maxX - cp.x + lw) / w).rounded(.up))
-        if maxXIndex - minXIndex > 0 {
-            let minY = bounds.minY, maxY = bounds.maxY
-            for i in minXIndex ..< maxXIndex {
-                let x = Double(i) * w + cp.x
-                pathlines.append(Pathline(Edge(Point(x: x, y: minY),
-                                               Point(x: x, y: maxY))))
-            }
-        }
         let minYIndex = Int(((bounds.minY - cp.y - lw) / h).rounded(.down))
         let maxYIndex = Int(((bounds.maxY - cp.y + lw) / h).rounded(.up))
+        if maxXIndex - minXIndex > 0 {
+            for xi in minXIndex ..< maxXIndex {
+                let x = Double(xi) * w + cp.x
+                
+                var preYI = minYIndex
+                for yi in minYIndex ..< maxYIndex {
+                    let shp = sheetPosition(at: IntPoint(xi, yi))
+                    if shp.x != xi && shp.isRight {
+                        let minY = Double(preYI) * h + cp.y
+                        let maxY = Double(yi) * h + cp.y
+                        if preYI < yi {
+                            pathlines.append(Pathline(Edge(Point(x: x, y: minY),
+                                                           Point(x: x, y: maxY))))
+                        }
+                        preYI = yi + 1
+                    }
+                }
+                if preYI < maxYIndex {
+                    let minY = Double(preYI) * h + cp.y
+                    let maxY = Double(maxYIndex) * h + cp.y
+                    pathlines.append(Pathline(Edge(Point(x: x, y: minY),
+                                                   Point(x: x, y: maxY))))
+                }
+            }
+        }
         if maxYIndex - minYIndex > 0 {
             let minX = bounds.minX, maxX = bounds.maxX
             for i in minYIndex ..< maxYIndex {
@@ -3736,7 +3819,7 @@ final class Document {
     func strongDrag(_ event: DragEvent) {
 //        switch event.phase {
 //        case .began:
-//            updateLastEditedSheetPosition(from: event)
+//            updateLastEditedSheetpos(from: event)
 //            stopInputTextEvent()
 //            strongDragEditor = RangeSelector(self)
 //            strongDragEditor?.send(event)
@@ -3758,7 +3841,7 @@ final class Document {
     func subDrag(_ event: DragEvent) {
         switch event.phase {
         case .began:
-            updateLastEditedSheetPosition(from: event)
+            updateLastEditedSheetpos(from: event)
             stopInputTextEvent()
             subDragEditor = RangeSelector(self)
             subDragEditor?.send(event)
@@ -3780,7 +3863,7 @@ final class Document {
     func middleDrag(_ event: DragEvent) {
         switch event.phase {
         case .began:
-            updateLastEditedSheetPosition(from: event)
+            updateLastEditedSheetpos(from: event)
             stopInputTextEvent()
             middleDragEditor = LassoCutter(self)
             middleDragEditor?.send(event)
@@ -3818,7 +3901,7 @@ final class Document {
     func drag(_ event: DragEvent) {
         switch event.phase {
         case .began:
-            updateLastEditedSheetPosition(from: event)
+            updateLastEditedSheetpos(from: event)
             stopInputTextEvent()
             let quasimode = Quasimode(modifier: modifierKeys, .drag)
             if quasimode != .selectTime {
@@ -3852,7 +3935,7 @@ final class Document {
     func inputText(_ event: InputTextEvent) {
         switch event.phase {
         case .began:
-            updateLastEditedSheetPosition(from: event)
+            updateLastEditedSheetpos(from: event)
             oldInputTextKeys.insert(event.inputKeyType)
             textEditor.send(event)
         case .changed:
@@ -3959,7 +4042,7 @@ final class Document {
     func inputKey(_ event: InputKeyEvent) {
         switch event.phase {
         case .began:
-            updateLastEditedSheetPosition(from: event)
+            updateLastEditedSheetpos(from: event)
             guard inputKeyEditor == nil else { return }
             let quasimode = Quasimode(modifier: modifierKeys,
                                       event.inputKeyType)
