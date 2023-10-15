@@ -186,6 +186,7 @@
 
 "About %@" = "%@について";
 "%@ Data" = "%@データ";
+"Show Imported Contents in Finder..." = "読み込んだコンテンツをファインダーで表示...";
 "Clear Root History..." = "全体履歴を消去...";
 "Replace..." = "置き換える...";
 "Export..." = "書き出す...";

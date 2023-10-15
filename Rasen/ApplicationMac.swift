@@ -120,6 +120,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         appMenu.addItem(databaseMenuItem)
         
         appMenu.addItem(NSMenuItem.separator())
+        appMenu.addItem(withTitle: "Show Imported Contents in Finder...".localized,
+                        action: #selector(AppDelegate.showImportedContentsInFinder(_:)),
+                        keyEquivalent: "")
         appMenu.addItem(withTitle: "Clear Root History...".localized,
                         action: #selector(SubMTKView.clearHistoryDatabase(_:)),
                         keyEquivalent: "")
@@ -398,6 +401,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         acknowledgmentsPanel
             = AppDelegate.makePanel(from: string,
                                     title: "Acknowledgments".localized)
+    }
+    
+    @objc func showImportedContentsInFinder(_ sender: Any) {
+        NSWorkspace.shared.selectFile(nil,
+                                      inFileViewerRootedAtPath: view.document.contentsDirectory.url.path())
     }
     
     static func makePanel(from string: String, title: String) -> NSPanel {
@@ -1773,8 +1781,45 @@ struct Image {
         let dic = [kCGImageSourceShouldCacheImmediately: kCFBooleanTrue]
         guard let s = CGImageSourceCreateWithURL(url as CFURL,
                                                  dic as CFDictionary),
-              let image = CGImageSourceCreateImageAtIndex(s, 0, dic as CFDictionary) else { return nil }
-        cg = image
+              let image = CGImageSourceCreateImageAtIndex(s, 0, dic as CFDictionary),
+              let cs = CGColorSpace.sRGBColorSpace else { return nil }
+        if image.colorSpace?.name == cs.name 
+            && ((image.bitmapInfo.rawValue & CGImageAlphaInfo.premultipliedLast.rawValue) != 0
+                || (image.bitmapInfo.rawValue & CGImageAlphaInfo.noneSkipLast.rawValue) != 0) {
+            cg = image
+        } else {
+            let isNoneAlpha = (image.bitmapInfo.rawValue & CGImageAlphaInfo.noneSkipLast.rawValue) != 0
+            || (image.bitmapInfo.rawValue & CGImageAlphaInfo.noneSkipFirst.rawValue) != 0
+            || (image.bitmapInfo.rawValue & CGImageAlphaInfo.none.rawValue) != 0
+            let bitmapInfo = CGBitmapInfo(rawValue: isNoneAlpha ?
+                                          CGImageAlphaInfo.noneSkipLast.rawValue : CGImageAlphaInfo.premultipliedLast.rawValue)
+            guard let data = image.dataProvider,
+                  let colorSpace = image.colorSpace,
+                  let nImage = CGImage(width: image.width, 
+                                       height: image.height,
+                                       bitsPerComponent: image.bitsPerComponent,
+                                       bitsPerPixel: image.bitsPerPixel,
+                                       bytesPerRow: image.bytesPerRow,
+                                       space: colorSpace,
+                                       bitmapInfo: image.bitmapInfo,
+                                       provider: data, 
+                                       decode: nil,
+                                       shouldInterpolate: false, 
+                                       intent: .absoluteColorimetric),
+                  let ctx = CGContext(data: nil,
+                                      width: image.width,
+                                      height: image.height,
+                                      bitsPerComponent: 8,
+                                      bytesPerRow: 4 * image.width,
+                                      space: cs,
+                                      bitmapInfo: bitmapInfo.rawValue) else { return nil }
+            ctx.draw(nImage, in: CGRect(x: 0,
+                                        y: 0,
+                                        width: nImage.width,
+                                        height: nImage.height))
+            guard let nnImage = ctx.makeImage() else { return nil }
+            cg = nnImage
+        }
     }
     init?(size: Size, color: Color) {
         let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue)

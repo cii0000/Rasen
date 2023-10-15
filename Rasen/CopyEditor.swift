@@ -1372,7 +1372,7 @@ final class CopyEditor: Editor {
     }
     
     private var oldScale: Double?, firstRotation = 0.0, oldSnapP: Point?,
-                textNode: Node?, textFrame: Rect?, textScale = 1.0
+                textNode: Node?, imageNode: Node?, textFrame: Rect?, textScale = 1.0
     var snapDistance = 1.0
     
     func updateWithPaste(at p: Point, atScreen sp: Point, _ phase: Phase) {
@@ -1491,13 +1491,34 @@ final class CopyEditor: Editor {
                 }
                 if scaleIndex(os) == scaleIndex(s),
                    let textNode = textNode {
-                    selectingLineNode.children = [textNode]
+                    if let imageNode {
+                        selectingLineNode.children = [textNode, imageNode]
+                    } else {
+                        selectingLineNode.children = [textNode]
+                    }
                 } else {
                     var ntext = text
                     ntext.origin *= fScale
                     ntext.size *= fScale
                     let textNode = ntext.node
-                    selectingLineNode.children = [textNode]
+                    
+                    if let image = text.timeframe?.content?.image,
+                       let texture = Texture(image: image, isOpaque: false,
+                                             colorSpace: .sRGB) {
+                        let size = (image.size / 2)
+                            .snapped(Sheet.defaultBounds.size * 0.95)
+                        * s
+                        let imageNode = Node(name: "content",
+                                             attitude: .init(position: ntext.origin),
+                                             path: Path(Rect(size: size)),
+                                             fillType: .texture(texture))
+                        self.imageNode = imageNode
+                        selectingLineNode.children = [textNode, imageNode]
+                    } else {
+                        self.imageNode = nil
+                        selectingLineNode.children = [textNode]
+                    }
+                    
                     self.textNode = textNode
                     self.textFrame = ntext.frame
                     textScale = document.worldToScreenScale
@@ -2247,7 +2268,8 @@ final class CopyEditor: Editor {
         case .uuColor(let uuColor):
             guard document.isSelect(at: p) else {
                 guard let _ = document.madeSheetView(at: shp) else { return }
-                let colorOwners = document.madeColorOwner(at: p)
+                let colorOwners = document.madeColorOwner(at: p,
+                                                          removingUUColor: uuColor)
                 colorOwners.forEach {
                     if $0.uuColor != uuColor {
                         $0.uuColor = uuColor

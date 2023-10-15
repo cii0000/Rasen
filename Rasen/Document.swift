@@ -3339,12 +3339,14 @@ final class Document {
             return Sheet.defalutBackgroundUUColor
         }
     }
-    func madeColorOwner(at p: Point) -> [SheetColorOwner] {
+    func madeColorOwner(at p: Point,
+                        removingUUColor: UUColor? = nil) -> [SheetColorOwner] {
         guard let sheetView = madeSheetView(at: p) else {
             return []
         }
         let inP = sheetView.convertFromWorld(p)
         return [sheetView.sheetColorOwner(at: inP,
+                                          removingUUColor: removingUUColor,
                                           scale: screenToWorldScale)]
     }
     func madeColorOwnersWithSelection(at p: Point) -> (firstUUColor: UUColor,

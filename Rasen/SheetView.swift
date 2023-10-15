@@ -2210,8 +2210,11 @@ final class SheetView: View {
             return nil
         }
     }
-    func sheetColorOwner(at p: Point, scale: Double) -> SheetColorOwner {
+    func sheetColorOwner(at p: Point,
+                         removingUUColor: UUColor? = nil,
+                         scale: Double) -> SheetColorOwner {
         if let (lineView, li) = lineTuple(at: p,
+                                          removingUUColor: removingUUColor,
                                           scale: scale) {
             let uuColor = lineView.model.uuColor
             
@@ -5446,6 +5449,7 @@ final class SheetView: View {
         return n
     }
     func lineTuple(at p: Point, isSmall ois: Bool? = nil,
+                   removingUUColor: UUColor? = nil,
                    scale: Double) -> (lineView: SheetLineView,
                                       lineIndex: Int)? {
         let isSmall = ois ??
@@ -5454,6 +5458,7 @@ final class SheetView: View {
         
         var minI: Int?, minDSquared = Double.infinity
         for (i, line) in model.picture.lines.enumerated() {
+            guard line.uuColor != removingUUColor else { continue }
             let nd = isSmall ? (line.size / 2 + ds) / 4 : line.size / 2 + ds * 5
             let ldSquared = nd * nd
             let dSquared = line.minDistanceSquared(at: p)

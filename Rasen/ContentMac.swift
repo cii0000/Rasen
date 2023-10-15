@@ -217,7 +217,7 @@ struct Content: Hashable, Codable {
         case "mp4", "mov", "MP4", "MOV": .movie
         case "wav", "m4a", "mp3", "aiff",
             "WAV", "M4A", "MP3", "AIFF": .sound
-        case "png", "jpeg", "jpg", "PNG", "JPEG", "JPG": .image
+        case "png", "jpeg", "jpg", "heif", "heic", "PNG", "JPEG", "JPG", "HEIF", "HEIC": .image
         default: .none
         }
     }

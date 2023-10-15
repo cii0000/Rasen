@@ -2003,12 +2003,20 @@ extension Sheet {
         let frameRate = animation.sec(fromBeat: Rational(1, minFrame))
         for i in 1 ..< 60 {
             if (frameRate * Rational(i)).decimalPart == 0 {
-                print(i, minFrame, frameRate)
                 return i
             }
         }
-        print(60, minFrame, frameRate)
         return 60
+    }
+    
+    var mainLineUUColor: UUColor? {
+        picture.lines.reduce(into: [UUColor: Int]()) {
+            if let i = $0[$1.uuColor] {
+                $0[$1.uuColor] = i + 1
+            } else {
+                $0[$1.uuColor] = 1
+            }
+        }.max { $0.value < $1.value }?.key
     }
     
     var bounds: Rect {

@@ -1937,8 +1937,9 @@ extension TextView {
             if let image = content.image,
                let texture = Texture(image: image, isOpaque: false,
                                      colorSpace: .sRGB) {
-                let size = (image.size / 2 * textSize)
+                let size = (image.size / 2)
                     .snapped(Sheet.defaultBounds.size * 0.95)
+                * textSize / Font.defaultSize
                 boxNodes.append(Node(name: "content",
                                      path: Path(Rect(size: size)),
                                      fillType: .texture(texture)))
