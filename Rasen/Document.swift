@@ -3529,7 +3529,7 @@ final class Document {
     }
     func currentNoteTimeInterval(fromScale scale: Double) -> Rational {
         isFullEditNoteTimeInterval(fromScale: scale) ?
-            Rational(1, 48) : Rational(1, 4)
+            Rational(1, 48) : Rational(1, 12)
     }
     func currentNoteTimeInterval(from text: Text) -> Rational {
         currentNoteTimeInterval(fromScale: text.font.defaultRatio)

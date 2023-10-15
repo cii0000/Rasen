@@ -1572,13 +1572,11 @@ extension TextView {
         guard let timeframe = model.timeframe,
               let sm = timeframe.spectrogram else { return }
         
-        let eSec = 0.0
-        let eW = width(atSecDuration: eSec)
-        
-        let firstX = x(atBeat: timeframe.beatRange.start) - eW
+        let firstX = x(atBeat: timeframe.beatRange.start + (timeframe.score != nil ? 0 : timeframe.localStartBeat))
         let y = (scoreFrame?.maxY ?? timeRangeFrame?.maxY ?? 0) + 0.5 * nodeRatio
-        let allBeat = timeframe.beatRange.length
-        let allW = width(atBeatDuration: allBeat) + eW * 2
+        let allBeat = timeframe.score != nil ?
+        timeframe.beatRange.length : timeframe.localBeatRange?.length ?? 0
+        let allW = width(atBeatDuration: allBeat)
         var nodes = [Node](), maxH = 0.0
         func spNode(width: Int, at xi: Int) -> Node? {
             guard let image = sm.image(width: width, at: xi),
@@ -1586,7 +1584,7 @@ extension TextView {
                                         isOpaque: false,
                                         colorSpace: .sRGB) else { return nil }
             let w = allW * Double(width) / Double(sm.frames.count)
-            let h = 350 * sm.maxFq / Audio.defaultExportSampleRate
+            let h = 256 * sm.maxFq / Audio.defaultExportSampleRate
             maxH = max(maxH, h)
             let x = allW * Double(xi) / Double(sm.frames.count)
             return Node(name: "spectrogram",
@@ -1610,9 +1608,9 @@ extension TextView {
         }
         
         let sNode = Node(name: "spectrogram",
-                        children: nodes,
-                        attitude: .init(position: .init(firstX, y)),
-                        path: Path(Rect(width: allW, height: maxH)))
+                         children: nodes,
+                         attitude: .init(position: .init(firstX, y)),
+                         path: Path(Rect(width: allW, height: maxH)))
         
         self.spectrogramMaxMel = Mel.mel(fromFq: sm.maxFq)
         
@@ -1893,9 +1891,9 @@ extension TextView {
                                       fillType: .color(.content)))
             } else if localBeatRange.start > 0 {
                 let ssx = x(atBeat: localBeatRange.start + timeframe.beatRange.start)
-                contentPathlines.append(Pathline(Rect(x: ssx - ratio / 2,
+                contentPathlines.append(Pathline(Rect(x: ssx - ratio / 4,
                                                       y: y - 3 * ratio,
-                                                      width: ratio,
+                                                      width: ratio / 2,
                                                       height: 6 * ratio)))
             }
         }
@@ -1920,9 +1918,9 @@ extension TextView {
                                       fillType: .color(.content)))
             } else if localBeatRange.end < timeframe.beatRange.length {
                 let ssx = x(atBeat: localBeatRange.end + timeframe.beatRange.start)
-                contentPathlines.append(Pathline(Rect(x: ssx - ratio / 2,
+                contentPathlines.append(Pathline(Rect(x: ssx - ratio / 4,
                                                       y: y - 3 * ratio,
-                                                      width: ratio,
+                                                      width: ratio / 2,
                                                       height: 6 * ratio)))
             }
         }
@@ -1999,7 +1997,7 @@ extension TextView {
         
         let roundedSBeat = timeframe.beatRange.start.rounded(.down)
         let deltaBeat = Rational(1, 48)
-        let beatR1 = Rational(1, 2), beatR2 = Rational(1, 4)
+        let beatR1 = Rational(1, 2), beatR2 = Rational(1, 12)
         let beat1 = Rational(2), beat2 = Rational(4)
         var cBeat = roundedSBeat
         while cBeat <= timeframe.beatRange.end {
@@ -3250,6 +3248,13 @@ extension TextView {
         
         return Rect(x: sx, y: y - 6 * ratio, width: ex - sx, height: 12 * ratio)
             .outset(by: 3 * ratio)
+    }
+    
+    func containsMainLine(_ p: Point, distance: Double) -> Bool {
+        guard containsTimeframe(p) else { return false }
+        let lastB = typesetter.firstReturnBounds ?? Rect()
+        let y = lastB.minY
+        return abs(p.y - y) < distance
     }
     
     func noteFrame(from note: Note,

@@ -383,6 +383,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         isPaused = true
         enableSetNeedsDisplay = true
         self.allowedTouchTypes = .indirect
+        self.wantsRestingTouches = true
         setupDocument()
         
         if !UserDefaults.standard.bool(forKey: SubMTKView.isHiddenActionListKey) {
@@ -1459,8 +1460,9 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         oldPressureStage = max(event.stage, oldPressureStage)
     }
     
-    private var beganSubDragEvent: DragEvent?, isSubDrag = false
+    private var beganSubDragEvent: DragEvent?, isSubDrag = false, isSubTouth = false
     override func rightMouseDown(with nsEvent: NSEvent) {
+        isSubTouth = nsEvent.subtype == .touch
         isSubDrag = false
         let beganDragEvent = dragEventWith(nsEvent, .began)
         self.beganSubDragEvent = beganDragEvent
@@ -1487,6 +1489,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 showMenu(nsEvent)
             }
         }
+        isSubTouth = false
         beganSubDragEvent = nil
     }
     
@@ -1852,7 +1855,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     pinchVs.append((magnification, event.timestamp))
                     self.oldPinchDistance = nPinchDistance
                     lastMagnification = magnification
-                } else if isEnabledScroll
+                } else if isEnabledScroll && !(isSubDrag && isSubTouth)
                             && !isBeganScroll && !isBeganPinch
                             && !isBeganRotate
                             && abs(nPinchDistance - oldPinchDistance) <= 6

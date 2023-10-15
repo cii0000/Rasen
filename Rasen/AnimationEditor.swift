@@ -827,7 +827,6 @@ final class Player: InputKeyEditor {
                         let textP = textView.convert(sheetP, from: cSheetView.node)
                         if textView.containsScore(textP),
                            let ni = textView.noteIndex(at: textP,
-                                                                          
                                                        maxDistance: 10.0 * document.screenToWorldScale),
                            let id = textView.model.timeframe?.id,
                            let score = textView.model.timeframe?.score {
@@ -837,6 +836,10 @@ final class Player: InputKeyEditor {
                             sec = timeframe.sec(fromBeat: beat)
                             - Rational(1, 16)
                             secRange = timeframe.secRange
+                            ids.insert(id)
+                        } else if textView.containsMainLine(textP, 
+                                                            distance: 5 * document.screenToWorldScale),
+                                  let id = textView.model.timeframe?.id {
                             ids.insert(id)
                         }
                     }
@@ -1814,7 +1817,7 @@ final class TimeframeSlider: DragEditor {
                 
                 switch type {
                 case .all:
-                    let nh = ScoreLayout.noteHeight * textView.nodeRatio
+                    let nh = Double(document.currentNotePitchInterval(from: textView.model)) * ScoreLayout.noteHeight * textView.nodeRatio
                     let px = (beganTextOrigin.x + inP.x - beganInP.x)
                     let py = (beganTextOrigin.y + inP.y - beganInP.y)
                         .interval(scale: nh)
