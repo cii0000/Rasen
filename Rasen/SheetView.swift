@@ -557,21 +557,19 @@ final class AnimationView: View {
         var cBeat = roundedSBeat
         while cBeat <= beatRange.end {
             if cBeat >= beatRange.start {
-                let lw: Double = {
-                    if cBeat % beat2 == 0 {
-                        return 2
-                    } else if cBeat % beat1 == 0 {
-                        return 1.5
-                    } else if cBeat % 1 == 0 {
-                        return 1
-                    } else if cBeat % beatR1 == 0 {
-                        return 0.5
-                    } else if cBeat % beatR2 == 0 {
-                        return 0.25
-                    } else {
-                        return 0.125
-                    }
-                } ()
+                let lw: Double = if cBeat % beat2 == 0 {
+                    2
+                } else if cBeat % beat1 == 0 {
+                    1.5
+                } else if cBeat % 1 == 0 {
+                    1
+                } else if cBeat % beatR1 == 0 {
+                    0.5
+                } else if cBeat % beatR2 == 0 {
+                    0.25
+                } else {
+                    0.125
+                }
                 
                 let beatX = x(atBeat: cBeat)
                 let rect = Rect(x: beatX - lw / 2, y: sy,
@@ -659,11 +657,10 @@ final class AnimationView: View {
         }
         
         if isSelected {
-            let d: Double
-            if let (i, iBeat) = model.indexAndInternalBeat(atRootBeat: model.localBeat) {
-                d = iBeat == 0 ? (model.keyframes[i].isKey ? knobH / 2 : iKnobH / 2) : lw / 2
+            let d = if let (i, iBeat) = model.indexAndInternalBeat(atRootBeat: model.localBeat) {
+                iBeat == 0 ? (model.keyframes[i].isKey ? knobH / 2 : iKnobH / 2) : lw / 2
             } else {
-                d = lw / 2
+                lw / 2
             }
             
             pathlines.append(.init(Rect(x: mainBeatX - lw / 2,

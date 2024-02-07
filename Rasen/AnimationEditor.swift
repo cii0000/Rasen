@@ -1663,8 +1663,7 @@ final class TimeframeSlider: DragEditor {
                             sheetView.notePlayer = notePlayer
                         }
                         notePlayer?.play()
-                    } else if textView.containsScore(inTP),
-                              textView.tempoPositionBeat(inTP,
+                    } else if textView.tempoPositionBeat(inTP,
                                                  maxDistance: maxD) != nil,
                               let timeframe = textView.model.timeframe {
                         type = .tempo

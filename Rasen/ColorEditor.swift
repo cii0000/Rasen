@@ -247,7 +247,7 @@ final class ColorEditor: Editor {
     var noteSheetView: SheetView?, noteTextIndex: Int?, noteIndexes = [Int]()
     var isPit = false
     var textI: Int?, noteI: Int?, pitI: Int?,
-        beganScore: Score?, beganPit: Pit?, beganPitbend: Pitbend?
+        beganScore: Score?, beganContent: Content?, beganPit: Pit?, beganPitbend: Pitbend?
     var beganTimeframes = [Int: Timeframe]()
     var beganVolumes = [Volume](), beganSP = Point(), firstScore: Score?
     var firstNoteIndex = 0, beganVolume = Volume(), isChangeScoreVolume = false
@@ -335,6 +335,34 @@ final class ColorEditor: Editor {
                             notePlayer?.play()
                         }
                     }
+                } else if let timeframe = textView.model.timeframe,
+                    let content = timeframe.content {
+                    
+                    let inP = sheetView.convertFromWorld(p)
+                    if let (ti, _) = sheetView.timeframeTuple(at: inP) {
+                        let textView = sheetView.textsView.elementViews[ti]
+                    
+                        let inTP = textView.convert(inP, from: sheetView.node)
+                        let maxD = textView.nodeRatio
+                        * 5.0 * document.screenToWorldScale
+                        if textView.containsTimeframe(inTP) {
+                            self.textI = ti
+                            
+                            beganVolume = content.volume
+                            let fs = document.selections
+                                .map { $0.rect }
+                                .map { sheetView.convertFromWorld($0) }
+                            beganTimeframes = sheetView.textsView.elementViews.enumerated().reduce(into: [Int: Timeframe]()) { (dic, v) in
+                                if fs.contains(where: { v.element.transformedScoreFrame.intersects($0) }),
+                                   let timeframe = v.element.model.timeframe,
+                                   timeframe.volume != nil {
+                                    dic[v.offset] = timeframe
+                                }
+                            }
+                            
+                            beganContent = textView.model.timeframe?.content
+                        }
+                    }
                 }
             }
         case .changed:
@@ -364,37 +392,24 @@ final class ColorEditor: Editor {
                     .clipped(min: 0, max: Volume.maxSmp)
                 let volume = Volume(smp: smp)
                 
-                if let score = textView.model.timeframe?.score {
-                    if isChangeScoreVolume {
-                        if !beganTimeframes.isEmpty {
-                            let scale = beganVolume.amp == 0 ?
-                                1 : volume.amp / beganVolume.amp
-                            for (ti, textView) in sheetView.textsView.elementViews.enumerated() {
-                                guard let beganTimeframeVolume = beganTimeframes[ti]?.volume else { continue }
-                                
-                                let volume: Volume
-                                if beganVolume.amp == 0 {
-                                    let smp = (beganTimeframeVolume.smp + dSmp)
-                                        .clipped(min: 0, max: Volume.maxSmp)
-                                    volume = Volume(smp: smp)
-                                } else {
-                                    let amp = (beganTimeframeVolume.amp * scale)
-                                        .clipped(min: 0, max: Volume.maxAmp)
-                                    volume = Volume(amp: amp)
-                                }
-                                
-                                textView.model.timeframe?.volume = volume
-                                
-                                if textView.model.timeframe?.content == nil {
-                                    textView.isUpdatedAudioCache = false
-                                }
-                                
-                                if let timeframe = textView.model.timeframe {
-                                    sheetView.sequencer?.mixings[timeframe.id]?
-                                        .volume = .init(volume.amp)
-                                }
+                if isChangeScoreVolume {
+                    if !beganTimeframes.isEmpty {
+                        let scale = beganVolume.amp == 0 ?
+                        1 : volume.amp / beganVolume.amp
+                        for (ti, textView) in sheetView.textsView.elementViews.enumerated() {
+                            guard let beganTimeframeVolume = beganTimeframes[ti]?.volume else { continue }
+                            
+                            let volume: Volume
+                            if beganVolume.amp == 0 {
+                                let smp = (beganTimeframeVolume.smp + dSmp)
+                                    .clipped(min: 0, max: Volume.maxSmp)
+                                volume = Volume(smp: smp)
+                            } else {
+                                let amp = (beganTimeframeVolume.amp * scale)
+                                    .clipped(min: 0, max: Volume.maxAmp)
+                                volume = Volume(amp: amp)
                             }
-                        } else {
+                            
                             textView.model.timeframe?.volume = volume
                             
                             if textView.model.timeframe?.content == nil {
@@ -406,7 +421,23 @@ final class ColorEditor: Editor {
                                     .volume = .init(volume.amp)
                             }
                         }
-                    } else if !noteIndexes.isEmpty,
+                    } else {
+                        textView.model.timeframe?.volume = volume
+                        
+                        if textView.model.timeframe?.content == nil {
+                            textView.isUpdatedAudioCache = false
+                        }
+                        
+                        if let timeframe = textView.model.timeframe {
+                            sheetView.sequencer?.mixings[timeframe.id]?
+                                .volume = .init(volume.amp)
+                        }
+                    }
+                    return
+                }
+                
+                if let score = textView.model.timeframe?.score {
+                    if !noteIndexes.isEmpty,
                               noteIndexes.count == beganVolumes.count {
                         let scale = beganVolume.amp == 0 ?
                             1 : volume.amp / beganVolume.amp
@@ -519,7 +550,7 @@ final class ColorEditor: Editor {
                 if sheetView.model.texts.contains(where: { $0.timeframe?.score != nil }) {
                     for (ti, textView) in sheetView.textsView.elementViews.enumerated() {
                         let inTP = textView.convertFromWorld(p)
-                        if textView.containsScore(inTP) {
+                        if textView.containsScore(inTP) || textView.containsTimeframe(inTP) {
                             isChangeVolumeAmp = true
                             noteSheetView = sheetView
                             noteTextIndex = ti

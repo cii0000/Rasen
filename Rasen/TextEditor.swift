@@ -1995,6 +1995,13 @@ extension TextView {
                                                height: ratio * 4)))
         }
         
+        let h = if let score = timeframe.score {
+            self.height(fromPitch: score.pitchRange.length,
+                                noteHeight: nh)
+        } else {
+            knobH / 2 + knobW
+        }
+        
         let roundedSBeat = timeframe.beatRange.start.rounded(.down)
         let deltaBeat = Rational(1, 48)
         let beatR1 = Rational(1, 2), beatR2 = Rational(1, 12)
@@ -2002,33 +2009,27 @@ extension TextView {
         var cBeat = roundedSBeat
         while cBeat <= timeframe.beatRange.end {
             if cBeat >= timeframe.beatRange.start {
-                let lw: Double = {
-                    if cBeat % beat2 == 0 {
-                        return 2
-                    } else if cBeat % beat1 == 0 {
-                        return 1.5
-                    } else if cBeat % 1 == 0 {
-                        return 1
-                    } else if cBeat % beatR1 == 0 {
-                        return 0.5
-                    } else if cBeat % beatR2 == 0 {
-                        return 0.25
-                    } else {
-                        return 0.125
-                    }
-                } () * ratio
+                let olw: Double = if cBeat % beat2 == 0 {
+                    2
+                } else if cBeat % beat1 == 0 {
+                    1.5
+                } else if cBeat % 1 == 0 {
+                    1
+                } else if cBeat % beatR1 == 0 {
+                    0.5
+                } else if cBeat % beatR2 == 0 {
+                    0.25
+                } else {
+                    0.125
+                }
+                let lw = olw * ratio
+                
                 let beatX = x(atBeat: cBeat)
                 
-                let rect = timeframe.score != nil ?
-                Rect(x: beatX - lw / 2,
-                     y: y,
-                     width: lw,
-                     height: self.height(fromPitch: timeframe.score!.pitchRange.length,
-                                         noteHeight: nh)) :
-                Rect(x: beatX - lw / 2,
-                     y: y - knobH / 2 - knobW,
-                     width: lw,
-                     height: knobH + knobW * 2)
+                let rect = Rect(x: beatX - lw / 2,
+                                y: y - knobH / 2 - knobW,
+                                width: lw,
+                                height: h + knobH / 2 + knobW)
                 if cBeat % 1 == 0 {
                     subBorderPathlines.append(Pathline(rect))
                 } else if lw == 0.125 {
@@ -2040,6 +2041,8 @@ extension TextView {
             cBeat += deltaBeat
         }
         
+        let knobRadius = 2 * ratio
+        
         if let score = timeframe.score {
             var notes = score.sortedNotes
             let indexes = Chord.chordIndexes(notes)
@@ -2047,8 +2050,6 @@ extension TextView {
                 notes[i].isChord = true
             }
             
-            let h = self.height(fromPitch: score.pitchRange.length,
-                                noteHeight: nh)
             let pitchRange = score.pitchRange
             if let range = Range<Int>(pitchRange) {
                 var isAppendOctaveText = false
@@ -2397,14 +2398,6 @@ extension TextView {
             let toneH = 10.0 * ratio
             let toneY = -toneH / 2
             let tone = score.tone
-            let knobRadius = 2 * ratio
-            
-            let tempoBeat = timeframe.beatRange.start.rounded(.down) + 1
-            if tempoBeat < timeframe.beatRange.end {
-                let np = Point(x(atBeat: tempoBeat), y + h)
-                contentPathlines.append(Pathline(circleRadius: knobRadius,
-                                                 position: np))
-            }
             
             let overtoneW = 6.0 * ratio
             let overtoneDW = 6.0 * ratio
@@ -2694,6 +2687,13 @@ extension TextView {
                                                   width: ratio, height: h + ratio / 2)))
             contentPathlines.append(Pathline(Rect(x: sx, y: y + h - ratio / 2,
                                                   width: ex - sx, height: ratio)))
+        }
+        
+        let tempoBeat = timeframe.beatRange.start.rounded(.down) + 1
+        if tempoBeat < timeframe.beatRange.end {
+            let np = Point(x(atBeat: tempoBeat), y + h)
+            contentPathlines.append(Pathline(circleRadius: knobRadius,
+                                             position: np))
         }
         
         var nodes = [Node]()
@@ -3178,7 +3178,11 @@ extension TextView {
         guard let timeframe = model.timeframe else { return nil }
         let tempoBeat = timeframe.beatRange.start.rounded(.down) + 1
         if tempoBeat < timeframe.beatRange.end {
-            let np = Point(x(atBeat: tempoBeat), scoreFrame?.maxY ?? 0)
+            let np = if let scoreFrame {
+                Point(x(atBeat: tempoBeat), scoreFrame.maxY)
+            } else {
+                Point(x(atBeat: tempoBeat), timeRangeFrame?.maxY ?? 0)
+            }
             return np.distance(p) < maxDistance ? tempoBeat : nil
         } else {
             return nil
@@ -3319,10 +3323,7 @@ extension TextView {
     func noteOutlinePathlines(from note: Note,
                               frame noteF: Rect) -> [Pathline] {
         let lw = 1 * nodeRatio
-        return [.init(Rect(x: noteF.minX, y: noteF.minY,
-                           width: noteF.width, height: lw)),
-                .init(Rect(x: noteF.minX, y: noteF.maxY - lw,
-                           width: noteF.width, height: lw))]
+        return []
     }
     
     func pitbend(from note: Note, at i: Int?,
