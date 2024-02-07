@@ -1489,6 +1489,9 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 showMenu(nsEvent)
             }
         }
+        if isSubTouth {
+            oldScrollPosition = nil
+        }
         isSubTouth = false
         beganSubDragEvent = nil
     }
@@ -1860,7 +1863,6 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                             && !isBeganRotate
                             && abs(nPinchDistance - oldPinchDistance) <= 6
                             && nScrollPosition.distance(oldScrollPosition) > 5 {
-                    
                     isBeganScroll = true
                     
                     scrollTimer?.cancel()
@@ -2029,9 +2031,10 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     func endPinch(with event: NSEvent,
                   timeInterval: Double = 1 / 60) {
-        guard isBeganPinch, pinchVs.count >= 2 else { return }
+        guard isBeganPinch else { return }
         self.oldPinchDistance = nil
         isBeganPinch = false
+        guard pinchVs.count >= 2 else { return }
         
         let fpi = pinchVs[..<(pinchVs.count - 1)]
             .lastIndex(where: { event.timestamp - $0.time > 0.05 }) ?? 0
@@ -2080,9 +2083,10 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         }
     }
     func endRotate(with event: NSEvent) {
-        guard isBeganRotate, rotateVs.count >= 2 else { return }
+        guard isBeganRotate else { return }
         self.oldRotateAngle = nil
         isBeganRotate = false
+        guard rotateVs.count >= 2 else { return }
         
         document.rotate(.init(screenPoint: screenPoint(with: event).my,
                              time: event.timestamp,
@@ -2091,9 +2095,10 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     func endScroll(with event: NSEvent,
                    timeInterval: Double = 1 / 60) {
-        guard isBeganScroll, scrollVs.count >= 2 else { return }
+        guard isBeganScroll else { return }
         self.oldScrollPosition = nil
         isBeganScroll = false
+        guard scrollVs.count >= 2 else { return }
         
         let fsi = scrollVs[..<(scrollVs.count - 1)]
             .lastIndex(where: { event.timestamp - $0.time > 0.05 }) ?? 0
