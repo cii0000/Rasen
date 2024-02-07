@@ -2012,16 +2012,16 @@ final class SheetView: View {
     
     func tempo(at p: Point) -> Rational? {
         if let i = nearestScoreIndex(at: p) {
-            return textsView.elementViews[i].model.timeframe?.tempo
+            textsView.elementViews[i].model.timeframe?.tempo
         } else {
-            return nil
+            nil
         }
     }
     func scaleKey(at p: Point) -> Rational? {
         if let i = nearestScoreIndex(at: p) {
-            return textsView.elementViews[i].model.timeframe?.score?.scaleKey
+            textsView.elementViews[i].model.timeframe?.score?.scaleKey
         } else {
-            return nil
+            nil
         }
     }
     func nearestScoreIndex(at p: Point) -> Int? {
