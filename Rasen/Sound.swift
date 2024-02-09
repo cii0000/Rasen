@@ -215,6 +215,8 @@ extension Pitbend: Protobuf {
     }
 }
 extension Pitbend {
+    static let enabledRecoilPitchDistance: Rational = 1
+    
     init(recoilS0 s0: Double, s1: Double, s2: Double, s3: Double,
          y0: Double, y1: Double, y2: Double, y3: Double, ly: Double,
          v1Amp: Double) {
@@ -408,7 +410,7 @@ extension Pitbend {
         let interpolation = interpolation
         var sec = 0.0, cs = [Line.Control]()
         while sec < secDuration {
-            if let v = interpolation.value(withTime: sec / secDuration) {
+            if let v = interpolation.monoValue(withTime: sec / secDuration) {
                 cs.append(.init(point: .init(sec, v.pitch), pressure: v.smp))
             }
             sec += dSec
@@ -424,15 +426,21 @@ extension Pitbend {
     }
 }
 
+struct Noterial {
+    
+}
+
 struct Note {
     var pitch = Rational(0)
     var pitbend = Pitbend()
     var beatRange = 0 ..< Rational(1, 4)
     var volumeAmp = Volume.mainAmp
+    var pan = 0.0
+    var tone = Tone()
     var lyric = ""
+    
     var isBreath = false
     var isVibrato = false
-    var isChord = false
     var isVowelReduction = false
 }
 extension Note: Protobuf {
@@ -460,6 +468,9 @@ extension Note: Protobuf {
 }
 extension Note: Hashable, Codable {}
 extension Note {
+    var isChord: Bool {
+        volumeAmp == 0
+    }
     var volume: Volume {
         get { .init(amp: volumeAmp) }
         set { volumeAmp = newValue.amp }
@@ -483,7 +494,6 @@ extension Note {
         && lyric == other.lyric
         && isBreath == other.isBreath
         && isVibrato == other.isVibrato
-        && isChord == other.isChord
     }
     
     var octavePitchString: String {
@@ -796,7 +806,7 @@ extension Chord: CustomStringConvertible {
 
 struct Envelope: Hashable, Codable {
     var attack = 0.02, decay = 0.04,
-        sustain = Volume(smp: 0.95).amp, release = 0.08
+        sustain = Volume(smp: 0.95).amp, release = 0.06
 }
 extension Envelope: Protobuf {
     init(_ pb: PBEnvelope) throws {
@@ -811,43 +821,6 @@ extension Envelope: Protobuf {
             $0.decay = decay
             $0.sustain = sustain
             $0.release = release
-        }
-    }
-}
-
-struct Pitchbend: Hashable, Codable {
-    static let maxPitchLog = 4.0
-    
-    var decay = 0.0, pitchLog = 0.0
-}
-extension Pitchbend: Protobuf {
-    init(_ pb: PBPitchbend) throws {
-        decay = try pb.decay.notNaN().clipped(min: 0, max: 1)
-        pitchLog = try pb.pitchLog.notNaN().clipped(min: -Pitchbend.maxPitchLog,
-                                                 max: Pitchbend.maxPitchLog)
-    }
-    var pb: PBPitchbend {
-        .with {
-            $0.decay = decay
-            $0.pitchLog = pitchLog
-        }
-    }
-}
-extension Pitchbend {
-    var isEmpty: Bool {
-        decay == 0 || pitchLog == 0
-    }
-    
-    func pitchLog(atSec sec: Double,
-                  easing: Easing = .easeOutSin) -> Double {
-        guard decay > 0 else { return 0 }
-        if sec < 0 {
-            return pitchLog
-        } else if sec < decay {
-            let t = (sec / decay).ease(easing)
-            return .linear(pitchLog, 0, t: t)
-        } else {
-            return 0
         }
     }
 }
@@ -901,21 +874,18 @@ extension Overtone {
 
 struct Tone: Hashable, Codable {
     var envelope = Envelope()
-    var pitchbend = Pitchbend()
     var overtone = Overtone()
     var spectlope = Spectlope()
 }
 extension Tone: Protobuf {
     init(_ pb: PBTone) throws {
         envelope = (try? Envelope(pb.envelope)) ?? .init()
-        pitchbend = (try? Pitchbend(pb.pitchbend)) ?? .init()
         overtone = (try? Overtone(pb.overtone)) ?? .init()
         spectlope = (try? Spectlope(pb.spectlope)) ?? .init()
     }
     var pb: PBTone {
         .with {
             $0.envelope = envelope.pb
-            $0.pitchbend = pitchbend.pb
             $0.overtone = overtone.pb
             $0.spectlope = spectlope.pb
         }
@@ -924,7 +894,6 @@ extension Tone: Protobuf {
 extension Tone {
     func isEqualTimebend(_ other: Self) -> Bool {
         envelope == other.envelope
-        && pitchbend == other.pitchbend
     }
     func isEqualWave(_ other: Self) -> Bool {
         overtone == other.overtone
@@ -1019,10 +988,9 @@ struct Score {
     var notes = [Note]()
     var volumeAmp = Volume(smp: 0.5).amp
     var pan = 0.0
-    var reverb = Audio.defaultReverb
     var tone = Tone()
     var octave = Rational(4)
-    var pitchRange = Rational(-6) ..< Rational(11)
+    var pitchRange = Rational(-12 * 3) ..< Rational(12 * 2)
 }
 extension Score: Protobuf {
     init(_ pb: PBScore) throws {
@@ -1030,7 +998,6 @@ extension Score: Protobuf {
         volumeAmp = ((try? pb.volumeAmp.notNaN()) ?? 1)
             .clipped(min: 0, max: Volume.maxAmp)
         pan = pb.pan.clipped(min: -1, max: 1)
-        reverb = pb.reverb.clipped(min: 0, max: 1)
         tone = (try? Tone(pb.tone)) ?? Tone()
         octave = ((try? Rational(pb.octave)) ?? 4)
             .clipped(min: Self.minOctave, max: Self.maxOctave)
@@ -1044,7 +1011,6 @@ extension Score: Protobuf {
             $0.notes = notes.map { $0.pb }
             $0.volumeAmp = volumeAmp
             $0.pan = pan
-            $0.reverb = reverb
             $0.tone = tone.pb
             $0.octave = octave.pb
             $0.pitchRange = RationalRange(value: pitchRange).pb
@@ -1468,7 +1434,7 @@ struct Audio: Hashable, Codable {
     static let clippingVolume = Volume(db: -headroomDb)
     static let clippingAmp = clippingVolume.amp
     static let floatClippingAmp = Float(clippingVolume.amp)
-    static let defaultReverb = 0.01
+    static let defaultReverb = 0.0
     
     var pcmData = Data()
 }

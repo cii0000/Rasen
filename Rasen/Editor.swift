@@ -855,6 +855,12 @@ final class IOEditor: Editor {
                     let clipScale = max(0.0, log10Scale)
                     let decimalPlaces = Int(clipScale + 2)
                     text.origin = nnp.rounded(decimalPlaces: decimalPlaces)
+                    if let size = content.image?.size {
+                        let size = size / 2
+                        if size.width < Sheet.width || size.height < Sheet.height {
+                            text.size *= min(size.width / Sheet.width, size.height / Sheet.height)
+                        }
+                    }
                     sheetView.newUndoGroup()
                     sheetView.append(text)
                 }

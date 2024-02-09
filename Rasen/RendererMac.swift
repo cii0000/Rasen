@@ -1349,7 +1349,8 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                             _ phase: Phase) -> InputTextEvent {
         InputTextEvent(screenPoint: screenPointFromCursor.my,
                        time: nsEvent.timestamp,
-                       pressure: 1, phase: phase, inputKeyType: keyType,
+                       pressure: 1, phase: phase, isRepeat: nsEvent.isARepeat,
+                       inputKeyType: keyType,
                        ns: nsEvent, inputContext: inputContext)
     }
     

@@ -974,7 +974,7 @@ final class LineEditor: Editor {
     private var isDrawNote = false
     private var noteSheetView: SheetView?, noteTextIndex: Int?, notePitch: Rational?, beganScore: Score?,
         noteIndex: Int?, noteStartTime: Rational?, notePlayer: NotePlayer?
-    func drawNote(with event: DragEvent) {
+    func drawNote(with event: DragEvent, isStraight: Bool = false) {
         guard isEditingSheet else {
             document.stop(with: event)
             return
@@ -992,7 +992,9 @@ final class LineEditor: Editor {
                     let count = score.notes.count
                     let interval = document.currentNoteTimeInterval(from: textView.model)
                     let t = textView.beat(atX: inP.x, interval: interval) - timeframe.beatRange.start - timeframe.localStartBeat
-                    let note = Note(pitch: pitch, beatRange: t ..< t)
+                    let beatRange = t ..< t
+                    let note = Note(pitch: pitch, beatRange: beatRange,
+                                    volumeAmp: isStraight ? 0 : Volume.mainAmp)
                     
                     noteIndex = count
                     notePitch = pitch
@@ -1003,16 +1005,17 @@ final class LineEditor: Editor {
                         score.volume * 0.1 : score.volume
                     if let notePlayer = sheetView.notePlayer {
                         self.notePlayer = notePlayer
+                        let note = isStraight ? Note(pitch: pitch, beatRange: beatRange) : note
                         notePlayer.notes = [score.convertPitchToWorld(note)]
                         notePlayer.tone = score.tone
                         notePlayer.volume = volume
                     } else {
+                        let note = isStraight ? Note(pitch: pitch, beatRange: beatRange) : note
                         notePlayer = try? NotePlayer(notes: [score.convertPitchToWorld(note)],
                                                      score.tone,
                                                      volume: volume,
                                                      pan: score.pan,
-                                                     tempo: Double(timeframe.tempo),
-                                                     reverb: timeframe.reverb ?? Audio.defaultReverb)
+                                                     tempo: Double(timeframe.tempo))
                         sheetView.notePlayer = notePlayer
                     }
                     notePlayer?.play()
@@ -1047,12 +1050,14 @@ final class LineEditor: Editor {
                     let beat = textView.beat(atX: inP.x, interval: interval) - timeframe.beatRange.start - timeframe.localStartBeat
                     let beatRange = beat > nsBeat ?
                         nsBeat ..< beat : beat ..< nsBeat
-                    let note = Note(pitch: pitch, beatRange: beatRange)
+                    let note = Note(pitch: pitch, beatRange: beatRange,
+                                    volumeAmp: isStraight ? 0 : Volume.mainAmp)
                     let isNote = noteMusicIndex != pitch
                     
                     sheetView.updateOtherNotes()
                     
                     if isNote {
+                        let note = isStraight ? Note(pitch: pitch, beatRange: beatRange) : note
                         notePlayer?.notes = [score.convertPitchToWorld(note)]
                         self.notePitch = pitch
                     }
@@ -1085,7 +1090,8 @@ final class LineEditor: Editor {
                     let t = textView.beat(atX: inP.x, interval: interval) - timeframe.beatRange.start - timeframe.localStartBeat
                     let tr = t > nst ? nst ..< t : t ..< nst
                     if tr.length > 0 {
-                        let note = Note(pitch: pitch, beatRange: tr)
+                        let note = Note(pitch: pitch, beatRange: tr,
+                                        volumeAmp: isStraight ? 0 : Volume.mainAmp)
                         
                         var score = score
                         score.notes.append(note)
@@ -1159,8 +1165,7 @@ final class LineEditor: Editor {
 //                                                     score.tone,
 //                                                     volume: volume,
 //                                                     pan: score.pan,
-//                                                     tempo: Double(timeframe.tempo),
-//                                                     reverb: timeframe.reverb ?? Audio.defaultReverb)
+//                                                     tempo: Double(timeframe.tempo))
 //                        sheetView.notePlayer = notePlayer
 //                    }
 //                    notePlayer?.play()
@@ -1357,7 +1362,7 @@ final class LineEditor: Editor {
         }
         
         if isDrawNote {
-//            drawPitchbendNote(with: event)
+            drawNote(with: event, isStraight: true)
             return
         } else if event.phase == .began {
             let p = document.convertScreenToWorld(event.screenPoint)
@@ -1368,7 +1373,7 @@ final class LineEditor: Editor {
                             isDrawNote = true
                             noteSheetView = sheetView
                             noteTextIndex = ti
-//                            drawPitchbendNote(with: event)
+                            drawNote(with: event, isStraight: true)
                             return
                         }
                     }

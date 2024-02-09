@@ -107,7 +107,6 @@ enum PastableObject {
     case notesValue(_ notesValue: NotesValue)
     case tone(_ tone: Tone)
     case envelope(_ envelope: Envelope)
-    case pitchbend(_ pitchbend: Pitchbend)
     case formant(_ formant: Formant)
 }
 extension PastableObject {
@@ -163,8 +162,6 @@ extension PastableObject {
              PastableObject.typeName(with: tone)
         case .envelope(let envelope):
              PastableObject.typeName(with: envelope)
-        case .pitchbend(let pitchbend):
-             PastableObject.typeName(with: pitchbend)
         case .formant(let formant):
              PastableObject.typeName(with: formant)
         }
@@ -212,8 +209,6 @@ extension PastableObject {
             self = .tone(try Tone(serializedData: data))
         case PastableObject.objectTypeName(with: Envelope.self):
             self = .envelope(try Envelope(serializedData: data))
-        case PastableObject.objectTypeName(with: Pitchbend.self):
-            self = .pitchbend(try Pitchbend(serializedData: data))
         case PastableObject.objectTypeName(with: Formant.self):
             self = .formant(try Formant(serializedData: data))
         default:
@@ -258,8 +253,6 @@ extension PastableObject {
              try? tone.serializedData()
         case .envelope(let envelope):
              try? envelope.serializedData()
-        case .pitchbend(let pitchbend):
-             try? pitchbend.serializedData()
         case .formant(let formant):
              try? formant.serializedData()
         }
@@ -307,8 +300,6 @@ extension PastableObject: Protobuf {
             self = .tone(try Tone(tone))
         case .envelope(let envelope):
             self = .envelope(try Envelope(envelope))
-        case .pitchbend(let pitchbend):
-            self = .pitchbend(try Pitchbend(pitchbend))
         case .formant(let formant):
             self = .formant(try Formant(formant))
         }
@@ -352,8 +343,6 @@ extension PastableObject: Protobuf {
                 $0.value = .tone(tone.pb)
             case .envelope(let envelope):
                 $0.value = .envelope(envelope.pb)
-            case .pitchbend(let pitchbend):
-                $0.value = .pitchbend(pitchbend.pb)
             case .formant(let formant):
                 $0.value = .formant(formant.pb)
             }
@@ -380,7 +369,6 @@ extension PastableObject: Codable {
         case notesValue = "13"
         case tone = "14"
         case envelope = "17"
-        case pitchbend = "18"
         case formant = "19"
     }
     init(from decoder: Decoder) throws {
@@ -423,8 +411,6 @@ extension PastableObject: Codable {
             self = .tone(try container.decode(Tone.self))
         case .envelope:
             self = .envelope(try container.decode(Envelope.self))
-        case .pitchbend:
-            self = .pitchbend(try container.decode(Pitchbend.self))
         case .formant:
             self = .formant(try container.decode(Formant.self))
         }
@@ -486,9 +472,6 @@ extension PastableObject: Codable {
         case .envelope(let envelope):
             try container.encode(CodingTypeKey.envelope)
             try container.encode(envelope)
-        case .pitchbend(let pitchbend):
-            try container.encode(CodingTypeKey.pitchbend)
-            try container.encode(pitchbend)
         case .formant(let formant):
             try container.encode(CodingTypeKey.formant)
             try container.encode(formant)
@@ -879,28 +862,12 @@ final class CopyEditor: Editor {
                         selectingLineNode.path = Path(textView.convertToWorld(frame))
                     }
                 }
-            } else if textView.containsVolume(inTP),
-               let volume = timeframe.volume {
-                if isSendPasteboard {
-                    Pasteboard.shared.copiedObjects = [.normalizationValue(volume.amp)]
-                }
-                if let frame = textView.volumeFrame {
-                    selectingLineNode.path = Path(textView.convertToWorld(frame))
-                }
             } else if textView.containsPan(inTP),
                let pan = timeframe.pan {
                 if isSendPasteboard {
                     Pasteboard.shared.copiedObjects = [.normalizationValue(pan)]
                 }
                 if let frame = textView.panFrame {
-                    selectingLineNode.path = Path(textView.convertToWorld(frame))
-                }
-            } else if textView.containsReverb(inTP),
-               let reverb = timeframe.reverb {
-                if isSendPasteboard {
-                    Pasteboard.shared.copiedObjects = [.normalizationValue(reverb)]
-                }
-                if let frame = textView.reverbFrame {
                     selectingLineNode.path = Path(textView.convertToWorld(frame))
                 }
             } else if textView.containsIsShownSpectrogram(inTP) {
@@ -933,14 +900,6 @@ final class CopyEditor: Editor {
                     Pasteboard.shared.copiedObjects = [.envelope(envelope)]
                 }
                 if let frame = textView.envelopeFrame {
-                    selectingLineNode.path = Path(textView.convertToWorld(frame))
-                }
-            } else if textView.containsPitchDecay(inTP),
-                      let pitchbend = timeframe.score?.tone.pitchbend {
-                if isSendPasteboard {
-                    Pasteboard.shared.copiedObjects = [.pitchbend(pitchbend)]
-                }
-                if let frame = textView.pitchDecayFrame {
                     selectingLineNode.path = Path(textView.convertToWorld(frame))
                 }
             } else if textView.containsTimeRange(inTP) {
@@ -1221,16 +1180,6 @@ final class CopyEditor: Editor {
                       let pan = timeframe.pan, pan != 0 {
                 timeframe.pan = 0
                 Pasteboard.shared.copiedObjects = [.normalizationValue(pan)]
-                sheetView.newUndoGroup()
-                var text = textView.model
-                text.timeframe = timeframe
-                sheetView.replace([IndexValue(value: text, index: ti)])
-                return true
-            } else if textView.containsReverb(inTP),
-                      var timeframe = textView.model.timeframe,
-                      let reverb = timeframe.reverb, (timeframe.content?.type == .sound && reverb != 0) || reverb != Audio.defaultReverb {
-                timeframe.reverb = timeframe.content?.type == .sound ? 0 : Audio.defaultReverb
-                Pasteboard.shared.copiedObjects = [.normalizationValue(reverb)]
                 sheetView.newUndoGroup()
                 var text = textView.model
                 text.timeframe = timeframe
@@ -1771,15 +1720,19 @@ final class CopyEditor: Editor {
                     
                     let interval = document.currentNoteTimeInterval(from: textView.model)
                     let t = textView.beat(atX: inTP.x, interval: interval)
+                    + timeframe.beatRange.start + timeframe.localStartBeat
+                    
                     var notes = notes
                     for j in 0 ..< notes.count {
-                        notes[j].pitch += pitch
+                        notes[j].volumeAmp *= score.volumeAmp
+                        notes[j].pitch += pitch - score.pitchRange.start
                         notes[j].beatRange.start += t
                     }
+                    
                     selectingLineNode.children = notes.map {
-                        let f = textView.noteFrame(from: $0, score, timeframe)
-                        let nf = textView.convertToWorld(f)
-                        return textView.noteNode(from: $0, at: nil, score, timeframe, frame: nf)
+                        let node = textView.noteNode(from: $0, at: nil, y: 0)
+                        node.attitude.position += textView.convertToWorld(textView.scoreFrame?.origin ?? .init())
+                        return node
                     }
                 }
             }
@@ -1825,8 +1778,6 @@ final class CopyEditor: Editor {
         case .tone:
             break
         case .envelope:
-            break
-        case .pitchbend:
             break
         case .formant:
             break
@@ -2439,6 +2390,14 @@ final class CopyEditor: Editor {
             let clipScale = max(0.0, log10Scale)
             let decimalPlaces = Int(clipScale + 2)
             text.origin = nnp.rounded(decimalPlaces: decimalPlaces)
+            
+            if let size = content.image?.size {
+                let size = size / 2
+                if size.width < Sheet.width || size.height < Sheet.height {
+                    text.size *= min(size.width / Sheet.width, size.height / Sheet.height)
+                }
+            }
+            
             sheetView.newUndoGroup()
             sheetView.append(text)
         case .beatRange(let beatRange):
@@ -2463,25 +2422,10 @@ final class CopyEditor: Editor {
                 let textView = sheetView.textsView.elementViews[ti]
                 var text = textView.model
                 let inTP = textView.convertFromWorld(p)
-                if textView.containsVolume(inTP) {
-                    let volume = Volume(amp: nValue.clipped(min: 0,
-                                                            max: Volume.maxAmp))
-                    if volume != text.timeframe?.volume {
-                        text.timeframe?.volume = volume
-                        sheetView.newUndoGroup()
-                        sheetView.replace([IndexValue(value: text, index: ti)])
-                    }
-                } else if textView.containsPan(inTP) {
+                if textView.containsPan(inTP) {
                     let pan = nValue.clipped(min: -1, max: 1)
                     if pan != text.timeframe?.pan {
                         text.timeframe?.pan = pan
-                        sheetView.newUndoGroup()
-                        sheetView.replace([IndexValue(value: text, index: ti)])
-                    }
-                } else if textView.containsReverb(inTP) {
-                    let reverb = nValue.clipped(min: 0, max: 1)
-                    if reverb != text.timeframe?.reverb {
-                        text.timeframe?.reverb = reverb
                         sheetView.newUndoGroup()
                         sheetView.replace([IndexValue(value: text, index: ti)])
                     }
@@ -2583,21 +2527,6 @@ final class CopyEditor: Editor {
                     sheetView.updatePlaying()
                 }
             }
-        case .pitchbend(let pitchbend):
-            guard let sheetView = document.sheetView(at: shp) else { return }
-            let np = sheetView.convertFromWorld(p)
-            if let ti = sheetView.timeframeIndex(at: np) {
-                let textView = sheetView.textsView.elementViews[ti]
-                if let timeframe = textView.model.timeframe,
-                   var score = timeframe.score {
-                    
-                    score.tone.pitchbend = pitchbend
-                    sheetView.newUndoGroup()
-                    sheetView.replaceScore(score, at: ti)
-                    
-                    sheetView.updatePlaying()
-                }
-            }
         case .formant(var formant):
             guard let sheetView = document.sheetView(at: shp) else { return }
             let np = sheetView.convertFromWorld(p)
@@ -2640,7 +2569,6 @@ final class CopyEditor: Editor {
         case .notesValue: true
         case .tone: false
         case .envelope: false
-        case .pitchbend: false
         case .formant: false
         }
     }

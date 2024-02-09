@@ -152,7 +152,6 @@ message PBContent {
     string name = 5;
     double volumeAmp = 2;
     double pan = 3;
-    double reverb = 4;
 }
 
 message PBPit {
@@ -193,10 +192,6 @@ message PBEnvelope {
     double sustain = 3;
     double release = 4;
 }
-message PBPitchbend {
-    double decay = 1;
-    double pitchLog = 2;
-}
 
 message PBFormant {
     double sdFq = 1;
@@ -219,7 +214,6 @@ message PBOvertone {
 
 message PBTone {
     PBEnvelope envelope = 1;
-    PBPitchbend pitchbend = 2;
     PBOvertone overtone = 3;
     PBSpectlope spectlope = 4;
     PBUUID id = 6;
@@ -230,7 +224,6 @@ message PBScore {
     repeated PBNote notes = 2;
     double volumeAmp = 8;
     double pan = 11;
-    double reverb = 12;
     PBRational octave = 10;
     PBRationalRange pitchRange = 9;
 }
@@ -639,7 +632,6 @@ message PBPastableObject {
         PBRational normalizationRationalValue = 16;
         PBNotesValue notesValue = 14;
         PBTone tone = 15;
-        PBPitchbend pitchbend = 18;
         PBEnvelope envelope = 19;
         PBFormant formant = 20;
     }

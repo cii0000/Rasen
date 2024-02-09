@@ -2615,7 +2615,8 @@ final class TextInputContext {
     }
 }
 struct InputTextEvent: Event {
-    var screenPoint: Point, time: Double, pressure: Double, phase: Phase
+    var screenPoint: Point, time: Double, pressure: Double, phase: Phase,
+        isRepeat: Bool
     var inputKeyType: InputKeyType
     var ns: NSEvent, inputContext: NSTextInputContext?
 }

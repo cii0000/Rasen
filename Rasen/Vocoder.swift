@@ -788,8 +788,6 @@ struct Waver {
     static let clappingTime = 0.03
     
     let envelope: Envelope
-    let firstPitchbend: Pitchbend
-    let lastPitchbend: Pitchbend
     let vibrato: Reswave
     let tremolo: Reswave
     var pitbend: Pitbend
@@ -800,16 +798,6 @@ struct Waver {
     let attackAndDecay, ampSustain: Double
     let rAttack, rDecay, rSustain, rRelease: Double
     
-    let firstPitchbendDecay, firstPitchLog: Double
-    let firstPitchbendEasing: Easing
-    let firstPitchbendBeganTime: Double
-    let rFirstPitchbendDecay: Double
-    let isEmptyFirstPitchbend: Bool
-    
-    let lastPitchbendDecay, lastPitchLog: Double
-    let lastPitchbendEasing: Easing
-    let rLastPitchbendDecay: Double
-    let isEmptyLastPitchbend: Bool
     let firstVibrato: Reswave?
     
     let isEmptyVibrato: Bool
@@ -818,7 +806,6 @@ struct Waver {
     init(_ tone: Tone,
          pitbend: Pitbend = Pitbend()) {
         self.init(envelope: tone.envelope,
-                  firstPitchbend: tone.pitchbend,
                   pitbend: pitbend)
     }
     
@@ -826,12 +813,7 @@ struct Waver {
                                        sustain: 1, release: 0.08),
          isLinearAttack: Bool = false,
          isLinearRelease: Bool = false,
-         firstPitchbend: Pitchbend = Pitchbend(),
          firstVibrato: Reswave? = nil,
-         firstPitchbendEasing: Easing = .easeOutSin,
-         firstPitchbendBeganTime: Double = 0,
-         lastPitchbend: Pitchbend = Pitchbend(),
-         lastPitchbendEasing: Easing = .easeInSin,
          vibrato: Reswave = Reswave(),
          tremolo: Reswave = Reswave(),
          pitbend: Pitbend = Pitbend()) {
@@ -839,12 +821,7 @@ struct Waver {
         self.envelope = envelope
         self.isLinearAttack = isLinearAttack
         self.isLinearRelease = isLinearRelease
-        self.firstPitchbend = firstPitchbend
         self.firstVibrato = firstVibrato
-        self.firstPitchbendEasing = firstPitchbendEasing
-        self.firstPitchbendBeganTime = firstPitchbendBeganTime
-        self.lastPitchbendEasing = lastPitchbendEasing
-        self.lastPitchbend = lastPitchbend
         self.vibrato = vibrato
         self.tremolo = tremolo
         self.pitbend = pitbend
@@ -859,16 +836,6 @@ struct Waver {
         rDecay = 1 / decay
         rSustain = 1 / smpSustain
         rRelease = 1 / release
-        
-        firstPitchbendDecay = firstPitchbend.decay
-        firstPitchLog = firstPitchbend.pitchLog
-        rFirstPitchbendDecay = 1 / firstPitchbendDecay
-        isEmptyFirstPitchbend = firstPitchbend.isEmpty
-        
-        lastPitchbendDecay = lastPitchbend.decay
-        lastPitchLog = lastPitchbend.pitchLog
-        rLastPitchbendDecay = 1 / lastPitchbendDecay
-        isEmptyLastPitchbend = lastPitchbend.isEmpty
         
         isEmptyVibrato = vibrato.isEmpty
         isEmptytremolo = tremolo.isEmpty
@@ -928,53 +895,6 @@ extension Waver {
             return ampSustain
         }
     }
-    
-    func firstFqScale(atLocalSec t: Double) -> Double {
-        firstFqScale(atLocalTime: t, pitchLog: firstPitchLog)
-    }
-    func firstFqScale(atLocalTime t: Double,
-                             pitchLog: Double) -> Double {
-        let t = t - firstPitchbendBeganTime
-        if firstPitchbendDecay > 0 {
-            if t < 0 {
-                return 2 ** pitchLog
-            } else if t < firstPitchbendDecay {
-                if let firstVibrato = firstVibrato {
-                    let v = firstVibrato.fqScale(atLocalTime: t)
-                    return Double.linear(v, 1, t: t * rFirstPitchbendDecay)
-                } else {
-                    let nt = (t * rFirstPitchbendDecay).ease(firstPitchbendEasing)
-                    let n = Double.linear(pitchLog, 0, t: nt)
-                    return 2 ** n
-                }
-            } else {
-                return 1
-            }
-        } else {
-            return 1
-        }
-    }
-    
-    func lastFqScale(atLocalReleaseTime t: Double) -> Double {
-        lastFqScale(atLocalReleaseTime: t,
-                           pitchLog: lastPitchLog)
-    }
-    func lastFqScale(atLocalReleaseTime t: Double,
-                            pitchLog: Double) -> Double {
-        if lastPitchbendDecay > 0 {
-            if t < 0 {
-                return 1
-            } else if t < lastPitchbendDecay {
-                let nt = (t * rLastPitchbendDecay).ease(lastPitchbendEasing)
-                let n = Double.linear(0, pitchLog, t: nt)
-                return 2 ** n
-            } else {
-                return 2 ** pitchLog
-            }
-        } else {
-            return 2 ** pitchLog
-        }
-    }
 }
 
 struct Notewave {
@@ -1023,15 +943,9 @@ extension Notewave {
             1 :
         waver.vibrato.fqScale120(atLocalTime: sec, tempo: tempo)
         
-        let firstScale = waver.isEmptyFirstPitchbend ?
-            1 :
-        waver.firstFqScale(atLocalSec: sec)
-        let lastScale = waver.isEmptyLastPitchbend || releaseSec == nil ?
-            1 :
-        waver.lastFqScale(atLocalReleaseTime: sec - releaseSec!)
 //            let vbScale = waver.pitbend.isEmpty ?
 //                1 : waver.pitbend.fqScale(atT: sec)
-        phase += vScale * firstScale * lastScale// * vbScale
+        phase += vScale// * vbScale
         * fqScale
         
         phase = phase.loop(start: 0, end: count)
@@ -1044,28 +958,16 @@ extension Notewave {
                       from waver: Waver,
                       atPhase phase: inout Double,
                       fqScale: Double, samplesCount: Int) {
-        let firstScale = waver.isEmptyFirstPitchbend ?
-            1 :
-            waver.firstFqScale(atLocalSec: sec)
-        let lastScale = waver.isEmptyLastPitchbend || releaseSec == nil ?
-            1 :
-            waver.lastFqScale(atLocalReleaseTime: sec - releaseSec!)
         let vbScale = waver.pitbend.isEmpty ?
             1 : waver.pitbend.fqScale(atT: sec)
-        phase += firstScale * lastScale * vbScale * fqScale
+        phase += vbScale * fqScale
         phase = phase.loop(0 ..< Double(samplesCount))
     }
     static func phaseScale(tempo: Double,
                            sec: Double, releaseSec: Double? = nil,
                            from waver: Waver) -> Double {
-        let firstScale = waver.isEmptyFirstPitchbend ?
-            1 :
-            waver.firstFqScale(atLocalSec: sec)
-        let lastScale = waver.isEmptyLastPitchbend || releaseSec == nil ?
-            1 :
-            waver.lastFqScale(atLocalReleaseTime: sec - releaseSec!)
         let vbScale = waver.pitbend.isEmpty ?
             1 : waver.pitbend.fqScale(atT: sec)
-        return firstScale * lastScale * vbScale
+        return vbScale
     }
 }

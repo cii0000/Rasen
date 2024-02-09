@@ -242,6 +242,39 @@ final class ColorEditor: Editor {
         }
     }
     
+    func volumeNodes(from volume: Volume, firstVolume: Volume, at p: Point) -> [Node] {
+        let vh = 50.0
+        let defaultVH = vh * (1 / Volume.maxSmp)
+        let vKnobW = 8.0, vKbobH = 2.0
+        let vx = 0.0, vy = 0.0
+        let y = volume.smp.clipped(min: Volume.minSmp, max: Volume.maxSmp,
+                                   newMin: 0, newMax: vh)
+        let fy = firstVolume.smp.clipped(min: Volume.minSmp, max: Volume.maxSmp,
+                                         newMin: 0, newMax: vh)
+        let path = Path([Pathline(Polygon(points: [Point(vx, vy),
+                                                   Point(vx + 1.5, vy + vh),
+                                                   Point(vx - 1.5, vy + vh)])),
+                         Pathline(Rect(x: vx - vKnobW / 2,
+                                       y: vy + y - vKbobH / 2,
+                                       width: vKnobW,
+                                       height: vKbobH)),
+                         Pathline(Rect(x: vx - 3,
+                                       y: vy + defaultVH - 1 / 2,
+                                       width: 6,
+                                       height: 1))])
+        return [Node(attitude: .init(position: p - Point(0, fy)), path: path,
+                     fillType: .color(.content))]
+    }
+    
+    var isChangePan = false
+    func changePan(with event: DragEvent) {
+        guard isEditingSheet else {
+            document.stop(with: event)
+            return
+        }
+        
+    }
+    
     var notePlayer: NotePlayer?
     var isChangeVolumeAmp = false
     var noteSheetView: SheetView?, noteTextIndex: Int?, noteIndexes = [Int]()
@@ -256,6 +289,12 @@ final class ColorEditor: Editor {
             document.stop(with: event)
             return
         }
+        
+        if isChangePan {
+            changePan(with: event)
+            return
+        }
+        
         let sp = event.screenPoint
         switch event.phase {
         case .began:
@@ -328,8 +367,7 @@ final class ColorEditor: Editor {
                                                              score.tone,
                                                              volume: volume,
                                                              pan: score.pan,
-                                                             tempo: Double(timeframe.tempo),
-                                                             reverb: timeframe.reverb ?? Audio.defaultReverb)
+                                                             tempo: Double(timeframe.tempo))
                                 sheetView.notePlayer = notePlayer
                             }
                             notePlayer?.play()
@@ -343,8 +381,6 @@ final class ColorEditor: Editor {
                         let textView = sheetView.textsView.elementViews[ti]
                     
                         let inTP = textView.convert(inP, from: sheetView.node)
-                        let maxD = textView.nodeRatio
-                        * 5.0 * document.screenToWorldScale
                         if textView.containsTimeframe(inTP) {
                             self.textI = ti
                             
@@ -364,6 +400,9 @@ final class ColorEditor: Editor {
                         }
                     }
                 }
+                
+                lightnessNode.children = volumeNodes(from: beganVolume, firstVolume: beganVolume, at: p)
+                document.rootNode.append(child: lightnessNode)
             }
         case .changed:
             if isPit {
@@ -382,6 +421,10 @@ final class ColorEditor: Editor {
                         pit.amp = (beganPit.amp + dp.y / 100).clipped(min: 0, max: Volume.maxAmp)
                         pitbend.pits[pitI] = pit
                         textView.model.timeframe?.score?.notes[noteI].pitbend = pitbend
+                        
+                        lightnessNode.children = volumeNodes(from: Volume(amp: pit.amp), 
+                                                             firstVolume: beganVolume,
+                                                             at: document.convertScreenToWorld(beganSP))
                     }
                 }
             } else if let sheetView = noteSheetView, let ti = noteTextIndex {
@@ -391,6 +434,10 @@ final class ColorEditor: Editor {
                 let smp = (beganVolume.smp + dSmp)
                     .clipped(min: 0, max: Volume.maxSmp)
                 let volume = Volume(smp: smp)
+                
+                lightnessNode.children = volumeNodes(from: volume,
+                                                     firstVolume: beganVolume,
+                                                     at: document.convertScreenToWorld(beganSP))
                 
                 if isChangeScoreVolume {
                     if !beganTimeframes.isEmpty {
@@ -467,6 +514,8 @@ final class ColorEditor: Editor {
             }
         case .ended:
             notePlayer?.stop()
+            
+            lightnessNode.removeFromParent()
             
             if isPit {
                 if let sheetView = noteSheetView,

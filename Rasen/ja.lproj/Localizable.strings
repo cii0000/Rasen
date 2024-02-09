@@ -44,6 +44,7 @@
 "Cut" = "カット";
 "Copy" = "コピー";
 "Paste" = "ペースト";
+"Copy Line Color" = "線色をコピー";
 
 "Undo" = "取り消す";
 "Redo" = "やり直す";

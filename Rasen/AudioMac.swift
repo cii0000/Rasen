@@ -68,7 +68,7 @@ final class NotePlayer {
     struct NotePlayerError: Error {}
     
     init(notes: [Note], _ tone: Tone, volume: Volume, pan: Double,
-         tempo: Double, reverb: Double) throws {
+         tempo: Double, reverb: Double = Audio.defaultReverb) throws {
         
         guard let sequencer = Sequencer(timetracks: [],
                                         isAsync: true, startSec: 0) else {
@@ -162,7 +162,7 @@ final class AVAudioPCMNoder {
     
     init(pcmBuffer: PCMBuffer, startTime: Double,
          contentStartTime: Double, duration: Double,
-         volumeAmp: Double, pan: Double, reverb: Double) {
+         volumeAmp: Double, pan: Double, reverb: Double = Audio.defaultReverb) {
         let sampleRate = pcmBuffer.format.sampleRate
         let scst = startTime + contentStartTime
         let csSampleTime = -min(contentStartTime, 0) * sampleRate
@@ -450,7 +450,7 @@ final class AVAudioScoreNoder {
     init(rendnotes: [Rendnote], tone: Tone, tempo: Double,
          format: AVAudioFormat = AVAudioFormat(standardFormatWithSampleRate: Audio.defaultSampleRate, channels: 1)!,
          startSec: Double, isAsync: Bool,
-         volumeAmp: Double, pan: Double, reverb: Double) {
+         volumeAmp: Double, pan: Double, reverb: Double = Audio.defaultReverb) {
         
         self.rendnotes = rendnotes
         self.tone = tone
@@ -675,11 +675,11 @@ final class Sequencer {
         
         struct TrackKey: Hashable {
             var tone: Tone, volumeAmp: Double,
-                pan: Double, reverb: Double, tempo: Rational
+                pan: Double, tempo: Rational
         }
         struct Track {
             var tone: Tone, volumeAmp: Double,
-                pan: Double, reverb: Double, tempo: Rational
+                pan: Double, tempo: Rational
             var rendnotes: [Rendnote]
             var id: UUID
         }
@@ -728,12 +728,11 @@ final class Sequencer {
                                                 contentStartTime: contentStartSec,
                                                 duration: secDur,
                                                 volumeAmp: volume.amp,
-                                                pan: timeframe.pan ?? 0,
-                                                reverb: timeframe.reverb ?? 0)
+                                                pan: timeframe.pan ?? 0)
                     
                     let reverbNode = AVAudioUnitReverb()
                     reverbNode.loadFactoryPreset(.mediumHall)
-                    reverbNode.wetDryMix = Float(timeframe.reverb ?? 0) * 100
+                    reverbNode.wetDryMix = Float(Audio.defaultReverb) * 100
                     reverbs[timeframe.id] = reverbNode
                     
                     pcmNodes.append((noder.node, reverbNode))
@@ -791,7 +790,6 @@ final class Sequencer {
                 let value = TrackKey(tone: score.tone,
                                      volumeAmp: score.volumeAmp,
                                      pan: score.pan,
-                                     reverb: score.reverb,
                                      tempo: timeframe.tempo)
                 if tracks[value] != nil {
                     tracks[value]?.rendnotes += rendnotes
@@ -799,7 +797,6 @@ final class Sequencer {
                     tracks[value] = .init(tone: score.tone,
                                           volumeAmp: score.volumeAmp,
                                           pan: score.pan,
-                                          reverb: score.reverb,
                                           tempo: timeframe.tempo,
                                           rendnotes: rendnotes,
                                           id: timeframe.id)
@@ -827,12 +824,11 @@ final class Sequencer {
                                           startSec: startSec,
                                           isAsync: isAsync,
                                           volumeAmp: track.volumeAmp,
-                                          pan: track.pan,
-                                          reverb: track.reverb)
+                                          pan: track.pan)
             
             let reverbNode = AVAudioUnitReverb()
             reverbNode.loadFactoryPreset(.mediumHall)
-            reverbNode.wetDryMix = Float(track.reverb) * 100
+            reverbNode.wetDryMix = Float(Audio.defaultReverb) * 100
             reverbs[track.id] = reverbNode
             
             scoreNodes.append((noder.node, reverbNode))
@@ -1411,6 +1407,17 @@ struct Spectrogram {
     static let (redRatio, greenRatio) = {
         var redColor = Color(red: 0.0625, green: 0, blue: 0)
         var greenColor = Color(red: 0, green: 0.0625, blue: 0)
+        if redColor.lightness < greenColor.lightness {
+            greenColor.lightness = redColor.lightness
+        } else {
+            redColor.lightness = greenColor.lightness
+        }
+        return (Double(redColor.rgba.r), Double(greenColor.rgba.g))
+    } ()
+    
+    static let (editRedRatio, editGreenRatio) = {
+        var redColor = Color(red: 0.5, green: 0, blue: 0)
+        var greenColor = Color(red: 0, green: 0.5, blue: 0)
         if redColor.lightness < greenColor.lightness {
             greenColor.lightness = redColor.lightness
         } else {

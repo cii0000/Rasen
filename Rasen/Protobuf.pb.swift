@@ -865,8 +865,6 @@ struct PBContent {
 
   var pan: Double = 0
 
-  var reverb: Double = 0
-
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -967,20 +965,6 @@ struct PBEnvelope {
   init() {}
 }
 
-struct PBPitchbend {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  var decay: Double = 0
-
-  var pitchLog: Double = 0
-
-  var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  init() {}
-}
-
 struct PBFormant {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -1047,15 +1031,6 @@ struct PBTone {
   /// Clears the value of `envelope`. Subsequent reads from it will return its default value.
   mutating func clearEnvelope() {self._envelope = nil}
 
-  var pitchbend: PBPitchbend {
-    get {return _pitchbend ?? PBPitchbend()}
-    set {_pitchbend = newValue}
-  }
-  /// Returns true if `pitchbend` has been explicitly set.
-  var hasPitchbend: Bool {return self._pitchbend != nil}
-  /// Clears the value of `pitchbend`. Subsequent reads from it will return its default value.
-  mutating func clearPitchbend() {self._pitchbend = nil}
-
   var overtone: PBOvertone {
     get {return _overtone ?? PBOvertone()}
     set {_overtone = newValue}
@@ -1088,7 +1063,6 @@ struct PBTone {
   init() {}
 
   fileprivate var _envelope: PBEnvelope? = nil
-  fileprivate var _pitchbend: PBPitchbend? = nil
   fileprivate var _overtone: PBOvertone? = nil
   fileprivate var _spectlope: PBSpectlope? = nil
   fileprivate var _id: PBUUID? = nil
@@ -1121,11 +1095,6 @@ struct PBScore {
   var pan: Double {
     get {return _storage._pan}
     set {_uniqueStorage()._pan = newValue}
-  }
-
-  var reverb: Double {
-    get {return _storage._reverb}
-    set {_uniqueStorage()._reverb = newValue}
   }
 
   var octave: PBRational {
@@ -3503,14 +3472,6 @@ struct PBPastableObject {
     set {value = .tone(newValue)}
   }
 
-  var pitchbend: PBPitchbend {
-    get {
-      if case .pitchbend(let v)? = value {return v}
-      return PBPitchbend()
-    }
-    set {value = .pitchbend(newValue)}
-  }
-
   var envelope: PBEnvelope {
     get {
       if case .envelope(let v)? = value {return v}
@@ -3547,7 +3508,6 @@ struct PBPastableObject {
     case normalizationRationalValue(PBRational)
     case notesValue(PBNotesValue)
     case tone(PBTone)
-    case pitchbend(PBPitchbend)
     case envelope(PBEnvelope)
     case formant(PBFormant)
 
@@ -3625,10 +3585,6 @@ struct PBPastableObject {
         guard case .tone(let l) = lhs, case .tone(let r) = rhs else { preconditionFailure() }
         return l == r
       }()
-      case (.pitchbend, .pitchbend): return {
-        guard case .pitchbend(let l) = lhs, case .pitchbend(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
       case (.envelope, .envelope): return {
         guard case .envelope(let l) = lhs, case .envelope(let r) = rhs else { preconditionFailure() }
         return l == r
@@ -3680,7 +3636,6 @@ extension PBPit: @unchecked Sendable {}
 extension PBPitbend: @unchecked Sendable {}
 extension PBNote: @unchecked Sendable {}
 extension PBEnvelope: @unchecked Sendable {}
-extension PBPitchbend: @unchecked Sendable {}
 extension PBFormant: @unchecked Sendable {}
 extension PBSpectlope: @unchecked Sendable {}
 extension PBOvertone: @unchecked Sendable {}
@@ -4789,7 +4744,6 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     5: .same(proto: "name"),
     2: .same(proto: "volumeAmp"),
     3: .same(proto: "pan"),
-    4: .same(proto: "reverb"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -4800,7 +4754,6 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       switch fieldNumber {
       case 2: try { try decoder.decodeSingularDoubleField(value: &self.volumeAmp) }()
       case 3: try { try decoder.decodeSingularDoubleField(value: &self.pan) }()
-      case 4: try { try decoder.decodeSingularDoubleField(value: &self.reverb) }()
       case 5: try { try decoder.decodeSingularStringField(value: &self.name) }()
       default: break
       }
@@ -4814,9 +4767,6 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     if self.pan != 0 {
       try visitor.visitSingularDoubleField(value: self.pan, fieldNumber: 3)
     }
-    if self.reverb != 0 {
-      try visitor.visitSingularDoubleField(value: self.reverb, fieldNumber: 4)
-    }
     if !self.name.isEmpty {
       try visitor.visitSingularStringField(value: self.name, fieldNumber: 5)
     }
@@ -4827,7 +4777,6 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     if lhs.name != rhs.name {return false}
     if lhs.volumeAmp != rhs.volumeAmp {return false}
     if lhs.pan != rhs.pan {return false}
-    if lhs.reverb != rhs.reverb {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5031,44 +4980,6 @@ extension PBEnvelope: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
   }
 }
 
-extension PBPitchbend: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = "PBPitchbend"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "decay"),
-    2: .same(proto: "pitchLog"),
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularDoubleField(value: &self.decay) }()
-      case 2: try { try decoder.decodeSingularDoubleField(value: &self.pitchLog) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.decay != 0 {
-      try visitor.visitSingularDoubleField(value: self.decay, fieldNumber: 1)
-    }
-    if self.pitchLog != 0 {
-      try visitor.visitSingularDoubleField(value: self.pitchLog, fieldNumber: 2)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: PBPitchbend, rhs: PBPitchbend) -> Bool {
-    if lhs.decay != rhs.decay {return false}
-    if lhs.pitchLog != rhs.pitchLog {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
 extension PBFormant: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBFormant"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
@@ -5217,7 +5128,6 @@ extension PBTone: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
   static let protoMessageName: String = "PBTone"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "envelope"),
-    2: .same(proto: "pitchbend"),
     3: .same(proto: "overtone"),
     4: .same(proto: "spectlope"),
     6: .same(proto: "id"),
@@ -5230,7 +5140,6 @@ extension PBTone: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularMessageField(value: &self._envelope) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._pitchbend) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._overtone) }()
       case 4: try { try decoder.decodeSingularMessageField(value: &self._spectlope) }()
       case 6: try { try decoder.decodeSingularMessageField(value: &self._id) }()
@@ -5247,9 +5156,6 @@ extension PBTone: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
     try { if let v = self._envelope {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
     } }()
-    try { if let v = self._pitchbend {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
     try { if let v = self._overtone {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
     } }()
@@ -5264,7 +5170,6 @@ extension PBTone: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
 
   static func ==(lhs: PBTone, rhs: PBTone) -> Bool {
     if lhs._envelope != rhs._envelope {return false}
-    if lhs._pitchbend != rhs._pitchbend {return false}
     if lhs._overtone != rhs._overtone {return false}
     if lhs._spectlope != rhs._spectlope {return false}
     if lhs._id != rhs._id {return false}
@@ -5280,7 +5185,6 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
     2: .same(proto: "notes"),
     8: .same(proto: "volumeAmp"),
     11: .same(proto: "pan"),
-    12: .same(proto: "reverb"),
     10: .same(proto: "octave"),
     9: .same(proto: "pitchRange"),
   ]
@@ -5290,7 +5194,6 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
     var _notes: [PBNote] = []
     var _volumeAmp: Double = 0
     var _pan: Double = 0
-    var _reverb: Double = 0
     var _octave: PBRational? = nil
     var _pitchRange: PBRationalRange? = nil
 
@@ -5303,7 +5206,6 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
       _notes = source._notes
       _volumeAmp = source._volumeAmp
       _pan = source._pan
-      _reverb = source._reverb
       _octave = source._octave
       _pitchRange = source._pitchRange
     }
@@ -5330,7 +5232,6 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
         case 9: try { try decoder.decodeSingularMessageField(value: &_storage._pitchRange) }()
         case 10: try { try decoder.decodeSingularMessageField(value: &_storage._octave) }()
         case 11: try { try decoder.decodeSingularDoubleField(value: &_storage._pan) }()
-        case 12: try { try decoder.decodeSingularDoubleField(value: &_storage._reverb) }()
         default: break
         }
       }
@@ -5361,9 +5262,6 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
       if _storage._pan != 0 {
         try visitor.visitSingularDoubleField(value: _storage._pan, fieldNumber: 11)
       }
-      if _storage._reverb != 0 {
-        try visitor.visitSingularDoubleField(value: _storage._reverb, fieldNumber: 12)
-      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -5377,7 +5275,6 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
         if _storage._notes != rhs_storage._notes {return false}
         if _storage._volumeAmp != rhs_storage._volumeAmp {return false}
         if _storage._pan != rhs_storage._pan {return false}
-        if _storage._reverb != rhs_storage._reverb {return false}
         if _storage._octave != rhs_storage._octave {return false}
         if _storage._pitchRange != rhs_storage._pitchRange {return false}
         return true
@@ -9234,7 +9131,6 @@ extension PBPastableObject: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
     16: .same(proto: "normalizationRationalValue"),
     14: .same(proto: "notesValue"),
     15: .same(proto: "tone"),
-    18: .same(proto: "pitchbend"),
     19: .same(proto: "envelope"),
     20: .same(proto: "formant"),
   ]
@@ -9443,19 +9339,6 @@ extension PBPastableObject: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
           self.value = .normalizationRationalValue(v)
         }
       }()
-      case 18: try {
-        var v: PBPitchbend?
-        var hadOneofValue = false
-        if let current = self.value {
-          hadOneofValue = true
-          if case .pitchbend(let m) = current {v = m}
-        }
-        try decoder.decodeSingularMessageField(value: &v)
-        if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.value = .pitchbend(v)
-        }
-      }()
       case 19: try {
         var v: PBEnvelope?
         var hadOneofValue = false
@@ -9569,10 +9452,6 @@ extension PBPastableObject: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
     case .normalizationRationalValue?: try {
       guard case .normalizationRationalValue(let v)? = self.value else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 16)
-    }()
-    case .pitchbend?: try {
-      guard case .pitchbend(let v)? = self.value else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 18)
     }()
     case .envelope?: try {
       guard case .envelope(let v)? = self.value else { preconditionFailure() }

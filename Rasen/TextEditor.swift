@@ -687,6 +687,38 @@ final class TextEditor: Editor {
             return
         }
         
+        let p = document.convertScreenToWorld(event.screenPoint)
+        if !event.isRepeat,
+           let sheetView = document.sheetView(at: p) {
+            let inP = sheetView.convertFromWorld(p)
+            if let (ti, timeframe) = sheetView.timeframeTuple(at: inP) {
+                let textView = sheetView.textsView.elementViews[ti]
+                let maxD = textView.nodeRatio
+                * 15.0 * document.screenToWorldScale
+                
+                let inTP = textView.convert(inP, from: sheetView.node)
+                if textView.containsScore(inTP),
+                   var score = timeframe.score,
+                   let ni = textView.noteIndex(at: inTP,
+                                               maxDistance: maxD) {
+                    
+                    score.notes[ni].lyric += event.inputKeyType.name
+                    
+                    if score.notes[ni].lyric.count >= 2, score.notes[ni].lyric.prefix(2).first == "^" {
+                        score.notes[ni].isBreath = true
+                    } else if score.notes[ni].lyric.count >= 3, score.notes[ni].lyric.prefix(3).first == "~" {
+                        score.notes[ni].isVibrato = true
+                    } else if score.notes[ni].lyric.count >= 3, score.notes[ni].lyric.prefix(3).first == "/" {
+                        score.notes[ni].isVowelReduction = true
+                    }
+                    
+                    sheetView.newUndoGroup()
+                    sheetView.replaceScore(score, at: ti)
+                    return
+                }
+            }
+        }
+        
         if !document.finding.isEmpty,
            document.editingFindingSheetView == nil {
             let sp = event.screenPoint
@@ -1419,6 +1451,7 @@ final class TextView<T: BinderProtocol>: View {
             note.beatRange.start
             -= timeframe.localStartBeat + timeframe.beatRange.start
             note.pitch -= octavePitch
+            note.volumeAmp *= (timeframe.volume?.amp ?? 0)
             return note
         }
     }
@@ -1431,21 +1464,14 @@ final class TextView<T: BinderProtocol>: View {
     func notesTempo120() -> [Note] {
         guard let timeframe = model.timeframe,
               let score = timeframe.score else { return [] }
-        var notes = score.clippedNotes(inBeatRange: timeframe.beatRange,
+        let notes = score.clippedNotes(inBeatRange: timeframe.beatRange,
                                        localStartBeat: timeframe.localStartBeat)
-        let indexes = Chord.chordIndexes(notes)
-        for i in indexes {
-            notes[i].isChord = true
-        }
-        
-        notes = notes.map {
+        return notes.map {
             var note = $0
             note.apply(toTempo: 120, fromTempo: timeframe.tempo)
             note.pitch += score.octavePitch
             return note
         }
-        
-        return notes
     }
     
     let timeframeNode = Node()
@@ -1702,6 +1728,10 @@ extension TextView {
         let nh = ScoreLayout.noteHeight * ratio
         let knobW = 2 * ratio, knobH = 12 * ratio
         let vy = (typesetter.lastBounds ?? Rect()).midY
+        let volumeH = 14.0 * ratio
+        let knobRadius = 2 * ratio
+        let lp = typesetter.lastBounds?.maxXMidYPoint ?? Point()
+        var vw = lp.x + padding * ratio
         
         var boxNodes = [Node]()
         var textNodes = [Node]()
@@ -1710,41 +1740,11 @@ extension TextView {
         var fullEditBorderPathlines = [Pathline]()
         var borderPathlines = [Pathline]()
         var contentRatioLinePathlines = [Pathline]()
-        var noteLinePathlines = [Pathline]()
+        var noteLineNodes = [Node]()
+        var noteOctaveLinePathlines = [Pathline]()
+        var noteChordLinePathlines = [Pathline]()
         var noteKnobPathlines = [Pathline]()
         
-        contentPathlines.append(Pathline(Rect(x: sx - ratio, y: y - knobH / 2,
-                                              width: knobW, height: knobH)))
-        contentPathlines.append(Pathline(Rect(x: ex - ratio, y: y - knobH / 2,
-                                              width: knobW, height: knobH)))
-        
-        let volumeH = 14.0 * ratio
-        let lp = typesetter.lastBounds?.maxXMidYPoint ?? Point()
-        var vw = lp.x + padding * ratio
-        if let volume = timeframe.volume {
-            let lp = typesetter.lastBounds?.maxXMidYPoint ?? Point()
-            let vh = volumeH
-            let defaultVH = volumeH * (1 / Volume.maxSmp)
-            let vx = lp.x + padding * ratio
-            let vKnobW = knobH, vKbobH = knobW
-            let vcx = vx + vKnobW / 2
-            contentPathlines.append(Pathline(Polygon(points: [Point(vcx, vy - vh / 2),
-                                                              Point(vcx + 1.5 * ratio, vy + vh / 2),
-                                                              Point(vcx - 1.5 * ratio, vy + vh / 2)])))
-            contentPathlines.append(Pathline(Rect(x: vcx - vKnobW / 2,
-                                                  y: vy - vh / 2 + defaultVH * volume.smp - vKbobH / 2,
-                                                  width: vKnobW,
-                                                  height: vKbobH)))
-            contentPathlines.append(Pathline(Rect(x: vcx - 3 * ratio,
-                                                  y: vy - vh / 2 + defaultVH - ratio / 2,
-                                                  width: 6 * ratio,
-                                                  height: ratio)))
-            
-            boxNodes.append(Node(name: "volume",
-                                 path: Path(Rect(x: vx, y: vy - vh / 2,
-                                                 width: vKnobW, height: vh))))
-            vw += volumeH
-        }
         if let pan = timeframe.pan {
             let vh = volumeH
             let panW = 18 * ratio
@@ -1788,70 +1788,9 @@ extension TextView {
                                                   height: vh))))
             vw += panW
         }
-        if let reverb = timeframe.reverb {
-            vw += 2 * ratio
-            let vh = volumeH
-            
-            let vKnobW = knobH, vKbobH = knobW
-            let reverbW = vKnobW
-            let vcx = vw + vKnobW / 2
-            
-            contentPathlines.append(Pathline(Polygon(points: [Point(vcx, vy - vh / 2),
-                                                              Point(vcx + 1.5 * ratio, vy + vh / 2),
-                                                              Point(vcx - 1.5 * ratio, vy + vh / 2)])))
-            
-            contentPathlines.append(Pathline(Rect(x: vcx - vKnobW / 2,
-                                                  y: vy - vh / 2 + vh * reverb.squareRoot() - vKbobH / 2,
-                                                  width: vKnobW,
-                                                  height: vKbobH)))
-            
-            boxNodes.append(Node(name: "reverb",
-                                  path: Path(Rect(x: vw, y: vy - vh / 2,
-                                                  width: reverbW,
-                                                  height: vh))))
-            vw += reverbW
-        }
-        if timeframe.isAudio {
-            vw += 2 * ratio
-            let vh = volumeH + 2 * ratio
-            let vKnobW = knobH, vKbobH = knobW
-            let issW = vKnobW
-            let vcx = vw + vKnobW / 2
-            
-            contentPathlines.append(Pathline(Rect(x: vcx - 2 * ratio,
-                                                  y: vy - vh / 2 * 0.5 - ratio / 2,
-                                                  width: 4 * ratio,
-                                                  height: ratio)))
-            contentPathlines.append(Pathline(Rect(x: vcx - 2 * ratio,
-                                                  y: vy + vh / 2 * 0.5 - ratio / 2,
-                                                  width: 4 * ratio,
-                                                  height: ratio)))
-            contentPathlines.append(Pathline(Rect(x: vcx - ratio / 2,
-                                                  y: vy - vh / 2 * 0.5,
-                                                  width: ratio,
-                                                  height: vh / 2)))
-            
-            if timeframe.isShownSpectrogram {
-                contentPathlines.append(Pathline(Rect(x: vcx - vKnobW / 2,
-                                                      y: vy + vh / 2 * 0.5 - ratio / 2,
-                                                      width: vKnobW,
-                                                      height: vKbobH)))
-            } else {
-                contentPathlines.append(Pathline(Rect(x: vcx - vKnobW / 2,
-                                                      y: vy - vh / 2 * 0.5 - ratio / 2,
-                                                      width: vKnobW,
-                                                      height: vKbobH)))
-            }
-            
-            boxNodes.append(Node(name: "isShownSpectrogram",
-                                 path: Path(Rect(x: vw, y: vy - vh / 2,
-                                                 width: issW,
-                                                 height: vh))))
-            
-            vw += issW
-        }
         
-        func timeString(at time: Rational) -> String {
+        func timeStringFrom(time: Rational,
+                            frameRate: Int) -> String {
             if time >= 60 {
                 let c = Int(time * Rational(frameRate))
                 let s = c / frameRate
@@ -1878,7 +1817,7 @@ extension TextView {
                 
                 let beat = -min(localBeatRange.start, 0)
                 - min(timeframe.beatRange.start, 0)
-                let timeText = Text(string: timeString(at: beat),
+                let timeText = Text(string: timeStringFrom(time: beat, frameRate: frameRate),
                                     size: textSize * Font.smallSize / Font.defaultSize)
                 let h = timeframe.score != nil ?
                 self.height(fromPitch: timeframe.score!.pitchRange.length,
@@ -1904,7 +1843,7 @@ extension TextView {
                 
                 let beat = timeframe.beatRange.length - localBeatRange.start
                 
-                let timeText = Text(string: timeString(at: beat),
+                let timeText = Text(string: timeStringFrom(time: beat, frameRate: frameRate),
                                     size: textSize * Font.smallSize / Font.defaultSize)
                 let timeFrame = timeText.frame ?? Rect()
                 let h = timeframe.score != nil ?
@@ -1951,7 +1890,13 @@ extension TextView {
                         return .init(point: .init(x(atSec: sec), y),
                                      pressure: content.volumeValues[i] * vt)
                     })
-                    noteLinePathlines.append(.init(line))
+                    
+                    let pan = timeframe.score?.pan ?? 0
+                    let color = Self.panColor(pan: pan,
+                                              brightness: 0.25)
+                    noteLineNodes += [Node(path: .init(line),
+                                           lineWidth: nh,
+                                           lineType: .color(color))]
                 }
             }
             
@@ -1982,9 +1927,14 @@ extension TextView {
             }
         }
         
+        contentPathlines.append(.init(Rect(x: sx - ratio, y: y - knobH / 2,
+                                           width: knobW, height: knobH)))
+        contentPathlines.append(.init(Rect(x: ex - ratio, y: y - knobH / 2,
+                                           width: knobW, height: knobH)))
         contentPathlines.append(.init(Rect(x: sx + ratio, y: y - lw / 2,
                                            width: ex - sx - ratio * 2,
                                            height: lw)))
+        
         let secRange = timeframe.secRange
         for sec in Int(secRange.start.rounded(.up)) ..< Int(secRange.end.rounded(.up)) {
             let sec = Rational(sec)
@@ -2004,7 +1954,7 @@ extension TextView {
         
         let roundedSBeat = timeframe.beatRange.start.rounded(.down)
         let deltaBeat = Rational(1, 48)
-        let beatR1 = Rational(1, 2), beatR2 = Rational(1, 12)
+        let beatR1 = Rational(1, 4), beatR2 = Rational(1, 12)
         let beat1 = Rational(2), beat2 = Rational(4)
         var cBeat = roundedSBeat
         while cBeat <= timeframe.beatRange.end {
@@ -2041,13 +1991,20 @@ extension TextView {
             cBeat += deltaBeat
         }
         
-        let knobRadius = 2 * ratio
-        
         if let score = timeframe.score {
-            var notes = score.sortedNotes
-            let indexes = Chord.chordIndexes(notes)
-            for i in indexes {
-                notes[i].isChord = true
+            let beat = timeframe.beatRange.start
+            let notes = score.sortedNotes.map {
+                var note = $0
+                note.volumeAmp *= score.volumeAmp
+                note.tone = score.tone//
+                note.pan = score.pan//
+                note.beatRange.start += beat + timeframe.localStartBeat
+                return note
+            }
+            let otherNotes = otherNotes.map {
+                var note = $0
+                note.beatRange.start += beat + timeframe.localStartBeat
+                return note
             }
             
             let pitchRange = score.pitchRange
@@ -2070,27 +2027,27 @@ extension TextView {
                                                       width: ex - sx, height: hlw)))
                     
                     let mod = (pitch + Int(score.scaleKey)).mod(12)
-                    if mod == 6 {
+                    if mod == 3 || mod == 6 || mod == 9 {
                         let sh = self.height(fromPitch: Rational(pitch) - pitchRange.start,
                                              noteHeight: nh)
-                        
-                        contentPathlines.append(Pathline(Rect(x: sx - ratio * 2,
+                        let lw = mod == 6 ? lw : lw / 2
+                        contentPathlines.append(Pathline(Rect(x: sx - ratio * 3,
                                                               y: y + sh + nh / 2 - lw / 2,
-                                                              width: ratio * 4,
+                                                              width: ratio * 3,
                                                               height: lw)))
                     } else if mod == 0 {
                         let sh = self.height(fromPitch: Rational(pitch) - pitchRange.start,
                                              noteHeight: nh)
                         
                         let plw = lw * 2
-                        contentPathlines.append(Pathline(Rect(x: sx - ratio * 2,
+                        contentPathlines.append(Pathline(Rect(x: sx - ratio * 3,
                                                               y: y + sh + nh / 2 - plw / 2,
-                                                              width: ratio * 4,
+                                                              width: ratio * 3,
                                                               height: plw)))
                         
                         let octaveText = Text(string: "\(Int(Rational(pitch) + score.octavePitch) / 12)",
                                                  size: Font.smallSize * ratio)
-                        textNodes.append(Node(attitude: Attitude(position: Point(sx - ratio * 2 - (octaveText.frame?.width ?? 0) - ratio, y + sh + nh / 2)),
+                        textNodes.append(Node(attitude: Attitude(position: Point(sx - ratio * 3 - (octaveText.frame?.width ?? 0) - ratio, y + sh + nh / 2)),
                                               path: octaveText.typesetter.path(),
                                               fillType: .color(.content)))
                         isAppendOctaveText = true
@@ -2110,11 +2067,7 @@ extension TextView {
                                           fillType: .color(.content)))
                 }
                 
-                let oUnisonsSet
-                = Set((otherNotes + notes)
-                    .compactMap { $0.isChord ? Int($0.pitch.rounded().mod(12)) : nil })
-                let unisonsSet = oUnisonsSet.isEmpty ? Set((otherNotes + notes)
-                    .compactMap { Int($0.pitch.rounded().mod(12)) }) : oUnisonsSet
+                let unisonsSet = Set((otherNotes + notes).compactMap { Int($0.pitch.rounded().mod(12)) })
                 for pitch in range {
                     guard unisonsSet
                         .contains(pitch.mod(12)) else { continue }
@@ -2125,70 +2078,77 @@ extension TextView {
                 }
             }
             
-            func appendClippedNotes(from notes: [Note],
-                                    lineWidth lw: Double,
-                                    insetWidth: Double = 0) {
-                for note in notes {
-                    let sh = self.height(fromPitch: note.pitch - pitchRange.start,
-                                         noteHeight: nh)
-                    let nx = x(atBeat: note.beatRange.start)
-                    let w = note.beatRange.length == 0 ?
-                    1.0 * ratio :
-                    x(atBeat: note.beatRange.end) - nx
-                    let ff = Rect(x: nx, y: y + sh, width: w, height: nh)
-                        .outset(by: lw / 2)
-                    let f = insetWidth == 0 ? ff : ff.inset(by: insetWidth)
-                    subBorderPathlines += [Pathline(Rect(x: f.minX, y: f.minY,
-                                                         width: lw, height: f.height)),
-                                           Pathline(Rect(x: f.minX + lw, y: f.minY,
-                                                         width: f.width - lw * 2, height: lw)),
-                                           Pathline(Rect(x: f.maxX - lw, y: f.minY,
-                                                         width: lw, height: f.height)),
-                                           Pathline(Rect(x: f.minX + lw, y: f.maxY - lw,
-                                                         width: f.width - lw * 2, height: lw))]
-                }
-            }
-            let oClippedNotes = Score.clippedNotes(otherNotes,
-                                                   pitchRange: score.pitchRange,
-                                                   inBeatRange: timeframe.beatRange,
-                                                   localStartBeat: timeframe.localStartBeat,
-                                                   isRepeartPitch: true,
-                                                   isChord: false)
-            appendClippedNotes(from: oClippedNotes, lineWidth: ratio)
-            
-            let ooClippedNotes = Score.clippedNotes(otherNotes,
-                                                    pitchRange: score.pitchRange,
-                                                    inBeatRange: timeframe.beatRange,
-                                                    localStartBeat: timeframe.localStartBeat,
-                                                    isRepeartPitch: false,
-                                                    isChord: false)
-            appendClippedNotes(from: ooClippedNotes, lineWidth: ratio / 2,
-                               insetWidth: ratio * 2)
-            
-            let otherClippedNotes = Score.clippedNotes(otherNotes,
-                                                       pitchRange: score.pitchRange,
-                                                       inBeatRange: timeframe.beatRange,
-                                                       localStartBeat: timeframe.localStartBeat,
-                                                       isRepeartPitch: true,
-                                                       isChord: true)
-            appendClippedNotes(from: otherClippedNotes, lineWidth: ratio * 2)
-            
-            let beat = timeframe.beatRange.start
             var brps = [(Range<Rational>, Int)]()
             let preBeat = max(beat, sBeat)
             let nextBeat = min(beat + timeframe.beatRange.length, eBeat)
             
-            for (i, note) in notes.enumerated() {
+            func appendOctaves(_ note: Note, isChord: Bool) {
+                var nNote = note
+                while true {
+                    nNote.pitch -= 12
+                    guard nNote.pitch > 0 && nNote.pitch < pitchRange.length else { break }
+                    
+                    let (aNoteLinePathlines, _, _)
+                    = notePathlines(from: nNote, y: y + nh / 2,
+                                    preFq: nil, nextFq: nil, tempo: timeframe.tempo)
+                    if isChord {
+                        noteChordLinePathlines += aNoteLinePathlines
+                    } else {
+                        noteOctaveLinePathlines += aNoteLinePathlines
+                    }
+                }
+                nNote = note
+                var count = 1
+                while true {
+                    nNote.pitch += 12
+                    count += 1
+                    guard nNote.pitch > 0 && nNote.pitch < pitchRange.length else { break }
+                    
+                    let (aNoteLinePathlines, _, _)
+                    = notePathlines(from: nNote, y: y + nh / 2,
+                                    preFq: nil, nextFq: nil, tempo: timeframe.tempo)
+                    if isChord {
+                        noteChordLinePathlines += aNoteLinePathlines
+                    } else {
+                        if count == 2 {
+                            let pan = timeframe.score?.pan ?? 0
+                            noteLineNodes += aNoteLinePathlines.enumerated().map {
+                                let color = Self.panColor(pan: pan,
+                                                          brightness: 1 - 0.25 * score.tone.overtone.evenScale)
+                                return Node(path: Path([$0.element]),
+                                            lineWidth: nh,
+                                            lineType: .color(color))
+                            }
+                            
+                            var nNote = nNote
+                            nNote.pitch += 7
+                            guard nNote.pitch > 0 && nNote.pitch < pitchRange.length else { break }
+                            
+                            let (aNoteLinePathlines, _, _)
+                            = notePathlines(from: nNote, y: y + nh / 2,
+                                            preFq: nil, nextFq: nil, tempo: timeframe.tempo)
+                            noteLineNodes += aNoteLinePathlines.enumerated().map {
+                                let color = Self.panColor(pan: pan,
+                                                          brightness: 1 - 0.25 * score.tone.overtone.oddScale)
+                                return Node(path: Path([$0.element]),
+                                            lineWidth: nh,
+                                            lineType: .color(color))
+                            }
+                        } else {
+                            noteOctaveLinePathlines += aNoteLinePathlines
+                        }
+                    }
+                }
+            }
+            let nNotes = notes
+            for (i, note) in nNotes.enumerated() {
                 guard pitchRange.contains(note.pitch) else { continue }
                 var beatRange = note.beatRange
-                beatRange.start += beat + timeframe.localStartBeat
                 
                 guard beatRange.end > preBeat
                         && beatRange.start < nextBeat
                         && note.volumeAmp >= Volume.minAmp
-                        && note.volumeAmp <= Volume.maxAmp else {
-                    continue
-                }
+                        && note.volumeAmp <= Volume.maxAmp else { continue }
                 
                 if beatRange.start < preBeat {
                     beatRange.length -= preBeat - beatRange.start
@@ -2198,85 +2158,53 @@ extension TextView {
                     beatRange.end = nextBeat
                 }
                 
-                brps.append((beatRange, note.roundedPitch))
+                var note = nNotes[i]
+                note.pitch -= pitchRange.start
                 
-                let sh = self.height(fromPitch: note.pitch - pitchRange.start,
-                                     noteHeight: nh)
-                let nx = x(atBeat: beatRange.start)
-                let nw = beatRange.length == 0 ?
-                width(atBeatDuration: Rational(1, 96)) :
-                x(atBeat: beatRange.end) - nx
-                let noteF = Rect(x: nx, y: y + sh, width: nw, height: nh)
-                let (aNoteLinePathlines, aNoteKnobPathlines)
-                    = notePathlines(from: note, at: i,
-                                    score, timeframe,
-                                    frame: noteF)
-                noteLinePathlines += aNoteLinePathlines
+                let (preFq, nextFq) = pitbendPreNext(notes: nNotes, at: i)
+                
+                let (aNoteLinePathlines, aNoteKnobPathlines, lyricPath)
+                = notePathlines(from: note, y: y + nh / 2,
+                                preFq: preFq, nextFq: nextFq, tempo: timeframe.tempo)
+                
+                let pan = timeframe.score?.pan ?? 0
+                noteLineNodes += aNoteLinePathlines.enumerated().map {
+                    let color = Self.panColor(pan: pan,
+                                              brightness: 0.25)
+                    return Node(path: Path([$0.element]),
+                                lineWidth: nh,
+                                lineType: .color(color))
+                }
+                
                 noteKnobPathlines += aNoteKnobPathlines
-                contentPathlines += noteOutlinePathlines(from: note, frame: noteF)
-                
-                if !score.tone.pitchbend.isEmpty {
-                    let pw = width(atSecDuration: score.tone.pitchbend.decay)
-                    let py = y + sh + nh / 2
-                    var ps = [Point]()
-                    let sSec: Double = sec(atX: x(atBeat: beatRange.start))
-                    for nxi in 0 ... 8 {
-                        let nx = pw * Double(nxi) / 8 + nx
-                        let sec = Double(sec(atX: nx) - sSec)
-                        let ph = score.tone.pitchbend.pitchLog(atSec: sec) * 5
-                        let ny = py + ph
-                        ps.append(.init(nx, ny))
-                    }
-                    if !ps.isEmpty {
-                        contentRatioLinePathlines.append(Pathline(ps))
-                    }
+                if let lyricPath {
+                    textNodes.append(.init(path: lyricPath, fillType: .color(.content)))
                 }
                 
-                func clippedLine(from line: Line,
-                                 dx: Double = 0, atY ny: Double) -> Line {
-                    let hlw = 1 * ratio
-                    var line = line
-                    line.controls = line.controls.map {
-                        .init(point: .init($0.point.x * (nw - 2 * hlw - 2 * dx) + nx + hlw + dx,
-                                           self.height(fromPitch: $0.point.y + .init(note.pitch - pitchRange.start),
-                                                       noteHeight: nh) + nh / 2 + y + ny),
-                              weight: $0.weight,
-                              pressure: $0.pressure)
-                    }
-                    line.size = hlw * 6
-                    return line
+                let isChord = note.isChord
+                if isChord {
+                    brps.append((beatRange, note.roundedPitch))
+                }
+                appendOctaves(note, isChord: isChord)
+            }
+            
+            for note in otherNotes {
+                guard pitchRange.contains(note.pitch) else { continue }
+                
+                let isChord = note.isChord
+                var note = note
+                note.pitch -= pitchRange.start
+                
+                let (aNoteLinePathlines, _, _)
+                = notePathlines(from: note, y: y + nh / 2,
+                                preFq: nil, nextFq: nil, tempo: timeframe.tempo)
+                if isChord {
+                    noteChordLinePathlines += aNoteLinePathlines
+                } else {
+                    noteOctaveLinePathlines += aNoteLinePathlines
                 }
                 
-                if score.isVoice {
-                    if !note.lyric.isEmpty {
-                        let lyricText = Text(string: "\(note.lyric)",
-                                             size: Font.smallSize * ratio)
-                        let typesetter = lyricText.typesetter
-                        textNodes.append(Node(attitude: Attitude(position: Point(nx, y + sh - typesetter.height / 2)),
-                                              path: typesetter.path(),
-                                              fillType: .color(.content)))
-                    }
-                    if note.isBreath {
-                        contentPathlines.append(Pathline(Rect(x: nx + nw - lw, y: y + sh - nh / 2,
-                                                              width: lw, height: nh / 2)))
-                    }
-                    if note.isVibrato {
-                        let lyricText = Text(string: "~",
-                                             size: Font.smallSize * ratio)
-                        let typesetter = lyricText.typesetter
-                        textNodes.append(Node(attitude: Attitude(position: Point(nx + nw - typesetter.width, y + sh - typesetter.height / 2)),
-                                              path: typesetter.path(),
-                                              fillType: .color(.content)))
-                    }
-                    if note.isVowelReduction {
-                        let lyricText = Text(string: "/",
-                                             size: Font.smallSize * ratio)
-                        let typesetter = lyricText.typesetter
-                        textNodes.append(Node(attitude: Attitude(position: Point(nx + nw - typesetter.width, y + sh - typesetter.height / 2)),
-                                              path: typesetter.path(),
-                                              fillType: .color(.content)))
-                    }
-                }
+                appendOctaves(note, isChord: isChord)
             }
             
             let trs = Chord.splitedTimeRanges(timeRanges: brps)
@@ -2314,7 +2242,7 @@ extension TextView {
                 for (i, typers) in typersDic {
                     let pitch = Rational(ps[i])
                     let nsx = x(atBeat: tr.start), nex = x(atBeat: tr.end)
-                    let sh = self.height(fromPitch: pitch - pitchRange.start,
+                    let sh = self.height(fromPitch: pitch,
                                          noteHeight: nh)
                     let d = 1.0 * ratio
                     let nw = 4.0 * Double(chord.typers.count - 1) * ratio
@@ -2322,31 +2250,31 @@ extension TextView {
                                          isInversion: Bool,
                                          _ typer: Chord.ChordTyper) {
                         let tlw = 0.5 * ratio
-                        let lw: Double
+                        let lw =
                         switch typer.type {
-                        case .octave: lw = 7 * tlw
-                        case .major, .power: lw = 5 * tlw
-                        case .suspended: lw = 3 * tlw
-                        case .minor: lw = 7 * tlw
-                        case .augmented: lw = 5 * tlw
-                        case .flatfive: lw = 3 * tlw
-                        case .diminish, .tritone: lw = 1 * tlw
+                        case .octave: 7 * tlw
+                        case .major, .power: 5 * tlw
+                        case .suspended: 3 * tlw
+                        case .minor: 7 * tlw
+                        case .augmented: 5 * tlw
+                        case .flatfive: 3 * tlw
+                        case .diminish, .tritone: 1 * tlw
                         }
                         
                         let x = -nw / 2 + 4.0 * Double(ti) * ratio
                         let fx = (nex + nsx) / 2 + x - lw / 2
-                        let fy0 = y + sh + nh, fy1 = y + sh - d
+                        let fy0 = y + sh + nh / 2 + ratio, fy1 = y + sh + nh / 2 - ratio - d
                         
-                        let minorCount: Int = {
-                            switch typer.type {
-                            case .minor: 4
-                            case .augmented: 3
-                            case .flatfive: 2
-                            case .diminish: 1
-                            case .tritone: 1
-                            default: 0
-                            }
-                        } ()
+                        let minorCount =
+                        switch typer.type {
+                        case .minor: 4
+                        case .augmented: 3
+                        case .flatfive: 2
+                        case .diminish: 1
+                        case .tritone: 1
+                        default: 0
+                        }
+                        
                         if minorCount > 0 {
                             for i in 0 ..< minorCount {
                                 let id = Double(i) * 2 * tlw
@@ -2384,19 +2312,9 @@ extension TextView {
             
             var vx = vw + ratio * padding
             
-//            let text = Text(string: "\(score.octave.integralPart).\(String(format: "%02d", Int(score.scaleKey)))",
-//                            size: Font.smallSize * ratio)
-//            textNodes.append(Node(name: "octave",
-//                                  attitude: Attitude(position: Point(vx, vy)),
-//                                  path: text.typesetter.path(),
-//                                  fillType: .color(.content)))
-//
-//            vx += text.typesetter.width + ratio * padding
-            
             vx += ratio * padding
             
             let toneH = 10.0 * ratio
-            let toneY = -toneH / 2
             let tone = score.tone
             
             let overtoneW = 6.0 * ratio
@@ -2599,88 +2517,6 @@ extension TextView {
                                                  width: spW,
                                                  height: fh).outset(by: 4 * ratio))))
             
-            vx += spW + ratio * padding
-            
-            
-            vx += ratio * padding
-            
-            let attackW = 20.0 * ratio
-            let attackX = (1 - tone.envelope.attack.squareRoot()) * attackW
-            contentPathlines.append(Pathline(circleRadius: knobRadius,
-                                             position: Point(vx + attackX, vy + toneY)))
-            contentRatioLinePathlines.append(Pathline([Point(vx + attackX, vy + toneY),
-                                                       Point(vx + attackW, vy + toneH + toneY)]))
-            boxNodes.append(Node(name: "attack",
-                                 path: Path(Rect(x: vx,
-                                                 y: vy + toneY,
-                                                 width: attackW,
-                                                 height: toneH))))
-            contentRatioLinePathlines.append(Pathline([Point(vx, vy + toneY),
-                                                       Point(vx + attackW, vy + toneY)]))
-            vx += attackW
-            
-            let ssy = Volume(amp: tone.envelope.sustain).smp * toneH
-            let dsW = 20.0 * ratio
-            let decayX = tone.envelope.decay.squareRoot() * dsW
-            contentPathlines.append(Pathline(circleRadius: knobRadius,
-                                             position: Point(vx + decayX, vy + ssy + toneY)))
-            
-            contentRatioLinePathlines.append(Pathline([Point(vx, vy + toneH + toneY),
-                                                       Point(vx + decayX, vy + ssy + toneY),
-                                                       Point(vx + dsW, vy + ssy + toneY)]))
-            boxNodes.append(Node(name: "decayAndSustain",
-                                 path: Path(Rect(x: vx,
-                                                 y: vy + toneY,
-                                                 width: dsW,
-                                                 height: toneH))))
-            vx += dsW
-            
-            let reW = 20.0 * ratio
-            let releaseX = tone.envelope.release.squareRoot() * reW
-            contentPathlines.append(Pathline(circleRadius: knobRadius,
-                                             position: Point(vx + releaseX, vy + toneY)))
-            contentRatioLinePathlines.append(Pathline([Point(vx, vy + ssy + toneY),
-                                                       Point(vx + releaseX, vy + toneY)]))
-            boxNodes.append(Node(name: "release",
-                                 path: Path(Rect(x: vx,
-                                                 y: vy + toneY,
-                                                 width: reW,
-                                                 height: toneH))))
-            contentRatioLinePathlines.append(Pathline([Point(vx, vy + toneY),
-                                                       Point(vx + reW, vy + toneY)]))
-            vx += reW
-            
-            vx += ratio * padding
-            
-            let piCenterY = toneY + toneH / 2
-            let pisdW = 15.0 * ratio
-            let pisdP: Point
-            if tone.pitchbend.isEmpty {
-                pisdP = Point(vx + pisdW, vy + piCenterY)
-            } else {
-                let d = pisdW * (1 - tone.pitchbend.decay.squareRoot()) * 0.88
-                pisdP = Point(vx + d,
-                              vy + piCenterY + tone.pitchbend.pitchLog / Pitchbend.maxPitchLog * toneH / 2)
-            }
-            
-            contentPathlines.append(Pathline(circleRadius: knobRadius,
-                                             position: pisdP))
-            contentRatioLinePathlines.append(Pathline([Point(vx + pisdW * 0.88, vy + piCenterY),
-                                                       pisdP]))
-            boxNodes.append(Node(name: "pitchD",
-                                 path: Path(Rect(x: vx, y: vy + toneY,
-                                                 width: pisdW,
-                                                 height: toneH))))
-            
-            let pidh = ratio * 2
-            contentRatioLinePathlines.append(Pathline([Point(vx + pisdW * 0.88, vy + piCenterY - pidh),
-                                                       Point(vx + pisdW * 0.88, vy + piCenterY + pidh)]))
-            contentRatioLinePathlines.append(Pathline([Point(vx, vy + piCenterY),
-                                                       Point(vx + pisdW, vy + piCenterY)]))
-            vx += pisdW
-            
-            vx += ratio * padding
-            
             contentPathlines.append(Pathline(Rect(x: sx - ratio / 2, y: y,
                                                   width: ratio, height: h + ratio / 2)))
             contentPathlines.append(Pathline(Rect(x: ex - ratio / 2, y: y,
@@ -2696,6 +2532,34 @@ extension TextView {
                                              position: np))
         }
         
+        if timeframe.isAudio {
+            let sprBeat = timeframe.beatRange.start.rounded(.down) + Rational(1, 2)
+            if sprBeat < timeframe.beatRange.end {
+                let sprH = 5 * ratio
+                let sprKnobW = knobH, sprKbobH = knobW
+                let np = Point(x(atBeat: sprBeat), y + h)
+                contentPathlines.append(Pathline(Rect(x: np.x - ratio / 2,
+                                                      y: np.y,
+                                                      width: ratio,
+                                                      height: sprH)))
+                if timeframe.isShownSpectrogram {
+                    contentPathlines.append(Pathline(Rect(x: np.x - sprKnobW / 2,
+                                                          y: np.y + sprH - sprKbobH / 2,
+                                                          width: sprKnobW,
+                                                          height: sprKbobH)))
+                } else {
+                    contentPathlines.append(Pathline(Rect(x: np.x - sprKnobW / 2,
+                                                          y: np.y - sprKbobH / 2,
+                                                          width: sprKnobW,
+                                                          height: sprKbobH)))
+                }
+                
+                boxNodes.append(Node(name: "isShownSpectrogram",
+                                     path: Path(Rect(x: np.x, y: np.y,
+                                                     width: sprKnobW, height: sprH))))
+            }
+        }
+        
         var nodes = [Node]()
         
         if !fullEditBorderPathlines.isEmpty {
@@ -2708,20 +2572,25 @@ extension TextView {
             nodes.append(Node(path: Path(borderPathlines),
                               fillType: .color(.border)))
         }
+        if !noteOctaveLinePathlines.isEmpty {
+            nodes += noteOctaveLinePathlines.enumerated().map {
+                return Node(path: Path([$0.element]),
+                            lineWidth: nh,
+                            lineType: .color(.border))
+            }
+        }
+        if !noteChordLinePathlines.isEmpty {
+            nodes += noteChordLinePathlines.enumerated().map {
+                return Node(path: Path([$0.element]),
+                            lineWidth: nh,
+                            lineType: .color(.subBorder))
+            }
+        }
         if !subBorderPathlines.isEmpty {
             nodes.append(Node(path: Path(subBorderPathlines),
                               fillType: .color(.subBorder)))
         }
-        if !noteLinePathlines.isEmpty {
-            let pan = timeframe.score?.pan ?? 0
-            nodes += noteLinePathlines.enumerated().map {
-                let color = Self.panColor(pan: pan,
-                                          brightness: 0.5)
-                return Node(path: Path([$0.element]),
-                            lineWidth: nh,
-                            lineType: .color(color))
-            }
-        }
+        nodes += noteLineNodes
         if !contentPathlines.isEmpty {
             nodes.append(Node(path: Path(contentPathlines),
                               fillType: .color(.content)))
@@ -2745,8 +2614,8 @@ extension TextView {
         pan == 0 ?
         Color(red: l, green: l, blue: l) :
             (pan < 0 ?
-             Color(red: -pan * Spectrogram.redRatio * (1 - l) + l, green: l, blue: l) :
-                Color(red: l, green: pan * Spectrogram.greenRatio * (1 - l) + l, blue: l))
+             Color(red: -pan * Spectrogram.editRedRatio * (1 - l) + l, green: l, blue: l) :
+                Color(red: l, green: pan * Spectrogram.editGreenRatio * (1 - l) + l, blue: l))
     }
     
     func updateTimeNode(atSec sec: Rational) {
@@ -2792,40 +2661,6 @@ extension TextView {
         } else {
             return nil
         }
-    }
-    
-    func containsVolume(_ p: Point) -> Bool {
-        paddingVolumeFrame?.contains(p) ?? false
-    }
-    var volumeFrame: Rect? {
-        guard model.timeframe?.volume != nil else { return nil }
-        if let node = timeframeNode.children.first(where: { $0.name == "volume" }) {
-            return node.transformedBounds
-        } else {
-            return nil
-        }
-    }
-    var paddingVolumeFrame: Rect? {
-        volumeFrame?.outset(by: 3 * nodeRatio)
-    }
-    func volumeT(at p: Point) -> Double {
-        guard let volumeFrame = volumeFrame else { return 0 }
-        return (p.x - volumeFrame.minX) / volumeFrame.width
-    }
-    
-    func containsReverb(_ p: Point) -> Bool {
-        paddingReverbFrame?.contains(p) ?? false
-    }
-    var reverbFrame: Rect? {
-        guard model.timeframe?.reverb != nil else { return nil }
-        if let node = timeframeNode.children.first(where: { $0.name == "reverb" }) {
-            return node.transformedBounds
-        } else {
-            return nil
-        }
-    }
-    var paddingReverbFrame: Rect? {
-        reverbFrame?.outset(by: 3 * nodeRatio)
     }
     
     var isShownSpectrogram: Bool {
@@ -2883,7 +2718,11 @@ extension TextView {
     }
     
     func containsAttack(_ p: Point) -> Bool {
-        paddingAttackFrame?.contains(p) ?? false
+        guard isFullEdit, let timeframe = model.timeframe, let score = timeframe.score,
+              let noteI = noteIndex(at: p, maxDistance: 5) else { return false }
+        
+        let nf = noteFrame(from: score.notes[noteI], score, timeframe)
+        return p.x < nf.minX + nf.width * 0.1
     }
     var attackFrame: Rect? {
         guard model.timeframe?.score != nil else { return nil }
@@ -2903,7 +2742,11 @@ extension TextView {
     }
     
     func containsDecayAndSustain(_ p: Point) -> Bool {
-        paddingDecayAndSustainFrame?.contains(p) ?? false
+        guard isFullEdit, let timeframe = model.timeframe, let score = timeframe.score,
+              let noteI = noteIndex(at: p, maxDistance: 5) else { return false }
+        
+        let nf = noteFrame(from: score.notes[noteI], score, timeframe)
+        return p.y > nf.minY + nf.height * 0.9
     }
     var decayAndSustainFrame: Rect? {
         guard model.timeframe?.score != nil else { return nil }
@@ -2923,7 +2766,11 @@ extension TextView {
     }
     
     func containsRelease(_ p: Point) -> Bool {
-        paddingReleaseFrame?.contains(p) ?? false
+        guard isFullEdit, let timeframe = model.timeframe, let score = timeframe.score,
+              let noteI = noteIndex(at: p, maxDistance: 5) else { return false }
+        
+        let nf = noteFrame(from: score.notes[noteI], score, timeframe)
+        return p.x > nf.minX + nf.width * 0.9
     }
     var releaseFrame: Rect? {
         guard model.timeframe?.score != nil else { return nil }
@@ -2940,21 +2787,6 @@ extension TextView {
                     y: f.minY - d,
                     width: f.width + d,
                     height: f.height + d * 2)
-    }
-    
-    func containsPitchDecay(_ p: Point) -> Bool {
-        paddingPitchDecayFrame?.contains(p) ?? false
-    }
-    var pitchDecayFrame: Rect? {
-        guard model.timeframe?.score != nil else { return nil }
-        if let node = timeframeNode.children.first(where: { $0.name == "pitchD" }) {
-            return node.transformedBounds?.outset(by: 5 * nodeRatio)
-        } else {
-            return nil
-        }
-    }
-    var paddingPitchDecayFrame: Rect? {
-        pitchDecayFrame?.outset(by: 5 * nodeRatio)
     }
     
     func overtonePosition(at type: OvertoneType) -> Point? {
@@ -3206,7 +3038,7 @@ extension TextView {
         guard model.timeframe?.score != nil else { return nil }
         return octaveFrame
         + overtoneFrame + spectlopeFrame
-        + envelopeFrame + pitchDecayFrame
+        + envelopeFrame
     }
     
     func containsScore(_ p: Point) -> Bool {
@@ -3235,8 +3067,8 @@ extension TextView {
     }
     
     func containsTimeframe(_ p: Point) -> Bool {
-        containsTimeRange(p) || containsVolume(p) || containsPan(p)
-        || containsReverb(p) || containsIsShownSpectrogram(p)
+        containsTimeRange(p) || containsPan(p)
+        || containsIsShownSpectrogram(p)
         || containsScore(p)
         || containsTone(p) || containsContent(p)
     }
@@ -3294,59 +3126,162 @@ extension TextView {
             return Rect(x: nx, y: y + sh, width: w, height: nh)
         }
     }
-    func noteNode(from note: Note, at i: Int?,
-                  _ score: Score, _ timeframe: Timeframe) -> Node {
-        noteNode(from: note, at: i, score, timeframe,
-                 frame: noteFrame(from: note, score, timeframe))
-    }
-    func noteNode(from note: Note, at i: Int?,
-                  _ score: Score, _ timeframe: Timeframe,
-                  frame f: Rect,
+    func noteNode(from note: Note, at i: Int?, y: Double,
                   color: Color = .content) -> Node {
-        Node(children: noteNodes(from: note, at: i, score, timeframe,
-                                 frame: f, color: color))
+        Node(children: noteNodes(from: note, at: i, y: y, color: color))
     }
-    func noteNodes(from note: Note, at i: Int?,
-                   _ score: Score, _ timeframe: Timeframe,
-                   frame f: Rect,
+    func noteNodes(from note: Note, at i: Int?, y: Double,
                    color: Color = .content) -> [Node] {
-        let (linePathlines, knobPathlines) = notePathlines(from: note,
-                                                           at: i, score,
-                                                           timeframe,
-                                                           frame: f)
-        return [Node(path: Path(linePathlines),
-                     lineWidth: nodeRatio,
-                     lineType: .color(color)),
-                Node(path: Path(knobPathlines),
-                     fillType: .color(.background))]
+        guard let timeframe = model.timeframe, let score = timeframe.score else { return [] }
+        let ratio = nodeRatio
+        let noteHeight = ScoreLayout.noteHeight * ratio
+        
+//        let lastB = typesetter.firstReturnBounds ?? Rect()
+        let y = y + noteHeight / 2
+        let (preFq, nextFq) = i != nil ? pitbendPreNext(notes: score.notes, at: i!) : (nil, nil)
+        let (linePathlines, knobPathlines, lyricPath) = notePathlines(from: note, y: y,
+                                                                      preFq: preFq, nextFq: nextFq,
+                                                                      tempo: timeframe.tempo)
+        
+        let lyricNodes: [Node]
+        if let lyricPath {
+            lyricNodes = [Node(path: lyricPath,
+                               fillType: .color(color))]
+        } else {
+            lyricNodes = []
+        }
+        
+        let pan = timeframe.score?.pan ?? 0
+        let nodes = linePathlines.enumerated().map {
+            let color = Self.panColor(pan: pan,
+                                      brightness: 0.25)
+            return Node(path: Path([$0.element]),
+                        lineWidth: noteHeight,
+                        lineType: .color(color))
+        }
+        
+        return nodes + [Node(path: Path(knobPathlines),
+                             fillType: .color(.background))] + lyricNodes
     }
-    func noteOutlinePathlines(from note: Note,
-                              frame noteF: Rect) -> [Pathline] {
-        let lw = 1 * nodeRatio
-        return []
+    func notePathlines(from note: Note, y: Double,
+                       preFq: Double?, nextFq: Double?,
+                       tempo: Rational) -> (linePathlines: [Pathline], knobPathlines: [Pathline],
+                                            lyricPath: Path?) {
+        let ratio = nodeRatio
+        let noteHeight = ScoreLayout.noteHeight * ratio
+        let nx = self.x(atBeat: note.beatRange.start)
+        let ny = self.height(fromPitch: note.pitch,
+                             noteHeight: noteHeight) + y
+        let nw = width(atBeatDuration: note.beatRange.length == 0 ? Rational(1, 96) : note.beatRange.length)
+        if note.volumeAmp == 0 {
+            let d = ratio - ratio / 4
+            var line0 = Line(edge: .init(.init(nx, ny - d), .init(nx + nw, ny - d)))
+            line0.controls = line0.controls.map {
+                .init(point: $0.point,
+                      weight: $0.weight,
+                      pressure: $0.pressure / noteHeight / 2)
+            }
+            var line1 = Line(edge: .init(.init(nx, ny + d), .init(nx + nw, ny + d)))
+            line1.controls = line1.controls.map {
+                .init(point: $0.point,
+                      weight: $0.weight,
+                      pressure: $0.pressure / noteHeight / 2)
+            }
+            
+            return ([.init(line0), .init(line1)], [], nil)
+        }
+        
+        let lyricPath: Path?
+        if !note.lyric.isEmpty || note.isBreath || note.isVibrato || note.isVowelReduction {
+            let lyricText = Text(string: "\(note.lyric)" + (note.isBreath ? "^" : "") + (note.isVibrato ? "~" : "") + (note.isVowelReduction ? "/" : ""),
+                                 size: Font.smallSize * ratio)
+            let typesetter = lyricText.typesetter
+            lyricPath = typesetter.path() * Transform(translationX: nx, y: ny - typesetter.height / 2)
+        } else {
+            lyricPath = nil
+        }
+        
+        if !note.pitbend.isEmpty || (note.pitbend.isEmpty && !note.lyric.isEmpty) {
+            let pitbend = pitbend(from: note, tempo: tempo, preFq: preFq, nextFq: nextFq)
+            
+            let secDur = Double(Timeframe.sec(fromBeat: note.beatRange.length, tempo: tempo))
+            let vt = Volume(amp: note.volume.amp).smp + 1 / noteHeight
+            
+            var line = pitbend.line(secDuration: secDur,
+                                            envelope: note.tone.envelope) ?? Line()
+            line.controls = line.controls.map {
+                .init(point: .init($0.point.x / secDur * nw + nx,
+                                   self.height(fromPitch: $0.point.y * 12,
+                                               noteHeight: noteHeight) + ny),
+                      weight: $0.weight,
+                      pressure: $0.pressure * vt)
+            }
+            
+            let knobPathlines = pitbend.pits.map {
+                Pathline(circleRadius: 0.5 * nodeRatio,
+                         position: .init($0.t * nw + nx,
+                                         self.height(fromPitch: $0.pitch * 12,
+                                                     noteHeight: noteHeight) + ny))
+            }
+            
+            return ((line.isEmpty ? [] : [.init(line)]), knobPathlines, lyricPath)
+        } else {
+            let smpT = Volume(amp: note.volume.amp).smp
+                .clipped(min: 0, max: Volume.maxSmp,
+                         newMin: 0, newMax: 1)
+            let env = note.tone.envelope
+            let attackW = width(atSecDuration: env.attack)
+            let sustain = Volume(amp: note.volume.amp * env.sustain).smp
+                .clipped(min: 0, max: Volume.maxSmp, newMin: 0, newMax: 1)
+            let line = Line(controls: [.init(point: Point(nx, ny), pressure: 0),
+                                       .init(point: Point(nx + attackW, ny), pressure: smpT),
+                                       .init(point: Point(nx + attackW, ny), pressure: smpT),
+                                       .init(point: Point(nx + attackW + width(atSecDuration: env.decay), ny), pressure: sustain),
+                                       .init(point: Point(nx + attackW + width(atSecDuration: env.decay), ny), pressure: sustain),
+                                       .init(point: Point(nx + nw, ny), pressure: sustain),
+                                       .init(point: Point(nx + nw, ny), pressure: sustain),
+                                       .init(point: Point(nx + nw + width(atSecDuration: env.release), ny), pressure: 0)])
+            return ([.init(line)], [], lyricPath)
+        }
     }
     
-    func pitbend(from note: Note, at i: Int?,
-                 _ score: Score, _ timeframe: Timeframe) -> Pitbend {
+    func pitbendPreNext(notes: [Note], at i: Int) -> (preFq: Double?, nextFq: Double?) {
+        let note = notes[i]
+        guard !note.lyric.isEmpty else { return (nil, nil) }
+        var preFq, nextFq: Double?
+        
+        var minD = Rational.max
+        for j in (0 ..< i).reversed() {
+            guard !notes[j].lyric.isEmpty else { continue }
+            guard notes[j].beatRange.end == note.beatRange.start else { break }
+            let d = abs(note.pitch - notes[j].pitch)
+            if d < Pitbend.enabledRecoilPitchDistance, d < minD {
+                preFq = notes[j].fq
+                minD = d
+            }
+        }
+        
+        minD = .max
+        for j in i + 1 ..< notes.count {
+            guard !notes[j].lyric.isEmpty else { continue }
+            guard notes[j].beatRange.start == note.beatRange.end else { break }
+            let d = abs(note.pitch - notes[j].pitch)
+            if d < Pitbend.enabledRecoilPitchDistance, d < minD {
+                preFq = notes[j].fq
+                minD = d
+            }
+        }
+        return (preFq, nextFq)
+    }
+    func pitbend(from note: Note, tempo: Rational,
+                 preFq: Double?, nextFq: Double?) -> Pitbend {
         if !note.pitbend.isEmpty || (note.pitbend.isEmpty && !note.lyric.isEmpty) {
             if !note.pitbend.isEmpty {
                 return note.pitbend
             } else {
-                let preFq, nextFq: Double?
-                if let i {
-                    let notes = score.sortedNotes
-                    preFq = i > 0 && notes[i - 1].beatRange.end == note.beatRange.start ?
-                    notes[i - 1].fq : nil
-                    nextFq = i + 1 < notes.count && notes[i + 1].beatRange.start == note.beatRange.end ?
-                    notes[i + 1].fq : nil
-                } else {
-                    preFq = nil
-                    nextFq = nil
-                }
-                
                 let isVowel = Phoneme.isSyllabicJapanese(Phoneme.phonemes(fromHiragana: note.lyric))
                 return Pitbend(isVibrato: note.isVibrato,
-                               duration: Double(timeframe.sec(fromBeat: note.beatRange.length)),
+                               duration: Double(Timeframe.sec(fromBeat: note.beatRange.length, tempo: tempo)),
                                fq: note.fq,
                                isVowel: isVowel,
                                previousFq: preFq, nextFq: nextFq)
@@ -3364,8 +3299,8 @@ extension TextView {
         var minNoteI: Int?, minPitT: Double?, minD = Double.infinity
         for noteI in 0 ..< score.notes.count {
             let note = score.notes[noteI]
-            let pitbend = pitbend(from: note,
-                                  at: noteI, score, timeframe)
+            let (preFq, nextFq) = pitbendPreNext(notes: score.notes, at: noteI)
+            let pitbend = pitbend(from: note, tempo: timeframe.tempo, preFq: preFq, nextFq: nextFq)
             
             let f = noteFrame(from: note, score, timeframe)
             let sh = self.height(fromPitch: note.pitch - score.pitchRange.start,
@@ -3405,8 +3340,8 @@ extension TextView {
             minDS = Double.infinity
         for noteI in 0 ..< score.notes.count {
             let note = score.notes[noteI]
-            let pitbend = pitbend(from: note,
-                                  at: noteI, score, timeframe)
+            let (preFq, nextFq) = pitbendPreNext(notes: score.notes, at: noteI)
+            let pitbend = pitbend(from: note, tempo: timeframe.tempo, preFq: preFq, nextFq: nextFq)
             let f = noteFrame(from: note, score, timeframe)
             let sh = self.height(fromPitch: note.pitch - score.pitchRange.start,
                                  noteHeight: f.height)
@@ -3429,58 +3364,6 @@ extension TextView {
             return (minNoteI, minPitI, minPit, minPitbend)
         } else {
             return nil
-        }
-    }
-    
-    func notePathlines(from note: Note, at i: Int?,
-                       _ score: Score, _ timeframe: Timeframe,
-                       frame f: Rect) -> (linePathlines: [Pathline], knobPathlines: [Pathline]) {
-        if !note.pitbend.isEmpty || (note.pitbend.isEmpty && !note.lyric.isEmpty) {
-            let pitbend = pitbend(from: note, at: i, score, timeframe)
-            
-            let secDur = Double(timeframe.sec(fromBeat: note.beatRange.length))
-            var line = pitbend.line(secDuration: secDur,
-                                            envelope: score.tone.envelope) ?? Line()
-            
-            let sh = self.height(fromPitch: note.pitch - score.pitchRange.start,
-                                 noteHeight: f.height)
-            let vt = Volume(amp: score.volumeAmp * note.volume.amp).smp
-                .clipped(min: 0, max: Volume.maxSmp,
-                         newMin: 0, newMax: 1)
-            line.controls = line.controls.map {
-                .init(point: .init($0.point.x / secDur * f.width + f.minX,
-                                   self.height(fromPitch: $0.point.y * 12 + .init(note.pitch - score.pitchRange.start),
-                                               noteHeight: f.height) + f.midY - sh),
-                      weight: $0.weight,
-                      pressure: $0.pressure * vt)
-            }
-            
-            let knobPathlines = pitbend.pits.map {
-                Pathline(circleRadius: 0.5 * nodeRatio,
-                         position: Point($0.t * f.width + f.minX,
-                                         self.height(fromPitch: $0.pitch * 12 + .init(note.pitch - score.pitchRange.start),
-                                                     noteHeight: f.height) + f.midY - sh))
-            }
-            
-            return ((line.isEmpty ? [] : [.init(line)]), knobPathlines)
-        } else {
-            let ampT = Volume(amp: score.volumeAmp * note.volume.amp).smp
-                .clipped(min: 0, max: Volume.maxSmp,
-                         newMin: 0, newMax: 1)
-            let env = score.tone.envelope
-            let attackW = width(atSecDuration: env.attack)
-            let sustain = Volume(amp: score.volumeAmp * note.volume.amp * env.sustain).smp
-                .clipped(min: 0, max: Volume.maxSmp,
-                         newMin: 0, newMax: 1)
-            let line = Line(controls: [.init(point: Point(f.minX, f.midY), pressure: 0),
-                                     .init(point: Point(f.minX + attackW, f.midY), pressure: ampT),
-                                       .init(point: Point(f.minX + attackW, f.midY), pressure: ampT),
-                                     .init(point: Point(f.minX + attackW + width(atSecDuration: env.decay), f.midY), pressure: sustain),
-                                       .init(point: Point(f.minX + attackW + width(atSecDuration: env.decay), f.midY), pressure: sustain),
-                                     .init(point: Point(f.minX + f.width, f.midY), pressure: sustain),
-                                       .init(point: Point(f.minX + f.width, f.midY), pressure: sustain),
-                                     .init(point: Point(f.minX + f.width + width(atSecDuration: env.release), f.midY), pressure: 0)])
-            return ([.init(line)], [])
         }
     }
     

@@ -102,19 +102,6 @@ extension Timeframe {
             }
         }
     }
-    var reverb: Double? {
-        get {
-            content?.type != .image ? content?.reverb ?? score?.reverb : nil
-        }
-        set {
-            guard let newValue = newValue else { return }
-            if content != nil {
-                content?.reverb = newValue
-            } else {
-                score?.reverb = newValue
-            }
-        }
-    }
     var localBeatRange: Range<Rational>? {
         if let content {
             let beatDur = Timeframe.beat(fromSec: content.secDuration,
@@ -224,7 +211,6 @@ struct Content: Hashable, Codable {
     
     var volume = Volume(smp: 1)
     var pan = 0.0
-    var reverb = 0.0
     
     let name: String
     let url: URL
@@ -233,13 +219,9 @@ struct Content: Hashable, Codable {
     let volumeValues: [Double]
     let image: Image?
     
-    init(name: String, volume: Volume = Volume(smp: 1),
-         pan: Double = 0, reverb: Double = 0) {
-        
+    init(name: String, volume: Volume = Volume(smp: 1), pan: Double = 0) {
         self.volume = volume
         self.pan = pan
-        self.reverb = reverb
-        
         self.name = name
         url = URL.contents.appending(component: name)
         type = Self.type(from: url)
@@ -307,8 +289,6 @@ extension Content: Protobuf {
         volume = .init(amp: ((try? pb.volumeAmp.notNaN()) ?? 1)
             .clipped(min: 0, max: Volume.maxAmp))
         pan = pb.pan.clipped(min: -1, max: 1)
-        reverb = pb.reverb.clipped(min: 0, max: 1)
-        
         name = pb.name
         url = URL.contents.appending(component: name)
         type = Content.type(from: url)
@@ -321,7 +301,6 @@ extension Content: Protobuf {
             $0.name = name
             $0.volumeAmp = volume.amp
             $0.pan = pan
-            $0.reverb = reverb
         }
     }
 }

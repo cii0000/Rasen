@@ -1527,14 +1527,13 @@ final class TimeframeSlider: DragEditor {
     
     enum SlideType {
         case all, startBeat, endBeat, startBeatOrOctave,
-             volume, pan, reverb, isShownSpectrogram,
+             pan,
              pitchStart, pitchLength,
              startNote, endNote, moveNote,
              octave,
              attack, decayAndSustain, release,
-             pitchDecay,
              overtone, formant,
-             tempo
+             isShownSpectrogram, tempo
     }
     
     private let editableInterval = 5.0
@@ -1557,10 +1556,10 @@ final class TimeframeSlider: DragEditor {
                 oldNotePitch: Rational?, oldNoteBeat: Rational?,
                 minScorePitch = Rational(0), maxScorePitch = Rational(0)
     private var beganStartBeat = Rational(0)
-    private var beganVolume = Volume(), beganPan = 0.0, oldPan = 0.0,
+    private var beganPan = 0.0, oldPan = 0.0,
                 beganReverb = 0.0, oldReverb = 0.0,
                 beganIsShownSpectrogram = false, oldIsShownSpectrogram = false,
-                beganEnvelope = Envelope(), beganPitchbend = Pitchbend()
+                beganEnvelope = Envelope()
     private var beganPitch: Rational?
     private var beganOvertone = Overtone()
     private var beganFormantIndex = 0, beganSpectlope = Spectlope()
@@ -1592,7 +1591,6 @@ final class TimeframeSlider: DragEditor {
                     beganTimeframe = timeframe
                     beganScore = timeframe.score
                     beganEnvelope = timeframe.score?.tone.envelope ?? .init()
-                    beganPitchbend = timeframe.score?.tone.pitchbend ?? .init()
                     beganText = textView.model
                     beganTimeframeTime = timeframe.beatRange.start
                     beganInP = inP
@@ -1658,8 +1656,7 @@ final class TimeframeSlider: DragEditor {
                                                          score.tone,
                                                          volume: volume,
                                                          pan: score.pan,
-                                                         tempo: Double(timeframe.tempo),
-                                                         reverb: timeframe.reverb ??  Audio.defaultReverb)
+                                                         tempo: Double(timeframe.tempo))
                             sheetView.notePlayer = notePlayer
                         }
                         notePlayer?.play()
@@ -1681,21 +1678,6 @@ final class TimeframeSlider: DragEditor {
                         }
                         
                         document.cursor = .arrowWith(string: SheetView.tempoString(fromTempo: timeframe.tempo))
-                    } else if textView.containsVolume(inTP),
-                              let volume = textView.model.timeframe?.volume {
-                        type = .volume
-                        beganVolume = volume
-                        
-                        let fs = document.selections
-                            .map { $0.rect }
-                            .map { sheetView.convertFromWorld($0) }
-                        beganTimeframes = sheetView.textsView.elementViews.enumerated().reduce(into: [Int: Timeframe]()) { (dic, v) in
-                            if fs.contains(where: { v.element.transformedScoreFrame.intersects($0) }),
-                               let timeframe = v.element.model.timeframe,
-                               timeframe.volume != nil {
-                                dic[v.offset] = timeframe
-                            }
-                        }
                     } else if textView.containsPan(inTP),
                               let pan = textView.model.timeframe?.pan {
                         type = .pan
@@ -1709,22 +1691,6 @@ final class TimeframeSlider: DragEditor {
                             if fs.contains(where: { v.element.transformedScoreFrame.intersects($0) }),
                                let timeframe = v.element.model.timeframe,
                                timeframe.pan != nil {
-                                dic[v.offset] = timeframe
-                            }
-                        }
-                    } else if textView.containsReverb(inTP),
-                              let reverb = textView.model.timeframe?.reverb {
-                        type = .reverb
-                        beganReverb = reverb
-                        oldReverb = reverb
-                        
-                        let fs = document.selections
-                            .map { $0.rect }
-                            .map { sheetView.convertFromWorld($0) }
-                        beganTimeframes = sheetView.textsView.elementViews.enumerated().reduce(into: [Int: Timeframe]()) { (dic, v) in
-                            if fs.contains(where: { v.element.transformedScoreFrame.intersects($0) }),
-                               let timeframe = v.element.model.timeframe,
-                               timeframe.reverb != nil {
                                 dic[v.offset] = timeframe
                             }
                         }
@@ -1754,10 +1720,7 @@ final class TimeframeSlider: DragEditor {
                         type = .decayAndSustain
                     } else if textView.containsRelease(inTP) {
                         type = .release
-                    } else if textView.containsPitchDecay(inTP) {
-                        type = .pitchDecay
                     } else if abs(inTP.x - textView.x(atBeat: timeframe.beatRange.start)) < maxMD {
-                        
                         type = .startBeatOrOctave
                         let inTP = textView.convertFromWorld(p)
                         if let score = timeframe.score,
@@ -1839,53 +1802,6 @@ final class TimeframeSlider: DragEditor {
                         }
                         document.updateSelects()
                     }
-                case .volume:
-                    let dSmp = (sp.y - beganSP.y)
-                        * (document.screenToWorldScale / 50 / textView.nodeRatio)
-                    let smp = (beganVolume.smp + dSmp)
-                        .clipped(min: 0, max: Volume.maxSmp)
-                    let volume = Volume(smp: smp)
-                    
-                    if !beganTimeframes.isEmpty {
-                        let scale = beganVolume.amp == 0 ?
-                            1 : volume.amp / beganVolume.amp
-                        for (ti, textView) in sheetView.textsView.elementViews.enumerated() {
-                            guard let beganTimeframeVolume = beganTimeframes[ti]?.volume else { continue }
-                            
-                            let volume: Volume
-                            if beganVolume.amp == 0 {
-                                let smp = (beganTimeframeVolume.smp + dSmp)
-                                    .clipped(min: 0, max: Volume.maxSmp)
-                                volume = Volume(smp: smp)
-                            } else {
-                                let amp = (beganTimeframeVolume.amp * scale)
-                                    .clipped(min: 0, max: Volume.maxAmp)
-                                volume = Volume(amp: amp)
-                            }
-                            
-                            textView.model.timeframe?.volume = volume
-                            
-                            if textView.model.timeframe?.content == nil {
-                                textView.isUpdatedAudioCache = false
-                            }
-                            
-                            if let timeframe = textView.model.timeframe {
-                                sheetView.sequencer?.mixings[timeframe.id]?
-                                    .volume = Float(volume.amp)
-                            }
-                        }
-                    } else {
-                        textView.model.timeframe?.volume = volume
-                        
-                        if textView.model.timeframe?.content == nil {
-                            textView.isUpdatedAudioCache = false
-                        }
-                        
-                        if let timeframe = textView.model.timeframe {
-                            sheetView.sequencer?.mixings[timeframe.id]?
-                                .volume = Float(volume.amp)
-                        }
-                    }
                 case .pan:
                     let dPan = (sp.x - beganSP.x)
                         * (document.screenToWorldScale / 50 / textView.nodeRatio)
@@ -1929,42 +1845,6 @@ final class TimeframeSlider: DragEditor {
                         if let timeframe = textView.model.timeframe {
                             sheetView.sequencer?.mixings[timeframe.id]?
                                 .pan = Float(pan)
-                        }
-                    }
-                case .reverb:
-                    let dReverb = (sp.y - beganSP.y)
-                        * (document.screenToWorldScale / 50 / textView.nodeRatio)
-                    let reverb = (beganReverb.squareRoot() + dReverb)
-                        .clipped(min: 0, max: 1).squared
-                    
-                    if !beganTimeframes.isEmpty {
-                        for (ti, textView) in sheetView.textsView.elementViews.enumerated() {
-                            guard let beganTimeframeReverb = beganTimeframes[ti]?.reverb else { continue }
-                            
-                            let reverb = (beganTimeframeReverb.squareRoot() + dReverb)
-                                    .clipped(min: 0, max: 1).squared
-                            
-                            textView.model.timeframe?.reverb = reverb
-                            
-                            if textView.model.timeframe?.content == nil {
-                                textView.isUpdatedAudioCache = false
-                            }
-                            
-                            if let timeframe = textView.model.timeframe {
-                                sheetView.sequencer?.reverbs[timeframe.id]?
-                                    .wetDryMix = Float(reverb) * 100
-                            }
-                        }
-                    } else {
-                        textView.model.timeframe?.reverb = reverb
-                        
-                        if textView.model.timeframe?.content == nil {
-                            textView.isUpdatedAudioCache = false
-                        }
-                        
-                        if let timeframe = textView.model.timeframe {
-                            sheetView.sequencer?.reverbs[timeframe.id]?
-                                .wetDryMix = Float(reverb) * 100
                         }
                     }
                 case .isShownSpectrogram:
@@ -2017,7 +1897,7 @@ final class TimeframeSlider: DragEditor {
                        
                         let screenScale = document.screenToWorldScale
                         / 50 / textView.nodeRatio
-                        let attack = (-(sp.x - beganSP.x) * screenScale
+                        let attack = ((sp.x - beganSP.x) * screenScale
                                         + beganEnvelope.attack.squareRoot())
                             .clipped(min: 0, max: 1).squared
                         if attack != score.tone.envelope.attack {
@@ -2068,38 +1948,6 @@ final class TimeframeSlider: DragEditor {
                             timeframe.score?.tone.envelope.release = release
                             sheetView.textsView.elementViews[ti].model.timeframe = timeframe
                             sheetView.sequencer?.scoreNoders[timeframe.id]?.tone.envelope.release = release
-                        }
-                    }
-                case .pitchDecay:
-                    if let score = timeframe.score,
-                       var tone = timeframe.score?.tone,
-                       let ti = textIndex {
-                       
-                        let screenScale = document.screenToWorldScale
-                        / 50 / textView.nodeRatio
-                        let otd = (-(sp.x - beganSP.x) * screenScale
-                                        + beganPitchbend.decay.squareRoot())
-                            .clipped(min: -0.15, max: 1)
-                        let td = otd.clipped(min: 0, max: 1).squared
-                        let ts = ((sp.y - beganSP.y) * screenScale * Pitchbend.maxPitchLog
-                                  + beganPitchbend.pitchLog)
-                            .clipped(min: -Pitchbend.maxPitchLog,
-                                     max: Pitchbend.maxPitchLog)
-                        if td != score.tone.pitchbend.decay
-                            || ts != score.tone.pitchbend.pitchLog {
-                            
-                            var timeframe = timeframe
-                            if otd < 0 {
-                                tone.pitchbend = Pitchbend()
-                            } else {
-                                tone.pitchbend.decay = td
-                                tone.pitchbend.pitchLog = ts
-                            }
-                            timeframe.score?.tone = tone
-                            sheetView.textsView.elementViews[ti].model.timeframe = timeframe
-                            
-                            sheetView.sequencer?.scoreNoders[timeframe.id]?.startSec = Double(sheetView.playingSec ?? 0)
-                            sheetView.sequencer?.scoreNoders[timeframe.id]?.tone = tone
                         }
                     }
                 case .overtone:
@@ -2249,7 +2097,7 @@ final class TimeframeSlider: DragEditor {
                     let inTP = textView.convertFromWorld(p)
                     if let pitch = document.pitch(from: textView, at: inTP) {
                         let phl = (pitch - minScorePitch)
-                            .clipped(min: 1, max: 100)
+                            .clipped(min: 1, max: 12 * 12)
                         if phl != timeframe.score?.pitchRange.length {
                             sheetView.textsView.elementViews[ti].model.timeframe?.score?.pitchRange.length = phl
                             sheetView.updateOtherNotes()
@@ -2423,8 +2271,7 @@ final class TimeframeSlider: DragEditor {
             }
             
             if type == .all || type == .pitchStart
-                || type == .startBeat || type == .endBeat
-                || (type == .volume && beganScore == nil) {
+                || type == .startBeat || type == .endBeat {
                 
                 if let sheetView = sheetView,
                     let ti = textIndex, ti < sheetView.model.texts.count,
@@ -2649,9 +2496,10 @@ final class KeyframeInserter: InputKeyEditor {
                        let score = timeframe.score,
                        let (ni, pitT) = textView.pitT(at: inTP,
                                                       maxDistance: maxD) {
+                        let (preFq, nextFq) = textView.pitbendPreNext(notes: score.notes, at: ni)
                         var pitbend = textView
-                            .pitbend(from: score.notes[ni],
-                                     at: ni, score, timeframe)
+                            .pitbend(from: score.notes[ni], tempo: timeframe.tempo,
+                                     preFq: preFq, nextFq: nextFq)
                         let pit = pitbend.pit(atT: pitT)
                         pitbend.pits.append(pit)
                         pitbend.pits.sort(by: { $0.t < $1.t })

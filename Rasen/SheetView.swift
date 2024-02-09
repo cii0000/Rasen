@@ -1343,9 +1343,7 @@ final class SheetView: View {
     static func timeNodes(duration: Rational,
                           time: Rational,
                           frameRate: Rational) -> [Node] {
-        let ss = Int(time.decimalPart * frameRate)
-        let s = time.integralPart
-        let u = time == 0 ? " 0" : String(format: "%2d.%02d", s, ss)
+        let u = timeString(time: time, frameRate: frameRate)
         let size = Font.largeSize
         let text = Text(string: u, size: size)
         let b = text.frame ?? Rect()
@@ -1412,14 +1410,6 @@ final class SheetView: View {
     func containsTimeRange(_ p: Point) -> Bool {
         for view in textsView.elementViews {
             if view.containsTimeRange(view.convert(p, from: node)) {
-                return true
-            }
-        }
-        return false
-    }
-    func containsTimeframeVolume(_ p: Point) -> Bool {
-        for view in textsView.elementViews {
-            if view.containsVolume(view.convert(p, from: node)) {
                 return true
             }
         }
