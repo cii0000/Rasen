@@ -2654,83 +2654,177 @@ extension NSEvent {
         return modifierKeys
     }
     var isArrow: Bool {
-        switch keyCode {
-        case 123, 124, 125, 126: true
-        default: false
+        if let specialKey {
+            switch specialKey {
+            case .upArrow, .downArrow, .leftArrow, .rightArrow: true
+            default: false
+            }
+        } else {
+            false
         }
     }
     var key: InputKeyType? {
-        switch keyCode {
-        case 0: .a
-        case 1: .s
-        case 2: .d
-        case 3: .f
-        case 4: .h
-        case 5: .g
-        case 6: .z
-        case 7: .x
-        case 8: .c
-        case 9: .v
-        case 11: .b
-        case 12: .q
-        case 13: .w
-        case 14: .e
-        case 15: .r
-        case 16: .y
-        case 17: .t
-        case 18: .no1
-        case 19: .no2
-        case 20: .no3
-        case 21: .no4
-        case 22: .no6
-        case 23: .no5
-        case 24: .equals
-        case 25: .no9
-        case 26: .no7
-        case 27: .minus
-        case 28: .no8
-        case 29: .no0
-        case 30: .rightBracket
-        case 31: .o
-        case 32: .u
-        case 33: .leftBracket
-        case 34: .i
-        case 35: .p
-        case 36: .return
-        case 37: .l
-        case 38: .j
-        case 39: .apostrophe
-        case 40: .k
-        case 41: .semicolon
-        case 42: .frontslash
-        case 43: .comma
-        case 44: .backslash
-        case 45: .n
-        case 46: .m
-        case 47: .period
-        case 48: .tab
-        case 49: .space
-        case 50: .backApostrophe
-        case 51: .delete
-        case 53: .escape
-        case 55: .command
-        case 56: .shift
-        case 57: .capsLock
-        case 58: .option
-        case 59: .control
-        case 63: .function
-        case 93: .frontslash
-        case 94: .underscore
-        case 96: .f5
-        case 97: .f6
-        case 99: .f3
-        case 118: .f4
-        case 120: .f2
-        case 122: .f1
-        case 123: .left
-        case 124: .right
-        case 125: .down
-        case 126: .up
+        if let specialKey {
+            return switch specialKey {
+            case .backspace: .backspace
+            case .carriageReturn: .carriageReturn
+            case .newline: .newline
+            case .enter: .enter
+            case .delete: .delete
+            case .deleteForward: .deleteForward
+            case .backTab: .backTab
+            case .tab: .tab
+            case .upArrow: .up
+            case .downArrow: .down
+            case .leftArrow: .left
+            case .rightArrow: .right
+            case .pageUp: .pageUp
+            case .pageDown: .pageDown
+            case .home: .home
+            case .end: .end
+            case .prev: .prev
+            case .next: .next
+            case .begin: .begin
+            case .`break`: .break
+            case .clearDisplay: .clearDisplay
+            case .clearLine: .clearLine
+            case .deleteCharacter: .deleteCharacter
+            case .deleteLine: .deleteLine
+            case .execute: .execute
+            case .find: .find
+            case .formFeed: .formFeed
+            case .help: .help
+            case .insert: .insert
+            case .insertCharacter: .insertCharacter
+            case .insertLine: .insertLine
+            case .lineSeparator: .lineSeparator
+            case .menu: .menu
+            case .modeSwitch: .modeSwitch
+            case .paragraphSeparator: .paragraphSeparator
+            case .pause: .pause
+            case .print: .print
+            case .printScreen: .printScreen
+            case .redo: .redo
+            case .reset: .reset
+            case .scrollLock: .scrollLock
+            case .select: .select
+            case .stop: .stop
+            case .sysReq: .sysReq
+            case .system: .system
+            case .undo: .undo
+            case .user: .user
+            case .f1: .f1
+            case .f2: .f2
+            case .f3: .f3
+            case .f4: .f4
+            case .f5: .f5
+            case .f6: .f6
+            case .f7: .f7
+            case .f8: .f8
+            case .f9: .f9
+            case .f10: .f10
+            case .f11: .f11
+            case .f12: .f12
+            case .f13: .f13
+            case .f14: .f14
+            case .f15: .f15
+            case .f16: .f16
+            case .f17: .f17
+            case .f18: .f18
+            case .f19: .f19
+            case .f20: .f20
+            case .f21: .f21
+            case .f22: .f22
+            case .f23: .f23
+            case .f24: .f24
+            case .f25: .f25
+            case .f26: .f26
+            case .f27: .f27
+            case .f28: .f28
+            case .f29: .f29
+            case .f30: .f30
+            case .f31: .f31
+            case .f32: .f32
+            case .f33: .f33
+            case .f34: .f34
+            case .f35: .f35
+            default: .unknown
+            }
+        }
+        
+        guard let characters else { return nil }
+        
+        return switch characters {
+        case "\u{1B}": .escape
+        case " ": .space
+        case "a", "A": .a
+        case "b", "B": .b
+        case "c", "C": .c
+        case "d", "D": .d
+        case "e", "E": .e
+        case "f", "F": .f
+        case "g", "G": .g
+        case "h", "H": .h
+        case "i", "I": .i
+        case "j", "J": .j
+        case "k", "K": .k
+        case "l", "L": .l
+        case "m", "M": .m
+        case "n", "N": .n
+        case "o", "O": .o
+        case "p", "P": .p
+        case "q", "Q": .q
+        case "r", "R": .r
+        case "s", "S": .s
+        case "t", "T": .t
+        case "u", "U": .u
+        case "v", "V": .v
+        case "w", "W": .w
+        case "x", "X": .x
+        case "y", "Y": .y
+        case "z", "Z": .z
+        case "0": .no0
+        case "1": .no1
+        case "2": .no2
+        case "3": .no3
+        case "4": .no4
+        case "5": .no5
+        case "6": .no6
+        case "7": .no7
+        case "8": .no8
+        case "9": .no9
+        case "!": .exclamationMark
+        case "\"": .quotationMarks
+        case "#": .numberSign
+        case "$": .dollarSign
+        case "%": .percentSign
+        case "&": .ampersand
+        case "'": .apostrophe
+        case "(": .leftParentheses
+        case ")": .rightParentheses
+        case "-": .minus
+        case "=": .equals
+        case "^": .backApostrophe
+        case "~": .tilde
+        case "¥": .yuanSign
+        case "|": .verticalBar
+        case "@": .atSign
+        case "`": .graveAccent
+        case "[": .leftBracket
+        case "{": .leftBrace
+        case ";": .semicolon
+        case "+": .plus
+        case ":": .colon
+        case "*": .asterisk
+        case "]": .rightBracket
+        case "}": .rightBrace
+        case ",": .comma
+        case "<": .lessThanSign
+        case ".": .period
+        case ">": .greaterThanSign
+        case "/": .backslash
+        case "?": .questionMark
+        case "_": .underscore
         default: nil
         }
     }

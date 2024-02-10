@@ -734,6 +734,28 @@ extension SourceFilter {
         fqSmps.isEmpty
     }
     
+    func smp(atFq fq: Double) -> Double {
+        guard !fqSmps.isEmpty else { return 1 }
+        var preFq = fqSmps.first!.x, preSmp = fqSmps.first!.y
+        guard fq >= preFq else { return fqSmps.first!.y }
+        for scale in fqSmps {
+            let nextFq = scale.x, nextSmp = scale.y
+            guard preFq < nextFq else {
+                preFq = nextFq
+                preSmp = nextSmp
+                continue
+            }
+            if fq < nextFq {
+                let t = (fq - preFq) / (nextFq - preFq)
+                let smp = Double.linear(preSmp, nextSmp, t: t)
+                return smp
+            }
+            preFq = nextFq
+            preSmp = nextSmp
+        }
+        return fqSmps.last!.y
+    }
+    
     func amp(atFq fq: Double) -> Double {
         guard !fqSmps.isEmpty else { return 1 }
         var preFq = fqSmps.first!.x, preSmp = fqSmps.first!.y

@@ -938,6 +938,8 @@ struct PBNote {
 
   var isVibrato: Bool = false
 
+  var isVowelReduction: Bool = false
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -4868,6 +4870,7 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
     4: .same(proto: "lyric"),
     5: .same(proto: "isBreath"),
     6: .same(proto: "isVibrato"),
+    9: .same(proto: "isVowelReduction"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -4883,6 +4886,7 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
       case 6: try { try decoder.decodeSingularBoolField(value: &self.isVibrato) }()
       case 7: try { try decoder.decodeSingularMessageField(value: &self._pitch) }()
       case 8: try { try decoder.decodeSingularMessageField(value: &self._pitbend) }()
+      case 9: try { try decoder.decodeSingularBoolField(value: &self.isVowelReduction) }()
       default: break
       }
     }
@@ -4914,6 +4918,9 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
     try { if let v = self._pitbend {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
     } }()
+    if self.isVowelReduction != false {
+      try visitor.visitSingularBoolField(value: self.isVowelReduction, fieldNumber: 9)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -4925,6 +4932,7 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
     if lhs.lyric != rhs.lyric {return false}
     if lhs.isBreath != rhs.isBreath {return false}
     if lhs.isVibrato != rhs.isVibrato {return false}
+    if lhs.isVowelReduction != rhs.isVowelReduction {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

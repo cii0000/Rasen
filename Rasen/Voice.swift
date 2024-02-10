@@ -123,6 +123,38 @@ extension Score {
         nNotes.reserveCapacity(notes.count)
         var previousMora: Mora?
         for (ni, note) in notes.enumerated() {
+            guard !note.lyric.isEmpty else {
+                previousMora = nil
+                
+                let startBeat = note.beatRange.start
+                let endBeat = note.beatRange.end
+                let snapBeat = startBeat.interval(scale: Rational(1, 4))
+                let sSec = Double(timeframe.sec(fromBeat: startBeat)) + startSecDur
+                let eSec = Double(timeframe.sec(fromBeat: endBeat)) + startSecDur
+                let snapSec = Double(timeframe.sec(fromBeat: snapBeat)) + startSecDur
+                let dSec = sSec - snapSec
+                
+                let pitbend = note.pitbend.with(scale: eSec - sSec)
+                nNotes.append(.init(fq: note.fq,
+                                    sourceFilter: sourceFIlter,
+                                    spectlopeInterpolation: nil,
+                                    deltaSpectlopeInterpolation: nil,
+                                    fAlpha: 1,
+                                    seed: Rendnote.seed(fromFq: note.fq, sec: sSec,
+                                                        position: position),
+                                    overtone: score.tone.overtone,
+                                    pitbend: pitbend,
+                                    secRange: sSec ..< eSec,
+                                    startDeltaSec: dSec,
+                                    volumeAmp: note.volumeAmp,
+                                    waver: .init(score.tone, pitbend: pitbend),
+                                    tempo: Double(timeframe.tempo),
+                                    sampleRate: sampleRate,
+                                    dftCount: Audio.defaultDftCount))
+                
+                continue
+            }
+            
             let deltaSecToNext: Double, nextMora: Mora?
             if ni + 1 < notes.count {
                 let nextNote = notes[ni + 1]

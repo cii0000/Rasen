@@ -1527,7 +1527,6 @@ final class TimeframeSlider: DragEditor {
     
     enum SlideType {
         case all, startBeat, endBeat, startBeatOrOctave,
-             pan,
              pitchStart, pitchLength,
              startNote, endNote, moveNote,
              octave,
@@ -1556,8 +1555,7 @@ final class TimeframeSlider: DragEditor {
                 oldNotePitch: Rational?, oldNoteBeat: Rational?,
                 minScorePitch = Rational(0), maxScorePitch = Rational(0)
     private var beganStartBeat = Rational(0)
-    private var beganPan = 0.0, oldPan = 0.0,
-                beganReverb = 0.0, oldReverb = 0.0,
+    private var beganReverb = 0.0, oldReverb = 0.0,
                 beganIsShownSpectrogram = false, oldIsShownSpectrogram = false,
                 beganEnvelope = Envelope()
     private var beganPitch: Rational?
@@ -1678,22 +1676,6 @@ final class TimeframeSlider: DragEditor {
                         }
                         
                         document.cursor = .arrowWith(string: SheetView.tempoString(fromTempo: timeframe.tempo))
-                    } else if textView.containsPan(inTP),
-                              let pan = textView.model.timeframe?.pan {
-                        type = .pan
-                        beganPan = pan
-                        oldPan = pan
-                        
-                        let fs = document.selections
-                            .map { $0.rect }
-                            .map { sheetView.convertFromWorld($0) }
-                        beganTimeframes = sheetView.textsView.elementViews.enumerated().reduce(into: [Int: Timeframe]()) { (dic, v) in
-                            if fs.contains(where: { v.element.transformedScoreFrame.intersects($0) }),
-                               let timeframe = v.element.model.timeframe,
-                               timeframe.pan != nil {
-                                dic[v.offset] = timeframe
-                            }
-                        }
                     } else if textView.containsIsShownSpectrogram(inTP),
                               let isShownSpectrogram = textView.model.timeframe?.isShownSpectrogram {
                         type = .isShownSpectrogram
@@ -1801,51 +1783,6 @@ final class TimeframeSlider: DragEditor {
                             sheetView.updateOtherNotes()
                         }
                         document.updateSelects()
-                    }
-                case .pan:
-                    let dPan = (sp.x - beganSP.x)
-                        * (document.screenToWorldScale / 50 / textView.nodeRatio)
-                    let oPan = (beganPan + dPan)
-                        .clipped(min: -1, max: 1)
-                    let pan: Double
-                    if oldPan < 0 && oPan > 0 {
-                        pan = oPan > 0.05 ? oPan - 0.05 : 0
-                    } else if oldPan > 0 && oPan < 0 {
-                        pan = oPan < -0.05 ? oPan + 0.05 : 0
-                    } else {
-                        pan = oPan
-                        oldPan = pan
-                    }
-                    
-                    if !beganTimeframes.isEmpty {
-                        for (ti, textView) in sheetView.textsView.elementViews.enumerated() {
-                            guard let beganTimeframePan = beganTimeframes[ti]?.pan else { continue }
-                            
-                            let pan = (beganTimeframePan + dPan)
-                                    .clipped(min: -1, max: 1)
-                            
-                            textView.model.timeframe?.pan = pan
-                            
-                            if textView.model.timeframe?.content == nil {
-                                textView.isUpdatedAudioCache = false
-                            }
-                            
-                            if let timeframe = textView.model.timeframe {
-                                sheetView.sequencer?.mixings[timeframe.id]?
-                                    .pan = Float(pan)
-                            }
-                        }
-                    } else {
-                        textView.model.timeframe?.pan = pan
-                        
-                        if textView.model.timeframe?.content == nil {
-                            textView.isUpdatedAudioCache = false
-                        }
-                        
-                        if let timeframe = textView.model.timeframe {
-                            sheetView.sequencer?.mixings[timeframe.id]?
-                                .pan = Float(pan)
-                        }
                     }
                 case .isShownSpectrogram:
                     let inTP = textView.convertFromWorld(p)

@@ -215,7 +215,7 @@ extension Pitbend: Protobuf {
     }
 }
 extension Pitbend {
-    static let enabledRecoilPitchDistance: Rational = 1
+    static let enabledRecoilPitchDistance: Rational = 12
     
     init(recoilS0 s0: Double, s1: Double, s2: Double, s3: Double,
          y0: Double, y1: Double, y2: Double, y3: Double, ly: Double,
@@ -453,6 +453,7 @@ extension Note: Protobuf {
         lyric = pb.lyric
         isBreath = pb.isBreath
         isVibrato = pb.isVibrato
+        isVowelReduction = pb.isVowelReduction
     }
     var pb: PBNote {
         .with {
@@ -463,6 +464,7 @@ extension Note: Protobuf {
             $0.lyric = lyric
             $0.isBreath = isBreath
             $0.isVibrato = isVibrato
+            $0.isVowelReduction = isVowelReduction
         }
     }
 }
@@ -494,6 +496,7 @@ extension Note {
         && lyric == other.lyric
         && isBreath == other.isBreath
         && isVibrato == other.isVibrato
+        && isVowelReduction == other.isVowelReduction
     }
     
     var octavePitchString: String {
@@ -1056,105 +1059,6 @@ extension Score {
     func pitchRange(fromScaleKey scaleKey: Int) -> Range<Rational> {
         let scalePitch = octavePitch + Rational(scaleKey)
         return pitchRange + scalePitch
-    }
-    mutating func replaceNoteLyrics(_ str: String,
-                                    inBeatRange beatRange: Range<Rational>) {
-        guard !str.isEmpty, str != "_" && str != "＿" else {
-            for i in 0 ..< notes.count {
-                notes[i].lyric = ""
-            }
-            return
-        }
-        
-        var str = str.isAlphanumeric ? str : str.toHiragana()
-        
-        if str.count < notes.count {
-            var nstr = "", i = str.startIndex
-            for _ in 0 ..< notes.count {
-                nstr.append(str[i])
-                i = str.index(after: i)
-                if i >= str.endIndex {
-                    i = str.startIndex
-                }
-            }
-            str = nstr
-        }
-        
-        let nis = notes.enumerated().sorted {
-            $0.element.beatRange.start < $1.element.beatRange.start
-        }
-        var si = str.startIndex
-        var i = 0
-        loop: while i < nis.count {
-            let v = nis[i]
-            let isD = (i + 1 < nis.count ? nis[i + 1].element.beatRange.start : beatRange.end) - v.element.beatRange.end > 0
-            self.notes[v.offset].lyric = String(str[si])
-            self.notes[v.offset].isBreath = false
-            self.notes[v.offset].isVibrato = false
-            self.notes[v.offset].isVowelReduction = false
-            
-            var nsi = str.index(after: si)
-            guard nsi < str.endIndex else { break loop }
-            
-            let ss = ["ゃ", "ゅ", "ょ",
-                      "ぁ", "ぃ", "ぅ", "ぇ", "ぉ", "ゎ"]
-            for s in ss {
-                var isNone = false, nnsi = nsi
-                for c in s {
-                    if str[nnsi] == c {
-                        nnsi = str.index(after: nnsi)
-                        guard nnsi < str.endIndex else { break loop }
-                    } else {
-                        isNone = true
-                        break
-                    }
-                }
-                if !isNone {
-                    for c in s {
-                        self.notes[v.offset].lyric.append(c)
-                        
-                        nsi = str.index(after: nsi)
-                        guard nsi < str.endIndex else { break loop }
-                    }
-                    if s.contains("’") && i - 1 >= 0 {
-                        self.notes[nis[i - 1].offset].lyric += self.notes[v.offset].lyric
-                        self.notes[v.offset].lyric = ""
-                        nsi = str.index(after: nsi)
-                        guard nsi < str.endIndex else { break loop }
-                        si = nsi
-                        continue loop
-                    }
-                    break
-                }
-            }
-            while nsi < str.endIndex {
-                if str[nsi] == " " || str[nsi] == "　" {
-                    if !isD {
-                        self.notes[v.offset].isBreath = true
-                    }
-                    
-                    nsi = str.index(after: nsi)
-                    guard nsi < str.endIndex else { break loop }
-                } else if str[nsi] == "~" || str[nsi] == "〜" {
-                    self.notes[v.offset].isVibrato = true
-                    nsi = str.index(after: nsi)
-                    guard nsi < str.endIndex else { break loop }
-                } else if str[nsi] == "/" {
-                    self.notes[v.offset].isVowelReduction = true
-                    nsi = str.index(after: nsi)
-                    guard nsi < str.endIndex else { break loop }
-                } else if str[nsi] == "_" || str[nsi] == "＿" {
-                    nsi = str.index(after: nsi)
-                    guard nsi < str.endIndex else { break loop }
-                } else {
-                    break
-                }
-            }
-            si = nsi
-            guard si < str.endIndex else { break loop }
-            
-            i += 1
-        }
     }
     
     func splitedTimeRanges(at indexes: [Int]) -> [Range<Rational>: Set<Int>] {

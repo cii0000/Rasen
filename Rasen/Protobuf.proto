@@ -171,6 +171,7 @@ message PBNote {
     string lyric = 4;
     bool isBreath = 5;
     bool isVibrato = 6;
+    bool isVowelReduction = 9;
 }
 
 enum PBMusicScaleType {

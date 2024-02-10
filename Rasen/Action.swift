@@ -55,7 +55,11 @@ extension ActionList {
                               quasimode: .selectVersion),
                        Action(name: "Select Time".localized,
                               quasimode: .selectTime,
-                              isEnableRoot: false)],
+                              isEnableRoot: false),
+//                       Action(name: "Slide Line Z".localized,
+//                              quasimode: .slideLineZ,
+//                              isEnableRoot: false)
+                      ],
                       [Action(name: "Play".localized,
                               quasimode: .play,
                               isEnableRoot: false),

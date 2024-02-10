@@ -807,6 +807,34 @@ final class CopyEditor: Editor {
             }
             return true
         } else if let sheetView = document.sheetView(at: p),
+                  let lineView = sheetView.lineTuple(at: sheetView.convertFromWorld(p),
+                                                     scale: 1 / document.worldToScreenScale)?.lineView {
+            
+            let t = Transform(translation: -sheetView.convertFromWorld(p))
+            let ssv = SheetValue(lines: [lineView.model],
+                                 planes: [], texts: [],
+                                 origin: sheetView.convertFromWorld(p),
+                                 id: sheetView.id,
+                                 rootKeyframeIndex: sheetView.model.animation.rootIndex) * t
+            if isSendPasteboard {
+                Pasteboard.shared.copiedObjects = [.sheetValue(ssv)]
+            }
+            
+            let scale = 1 / document.worldToScreenScale
+            let lw = Line.defaultLineWidth
+            let selectedNode = Node(path: lineView.node.path * sheetView.node.localTransform,
+                                    lineWidth: max(lw * 1.5, lw * 2.5 * scale, 1 * scale),
+                                    lineType: .color(.selected))
+            if sheetView.model.enabledAnimation {
+                selectingLineNode.children = [selectedNode]
+                + sheetView.animationView.interpolationNodes(from: [lineView.model.id], scale: scale)
+                + sheetView.interporatedTimelineNodes(from: [lineView.model.id])
+            } else {
+                selectingLineNode.children = [selectedNode]
+            }
+            
+            return true
+        } else if let sheetView = document.sheetView(at: p),
                   let (ti, timeframe) = sheetView.timeframeTuple(at: sheetView.convertFromWorld(p)) {
             
             let textView = sheetView.textsView.elementViews[ti]
@@ -862,14 +890,6 @@ final class CopyEditor: Editor {
                         selectingLineNode.path = Path(textView.convertToWorld(frame))
                     }
                 }
-            } else if textView.containsPan(inTP),
-               let pan = timeframe.pan {
-                if isSendPasteboard {
-                    Pasteboard.shared.copiedObjects = [.normalizationValue(pan)]
-                }
-                if let frame = textView.panFrame {
-                    selectingLineNode.path = Path(textView.convertToWorld(frame))
-                }
             } else if textView.containsIsShownSpectrogram(inTP) {
                 if isSendPasteboard {
                     Pasteboard.shared.copiedObjects = [.normalizationValue(timeframe.isShownSpectrogram ? 1 : 0)]
@@ -894,14 +914,6 @@ final class CopyEditor: Editor {
                     selectingLineNode.path = Path(circleRadius: 2,
                                                   position: textView.convertToWorld(p))
                 }
-            } else if textView.containsEnvelope(inTP),
-                      let envelope = timeframe.score?.tone.envelope {
-                if isSendPasteboard {
-                    Pasteboard.shared.copiedObjects = [.envelope(envelope)]
-                }
-                if let frame = textView.envelopeFrame {
-                    selectingLineNode.path = Path(textView.convertToWorld(frame))
-                }
             } else if textView.containsTimeRange(inTP) {
                 if isSendPasteboard {
                     Pasteboard.shared.copiedObjects = [.timeframe(timeframe)]
@@ -925,34 +937,6 @@ final class CopyEditor: Editor {
                     selectingLineNode.path = Path(textView.convertToWorld(frame))
                 }
             }
-            return true
-        } else if let sheetView = document.sheetView(at: p),
-                  let lineView = sheetView.lineTuple(at: sheetView.convertFromWorld(p),
-                                                     scale: 1 / document.worldToScreenScale)?.lineView {
-            
-            let t = Transform(translation: -sheetView.convertFromWorld(p))
-            let ssv = SheetValue(lines: [lineView.model],
-                                 planes: [], texts: [],
-                                 origin: sheetView.convertFromWorld(p),
-                                 id: sheetView.id,
-                                 rootKeyframeIndex: sheetView.model.animation.rootIndex) * t
-            if isSendPasteboard {
-                Pasteboard.shared.copiedObjects = [.sheetValue(ssv)]
-            }
-            
-            let scale = 1 / document.worldToScreenScale
-            let lw = Line.defaultLineWidth
-            let selectedNode = Node(path: lineView.node.path * sheetView.node.localTransform,
-                                    lineWidth: max(lw * 1.5, lw * 2.5 * scale, 1 * scale),
-                                    lineType: .color(.selected))
-            if sheetView.model.enabledAnimation {
-                selectingLineNode.children = [selectedNode]
-                + sheetView.animationView.interpolationNodes(from: [lineView.model.id], scale: scale)
-                + sheetView.interporatedTimelineNodes(from: [lineView.model.id])
-            } else {
-                selectingLineNode.children = [selectedNode]
-            }
-            
             return true
         } else if let (sBorder, edge) = document.worldBorder(at: p, distance: d) {
             if isSendPasteboard {
@@ -1132,99 +1116,6 @@ final class CopyEditor: Editor {
             document.selections = []
             return true
         } else if let sheetView = document.sheetView(at: p),
-                  let ti = sheetView.timeframeIndex(at: sheetView.convertFromWorld(p)) {
-        
-            let textView = sheetView.textsView.elementViews[ti]
-            let inTP = textView.convertFromWorld(p)
-            if textView.containsScore(inTP),
-               let timeframe = textView.model.timeframe,
-               var score = timeframe.score {
-                
-                let maxD = textView.nodeRatio
-                * 15.0 * document.screenToWorldScale
-                if let score = timeframe.score,
-                   let (ni, pitI, _, pitbend) = textView.pitbendTuple(at: inTP,
-                                                          maxDistance: maxD) {
-                    var pitbend = pitbend
-                    if !pitbend.pits.isEmpty {
-                        pitbend.pits.remove(at: pitI)
-                        var score = score
-                        score.notes[ni].pitbend = pitbend
-                        
-                        sheetView.newUndoGroup()
-                        sheetView.replaceScore(score, at: ti)
-                        
-                        sheetView.updatePlaying()
-                        return true
-                    }
-                }
-                
-                if let noteI = textView.noteIndex(at: inTP,
-                                                  maxDistance: 2.0 * document.screenToWorldScale),
-                   let pitch = document.pitch(from: textView, at: inTP) {
-                    let interval = document.currentNoteTimeInterval(from: textView.model)
-                    let beat = textView.beat(atX: inTP.x, interval: interval)
-                    var note = score.notes[noteI]
-                    note.pitch -= pitch
-                    note.beatRange.start -= beat
-                    score.notes.remove(at: noteI)
-                    Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [note]))]
-                    sheetView.newUndoGroup()
-                    sheetView.replaceScore(score, at: ti)
-                    
-                    sheetView.updatePlaying()
-                    return true
-                }
-            } else if textView.containsPan(inTP),
-                      var timeframe = textView.model.timeframe,
-                      let pan = timeframe.pan, pan != 0 {
-                timeframe.pan = 0
-                Pasteboard.shared.copiedObjects = [.normalizationValue(pan)]
-                sheetView.newUndoGroup()
-                var text = textView.model
-                text.timeframe = timeframe
-                sheetView.replace([IndexValue(value: text, index: ti)])
-                return true
-            } else if textView.containsSpectlope(inTP),
-                      let timeframe = textView.model.timeframe,
-                      var score = timeframe.score {
-                
-                if let (i, _, isLast) = textView.spectlopeType(at: inTP, maxDistance: 25.0 * document.screenToWorldScale),
-                   !isLast {
-                   
-                    let formant = score.tone.spectlope.formants[i]
-                    var spectlope = score.tone.spectlope
-                    spectlope.formants.remove(at: i)
-                    score.tone.spectlope = spectlope
-                    Pasteboard.shared.copiedObjects = [.formant(formant)]
-                    sheetView.newUndoGroup()
-                    sheetView.replaceScore(score, at: ti)
-                    return true
-                } else if score.tone.spectlope != Spectlope() {
-                    score.tone.spectlope = Spectlope()
-                    Pasteboard.shared.copiedObjects = [.tone(score.tone)]
-                    sheetView.newUndoGroup()
-                    sheetView.replaceScore(score, at: ti)
-                    return true
-                }
-            }
-            
-            var text = textView.model
-            let timeframe = text.timeframe
-            if text.timeframe?.score != nil
-                && !textView.containsTimeRange(inTP) {
-                
-                text.timeframe?.score = nil
-            } else {
-                text.timeframe = nil
-            }
-            if let timeframe = timeframe {
-                Pasteboard.shared.copiedObjects = [.timeframe(timeframe)]
-            }
-            sheetView.newUndoGroup()
-            sheetView.replace([IndexValue(value: text, index: ti)])
-            return true
-        } else if let sheetView = document.sheetView(at: p),
                   let (lineView, li) = sheetView
                     .lineTuple(at: sheetView.convertFromWorld(p),
                                scale: 1 / document.worldToScreenScale) {
@@ -1298,6 +1189,89 @@ final class CopyEditor: Editor {
             selectingLineNode.path = Path(tbs.map { Pathline(textView.convertToWorld($0)) })
             sheetView.newUndoGroup()
             sheetView.removeText(at: ti)
+            return true
+        } else if let sheetView = document.sheetView(at: p),
+                  let ti = sheetView.timeframeIndex(at: sheetView.convertFromWorld(p)) {
+        
+            let textView = sheetView.textsView.elementViews[ti]
+            let inTP = textView.convertFromWorld(p)
+            if textView.containsScore(inTP),
+               let timeframe = textView.model.timeframe,
+               var score = timeframe.score {
+                
+                let maxD = textView.nodeRatio
+                * 15.0 * document.screenToWorldScale
+                if let score = timeframe.score,
+                   let (ni, pitI, _, pitbend) = textView.pitbendTuple(at: inTP,
+                                                          maxDistance: maxD) {
+                    var pitbend = pitbend
+                    if !pitbend.pits.isEmpty {
+                        pitbend.pits.remove(at: pitI)
+                        var score = score
+                        score.notes[ni].pitbend = pitbend
+                        
+                        sheetView.newUndoGroup()
+                        sheetView.replaceScore(score, at: ti)
+                        
+                        sheetView.updatePlaying()
+                        return true
+                    }
+                }
+                
+                if let noteI = textView.noteIndex(at: inTP,
+                                                  maxDistance: 2.0 * document.screenToWorldScale),
+                   let pitch = document.pitch(from: textView, at: inTP) {
+                    let interval = document.currentNoteTimeInterval(from: textView.model)
+                    let beat = textView.beat(atX: inTP.x, interval: interval)
+                    var note = score.notes[noteI]
+                    note.pitch -= pitch
+                    note.beatRange.start -= beat
+                    score.notes.remove(at: noteI)
+                    Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [note]))]
+                    sheetView.newUndoGroup()
+                    sheetView.replaceScore(score, at: ti)
+                    
+                    sheetView.updatePlaying()
+                    return true
+                }
+            } else if textView.containsSpectlope(inTP),
+                      let timeframe = textView.model.timeframe,
+                      var score = timeframe.score {
+                
+                if let (i, _, isLast) = textView.spectlopeType(at: inTP, maxDistance: 25.0 * document.screenToWorldScale),
+                   !isLast {
+                   
+                    let formant = score.tone.spectlope.formants[i]
+                    var spectlope = score.tone.spectlope
+                    spectlope.formants.remove(at: i)
+                    score.tone.spectlope = spectlope
+                    Pasteboard.shared.copiedObjects = [.formant(formant)]
+                    sheetView.newUndoGroup()
+                    sheetView.replaceScore(score, at: ti)
+                    return true
+                } else if score.tone.spectlope != Spectlope() {
+                    score.tone.spectlope = Spectlope()
+                    Pasteboard.shared.copiedObjects = [.tone(score.tone)]
+                    sheetView.newUndoGroup()
+                    sheetView.replaceScore(score, at: ti)
+                    return true
+                }
+            }
+            
+            var text = textView.model
+            let timeframe = text.timeframe
+            if text.timeframe?.score != nil
+                && !textView.containsTimeRange(inTP) {
+                
+                text.timeframe?.score = nil
+            } else {
+                text.timeframe = nil
+            }
+            if let timeframe = timeframe {
+                Pasteboard.shared.copiedObjects = [.timeframe(timeframe)]
+            }
+            sheetView.newUndoGroup()
+            sheetView.replace([IndexValue(value: text, index: ti)])
             return true
         } else if let (border, i, edge) = document.border(at: p, distance: d),
                   let sheetView = document.sheetView(at: p) {
@@ -2422,14 +2396,7 @@ final class CopyEditor: Editor {
                 let textView = sheetView.textsView.elementViews[ti]
                 var text = textView.model
                 let inTP = textView.convertFromWorld(p)
-                if textView.containsPan(inTP) {
-                    let pan = nValue.clipped(min: -1, max: 1)
-                    if pan != text.timeframe?.pan {
-                        text.timeframe?.pan = pan
-                        sheetView.newUndoGroup()
-                        sheetView.replace([IndexValue(value: text, index: ti)])
-                    }
-                } else if textView.containsIsShownSpectrogram(inTP) {
+                if textView.containsIsShownSpectrogram(inTP) {
                     let isShownSpectrogram = nValue == 0
                     if isShownSpectrogram != text.timeframe?.isShownSpectrogram {
                         text.timeframe?.isShownSpectrogram = isShownSpectrogram

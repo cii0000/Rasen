@@ -702,16 +702,21 @@ final class TextEditor: Editor {
                    let ni = textView.noteIndex(at: inTP,
                                                maxDistance: maxD) {
                     
-                    score.notes[ni].lyric += event.inputKeyType.name
-                    
-                    if score.notes[ni].lyric.count >= 2, score.notes[ni].lyric.prefix(2).first == "^" {
+                    let key = (event.inputKeyType.name.applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? "").lowercased()
+                    if key == "^" {
                         score.notes[ni].isBreath = true
-                    } else if score.notes[ni].lyric.count >= 3, score.notes[ni].lyric.prefix(3).first == "~" {
+                    } else if key == "~" {
                         score.notes[ni].isVibrato = true
-                    } else if score.notes[ni].lyric.count >= 3, score.notes[ni].lyric.prefix(3).first == "/" {
+                    } else if key == "/" {
                         score.notes[ni].isVowelReduction = true
+                    } else if event.inputKeyType == .delete, !score.notes[ni].lyric.isEmpty {
+                        score.notes[ni].lyric.removeLast()
+                    } else if event.inputKeyType != .delete {
+                        score.notes[ni].lyric += key
                     }
                     
+                    var timeframe = timeframe
+                    timeframe.score = score
                     sheetView.newUndoGroup()
                     sheetView.replaceScore(score, at: ti)
                     return
@@ -1251,7 +1256,6 @@ final class TextEditor: Editor {
                     
                     textView.binder[keyPath: textView.keyPath]
                         .widthCount = count
-                    textView.updateLyrics()
                     textView.updateTypesetter()
                     textView.updateSelectedLineLocation()
                 }
@@ -1286,7 +1290,6 @@ final class TextEditor: Editor {
                     
                     textView.binder[keyPath: textView.keyPath]
                         .widthCount = Typobute.defaultWidthCount
-                    textView.updateLyrics()
                     textView.updateTypesetter()
                     textView.updateSelectedLineLocation()
                 }
@@ -1497,7 +1500,6 @@ final class TextView<T: BinderProtocol>: View {
 extension TextView {
     func updateWithModel() {
         node.attitude.position = model.origin
-        updateLyrics()
         updateLineWidth()
         updateTypesetter()
     }
@@ -1507,14 +1509,6 @@ extension TextView {
         borderNode.lineWidth = cursorNode.lineWidth
         markedRangeNode.lineWidth = Line.defaultLineWidth * ratio
         replacedRangeNode.lineWidth = Line.defaultLineWidth * 1.5 * ratio
-    }
-    func updateLyrics() {
-        if let timeframe = model.timeframe, timeframe.score != nil {
-            binder[keyPath: keyPath].timeframe?.score?
-                .replaceNoteLyrics(model.string,
-                                   inBeatRange: timeframe.beatRange)
-            isUpdatedAudioCache = false
-        }
     }
     func updateAudioCache() {
         if !isUpdatedAudioCache,
@@ -1728,10 +1722,9 @@ extension TextView {
         let nh = ScoreLayout.noteHeight * ratio
         let knobW = 2 * ratio, knobH = 12 * ratio
         let vy = (typesetter.lastBounds ?? Rect()).midY
-        let volumeH = 14.0 * ratio
         let knobRadius = 2 * ratio
         let lp = typesetter.lastBounds?.maxXMidYPoint ?? Point()
-        var vw = lp.x + padding * ratio
+        let vw = lp.x + padding * ratio
         
         var boxNodes = [Node]()
         var textNodes = [Node]()
@@ -1744,50 +1737,6 @@ extension TextView {
         var noteOctaveLinePathlines = [Pathline]()
         var noteChordLinePathlines = [Pathline]()
         var noteKnobPathlines = [Pathline]()
-        
-        if let pan = timeframe.pan {
-            let vh = volumeH
-            let panW = 18 * ratio
-            
-            let vKnobW = knobW, vKbobH = knobH, plh = ratio * 3, plw = ratio
-            contentPathlines.append(Pathline(Rect(x: vw + panW / 2 + pan * panW / 2 - vKnobW / 2,
-                                                  y: vy - vKbobH / 2,
-                                                  width: vKnobW,
-                                                  height: vKbobH)))
-            
-            contentPathlines.append(Pathline(Rect(x: vw + panW / 2 - plw / 2,
-                                                  y: vy - plh / 2,
-                                                  width: plw,
-                                                  height: plh)))
-            
-            contentPathlines.append(Pathline(Polygon(points: [
-                Point(vw, vy - plh / 2),
-                Point(vw + panW / 2, vy),
-                Point(vw, vy + plh / 2)
-            ])))
-            contentPathlines.append(Pathline(Polygon(points: [
-                Point(vw + panW, vy + plh / 2),
-                Point(vw + panW / 2, vy),
-                Point(vw + panW, vy - plh / 2)
-            ])))
-            
-            if pan == 0 {
-                contentPathlines.append(Pathline(Rect(x: vw + panW / 2 - vKnobW / 2,
-                                                      y: vy - vKbobH / 2 - plw * 2,
-                                                      width: vKnobW,
-                                                      height: plw)))
-                contentPathlines.append(Pathline(Rect(x: vw + panW / 2 - vKnobW / 2,
-                                                      y: vy + vKbobH / 2 + plw,
-                                                      width: vKnobW,
-                                                      height: plw)))
-            }
-            
-            boxNodes.append(Node(name: "pan",
-                                  path: Path(Rect(x: vw, y: vy - vh / 2,
-                                                  width: panW,
-                                                  height: vh))))
-            vw += panW
-        }
         
         func timeStringFrom(time: Rational,
                             frameRate: Int) -> String {
@@ -2097,46 +2046,67 @@ extension TextView {
                         noteOctaveLinePathlines += aNoteLinePathlines
                     }
                 }
-                nNote = note
-                var count = 1
-                while true {
-                    nNote.pitch += 12
-                    count += 1
-                    guard nNote.pitch > 0 && nNote.pitch < pitchRange.length else { break }
-                    
-                    let (aNoteLinePathlines, _, _)
-                    = notePathlines(from: nNote, y: y + nh / 2,
-                                    preFq: nil, nextFq: nil, tempo: timeframe.tempo)
-                    if isChord {
+                
+                if isChord {
+                    nNote = note
+                    var count = 1
+                    while true {
+                        nNote.pitch += 12
+                        count += 1
+                        guard nNote.pitch > 0 && nNote.pitch < pitchRange.length else { break }
+                        
+                        let (aNoteLinePathlines, _, _)
+                        = notePathlines(from: nNote, y: y + nh / 2,
+                                        preFq: nil, nextFq: nil, tempo: timeframe.tempo)
                         noteChordLinePathlines += aNoteLinePathlines
-                    } else {
-                        if count == 2 {
-                            let pan = timeframe.score?.pan ?? 0
-                            noteLineNodes += aNoteLinePathlines.enumerated().map {
-                                let color = Self.panColor(pan: pan,
-                                                          brightness: 1 - 0.25 * score.tone.overtone.evenScale)
-                                return Node(path: Path([$0.element]),
-                                            lineWidth: nh,
-                                            lineType: .color(color))
-                            }
-                            
-                            var nNote = nNote
-                            nNote.pitch += 7
-                            guard nNote.pitch > 0 && nNote.pitch < pitchRange.length else { break }
-                            
-                            let (aNoteLinePathlines, _, _)
-                            = notePathlines(from: nNote, y: y + nh / 2,
-                                            preFq: nil, nextFq: nil, tempo: timeframe.tempo)
-                            noteLineNodes += aNoteLinePathlines.enumerated().map {
-                                let color = Self.panColor(pan: pan,
-                                                          brightness: 1 - 0.25 * score.tone.overtone.oddScale)
-                                return Node(path: Path([$0.element]),
-                                            lineWidth: nh,
-                                            lineType: .color(color))
-                            }
-                        } else {
-                            noteOctaveLinePathlines += aNoteLinePathlines
-                        }
+                    }
+                } else {
+                    nNote = note
+                    var count = 1
+                    var fq = nNote.fq, fFq = fq
+                    let sf = SourceFilter(nNote.tone.spectlope)
+                    while true {
+                        fq += fFq
+                        count += 1
+                        nNote.pitch = Rational(Pitch.pitch(fromFq: fq), intervalScale: .init(1, 1000))
+                        guard nNote.pitch > 0 && nNote.pitch < pitchRange.length else { break }
+                        
+                        let l = sf.smp(atFq: fq) * (count % 2 == 0 ? score.tone.overtone.evenScale : score.tone.overtone.oddScale)
+                        
+                        let (aNoteLinePathlines, _, _)
+                        = notePathlines(from: nNote, y: y + nh / 2,
+                                        preFq: nil, nextFq: nil, tempo: timeframe.tempo)
+    //                    if isChord {
+    //                        noteChordLinePathlines += aNoteLinePathlines
+    //                    } else {
+    //                        if count == 2 {
+                                let pan = timeframe.score?.pan ?? 0
+                                noteLineNodes += aNoteLinePathlines.enumerated().map {
+                                    let color = Self.panColor(pan: pan,
+                                                              brightness: 0.75)
+                                    return Node(path: Path([$0.element]),
+                                                lineWidth: nh * l,
+                                                lineType: .color(color))
+                                }
+                                
+    //                            var nNote = nNote
+    //                            nNote.pitch += 7
+    //                            guard nNote.pitch > 0 && nNote.pitch < pitchRange.length else { break }
+    //
+    //                            let (aNoteLinePathlines, _, _)
+    //                            = notePathlines(from: nNote, y: y + nh / 2,
+    //                                            preFq: nil, nextFq: nil, tempo: timeframe.tempo)
+    //                            noteLineNodes += aNoteLinePathlines.enumerated().map {
+    //                                let color = Self.panColor(pan: pan,
+    //                                                          brightness: 1 - 0.25 * score.tone.overtone.oddScale)
+    //                                return Node(path: Path([$0.element]),
+    //                                            lineWidth: nh,
+    //                                            lineType: .color(color))
+    //                            }
+    //                        } else {
+    //                            noteOctaveLinePathlines += aNoteLinePathlines
+    //                        }
+    //                    }
                     }
                 }
             }
@@ -2161,8 +2131,13 @@ extension TextView {
                 var note = nNotes[i]
                 note.pitch -= pitchRange.start
                 
-                let (preFq, nextFq) = pitbendPreNext(notes: nNotes, at: i)
+                let isChord = note.isChord
+                if isChord {
+                    brps.append((beatRange, note.roundedPitch))
+                }
+                appendOctaves(note, isChord: isChord)
                 
+                let (preFq, nextFq) = pitbendPreNext(notes: nNotes, at: i)
                 let (aNoteLinePathlines, aNoteKnobPathlines, lyricPath)
                 = notePathlines(from: note, y: y + nh / 2,
                                 preFq: preFq, nextFq: nextFq, tempo: timeframe.tempo)
@@ -2180,12 +2155,6 @@ extension TextView {
                 if let lyricPath {
                     textNodes.append(.init(path: lyricPath, fillType: .color(.content)))
                 }
-                
-                let isChord = note.isChord
-                if isChord {
-                    brps.append((beatRange, note.roundedPitch))
-                }
-                appendOctaves(note, isChord: isChord)
             }
             
             for note in otherNotes {
@@ -2314,7 +2283,6 @@ extension TextView {
             
             vx += ratio * padding
             
-            let toneH = 10.0 * ratio
             let tone = score.tone
             
             let overtoneW = 6.0 * ratio
@@ -2690,21 +2658,6 @@ extension TextView {
         isShownSpectrogramFrame?.outset(by: 3 * nodeRatio)
     }
     
-    func containsPan(_ p: Point) -> Bool {
-        paddingPanFrame?.contains(p) ?? false
-    }
-    var panFrame: Rect? {
-        guard model.timeframe?.pan != nil else { return nil }
-        if let node = timeframeNode.children.first(where: { $0.name == "pan" }) {
-            return node.transformedBounds
-        } else {
-            return nil
-        }
-    }
-    var paddingPanFrame: Rect? {
-        panFrame?.outset(by: 3 * nodeRatio)
-    }
-    
     func containsOctave(_ p: Point) -> Bool {
         octaveFrame?.contains(p) ?? false
     }
@@ -3021,24 +2974,12 @@ extension TextView {
         }
     }
     
-    func containsEnvelope(_ p: Point) -> Bool {
-        envelopeFrame?.contains(p) ?? false
-    }
-    var envelopeFrame: Rect? {
-        guard let timeframe = model.timeframe,
-              let score = timeframe.score, !score.isVoice else { return nil }
-        return (attackFrame + decayAndSustainFrame + releaseFrame)?
-            .outset(by: 5 * nodeRatio)
-    }
-    
     func containsTone(_ p: Point) -> Bool {
         toneFrame?.contains(p) ?? false
     }
     var toneFrame: Rect? {
         guard model.timeframe?.score != nil else { return nil }
-        return octaveFrame
-        + overtoneFrame + spectlopeFrame
-        + envelopeFrame
+        return overtoneFrame + spectlopeFrame
     }
     
     func containsScore(_ p: Point) -> Bool {
@@ -3067,7 +3008,7 @@ extension TextView {
     }
     
     func containsTimeframe(_ p: Point) -> Bool {
-        containsTimeRange(p) || containsPan(p)
+        containsTimeRange(p)
         || containsIsShownSpectrogram(p)
         || containsScore(p)
         || containsTone(p) || containsContent(p)
@@ -3649,7 +3590,6 @@ extension TextView {
             binder[keyPath: keyPath].widthCount = widthCount
         }
         
-        updateLyrics()
         updateTypesetter()
         updateSelectedLineLocation()
     }
@@ -3930,7 +3870,6 @@ extension TextView {
         selectedRange = ni ..< ni
         
         TextInputContext.update()
-        updateLyrics()
         updateTypesetter()
         updateSelectedLineLocation()
     }
@@ -3979,7 +3918,6 @@ extension TextView {
             replacedRange = imsi ..< imei
             selectedRange = di ..< di
         }
-        updateLyrics()
         updateTypesetter()
         updateSelectedLineLocation()
     }
@@ -4007,7 +3945,6 @@ extension TextView {
                                     offsetBy: irRange.lowerBound + str.count)
         selectedRange = ei ..< ei
         
-        updateLyrics()
         updateTypesetter()
         updateSelectedLineLocation()
     }

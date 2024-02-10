@@ -265,14 +265,194 @@ final class ColorEditor: Editor {
         return [Node(attitude: .init(position: p - Point(0, fy)), path: path,
                      fillType: .color(.content))]
     }
+    func panNodes(fromPan pan: Double, firstPan: Double, at p: Point) -> [Node] {
+        let panW = 50.0
+        
+        var contentPathlines = [Pathline]()
+        
+        let vw = 0.0, vy = 0.0
+        let fx = firstPan.clipped(min: -1, max: 1, newMin: 0, newMax: panW)
+        
+        let knobW = 2.0, knobH = 12.0
+        let vKnobW = knobW, vKbobH = knobH, plh = 3.0, plw = 1.0
+        contentPathlines.append(Pathline(Rect(x: vw + panW / 2 + pan * panW / 2 - vKnobW / 2,
+                                              y: vy - vKbobH / 2,
+                                              width: vKnobW,
+                                              height: vKbobH)))
+        
+        contentPathlines.append(Pathline(Rect(x: vw + panW / 2 - plw / 2,
+                                              y: vy - plh / 2,
+                                              width: plw,
+                                              height: plh)))
+        
+        contentPathlines.append(Pathline(Polygon(points: [
+            Point(vw, vy - plh / 2),
+            Point(vw + panW / 2, vy),
+            Point(vw, vy + plh / 2)
+        ])))
+        contentPathlines.append(Pathline(Polygon(points: [
+            Point(vw + panW, vy + plh / 2),
+            Point(vw + panW / 2, vy),
+            Point(vw + panW, vy - plh / 2)
+        ])))
+        
+        if pan == 0 {
+            contentPathlines.append(Pathline(Rect(x: vw + panW / 2 - vKnobW / 2,
+                                                  y: vy - vKbobH / 2 - plw * 2,
+                                                  width: vKnobW,
+                                                  height: plw)))
+            contentPathlines.append(Pathline(Rect(x: vw + panW / 2 - vKnobW / 2,
+                                                  y: vy + vKbobH / 2 + plw,
+                                                  width: vKnobW,
+                                                  height: plw)))
+        }
+        return [Node(attitude: .init(position: p - Point(fx, 0)), path: Path(contentPathlines),
+                     fillType: .color(.content))]
+    }
     
-    var isChangePan = false
+    private var beganPan = 0.0, oldPan = 0.0
+    var isChangePan = false, isFirstChangedVolumeAmp = false
     func changePan(with event: DragEvent) {
         guard isEditingSheet else {
             document.stop(with: event)
             return
         }
         
+        let sp = event.screenPoint
+        let p = document.convertScreenToWorld(event.screenPoint)
+        switch event.phase {
+        case .began:
+            document.cursor = .arrow
+            
+            beganSP = event.screenPoint
+            
+            if let sheetView = document.sheetView(at: p) {
+                let inP = sheetView.convertFromWorld(p)
+                if let (ti, _) = sheetView.timeframeTuple(at: inP) {
+                    let textView = sheetView.textsView.elementViews[ti]
+                    if let pan = textView.model.timeframe?.pan {
+                        
+                        beganPan = pan
+                        oldPan = pan
+                        
+                        self.textI = ti
+                        
+                        let fs = document.selections
+                            .map { $0.rect }
+                            .map { sheetView.convertFromWorld($0) }
+                        beganTimeframes = sheetView.textsView.elementViews.enumerated().reduce(into: [Int: Timeframe]()) { (dic, v) in
+                            if fs.contains(where: { v.element.transformedScoreFrame.intersects($0) }),
+                               let timeframe = v.element.model.timeframe,
+                               timeframe.pan != nil {
+                                dic[v.offset] = timeframe
+                            }
+                        }
+                        
+                        lightnessNode.children = panNodes(fromPan: beganPan, firstPan: beganPan, at: p)
+                        document.rootNode.append(child: lightnessNode)
+                    }
+                }
+            }
+        case .changed:
+            if let sheetView = noteSheetView,
+               let textI, textI < sheetView.textsView.elementViews.count {
+                
+                let textView = sheetView.textsView.elementViews[textI]
+                
+                let dPan = (sp.x - beganSP.x)
+                    * (document.screenToWorldScale / 50 / textView.nodeRatio)
+                let oPan = (beganPan + dPan)
+                    .clipped(min: -1, max: 1)
+                let pan: Double
+                if oldPan < 0 && oPan > 0 {
+                    pan = oPan > 0.05 ? oPan - 0.05 : 0
+                } else if oldPan > 0 && oPan < 0 {
+                    pan = oPan < -0.05 ? oPan + 0.05 : 0
+                } else {
+                    pan = oPan
+                    oldPan = pan
+                }
+                
+                if !beganTimeframes.isEmpty {
+                    for (ti, textView) in sheetView.textsView.elementViews.enumerated() {
+                        guard let beganTimeframePan = beganTimeframes[ti]?.pan else { continue }
+                        
+                        let pan = (beganTimeframePan + dPan)
+                                .clipped(min: -1, max: 1)
+                        
+                        textView.model.timeframe?.pan = pan
+                        
+                        if textView.model.timeframe?.content == nil {
+                            textView.isUpdatedAudioCache = false
+                        }
+                        
+                        if let timeframe = textView.model.timeframe {
+                            sheetView.sequencer?.mixings[timeframe.id]?
+                                .pan = Float(pan)
+                        }
+                    }
+                } else {
+                    textView.model.timeframe?.pan = pan
+                    
+                    if textView.model.timeframe?.content == nil {
+                        textView.isUpdatedAudioCache = false
+                    }
+                    
+                    if let timeframe = textView.model.timeframe {
+                        sheetView.sequencer?.mixings[timeframe.id]?
+                            .pan = Float(pan)
+                    }
+                }
+                
+                lightnessNode.children = panNodes(fromPan: pan,
+                                                  firstPan: beganPan,
+                                                  at: document.convertScreenToWorld(beganSP))
+            }
+        case .ended:
+            notePlayer?.stop()
+            
+            lightnessNode.removeFromParent()
+            
+            if let sheetView = noteSheetView {
+                var isNewUndoGroup = false
+                func updateUndoGroup() {
+                    if !isNewUndoGroup {
+                        sheetView.newUndoGroup()
+                        isNewUndoGroup = true
+                    }
+                }
+                if !beganTimeframes.isEmpty {
+                    for (ti, beganTimeframe) in beganTimeframes {
+                        guard ti < sheetView.model.texts.count else { continue }
+                        if let beganScore = beganTimeframe.score {
+                           let score = sheetView.textsView.elementViews[ti].model.timeframe?.score
+                           if score != beganScore {
+                               updateUndoGroup()
+                               sheetView.captureScore(score, old: beganScore, at: ti)
+                           }
+                        } else {
+                            let text = sheetView.textsView.elementViews[ti].model
+                            if text.timeframe != beganTimeframe {
+                                var beganText = text
+                                beganText.timeframe = beganTimeframe
+                                updateUndoGroup()
+                                sheetView.captureText(text, old: beganText, at: ti)
+                            }
+                        }
+                    }
+                } else if let ti = textI,
+                            ti < sheetView.model.texts.count,
+                            let beganScore = beganScore {
+                    let score = sheetView.textsView.elementViews[ti].model.timeframe?.score
+                    if score != beganScore {
+                        updateUndoGroup()
+                        sheetView.captureScore(score, old: beganScore, at: ti)
+                    }
+                }
+            }
+            
+            document.cursor = Document.defaultCursor
+        }
     }
     
     var notePlayer: NotePlayer?
@@ -405,6 +585,21 @@ final class ColorEditor: Editor {
                 document.rootNode.append(child: lightnessNode)
             }
         case .changed:
+            let dsp = event.screenPoint - beganSP
+            if !isFirstChangedVolumeAmp, abs(dsp.x) > abs(dsp.y) {
+                isChangePan = true
+                
+                lightnessNode.removeFromParent()
+                
+                var nEvent = event
+                nEvent.phase = .began
+                changePan(with: nEvent)
+                changePan(with: event)
+                
+                return
+            }
+            isFirstChangedVolumeAmp = true
+            
             if isPit {
                 if let sheetView = noteSheetView,
                     let textI, textI < sheetView.textsView.elementViews.count {
