@@ -2752,9 +2752,8 @@ extension NSEvent {
             }
         }
         
-        guard let characters else { return nil }
-        
-        return switch characters {
+        guard let charactersIM = self.charactersIgnoringModifiers else { return nil }
+        return switch charactersIM {
         case "\u{1B}": .escape
         case " ": .space
         case "a", "A": .a
@@ -2825,7 +2824,7 @@ extension NSEvent {
         case "/": .backslash
         case "?": .questionMark
         case "_": .underscore
-        default: nil
+        default: if let characters { .init(name: characters) } else { nil }
         }
     }
 }

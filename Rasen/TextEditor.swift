@@ -184,27 +184,7 @@ final class Looker: InputKeyEditor {
             let note = score.convertPitchToWorld(note)
             let fq = note.fq
             let fqStr = "\(note.octavePitchString) (\(fq.string(digitsCount: 3)) Hz)".localized
-            if !note.lyric.isEmpty,
-               let mora = Mora(hiragana: note.lyric, fq: fq,
-                               previousMora: nil, nextMora: nil,
-                               isVowelReduction: false,
-                               from: score.tone.spectlope),
-               let spectlope = mora.firstKeySpectlopes.last?.spectlope {
-                
-                var str = fqStr
-                func overtones(minF: Double, maxF: Double) -> [Int] {
-                    let minI = Int(((minF - 0.01) / fq).rounded(.up))
-                    let maxI = Int(((maxF + 0.01) / fq).rounded(.down))
-                    return minI <= maxI ? Array(minI ... maxI) : []
-                }
-                str += "\n\tF1PF: \(overtones(minF: spectlope[1].sFq, maxF: spectlope[1].eFq))"
-                str += "\n\tF2PF: \(overtones(minF: spectlope[2].sFq, maxF: spectlope[2].eFq))"
-                str += "\n\tF3PF: \(overtones(minF: spectlope[3].sFq, maxF: spectlope[3].eFq))"
-                str += "\n\tF4PF: \(overtones(minF: spectlope[4].sFq, maxF: spectlope[4].eFq))"
-                document.show(str, at: p)
-            } else {
-                document.show(fqStr, at: p)
-            }
+            document.show(fqStr, at: p)
             return true
         } else if let sheetView = document.sheetView(at: p),
                   let (_, timeframe) = sheetView.timeframeTuple(at: sheetView.convertFromWorld(p)),
@@ -2047,66 +2027,20 @@ extension TextView {
                     }
                 }
                 
-                if isChord {
-                    nNote = note
-                    var count = 1
-                    while true {
-                        nNote.pitch += 12
-                        count += 1
-                        guard nNote.pitch > 0 && nNote.pitch < pitchRange.length else { break }
-                        
-                        let (aNoteLinePathlines, _, _)
-                        = notePathlines(from: nNote, y: y + nh / 2,
-                                        preFq: nil, nextFq: nil, tempo: timeframe.tempo)
+                nNote = note
+                var count = 1
+                while true {
+                    nNote.pitch += 12
+                    count += 1
+                    guard nNote.pitch > 0 && nNote.pitch < pitchRange.length else { break }
+                    
+                    let (aNoteLinePathlines, _, _)
+                    = notePathlines(from: nNote, y: y + nh / 2,
+                                    preFq: nil, nextFq: nil, tempo: timeframe.tempo)
+                    if isChord {
                         noteChordLinePathlines += aNoteLinePathlines
-                    }
-                } else {
-                    nNote = note
-                    var count = 1
-                    var fq = nNote.fq, fFq = fq
-                    let sf = SourceFilter(nNote.tone.spectlope)
-                    while true {
-                        fq += fFq
-                        count += 1
-                        nNote.pitch = Rational(Pitch.pitch(fromFq: fq), intervalScale: .init(1, 1000))
-                        guard nNote.pitch > 0 && nNote.pitch < pitchRange.length else { break }
-                        
-                        let l = sf.smp(atFq: fq) * (count % 2 == 0 ? score.tone.overtone.evenScale : score.tone.overtone.oddScale)
-                        
-                        let (aNoteLinePathlines, _, _)
-                        = notePathlines(from: nNote, y: y + nh / 2,
-                                        preFq: nil, nextFq: nil, tempo: timeframe.tempo)
-    //                    if isChord {
-    //                        noteChordLinePathlines += aNoteLinePathlines
-    //                    } else {
-    //                        if count == 2 {
-                                let pan = timeframe.score?.pan ?? 0
-                                noteLineNodes += aNoteLinePathlines.enumerated().map {
-                                    let color = Self.panColor(pan: pan,
-                                                              brightness: 0.75)
-                                    return Node(path: Path([$0.element]),
-                                                lineWidth: nh * l,
-                                                lineType: .color(color))
-                                }
-                                
-    //                            var nNote = nNote
-    //                            nNote.pitch += 7
-    //                            guard nNote.pitch > 0 && nNote.pitch < pitchRange.length else { break }
-    //
-    //                            let (aNoteLinePathlines, _, _)
-    //                            = notePathlines(from: nNote, y: y + nh / 2,
-    //                                            preFq: nil, nextFq: nil, tempo: timeframe.tempo)
-    //                            noteLineNodes += aNoteLinePathlines.enumerated().map {
-    //                                let color = Self.panColor(pan: pan,
-    //                                                          brightness: 1 - 0.25 * score.tone.overtone.oddScale)
-    //                                return Node(path: Path([$0.element]),
-    //                                            lineWidth: nh,
-    //                                            lineType: .color(color))
-    //                            }
-    //                        } else {
-    //                            noteOctaveLinePathlines += aNoteLinePathlines
-    //                        }
-    //                    }
+                    } else {
+                        noteOctaveLinePathlines += aNoteLinePathlines
                     }
                 }
             }
@@ -2281,8 +2215,6 @@ extension TextView {
             
             var vx = vw + ratio * padding
             
-            vx += ratio * padding
-            
             let tone = score.tone
             
             let overtoneW = 6.0 * ratio
@@ -2339,147 +2271,83 @@ extension TextView {
                                                     oddP2]))
             vx += overtoneDW + ratio * padding
             
-            let spectlope = tone.spectlope
+            let sf = tone.sourceFilter
 
             let fh = 12 * ratio
             let hfh = fh / 2
             let octaveCount = 7.0
             let spW = octaveCount * 20 * ratio
             let spy = vy - hfh
-            let spfp = Point(vx, spy)
-            let splp = Point(vx + spW, spy)
+            let sffp = Point(vx, spy)
+            let sflp = Point(vx + spW, spy)
             
-            func spectlopeX(atFq fq: Double) -> Double {
+            func sourceFilterX(atFq fq: Double) -> Double {
                 let t = Mel.mel(fromFq: fq)
                     .clipped(min: 0, max: 4000, newMin: 0, newMax: 1)
-//                let t = fq.clipped(min: 0, max: 15000, newMin: 0, newMax: 1)
                 return vx + spW * t
             }
-            func spectlopeY(atSmp smp: Double) -> Double {
+            func sourceFilterY(atSmp smp: Double) -> Double {
                 vy - hfh + smp * fh
             }
-            func spectlopeP(at p: Point) -> Point {
-                .init(spectlopeX(atFq: p.x),
-                      spectlopeY(atSmp: p.y))
+            func sourceFilterP(at p: Point) -> Point {
+                .init(sourceFilterX(atFq: p.x),
+                      sourceFilterY(atSmp: p.y))
             }
-            var lastP = Point()
-            
-            let sf = SourceFilter(spectlope)
-            let nps = [spfp, splp] + sf.noiseFqSmps.map { spectlopeP(at: $0) }.reversed()
             
             borderPathlines += (1 ... 10).map {
-                .init(Rect(x: spectlopeX(atFq: Pitch(octave: $0, step: .c).fq),
-                           y: spfp.y,
+                .init(Rect(x: sourceFilterX(atFq: Pitch(octave: $0, step: .c).fq),
+                           y: sffp.y,
                            width: 0.5 * ratio, height: fh))
             }
             
-            borderPathlines += stride(from: 1000.0, to: 15000.0, by: 1000.0).map {
-                .init(Rect(x: spectlopeX(atFq: $0),
-                           y: spfp.y - 4 * ratio,
-                           width: 0.5 * ratio, height: 4 * ratio))
-            }
-
-            func spectlopePoints(from spectlope: Spectlope, isAppendKnob: Bool) -> (ps: [Point],
-                                                                ns: [Point]) {
-                var ps = [Point]()
-                ps.reserveCapacity(spectlope.count * 4)
-                var ns = [Point]()
-                ns.reserveCapacity(spectlope.count * 4)
-                for (i, formant) in spectlope.enumerated() {
-                    let sp = spectlopeP(at: formant.sFqSmp)
-                    let ep = spectlopeP(at: formant.eFqSmp)
-                    let eep = spectlopeP(at: formant.eeFqSmp)
-                    let nsp = spectlopeP(at: formant.sFqNoiseSmp)
-                    let nep = spectlopeP(at: formant.eFqNoiseSmp)
-                    let neep = spectlopeP(at: formant.eeFqNoiseSmp)
-                    
-                    if i > 0 {
-                        let ssp = spectlopeP(at: spectlope[i, .ssFqSmp])
-                        let ssnp = spectlopeP(at: spectlope[i, .ssFqNoiseSmp])
-                        ps.append(ssp)
-                        ns.append(ssnp)
-                        
-                        if isAppendKnob {
-                            contentPathlines.append(Pathline(circleRadius: knobRadius / 2,
-                                                             position: ssp))
-                            
-                            let essnp = spectlopeP(at: spectlope[i, .editSsFqNoiseSmp])
-                            let nefp = Point(essnp.x, spy)
-                            contentRatioLinePathlines
-                                .append(.init([nefp, essnp],
-                                              isClosed: false))
-                            contentPathlines.append(Pathline(circleRadius: knobRadius / 2,
-                                                             position: essnp))
-                        }
-                    } else {
-                        ps.append(sp)
-                        ns.append(nsp)
-                    }
-                    
-                    ps.append(sp)
-                    ps.append(ep)
-                    ps.append(eep)
-                    
-                    lastP = eep
-                    
-                    ns.append(nsp)
-                    ns.append(nep)
-                    ns.append(neep)
-                    
-                    if isAppendKnob {
-                        let p = spectlopeP(at: formant.fqSmp)
-                        contentPathlines.append(Pathline(circleRadius: knobRadius * 0.75,
-                                                         position: p))
-                        
-                        contentPathlines.append(Pathline(circleRadius: knobRadius / 2,
-                                                         position: eep))
-                        
-                        let nfp = Point(p.x, spy)
-                        let np = Point(p.x, spectlopeY(atSmp: formant.editNoiseSmp))
-                        contentRatioLinePathlines.append(.init([nfp, np],
-                                                               isClosed: false))
-                        contentPathlines.append(Pathline(circleRadius: knobRadius / 2,
-                                                         position: np))
-                        
-                        let eeenp = spectlopeP(at: spectlope[i, .editEeFqNoiseSmp])
-                        let nefp = Point(eeenp.x, spy)
-                        contentRatioLinePathlines
-                            .append(.init([nefp, eeenp],
-                                          isClosed: false))
-                        contentPathlines.append(Pathline(circleRadius: knobRadius / 2,
-                                                         position: eeenp))
-                        
-                        let dfp = Point(p.x, spfp.y - ratio * 2)
-                        let dlp = Point(ep.x, spfp.y - ratio * 2)
-                        contentRatioLinePathlines.append(.init([dfp, dlp], isClosed: false))
-                        contentPathlines.append(Pathline(circleRadius: knobRadius / 2,
-                                                         position: dlp))
-                    }
-                    
-                    if i == spectlope.count - 1 {
-                        let splpy = spectlopeY(atSmp: formant.edSmp)
-                        let nsplpy = spectlopeY(atSmp: formant.edNoiseSmp)
-                        ps.append(Point(splp.x, splpy))
-                        ns.append(Point(splp.x, nsplpy))
-                    }
+            var lastP = Point()
+            var noisePs = [Point](capacity: sf.fqSmps.count)
+            var ps = [Point](capacity: sf.fqSmps.count)
+            for (i, fqSmp) in sf.fqSmps.enumerated() {
+                let noiseSmp = sf.noiseFqSmps[i]
+                
+                let editNoiseP = sourceFilterP(at: sf[i, .editFqNoiseSmp])
+                let noiseFP = Point(editNoiseP.x, spy)
+                let noiseP = sourceFilterP(at: noiseSmp)
+//                contentRatioLinePathlines.append(.init([noiseFP, noiseP],
+//                                                       isClosed: false))
+                contentPathlines.append(Pathline(circleRadius: knobRadius / 2,
+                                                 position: editNoiseP))
+                
+                let p = sourceFilterP(at: fqSmp)
+                contentPathlines.append(Pathline(circleRadius: knobRadius * 0.75,
+                                                 position: p))
+                
+                if i == 0 {
+                    noisePs.append(Point(sffp.x, noiseP.y))
+                    ps.append(Point(sffp.x, p.y))
                 }
-                return (ps, ns)
+                
+                noisePs.append(noiseP)
+                ps.append(p)
+                
+                lastP = p
+                
+                if i == sf.fqSmps.count - 1 {
+                    noisePs.append(Point(sflp.x, noiseP.y))
+                    ps.append(Point(sflp.x, p.y))
+                }
             }
-            let (ps, ns) = spectlopePoints(from: spectlope, isAppendKnob: true)
-            if !ps.isEmpty && !ns.isEmpty {
-                contentRatioLinePathlines += [.init(ns, isClosed: false),
+            if !ps.isEmpty && !noisePs.isEmpty {
+//                let nps = [sffp, sflp] + noisePs.reversed()
+//                borderPathlines += [.init(nps, isClosed: false)]
+                
+                contentRatioLinePathlines += [.init(noisePs, isClosed: false),
                                               .init(ps, isClosed: false)]
             }
             
-            borderPathlines += [.init(nps, isClosed: true)]
-            
-            contentRatioLinePathlines += [.init([spfp, splp],
+            contentRatioLinePathlines += [.init([sffp, sflp],
                                                 isClosed: false)]
             
             contentPathlines.append(Pathline(circleRadius: knobRadius,
-                                             position: Point(lastP.x + ratio * 2, splp.y)))
+                                             position: Point(lastP.x + ratio * 2, sflp.y)))
             
-            boxNodes.append(Node(name: "spectlope",
+            boxNodes.append(Node(name: "sourceFilter",
                                  path: Path(Rect(x: vx,
                                                  y: vy - hfh,
                                                  width: spW,
@@ -2784,136 +2652,79 @@ extension TextView {
         }
     }
     
-    func spectlopeFq(atX x: Double,
-                    octaveCount: Double = 7,
-                    octaveWidth: Double = 20) -> Double? {
-        guard let f = spectlopeFrame else { return nil }
+    func sourceFilterFq(atX x: Double,
+                       octaveCount: Double = 7,
+                       octaveWidth: Double = 20) -> Double? {
+        guard let f = sourceFilterFrame else { return nil }
         let ratio = nodeRatio
         let spx = f.minX + 4 * ratio
         let spW = octaveCount * octaveWidth * ratio
         let mel = ((x - spx) / spW).clipped(min: 0, max: 1,
                                             newMin: 0, newMax: 4000)
         return Mel.fq(fromMel: mel)
-//        return ((x - spx) / spW).clipped(min: 0, max: 1,
-//                                         newMin: 0, newMax: 15000)
     }
-    func spectlopeX(atFq fq: Double,
-                    octaveCount: Double = 7,
-                    octaveWidth: Double = 20) -> Double? {
-        guard let f = spectlopeFrame else { return nil }
+    func sourceFilterX(atFq fq: Double,
+                      octaveCount: Double = 7,
+                      octaveWidth: Double = 20) -> Double? {
+        guard let f = sourceFilterFrame else { return nil }
         let ratio = nodeRatio
         let spx = f.minX + 4 * ratio
         let spW = octaveCount * octaveWidth * ratio
         let t = Mel.mel(fromFq: fq)
             .clipped(min: 0, max: 4000, newMin: 0, newMax: 1)
-//        let t = fq.clipped(min: 0, max: 15000, newMin: 0, newMax: 1)
         return spx + spW * t
     }
-    func formantIndex(at x: Double) -> Int? {
-        guard let spectlope = model.timeframe?.score?.tone.spectlope,
-              let fq = spectlopeFq(atX: x) else { return nil }
-        for (i, formant) in spectlope.formants.enumerated().reversed() {
-            if fq >= formant.fq {
+    func sourceFilterIndex(atX x: Double) -> Int? {
+        guard let sourceFilter = model.timeframe?.score?.tone.sourceFilter,
+              let fq = sourceFilterFq(atX: x) else { return nil }
+        for (i, fqSmp) in sourceFilter.fqSmps.enumerated().reversed() {
+            if fq >= fqSmp.x {
                 return i
             }
         }
         return nil
     }
-    func formantFrame(at i: Int) -> Rect? {
-        guard let f = spectlopeFrame,
-              let score = model.timeframe?.score else { return nil }
-        
-        let ratio = nodeRatio
-        let spx = f.minX + 4 * ratio, spy = f.minY + 4 * ratio
-        
-        func spectlopeP(at p: Point) -> Point {
-            .init(spectlopeX(atFq: p.x)!,
-                  spectlopeY(atSmp: p.y)!)
-        }
-        
-        let spfp = Point(spx, spy)
-        
-        var ps = [Point]()
-        let spectlope = score.tone.spectlope
-        let formant = spectlope.formants[i]
-        
-        let ep = spectlopeP(at: formant.eFqSmp)
-        let eep = spectlopeP(at: formant.eeFqSmp)
-        
-        if i > 0 {
-            let ssp = spectlopeP(at: spectlope[i, .ssFqSmp])
-            ps.append(ssp)
-            let essnp = spectlopeP(at: spectlope[i, .editSsFqNoiseSmp])
-            ps.append(essnp)
-        }
-        let p = spectlopeP(at: formant.fqSmp)
-        ps.append(p)
-        ps.append(eep)
-        let np = Point(p.x, spectlopeY(atSmp: formant.editNoiseSmp)!)
-        ps.append(np)
-        let eeenp = spectlopeP(at: spectlope[i, .editEeFqNoiseSmp])
-        ps.append(eeenp)
-        let dlp = Point(ep.x, spfp.y - ratio * 2)
-        ps.append(dlp)
-        return ps.bounds
-    }
-    func spectlopeY(atSmp smp: Double, height: Double = 12) -> Double? {
-        guard let f = spectlopeFrame else { return nil }
+    func sourceFilterY(atSmp smp: Double, height: Double = 12) -> Double? {
+        guard let f = sourceFilterFrame else { return nil }
         let ratio = nodeRatio
         let spy = f.minY + 4 * ratio
         let fh = height * ratio
         return spy + smp * fh
     }
+    func sourceFilterSmp(atY y: Double, height: Double = 12) -> Double? {
+        guard let f = sourceFilterFrame else { return nil }
+        let ratio = nodeRatio
+        let spy = f.minY + 4 * ratio
+        let fh = height * ratio
+        return (y - spy) / fh
+    }
     
-    func spectlopeType(at p: Point,
-                       maxDistance: Double) -> (i: Int, type: SpectlopeType, isLast: Bool)? {
-        guard let f = spectlopeFrame, f.contains(p),
+    func sourceFilterType(at p: Point,
+                       maxDistance: Double) -> (i: Int, type: SourceFilterType, isLast: Bool)? {
+        guard let f = sourceFilterFrame, f.contains(p),
               let score = model.timeframe?.score else { return nil }
         
         let ratio = nodeRatio
-        let spx = f.minX + 4 * ratio, spy = f.minY + 4 * ratio
+        let spy = f.minY + 4 * ratio
         
-        func spectlopeP(at p: Point) -> Point {
-            .init(spectlopeX(atFq: p.x)!,
-                  spectlopeY(atSmp: p.y)!)
+        func sourceFilterP(at p: Point) -> Point {
+            .init(sourceFilterX(atFq: p.x)!,
+                  sourceFilterY(atSmp: p.y)!)
         }
         
-        let spfp = Point(spx, spy)
-        
-        var ps = [(p: Point, i: Int, type: SpectlopeType)](), lastP = Point()
-        let spectlope = score.tone.spectlope
-        for (i, formant) in spectlope.enumerated() {
-            let ep = spectlopeP(at: formant.eFqSmp)
-            let eep = spectlopeP(at: formant.eeFqSmp)
+        var ps = [(p: Point, i: Int, type: SourceFilterType)](), lastP = Point()
+        let sf = score.tone.sourceFilter
+        for (i, fqSmp) in sf.fqSmps.enumerated() {
+            let enp = sourceFilterP(at: sf[i, .editFqNoiseSmp])
+            let p = sourceFilterP(at: fqSmp)
             
-            if i > 0 {
-                let ssp = spectlopeP(at: spectlope[i, .ssFqSmp])
-                
-                ps.append((ssp, i, .ssFqSmp))
-                
-                let essnp = spectlopeP(at: spectlope[i, .editSsFqNoiseSmp])
-                ps.append((essnp, i, .editSsFqNoiseSmp))
-            }
-            
-            lastP = eep
-            
-            let p = spectlopeP(at: formant.fqSmp)
+            ps.append((enp, i, .editFqNoiseSmp))
             ps.append((p, i, .fqSmp))
-            
-            ps.append((eep, i, .eeFqSmp))
-            
-            let np = Point(p.x, spectlopeY(atSmp: formant.editNoiseSmp)!)
-            ps.append((np, i, .editFqNoiseSmp))
-            
-            let eeenp = spectlopeP(at: spectlope[i, .editEeFqNoiseSmp])
-            ps.append((eeenp, i, .editEeFqNoiseSmp))
-            
-            let dlp = Point(ep.x, spfp.y - ratio * 2)
-            ps.append((dlp, i, .dFqZero))
+            lastP = p
         }
         
         let maxDS = maxDistance * maxDistance
-        var minDS = Double.infinity, minI: Int?, minType = SpectlopeType.fqSmp
+        var minDS = Double.infinity, minI: Int?, minType = SourceFilterType.fqSmp
         
         for fpt in ps {
             let ds = fpt.p.distanceSquared(p)
@@ -2924,23 +2735,26 @@ extension TextView {
             }
         }
         
+        if let minI, minType == .editFqNoiseSmp && sourceFilterP(at: sf.fqSmps[minI]).distance(sourceFilterP(at: sf[minI, .editFqNoiseSmp])) < ratio * 2 {
+            minType = .fqSmp
+        }
+        
         let np = Point(lastP.x + ratio * 2, spy)
         let ds = np.distanceSquared(p)
         if ds < minDS && ds < maxDS {
-            return (score.tone.spectlope.formants.count - 1,
-                    minType, true)
+            return (score.tone.sourceFilter.fqSmps.count - 1, minType, true)
         } else if let minI {
             return (minI, minType, false)
         } else {
             return nil
         }
     }
-    func containsSpectlope(_ p: Point) -> Bool {
-        spectlopeFrame?.contains(p) ?? false
+    func containsSourceFilter(_ p: Point) -> Bool {
+        sourceFilterFrame?.contains(p) ?? false
     }
-    var spectlopeFrame: Rect? {
+    var sourceFilterFrame: Rect? {
         guard model.timeframe?.score != nil else { return nil }
-        if let node = timeframeNode.children.first(where: { $0.name == "spectlope" }) {
+        if let node = timeframeNode.children.first(where: { $0.name == "sourceFilter" }) {
             return node.transformedBounds
         } else {
             return nil
@@ -2979,7 +2793,7 @@ extension TextView {
     }
     var toneFrame: Rect? {
         guard model.timeframe?.score != nil else { return nil }
-        return overtoneFrame + spectlopeFrame
+        return overtoneFrame + sourceFilterFrame
     }
     
     func containsScore(_ p: Point) -> Bool {
@@ -3132,30 +2946,31 @@ extension TextView {
             return ([.init(line0), .init(line1)], [], nil)
         }
         
-        let lyricPath: Path?
-        if !note.lyric.isEmpty || note.isBreath || note.isVibrato || note.isVowelReduction {
-            let lyricText = Text(string: "\(note.lyric)" + (note.isBreath ? "^" : "") + (note.isVibrato ? "~" : "") + (note.isVowelReduction ? "/" : ""),
-                                 size: Font.smallSize * ratio)
-            let typesetter = lyricText.typesetter
-            lyricPath = typesetter.path() * Transform(translationX: nx, y: ny - typesetter.height / 2)
-        } else {
-            lyricPath = nil
+        func lyricPath(at p: Point) -> Path? {
+            if !note.lyric.isEmpty || note.isBreath || note.isVibrato || note.isVowelReduction {
+                let lyricText = Text(string: "\(note.lyric)" + (note.isBreath ? "^" : "") + (note.isVibrato ? "~" : "") + (note.isVowelReduction ? "/" : ""),
+                                     size: Font.smallSize * ratio)
+                let typesetter = lyricText.typesetter
+                return typesetter.path() * Transform(translationX: p.x, y: p.y - typesetter.height / 2)
+            } else {
+                return nil
+            }
         }
         
+        let smpT = note.volume.smp
+            .clipped(min: 0, max: Volume.maxSmp, newMin: 0, newMax: 1) + 1 / noteHeight
         if !note.pitbend.isEmpty || (note.pitbend.isEmpty && !note.lyric.isEmpty) {
             let pitbend = pitbend(from: note, tempo: tempo, preFq: preFq, nextFq: nextFq)
-            
             let secDur = Double(Timeframe.sec(fromBeat: note.beatRange.length, tempo: tempo))
-            let vt = Volume(amp: note.volume.amp).smp + 1 / noteHeight
             
             var line = pitbend.line(secDuration: secDur,
-                                            envelope: note.tone.envelope) ?? Line()
+                                    envelope: note.tone.envelope) ?? Line()
             line.controls = line.controls.map {
                 .init(point: .init($0.point.x / secDur * nw + nx,
                                    self.height(fromPitch: $0.point.y * 12,
                                                noteHeight: noteHeight) + ny),
                       weight: $0.weight,
-                      pressure: $0.pressure * vt)
+                      pressure: $0.pressure * smpT)
             }
             
             let knobPathlines = pitbend.pits.map {
@@ -3165,15 +2980,13 @@ extension TextView {
                                                      noteHeight: noteHeight) + ny))
             }
             
-            return ((line.isEmpty ? [] : [.init(line)]), knobPathlines, lyricPath)
+            let lp = (line.controls.first?.point ?? .init(nx, ny)) + .init(0, -noteHeight / 2)
+            return ((line.isEmpty ? [] : [.init(line)]), knobPathlines, lyricPath(at: lp))
         } else {
-            let smpT = Volume(amp: note.volume.amp).smp
-                .clipped(min: 0, max: Volume.maxSmp,
-                         newMin: 0, newMax: 1)
             let env = note.tone.envelope
             let attackW = width(atSecDuration: env.attack)
             let sustain = Volume(amp: note.volume.amp * env.sustain).smp
-                .clipped(min: 0, max: Volume.maxSmp, newMin: 0, newMax: 1)
+                .clipped(min: 0, max: Volume.maxSmp, newMin: 0, newMax: 1) + 1 / noteHeight
             let line = Line(controls: [.init(point: Point(nx, ny), pressure: 0),
                                        .init(point: Point(nx + attackW, ny), pressure: smpT),
                                        .init(point: Point(nx + attackW, ny), pressure: smpT),
@@ -3182,7 +2995,7 @@ extension TextView {
                                        .init(point: Point(nx + nw, ny), pressure: sustain),
                                        .init(point: Point(nx + nw, ny), pressure: sustain),
                                        .init(point: Point(nx + nw + width(atSecDuration: env.release), ny), pressure: 0)])
-            return ([.init(line)], [], lyricPath)
+            return ([.init(line)], [], lyricPath(at: .init(nx, ny - noteHeight / 2)))
         }
     }
     

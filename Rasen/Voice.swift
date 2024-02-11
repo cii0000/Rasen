@@ -50,7 +50,6 @@ extension Score {
             return note
         }
         
-        let sourceFIlter = SourceFilter(score.tone.spectlope)
         guard score.isVoice else {
             return notes.map { note in
                 let startBeat = note.beatRange.start
@@ -63,9 +62,9 @@ extension Score {
                 
                 let pitbend = note.pitbend.with(scale: eSec - sSec)
                 return .init(fq: note.fq,
-                             sourceFilter: sourceFIlter,
-                             spectlopeInterpolation: nil,
-                             deltaSpectlopeInterpolation: nil,
+                             sourceFilter: score.tone.sourceFilter,
+                             formantFilterInterpolation: nil,
+                             deltaFormantFilterInterpolation: nil,
                              fAlpha: 1,
                              seed: Rendnote.seed(fromFq: note.fq, sec: sSec,
                                                  position: position),
@@ -121,7 +120,7 @@ extension Score {
         
         var nNotes = [Rendnote]()
         nNotes.reserveCapacity(notes.count)
-        var previousMora: Mora?
+        var previousMora: Mora? // with all notes
         for (ni, note) in notes.enumerated() {
             guard !note.lyric.isEmpty else {
                 previousMora = nil
@@ -136,9 +135,9 @@ extension Score {
                 
                 let pitbend = note.pitbend.with(scale: eSec - sSec)
                 nNotes.append(.init(fq: note.fq,
-                                    sourceFilter: sourceFIlter,
-                                    spectlopeInterpolation: nil,
-                                    deltaSpectlopeInterpolation: nil,
+                                    sourceFilter: note.tone.sourceFilter,
+                                    formantFilterInterpolation: nil,
+                                    deltaFormantFilterInterpolation: nil,
                                     fAlpha: 1,
                                     seed: Rendnote.seed(fromFq: note.fq, sec: sSec,
                                                         position: position),
@@ -155,6 +154,8 @@ extension Score {
                 continue
             }
             
+            let baseFormantFIlter = FormantFilter()
+            
             let deltaSecToNext: Double, nextMora: Mora?
             if ni + 1 < notes.count {
                 let nextNote = notes[ni + 1]
@@ -166,7 +167,7 @@ extension Score {
                                         previousMora: nil,
                                         nextMora: nil,
                                         isVowelReduction: note.isVowelReduction,
-                                        from: score.tone.spectlope) {
+                                        from: baseFormantFIlter) {
                     deltaSecToNext = dstn
                         + aNextMora.deltaSyllabicStartSec
                         - aNextMora.onsetSecDur
@@ -186,7 +187,7 @@ extension Score {
                                   previousMora: previousMora,
                                   nextMora: nextMora,
                                   isVowelReduction: note.isVowelReduction,
-                                  from: score.tone.spectlope) else {
+                                  from: baseFormantFIlter) else {
                 previousMora = nil
                 continue
             }
@@ -217,8 +218,8 @@ extension Score {
                 let volumeAmp = note.volumeAmp * onset.volumeAmp
                 nNotes.append(.init(fq: fq,
                                     sourceFilter: onset.sourceFilter,
-                                    spectlopeInterpolation: nil,
-                                    deltaSpectlopeInterpolation: nil,
+                                    formantFilterInterpolation: nil,
+                                    deltaFormantFilterInterpolation: nil,
                                     fAlpha: 1,
                                     seed: Rendnote.seed(fromFq: fq,
                                                         sec: nsSec,
@@ -268,15 +269,15 @@ extension Score {
                     .with(scale: nDur)
                 let waver = Waver(envelope: envelope,
                                   pitbend: pitbend)
-                let si = mora.spectlopeInterpolation(fromDuration: nDur + releaseSec)
+                let si = mora.formantFilterInterpolation(fromDuration: nDur + releaseSec)
                 let dsi = Interpolation(keys: si.keys.map {
-                    .init(value: $0.value.divide(score.tone.spectlope),
+                    .init(value: $0.value.divide(baseFormantFIlter),
                           time: $0.time, type: $0.type)
                 }, duration: si.duration)
                 nNotes.append(.init(fq: note.fq,
-                                    sourceFilter: sourceFIlter,
-                                    spectlopeInterpolation: si,
-                                    deltaSpectlopeInterpolation: dsi,
+                                    sourceFilter: note.tone.sourceFilter,
+                                    formantFilterInterpolation: si,
+                                    deltaFormantFilterInterpolation: dsi,
                                     fAlpha: 1,
                                     seed: Rendnote.seed(fromFq: fq,
                                                         sec: mainSec,
@@ -568,7 +569,7 @@ extension Formant {
     }
 }
 
-struct Spectlope: Hashable, Codable {
+struct FormantFilter: Hashable, Codable {
     var formants: [Formant] = [
         .init(sFq: 0, eFq: 300, edFq: 400,
               smp: 0.8, noiseT: 0,
@@ -596,25 +597,15 @@ struct Spectlope: Hashable, Codable {
               edSmp: 0.1, edNoiseT: 0.8)
     ]
 }
-extension Spectlope: Protobuf {
-    init(_ pb: PBSpectlope) throws {
-        formants = pb.formants.compactMap { try? Formant($0) }
-    }
-    var pb: PBSpectlope {
-        .with {
-            $0.formants = formants.map { $0.pb }
-        }
-    }
-}
-enum SpectlopeType {
+enum FormantFilterType {
     case fqSmp, fqNoiseSmp, editFqNoiseSmp, dFqZero,
          ssFqSmp, ssFqNoiseSmp, editSsFqNoiseSmp,
          eeFqSmp, eeFqNoiseSmp, editEeFqNoiseSmp
 }
-extension Spectlope {
+extension FormantFilter {
     static let empty = Self.init(formants: .init(repeating: .init(),
                                                  count: 8))
-    subscript(i: Int, type: SpectlopeType) -> Point {
+    subscript(i: Int, type: FormantFilterType) -> Point {
         get {
             switch type {
             case .fqSmp: .init(self[i].fqSmp)
@@ -668,7 +659,7 @@ extension Spectlope {
         }
     }
 }
-extension Spectlope {
+extension FormantFilter {
     func divide(_ os: Self) -> Self {
         .init(formants: (0 ..< Swift.min(count, os.count)).map { j in
                 .init(sdFq: Swift.max(0, self[j].sdFq.safeDivide(os[j].sdFq)),
@@ -694,8 +685,8 @@ extension Spectlope {
         })
     }
 }
-extension Spectlope {
-    func with(lyric: String) -> Spectlope {
+extension FormantFilter {
+    func with(lyric: String) -> FormantFilter {
         let phonemes = Phoneme.phonemes(fromHiragana: lyric)
         if let phoneme = phonemes.last, phoneme.isSyllabicJapanese {
             return with(phoneme: phoneme)
@@ -703,7 +694,7 @@ extension Spectlope {
             return self
         }
     }
-    func with(phoneme: Phoneme) -> Spectlope {
+    func with(phoneme: Phoneme) -> FormantFilter {
         switch phoneme {
         case .a: return self
         case .i:
@@ -860,7 +851,7 @@ extension Spectlope {
         }
     }
 }
-extension Spectlope: RandomAccessCollection {
+extension FormantFilter: RandomAccessCollection {
     var startIndex: Int { formants.startIndex }
     var endIndex: Int { formants.endIndex }
     subscript(i: Int) -> Formant {
@@ -872,7 +863,7 @@ extension Spectlope: RandomAccessCollection {
         }
     }
 }
-extension Spectlope: Interpolatable {
+extension FormantFilter: Interpolatable {
     static func linear(_ f0: Self, _ f1: Self, t: Double) -> Self {
         .init(formants: .linear(f0.formants, f1.formants, t: t))
     }
@@ -892,7 +883,7 @@ extension Spectlope: Interpolatable {
                                     f2.formants, t: t))
     }
 }
-extension Spectlope: MonoInterpolatable {
+extension FormantFilter: MonoInterpolatable {
     static func firstMonospline(_ f1: Self, _ f2: Self,
                                 _ f3: Self, with ms: Monospline) -> Self {
         .init(formants: .firstMonospline(f1.formants, f2.formants,
@@ -910,7 +901,7 @@ extension Spectlope: MonoInterpolatable {
                                         f2.formants, with: ms))
     }
 }
-extension Spectlope {
+extension FormantFilter {
     var isFullNoise: Bool {
         !(formants.contains(where: { !$0.isFullNoise }))
     }
@@ -921,20 +912,20 @@ extension Spectlope {
     var maxSinFq: Double {
         self[5].eeFq
     }
-    func voiceless(fqScale: Double = 0.8) -> Spectlope {
+    func voiceless(fqScale: Double = 0.8) -> FormantFilter {
         var n = self
         n[0].fq *= fqScale
         n[1].fq *= fqScale
         n[4].smp = n[3].edSmp
         return n
     }
-    func movedF2(sFq: Double, eFq: Double) -> Spectlope {
+    func movedF2(sFq: Double, eFq: Double) -> FormantFilter {
         var n = self
         n[2].sFq = sFq
         n[2].eFq = eFq
         return n
     }
-    func offVoice() -> Spectlope {
+    func offVoice() -> FormantFilter {
         var sl = off(from: 2)
         sl[0].fq = 0
         sl[0].edSmp = 0
@@ -943,7 +934,7 @@ extension Spectlope {
         return sl
     }
     func multiplyF2To(f2Smp: Double = 0.85,
-                      smp: Double = 0.43) -> Spectlope {
+                      smp: Double = 0.43) -> FormantFilter {
         var v = self
         v[1].edSmp *= f2Smp
         v[2].smp *= f2Smp
@@ -955,7 +946,7 @@ extension Spectlope {
         }
         return v
     }
-    func off(to i: Int) -> Spectlope {
+    func off(to i: Int) -> FormantFilter {
         var v = self
         for i in 0 ... i {
             v[i].smp = 0
@@ -963,7 +954,7 @@ extension Spectlope {
         }
         return v
     }
-    func off(from i: Int) -> Spectlope {
+    func off(from i: Int) -> FormantFilter {
         var v = self
         for i in i ..< 8 {
             v[i].smp = 0
@@ -979,18 +970,18 @@ extension Spectlope {
         }
         return sl
     }
-    func filledNoiseT(from sl: Spectlope) -> Spectlope {
+    func filledNoiseT(from sl: FormantFilter) -> FormantFilter {
         .init(formants: formants.enumerated().map { $0.element.filledNoiseT(sl[$0.offset]) })
     }
-    func filledSmp(from sl: Spectlope) -> Spectlope {
+    func filledSmp(from sl: FormantFilter) -> FormantFilter {
         .init(formants: formants.enumerated().map { $0.element.filledSmp(sl[$0.offset]) })
     }
-    func union(smp: Double = 0.85) -> Spectlope {
+    func union(smp: Double = 0.85) -> FormantFilter {
         var v = self
         v[2].smp *= smp
         return v
     }
-    func fricative(isO: Bool) -> Spectlope {
+    func fricative(isO: Bool) -> FormantFilter {
         var sl = off(from: 6)
         sl[0].smp = 0
         sl[0].edSmp *= 0.56
@@ -1007,7 +998,7 @@ extension Spectlope {
         sl[5].edSmp = 0
         return sl
     }
-    func breath() -> Spectlope {
+    func breath() -> FormantFilter {
         var sl = off(from: 5)
         sl[0].smp = sl[2].smp * 0.7
         sl[0].edSmp = sl[1].edSmp * 0.7
@@ -1017,7 +1008,7 @@ extension Spectlope {
         sl[4].smp *= 0.7
         return sl
     }
-    func toDakuon() -> Spectlope {
+    func toDakuon() -> FormantFilter {
         var sl = off(from: 2)
         sl[0].fqRange = 0 ... 400
         sl[0].edSmp *= 0.94
@@ -1026,14 +1017,11 @@ extension Spectlope {
         sl[1].edSmp = 0
         return sl
     }
-    func toNoise() -> Spectlope {
+    func toNoise() -> FormantFilter {
         var sl = self
         sl.formants = sl.formants.map { $0.toNoise() }
         return sl
     }
-//    func strong(t: Double) -> Spectlope {
-//
-//    }
     
     mutating func optimize() {
         var preFq = 0.0
@@ -1070,12 +1058,12 @@ extension Onset {
     }
 }
 
-struct KeySpectlope: Hashable, Codable {
-    var spectlope: Spectlope
+struct KeyFormantFilter: Hashable, Codable {
+    var formantFilter: FormantFilter
     var sec = 0.0
     
-    init(_ spectlope: Spectlope, sec: Double = 0) {
-        self.spectlope = spectlope
+    init(_ formantFilter: FormantFilter, sec: Double = 0) {
+        self.formantFilter = formantFilter
         self.sec = sec
     }
 }
@@ -1092,21 +1080,21 @@ struct Mora: Hashable, Codable {
     var isVowel = false
     var isDakuon = false
     var isOffVoice = false
-    var firstMainSpectlope: Spectlope
-    var firstKeySpectlopes: [KeySpectlope]
-    var lastKeySpectlopes: [KeySpectlope]
+    var firstMainFormantFilter: FormantFilter
+    var firstKeyFormantFilters: [KeyFormantFilter]
+    var lastKeyFormantFilters: [KeyFormantFilter]
     
     init?(hiragana: String, fq: Double,
           previousMora: Mora?, nextMora: Mora?,
           isVowelReduction: Bool,
-          from baseSpectlope: Spectlope) {
+          from baseFormantFilter: FormantFilter) {
         var phonemes = Phoneme.phonemes(fromHiragana: hiragana)
         guard !phonemes.isEmpty else { return nil }
         lyric = hiragana
         self.fq = fq
         
-        func spectlope(from phoneme: Phoneme) -> Spectlope? {
-            baseSpectlope.with(phoneme: phoneme).optimized()
+        func formantFilter(from phoneme: Phoneme) -> FormantFilter? {
+            baseFormantFilter.with(phoneme: phoneme).optimized()
         }
         
         syllabics = []
@@ -1122,13 +1110,13 @@ struct Mora: Hashable, Codable {
         case .sokuon:
             syllabics.append(phonemes.last!)
             
-            let ɯSl = baseSpectlope.with(phoneme: .ɯ)
+            let ɯSl = baseFormantFilter.with(phoneme: .ɯ)
             
             sourceFilter = SourceFilter()
             onsets = []
-            firstKeySpectlopes = [.init(ɯSl, sec: 0)]
-            firstMainSpectlope = firstKeySpectlopes.first!.spectlope
-            lastKeySpectlopes = [.init(ɯSl, sec: 0.1)]
+            firstKeyFormantFilters = [.init(ɯSl, sec: 0)]
+            firstMainFormantFilter = firstKeyFormantFilters.first!.formantFilter
+            lastKeyFormantFilters = [.init(ɯSl, sec: 0.1)]
             return
         case .breath:
             syllabics.append(phonemes.last!)
@@ -1136,7 +1124,7 @@ struct Mora: Hashable, Codable {
             sourceFilter = SourceFilter()
             onsets = []
             
-            let aSl = baseSpectlope.with(phoneme: .a)
+            let aSl = baseFormantFilter.with(phoneme: .a)
             
             let tl = 0.05
             
@@ -1170,14 +1158,14 @@ struct Mora: Hashable, Codable {
                                 sourceFilter: .init(sl)))
             onsetSecDur = tl
             
-            firstKeySpectlopes = [.init(.empty, sec: 0)]
-            firstMainSpectlope = firstKeySpectlopes.first!.spectlope
-            lastKeySpectlopes = [.init(.empty, sec: 0.1)]
+            firstKeyFormantFilters = [.init(.empty, sec: 0)]
+            firstMainFormantFilter = firstKeyFormantFilters.first!.formantFilter
+            lastKeyFormantFilters = [.init(.empty, sec: 0.1)]
             return
         default: return nil
         }
-        let syllabicSpectlope = spectlope(from: syllabics.last!)!
-        sourceFilter = .init(syllabicSpectlope)
+        let syllabicFormantFilter = formantFilter(from: syllabics.last!)!
+        sourceFilter = .init(syllabicFormantFilter)
         
         onsets = []
         
@@ -1198,14 +1186,14 @@ struct Mora: Hashable, Codable {
         enum Youon {
             case j, β, none
         }
-        let youon: Youon, youonKsls: [KeySpectlope]
+        let youon: Youon, youonKsls: [KeyFormantFilter]
         switch phonemes.last {
         case .j, .ja:
             youon = .j
             let phoneme = phonemes.last!
             phonemes.removeLast()
             
-            var sl = spectlope(from: phoneme)!
+            var sl = formantFilter(from: phoneme)!
                 .multiplyF2To(f2Smp: 0.7, smp: 1)
             sl[2].sdFq *= 4
             sl[2].edFq *= 4
@@ -1217,7 +1205,7 @@ struct Mora: Hashable, Codable {
             youon = .β
             phonemes.removeLast()
             
-            let sl = spectlope(from: .β)!.multiplyF2To()
+            let sl = formantFilter(from: .β)!.multiplyF2To()
             youonKsls = [.init(sl, sec: 0.01),
                          .init(sl, sec: 0.075)]
             deltaSyllabicStartSec = -0.025
@@ -1228,8 +1216,8 @@ struct Mora: Hashable, Codable {
             youonKsls = []
         }
         
-        firstKeySpectlopes = []
-        lastKeySpectlopes = []
+        firstKeyFormantFilters = []
+        lastKeyFormantFilters = []
         
         if phonemes.count != 1 {
             onsets = []
@@ -1238,37 +1226,37 @@ struct Mora: Hashable, Codable {
             switch oph {
             case .n, .nj:
                 let nTl = 0.0325
-                let nsl = spectlope(from: oph)!
-                let nextSl = youonKsls.first?.spectlope ?? syllabicSpectlope
+                let nsl = formantFilter(from: oph)!
+                let nextSl = youonKsls.first?.formantFilter ?? syllabicFormantFilter
                 var nnsl = nsl
                 nnsl[2].edSmp = .linear(nnsl[2].edSmp, nextSl[2].smp, t: 0.075)
                 nnsl[3].edSmp = .linear(nnsl[3].edSmp, nextSl[3].smp, t: 0.025)
-                firstKeySpectlopes.append(.init(nsl, sec: nTl))
-                firstKeySpectlopes.append(.init(nnsl, sec: youon != .none ? 0.01 : 0.015))
+                firstKeyFormantFilters.append(.init(nsl, sec: nTl))
+                firstKeyFormantFilters.append(.init(nnsl, sec: youon != .none ? 0.01 : 0.015))
                 deltaSyllabicStartSec = -0.01
                 onsetSecDur = nTl
                 deltaSinStartSec -= nTl
             case .m, .mj:
                 let mTl = 0.0325
-                let msl = spectlope(from: oph)!
-                let nextSl = youonKsls.first?.spectlope ?? syllabicSpectlope
+                let msl = formantFilter(from: oph)!
+                let nextSl = youonKsls.first?.formantFilter ?? syllabicFormantFilter
                 var nmsl = msl
                 nmsl[2].edSmp = .linear(nmsl[2].edSmp, nextSl[2].smp, t: 0.075)
                 nmsl[3].edSmp = .linear(nmsl[3].edSmp, nextSl[3].smp, t: 0.025)
-                firstKeySpectlopes.append(.init(msl, sec: mTl))
-                firstKeySpectlopes.append(.init(nmsl, sec: youon != .none ? 0.01 : 0.015))
+                firstKeyFormantFilters.append(.init(msl, sec: mTl))
+                firstKeyFormantFilters.append(.init(nmsl, sec: youon != .none ? 0.01 : 0.015))
                 deltaSyllabicStartSec = -0.01
                 onsetSecDur = mTl
                 deltaSinStartSec -= mTl
             case .r, .rj:
                 let rTl = 0.01
-                let rsl = spectlope(from: oph)!
-                let nextSl = youonKsls.first?.spectlope ?? syllabicSpectlope
+                let rsl = formantFilter(from: oph)!
+                let nextSl = youonKsls.first?.formantFilter ?? syllabicFormantFilter
                 var nrsl = rsl
                 nrsl[2].edSmp = .linear(nrsl[2].edSmp, nextSl[2].smp, t: 0.075)
                 nrsl[3].edSmp = .linear(nrsl[3].edSmp, nextSl[3].smp, t: 0.025)
-                firstKeySpectlopes.append(.init(rsl, sec: rTl))
-                firstKeySpectlopes.append(.init(nrsl, sec: youon != .none ? 0.01 : 0.05))
+                firstKeyFormantFilters.append(.init(rsl, sec: rTl))
+                firstKeyFormantFilters.append(.init(nrsl, sec: youon != .none ? 0.01 : 0.05))
                 deltaSyllabicStartSec = 0.0
                 onsetSecDur = rTl
                 deltaSinStartSec -= rTl
@@ -1477,7 +1465,7 @@ struct Mora: Hashable, Codable {
                     = previousMora?.syllabics == [.sokuon]
                     || isVowelReduction ? 1.5 : 1
                 let hTl = 0.06 * sokuonScale
-                let psl = youonKsls.first?.spectlope ?? syllabicSpectlope
+                let psl = youonKsls.first?.formantFilter ?? syllabicFormantFilter
                 let npsl = psl.fricative(isO: syllabics.first == .o).toNoise()
                 onsets.append(.init(duration: hTl,
                                     volume: .init(smp: 0.37),
@@ -1561,15 +1549,15 @@ struct Mora: Hashable, Codable {
             }
         }
         
-        firstKeySpectlopes += youonKsls
-        firstKeySpectlopes.append(.init(syllabicSpectlope, sec: 0))
+        firstKeyFormantFilters += youonKsls
+        firstKeyFormantFilters.append(.init(syllabicFormantFilter, sec: 0))
         
-        firstMainSpectlope = firstKeySpectlopes.first!.spectlope
+        firstMainFormantFilter = firstKeyFormantFilters.first!.formantFilter
         
         if isOffVoice && youon == .none {
-            let sl = firstMainSpectlope
+            let sl = firstMainFormantFilter
             if phonemes.last == .g || phonemes.last == .d || phonemes.last == .b {
-                let osl: Spectlope
+                let osl: FormantFilter
                 switch phonemes.last {
                 case .g:
                     osl = syllabics.last! == .o || syllabics.last! == .ɯ ?
@@ -1579,22 +1567,22 @@ struct Mora: Hashable, Codable {
                 case .b: osl = sl.movedF2(sFq: 600, eFq: 800)
                 default: fatalError()
                 }
-                let nsl = Spectlope.linear(osl, sl, t: 0.8).voiceless()
-                firstKeySpectlopes.insert(.init(nsl, sec: 0.075 * 0.25), at: 0)
-                let nnsl = Spectlope.linear(nsl, firstMainSpectlope, t: 0.25)
-                    .filledSmp(from: firstMainSpectlope)
-                firstKeySpectlopes.insert(.init(nnsl, sec: 0.075 * 0.75), at: 1)
-            } else if let preSl = previousMora?.mainSpectlope {
-                let nsl = Spectlope.linear(preSl.offVoice(), sl, t: 0.65)
+                let nsl = FormantFilter.linear(osl, sl, t: 0.8).voiceless()
+                firstKeyFormantFilters.insert(.init(nsl, sec: 0.075 * 0.25), at: 0)
+                let nnsl = FormantFilter.linear(nsl, firstMainFormantFilter, t: 0.25)
+                    .filledSmp(from: firstMainFormantFilter)
+                firstKeyFormantFilters.insert(.init(nnsl, sec: 0.075 * 0.75), at: 1)
+            } else if let preSl = previousMora?.mainFormantFilter {
+                let nsl = FormantFilter.linear(preSl.offVoice(), sl, t: 0.65)
                     .voiceless()
-                firstKeySpectlopes.insert(.init(nsl, sec: 0.075 * 0.25), at: 0)
-                let nnsl = Spectlope.linear(nsl, firstMainSpectlope, t: 0.25)
-                    .filledSmp(from: firstMainSpectlope)
-                firstKeySpectlopes.insert(.init(nnsl, sec: 0.075 * 0.75), at: 1)
+                firstKeyFormantFilters.insert(.init(nsl, sec: 0.075 * 0.25), at: 0)
+                let nnsl = FormantFilter.linear(nsl, firstMainFormantFilter, t: 0.25)
+                    .filledSmp(from: firstMainFormantFilter)
+                firstKeyFormantFilters.insert(.init(nnsl, sec: 0.075 * 0.75), at: 1)
             }
         } else if isVowel {
-            let nsl = firstMainSpectlope.offVoice()
-            firstKeySpectlopes.insert(.init(nsl, sec: 0.02), at: 0)
+            let nsl = firstMainFormantFilter.offVoice()
+            firstKeyFormantFilters.insert(.init(nsl, sec: 0.02), at: 0)
         }
         
         if firstType == .dakuon {
@@ -1607,67 +1595,67 @@ struct Mora: Hashable, Codable {
             onsets.append(.init(duration: dakuTl, volume: .init(smp: 0.5),
                                 sourceFilter: sf))
             
-            let sl = firstKeySpectlopes[.first].spectlope.toDakuon()
-            firstKeySpectlopes.insert(.init(sl, sec: 0.0075), at: 0)
-            firstKeySpectlopes.insert(.init(sl, sec: 0.01), at: 1)
+            let sl = firstKeyFormantFilters[.first].formantFilter.toDakuon()
+            firstKeyFormantFilters.insert(.init(sl, sec: 0.0075), at: 0)
+            firstKeyFormantFilters.insert(.init(sl, sec: 0.01), at: 1)
             deltaSinStartSec = -0.0075
         }
         
         var t = 0.0
-        firstKeySpectlopes = firstKeySpectlopes.map {
-            let ks = KeySpectlope($0.spectlope, sec: t)
+        firstKeyFormantFilters = firstKeyFormantFilters.map {
+            let ks = KeyFormantFilter($0.formantFilter, sec: t)
             t += $0.sec
             return ks
         }
         
-        let preSl = firstKeySpectlopes.last!.spectlope.multiplyFq(1.02)
-        lastKeySpectlopes.append(.init(preSl, sec: 0))
+        let preSl = firstKeyFormantFilters.last!.formantFilter.multiplyFq(1.02)
+        lastKeyFormantFilters.append(.init(preSl, sec: 0))
         if let nextMora {
-            let sl = nextMora.firstMainSpectlope
+            let sl = nextMora.firstMainFormantFilter
             if nextMora.isOffVoice {
-                let nsl = Spectlope.linear(preSl, sl, t: 0.3).offVoice()
-                let nnsl = Spectlope.linear(preSl, nsl, t: 0.25)
-                lastKeySpectlopes.append(.init(nnsl, sec: 0.05 * 0.25))
-                lastKeySpectlopes.append(.init(nsl, sec: 0.05))
+                let nsl = FormantFilter.linear(preSl, sl, t: 0.3).offVoice()
+                let nnsl = FormantFilter.linear(preSl, nsl, t: 0.25)
+                lastKeyFormantFilters.append(.init(nnsl, sec: 0.05 * 0.25))
+                lastKeyFormantFilters.append(.init(nsl, sec: 0.05))
             } else {
-                let nsl = Spectlope.linear(preSl, sl, t: 0.35).union()
-                let nnsl = Spectlope.linear(preSl, nsl, t: 0.25)
-                lastKeySpectlopes.append(.init(nnsl, sec: 0.1125 * 0.25))
-                lastKeySpectlopes.append(.init(nsl, sec: 0.1125))
+                let nsl = FormantFilter.linear(preSl, sl, t: 0.35).union()
+                let nnsl = FormantFilter.linear(preSl, nsl, t: 0.25)
+                lastKeyFormantFilters.append(.init(nnsl, sec: 0.1125 * 0.25))
+                lastKeyFormantFilters.append(.init(nsl, sec: 0.1125))
             }
         } else {
             let nsl = preSl.offVoice()
-            let nnsl = Spectlope.linear(preSl, nsl, t: 0.25)
-            lastKeySpectlopes.append(.init(nnsl, sec: 0.075 * 0.25))
-            lastKeySpectlopes.append(.init(nsl, sec: 0.075))
+            let nnsl = FormantFilter.linear(preSl, nsl, t: 0.25)
+            lastKeyFormantFilters.append(.init(nnsl, sec: 0.075 * 0.25))
+            lastKeyFormantFilters.append(.init(nsl, sec: 0.075))
         }
         
         self.isOffVoice = isOffVoice
     }
 }
 extension Mora {
-    func spectlopeInterpolation(fromDuration dur: Double) -> Interpolation<Spectlope> {
-        let fks = firstKeySpectlopes.map {
-            Interpolation.Key(value: $0.spectlope,
+    func formantFilterInterpolation(fromDuration dur: Double) -> Interpolation<FormantFilter> {
+        let fks = firstKeyFormantFilters.map {
+            Interpolation.Key(value: $0.formantFilter,
                               time: $0.sec, type: .spline)
         }
-        let lks = lastKeySpectlopes.map {
-            Interpolation.Key(value: $0.spectlope,
-                              time: dur - lastKeySpectlopes.last!.sec + $0.sec, type: .spline)
+        let lks = lastKeyFormantFilters.map {
+            Interpolation.Key(value: $0.formantFilter,
+                              time: dur - lastKeyFormantFilters.last!.sec + $0.sec, type: .spline)
         }
         return .init(keys: fks + lks, duration: dur)
     }
-    var mainSpectlope: Spectlope {
-        firstKeySpectlopes.last!.spectlope
+    var mainFormantFilter: FormantFilter {
+        firstKeyFormantFilters.last!.formantFilter
     }
-    func spectlopes(atSec sec: Double, lastSec: Double) -> Spectlope {
-        if sec < firstKeySpectlopes.first!.sec {
-            return firstKeySpectlopes.first!.spectlope
+    func formantFilter(atSec sec: Double, lastSec: Double) -> FormantFilter {
+        if sec < firstKeyFormantFilters.first!.sec {
+            return firstKeyFormantFilters.first!.formantFilter
         } else if sec >= lastSec {
-            return lastKeySpectlopes.last!.spectlope
+            return lastKeyFormantFilters.last!.formantFilter
         } else {
-            return spectlopeInterpolation(fromDuration: lastSec)
-                .value(withTime: sec) ?? lastKeySpectlopes.last!.spectlope
+            return formantFilterInterpolation(fromDuration: lastSec)
+                .value(withTime: sec) ?? lastKeyFormantFilters.last!.formantFilter
         }
     }
 }

@@ -356,15 +356,6 @@ extension Text: Protobuf {
         } else {
             timeframe = nil
         }
-        
-        if timeframe?.score?.tone.envelope.attack == 1 {
-            timeframe?.score?.tone.envelope.attack = Waver.clappingTime
-            if !(timeframe?.score?.notes.isEmpty ?? true) {
-                timeframe?.score?.notes[.first].lyric = "p"
-            }
-            string = "p"
-        }
-        
         self.locale = (try? Locale(pb.locale)) ?? .current
     }
     var pb: PBText {

@@ -106,8 +106,8 @@ extension vDSP {
 struct Rendnote {
     var fq: Double
     var sourceFilter: SourceFilter
-    var spectlopeInterpolation: Interpolation<Spectlope>?
-    var deltaSpectlopeInterpolation: Interpolation<Spectlope>?
+    var formantFilterInterpolation: Interpolation<FormantFilter>?
+    var deltaFormantFilterInterpolation: Interpolation<FormantFilter>?
     var fAlpha: Double
     var seed: UInt64
     var overtone: Overtone
@@ -150,7 +150,7 @@ extension Rendnote {
         let nCount = Int((releaseDur * sampleRate).rounded(.up))
         
         let isStft = !pitbend.isEmptyPitch
-            || spectlopeInterpolation != nil
+            || formantFilterInterpolation != nil
         let isFullNoise = !sourceFilter.noiseTs.contains { $0 != 1 }
         let isNoise = sourceFilter.noiseTs.contains { $0 != 0 }
         
@@ -439,17 +439,17 @@ extension Rendnote {
                     samples = nSamples
                 }
                 
-                if let spectlopeInterpolation {
+                if let formantFilterInterpolation {
                     let spectrumCount = vDSP
                         .spectramCount(sampleCount: samples.count,
                                        fftSize: fftSize)
                     let rDurSp = releaseDur / Double(spectrumCount)
                     let spectrogram = (0 ..< spectrumCount).map { i in
                         let sec = Double(i) * rDurSp
-                        let spectlope = spectlopeInterpolation.value(withTime: sec)
-                            ?? spectlopeInterpolation.keys.last?.value
+                        let formantFilter = formantFilterInterpolation.value(withTime: sec)
+                            ?? formantFilterInterpolation.keys.last?.value
                             ?? .empty
-                        let sourceFilter = SourceFilter(spectlope)
+                        let sourceFilter = sourceFilter.union(SourceFilter(formantFilter))
                         return vDSP.subtract(spectrum(from: sourceFilter.fqSmps),
                                              spectrum(from: sourceFilter.noiseFqSmps))
                     }
@@ -467,17 +467,17 @@ extension Rendnote {
                                                   seed: seed)
             
             var nNoiseSamples: [Double]
-            if let spectlopeInterpolation {
+            if let formantFilterInterpolation {
                 let spectrumCount = vDSP
                     .spectramCount(sampleCount: noiseSamples.count,
                                    fftSize: fftSize)
                 let rDurSp = releaseDur / Double(spectrumCount)
                 let spectrogram = (0 ..< spectrumCount).map { i in
                     let t = Double(i) * rDurSp
-                    let spectlope = spectlopeInterpolation.value(withTime: t)
-                        ?? spectlopeInterpolation.keys.last?.value
+                    let formantFilter = formantFilterInterpolation.value(withTime: t)
+                        ?? formantFilterInterpolation.keys.last?.value
                         ?? .empty
-                    let sourceFilter = SourceFilter(spectlope)
+                    let sourceFilter = SourceFilter(formantFilter)
                     return spectrum(from: sourceFilter.noiseFqSmps)
                 }
                 nNoiseSamples = vDSP.apply(noiseSamples, scales: spectrogram)
@@ -602,10 +602,75 @@ extension vDSP {
 }
 
 struct SourceFilter: Hashable, Codable {
-    var fqSmps = [Point]()
-    var noiseFqSmps = [Point]()
-    var noiseTs = [Double]()
+    static let maxFq = 22050.0
+    
+    var fqSmps = [Point(0, 1), Point(4000, 0)]
+    var noiseFqSmps = [Point(0, 0), Point(4000, 0)]
+    var noiseTs = [0.0, 0.0]
 }
+extension SourceFilter: Protobuf {
+    init(_ pb: PBSourceFilter) throws {
+        fqSmps = pb.fqSmps.compactMap { try? Point($0) }
+        fqSmps = fqSmps.map {
+            .init($0.x.clipped(min: 0, max: Self.maxFq),
+                  $0.y.clipped(min: 0, max: 1))
+        }.sorted { $0.x < $1.x }
+        
+        noiseTs = pb.noiseTs.map { $0.clipped(min: 0, max: 1) }
+        if noiseTs.count < fqSmps.count {
+            noiseTs += .init(repeating: 0, count: fqSmps.count - noiseTs.count)
+        } else if noiseTs.count > fqSmps.count {
+            noiseTs.removeLast(noiseTs.count - fqSmps.count)
+        }
+        noiseFqSmps = fqSmps.enumerated().map { .init($0.element.x, $0.element.y * noiseTs[$0.offset]) }
+    }
+    var pb: PBSourceFilter {
+        .with {
+            $0.fqSmps = fqSmps.map { $0.pb }
+            $0.noiseTs = noiseTs
+        }
+    }
+}
+enum SourceFilterType {
+    case fqSmp, fqNoiseSmp, editFqNoiseSmp
+}
+extension SourceFilter {
+    subscript(i: Int, type: SourceFilterType) -> Point {
+        get {
+            switch type {
+            case .fqSmp: fqSmps[i]
+            case .fqNoiseSmp: noiseFqSmps[i]
+            case .editFqNoiseSmp: .init(fqSmps[i].x, fqSmps[i].y * noiseTs[i] * 0.75)
+            }
+        }
+        set {
+            switch type {
+            case .fqSmp:
+                fqSmps[i] = newValue
+                noiseFqSmps[i] = .init(newValue.x, newValue.y * noiseTs[i])
+            case .fqNoiseSmp:
+                fqSmps[i].x = newValue.x
+                noiseTs[i] = (fqSmps[i].y == 0 ? 0 : newValue.y / fqSmps[i].y).clipped(min: 0, max: 1)
+                noiseFqSmps[i] = newValue
+            case .editFqNoiseSmp:
+                let smp = fqSmps[i].y
+                noiseTs[i] = (smp == 0 ? 0 : newValue.y / smp / 0.75).clipped(min: 0, max: 1)
+                noiseFqSmps[i] = .init(newValue.x, smp * noiseTs[i])
+                fqSmps[i].x = newValue.x
+            }
+        }
+    }
+    mutating func formMultiplyFq(_ x: Double) {
+        fqSmps = fqSmps.map { .init($0.x * x, $0.y) }
+        noiseFqSmps = noiseFqSmps.map { .init($0.x * x, $0.y) }
+    }
+    func multiplyFq(_ x: Double) -> Self {
+        var n = self
+        n.formMultiplyFq(x)
+        return n
+    }
+}
+
 extension SourceFilter {
     init(fqSmps: [Point] = [], noiseFqSmps: [Point] = []) {
         if noiseFqSmps.isEmpty {
@@ -633,20 +698,26 @@ extension SourceFilter {
             return Point(scale.x, scale.y - $0.element.y)
         }
     }
+    
+    func union(_ other: Self) -> Self {
+        self
+//        fqSmps
+//        other
+    }
 }
 extension SourceFilter {
-    init(_ spectlope: Spectlope) {
+    init(_ formantFilter: FormantFilter) {
         var ps = [Point]()
-        ps.reserveCapacity(spectlope.count * 4)
+        ps.reserveCapacity(formantFilter.count * 4)
         var ns = [Point]()
-        ns.reserveCapacity(spectlope.count * 4)
-        for (i, f) in spectlope.enumerated() {
+        ns.reserveCapacity(formantFilter.count * 4)
+        for (i, f) in formantFilter.enumerated() {
             ps.append(.init(f.sFq, f.smp))
             ps.append(.init(f.eFq, f.smp))
             ns.append(.init(f.sFq, f.noiseT))
             ns.append(.init(f.eFq, f.noiseT))
-            if i + 1 < spectlope.count {
-                let nextF = spectlope[i + 1]
+            if i + 1 < formantFilter.count {
+                let nextF = formantFilter[i + 1]
                 if f.eeFq <= nextF.ssFq {
                     ps.append(f.eeFqSmp)
                     ps.append(.init(nextF.ssFq, f.edSmp))
@@ -777,6 +848,24 @@ extension SourceFilter {
         }
         return Volume(smp: fqSmps.last!.y).amp
     }
+    func noiseT(atFq fq: Double) -> Double {
+        guard !noiseFqSmps.isEmpty else { return 0 }
+        
+        var preFq = noiseFqSmps.first!.x
+        guard fq >= preFq else { return noiseTs.first! }
+        for scale in noiseFqSmps {
+            let nextFq = scale.x, nextSmp = scale.y
+            guard preFq < nextFq else {
+                preFq = nextFq
+                continue
+            }
+            if fq < nextFq {
+                return (fq - preFq) / (nextFq - preFq)
+            }
+            preFq = nextFq
+        }
+        return noiseTs.last!
+    }
     func noiseAmp(atFq fq: Double) -> Double {
         guard !noiseFqSmps.isEmpty else { return 0 }
         
@@ -807,8 +896,6 @@ extension SourceFilter {
 }
 
 struct Waver {
-    static let clappingTime = 0.03
-    
     let envelope: Envelope
     let vibrato: Reswave
     let tremolo: Reswave

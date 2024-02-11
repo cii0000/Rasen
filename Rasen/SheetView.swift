@@ -5777,7 +5777,7 @@ final class SheetView: View {
                         let nRect = textView.convertFromWorld(selection.rect)
                         let tfp = textView.convertFromWorld(selection.firstOrigin)
                         let tlp = textView.convertFromWorld(selection.lastOrigin)
-                        if textView.intersects(nRect),
+                        if textView.intersectsHalf(nRect),
                            let fi = textView.characterIndexWithOutOfBounds(for: tfp),
                            let li = textView.characterIndexWithOutOfBounds(for: tlp) {
                             

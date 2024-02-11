@@ -993,12 +993,26 @@ struct PBFormant {
   init() {}
 }
 
-struct PBSpectlope {
+struct PBFormantFilter {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   var formants: [PBFormant] = []
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
+struct PBSourceFilter {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var fqSmps: [PBPoint] = []
+
+  var noiseTs: [Double] = []
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1042,14 +1056,14 @@ struct PBTone {
   /// Clears the value of `overtone`. Subsequent reads from it will return its default value.
   mutating func clearOvertone() {self._overtone = nil}
 
-  var spectlope: PBSpectlope {
-    get {return _spectlope ?? PBSpectlope()}
-    set {_spectlope = newValue}
+  var sourceFilter: PBSourceFilter {
+    get {return _sourceFilter ?? PBSourceFilter()}
+    set {_sourceFilter = newValue}
   }
-  /// Returns true if `spectlope` has been explicitly set.
-  var hasSpectlope: Bool {return self._spectlope != nil}
-  /// Clears the value of `spectlope`. Subsequent reads from it will return its default value.
-  mutating func clearSpectlope() {self._spectlope = nil}
+  /// Returns true if `sourceFilter` has been explicitly set.
+  var hasSourceFilter: Bool {return self._sourceFilter != nil}
+  /// Clears the value of `sourceFilter`. Subsequent reads from it will return its default value.
+  mutating func clearSourceFilter() {self._sourceFilter = nil}
 
   var id: PBUUID {
     get {return _id ?? PBUUID()}
@@ -1066,7 +1080,7 @@ struct PBTone {
 
   fileprivate var _envelope: PBEnvelope? = nil
   fileprivate var _overtone: PBOvertone? = nil
-  fileprivate var _spectlope: PBSpectlope? = nil
+  fileprivate var _sourceFilter: PBSourceFilter? = nil
   fileprivate var _id: PBUUID? = nil
 }
 
@@ -3474,22 +3488,6 @@ struct PBPastableObject {
     set {value = .tone(newValue)}
   }
 
-  var envelope: PBEnvelope {
-    get {
-      if case .envelope(let v)? = value {return v}
-      return PBEnvelope()
-    }
-    set {value = .envelope(newValue)}
-  }
-
-  var formant: PBFormant {
-    get {
-      if case .formant(let v)? = value {return v}
-      return PBFormant()
-    }
-    set {value = .formant(newValue)}
-  }
-
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   enum OneOf_Value: Equatable {
@@ -3510,8 +3508,6 @@ struct PBPastableObject {
     case normalizationRationalValue(PBRational)
     case notesValue(PBNotesValue)
     case tone(PBTone)
-    case envelope(PBEnvelope)
-    case formant(PBFormant)
 
   #if !swift(>=4.1)
     static func ==(lhs: PBPastableObject.OneOf_Value, rhs: PBPastableObject.OneOf_Value) -> Bool {
@@ -3587,14 +3583,6 @@ struct PBPastableObject {
         guard case .tone(let l) = lhs, case .tone(let r) = rhs else { preconditionFailure() }
         return l == r
       }()
-      case (.envelope, .envelope): return {
-        guard case .envelope(let l) = lhs, case .envelope(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.formant, .formant): return {
-        guard case .formant(let l) = lhs, case .formant(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
       default: return false
       }
     }
@@ -3639,7 +3627,8 @@ extension PBPitbend: @unchecked Sendable {}
 extension PBNote: @unchecked Sendable {}
 extension PBEnvelope: @unchecked Sendable {}
 extension PBFormant: @unchecked Sendable {}
-extension PBSpectlope: @unchecked Sendable {}
+extension PBFormantFilter: @unchecked Sendable {}
+extension PBSourceFilter: @unchecked Sendable {}
 extension PBOvertone: @unchecked Sendable {}
 extension PBTone: @unchecked Sendable {}
 extension PBScore: @unchecked Sendable {}
@@ -5062,8 +5051,8 @@ extension PBFormant: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
   }
 }
 
-extension PBSpectlope: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = "PBSpectlope"
+extension PBFormantFilter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = "PBFormantFilter"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "formants"),
   ]
@@ -5087,8 +5076,46 @@ extension PBSpectlope: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
     try unknownFields.traverse(visitor: &visitor)
   }
 
-  static func ==(lhs: PBSpectlope, rhs: PBSpectlope) -> Bool {
+  static func ==(lhs: PBFormantFilter, rhs: PBFormantFilter) -> Bool {
     if lhs.formants != rhs.formants {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
+extension PBSourceFilter: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = "PBSourceFilter"
+  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "fqSmps"),
+    2: .same(proto: "noiseTs"),
+  ]
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.fqSmps) }()
+      case 2: try { try decoder.decodeRepeatedDoubleField(value: &self.noiseTs) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.fqSmps.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.fqSmps, fieldNumber: 1)
+    }
+    if !self.noiseTs.isEmpty {
+      try visitor.visitPackedDoubleField(value: self.noiseTs, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: PBSourceFilter, rhs: PBSourceFilter) -> Bool {
+    if lhs.fqSmps != rhs.fqSmps {return false}
+    if lhs.noiseTs != rhs.noiseTs {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5137,7 +5164,7 @@ extension PBTone: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "envelope"),
     3: .same(proto: "overtone"),
-    4: .same(proto: "spectlope"),
+    4: .same(proto: "sourceFilter"),
     6: .same(proto: "id"),
   ]
 
@@ -5149,7 +5176,7 @@ extension PBTone: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularMessageField(value: &self._envelope) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._overtone) }()
-      case 4: try { try decoder.decodeSingularMessageField(value: &self._spectlope) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._sourceFilter) }()
       case 6: try { try decoder.decodeSingularMessageField(value: &self._id) }()
       default: break
       }
@@ -5167,7 +5194,7 @@ extension PBTone: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
     try { if let v = self._overtone {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
     } }()
-    try { if let v = self._spectlope {
+    try { if let v = self._sourceFilter {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
     } }()
     try { if let v = self._id {
@@ -5179,7 +5206,7 @@ extension PBTone: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
   static func ==(lhs: PBTone, rhs: PBTone) -> Bool {
     if lhs._envelope != rhs._envelope {return false}
     if lhs._overtone != rhs._overtone {return false}
-    if lhs._spectlope != rhs._spectlope {return false}
+    if lhs._sourceFilter != rhs._sourceFilter {return false}
     if lhs._id != rhs._id {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -9139,8 +9166,6 @@ extension PBPastableObject: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
     16: .same(proto: "normalizationRationalValue"),
     14: .same(proto: "notesValue"),
     15: .same(proto: "tone"),
-    19: .same(proto: "envelope"),
-    20: .same(proto: "formant"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -9347,32 +9372,6 @@ extension PBPastableObject: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
           self.value = .normalizationRationalValue(v)
         }
       }()
-      case 19: try {
-        var v: PBEnvelope?
-        var hadOneofValue = false
-        if let current = self.value {
-          hadOneofValue = true
-          if case .envelope(let m) = current {v = m}
-        }
-        try decoder.decodeSingularMessageField(value: &v)
-        if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.value = .envelope(v)
-        }
-      }()
-      case 20: try {
-        var v: PBFormant?
-        var hadOneofValue = false
-        if let current = self.value {
-          hadOneofValue = true
-          if case .formant(let m) = current {v = m}
-        }
-        try decoder.decodeSingularMessageField(value: &v)
-        if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.value = .formant(v)
-        }
-      }()
       case 21: try {
         var v: PBImage?
         var hadOneofValue = false
@@ -9460,14 +9459,6 @@ extension PBPastableObject: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
     case .normalizationRationalValue?: try {
       guard case .normalizationRationalValue(let v)? = self.value else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 16)
-    }()
-    case .envelope?: try {
-      guard case .envelope(let v)? = self.value else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 19)
-    }()
-    case .formant?: try {
-      guard case .formant(let v)? = self.value else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 20)
     }()
     case .image?: try {
       guard case .image(let v)? = self.value else { preconditionFailure() }

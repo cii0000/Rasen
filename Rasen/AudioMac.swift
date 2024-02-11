@@ -111,8 +111,8 @@ final class NotePlayer {
             noteIDs.insert(noteID)
             let fq = note.fq
             return .init(fq: fq,
-                         sourceFilter: .init(tone.spectlope.with(lyric: note.lyric)),
-                         spectlopeInterpolation: nil,
+                         sourceFilter: tone.sourceFilter.union(.init(FormantFilter().with(lyric: note.lyric))),
+                         formantFilterInterpolation: nil,
                          fAlpha: 1,
                          seed: Rendnote.seed(fromFq: fq, sec: .infinity,
                                              position: Point()),
@@ -299,20 +299,19 @@ final class AVAudioScoreNoder {
     var tone = Tone() {
         didSet {
             if tone != oldValue {
-                let waver = Waver(tone),
-                    sourceFilter = SourceFilter(tone.spectlope)
+                let waver = Waver(tone), sourceFilter = tone.sourceFilter
                 for i in 0 ..< rendnotes.count {
                     rendnotes[i].overtone = tone.overtone
                     rendnotes[i].waver = waver
                     rendnotes[i].sourceFilter = sourceFilter
                     
-                    if let dsi = rendnotes[i].deltaSpectlopeInterpolation {
-                        let ns = tone.spectlope
-                        rendnotes[i].spectlopeInterpolation?.keys = dsi.keys.map {
-                            .init(value: $0.value.multiply(ns),
-                                  time: $0.time, type: $0.type)
-                        }
-                    }
+//                    if let dsi = rendnotes[i].deltaFormantFilterInterpolation {
+//                        let ns = tone.spectlope
+//                        rendnotes[i].formantFilterInterpolation?.keys = dsi.keys.map {
+//                            .init(value: $0.value.multiply(ns),
+//                                  time: $0.time, type: $0.type)
+//                        }
+//                    }
                 }
             }
             
@@ -399,7 +398,7 @@ final class AVAudioScoreNoder {
     struct NotewaveID: Hashable, Codable {
         var fq: Double,
             sourceFilter: SourceFilter,
-            spectlopeInterpolation: Interpolation<Spectlope>?,
+            formantFilterInterpolation: Interpolation<FormantFilter>?,
             fAlpha: Double,
             seed: UInt64,
             overtone: Overtone,
@@ -411,7 +410,7 @@ final class AVAudioScoreNoder {
         init(_ rendnote: Rendnote) {
             fq = rendnote.fq
             sourceFilter = rendnote.sourceFilter
-            spectlopeInterpolation = rendnote.spectlopeInterpolation
+            formantFilterInterpolation = rendnote.formantFilterInterpolation
             fAlpha = rendnote.fAlpha
             seed = rendnote.seed
             overtone = rendnote.overtone

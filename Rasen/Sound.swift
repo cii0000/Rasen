@@ -408,10 +408,12 @@ extension Pitbend {
         guard !isEmpty else { return nil }
         let dSec = 1 / Double(count)
         let interpolation = interpolation
+        let waver = Waver(envelope: envelope)
         var sec = 0.0, cs = [Line.Control]()
         while sec < secDuration {
             if let v = interpolation.monoValue(withTime: sec / secDuration) {
-                cs.append(.init(point: .init(sec, v.pitch), pressure: v.smp))
+                cs.append(.init(point: .init(sec, v.pitch),
+                                pressure: Volume(amp: Volume(smp: v.smp).amp * waver.volume(atTime: sec, releaseTime: nil, startTime: 0)).smp))
             }
             sec += dSec
         }
@@ -878,19 +880,19 @@ extension Overtone {
 struct Tone: Hashable, Codable {
     var envelope = Envelope()
     var overtone = Overtone()
-    var spectlope = Spectlope()
+    var sourceFilter = SourceFilter()
 }
 extension Tone: Protobuf {
     init(_ pb: PBTone) throws {
         envelope = (try? Envelope(pb.envelope)) ?? .init()
         overtone = (try? Overtone(pb.overtone)) ?? .init()
-        spectlope = (try? Spectlope(pb.spectlope)) ?? .init()
+        sourceFilter = (try? SourceFilter(pb.sourceFilter)) ?? .init()
     }
     var pb: PBTone {
         .with {
             $0.envelope = envelope.pb
             $0.overtone = overtone.pb
-            $0.spectlope = spectlope.pb
+            $0.sourceFilter = sourceFilter.pb
         }
     }
 }
@@ -900,7 +902,7 @@ extension Tone {
     }
     func isEqualWave(_ other: Self) -> Bool {
         overtone == other.overtone
-        && spectlope == other.spectlope
+        && sourceFilter == other.sourceFilter
     }
 }
 
@@ -1339,6 +1341,7 @@ struct Audio: Hashable, Codable {
     static let clippingAmp = clippingVolume.amp
     static let floatClippingAmp = Float(clippingVolume.amp)
     static let defaultReverb = 0.0
+    static let hearingRange = 20.0 ... 20000.0
     
     var pcmData = Data()
 }

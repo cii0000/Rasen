@@ -204,8 +204,12 @@ message PBFormant {
     double edAmp = 7;
     double edNoiseT = 8;
 }
-message PBSpectlope {
+message PBFormantFilter {
     repeated PBFormant formants = 1;
+}
+message PBSourceFilter {
+    repeated PBPoint fqSmps = 1;
+    repeated double noiseTs = 2;
 }
 
 message PBOvertone {
@@ -216,7 +220,7 @@ message PBOvertone {
 message PBTone {
     PBEnvelope envelope = 1;
     PBOvertone overtone = 3;
-    PBSpectlope spectlope = 4;
+    PBSourceFilter sourceFilter = 4;
     PBUUID id = 6;
 }
 
@@ -633,7 +637,5 @@ message PBPastableObject {
         PBRational normalizationRationalValue = 16;
         PBNotesValue notesValue = 14;
         PBTone tone = 15;
-        PBEnvelope envelope = 19;
-        PBFormant formant = 20;
     }
 }

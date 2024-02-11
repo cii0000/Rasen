@@ -1531,7 +1531,7 @@ final class TimeframeSlider: DragEditor {
              startNote, endNote, moveNote,
              octave,
              attack, decayAndSustain, release,
-             overtone, formant,
+             overtone, sourceFilter,
              isShownSpectrogram, tempo
     }
     
@@ -1542,7 +1542,7 @@ final class TimeframeSlider: DragEditor {
     private var notePlayer: NotePlayer?
     private var sheetView: SheetView?, textIndex: Int?
     private var type = SlideType.all
-    private var formantType = SpectlopeType.fqSmp, isFormantLast = false
+    private var sourceFilterType = SourceFilterType.fqSmp, isSourceFilterLast = false
     private var overtoneType = OvertoneType.evenScale
     private var beganSP = Point(), beganTime = Rational(0),
                 beganTimeframeTime = Rational(0), beganText: Text?,
@@ -1560,7 +1560,8 @@ final class TimeframeSlider: DragEditor {
                 beganEnvelope = Envelope()
     private var beganPitch: Rational?
     private var beganOvertone = Overtone()
-    private var beganFormantIndex = 0, beganSpectlope = Spectlope()
+    private var beganSourceFilterIndex = 0, beganSourceFilter = SourceFilter(),
+                beganSourceFilterFq = 0.0, beganSourceFilterSmp = 0.0
     private var beganAnimationOption: AnimationOption?
     private var beganTimeframes = [Int: Timeframe]()
     private var beganTempo: Rational = 1, oldTempo: Rational = 1
@@ -1681,13 +1682,17 @@ final class TimeframeSlider: DragEditor {
                         type = .isShownSpectrogram
                         beganIsShownSpectrogram = isShownSpectrogram
                         oldIsShownSpectrogram = isShownSpectrogram
-                    } else if let (i, formantType, isLast) = textView.spectlopeType(at: inTP, maxDistance: 25.0 * document.screenToWorldScale),
-                               let tone = textView.model.timeframe?.score?.tone {
-                        type = .formant
-                        self.beganFormantIndex = i
-                        self.beganSpectlope = tone.spectlope
-                        self.formantType = formantType
-                        self.isFormantLast = isLast
+                    } else if let (i, sourceFilterType, isLast) = textView.sourceFilterType(at: inTP, maxDistance: 25.0 * document.screenToWorldScale),
+                               let tone = textView.model.timeframe?.score?.tone,
+                              let nfq = textView.sourceFilterFq(atX: inP.x),
+                              let nSmp = textView.sourceFilterSmp(atY: inP.y) {
+                        type = .sourceFilter
+                        self.beganSourceFilterIndex = i
+                        self.beganSourceFilter = tone.sourceFilter
+                        self.sourceFilterType = sourceFilterType
+                        self.isSourceFilterLast = isLast
+                        self.beganSourceFilterFq = nfq
+                        self.beganSourceFilterSmp = nSmp
                     } else if textView.containsOctave(inTP),
                               let score = textView.model.timeframe?.score,
                               let pitch = document.pitch(from: textView, at: inTP) {
@@ -1910,25 +1915,31 @@ final class TimeframeSlider: DragEditor {
                         sheetView.sequencer?.scoreNoders[timeframe.id]?.startSec = Double(sheetView.playingSec ?? 0)
                         sheetView.sequencer?.scoreNoders[timeframe.id]?.tone = tone
                     }
-                case .formant:
+                case .sourceFilter:
                     if let score = timeframe.score,
-                       let ti = textIndex {
+                       let ti = textIndex, 
+                        let nfq = textView.sourceFilterFq(atX: inP.x),
+                        let nSmp = textView.sourceFilterSmp(atY: inP.y) {
                         
                         let ndp = sp - beganSP
                         var tone = score.tone
-                        if isFormantLast {
-                            let scale = ndp.x.clipped(min: -200, max: 200, newMin: -2, newMax: 2) + 1
-                            tone.spectlope = beganSpectlope.multiplyFq(scale)
-                        } else {
-                            let firstV = beganSpectlope[beganFormantIndex, formantType]
 
-                            let nx = (ndp.x * 4 + firstV.x)
-                                .clipped(min: 0, max: 30000)
-                            let ny = (ndp.y / 100 + firstV.y)
-                                .clipped(min: 0, max: 1)
+                        if isSourceFilterLast {
+                            let scale = ndp.x.clipped(min: -200, max: 200, newMin: -2, newMax: 2) + 1
+                            tone.sourceFilter = beganSourceFilter.multiplyFq(scale)
+                        } else {
+                            let firstV = beganSourceFilter[beganSourceFilterIndex, sourceFilterType]
+
+                            let preFq = beganSourceFilterIndex - 1 >= 0 ?
+                            tone.sourceFilter.fqSmps[beganSourceFilterIndex - 1].x : 0
+                            let nextFq = beganSourceFilterIndex + 1 < tone.sourceFilter.fqSmps.count ?
+                            tone.sourceFilter.fqSmps[beganSourceFilterIndex + 1].x : SourceFilter.maxFq
+                            
+                            let nx = (firstV.x + nfq - beganSourceFilterFq).clipped(min: preFq, max: nextFq)
+                            let ny = (firstV.y + nSmp - beganSourceFilterSmp).clipped(min: 0, max: 1)
                             let ntp = Point(nx, ny)
-                            if ntp != score.tone.spectlope[beganFormantIndex, formantType] {
-                                tone.spectlope[beganFormantIndex, formantType] = ntp
+                            if ntp != score.tone.sourceFilter[beganSourceFilterIndex, sourceFilterType] {
+                                tone.sourceFilter[beganSourceFilterIndex, sourceFilterType] = ntp
                             }
                         }
                         
@@ -2430,18 +2441,34 @@ final class KeyframeInserter: InputKeyEditor {
                     * 15.0 * document.screenToWorldScale
                     let inTP = textView.convert(inP, from: sheetView.node)
                     if textView.containsScore(inTP),
-                       let score = timeframe.score,
-                       let (ni, pitT) = textView.pitT(at: inTP,
-                                                      maxDistance: maxD) {
-                        let (preFq, nextFq) = textView.pitbendPreNext(notes: score.notes, at: ni)
-                        var pitbend = textView
-                            .pitbend(from: score.notes[ni], tempo: timeframe.tempo,
-                                     preFq: preFq, nextFq: nextFq)
-                        let pit = pitbend.pit(atT: pitT)
-                        pitbend.pits.append(pit)
-                        pitbend.pits.sort(by: { $0.t < $1.t })
-                        var score = score
-                        score.notes[ni].pitbend = pitbend
+                       let score = timeframe.score {
+                        
+                        if let (ni, pitT) = textView.pitT(at: inTP,
+                                                          maxDistance: maxD) {
+                            let (preFq, nextFq) = textView.pitbendPreNext(notes: score.notes, at: ni)
+                            var pitbend = textView
+                                .pitbend(from: score.notes[ni], tempo: timeframe.tempo,
+                                         preFq: preFq, nextFq: nextFq)
+                            let pit = pitbend.pit(atT: pitT)
+                            pitbend.pits.append(pit)
+                            pitbend.pits.sort(by: { $0.t < $1.t })
+                            var score = score
+                            score.notes[ni].pitbend = pitbend
+                            
+                            sheetView.newUndoGroup()
+                            sheetView.replaceScore(score, at: ti)
+                            
+                            sheetView.updatePlaying()
+                        }
+                    } else if var score = timeframe.score,
+                              textView.containsSourceFilter(inTP),
+                              let i = textView.sourceFilterIndex(atX: inTP.x),
+                              let fq = textView.sourceFilterFq(atX: inTP.x) {
+                        let smp = score.tone.sourceFilter.smp(atFq: fq)
+                        let noiseT = score.tone.sourceFilter.noiseT(atFq: fq)
+                        score.tone.sourceFilter.fqSmps.insert(.init(fq, smp), at: i + 1)
+                        score.tone.sourceFilter.noiseTs.insert(noiseT, at: i + 1)
+                        score.tone.sourceFilter.noiseFqSmps.insert(.init(fq, smp * noiseT), at: i + 1)
                         
                         sheetView.newUndoGroup()
                         sheetView.replaceScore(score, at: ti)

@@ -106,8 +106,6 @@ enum PastableObject {
     case normalizationRationalValue(_ normalizationRationalValue: Rational)
     case notesValue(_ notesValue: NotesValue)
     case tone(_ tone: Tone)
-    case envelope(_ envelope: Envelope)
-    case formant(_ formant: Formant)
 }
 extension PastableObject {
     static func typeName(with obj: Any) -> String {
@@ -160,10 +158,6 @@ extension PastableObject {
              PastableObject.typeName(with: notesValue)
         case .tone(let tone):
              PastableObject.typeName(with: tone)
-        case .envelope(let envelope):
-             PastableObject.typeName(with: envelope)
-        case .formant(let formant):
-             PastableObject.typeName(with: formant)
         }
     }
     init(data: Data, typeName: String) throws {
@@ -207,10 +201,6 @@ extension PastableObject {
             self = .notesValue(try NotesValue(serializedData: data))
         case PastableObject.objectTypeName(with: Tone.self):
             self = .tone(try Tone(serializedData: data))
-        case PastableObject.objectTypeName(with: Envelope.self):
-            self = .envelope(try Envelope(serializedData: data))
-        case PastableObject.objectTypeName(with: Formant.self):
-            self = .formant(try Formant(serializedData: data))
         default:
             throw PastableObject.PastableError()
         }
@@ -251,10 +241,6 @@ extension PastableObject {
              try? notesValue.serializedData()
         case .tone(let tone):
              try? tone.serializedData()
-        case .envelope(let envelope):
-             try? envelope.serializedData()
-        case .formant(let formant):
-             try? formant.serializedData()
         }
     }
 }
@@ -298,10 +284,6 @@ extension PastableObject: Protobuf {
             self = .notesValue(try NotesValue(notesValue))
         case .tone(let tone):
             self = .tone(try Tone(tone))
-        case .envelope(let envelope):
-            self = .envelope(try Envelope(envelope))
-        case .formant(let formant):
-            self = .formant(try Formant(formant))
         }
     }
     var pb: PBPastableObject {
@@ -341,10 +323,6 @@ extension PastableObject: Protobuf {
                 $0.value = .notesValue(notesValue.pb)
             case .tone(let tone):
                 $0.value = .tone(tone.pb)
-            case .envelope(let envelope):
-                $0.value = .envelope(envelope.pb)
-            case .formant(let formant):
-                $0.value = .formant(formant.pb)
             }
         }
     }
@@ -368,8 +346,6 @@ extension PastableObject: Codable {
         case normalizationRationalValue = "15"
         case notesValue = "13"
         case tone = "14"
-        case envelope = "17"
-        case formant = "19"
     }
     init(from decoder: Decoder) throws {
         var container = try decoder.unkeyedContainer()
@@ -409,10 +385,6 @@ extension PastableObject: Codable {
             self = .notesValue(try container.decode(NotesValue.self))
         case .tone:
             self = .tone(try container.decode(Tone.self))
-        case .envelope:
-            self = .envelope(try container.decode(Envelope.self))
-        case .formant:
-            self = .formant(try container.decode(Formant.self))
         }
     }
     func encode(to encoder: Encoder) throws {
@@ -469,12 +441,6 @@ extension PastableObject: Codable {
         case .tone(let tone):
             try container.encode(CodingTypeKey.tone)
             try container.encode(tone)
-        case .envelope(let envelope):
-            try container.encode(CodingTypeKey.envelope)
-            try container.encode(envelope)
-        case .formant(let formant):
-            try container.encode(CodingTypeKey.formant)
-            try container.encode(formant)
         }
     }
 }
@@ -870,25 +836,13 @@ final class CopyEditor: Editor {
                          lineType: .color(.selected),
                          fillType: .color(.subSelected))
                 }
-            } else if textView.containsSpectlope(inTP),
+            } else if textView.containsSourceFilter(inTP),
                let score = textView.model.timeframe?.score {
-                
-                if let (i, _, isLast) = textView.spectlopeType(at: inTP, maxDistance: 25.0 * document.screenToWorldScale),
-                   !isLast {
-                   
-                    if isSendPasteboard {
-                        Pasteboard.shared.copiedObjects = [.formant(score.tone.spectlope.formants[i])]
-                    }
-                    if let frame = textView.formantFrame(at: i) {
-                        selectingLineNode.path = Path(textView.convertToWorld(frame))
-                    }
-                } else {
-                    if isSendPasteboard {
-                        Pasteboard.shared.copiedObjects = [.tone(score.tone)]
-                    }
-                    if let frame = textView.spectlopeFrame {
-                        selectingLineNode.path = Path(textView.convertToWorld(frame))
-                    }
+                if isSendPasteboard {
+                    Pasteboard.shared.copiedObjects = [.tone(score.tone)]
+                }
+                if let frame = textView.sourceFilterFrame {
+                    selectingLineNode.path = Path(textView.convertToWorld(frame))
                 }
             } else if textView.containsIsShownSpectrogram(inTP) {
                 if isSendPasteboard {
@@ -1234,23 +1188,25 @@ final class CopyEditor: Editor {
                     sheetView.updatePlaying()
                     return true
                 }
-            } else if textView.containsSpectlope(inTP),
+            } else if textView.containsSourceFilter(inTP),
                       let timeframe = textView.model.timeframe,
                       var score = timeframe.score {
                 
-                if let (i, _, isLast) = textView.spectlopeType(at: inTP, maxDistance: 25.0 * document.screenToWorldScale),
+                if let (i, _, isLast) = textView.sourceFilterType(at: inTP, maxDistance: 25.0 * document.screenToWorldScale),
                    !isLast {
                    
-                    let formant = score.tone.spectlope.formants[i]
-                    var spectlope = score.tone.spectlope
-                    spectlope.formants.remove(at: i)
-                    score.tone.spectlope = spectlope
-                    Pasteboard.shared.copiedObjects = [.formant(formant)]
+//                    let formant = score.tone.sourceFilter.formants[i]
+                    var sourceFilter = score.tone.sourceFilter
+                    sourceFilter.fqSmps.remove(at: i)
+                    sourceFilter.noiseTs.remove(at: i)
+                    sourceFilter.noiseFqSmps.remove(at: i)
+                    score.tone.sourceFilter = sourceFilter
+//                    Pasteboard.shared.copiedObjects = [.formant(formant)]
                     sheetView.newUndoGroup()
                     sheetView.replaceScore(score, at: ti)
                     return true
-                } else if score.tone.spectlope != Spectlope() {
-                    score.tone.spectlope = Spectlope()
+                } else if score.tone.sourceFilter != SourceFilter() {
+                    score.tone.sourceFilter = .init()
                     Pasteboard.shared.copiedObjects = [.tone(score.tone)]
                     sheetView.newUndoGroup()
                     sheetView.replaceScore(score, at: ti)
@@ -1750,10 +1706,6 @@ final class CopyEditor: Editor {
         case .notesValue(let notesValue):
             updateNotes(notesValue.notes)
         case .tone:
-            break
-        case .envelope:
-            break
-        case .formant:
             break
         }
     }
@@ -2479,40 +2431,6 @@ final class CopyEditor: Editor {
                     sheetView.updatePlaying()
                 }
             }
-        case .envelope(let envelope):
-            guard let sheetView = document.sheetView(at: shp) else { return }
-            let np = sheetView.convertFromWorld(p)
-            if let ti = sheetView.timeframeIndex(at: np) {
-                let textView = sheetView.textsView.elementViews[ti]
-                if let timeframe = textView.model.timeframe,
-                   var score = timeframe.score {
-                    
-                    score.tone.envelope = envelope
-                    sheetView.newUndoGroup()
-                    sheetView.replaceScore(score, at: ti)
-                    
-                    sheetView.updatePlaying()
-                }
-            }
-        case .formant(var formant):
-            guard let sheetView = document.sheetView(at: shp) else { return }
-            let np = sheetView.convertFromWorld(p)
-            if let ti = sheetView.timeframeIndex(at: np) {
-                let textView = sheetView.textsView.elementViews[ti]
-                let inTP = textView.convertFromWorld(p)
-                if let timeframe = textView.model.timeframe,
-                   var score = timeframe.score,
-                   let i = textView.formantIndex(at: inTP.x),
-                   let fq = textView.spectlopeFq(atX: inTP.x) {
-                    
-                    formant.fq = fq
-                    score.tone.spectlope.formants.insert(formant, at: i + 1)
-                    sheetView.newUndoGroup()
-                    sheetView.replaceScore(score, at: ti)
-                    
-                    sheetView.updatePlaying()
-                }
-            }
         }
     }
     
@@ -2535,8 +2453,6 @@ final class CopyEditor: Editor {
         case .normalizationRationalValue: false
         case .notesValue: true
         case .tone: false
-        case .envelope: false
-        case .formant: false
         }
     }
     
