@@ -315,14 +315,33 @@ extension Locale: Protobuf {
     }
 }
 
+struct TextTimeOption: Codable, Hashable, BeatRangeType {
+    var beatRange = 0 ..< Rational(0)
+    var tempo = Music.defaultTempo
+}
+extension TextTimeOption: Protobuf {
+    init(_ pb: PBTextTimeOption) throws {
+        beatRange = (try? RationalRange(pb.beatRange).value) ?? 0 ..< 0
+        tempo = (try? Rational(pb.tempo))?.clipped(Music.tempoRange) ?? Music.defaultTempo
+    }
+    var pb: PBTextTimeOption {
+        .with {
+            $0.beatRange = RationalRange(value: beatRange).pb
+            if tempo != Music.defaultTempo {
+                $0.tempo = tempo.pb
+            }
+        }
+    }
+}
+
 struct Text {
     var string = ""
     var orientation = Orientation.horizontal
     var size = Font.defaultSize
     var widthCount = Typobute.defaultWidthCount
     var origin = Point()
-    var timeframe: Timeframe?
     var locale = Locale.autoupdatingCurrent
+    var timeOption: TextTimeOption?
 }
 extension Text {
     init(autoWidthCountWith string: String,
@@ -344,19 +363,19 @@ extension Text {
 extension Text: Protobuf {
     init(_ pb: PBText) throws {
         string = pb.string
-        orientation = (try? Orientation(pb.orientation)) ?? .horizontal
+        orientation = (try? .init(pb.orientation)) ?? .horizontal
         let size = (try? pb.size.notNaN()) ?? Font.defaultSize
         self.size = size.clipped(min: 0, max: Font.maxSize)
         let wc = (try? pb.widthCount.notZeroAndNaN()) ?? Typobute.defaultWidthCount
         self.widthCount = wc.clipped(min: Typobute.minWidthCount,
                                      max: Typobute.maxWidthCount)
-        origin = (try? Point(pb.origin).notInfiniteAndNAN()) ?? Point()
-        if case .timeframe(let timeframe)? = pb.timeframeOptional {
-            self.timeframe = try? Timeframe(timeframe)
+        origin = (try? .init(pb.origin).notInfiniteAndNAN()) ?? .init()
+        self.locale = (try? .init(pb.locale)) ?? .current
+        self.timeOption = if case .timeOption(let timeOption)? = pb.timeOptionOptional {
+            try? .init(timeOption)
         } else {
-            timeframe = nil
+            nil
         }
-        self.locale = (try? Locale(pb.locale)) ?? .current
     }
     var pb: PBText {
         .with {
@@ -365,12 +384,12 @@ extension Text: Protobuf {
             $0.size = size
             $0.widthCount = widthCount
             $0.origin = origin.pb
-            if let timeframe = timeframe {
-                $0.timeframeOptional = .timeframe(timeframe.pb)
-            } else {
-                $0.timeframeOptional = nil
-            }
             $0.locale = locale.pb
+            $0.timeOptionOptional = if let timeOption {
+                .timeOption(timeOption.pb)
+            } else {
+                nil
+            }
         }
     }
 }

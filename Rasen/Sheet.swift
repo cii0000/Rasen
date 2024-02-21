@@ -102,6 +102,24 @@ extension ColorValue: Protobuf {
 }
 extension ColorValue: Codable {}
 
+struct ToneValue {
+    var tone: Tone
+    var noteIndexes: [Int]
+}
+extension ToneValue: Protobuf {
+    init(_ pb: PBToneValue) throws {
+        tone = try .init(pb.tone)
+        noteIndexes = pb.noteIndexes.map { max(.init($0), 0) }
+    }
+    var pb: PBToneValue {
+        .with {
+            $0.tone = tone.pb
+            $0.noteIndexes = noteIndexes.map { .init($0) }
+        }
+    }
+}
+extension ToneValue: Codable {}
+
 struct TextValue: Hashable, Codable {
     var string: String, replacedRange: Range<Int>,
         origin: Point?, size: Double?, widthCount: Double?
@@ -411,22 +429,26 @@ extension IndexValue where Value == Text {
         }
     }
 }
-extension IndexValue where Value == Score? {
-    init(_ pb: PBScoreIndexValue) throws {
-        if case .value(let value)? = pb.valueOptional {
-            self.value = try? Score(value)
-        } else {
-            value = nil
-        }
+extension IndexValue where Value == Note {
+    init(_ pb: PBNoteIndexValue) throws {
+        value = (try? .init(pb.value)) ?? .init()
         index = max(Int(pb.index), 0)
     }
-    var pb: PBScoreIndexValue {
+    var pb: PBNoteIndexValue {
         .with {
-            if let value = value {
-                $0.valueOptional = .value(value.pb)
-            } else {
-                $0.valueOptional = nil
-            }
+            $0.value = value.pb
+            $0.index = Int64(index)
+        }
+    }
+}
+extension IndexValue where Value == Content {
+    init(_ pb: PBContentIndexValue) throws {
+        value = (try? .init(pb.value)) ?? .init()
+        index = max(Int(pb.index), 0)
+    }
+    var pb: PBContentIndexValue {
+        .with {
+            $0.value = value.pb
             $0.index = Int64(index)
         }
     }
@@ -479,18 +501,6 @@ extension IndexValue where Value == KeyframeOption {
         }
     }
 }
-extension IndexValue where Value == Content {
-    init(_ pb: PBContentIndexValue) throws {
-        value = try Content(pb.value)
-        index = max(Int(pb.index), 0)
-    }
-    var pb: PBContentIndexValue {
-        .with {
-            $0.value = value.pb
-            $0.index = Int64(index)
-        }
-    }
-}
 extension Array where Element == IndexValue<Line> {
     init(_ pb: PBLineIndexValueArray) throws {
         self = try pb.value.map { try IndexValue<Line>($0) }
@@ -520,6 +530,22 @@ extension Array where Element == IndexValue<Text> {
         self = try pb.value.map { try IndexValue<Text>($0) }
     }
     var pb: PBTextIndexValueArray {
+        .with { $0.value = map { $0.pb } }
+    }
+}
+extension Array where Element == IndexValue<Note> {
+    init(_ pb: PBNoteIndexValueArray) throws {
+        self = try pb.value.map { try IndexValue<Note>($0) }
+    }
+    var pb: PBNoteIndexValueArray {
+        .with { $0.value = map { $0.pb } }
+    }
+}
+extension Array where Element == IndexValue<Content> {
+    init(_ pb: PBContentIndexValueArray) throws {
+        self = try pb.value.map { try IndexValue<Content>($0) }
+    }
+    var pb: PBContentIndexValueArray {
         .with { $0.value = map { $0.pb } }
     }
 }
@@ -571,14 +597,6 @@ extension Array where Element == IndexValue<[IndexValue<InterOption>]> {
         .with { $0.value = map { $0.pb } }
     }
 }
-extension Array where Element == IndexValue<Content> {
-    init(_ pb: PBContentIndexValueArray) throws {
-        self = try pb.value.map { try IndexValue<Content>($0) }
-    }
-    var pb: PBContentIndexValueArray {
-        .with { $0.value = map { $0.pb } }
-    }
-}
 
 enum SheetUndoItem {
     case appendLine(_ line: Line)
@@ -619,8 +637,15 @@ enum SheetUndoItem {
     case insertDraftKeyPlanes(_ kvs: [IndexValue<[IndexValue<Plane>]>])
     case removeDraftKeyPlanes(_ indexes: [IndexValue<[Int]>])
     case setLineIDs(_ idvs: [IndexValue<[IndexValue<InterOption>]>])
-    case replaceScore(_ scoreValue: IndexValue<Score?>)
     case setAnimationOption(_ option: AnimationOption)
+    case insertNotes(_ noteIndexValues: [IndexValue<Note>])
+    case replaceNotes(_ noteIndexValue: [IndexValue<Note>])
+    case removeNotes(noteIndexes: [Int])
+    case changedTones(_ toneValue: ToneValue)
+    case insertContents(_ contentIndexValues: [IndexValue<Content>])
+    case replaceContents(_ contentIndexValue: [IndexValue<Content>])
+    case removeContents(contentIndexes: [Int])
+    case setScoreOption(_ option: ScoreOption)
 }
 extension SheetUndoItem: UndoItem {
     var type: UndoItemType {
@@ -663,8 +688,15 @@ extension SheetUndoItem: UndoItem {
         case .insertDraftKeyPlanes: .reversible
         case .removeDraftKeyPlanes: .unreversible
         case .setLineIDs: .lazyReversible
-        case .replaceScore: .lazyReversible
         case .setAnimationOption: .lazyReversible
+        case .insertNotes: .reversible
+        case .replaceNotes: .lazyReversible
+        case .removeNotes: .unreversible
+        case .changedTones: .lazyReversible
+        case .insertContents: .reversible
+        case .replaceContents: .lazyReversible
+        case .removeContents: .unreversible
+        case .setScoreOption: .lazyReversible
         }
     }
     func reversed() -> SheetUndoItem? {
@@ -749,9 +781,27 @@ extension SheetUndoItem: UndoItem {
              nil
         case .setLineIDs:
              self
-        case .replaceScore:
-             self
         case .setAnimationOption:
+             self
+        
+        case .insertNotes(let nivs):
+             .removeNotes(noteIndexes: nivs.map { $0.index })
+        case .replaceNotes:
+             self
+        case .removeNotes:
+             nil
+            
+        case .changedTones:
+             self
+            
+        case .insertContents(let civs):
+             .removeContents(contentIndexes: civs.map { $0.index })
+        case .replaceContents:
+             self
+        case .removeContents:
+             nil
+            
+        case .setScoreOption:
              self
         }
     }
@@ -838,10 +888,24 @@ extension SheetUndoItem: Protobuf {
             self = .removeDraftKeyPlanes(try [IndexValue<[Int]>](iivs))
         case .setLineIds(let idvs):
             self = .setLineIDs(try [IndexValue<[IndexValue<InterOption>]>](idvs))
-        case .replaceScore(let scoreValue):
-            self = .replaceScore(try IndexValue<Score?>(scoreValue))
         case .setAnimationOption(let option):
             self = .setAnimationOption(try AnimationOption(option))
+        case .insertNotes(let notes):
+            self = .insertNotes(try [IndexValue<Note>](notes))
+        case .replaceNotes(let notes):
+            self = .replaceNotes(try [IndexValue<Note>](notes))
+        case .removeNotes(let noteIndexes):
+            self = .removeNotes(noteIndexes: try [Int](noteIndexes))
+        case .changedTones(let toneValue):
+            self = .changedTones(try ToneValue(toneValue))
+        case .insertContents(let contents):
+            self = .insertContents(try [IndexValue<Content>](contents))
+        case .replaceContents(let contents):
+            self = .replaceContents(try [IndexValue<Content>](contents))
+        case .removeContents(let contentIndexes):
+            self = .removeContents(contentIndexes: try [Int](contentIndexes))
+        case .setScoreOption(let option):
+            self = .setScoreOption(try ScoreOption(option))
         }
     }
     var pb: PBSheetUndoItem {
@@ -923,10 +987,24 @@ extension SheetUndoItem: Protobuf {
                 $0.value = .removeDraftKeyPlanes(iivs.pb)
             case .setLineIDs(let idvs):
                 $0.value = .setLineIds(idvs.pb)
-            case .replaceScore(let scoreValue):
-                $0.value = .replaceScore(scoreValue.pb)
             case .setAnimationOption(let option):
                 $0.value = .setAnimationOption(option.pb)
+            case .insertNotes(let nivs):
+                $0.value = .insertNotes(nivs.pb)
+            case .replaceNotes(let nivs):
+                $0.value = .replaceNotes(nivs.pb)
+            case .removeNotes(let nis):
+                $0.value = .removeNotes(nis.pb)
+            case .changedTones(let toneValue):
+                $0.value = .changedTones(toneValue.pb)
+            case .insertContents(let civs):
+                $0.value = .insertContents(civs.pb)
+            case .replaceContents(let civs):
+                $0.value = .replaceContents(civs.pb)
+            case .removeContents(let cis):
+                $0.value = .removeContents(cis.pb)
+            case .setScoreOption(let option):
+                $0.value = .setScoreOption(option.pb)
             }
         }
     }
@@ -971,8 +1049,15 @@ extension SheetUndoItem: Codable {
         case insertDraftKeyPlanes = "37"
         case removeDraftKeyPlanes = "38"
         case setLineIDs = "30"
-        case replaceScore = "32"
         case setAnimationOption = "39"
+        case insertNotes = "41"
+        case replaceNotes = "42"
+        case removeNotes = "43"
+        case changedTones = "44"
+        case insertContents = "45"
+        case replaceContents = "46"
+        case removeContents = "47"
+        case setScoreOption = "48"
     }
     init(from decoder: Decoder) throws {
         var container = try decoder.unkeyedContainer()
@@ -1054,10 +1139,24 @@ extension SheetUndoItem: Codable {
             self = .removeDraftKeyPlanes(try container.decode([IndexValue<[Int]>].self))
         case .setLineIDs:
             self = .setLineIDs(try container.decode([IndexValue<[IndexValue<InterOption>]>].self))
-        case .replaceScore:
-            self = .replaceScore(try container.decode(IndexValue<Score?>.self))
         case .setAnimationOption:
             self = .setAnimationOption(try container.decode(AnimationOption.self))
+        case .insertNotes:
+            self = .insertNotes(try container.decode([IndexValue<Note>].self))
+        case .replaceNotes:
+            self = .replaceNotes(try container.decode([IndexValue<Note>].self))
+        case .removeNotes:
+            self = .removeNotes(noteIndexes: try container.decode([Int].self))
+        case .changedTones:
+            self = .changedTones(try container.decode(ToneValue.self))
+        case .insertContents:
+            self = .insertContents(try container.decode([IndexValue<Content>].self))
+        case .replaceContents:
+            self = .replaceContents(try container.decode([IndexValue<Content>].self))
+        case .removeContents:
+            self = .removeContents(contentIndexes: try container.decode([Int].self))
+        case .setScoreOption:
+            self = .setScoreOption(try container.decode(ScoreOption.self))
         }
     }
     func encode(to encoder: Encoder) throws {
@@ -1177,11 +1276,32 @@ extension SheetUndoItem: Codable {
         case .setLineIDs(let idvs):
             try container.encode(CodingTypeKey.setLineIDs)
             try container.encode(idvs)
-        case .replaceScore(let scoreValue):
-            try container.encode(CodingTypeKey.replaceScore)
-            try container.encode(scoreValue)
         case .setAnimationOption(let option):
             try container.encode(CodingTypeKey.setAnimationOption)
+            try container.encode(option)
+        case .insertNotes(let vs):
+            try container.encode(CodingTypeKey.insertNotes)
+            try container.encode(vs)
+        case .replaceNotes(let vs):
+            try container.encode(CodingTypeKey.replaceNotes)
+            try container.encode(vs)
+        case .removeNotes(let vs):
+            try container.encode(CodingTypeKey.removeNotes)
+            try container.encode(vs)
+        case .changedTones(let toneValue):
+            try container.encode(CodingTypeKey.changedTones)
+            try container.encode(toneValue)
+        case .insertContents(let vs):
+            try container.encode(CodingTypeKey.insertContents)
+            try container.encode(vs)
+        case .replaceContents(let vs):
+            try container.encode(CodingTypeKey.replaceContents)
+            try container.encode(vs)
+        case .removeContents(let vs):
+            try container.encode(CodingTypeKey.removeContents)
+            try container.encode(vs)
+        case .setScoreOption(let option):
+            try container.encode(CodingTypeKey.setScoreOption)
             try container.encode(option)
         }
     }
@@ -1227,8 +1347,15 @@ extension SheetUndoItem: CustomStringConvertible {
         case .insertDraftKeyPlanes: "insertDraftKeyPlanes"
         case .removeDraftKeyPlanes: "removeDraftKeyPlanes"
         case .setLineIDs: "setLineIDs"
-        case .replaceScore: "replaceScore"
         case .setAnimationOption: "setAnimationOption"
+        case .insertNotes: "insertNotes"
+        case .replaceNotes: "replaceNotes"
+        case .removeNotes: "removeNotes"
+        case .changedTones: "changedTones"
+        case .insertContents: "insertContents"
+        case .replaceContents: "replaceContents"
+        case .removeContents: "removeContents"
+        case .setScoreOption: "setScoreOption"
         }
     }
 }
@@ -1496,9 +1623,9 @@ extension AnimationZipper: Protobuf {
 }
 
 struct Animation {
-    static let defaultBeatDuration = Timeframe.defaultBeatDuration
+    static let defaultBeatDuration = Music.defaultBeatDuration
     static let defaultBeatRange = 0 ..< defaultBeatDuration
-    static let timelineY = 18.0
+    static let timelineY = 15.0
     
     var keyframes = [Keyframe]()
 
@@ -1513,15 +1640,13 @@ struct Animation {
     var tempo = Music.defaultTempo
     var timelineY = timelineY
     var enabled = false
-    var isPlaying = false
     
     init(keyframes: [Keyframe] = [],
          rootBeat: Rational = 0,
          startBeat: Rational = 0,
          tempo: Rational = Music.defaultTempo,
          timelineY: Double = timelineY,
-         enabled: Bool = false,
-         isPlaying: Bool = false) {
+         enabled: Bool = false) {
         
         self.keyframes = keyframes
         self.rootBeat = rootBeat
@@ -1529,7 +1654,6 @@ struct Animation {
         self.tempo = tempo
         self.timelineY = timelineY
         self.enabled = enabled
-        self.isPlaying = isPlaying
         index = keyframes.isEmpty ?
             0 : index(atRootBeat: rootBeat)
     }
@@ -1571,9 +1695,9 @@ extension Animation: Protobuf {
         rootBeat = (try? Rational(pb.rootBeat)) ?? 0
         startBeat = (try? Rational(pb.startBeat)) ?? 0
         tempo = (try? Rational(pb.tempo))?.clipped(Music.tempoRange) ?? Music.defaultTempo
-        timelineY = pb.timelineY
+        timelineY = pb.timelineY.clipped(min: Animation.timelineY,
+                                         max: Sheet.height - Animation.timelineY)
         enabled = pb.enabled
-        isPlaying = pb.isPlaying
         index = keyframes.isEmpty ?
             0 : index(atRootBeat: rootBeat)
     }
@@ -1648,18 +1772,14 @@ extension Animation: Protobuf {
             $0.tempo = tempo.pb
             $0.timelineY = timelineY
             $0.enabled = enabled
-            $0.isPlaying = isPlaying
         }
     }
 }
-extension Animation: TempoType {
+extension Animation: BeatRangeType {
     var isEmpty: Bool {
         keyframes.isEmpty
     }
     
-    var secRange: Range<Rational> {
-        secRange(fromBeat: beatRange)
-    }
     var beatRange: Range<Rational> {
         startBeat ..< (startBeat + localBeatDuration)
     }
@@ -1935,7 +2055,9 @@ extension PreviousNext: Protobuf {
 
 struct Sheet {
     var animation = Animation(keyframes: [Keyframe(beatDuration: 0)])
+    var score = Score()
     var texts = [Text]()
+    var contents = [Content]()
     var borders = [Border]()
     var backgroundUUColor = Sheet.defalutBackgroundUUColor
 }
@@ -1950,7 +2072,10 @@ extension Sheet: Protobuf {
                               beatDuration: 0)
             animation = Animation(keyframes: [kf])
         }
+        
+        score = (try? .init(pb.score)) ?? .init()
         texts = pb.texts.compactMap { try? Text($0) }
+        contents = pb.contents.compactMap { try? .init($0) }
         borders = pb.borders.compactMap { try? Border($0) }
         backgroundUUColor = (try? UUColor(pb.backgroundUucolor))
             ?? Sheet.defalutBackgroundUUColor
@@ -1963,7 +2088,9 @@ extension Sheet: Protobuf {
                 $0.picture = picture.pb
                 $0.draftPicture = draftPicture.pb
             }
+            $0.score = score.pb
             $0.texts = texts.map { $0.pb }
+            $0.contents = contents.map { $0.pb }
             $0.borders = borders.map { $0.pb }
             $0.backgroundUucolor = backgroundUUColor.pb
         }
@@ -1976,7 +2103,9 @@ extension Sheet {
     static let defaultAnimationBounds = Rect(width: 400, height: 300)
     static let defalutBackgroundUUColor = UU(Color.background, id: .zero)
     static let textPadding = Size(width: 16, height: 15)
-    static let secWidth = 60.0
+    static let secWidth = 60.0, secPadding = 16.0
+    static let timelineHalfHeight = 12.0
+    static let knobWidth = 2.0, knobHeight = 12.0
 }
 extension Sheet {
     var picture: Picture {
@@ -1994,8 +2123,11 @@ extension Sheet {
     var enabledAnimation: Bool {
         animation.enabled
     }
-    var enabledTimetrack: Bool {
-        animation.enabled || texts.contains { $0.timeframe != nil }
+    var enabledAudiotrack: Bool {
+        animation.enabled
+        || score.enabled
+        || contents.contains { $0.type.isDuration && $0.timeOption != nil }
+        || texts.contains { $0.timeOption != nil }
     }
     
     var mainFrameRate: Int {
@@ -2238,41 +2370,46 @@ extension Sheet {
     }
     
     var musicBeatDuration: Rational {
-        texts.reduce(into: Rational(0)) {
-            if let timeframe = $1.timeframe {
-                $0 = max($0, timeframe.beatRange.upperBound)
+        var v = Rational(0)
+        v = max(v, score.beatRange.upperBound)
+        v = contents.reduce(into: v) {
+            if let timeOption = $1.timeOption {
+                $0 = max($0, timeOption.beatRange.upperBound)
             }
         }
+        v = texts.reduce(into: v) {
+            if let timeOption = $1.timeOption {
+                $0 = max($0, timeOption.beatRange.upperBound)
+            }
+        }
+        return v
     }
     var musicSecDuration: Rational {
-        texts.reduce(into: 0) {
-            if let timeframe = $1.timeframe {
-                $0 = max($0, timeframe.secRange.upperBound)
+        var v = Rational(0)
+        v = max(v, score.secRange.upperBound)
+        v = contents.reduce(into: v) {
+            if let timeOption = $1.timeOption {
+                $0 = max($0, timeOption.secRange.upperBound)
             }
         }
+        v = texts.reduce(into: v) {
+            if let timeOption = $1.timeOption {
+                $0 = max($0, timeOption.secRange.upperBound)
+            }
+        }
+        return v
     }
     
     var enabledMusic: Bool {
-        !timetrack.timeframes.isEmpty
+        !audiotrack.values.isEmpty
     }
-    var timetrack: Timetrack {
-        let timeframes: [(Point, Timeframe)] = texts.compactMap {
-            guard let timeframe = $0.timeframe else { return nil }
-            if timeframe.score != nil {
-                return ($0.origin, timeframe)
-            } else if timeframe.content?.type == .movie
-                        || timeframe.content?.type == .sound {
-                return ($0.origin, timeframe)
-            } else {
-                return nil
-            }
-        }
-        return Timetrack(timeframes: timeframes)
+    var audiotrack: Audiotrack {
+        .init(values: [.score(score)] + contents.compactMap { $0.type.isAudio ? .sound($0) : nil })
     }
     var pcmBuffer: PCMBuffer? {
-        let timetrack = timetrack
-        if !timetrack.isEmpty,
-           let sequencer = Sequencer(timetracks: [timetrack],
+        let audiotrack = audiotrack
+        if !audiotrack.isEmpty,
+           let sequencer = Sequencer(audiotracks: [audiotrack],
                                      isAsync: false, startSec: 0) {
             return try? sequencer.buffer(sampleRate: 44100,
                                          clippingAmp: nil) { _, _ in }
@@ -2282,11 +2419,11 @@ extension Sheet {
     
     var captions: [Caption] {
         texts.compactMap {
-            if let timeframe = $0.timeframe, !timeframe.isAudio {
+            if let timeOption = $0.timeOption {
                 return Caption(string: $0.string, orientation: $0.orientation,
                                isTitle: $0.typobute.font.isProportional,
-                               beatRange: timeframe.beatRange,
-                               tempo: timeframe.tempo)
+                               beatRange: timeOption.beatRange,
+                               tempo: timeOption.tempo)
             } else {
                 return nil
             }

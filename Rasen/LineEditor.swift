@@ -32,7 +32,7 @@ final class RangeSelector: DragEditor {
         switch event.phase {
         case .began:
             if let sheetView = document.sheetView(at: p),
-               sheetView.containsTimeline(sheetView.convertFromWorld(p)) {
+               sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p)) {
                 
                 multiFrameSlider = MultiFrameSlider(document)
                 multiFrameSlider?.send(event)
@@ -972,8 +972,9 @@ final class LineEditor: Editor {
     }
     
     private var isDrawNote = false
-    private var noteSheetView: SheetView?, noteTextIndex: Int?, notePitch: Rational?, beganScore: Score?,
-        noteIndex: Int?, noteStartTime: Rational?, notePlayer: NotePlayer?
+    private var noteSheetView: SheetView?, notePitch: Rational?,
+                beganScore: Score?,
+                noteIndex: Int?, noteStartBeat: Rational?, notePlayer: NotePlayer?
     func drawNote(with event: DragEvent, isStraight: Bool = false) {
         guard isEditingSheet else {
             document.stop(with: event)
@@ -982,339 +983,146 @@ final class LineEditor: Editor {
         switch event.phase {
         case .began:
             let p = document.convertScreenToWorld(event.screenPoint)
-            if let sheetView = noteSheetView, let ti = noteTextIndex {
-                let textView = sheetView.textsView.elementViews[ti]
+            if let sheetView = noteSheetView, sheetView.model.score.enabled {
+                let scoreView = sheetView.scoreView
                 let inP = sheetView.convertFromWorld(p)
-                let inTP = textView.convertFromWorld(p)
-                if let pitch = document.pitch(from: textView, at: inTP),
-                   let timeframe = textView.model.timeframe,
-                   let score = timeframe.score {
-                    let count = score.notes.count
-                    let interval = document.currentNoteTimeInterval(from: textView.model)
-                    let t = textView.beat(atX: inP.x, interval: interval) - timeframe.beatRange.start - timeframe.localStartBeat
-                    let beatRange = t ..< t
-                    let note = Note(pitch: pitch, beatRange: beatRange,
-                                    volumeAmp: isStraight ? 0 : Volume.mainAmp)
-                    
-                    noteIndex = count
-                    notePitch = pitch
-                    noteStartTime = t
-                    beganScore = score
-                    
-                    let volume = sheetView.isPlaying ?
-                        score.volume * 0.1 : score.volume
-                    if let notePlayer = sheetView.notePlayer {
-                        self.notePlayer = notePlayer
-                        let note = isStraight ? Note(pitch: pitch, beatRange: beatRange) : note
-                        notePlayer.notes = [score.convertPitchToWorld(note)]
-                        notePlayer.tone = score.tone
-                        notePlayer.volume = volume
-                    } else {
-                        let note = isStraight ? Note(pitch: pitch, beatRange: beatRange) : note
-                        notePlayer = try? NotePlayer(notes: [score.convertPitchToWorld(note)],
-                                                     score.tone,
-                                                     volume: volume,
-                                                     pan: score.pan,
-                                                     tempo: Double(timeframe.tempo))
-                        sheetView.notePlayer = notePlayer
-                    }
-                    notePlayer?.play()
-                    
-                    var nTimeframe = timeframe
-                    nTimeframe.score?.notes.append(note)
-                    sheetView.textsView.elementViews[ti]
-                        .model.timeframe = nTimeframe
-                    
-//                    let noteNode = textView.noteNode(from: note, score, timeframe)
+                let inTP = scoreView.convertFromWorld(p)
+                let pitch = document.pitch(from: scoreView, at: inTP)
+                let score = scoreView.model
+                let count = score.notes.count
+                let interval = document.currentNoteTimeInterval()
+                let beat = scoreView.beat(atX: inP.x, interval: interval) - score.beatRange.start
+                let beatRange = beat ..< beat
+                let tone = isStraight ?
+                Tone(overtone: .init(evenScale: 1, oddScale: 1),
+                     sourceFilter: .init(fqSmps: [.init(0, 1)])) :
+                Tone()
+                let note = Note(pitch: pitch, beatRange: beatRange,
+                                volumeAmp: isStraight ? 0 : Note.defaultVolume.amp, tone: tone)
+                
+                noteIndex = count
+                notePitch = pitch
+                noteStartBeat = beat
+                beganScore = score
+                
+                let volume = Volume(smp: sheetView.isPlaying ? 0.1 : 1)
+                if let notePlayer = sheetView.notePlayer {
+                    self.notePlayer = notePlayer
+                    let note = isStraight ? Note(pitch: pitch, beatRange: beatRange) : note
+                    notePlayer.notes = [note]
+                    notePlayer.volume = volume
+                } else {
+                    let note = isStraight ? Note(pitch: pitch, beatRange: beatRange) : note
+                    notePlayer = try? NotePlayer(notes: [note],
+                                                 volume: volume,
+                                                 pan: note.pan)
+                    sheetView.notePlayer = notePlayer
+                }
+                notePlayer?.play()
+                
+                sheetView.scoreView.notesView.append(note)
+//                    let noteNode = scoreView.noteNode(from: note)
 //                    noteNode.attitude.position
-//                        = textView.node.attitude.position
+//                        = scoreView.node.attitude.position
 //                        + sheetView.node.attitude.position
 //                    self.tempLineNode = noteNode
 //                    document.rootNode.insert(child: noteNode,
 //                                             at: document.accessoryNodeIndex)
-                }
             }
         case .changed:
             let p = document.convertScreenToWorld(event.screenPoint)
-            if let sheetView = noteSheetView, let ti = noteTextIndex,
-               let noteMusicIndex = notePitch,
-                let nsBeat = noteStartTime {
-                let textView = sheetView.textsView.elementViews[ti]
-                let inP = sheetView.convertFromWorld(p)
-                let inTP = textView.convertFromWorld(p)
-                if let timeframe = textView.model.timeframe,
-                   let i = noteIndex,
-                   let score = textView.model.timeframe?.score,
-                   let pitch = document.pitch(from: textView, at: inTP) {
-                    let interval = document.currentNoteTimeInterval(from: textView.model)
-                    let beat = textView.beat(atX: inP.x, interval: interval) - timeframe.beatRange.start - timeframe.localStartBeat
-                    let beatRange = beat > nsBeat ?
-                        nsBeat ..< beat : beat ..< nsBeat
-                    let note = Note(pitch: pitch, beatRange: beatRange,
-                                    volumeAmp: isStraight ? 0 : Volume.mainAmp)
-                    let isNote = noteMusicIndex != pitch
-                    
-                    sheetView.updateOtherNotes()
-                    
-                    if isNote {
-                        let note = isStraight ? Note(pitch: pitch, beatRange: beatRange) : note
-                        notePlayer?.notes = [score.convertPitchToWorld(note)]
-                        self.notePitch = pitch
-                    }
-                    
-                    var nTimeframe = timeframe
-                    nTimeframe.score?.notes[i] = note
-                    sheetView.textsView.elementViews[ti]
-                        .model.timeframe = nTimeframe
-                    
-//                    tempLineNode?.children
-//                        = textView.noteNode(from: note, score, timeframe).children
+            if let sheetView = noteSheetView, let notePitch,
+                let nsBeat = noteStartBeat, let ni = noteIndex {
+                
+                let scoreView = sheetView.scoreView
+                let sheetP = sheetView.convertFromWorld(p)
+                let scoreP = scoreView.convertFromWorld(p)
+                let pitch = document.pitch(from: scoreView, at: scoreP)
+                let score = scoreView.model
+                let interval = document.currentNoteTimeInterval()
+                let beat = scoreView.beat(atX: sheetP.x, interval: interval) - score.beatRange.start
+                let beatRange = beat > nsBeat ? nsBeat ..< beat : beat ..< nsBeat
+                let tone = isStraight ?
+                Tone(overtone: .init(evenScale: 1, oddScale: 1),
+                     sourceFilter: .init(fqSmps: [.init(0, 1)])) :
+                Tone()
+                let note = Note(pitch: pitch, beatRange: beatRange,
+                                volumeAmp: isStraight ? 0 : Note.defaultVolume.amp, tone: tone)
+                let isNote = notePitch != pitch
+                
+                if isNote {
+                    let note = isStraight ? Note(pitch: pitch, beatRange: beatRange) : note
+                    notePlayer?.notes = [note]
+                    self.notePitch = pitch
                 }
+                
+                sheetView.scoreView.model.notes[ni] = note
+//                    tempLineNode?.children
+//                        = scoreView.noteNode(from: note).children
             }
         case .ended:
             tempLineNode?.removeFromParent()
             tempLineNode = nil
             
             let p = document.convertScreenToWorld(event.screenPoint)
-            if let sheetView = noteSheetView, let ti = noteTextIndex,
-                let nst = noteStartTime {
-                
-                let textView = sheetView.textsView.elementViews[ti]
-                let inP = sheetView.convertFromWorld(p)
-                let inTP = textView.convertFromWorld(p)
-                if let timeframe = textView.model.timeframe,
-                   let score = textView.model.timeframe?.score,
-                   let beganScore = beganScore,
-                   let pitch = document.pitch(from: textView, at: inTP) {
-                    let interval = document.currentNoteTimeInterval(from: textView.model)
-                    let t = textView.beat(atX: inP.x, interval: interval) - timeframe.beatRange.start - timeframe.localStartBeat
-                    let tr = t > nst ? nst ..< t : t ..< nst
-                    if tr.length > 0 {
-                        let note = Note(pitch: pitch, beatRange: tr,
-                                        volumeAmp: isStraight ? 0 : Volume.mainAmp)
-                        
-                        var score = score
-                        score.notes.append(note)
-                        sheetView.newUndoGroup()
-                        sheetView.captureScore(score, old: beganScore, at: ti)
+            if let sheetView = noteSheetView, let nsBeat = noteStartBeat {
+                let scoreView = sheetView.scoreView
+                let score = scoreView.model
+                let sheetP = sheetView.convertFromWorld(p)
+                let scoreP = scoreView.convertFromWorld(p)
+                let pitch = document.pitch(from: scoreView, at: scoreP)
+                let interval = document.currentNoteTimeInterval()
+                let beat = scoreView.beat(atX: sheetP.x, interval: interval) - score.beatRange.start
+                let beatRange = beat > nsBeat ? nsBeat ..< beat : beat ..< nsBeat
+                if beatRange.length > 0 {
+                    let tone = isStraight ?
+                    Tone(overtone: .init(evenScale: 1, oddScale: 1),
+                         sourceFilter: .init(fqSmps: [.init(0, 1)])) :
+                    Tone()
+                    let note = Note(pitch: pitch, beatRange: beatRange,
+                                    volumeAmp: isStraight ? 0 : Note.defaultVolume.amp, tone: tone)
+                    
+//                        sheetView.scoresView.elementViews[si]
+//                            .model.notes[ni] = note
+                    
+                    sheetView.newUndoGroup()
+                    sheetView.captureAppend(note)
 //                        sheetView.replaceScore(score, at: ti)
-                        
-                        sheetView.updateOtherNotes()
-                        
-                        sheetView.updatePlaying()
-                    }
+                    
+                    sheetView.updatePlaying()
                 }
             }
             
             notePlayer?.stop()
         }
     }
-//    private var averagePitch = 0.0, averageCount = 0.0
-//    func drawPitchbendNote(with event: DragEvent) {
-//        guard isEditingSheet else {
-//            document.stop(with: event)
-//            return
-//        }
-//
-//        let p = document.convertScreenToWorld(event.screenPoint)
-//        if event.phase == .began {
-//            updateClipBoundsAndIndexRange(at: p)
-//            let tempLineNode = Node(attitude: Attitude(position: centerOrigin),
-//                                    path: Path(),
-//                                    lineWidth: document.sheetLineWidth,
-//                                    lineType: .color(.content))
-//            self.tempLineNode = tempLineNode
-//            document.rootNode.insert(child: tempLineNode,
-//                                     at: document.accessoryNodeIndex)
-//        }
-//        drawLine(for: p - centerOrigin, sp: event.screenPoint,
-//                 pressure: event.pressure,
-//                 time: event.time, event.phase)
-//
-//        switch event.phase {
-//        case .began:
-//            let p = document.convertScreenToWorld(event.screenPoint)
-//            if let sheetView = noteSheetView, let ti = noteTextIndex {
-//                let textView = sheetView.textsView.elementViews[ti]
-//                let inP = sheetView.convertFromWorld(p)
-//                let inTP = textView.convertFromWorld(p)
-//                if let pitch = document.pitch(from: textView, at: inTP),
-//                   let timeframe = textView.model.timeframe,
-//                   let score = timeframe.score {
-//                    let count = score.notes.count
-//                    let interval = document.currentNoteTimeInterval(from: textView.model)
-//                    let t = (textView.beat(atX: inP.x, interval: interval) - timeframe.beatRange.start - timeframe.localStartBeat)
-//                    let note = Note(pitch: pitch, beatRange: t ..< t)
-//
-//                    averagePitch += Double(pitch)
-//                    averageCount += 1
-//
-//                    noteIndex = count
-//                    notePitch = pitch
-//                    noteStartTime = t
-//
-//                    let volume = sheetView.isPlaying ?
-//                        score.volume * 0.1 : score.volume
-//                    if let notePlayer = sheetView.notePlayer {
-//                        self.notePlayer = notePlayer
-//                        notePlayer.notes = [score.convertPitchToWorld(note)]
-//                        notePlayer.tone = score.tone
-//                        notePlayer.volume = volume
-//                    } else {
-//                        notePlayer = try? NotePlayer(notes: [score.convertPitchToWorld(note)],
-//                                                     score.tone,
-//                                                     volume: volume,
-//                                                     pan: score.pan,
-//                                                     tempo: Double(timeframe.tempo))
-//                        sheetView.notePlayer = notePlayer
-//                    }
-//                    notePlayer?.play()
-//
-//                    let noteNode = textView.noteNode(from: note, score, timeframe)
-//                    noteNode.attitude.position
-//                        = textView.node.attitude.position
-//                        + sheetView.node.attitude.position
-//                    self.tempLineNode = noteNode
-//                    document.rootNode.insert(child: noteNode,
-//                                             at: document.accessoryNodeIndex)
-//                }
-//            }
-//        case .changed:
-//            let p = document.convertScreenToWorld(event.screenPoint)
-//            if let sheetView = noteSheetView, let ti = noteTextIndex,
-//               let noteMusicIndex = notePitch,
-//                let nst = noteStartTime {
-//                let textView = sheetView.textsView.elementViews[ti]
-//                let inP = sheetView.convertFromWorld(p)
-//                let inTP = textView.convertFromWorld(p)
-//                if let timeframe = textView.model.timeframe,
-//                   let score = textView.model.timeframe?.score,
-//                   let pitch = document.pitch(from: textView, at: inTP) {
-//                    let interval = document.currentNoteTimeInterval(from: textView.model)
-//                    let t = (textView.beat(atX: inP.x, interval: interval) - timeframe.beatRange.start - timeframe.localStartBeat)
-//                        .clipped(min: 0, max: timeframe.beatRange.length)
-//
-//                    averagePitch += Double(pitch)
-//                    averageCount += 1
-//                    let narPitch = (averagePitch / averageCount)
-//                    let nPitch = Rational(narPitch, intervalScale: interval)
-//
-//                    let tr = t > nst ? nst ..< t : t ..< nst
-//
-//                    let nf = textView.noteFrame(from: Note(pitch: nPitch,
-//                                                           beatRange: tr),
-//                                                score, timeframe)
-//                    var line = tempLine
-//                    line = textView.convert(line, from: sheetView.node)
-//                    line.controls = line.controls.map {
-//                        .init(point: .init(($0.point.x - nf.minX) / nf.width, Double(document.pitch(from: textView, at: $0.point) ?? 0) - Double(nPitch)),
-//                              weight: $0.weight,
-//                              pressure: $0.pressure)
-//                    }
-//
-//                    let note = Note(pitch: nPitch, pitchbendLine: line,
-//                                    beatRange: tr)
-//                    let isNote = noteMusicIndex != nPitch
-//                    if isNote {
-//                        notePlayer?.notes = [score.convertPitchToWorld(note)]
-//                        self.notePitch = nPitch
-//                    }
-//                    tempLineNode?.children
-//                        = textView.noteNode(from: note, score, timeframe).children
-//                }
-//            }
-//        case .ended:
-//            tempLineNode?.removeFromParent()
-//            tempLineNode = nil
-//
-//            let p = document.convertScreenToWorld(event.screenPoint)
-//            if let sheetView = noteSheetView, let ti = noteTextIndex,
-//                let nst = noteStartTime {
-//
-//                let textView = sheetView.textsView.elementViews[ti]
-//                let inP = sheetView.convertFromWorld(p)
-//                let inTP = textView.convertFromWorld(p)
-//                if let timeframe = textView.model.timeframe,
-//                   let score = textView.model.timeframe?.score,
-//                   let pitch = document.pitch(from: textView, at: inTP) {
-//                    let interval = document.currentNoteTimeInterval(from: textView.model)
-//                    let t = textView.beat(atX: inP.x, interval: interval) - timeframe.beatRange.start - timeframe.localStartBeat
-//
-//                    averagePitch += Double(pitch)
-//                    averageCount += 1
-//                    let narPitch = (averagePitch / averageCount)
-//                    let nPitch = Rational(narPitch, intervalScale: interval)
-//
-//                    let tr = t > nst ? nst ..< t : t ..< nst
-//                    if tr.length > 0 {
-////                        let nf = textView.noteFrame(from: Note(pitch: nPitch,
-////                                                               beatRange: tr),
-////                                                    score, timeframe)
-////                        let dx = textView.scoreFrame?.minX ?? 0
-//                        var line = tempLine
-//                        let minX = line.controls.min(by: { $0.point.x < $1.point.x })?.point.x ?? 0
-//                        let maxX = line.controls.max(by: { $0.point.x < $1.point.x })?.point.x ?? 0
-////                        print("A:", line.controls.map {
-////                            ($0.point, minX == maxX ? 0 : ($0.point.x - minX) / (maxX - minX)) })
-//                        line.controls = line.controls.map {
-//                            let x = minX == maxX ? 0 : ($0.point.x - minX) / (maxX - minX)
-//                            let inTP = textView.convert($0.point, from: sheetView.node)
-//                            let y = (document.smoothPitch(from: textView, at: inTP) ?? 0) - Double(nPitch)
-////                            print("S:", x, y)
-//                            return .init(point: .init(x, y),
-//                                         weight: $0.weight,
-//                                         pressure: $0.pressure)
-//                        }
-////                        print("B:", line.controls.map { $0.point })
-//
-//                        let note = Note(pitch: nPitch, pitchbendLine: line, beatRange: tr)
-//
-//                        var score = score
-//                        score.notes.append(note)
-//                        sheetView.newUndoGroup()
-//                        sheetView.replaceScore(score, at: ti)
-//
-//                        sheetView.updatePlaying()
-//                    }
-//                }
-//            }
-//
-//            notePlayer?.stop()
-//        }
-//    }
+    
     func removeNote(with event: DragEvent) {
         let p = document.convertScreenToWorld(event.screenPoint)
         if let sheetView = document.sheetView(at: p) {
-            for (ti, textView) in sheetView.textsView.elementViews.enumerated() {
-                
-                let inTP = textView.convertFromWorld(p)
-                let nLine = tempLine * Transform(translation: -centerBounds.origin)
-                let path = sheetView.convertToWorld(nLine.path(isClosed: true, isPolygon: false))
-                let nPath = textView.convertFromWorld(path)
-                if let scoreFrame = textView.scoreFrame,
-                   nPath.intersects(scoreFrame),
-                   let timeframe = textView.model.timeframe,
-                    var score = timeframe.score {
-                    
-                    if let pitch = document.pitch(from: textView, at: inTP) {
-                        let nis = document.selectedNoteIndexes(from: textView,
-                                                               path: path)
-                        if !nis.isEmpty {
-                            let interval = document.currentNoteTimeInterval(from: textView.model)
-                            let t = textView.beat(atX: inTP.x, interval: interval)
-                            let notes: [Note] = nis.map {
-                                var note = score.notes[$0]
-                                note.pitch -= pitch
-                                note.beatRange.start -= t
-                                return note
-                            }
-                            score.notes.remove(at: nis)
-                            Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: notes))]
-                            sheetView.newUndoGroup()
-                            sheetView.replaceScore(score, at: ti)
-                            break
-                        }
+            let scoreView = sheetView.scoreView
+            let inTP = scoreView.convertFromWorld(p)
+            let nLine = tempLine * Transform(translation: -centerBounds.origin)
+            let path = sheetView.convertToWorld(nLine.path(isClosed: true, isPolygon: false))
+            let nPath = scoreView.convertFromWorld(path)
+            let scoreFrame = scoreView.mainFrame
+            if nPath.intersects(scoreFrame) {
+                let nis = document.selectedNoteIndexes(from: scoreView, path: path)
+                if !nis.isEmpty {
+                    let pitch = document.pitch(from: scoreView, at: inTP)
+                    let score = scoreView.model
+                    let interval = document.currentNoteTimeInterval()
+                    let t = scoreView.beat(atX: inTP.x, interval: interval)
+                    let notes: [Note] = nis.map {
+                        var note = score.notes[$0]
+                        note.pitch -= pitch
+                        note.beatRange.start -= t
+                        return note
                     }
+                    
+                    Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: notes))]
+                    sheetView.newUndoGroup()
+                    sheetView.removeNote(at: nis)
                 }
             }
         }
@@ -1333,18 +1141,11 @@ final class LineEditor: Editor {
             return
         } else if event.phase == .began {
             let p = document.convertScreenToWorld(event.screenPoint)
-            if let sheetView = document.sheetView(at: p) {
-                if sheetView.model.texts.contains(where: { $0.timeframe?.score != nil }) {
-                    for (ti, textView) in sheetView.textsView.elementViews.enumerated() {
-                        if textView.containsScore(textView.convertFromWorld(p)) {
-                            isDrawNote = true
-                            noteSheetView = sheetView
-                            noteTextIndex = ti
-                            drawNote(with: event)
-                            return
-                        }
-                    }
-                }
+            if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+                isDrawNote = true
+                noteSheetView = sheetView
+                drawNote(with: event)
+                return
             }
         }
         
@@ -1366,18 +1167,11 @@ final class LineEditor: Editor {
             return
         } else if event.phase == .began {
             let p = document.convertScreenToWorld(event.screenPoint)
-            if let sheetView = document.sheetView(at: p) {
-                if sheetView.model.texts.contains(where: { $0.timeframe?.score != nil }) {
-                    for (ti, textView) in sheetView.textsView.elementViews.enumerated() {
-                        if textView.containsScore(textView.convertFromWorld(p)) {
-                            isDrawNote = true
-                            noteSheetView = sheetView
-                            noteTextIndex = ti
-                            drawNote(with: event, isStraight: true)
-                            return
-                        }
-                    }
-                }
+            if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+                isDrawNote = true
+                noteSheetView = sheetView
+                drawNote(with: event, isStraight: true)
+                return
             }
         }
         
@@ -1571,18 +1365,7 @@ final class LineEditor: Editor {
         case .began:
             document.cursor = Document.defaultCursor
             
-            var isScore = false
-            if let sheetView = document.sheetView(at: p) {
-                if sheetView.model.texts.contains(where: { $0.timeframe?.score != nil }) {
-                    for textView in sheetView.textsView.elementViews {
-                        if textView.containsScore(textView.convertFromWorld(p)) {
-                            
-                            isScore = true
-                            break
-                        }
-                    }
-                }
-            }
+            let isScore = document.sheetView(at: p)?.model.score.enabled ?? false
             
             if !isScore && document.isPlaying(with: event) {
                 document.stopPlaying(with: event)
@@ -1699,28 +1482,9 @@ final class LineEditor: Editor {
             switch type {
             case .cut:
                 if isEditingSheet {
-                    var isNote = false
-                    if let sheetView = document.sheetView(at: p) {
-                        if sheetView.model.texts.contains(where: { $0.timeframe?.score != nil }) {
-                            
-                            let nLine = tempLine * Transform(translation: -centerBounds.origin)
-                            let path = sheetView.convertToWorld(nLine.path(isClosed: true, isPolygon: false))
-                            
-                            for (_, textView) in sheetView.textsView.elementViews.enumerated() {
-                                
-                                let nPath = textView.convertFromWorld(path)
-                                if let scoreFrame = textView.scoreFrame,
-                                   nPath.intersects(scoreFrame) {
-                                    
-                                    isNote = true
-                                    removeNote(with: event)
-                                    break
-                                }
-                            }
-                        }
-                    }
-                    
-                    if !isNote {
+                    if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+                        removeNote(with: event)
+                    } else {
                         lassoCopy(isRemove: true, distance: lassoDistance, at: p)
                     }
                 } else {

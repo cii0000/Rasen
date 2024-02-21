@@ -356,12 +356,12 @@ extension Rational {
     static let basicEffectiveFieldOfView = Rational(152, 100)
 }
 extension Rational: Equatable {
-    static func == (lhs: Rational, rhs: Rational) -> Bool {
-        lhs.p * rhs.q == lhs.q * rhs.p
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.q == rhs.q ? lhs.p == rhs.p : lhs.p * rhs.q == lhs.q * rhs.p
     }
 }
 extension Rational: Comparable {
-    static func < (lhs: Rational, rhs: Rational) -> Bool {
+    static func < (lhs: Self, rhs: Self) -> Bool {
         lhs.p * rhs.q < rhs.p * lhs.q
     }
 }

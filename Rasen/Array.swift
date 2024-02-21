@@ -322,6 +322,34 @@ extension Array {
         self.init()
         reserveCapacity(capacity)
     }
+    func maxValue<V: Comparable>(_ handler: (Element) -> (V)) -> V? {
+        if let firstE = first {
+            var maxV = handler(firstE)
+            for i in 1 ..< count {
+                let v = handler(self[i])
+                if v > maxV {
+                    maxV = v
+                }
+            }
+            return maxV
+        } else {
+            return nil
+        }
+    }
+    func minValue<V: Comparable>(_ handler: (Element) -> (V)) -> V? {
+        if let firstE = first {
+            var minV = handler(firstE)
+            for i in 1 ..< count {
+                let v = handler(self[i])
+                if v < minV {
+                    minV = v
+                }
+            }
+            return minV
+        } else {
+            return nil
+        }
+    }
 }
 
 extension Array {

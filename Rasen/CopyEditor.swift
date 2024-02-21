@@ -99,7 +99,8 @@ enum PastableObject {
     case uuColor(_ uuColor: UUColor)
     case animation(_ animation: Animation)
     case ids(_ ids: InteroptionsValue)
-    case timeframe(_ timeframe: Timeframe)
+    case score(_ score: Score)
+    case content(_ content: Content)
     case image(_ image: Image)
     case beatRange(_ beatRange: Range<Rational>)
     case normalizationValue(_ normalizationValue: Double)
@@ -144,8 +145,10 @@ extension PastableObject {
              PastableObject.typeName(with: animation)
         case .ids(let ids):
              PastableObject.typeName(with: ids)
-        case .timeframe(let timeframe):
-             PastableObject.typeName(with: timeframe)
+        case .score(let score):
+             PastableObject.typeName(with: score)
+        case .content(let content):
+             PastableObject.typeName(with: content)
         case .image(let image):
              PastableObject.typeName(with: image)
         case .beatRange(let beatRange):
@@ -187,8 +190,10 @@ extension PastableObject {
             self = .animation(try Animation(serializedData: data))
         case PastableObject.objectTypeName(with: InteroptionsValue.self):
             self = .ids(try InteroptionsValue(serializedData: data))
-        case PastableObject.objectTypeName(with: Timeframe.self):
-            self = .timeframe(try Timeframe(serializedData: data))
+        case PastableObject.objectTypeName(with: Score.self):
+            self = .score(try Score(serializedData: data))
+        case PastableObject.objectTypeName(with: Content.self):
+            self = .content(try Content(serializedData: data))
         case PastableObject.objectTypeName(with: Image.self):
             self = .image(try Image(serializedData: data))
         case PastableObject.objectTypeName(with: Range<Rational>.self):
@@ -227,8 +232,10 @@ extension PastableObject {
              try? animation.serializedData()
         case .ids(let ids):
              try? ids.serializedData()
-        case .timeframe(let timeframe):
-             try? timeframe.serializedData()
+        case .score(let score):
+             try? score.serializedData()
+        case .content(let content):
+             try? content.serializedData()
         case .image(let image):
              try? image.serializedData()
         case .beatRange(let beatRange):
@@ -270,8 +277,10 @@ extension PastableObject: Protobuf {
             self = .animation(try Animation(animation))
         case .ids(let ids):
             self = .ids(try InteroptionsValue(ids))
-        case .timeframe(let timeframe):
-            self = .timeframe(try Timeframe(timeframe))
+        case .score(let score):
+            self = .score(try Score(score))
+        case .content(let content):
+            self = .content(try Content(content))
         case .image(let image):
             self = .image(try Image(image))
         case .beatRange(let beatRange):
@@ -309,8 +318,10 @@ extension PastableObject: Protobuf {
                 $0.value = .animation(animation.pb)
             case .ids(let ids):
                 $0.value = .ids(ids.pb)
-            case .timeframe(let timeframe):
-                $0.value = .timeframe(timeframe.pb)
+            case .score(let score):
+                $0.value = .score(score.pb)
+            case .content(let content):
+                $0.value = .content(content.pb)
             case .image(let image):
                 $0.value = .image(image.pb)
             case .beatRange(let beatRange):
@@ -339,7 +350,8 @@ extension PastableObject: Codable {
         case uuColor = "7"
         case animation = "8"
         case ids = "9"
-        case timeframe = "10"
+        case score = "10"
+        case content = "16"
         case image = "20"
         case beatRange = "11"
         case normalizationValue = "12"
@@ -371,8 +383,10 @@ extension PastableObject: Codable {
             self = .animation(try container.decode(Animation.self))
         case .ids:
             self = .ids(try container.decode(InteroptionsValue.self))
-        case .timeframe:
-            self = .timeframe(try container.decode(Timeframe.self))
+        case .score:
+            self = .score(try container.decode(Score.self))
+        case .content:
+            self = .content(try container.decode(Content.self))
         case .image:
             self = .image(try container.decode(Image.self))
         case .beatRange:
@@ -420,9 +434,12 @@ extension PastableObject: Codable {
         case .ids(let ids):
             try container.encode(CodingTypeKey.ids)
             try container.encode(ids)
-        case .timeframe(let timeframe):
-            try container.encode(CodingTypeKey.timeframe)
-            try container.encode(timeframe)
+        case .score(let score):
+            try container.encode(CodingTypeKey.score)
+            try container.encode(score)
+        case .content(let content):
+            try container.encode(CodingTypeKey.content)
+            try container.encode(content)
         case .image(let image):
             try container.encode(CodingTypeKey.image)
             try container.encode(image)
@@ -616,7 +633,7 @@ final class CopyEditor: Editor {
         let d = 5 / document.worldToScreenScale
         
         if let sheetView = document.sheetView(at: p),
-           sheetView.containsTimeline(sheetView.convertFromWorld(p)),
+           sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p)),
            let ki = sheetView.animationView.keyframeIndex(at: sheetView.convertFromWorld(p)) {
             
             let animationView = sheetView.animationView
@@ -635,41 +652,35 @@ final class CopyEditor: Editor {
                 .compactMap { animationView.transformedKeyframeBounds(at: $0) }
             selectingLineNode.path = Path(rects.map { Pathline(sheetView.convertToWorld($0)) })
         } else if document.isSelectSelectedNoneCursor(at: p), !document.selections.isEmpty {
-            
-            if let sheetView = document.sheetView(at: p),
-               let ti = sheetView.timeframeIndex(at: sheetView.convertFromWorld(p)) {
-                let textView = sheetView.textsView.elementViews[ti]
-                let inTP = textView.convertFromWorld(p)
-                if textView.containsScore(inTP),
-                   let timeframe = textView.model.timeframe,
-                   let score = timeframe.score {
-                    
-                    if let pitch = document.pitch(from: textView, at: inTP) {
-                        
-                        let nis = document.selectedNoteIndexes(from: textView)
-                        if !nis.isEmpty {
-                            let interval = document.currentNoteTimeInterval(from: textView.model)
-                            let t = textView.beat(atX: inTP.x, interval: interval)
-                            let notes: [Note] = nis.map {
-                                var note = score.notes[$0]
-                                note.pitch -= pitch
-                                note.beatRange.start -= t
-                                return note
-                            }
-                            if isSendPasteboard {
-                                Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: notes))]
-                            }
-                            let rects = nis
-                                .map { textView.noteFrame(from: score.notes[$0], score, timeframe) }
-                                .map { textView.convertToWorld($0) }
-                            let lw = Line.defaultLineWidth * 2 / document.worldToScreenScale
-                            selectingLineNode.children = rects.map {
-                                Node(path: Path($0),
-                                     lineWidth: lw,
-                                     lineType: .color(.selected),
-                                     fillType: .color(.subSelected))
-                            }
-                        }
+            if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
+               sheetView.scoreView.noteIndex(at: p, maxDistance: 15 * document.screenToWorldScale) != nil {
+                
+                let scoreView = sheetView.scoreView
+                let nis = document.selectedNoteIndexes(from: scoreView)
+                if !nis.isEmpty {
+                    let inTP = scoreView.convertFromWorld(p)
+                    let pitch = document.pitch(from: scoreView, at: inTP)
+                    let score = scoreView.model
+                    let interval = document.currentNoteTimeInterval()
+                    let t = scoreView.beat(atX: inTP.x, interval: interval)
+                    let notes: [Note] = nis.map {
+                        var note = score.notes[$0]
+                        note.pitch -= pitch
+                        note.beatRange.start -= t
+                        return note
+                    }
+                    if isSendPasteboard {
+                        Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: notes))]
+                    }
+                    let rects = nis
+                        .map { scoreView.noteFrame(from: score.notes[$0]) }
+                        .map { scoreView.convertToWorld($0) }
+                    let lw = Line.defaultLineWidth * 2 / document.worldToScreenScale
+                    selectingLineNode.children = rects.map {
+                        Node(path: Path($0),
+                             lineWidth: lw,
+                             lineType: .color(.selected),
+                             fillType: .color(.subSelected))
                     }
                 }
             } else {
@@ -714,7 +725,6 @@ final class CopyEditor: Editor {
             return true
         } else if let sheetView = document.sheetView(at: p),
                   let (textView, _, si, _) = sheetView.textTuple(at: sheetView.convertFromWorld(p)) {
-            
             if let node = document.findingNode(at: p) {
                 if isSendPasteboard {
                     if let range = textView.model.string.ranges(of: document.finding.string)
@@ -735,11 +745,11 @@ final class CopyEditor: Editor {
                                                    fillType: .color(.subSelected))]
                 return true
             } else if let result = textView.typesetter.warpCursorOffset(at: textView.convertFromWorld(p)), result.isLastWarp,
-               let wcPath = textView.typesetter.warpCursorPath(at: textView.convertFromWorld(p)) {
+                      let wcPath = textView.typesetter.warpCursorPath(at: textView.convertFromWorld(p)) {
                 
                 let x = result.offset +
-                    (textView.textOrientation == .horizontal ?
-                        textView.model.origin.x : textView.model.origin.y)
+                (textView.textOrientation == .horizontal ?
+                 textView.model.origin.x : textView.model.origin.y)
                 let origin = document.sheetFrame(with: document.sheetPosition(at: p)).origin
                 let path =  wcPath * Transform(translation: textView.model.origin + origin)
                 selectingLineNode.fillType = .color(.subSelected)
@@ -773,9 +783,21 @@ final class CopyEditor: Editor {
             }
             return true
         } else if let sheetView = document.sheetView(at: p),
+                  let (_, textView) = sheetView.textIndexAndView(at: sheetView.convertFromWorld(p)),
+                  textView.containsTimeline(textView.convertFromWorld(p)),
+                  let beatRange = textView.beatRange, let tf = textView.timelineFrame {
+            
+            if isSendPasteboard {
+                Pasteboard.shared.copiedObjects = [.beatRange(beatRange)]
+            }
+            
+            selectingLineNode.fillType = .color(.subSelected)
+            selectingLineNode.lineType = .color(.selected)
+            selectingLineNode.lineWidth = document.worldLineWidth
+            selectingLineNode.path = Path(textView.convertToWorld(tf))
+        } else if let sheetView = document.sheetView(at: p),
                   let lineView = sheetView.lineTuple(at: sheetView.convertFromWorld(p),
                                                      scale: 1 / document.worldToScreenScale)?.lineView {
-            
             let t = Transform(translation: -sheetView.convertFromWorld(p))
             let ssv = SheetValue(lines: [lineView.model],
                                  planes: [], texts: [],
@@ -801,94 +823,78 @@ final class CopyEditor: Editor {
             
             return true
         } else if let sheetView = document.sheetView(at: p),
-                  let (ti, timeframe) = sheetView.timeframeTuple(at: sheetView.convertFromWorld(p)) {
-            
-            let textView = sheetView.textsView.elementViews[ti]
-            let inTP = textView.convertFromWorld(p)
+                  let ci = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
+                                                  scale: document.screenToWorldScale) {
+            let contentView = sheetView.contentsView.elementViews[ci]
+            let contentP = contentView.convertFromWorld(p)
+            if contentView.containsTimeline(contentP),
+               let beatRange = contentView.beatRange, let tf = contentView.timelineFrame {
+                
+                if isSendPasteboard {
+                    if contentView.model.type.isAudio {
+                        var content = contentView.model
+                        content.origin -= sheetView.convertFromWorld(p)
+                        Pasteboard.shared.copiedObjects = [.content(content)]
+                    } else {
+                        Pasteboard.shared.copiedObjects = [.beatRange(beatRange)]
+                    }
+                }
+                
+                selectingLineNode.fillType = .color(.subSelected)
+                selectingLineNode.lineType = .color(.selected)
+                selectingLineNode.lineWidth = document.worldLineWidth
+                selectingLineNode.path = Path(contentView.convertToWorld(tf))
+            } else if let frame = contentView.imageFrame {
+                if isSendPasteboard {
+                    var content = contentView.model
+                    content.origin -= sheetView.convertFromWorld(p)
+                    Pasteboard.shared.copiedObjects = [.content(content)]
+                }
+                
+                selectingLineNode.fillType = .color(.subSelected)
+                selectingLineNode.lineType = .color(.selected)
+                selectingLineNode.lineWidth = document.worldLineWidth
+                selectingLineNode.path = Path(sheetView.convertToWorld(frame))
+            }
+        } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
+                  let ni = sheetView.scoreView.noteIndex(at: sheetView.convertFromWorld(p),
+                                                         maxDistance: 15 * document.screenToWorldScale) {
+            let scoreView = sheetView.scoreView
+            let score = scoreView.model
+            let scoreP = scoreView.convertFromWorld(p)
             
             selectingLineNode.fillType = .color(.subSelected)
             selectingLineNode.lineType = .color(.selected)
             selectingLineNode.lineWidth = document.worldLineWidth
             
-            if textView.containsScore(inTP),
-               var timeframe = textView.model.timeframe,
-               let score = timeframe.score,
-               let ni = textView.noteIndex(at: inTP,
-                                           maxDistance: 2.0 * document.screenToWorldScale),
-               let pitch = document.pitch(from: textView, at: inTP) {
-                    
-                let interval = document.currentNoteTimeInterval(from: textView.model)
-                let beat = textView.beat(atX: inTP.x, interval: interval)
+            if scoreView.isFullEdit, let sfi = scoreView.sourceFilterIndex(at: scoreP, at: ni) {
+                var tone = score.notes[ni].tone
+                tone.sourceFilter.fqSmps.remove(at: sfi)
+                tone.sourceFilter.noiseTs.remove(at: sfi)
+                tone.sourceFilter.noiseFqSmps.remove(at: sfi)
+//                Pasteboard.shared.copiedObjects = [.formant(formant)]
+                sheetView.newUndoGroup()
+                sheetView.replace(tone, at: ni)
+                return true
+            } else {
+                let pitch = document.pitch(from: scoreView, at: scoreP)
+                let interval = document.currentNoteTimeInterval()
+                let beat = scoreView.beat(atX: scoreP.x, interval: interval)
                 var note = score.notes[ni]
                 note.pitch -= pitch
                 note.beatRange.start -= beat
-                timeframe.score?.notes.remove(at: ni)
                 if isSendPasteboard {
                     Pasteboard.shared.copiedObjects
-                        = [.notesValue(NotesValue(notes: [note]))]
+                    = [.notesValue(NotesValue(notes: [note]))]
                 }
-                let rects = [textView.noteFrame(from: score.notes[ni], score, timeframe)]
-                    .map { textView.convertToWorld($0) }
+                let rects = [scoreView.noteFrame(from: score.notes[ni])]
+                    .map { scoreView.convertToWorld($0) }
                 let lw = Line.defaultLineWidth * 2 / document.worldToScreenScale
                 selectingLineNode.children = rects.map {
                     Node(path: Path($0),
                          lineWidth: lw,
                          lineType: .color(.selected),
                          fillType: .color(.subSelected))
-                }
-            } else if textView.containsSourceFilter(inTP),
-               let score = textView.model.timeframe?.score {
-                if isSendPasteboard {
-                    Pasteboard.shared.copiedObjects = [.tone(score.tone)]
-                }
-                if let frame = textView.sourceFilterFrame {
-                    selectingLineNode.path = Path(textView.convertToWorld(frame))
-                }
-            } else if textView.containsIsShownSpectrogram(inTP) {
-                if isSendPasteboard {
-                    Pasteboard.shared.copiedObjects = [.normalizationValue(timeframe.isShownSpectrogram ? 1 : 0)]
-                }
-                if let frame = textView.isShownSpectrogramFrame {
-                    selectingLineNode.path = Path(textView.convertToWorld(frame))
-                }
-            } else if textView.containsOctave(inTP),
-                      let octave = timeframe.score?.octave {
-                if isSendPasteboard {
-                    Pasteboard.shared.copiedObjects = [.normalizationRationalValue(octave)]
-                }
-                if let frame = textView.octaveFrame {
-                    selectingLineNode.path = Path(textView.convertToWorld(frame))
-                }
-            } else if let type = textView.overtoneType(at: inTP),
-                      let value = timeframe.score?.tone.overtone[type] {
-                if isSendPasteboard {
-                    Pasteboard.shared.copiedObjects = [.normalizationValue(value)]
-                }
-                if let p = textView.overtonePosition(at: type) {
-                    selectingLineNode.path = Path(circleRadius: 2,
-                                                  position: textView.convertToWorld(p))
-                }
-            } else if textView.containsTimeRange(inTP) {
-                if isSendPasteboard {
-                    Pasteboard.shared.copiedObjects = [.timeframe(timeframe)]
-                }
-                if let frame = textView.timeRangeFrame {
-                    selectingLineNode.path = Path(textView.convertToWorld(frame))
-                }
-            } else if textView.containsScore(inTP) {
-                if isSendPasteboard {
-                    Pasteboard.shared.copiedObjects = [.timeframe(timeframe)]
-                }
-                if let frame = textView.scoreFrame {
-                    selectingLineNode.path = Path(textView.convertToWorld(frame))
-                }
-            } else if textView.containsTone(inTP),
-                        let tone = timeframe.score?.tone {
-                if isSendPasteboard {
-                    Pasteboard.shared.copiedObjects = [.tone(tone)]
-                }
-                if let frame = textView.toneFrame {
-                    selectingLineNode.path = Path(textView.convertToWorld(frame))
                 }
             }
             return true
@@ -955,7 +961,7 @@ final class CopyEditor: Editor {
         let d = 5 / document.worldToScreenScale
         
         if let sheetView = document.sheetView(at: p),
-           sheetView.containsTimeline(sheetView.convertFromWorld(p)),
+           sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p)),
            let ki = sheetView.animationView.keyframeIndex(at: sheetView.convertFromWorld(p), isEnabledCount: true) {
             
             let animationView = sheetView.animationView
@@ -1023,34 +1029,32 @@ final class CopyEditor: Editor {
             if document.isSelectedText, document.selections.count == 1 {
                 document.textEditor.cut(from: document.selections[0], at: p)
             } else {
-                if let sheetView = document.sheetView(at: p),
-                          let ti = sheetView.timeframeIndex(at: sheetView.convertFromWorld(p)) {
-                    let textView = sheetView.textsView.elementViews[ti]
-                    let inTP = textView.convertFromWorld(p)
-                    if textView.containsScore(inTP),
-                       let timeframe = textView.model.timeframe,
-                        var score = timeframe.score {
-                        
-                        if let pitch = document.pitch(from: textView, at: inTP) {
-                            
-                            let nis = document.selectedNoteIndexes(from: textView)
-                            if !nis.isEmpty {
-                                let interval = document.currentNoteTimeInterval(from: textView.model)
-                                let t = textView.beat(atX: inTP.x, interval: interval)
-                                let notes: [Note] = nis.map {
-                                    var note = score.notes[$0]
-                                    note.pitch -= pitch
-                                    note.beatRange.start -= t
-                                    return note
-                                }
-                                score.notes.remove(at: nis)
-                                Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: notes))]
-                                sheetView.newUndoGroup()
-                                sheetView.replaceScore(score, at: ti)
-                                
-                                sheetView.updatePlaying()
-                            }
+                if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
+                   sheetView.scoreView
+                    .noteIndex(at: sheetView.convertFromWorld(p),
+                               maxDistance: 15 * document.screenToWorldScale) != nil {
+                    
+                    let scoreView = sheetView.scoreView
+                    let inTP = scoreView.convertFromWorld(p)
+                    let pitch = document.pitch(from: scoreView, at: inTP)
+                    let nis = document.selectedNoteIndexes(from: scoreView)
+                    if !nis.isEmpty {
+                        let interval = document.currentNoteTimeInterval()
+                        let t = scoreView.beat(atX: inTP.x, interval: interval)
+                        let score = scoreView.model
+                        let notes: [Note] = nis.map {
+                            var note = score.notes[$0]
+                            note.pitch -= pitch
+                            note.beatRange.start -= t
+                            return note
                         }
+                        
+                        Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: notes))]
+                        
+                        sheetView.newUndoGroup()
+                        sheetView.removeNote(at: nis)
+                        
+                        sheetView.updatePlaying()
                     }
                 } else {
                     let se = LineEditor(document)
@@ -1139,101 +1143,111 @@ final class CopyEditor: Editor {
             
             Pasteboard.shared.copiedObjects = [.text(text),
                                                .string(text.string)]
+            
             let tbs = textView.typesetter.allRects()
             selectingLineNode.path = Path(tbs.map { Pathline(textView.convertToWorld($0)) })
+            
             sheetView.newUndoGroup()
             sheetView.removeText(at: ti)
             return true
         } else if let sheetView = document.sheetView(at: p),
-                  let ti = sheetView.timeframeIndex(at: sheetView.convertFromWorld(p)) {
-        
-            let textView = sheetView.textsView.elementViews[ti]
-            let inTP = textView.convertFromWorld(p)
-            if textView.containsScore(inTP),
-               let timeframe = textView.model.timeframe,
-               var score = timeframe.score {
+                  let (ti, textView) = sheetView.textIndexAndView(at: sheetView.convertFromWorld(p)),
+                  textView.containsTimeline(textView.convertFromWorld(p)),
+                  let beatRange = textView.beatRange {
                 
-                let maxD = textView.nodeRatio
-                * 15.0 * document.screenToWorldScale
-                if let score = timeframe.score,
-                   let (ni, pitI, _, pitbend) = textView.pitbendTuple(at: inTP,
-                                                          maxDistance: maxD) {
-                    var pitbend = pitbend
-                    if !pitbend.pits.isEmpty {
-                        pitbend.pits.remove(at: pitI)
-                        var score = score
-                        score.notes[ni].pitbend = pitbend
-                        
-                        sheetView.newUndoGroup()
-                        sheetView.replaceScore(score, at: ti)
-                        
-                        sheetView.updatePlaying()
-                        return true
-                    }
-                }
-                
-                if let noteI = textView.noteIndex(at: inTP,
-                                                  maxDistance: 2.0 * document.screenToWorldScale),
-                   let pitch = document.pitch(from: textView, at: inTP) {
-                    let interval = document.currentNoteTimeInterval(from: textView.model)
-                    let beat = textView.beat(atX: inTP.x, interval: interval)
-                    var note = score.notes[noteI]
-                    note.pitch -= pitch
-                    note.beatRange.start -= beat
-                    score.notes.remove(at: noteI)
-                    Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [note]))]
-                    sheetView.newUndoGroup()
-                    sheetView.replaceScore(score, at: ti)
-                    
-                    sheetView.updatePlaying()
-                    return true
-                }
-            } else if textView.containsSourceFilter(inTP),
-                      let timeframe = textView.model.timeframe,
-                      var score = timeframe.score {
-                
-                if let (i, _, isLast) = textView.sourceFilterType(at: inTP, maxDistance: 25.0 * document.screenToWorldScale),
-                   !isLast {
-                   
-//                    let formant = score.tone.sourceFilter.formants[i]
-                    var sourceFilter = score.tone.sourceFilter
-                    sourceFilter.fqSmps.remove(at: i)
-                    sourceFilter.noiseTs.remove(at: i)
-                    sourceFilter.noiseFqSmps.remove(at: i)
-                    score.tone.sourceFilter = sourceFilter
-//                    Pasteboard.shared.copiedObjects = [.formant(formant)]
-                    sheetView.newUndoGroup()
-                    sheetView.replaceScore(score, at: ti)
-                    return true
-                } else if score.tone.sourceFilter != SourceFilter() {
-                    score.tone.sourceFilter = .init()
-                    Pasteboard.shared.copiedObjects = [.tone(score.tone)]
-                    sheetView.newUndoGroup()
-                    sheetView.replaceScore(score, at: ti)
-                    return true
-                }
-            }
+            Pasteboard.shared.copiedObjects = [.beatRange(beatRange)]
             
             var text = textView.model
-            let timeframe = text.timeframe
-            if text.timeframe?.score != nil
-                && !textView.containsTimeRange(inTP) {
-                
-                text.timeframe?.score = nil
-            } else {
-                text.timeframe = nil
-            }
-            if let timeframe = timeframe {
-                Pasteboard.shared.copiedObjects = [.timeframe(timeframe)]
-            }
+            text.timeOption = nil
+            
             sheetView.newUndoGroup()
             sheetView.replace([IndexValue(value: text, index: ti)])
+            return true
+        } else if let sheetView = document.sheetView(at: p),
+                  let (ci, contentView) = sheetView.contentIndexAndView(at: sheetView.convertFromWorld(p),
+                                                                        scale: document.screenToWorldScale) {
+            if contentView.containsTimeline(contentView.convertFromWorld(p)),
+               let beatRange = contentView.beatRange, !contentView.model.type.isAudio {
+                
+                Pasteboard.shared.copiedObjects = [.beatRange(beatRange)]
+                
+                var content = contentView.model
+                content.timeOption = nil
+                
+                sheetView.newUndoGroup()
+                sheetView.replace(IndexValue(value: content, index: ci))
+                return true
+            } else {
+                var content = sheetView.contentsView.elementViews[ci].model
+                content.origin -= sheetView.convertFromWorld(p)
+                
+                Pasteboard.shared.copiedObjects = [.content(content)]
+                
+                sheetView.newUndoGroup()
+                sheetView.removeContent(at: ci)
+                
+                sheetView.updatePlaying()
+                return true
+            }
+        } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
+                    let ni = sheetView.scoreView.noteIndex(at: sheetView.convertFromWorld(p), 
+                                                           maxDistance: 15 * document.screenToWorldScale) {
+            let scoreView = sheetView.scoreView
+            let score = scoreView.model
+            let scoreP = scoreView.convertFromWorld(p)
+            if let sfi = scoreView.sourceFilterIndex(at: scoreP, at: ni) {
+                var tone = score.notes[ni].tone
+                tone.sourceFilter.fqSmps.remove(at: sfi)
+                tone.sourceFilter.noiseTs.remove(at: sfi)
+                tone.sourceFilter.noiseFqSmps.remove(at: sfi)
+//                Pasteboard.shared.copiedObjects = [.formant(formant)]
+                sheetView.newUndoGroup()
+                sheetView.replace(tone, at: ni)
+                return true
+            } else if let (ni, pitI, _, pitbend) = scoreView
+                .pitbendTuple(at: scoreP, maxDistance: 15 * document.screenToWorldScale),
+                   !pitbend.pits.isEmpty {
+                
+                var pitbend = pitbend
+                pitbend.pits.remove(at: pitI)
+                var note = score.notes[ni]
+                note.pitbend = pitbend
+
+                sheetView.newUndoGroup()
+                sheetView.replace(note, at: ni)
+                
+                sheetView.updatePlaying()
+                return true
+            } else {
+                let pitch = document.pitch(from: scoreView, at: scoreP)
+                let interval = document.currentNoteTimeInterval()
+                let beat = scoreView.beat(atX: scoreP.x, interval: interval)
+                var note = score.notes[ni]
+                note.pitch -= pitch
+                note.beatRange.start -= beat
+                
+                Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [note]))]
+                
+                sheetView.newUndoGroup()
+                sheetView.removeNote(at: ni)
+                
+                sheetView.updatePlaying()
+                return true
+            }
+        } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+            var option = sheetView.model.score.option
+            option.enabled = false
+            
+            sheetView.newUndoGroup()
+            sheetView.set(option)
             return true
         } else if let (border, i, edge) = document.border(at: p, distance: d),
                   let sheetView = document.sheetView(at: p) {
             
             Pasteboard.shared.copiedObjects = [.border(border)]
+            
             selectingLineNode.path = Path([Pathline([edge.p0, edge.p1])])
+            
             sheetView.newUndoGroup()
             sheetView.removeBorder(at: i)
             return true
@@ -1421,30 +1435,11 @@ final class CopyEditor: Editor {
                         selectingLineNode.children = [textNode]
                     }
                 } else {
-                    var ntext = text
-                    ntext.origin *= fScale
-                    ntext.size *= fScale
-                    let textNode = ntext.node
-                    
-                    if let image = text.timeframe?.content?.image,
-                       let texture = Texture(image: image, isOpaque: false,
-                                             colorSpace: .sRGB) {
-                        let size = (image.size / 2)
-                            .snapped((sheetView?.bounds.size ?? Sheet.defaultBounds.size) * 0.95)
-                        * s
-                        let imageNode = Node(name: "content",
-                                             attitude: .init(position: ntext.origin),
-                                             path: Path(Rect(size: size)),
-                                             fillType: .texture(texture))
-                        self.imageNode = imageNode
-                        selectingLineNode.children = [textNode, imageNode]
-                    } else {
-                        self.imageNode = nil
-                        selectingLineNode.children = [textNode]
-                    }
-                    
-                    self.textNode = textNode
-                    self.textFrame = ntext.frame
+                    var nText = text
+                    nText.origin *= fScale
+                    nText.size *= fScale
+                    self.textNode = nText.node
+                    self.textFrame = nText.frame
                     textScale = document.worldToScreenScale
                 }
                 
@@ -1638,34 +1633,51 @@ final class CopyEditor: Editor {
             
             selectingLineNode.children = nodes
         }
-        func updateNotes(_ notes: [Note]) {
-            guard let sheetView = document.sheetView(at: shp) else { return }
-            let np = sheetView.convertFromWorld(p)
-            if let ti = sheetView.timeframeIndex(at: np) {
-                let textView = sheetView.textsView.elementViews[ti]
-                let inTP = textView.convertFromWorld(p)
-                if let timeframe = textView.model.timeframe,
-                   let score = timeframe.score,
-                   let pitch = document.pitch(from: textView, at: inTP) {
-                    
-                    let interval = document.currentNoteTimeInterval(from: textView.model)
-                    let t = textView.beat(atX: inTP.x, interval: interval)
-                    + timeframe.beatRange.start + timeframe.localStartBeat
-                    
-                    var notes = notes
-                    for j in 0 ..< notes.count {
-                        notes[j].volumeAmp *= score.volumeAmp
-                        notes[j].pitch += pitch - score.pitchRange.start
-                        notes[j].beatRange.start += t
+        func updateImage(_ image: Image, imageFrame: Rect? = nil) {
+            if phase == .began {
+                if let texture = Texture(image: image, isOpaque: false,
+                                         colorSpace: .sRGB) {
+                    let rect: Rect
+                    if let imf = imageFrame {
+                        rect = imf
+                    } else {
+                        var size = image.size / 2
+                        if size.width > Sheet.width || size.height > Sheet.height {
+                            size *= min(Sheet.width / size.width, Sheet.height / size.height)
+                        }
+                        rect = Rect(origin: -Point(size.width / 2, size.height / 2), size: size)
                     }
                     
-                    selectingLineNode.children = notes.map {
-                        let node = textView.noteNode(from: $0, at: nil, y: 0)
-                        node.attitude.position += textView.convertToWorld(textView.scoreFrame?.origin ?? .init())
-                        return node
-                    }
+                    let scale = firstScale / document.worldToScreenScale
+                    let imageNode = Node(name: "content",
+                                         attitude: .init(position: p, scale: .init(square: scale)),
+                                         path: Path(rect),
+                                         fillType: .texture(texture))
+                    self.imageNode = imageNode
+                    selectingLineNode.children = [imageNode]
                 }
+            } else if !selectingLineNode.children.isEmpty {
+                let scale = firstScale / document.worldToScreenScale
+                selectingLineNode.children[0].attitude = Attitude(position: p, scale: .init(square: scale))
             }
+        }
+        func updateNotes(_ notes: [Note]) {
+            guard let sheetView = document.sheetView(at: shp),
+                  sheetView.model.score.enabled else { return }
+            let scoreView = sheetView.scoreView
+            let scoreP = scoreView.convertFromWorld(p)
+            let pitch = document.pitch(from: scoreView, at: scoreP)
+            let score = scoreView.model
+            let interval = document.currentNoteTimeInterval()
+            let t = scoreView.beat(atX: scoreP.x, interval: interval) + score.beatRange.start
+            
+            var notes = notes
+            for j in 0 ..< notes.count {
+                notes[j].pitch += pitch - Score.pitchRange.start
+                notes[j].beatRange.start += t
+            }
+            
+            selectingLineNode.children = notes.map { scoreView.noteNode(from: $0, at: nil) }
         }
         
         switch pasteObject {
@@ -1693,10 +1705,14 @@ final class CopyEditor: Editor {
             break
         case .ids(let ids):
             updateIDs(ids.ids)
-        case .timeframe:
+        case .score:
             break
-        case .image:
-            break
+        case .content(let content):
+            if let image = content.image {
+                updateImage(image, imageFrame: content.imageFrame)
+            }
+        case .image(let image):
+            updateImage(image)
         case .beatRange:
             break
         case .normalizationValue:
@@ -1859,9 +1875,7 @@ final class CopyEditor: Editor {
                 let t = transform(in: frame, at: p)
                 var nText = text * t
                 if let (sheetView, isNew) = document
-                    .madeSheetViewIsNew(at: nshp,
-                                          isNewUndoGroup:
-                                            isRootNewUndoGroup) {
+                    .madeSheetViewIsNew(at: nshp, isNewUndoGroup: isRootNewUndoGroup) {
                     let sb = sheetView.bounds.inset(by: Sheet.textPadding)
                     if let textFrame = nText.frame,
                        !sb.contains(textFrame) {
@@ -1877,9 +1891,6 @@ final class CopyEditor: Editor {
                             nText.size *= scale
                             nText.origin += dp
                         }
-                    }
-                    if nText.timeframe != nil {
-                        nText.origin.y = nText.origin.y.interval(scale: 5)
                     }
                     if isNew {
                         isRootNewUndoGroup = false
@@ -2029,9 +2040,7 @@ final class CopyEditor: Editor {
                         text.origin += dp
                     }
                 }
-                if text.timeframe != nil {
-                    text.timeframe?.beatRange.start = sheetView.animationView.beat(atX: np.x)
-                }
+                
                 updateUndoGroup(with: nshp)
                 sheetView.append(text)
             }
@@ -2276,159 +2285,169 @@ final class CopyEditor: Editor {
                 sheetView.newUndoGroup()
                 sheetView.set([IndexValue(value: idivs, index: sheetView.animationView.model.index)])
             }
-        case .timeframe(var timeframe):
-            guard let sheetView = document.sheetView(at: shp) else { return }
-            let np = sheetView.convertFromWorld(p)
-            if let ti = sheetView.timeframeIndex(at: np) ?? sheetView.textTuple(at: np)?.textIndex {
-                var text = sheetView.model.texts[ti]
-                if let beatRange =  text.timeframe?.beatRange {
-                    timeframe.beatRange = beatRange
-                }
-                text.timeframe = timeframe
-                sheetView.newUndoGroup()
-                sheetView.replace([IndexValue(value: text, index: ti)])
-            }
-        case .image(let image):
-            guard let sheetView = document.madeSheetView(at: shp) else { return }
-            let np = sheetView.convertFromWorld(p)
+        case .score(let score):
+            guard !score.notes.isEmpty, let sheetView = document.sheetView(at: shp) else { return }
             
-            let tempo = sheetView.tempo(at: np) ?? Music.defaultTempo
-            let filename = ""
-            let name = UUID().uuidString + ".tiff"
-            
-            try? image.write(.tiff, to: document.contentsDirectory.url.appending(component: name))
-            
-            let content = Content(name: name)
-            let interval = document
-                .currentNoteTimeInterval(fromScale: 1)
-            let startBeat = sheetView.animationView
-                .beat(atX: np.x, interval: interval)
-            let beatDur = Timeframe.beat(fromSec: content.secDuration,
-                                         tempo: tempo,
-                                         beatRate: Keyframe.defaultFrameRate,
-                                         rounded: .up)
-            let beatRange = Range(start: startBeat, length: beatDur)
-            var text = Text(string: filename,
-                            timeframe: Timeframe(beatRange: beatRange, content: content, tempo: tempo))
-            
-            let nnp = text.origin + np
-            let log10Scale: Double = .log10(document.worldToScreenScale)
-            let clipScale = max(0.0, log10Scale)
-            let decimalPlaces = Int(clipScale + 2)
-            text.origin = nnp.rounded(decimalPlaces: decimalPlaces)
-            
-            if let size = content.image?.size {
-                let size = size / 2
-                if size.width < Sheet.width || size.height < Sheet.height {
-                    text.size *= min(size.width / Sheet.width, size.height / Sheet.height)
-                }
+            var ni = sheetView.model.score.notes.count
+            let nivs: [IndexValue<Note>] = score.notes.map {
+                let v = IndexValue(value: $0, index: ni)
+                ni += 1
+                return v
             }
             
             sheetView.newUndoGroup()
-            sheetView.append(text)
+            sheetView.insert(nivs)
+            
+            var option = sheetView.scoreView.model.option
+            if !option.enabled {
+                option.enabled = true
+                sheetView.set(option)
+            }
+        case .content(var content):
+            guard let sheetView = document.madeSheetView(at: shp) else { return }
+            let sheetP = sheetView.convertFromWorld(p)
+            
+            let scale = firstScale / document.worldToScreenScale
+            let nnp = content.origin * scale + sheetP
+            let log10Scale: Double = .log10(document.worldToScreenScale)
+            let clipScale = max(0.0, log10Scale)
+            let decimalPlaces = Int(clipScale + 2)
+            content.origin = nnp.rounded(decimalPlaces: decimalPlaces)
+            
+            content.size = content.size * scale
+            if content.size.width > Sheet.width || content.size.height > Sheet.height {
+                content.size *= min(Sheet.width / content.size.width, Sheet.height / content.size.height)
+            }
+            
+            if content.type.isDuration {
+                let tempo = sheetView.nearestTempo(at: sheetP) ?? Music.defaultTempo
+                let interval = document.currentNoteTimeInterval(fromScale: 1)
+                let startBeat = sheetView.animationView.beat(atX: sheetP.x, interval: interval)
+                let beatDur = ContentTimeOption.beat(fromSec: content.secDuration,
+                                                     tempo: tempo,
+                                                     beatRate: Keyframe.defaultFrameRate,
+                                                     rounded: .up)
+                let beatRange = Range(start: startBeat, length: beatDur)
+                content.timeOption = .init(beatRange: beatRange, tempo: tempo)
+            }
+            
+            content.id = .init()
+            
+            sheetView.newUndoGroup()
+            sheetView.append(content)
+        case .image(let image):
+            guard let sheetView = document.madeSheetView(at: shp) else { return }
+            let sheetP = sheetView.convertFromWorld(p)
+            
+            let name = UUID().uuidString + ".tiff"
+            try? image.write(.tiff, to: document.contentsDirectory.url.appending(component: name))
+            
+            let scale = firstScale / document.worldToScreenScale
+            let log10Scale: Double = .log10(document.worldToScreenScale)
+            let clipScale = max(0.0, log10Scale)
+            let decimalPlaces = Int(clipScale + 2)
+            let nnp = sheetP.rounded(decimalPlaces: decimalPlaces)
+            
+            var content = Content(name: name, origin: nnp)
+            if let size = content.image?.size {
+                var size = size / 2
+                if size.width > Sheet.width || size.height > Sheet.height {
+                    size *= min(Sheet.width / size.width, Sheet.height / size.height)
+                }
+                content.size = size
+            }
+            content.size = content.size * scale
+            content.origin -= Point(content.size.width / 2, content.size.height / 2)
+            
+            if content.type.isDuration {
+                let interval = document.currentNoteTimeInterval(fromScale: 1)
+                let startBeat = sheetView.animationView.beat(atX: sheetP.x, interval: interval)
+                let tempo = sheetView.nearestTempo(at: sheetP) ?? Music.defaultTempo
+                let beatDur = if let nbr = content.timeOption?.beatRange {
+                    nbr.length
+                } else {
+                    ContentTimeOption.beat(fromSec: content.secDuration,
+                                           tempo: tempo,
+                                           beatRate: Keyframe.defaultFrameRate,
+                                           rounded: .up)
+                }
+                let beatRange = Range(start: startBeat, length: beatDur)
+                
+                content.timeOption = .init(beatRange: beatRange, tempo: tempo)
+            }
+            
+            sheetView.newUndoGroup()
+            sheetView.append(content)
         case .beatRange(let beatRange):
             guard let sheetView = document.sheetView(at: shp) else { return }
-            let np = sheetView.convertFromWorld(p)
-            if let ti = sheetView.timeframeIndex(at: np) ?? sheetView.textTuple(at: np)?.textIndex {
-                let beatRange = Range(start: sheetView.animationView.beat(atX: np.x),
+            let sheetP = sheetView.convertFromWorld(p)
+            if let ci = sheetView.contentIndex(at: sheetP,
+                                               scale: document.screenToWorldScale) {
+                var content = sheetView.model.contents[ci]
+                let beatRange = Range(start: sheetView.animationView.beat(atX: content.origin.x),
                                       length: beatRange.length)
-                var text = sheetView.model.texts[ti]
-                if text.timeframe == nil {
-                    text.timeframe = Timeframe(beatRange: beatRange)
+                if content.timeOption != nil {
+                    content.timeOption?.beatRange = beatRange
                 } else {
-                    text.timeframe?.beatRange = beatRange
+                    content.timeOption = .init(beatRange: beatRange)
+                }
+                sheetView.newUndoGroup()
+                sheetView.replace(content, at: ci)
+            } else if let ti = sheetView.textIndex(at: sheetP) {
+                var text = sheetView.model.texts[ti]
+                let beatRange = Range(start: sheetView.animationView.beat(atX: text.origin.x),
+                                      length: beatRange.length)
+                if text.timeOption != nil {
+                    text.timeOption?.beatRange = beatRange
+                } else {
+                    text.timeOption = .init(beatRange: beatRange)
                 }
                 sheetView.newUndoGroup()
                 sheetView.replace([IndexValue(value: text, index: ti)])
             }
-        case .normalizationValue(let nValue):
-            guard let sheetView = document.sheetView(at: shp) else { return }
-            let np = sheetView.convertFromWorld(p)
-            if let ti = sheetView.timeframeIndex(at: np) ?? sheetView.textTuple(at: np)?.textIndex {
-                let textView = sheetView.textsView.elementViews[ti]
-                var text = textView.model
-                let inTP = textView.convertFromWorld(p)
-                if textView.containsIsShownSpectrogram(inTP) {
-                    let isShownSpectrogram = nValue == 0
-                    if isShownSpectrogram != text.timeframe?.isShownSpectrogram {
-                        text.timeframe?.isShownSpectrogram = isShownSpectrogram
-                        sheetView.newUndoGroup()
-                        sheetView.replace([IndexValue(value: text, index: ti)])
-                    }
-                } else if let type = textView.overtoneType(at: inTP),
-                          var score = text.timeframe?.score {
-                    switch type {
-                    case .evenScale:
-                        let evenScale = nValue.clipped(min: 0, max: 1)
-                        if evenScale != score.tone.overtone.evenScale {
-                            score.tone.overtone.evenScale = evenScale
-                            sheetView.newUndoGroup()
-                            sheetView.replaceScore(IndexValue(value: score, index: ti))
-                        }
-                    case .oddScale:
-                        let oddScale = nValue.clipped(min: 0.125, max: 100)
-                        if oddScale != score.tone.overtone.oddScale {
-                            score.tone.overtone.oddScale = oddScale
-                            sheetView.newUndoGroup()
-                            sheetView.replaceScore(IndexValue(value: score, index: ti))
-                        }
-                    }
-                }
-            }
-        case .normalizationRationalValue(let nValue):
-            guard let sheetView = document.sheetView(at: shp) else { return }
-            let np = sheetView.convertFromWorld(p)
-            if let ti = sheetView.timeframeIndex(at: np) ?? sheetView.textTuple(at: np)?.textIndex {
-                let textView = sheetView.textsView.elementViews[ti]
-                let inTP = textView.convertFromWorld(p)
-                if textView.containsOctave(inTP),
-                   var score = textView.model.timeframe?.score {
-                    let octave = nValue.clipped(min: Score.minOctave,
-                                                max: Score.maxOctave)
-                    if octave != score.octave {
-                        score.octave = octave
-                        sheetView.newUndoGroup()
-                        sheetView.replaceScore(IndexValue(value: score, index: ti))
-                    }
-                }
-            }
+        case .normalizationValue:
+            break
+        case .normalizationRationalValue:
+            break
         case .notesValue(let notesValue):
-            guard let sheetView = document.sheetView(at: shp) else { return }
-            let np = sheetView.convertFromWorld(p)
-            if let ti = sheetView.timeframeIndex(at: np) {
-                let textView = sheetView.textsView.elementViews[ti]
-                let inTP = textView.convertFromWorld(p)
-                if let timeframe = textView.model.timeframe,
-                   var score = timeframe.score,
-                   let pitch = document.pitch(from: textView, at: inTP) {
-                    
-                    let interval = document.currentNoteTimeInterval(from: textView.model)
-                    let t = textView.beat(atX: inTP.x, interval: interval)
-                    var notes = notesValue.notes
-                    for j in 0 ..< notes.count {
-                        notes[j].pitch += pitch
-                        notes[j].beatRange.start += t
-                    }
-                    score.notes += notes
-                    sheetView.newUndoGroup()
-                    sheetView.replaceScore(score, at: ti)
-                    
-                    sheetView.updatePlaying()
-                }
+            guard let sheetView = document.sheetView(at: shp), 
+                    sheetView.model.score.enabled else { return }
+            let scoreView = sheetView.scoreView
+            let scoreP = scoreView.convertFromWorld(p)
+            let pitch = document.pitch(from: scoreView, at: scoreP)
+            let interval = document.currentNoteTimeInterval()
+            let t = scoreView.beat(atX: scoreP.x, interval: interval)
+            var notes = notesValue.notes
+            for j in 0 ..< notes.count {
+                notes[j].pitch += pitch
+                notes[j].beatRange.start += t
             }
+            sheetView.newUndoGroup()
+            sheetView.append(notes)
+            
+            sheetView.updatePlaying()
         case .tone(let tone):
             guard let sheetView = document.sheetView(at: shp) else { return }
-            let np = sheetView.convertFromWorld(p)
-            if let ti = sheetView.timeframeIndex(at: np) {
-                let textView = sheetView.textsView.elementViews[ti]
-                if let timeframe = textView.model.timeframe,
-                   var score = timeframe.score {
-                    
-                    score.tone = tone
-                    sheetView.newUndoGroup()
-                    sheetView.replaceScore(score, at: ti)
-                    
-                    sheetView.updatePlaying()
+            if sheetView.model.score.enabled {
+                let scoreView = sheetView.scoreView
+                let maxD = 15 * document.screenToWorldScale
+                if let ni = scoreView.noteIndex(at: scoreView.convertFromWorld(p), maxDistance: maxD) {
+                    if document.isSelect(at: p) {
+                        let score = scoreView.model
+                        let nis = document.selectedNoteIndexes(from: scoreView)
+                            .filter { score.notes[$0].tone != tone }
+                        if !nis.isEmpty {
+                            sheetView.newUndoGroup()
+                            sheetView.replace(tone, at: nis)
+                            
+                            sheetView.updatePlaying()
+                        }
+                    } else {
+                        sheetView.newUndoGroup()
+                        sheetView.replace(tone, at: ni)
+                        
+                        sheetView.updatePlaying()
+                    }
                 }
             }
         }
@@ -2446,7 +2465,8 @@ final class CopyEditor: Editor {
         case .uuColor: false
         case .animation: true
         case .ids: true
-        case .timeframe: false
+        case .score: true
+        case .content: true
         case .image: true
         case .beatRange: false
         case .normalizationValue: false
@@ -2903,7 +2923,7 @@ final class LineColorCopier: InputKeyEditor {
             let lw = Line.defaultLineWidth
             let selectedNode = Node(path: lineView.node.path * sheetView.node.localTransform,
                                     lineWidth: max(lw * 1.5, lw * 2.5 * scale, 1 * scale),
-                                    lineType: .color(.subSelected))
+                                    lineType: .color(.selected))
             if sheetView.model.enabledAnimation {
                 selectingLineNode.children = [selectedNode]
                 + sheetView.animationView.interpolationNodes(from: [lineView.model.id], scale: scale)
@@ -2913,6 +2933,31 @@ final class LineColorCopier: InputKeyEditor {
             }
             
             return true
+        } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+            let scoreView = sheetView.scoreView
+            let maxD = 15 * document.screenToWorldScale
+            if let ni = scoreView.noteIndex(at: scoreView.convertFromWorld(p), maxDistance: maxD) {
+                let score = scoreView.model
+                let tone = score.notes[ni].tone
+                if isSendPasteboard {
+                    Pasteboard.shared.copiedObjects = [.tone(tone)]
+                }
+                
+                let (preFq, nextFq) = scoreView.pitbendPreNext(notes: score.notes, at: ni)
+                let (linePathlines, _, _) = scoreView.notePathlines(from: score.notes[ni],
+                                                                    preFq: preFq, nextFq: nextFq,
+                                                                    tempo: score.tempo)
+                let path = scoreView.convertToWorld(Path(linePathlines))
+                
+                let scale = 1 / document.worldToScreenScale
+                let lw = Line.defaultLineWidth
+                let selectedNode = Node(path: path,
+                                        lineWidth: max(lw * 1.5, lw * 2.5 * scale, 1 * scale),
+                                        lineType: .color(.selected))
+                selectingLineNode.children = [selectedNode]
+                
+                return true
+            }
         }
         return false
     }

@@ -110,6 +110,13 @@
 "Loudness" = "ラウドネス";
 "Sample Peak" = "サンプルピーク";
 
+"Movie" = "動画";
+"Image" = "画像";
+"None" = "なし";
+
+"Background" = "背景";
+"No selection" = "選択なし";
+
 "Export as Image..." = "画像として書き出す...";
 "Export as PDF..." = "PDFとして書き出す...";
 "Export as GIF..." = "GIFとして書き出す...";

@@ -18,18 +18,14 @@
 import RealModule
 
 extension Score {
-    static func rendnotes(from score: Score, _ timeframe: Timeframe,
-                          position: Point,
-                          startSecDur: Double,
-                          sampleRate: Double = Audio.defaultSampleRate,
-                          isUsingFirst: Bool,
-                          isUsingLast: Bool) -> [Rendnote] {
-        let preBeat = timeframe.beatRange.start
-        let nextBeat = timeframe.beatRange.end
+    static func rendnotes(from score: Score, startSecDur: Double,
+                          sampleRate: Double = Audio.defaultSampleRate) -> [Rendnote] {
+        let preBeat = score.beatRange.start, nextBeat = score.beatRange.end
         var notes: [Note] = score.notes.sorted { $0.beatRange.start < $1.beatRange.start }.compactMap { note in
-            guard score.pitchRange.contains(note.pitch) else { return nil }
-            var note = score.convertPitchToWorld(note)
-            note.beatRange.start += preBeat + timeframe.localStartBeat
+            guard Score.pitchRange.contains(note.pitch) else { return nil }
+            
+            var note = note
+            note.beatRange.start += preBeat
             guard note.beatRange.length > 0
                     && note.beatRange.end > preBeat
                     && note.beatRange.start < nextBeat
@@ -50,34 +46,9 @@ extension Score {
             return note
         }
         
-        guard score.isVoice else {
-            return notes.map { note in
-                let startBeat = note.beatRange.start
-                let endBeat = note.beatRange.end
-                let snapBeat = startBeat.interval(scale: Rational(1, 4))
-                let sSec = Double(timeframe.sec(fromBeat: startBeat)) + startSecDur
-                let eSec = Double(timeframe.sec(fromBeat: endBeat)) + startSecDur
-                let snapSec = Double(timeframe.sec(fromBeat: snapBeat)) + startSecDur
-                let dSec = sSec - snapSec
-                
-                let pitbend = note.pitbend.with(scale: eSec - sSec)
-                return .init(fq: note.fq,
-                             sourceFilter: score.tone.sourceFilter,
-                             formantFilterInterpolation: nil,
-                             deltaFormantFilterInterpolation: nil,
-                             fAlpha: 1,
-                             seed: Rendnote.seed(fromFq: note.fq, sec: sSec,
-                                                 position: position),
-                             overtone: score.tone.overtone,
-                             pitbend: pitbend,
-                             secRange: sSec ..< eSec,
-                             startDeltaSec: dSec,
-                             volumeAmp: note.volumeAmp,
-                             waver: .init(score.tone, pitbend: pitbend),
-                             tempo: Double(timeframe.tempo),
-                             sampleRate: sampleRate,
-                             dftCount: Audio.defaultDftCount)
-            }
+        guard score.notes.contains(where: { !$0.lyric.isEmpty }) else {
+            return notes.map { .init(note: $0, score: score, startSecDur: startSecDur,
+                                     sampleRate: sampleRate) }
         }
         
         var ivs = [IndexValue<Note>]()
@@ -90,11 +61,10 @@ extension Score {
                     let eSec = notes[ni].beatRange.end
                     let sSec = eSec - Rational(1, 4)
                     notes[ni].beatRange.length -= Rational(1, 2)
-                    notes[ni].isBreath = false
+                    notes[ni].lyric = note.lyric.filter { $0 != "^" }
                     let tNote = Note(pitch: note.pitch,
                                      beatRange: sSec ..< eSec,
-                                     lyric: isBreath ? "^" : "っ",
-                                     isBreath: true)
+                                     lyric: isBreath ? "^" : "っ")
                     ivs.append(IndexValue(value: tNote, index: ni + 1))
                 }
             }
@@ -103,54 +73,25 @@ extension Score {
             notes.insert(ivs)
         }
         
-        var noteSecTuples = [(secRange: Range<Double>, dSec: Double)]()
-        noteSecTuples.reserveCapacity(notes.count)
+        var noteSecTuples = [(secRange: Range<Double>, dSec: Double)](capacity: notes.count)
         for note in notes {
             let startBeat = note.beatRange.start
             let endBeat = note.beatRange.end
             let snapBeat = startBeat.interval(scale: Rational(1, 4))
-            let sSec = Double(timeframe.sec(fromBeat: startBeat)) + startSecDur
-            let eSec = Double(timeframe.sec(fromBeat: endBeat)) + startSecDur
-            let snapSec = Double(timeframe.sec(fromBeat: snapBeat)) + startSecDur
+            let sSec = Double(score.sec(fromBeat: startBeat)) + startSecDur
+            let eSec = Double(score.sec(fromBeat: endBeat)) + startSecDur
+            let snapSec = Double(score.sec(fromBeat: snapBeat)) + startSecDur
             let dSec = sSec - snapSec
             noteSecTuples.append((sSec ..< eSec, dSec))
         }
         
-        let tempo = Double(timeframe.tempo)
-        
-        var nNotes = [Rendnote]()
-        nNotes.reserveCapacity(notes.count)
+        var nNotes = [Rendnote](capacity: notes.count)
         var previousMora: Mora? // with all notes
         for (ni, note) in notes.enumerated() {
             guard !note.lyric.isEmpty else {
                 previousMora = nil
-                
-                let startBeat = note.beatRange.start
-                let endBeat = note.beatRange.end
-                let snapBeat = startBeat.interval(scale: Rational(1, 4))
-                let sSec = Double(timeframe.sec(fromBeat: startBeat)) + startSecDur
-                let eSec = Double(timeframe.sec(fromBeat: endBeat)) + startSecDur
-                let snapSec = Double(timeframe.sec(fromBeat: snapBeat)) + startSecDur
-                let dSec = sSec - snapSec
-                
-                let pitbend = note.pitbend.with(scale: eSec - sSec)
-                nNotes.append(.init(fq: note.fq,
-                                    sourceFilter: note.tone.sourceFilter,
-                                    formantFilterInterpolation: nil,
-                                    deltaFormantFilterInterpolation: nil,
-                                    fAlpha: 1,
-                                    seed: Rendnote.seed(fromFq: note.fq, sec: sSec,
-                                                        position: position),
-                                    overtone: score.tone.overtone,
-                                    pitbend: pitbend,
-                                    secRange: sSec ..< eSec,
-                                    startDeltaSec: dSec,
-                                    volumeAmp: note.volumeAmp,
-                                    waver: .init(score.tone, pitbend: pitbend),
-                                    tempo: Double(timeframe.tempo),
-                                    sampleRate: sampleRate,
-                                    dftCount: Audio.defaultDftCount))
-                
+                nNotes.append(.init(note: note, score: score, startSecDur: startSecDur,
+                                    sampleRate: sampleRate))
                 continue
             }
             
@@ -162,7 +103,7 @@ extension Score {
                 let dstn = noteSecTuples[ni + 1].secRange.start - noteSecTuples[ni].secRange.end
                 let fq = nextNote.fq
                 if dstn == 0, !note.isBreath,
-                   let aNextMora = Mora(hiragana: nextNote.lyric,
+                   let aNextMora = Mora(hiragana: nextNote.mainLyric,
                                         fq: fq,
                                         previousMora: nil,
                                         nextMora: nil,
@@ -182,7 +123,7 @@ extension Score {
             }
             
             let fq = note.fq
-            guard let mora = Mora(hiragana: note.lyric,
+            guard let mora = Mora(hiragana: note.mainLyric,
                                   fq: fq,
                                   previousMora: previousMora,
                                   nextMora: nextMora,
@@ -192,9 +133,7 @@ extension Score {
                 continue
             }
             
-            guard mora.syllabics != [.sokuon]
-                    && !(ni == 0 && !isUsingFirst)
-                    && !(ni == notes.count - 1 && !isUsingLast) else {
+            guard mora.syllabics != [.sokuon] else {
                 previousMora = nextMora != nil ? mora : nil
                 continue
             }
@@ -211,38 +150,35 @@ extension Score {
                 let nsSec = mainSec + aDur
                 let neSec = nsSec + oDur
                 
-                let envelope = Envelope(attack: onset.attackSec,
-                                        decay: 0, sustain: 1,
-                                        release: onset.releaseSec)
-                let waver = Waver(envelope: envelope)
+                let envelope = Envelope(attackSec: onset.attackSec,
+                                        decaySec: 0, sustainAmp: 1,
+                                        releaseSec: onset.releaseSec)
+                let waver = Waver(envelope: envelope, pitbend: .init())
                 let volumeAmp = note.volumeAmp * onset.volumeAmp
                 nNotes.append(.init(fq: fq,
                                     sourceFilter: onset.sourceFilter,
                                     formantFilterInterpolation: nil,
                                     deltaFormantFilterInterpolation: nil,
                                     fAlpha: 1,
-                                    seed: Rendnote.seed(fromFq: fq,
-                                                        sec: nsSec,
-                                                        position: position),
-                                    overtone: score.tone.overtone,
+                                    seed: Rendnote.seed(fromFq: fq, sec: nsSec),
+                                    overtone: note.tone.overtone,
                                     pitbend: .init(),
                                     secRange: nsSec ..< neSec,
                                     startDeltaSec: nsSec - snapSSec,
                                     volumeAmp: volumeAmp,
                                     waver: waver,
-                                    tempo: tempo,
                                     sampleRate: sampleRate,
                                     dftCount: Audio.defaultDftCount))
             }
             
             if !note.isVowelReduction {
                 let eSec = noteSecTuples[ni].secRange.end
-                let attackSec = score.tone.envelope.attack,
-                    decaySec = score.tone.envelope.decay,
-                    sustainSec = score.tone.envelope.sustain
+                let attackSec = note.envelope.attackSec,
+                    decaySec = note.envelope.decaySec,
+                    sustainAmp = note.envelope.sustainAmp
                 let minReleaseSec = 0.04
                 let maxReleaseSec = max(minReleaseSec,
-                                        score.tone.envelope.release)
+                                        note.envelope.releaseSec)
                 let releaseSec = deltaSecToNext.clipped(min: minReleaseSec,
                                                         max: maxReleaseSec)
                 
@@ -254,10 +190,10 @@ extension Score {
                     eSec - releaseSec * 0.25
                 let nDur = neSec - nsSec
                 
-                let envelope = Envelope(attack: attackSec,
-                                        decay: decaySec,
-                                        sustain: sustainSec,
-                                        release: releaseSec)
+                let envelope = Envelope(attackSec: attackSec,
+                                        decaySec: decaySec,
+                                        sustainAmp: sustainAmp,
+                                        releaseSec: releaseSec)
                 let pitbend = (note.pitbend.isEmpty ?
                     Pitbend(isVibrato: note.isVibrato,
                             duration: nDur,
@@ -267,8 +203,7 @@ extension Score {
                             nextFq: nextMora?.fq) :
                                 note.pitbend)
                     .with(scale: nDur)
-                let waver = Waver(envelope: envelope,
-                                  pitbend: pitbend)
+                let waver = Waver(envelope: envelope, pitbend: pitbend)
                 let si = mora.formantFilterInterpolation(fromDuration: nDur + releaseSec)
                 let dsi = Interpolation(keys: si.keys.map {
                     .init(value: $0.value.divide(baseFormantFIlter),
@@ -279,16 +214,13 @@ extension Score {
                                     formantFilterInterpolation: si,
                                     deltaFormantFilterInterpolation: dsi,
                                     fAlpha: 1,
-                                    seed: Rendnote.seed(fromFq: fq,
-                                                        sec: mainSec,
-                                                        position: position),
-                                    overtone: score.tone.overtone,
+                                    seed: Rendnote.seed(fromFq: fq, sec: mainSec),
+                                    overtone: note.tone.overtone,
                                     pitbend: pitbend,
                                     secRange: nsSec ..< neSec,
                                     startDeltaSec: nsSec - snapSSec,
                                     volumeAmp: note.volumeAmp,
                                     waver: waver,
-                                    tempo: tempo,
                                     sampleRate: sampleRate,
                                     dftCount: Audio.defaultDftCount))
             }

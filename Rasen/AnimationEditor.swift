@@ -47,18 +47,18 @@ final class KeyframePreviousMover: InputKeyEditor {
             sheetView = document.sheetView(at: p)
             move(from: sheetView, at: p)
             
-            sheetView?.showTimeframeTimeNodeFromMainBeat()
+            sheetView?.showOtherTimeNodeFromMainBeat()
             
             document.cursor = document.cursor(from: sheetView?.currentTimeString() ?? SheetView.timeString(time: 0, frameRate: 0))
         case .changed:
             if event.isRepeat, let sheetView {
                 move(from: sheetView, at: p)
-                sheetView.showTimeframeTimeNodeFromMainBeat()
+                sheetView.showOtherTimeNodeFromMainBeat()
                 
                 document.cursor = .circle(string: sheetView.currentTimeString())
             }
         case .ended:
-            sheetView?.hideTimeframeTimeNode()
+            sheetView?.hideOtherTimeNode()
             
             document.cursor = Document.defaultCursor
         }
@@ -100,18 +100,18 @@ final class KeyframeNextMover: InputKeyEditor {
             sheetView = document.sheetView(at: p)
             move(from: sheetView, at: p)
             
-            sheetView?.showTimeframeTimeNodeFromMainBeat()
+            sheetView?.showOtherTimeNodeFromMainBeat()
             
             document.cursor = document.cursor(from: sheetView?.currentTimeString() ?? SheetView.timeString(time: 0, frameRate: 0))
         case .changed:
             if event.isRepeat, let sheetView {
                 move(from: sheetView, at: p)
-                sheetView.showTimeframeTimeNodeFromMainBeat()
+                sheetView.showOtherTimeNodeFromMainBeat()
                 
                 document.cursor = document.cursor(from: sheetView.currentTimeString())
             }
         case .ended:
-            sheetView?.hideTimeframeTimeNode()
+            sheetView?.hideOtherTimeNode()
             
             document.cursor = Document.defaultCursor
         }
@@ -152,18 +152,18 @@ final class TimePreviousMover: InputKeyEditor {
             sheetView = document.sheetView(at: p)
             move(from: sheetView, at: p)
             
-            sheetView?.showTimeframeTimeNodeFromMainBeat()
+            sheetView?.showOtherTimeNodeFromMainBeat()
             
             document.cursor = document.cursor(from: sheetView?.currentTimeString() ?? SheetView.timeString(time: 0, frameRate: 0))
         case .changed:
             if event.isRepeat, let sheetView {
                 move(from: sheetView, at: p)
-                sheetView.showTimeframeTimeNodeFromMainBeat()
+                sheetView.showOtherTimeNodeFromMainBeat()
                 
                 document.cursor = document.cursor(from: sheetView.currentTimeString())
             }
         case .ended:
-            sheetView?.hideTimeframeTimeNode()
+            sheetView?.hideOtherTimeNode()
             
             document.cursor = Document.defaultCursor
         }
@@ -205,18 +205,18 @@ final class TimeNextMover: InputKeyEditor {
             sheetView = document.sheetView(at: p)
             move(from: sheetView, at: p)
             
-            sheetView?.showTimeframeTimeNodeFromMainBeat()
+            sheetView?.showOtherTimeNodeFromMainBeat()
             
             document.cursor = document.cursor(from: sheetView?.currentTimeString() ?? SheetView.timeString(time: 0, frameRate: 0))
         case .changed:
             if event.isRepeat, let sheetView {
                 move(from: sheetView, at: p)
-                sheetView.showTimeframeTimeNodeFromMainBeat()
+                sheetView.showOtherTimeNodeFromMainBeat()
                 
                 document.cursor = document.cursor(from: sheetView.currentTimeString())
             }
         case .ended:
-            sheetView?.hideTimeframeTimeNode()
+            sheetView?.hideOtherTimeNode()
             
             document.cursor = Document.defaultCursor
         }
@@ -284,7 +284,7 @@ final class KeyframeSwiper: SwipeEditor {
                 document.cursor = document.cursor(from: SheetView.timeString(time: 0, frameRate: 0))
             }
             
-            sheetView?.showTimeframeTimeNodeFromMainBeat()
+            sheetView?.showOtherTimeNodeFromMainBeat()
         case .changed:
             if let sheetView {
                 let animationView = sheetView.animationView
@@ -338,7 +338,7 @@ final class KeyframeSwiper: SwipeEditor {
                             }
                         }
                         
-                        sheetView.showTimeframeTimeNodeFromMainBeat()
+                        sheetView.showOtherTimeNodeFromMainBeat()
                         
                         document.updateEditorNode()
                         document.updateSelects()
@@ -358,7 +358,7 @@ final class KeyframeSwiper: SwipeEditor {
                 let animationView = sheetView.animationView
                 animationView.shownInterTypeKeyframeIndex = nil
                 
-                sheetView.hideTimeframeTimeNode()
+                sheetView.hideOtherTimeNode()
                 
                 for (sec, rootI) in lastRootIs.reversed() {
                     if event.time - sec > minLastSec {
@@ -428,7 +428,7 @@ final class KeyframeSlider: DragEditor {
                 document.cursor = document.cursor(from: SheetView.timeString(time: 0, frameRate: 0))
             }
             
-            sheetView?.showTimeframeTimeNodeFromMainBeat()
+            sheetView?.showOtherTimeNodeFromMainBeat()
         case .changed:
             if let sheetView {
                 let animationView = sheetView.animationView
@@ -481,7 +481,7 @@ final class KeyframeSlider: DragEditor {
                             }
                         }
                         
-                        sheetView.showTimeframeTimeNodeFromMainBeat()
+                        sheetView.showOtherTimeNodeFromMainBeat()
                         
                         document.updateEditorNode()
                         document.updateSelects()
@@ -501,7 +501,7 @@ final class KeyframeSlider: DragEditor {
                 let animationView = sheetView.animationView
                 animationView.shownInterTypeKeyframeIndex = nil
                 
-                sheetView.hideTimeframeTimeNode()
+                sheetView.hideOtherTimeNode()
                 
                 for (sec, rootI) in lastRootIs.reversed() {
                     if event.time - sec > minLastSec {
@@ -556,10 +556,7 @@ final class FrameEditor: Editor {
     private let indexInterval = 2.0
     private let snapDeltaIndex = 4, snapDeltaEventTime = 0.075
     
-    private var isPit = false
-    private var sheetView: SheetView?, animationIndex: Int?,
-                textI: Int?, noteI: Int?, pitI: Int?,
-                beganScore: Score?, beganPit: Pit?, beganPitbend: Pitbend?
+    private var sheetView: SheetView?, animationIndex: Int?
     private var beganSP = Point(),
                 beganRootBeat = Rational(0), beganBeat = Rational(0),
                 beganSelectedFrameIndexes = [Int](), beganEventTime = 0.0
@@ -588,28 +585,7 @@ final class FrameEditor: Editor {
             beganEventTime = event.time
             sheetView = document.sheetView(at: p)
             if let sheetView {
-                let inP = sheetView.convertFromWorld(p)
-                isPit = false
-                if let (ti, _) = sheetView.timeframeTuple(at: inP) {
-                    let textView = sheetView.textsView.elementViews[ti]
-                
-                    let inTP = textView.convert(inP, from: sheetView.node)
-                    let maxD = textView.nodeRatio
-                    * 5.0 * document.screenToWorldScale
-                    if textView.containsScore(inTP),
-                       let (ni, pitI, pit, pitbend) = textView.pitbendTuple(at: inTP,
-                                                              maxDistance: maxD) {
-                        
-                        self.textI = ti
-                        self.noteI = ni
-                        self.pitI = pitI
-                        beganScore = textView.model.timeframe?.score
-                        beganPit = pit
-                        beganPitbend = pitbend
-                        isPit = true
-                    }
-                }
-                if !isPit, sheetView.model.enabledAnimation {
+                if sheetView.model.enabledAnimation {
                     let animationView = sheetView.animationView
                     beganRootBeat = animationView.rootBeat
                     lastRootBeats.append((event.time, beganRootBeat))
@@ -620,31 +596,10 @@ final class FrameEditor: Editor {
             }
             document.cursor = document.cursor(from: sheetView?.currentTimeString() ?? SheetView.timeString(time: 0, frameRate: 0))
             
-            sheetView?.showTimeframeTimeNodeFromMainBeat()
+            sheetView?.showOtherTimeNodeFromMainBeat()
         case .changed:
             if let sheetView {
-                if isPit {
-                    if let textI, textI < sheetView.textsView.elementViews.count {
-                        
-                        let textView = sheetView.textsView.elementViews[textI]
-                        if let score = textView.model.timeframe?.score,
-                           let noteI, noteI < score.notes.count,
-                           let pitI, let beganPit, let beganPitbend,
-                           pitI < beganPitbend.pits.count {
-                            
-                            let dp = sp - beganSP
-                            var pitbend = beganPitbend
-                            var pit = pitbend.pits[pitI]
-                            pit.t = (beganPit.t + dp.x / 100)
-                                .clipped(min: pitI > 0 ? pitbend.pits[pitI - 1].t : 0,
-                                         max: pitI + 1 < pitbend.pits.count ? pitbend.pits[pitI + 1].t : 1)
-                            pit.pitch = beganPit.pitch + dp.y / 100
-                            pitbend.pits[pitI] = pit
-
-                            textView.model.timeframe?.score?.notes[noteI].pitbend = pitbend
-                        }
-                    }
-                } else if sheetView.model.enabledAnimation {
+                if sheetView.model.enabledAnimation {
                     let animationView = sheetView.animationView
                     
                     let dp = event.screenPoint - beganSP
@@ -695,7 +650,7 @@ final class FrameEditor: Editor {
                         }
                         
                         document.cursor = document.cursor(from: sheetView.currentTimeString())
-                        sheetView.showTimeframeTimeNodeFromMainBeat()
+                        sheetView.showOtherTimeNodeFromMainBeat()
                     }
                 }
             }
@@ -703,30 +658,16 @@ final class FrameEditor: Editor {
             document.cursor = Document.defaultCursor
             
             if let sheetView {
-                if isPit {
-                    if let textI, textI < sheetView.textsView.elementViews.count {
-                        
-                        let textView = sheetView.textsView.elementViews[textI]
-                        if let score = textView.model.timeframe?.score,
-                           score != beganScore {
-                            
-                            sheetView.newUndoGroup()
-                            sheetView.captureScore(score, old: beganScore,
-                                                   at: textI)
-                        }
-                    }
-                } else {
-                    let animationView = sheetView.animationView
-                    animationView.shownInterTypeKeyframeIndex = nil
-                    sheetView.hideTimeframeTimeNode()
+                let animationView = sheetView.animationView
+                animationView.shownInterTypeKeyframeIndex = nil
+                sheetView.hideOtherTimeNode()
                     
-                    for (sec, rootBeat) in lastRootBeats.reversed() {
-                        if event.time - sec > minLastSec {
-                            sheetView.rootBeat = rootBeat
-                            document.updateEditorNode()
-                            document.updateSelects()
-                            break
-                        }
+                for (sec, rootBeat) in lastRootBeats.reversed() {
+                    if event.time - sec > minLastSec {
+                        sheetView.rootBeat = rootBeat
+                        document.updateEditorNode()
+                        document.updateSelects()
+                        break
                     }
                 }
             }
@@ -773,7 +714,7 @@ final class Player: InputKeyEditor {
                     let shp = document.sheetPosition(at: ip)
                     if !filledShps.contains(shp),
                        let aSheetView = document.sheetView(at: shp),
-                       aSheetView.model.enabledTimetrack {
+                       aSheetView.model.enabledAudiotrack {
                         
                         filledShps.insert(shp)
                         return aSheetView
@@ -815,40 +756,32 @@ final class Player: InputKeyEditor {
                     cSheetView.topSheetView = aSheetView
                 }
                 
-                if !document.containsScoreOrAnimation(with: event) {
+                if !document.containsAllTimeline(with: event) {
                     cSheetView.play()
                 } else {
                     let sheetP = cSheetView.convertFromWorld(p)
                     var ids = Set<UUID>()
                     var secRange: Range<Rational>?
                     var sec: Rational = cSheetView.animationView.sec(atX: sheetP.x)
-                    if let (ti, timeframe) = cSheetView.timeframeTuple(at: sheetP) {
-                        let textView = cSheetView.textsView.elementViews[ti]
-                        let textP = textView.convert(sheetP, from: cSheetView.node)
-                        if textView.containsScore(textP),
-                           let ni = textView.noteIndex(at: textP,
-                                                       maxDistance: 10.0 * document.screenToWorldScale),
-                           let id = textView.model.timeframe?.id,
-                           let score = textView.model.timeframe?.score {
-                            
-                            let beat = score.notes[ni].beatRange.start
-                            + timeframe.beatRange.start + timeframe.localStartBeat
-                            sec = timeframe.sec(fromBeat: beat)
-                            - Rational(1, 16)
-                            secRange = timeframe.secRange
-                            ids.insert(id)
-                        } else if textView.containsMainLine(textP, 
-                                                            distance: 5 * document.screenToWorldScale),
-                                  let id = textView.model.timeframe?.id {
-                            ids.insert(id)
-                        }
+                    let scoreView = cSheetView.scoreView
+                    let scoreP = scoreView.convertFromWorld(p)
+                    let score = scoreView.model
+                    if let ni = scoreView.noteIndex(at: scoreP,
+                                                    maxDistance: 10 * document.screenToWorldScale) {
+                        let beat = score.notes[ni].beatRange.start + score.beatRange.start
+                        sec = score.sec(fromBeat: beat) - Rational(1, 16)
+                        secRange = score.secRange
+                        ids.insert(score.id)
+                    } else if scoreView.containsMainLine(scoreP,
+                                                         distance: 5 * document.screenToWorldScale) {
+                        ids.insert(score.id)
                     }
                     if secRange != nil {
                         cSheetView.previousSheetView = nil
                         cSheetView.nextSheetView = nil
                     }
                     cSheetView.play(atSec: sec, inSec: secRange,
-                                   timeframeIDs: ids)
+                                    otherTimelineIDs: ids)
                 }
             }
         case .changed:
@@ -938,7 +871,7 @@ final class FrameSlideEditor: Editor {
         case .began:
             document.cursor = .arrow
             if let sheetView = document.sheetView(at: p),
-               sheetView.containsTimeline(sheetView.convertFromWorld(p)) {
+               sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p)) {
                 
                 self.sheetView = sheetView
                 let animationView = sheetView.animationView
@@ -1052,10 +985,14 @@ final class AnimationSlider: DragEditor {
                 animationIndex = 0, keyframeIndex = 0
     private var type = SlideType.key
     private var beganSP = Point(), beganInP = Point(),
-                beganAnimationOption: AnimationOption?,
-                beganTimeframes = [Int: Timeframe](), beganTimelineX = 0.0,
-                beganTempo: Rational = 120, oldTempo: Rational = 1,
+                beganTimelineX = 0.0,
                 beganKeyframeBeatDuration = Rational(0)
+    
+    private var beganTempo: Rational = 1, oldTempo: Rational = 1
+    private var beganAnimationOption: AnimationOption?, beganScoreOption: ScoreOption?,
+                beganContents = [Int: Content](),
+                beganTexts = [Int: Text]()
+    
     private var lastBeats = [(sec: Double, rootBeat: Rational)](capacity: 128)
     private var minLastSec = 1 / 12.0
     
@@ -1082,7 +1019,7 @@ final class AnimationSlider: DragEditor {
                 let inP = sheetView.convertFromWorld(p)
                 beganInP = inP
                 beganTimelineX = sheetView.animationView.x(atBeat: sheetView.animationView.model.beatRange.start)
-                if sheetView.containsTimeline(inP) {
+                if sheetView.animationView.containsTimeline(inP) {
                     let animationView = sheetView.animationView
                     
                     if let minI = sheetView.animationView
@@ -1103,22 +1040,30 @@ final class AnimationSlider: DragEditor {
                         beganAnimationOption = sheetView.model.animation.option
                         lastBeats.append((event.time, beganAnimationOption!.startBeat))
                     } else if animationView.tempoPositionBeat(inP,
-                                                 maxDistance: 15.0 * document.screenToWorldScale) != nil {
+                                                              scale: document.screenToWorldScale) != nil {
                         type = .tempo
                         
                         beganTempo = animationView.tempo
                         oldTempo = beganTempo
                         
-                        beganTimeframes = sheetView.textsView.elementViews.enumerated().reduce(into: [Int: Timeframe]()) { (dic, v) in
-                            if beganTempo == v.element.model.timeframe?.tempo {
-                                dic[v.offset] = v.element.model.timeframe
+                        beganContents = sheetView.contentsView.elementViews.enumerated().reduce(into: .init()) { (dic, v) in
+                            if beganTempo == v.element.model.timeOption?.tempo {
+                                dic[v.offset] = v.element.model
+                            }
+                        }
+                        beganTexts = sheetView.textsView.elementViews.enumerated().reduce(into: .init()) { (dic, v) in
+                            if beganTempo == v.element.model.timeOption?.tempo {
+                                dic[v.offset] = v.element.model
                             }
                         }
                         if beganTempo == sheetView.model.animation.tempo {
                             beganAnimationOption = sheetView.model.animation.option
                         }
+                        if beganTempo == sheetView.model.score.tempo {
+                            beganScoreOption = sheetView.model.score.option
+                        }
                         
-                        document.cursor = .arrowWith(string: sheetView.tempoString(from: animationView))
+                        document.cursor = .arrowWith(string: SheetView.tempoString(fromTempo: beganTempo))
                     } else {
                         type = .none
                     }
@@ -1128,7 +1073,6 @@ final class AnimationSlider: DragEditor {
             if let sheetView = sheetView {
                 let animationView = sheetView.animationView
                 let inP = sheetView.convertFromWorld(p)
-//                let dp = inP - beganInP
                 
                 switch type {
                 case .tempo:
@@ -1137,14 +1081,22 @@ final class AnimationSlider: DragEditor {
                                          intervalScale: Rational(1, 4))
                         .clipped(Music.tempoRange)
                     if tempo != oldTempo {
-                        beganTimeframes.forEach {
-                            sheetView.textsView.elementViews[$0.key].model.timeframe?.tempo = tempo
+                        beganContents.forEach {
+                            sheetView.contentsView.elementViews[$0.key].model.timeOption?.tempo = tempo
+                        }
+                        beganTexts.forEach {
+                            sheetView.textsView.elementViews[$0.key].model.timeOption?.tempo = tempo
                         }
                         if beganAnimationOption != nil {
                             sheetView.animationView.tempo = tempo
                         }
+                        if beganScoreOption != nil {
+                            sheetView.scoreView.tempo = tempo
+                        }
                         
-                        document.cursor = .arrowWith(string: sheetView.tempoString(from: animationView))
+                        document.updateSelects()
+                        
+                        document.cursor = .arrowWith(string: SheetView.tempoString(fromTempo: tempo))
                         
                         oldTempo = tempo
                     }
@@ -1288,15 +1240,26 @@ final class AnimationSlider: DragEditor {
                         sheetView.capture(option: sheetView.model.animation.option,
                                           oldOption: beganAnimationOption)
                     }
-                    if !beganTimeframes.isEmpty {
-                        for (ti, beganTimeframe) in beganTimeframes {
+                    if let beganScoreOption, sheetView.model.score.option != beganScoreOption {
+                        updateUndoGroup()
+                        sheetView.capture(sheetView.model.score.option,
+                                          old: beganScoreOption)
+                    }
+                    if !beganContents.isEmpty || !beganTexts.isEmpty {
+                        for (ci, beganContent) in beganContents {
+                            guard ci < sheetView.model.contents.count else { continue }
+                            let content = sheetView.contentsView.elementViews[ci].model
+                            if content != beganContent {
+                                updateUndoGroup()
+                                sheetView.capture(content, old: beganContent, at: ci)
+                            }
+                        }
+                        for (ti, beganText) in beganTexts {
                             guard ti < sheetView.model.texts.count else { continue }
                             let text = sheetView.textsView.elementViews[ti].model
-                            if text.timeframe != beganTimeframe {
-                                var beganText = text
-                                beganText.timeframe = beganTimeframe
+                            if text != beganText {
                                 updateUndoGroup()
-                                sheetView.captureText(text, old: beganText, at: ti)
+                                sheetView.capture(text, old: beganText, at: ti)
                             }
                         }
                     }
@@ -1318,6 +1281,9 @@ final class LineSlider: DragEditor {
         isEditingSheet = document.isEditingSheet
     }
 
+    private var isPit = false, noteI: Int?, pitI: Int?,
+                beganNote: Note?, beganPit: Pit?, beganPitbend: Pitbend?, beganSP = Point()
+    
     private var sheetView: SheetView?,
                 lineIndex = 0, pointIndex = 0
     private var beganLine = Line(), beganMainP = Point(), beganInP = Point(),
@@ -1343,9 +1309,22 @@ final class LineSlider: DragEditor {
 
             if let sheetView = document.sheetView(at: p) {
                 let inP = sheetView.convertFromWorld(p)
-                if let (lineView, li) = sheetView.lineTuple(at: inP,
-                                                            isSmall: false,
-                                                            scale: document.screenToWorldScale),
+                let scoreView = sheetView.scoreView
+                let scoreP = scoreView.convertFromWorld(p)
+                let maxD = 5.0 * document.screenToWorldScale
+                if let (ni, pitI, pit, pitbend) = scoreView.pitbendTuple(at: scoreP,
+                                                                         maxDistance: maxD) {
+                    self.sheetView = sheetView
+                    self.noteI = ni
+                    self.pitI = pitI
+                    beganSP = sp
+                    beganNote = scoreView.model.notes[ni]
+                    beganPit = pit
+                    beganPitbend = pitbend
+                    isPit = true
+                } else if let (lineView, li) = sheetView.lineTuple(at: inP,
+                                                                   isSmall: false,
+                                                                   scale: document.screenToWorldScale),
                    let pi = lineView.model.mainPointSequence.nearestIndex(at: inP) {
                     
                     self.sheetView = sheetView
@@ -1360,45 +1339,75 @@ final class LineSlider: DragEditor {
                 }
             }
         case .changed:
-            if let sheetView = sheetView,
-               lineIndex < sheetView.linesView.elementViews.count {
-                let lineView = sheetView.linesView.elementViews[lineIndex]
-                
-                var line = lineView.model
-                if pointIndex < line.mainPointCount {
-                    let inP = sheetView.convertFromWorld(p)
-                    let op = inP - beganInP + beganMainP
-                    let np = line.mainPoint(withMainCenterPoint: op,
-                                            at: pointIndex)
-                    let pressure = event.pressure
-                        .clipped(min: 0.4, max: 1, newMin: 0, newMax: 1)
-                    pressures.append((event.time, pressure))
-                    
-                    line.controls[pointIndex].point = np
-                    
-                    if isPressure || (!isPressure && (event.time - (pressures.first?.time ?? 0) > 1 && !pressures.contains(where: { $0.pressure > 0.5 }))) {
-                        isPressure = true
+            if let sheetView {
+                if isPit {
+                    let scoreView = sheetView.scoreView
+                    let score = scoreView.model
+                    if let noteI, noteI < score.notes.count,
+                       let pitI, let beganPit, let beganPitbend, pitI < beganPitbend.pits.count {
                         
-                        let nPressures = pressures
-                            .filter { (0.04 ..< 0.4).contains(event.time - $0.time) }
-                        let nPressure = nPressures.isEmpty ?
-                            pressures.first!.pressure :
-                            nPressures.mean { $0.pressure }
-                        line.controls[pointIndex].pressure = nPressure
+                        let dp = sp - beganSP
+                        var pitbend = beganPitbend
+                        var pit = pitbend.pits[pitI]
+                        pit.t = (beganPit.t + dp.x / 100)
+                            .clipped(min: pitI > 0 ? pitbend.pits[pitI - 1].t : 0,
+                                     max: pitI + 1 < pitbend.pits.count ? pitbend.pits[pitI + 1].t : 1)
+                        pit.pitch = beganPit.pitch + dp.y / 100
+                        pitbend.pits[pitI] = pit
+                        
+                        scoreView.model.notes[noteI].pitbend = pitbend
                     }
-                    
-                    lineView.model = line
+                } else {
+                    if lineIndex < sheetView.linesView.elementViews.count {
+                        let lineView = sheetView.linesView.elementViews[lineIndex]
+                        
+                        var line = lineView.model
+                        if pointIndex < line.mainPointCount {
+                            let inP = sheetView.convertFromWorld(p)
+                            let op = inP - beganInP + beganMainP
+                            let np = line.mainPoint(withMainCenterPoint: op,
+                                                    at: pointIndex)
+                            let pressure = event.pressure
+                                .clipped(min: 0.4, max: 1, newMin: 0, newMax: 1)
+                            pressures.append((event.time, pressure))
+                            
+                            line.controls[pointIndex].point = np
+                            
+                            if isPressure || (!isPressure && (event.time - (pressures.first?.time ?? 0) > 1 && !pressures.contains(where: { $0.pressure > 0.5 }))) {
+                                isPressure = true
+                                
+                                let nPressures = pressures
+                                    .filter { (0.04 ..< 0.4).contains(event.time - $0.time) }
+                                let nPressure = nPressures.isEmpty ?
+                                pressures.first!.pressure :
+                                nPressures.mean { $0.pressure }
+                                line.controls[pointIndex].pressure = nPressure
+                            }
+                            
+                            lineView.model = line
+                        }
+                    }
                 }
             }
         case .ended:
-            if let sheetView = sheetView,
-               lineIndex < sheetView.linesView.elementViews.count {
-                
-                let line = sheetView.linesView.elementViews[lineIndex].model
-                if line != beganLine {
-                    sheetView.newUndoGroup()
-                    sheetView.captureLine(line, old: beganLine,
-                                          at: lineIndex)
+            if let sheetView {
+                if isPit {
+                    let scoreView = sheetView.scoreView
+                    if let beganNote, let noteI, noteI < scoreView.model.notes.count {
+                        let note = scoreView.model.notes[noteI]
+                        if note != beganNote {
+                            sheetView.newUndoGroup()
+                            sheetView.capture(note, old: beganNote, at: noteI)
+                        }
+                    }
+                } else {
+                    if lineIndex < sheetView.linesView.elementViews.count {
+                        let line = sheetView.linesView.elementViews[lineIndex].model
+                        if line != beganLine {
+                            sheetView.newUndoGroup()
+                            sheetView.captureLine(line, old: beganLine, at: lineIndex)
+                        }
+                    }
                 }
             }
 
@@ -1516,769 +1525,6 @@ final class LineZSlider: DragEditor {
     }
 }
 
-final class TimeframeSlider: DragEditor {
-    let document: Document
-    let isEditingSheet: Bool
-    
-    init(_ document: Document) {
-        self.document = document
-        isEditingSheet = document.isEditingSheet
-    }
-    
-    enum SlideType {
-        case all, startBeat, endBeat, startBeatOrOctave,
-             pitchStart, pitchLength,
-             startNote, endNote, moveNote,
-             octave,
-             attack, decayAndSustain, release,
-             overtone, sourceFilter,
-             isShownSpectrogram, tempo
-    }
-    
-    private let editableInterval = 5.0
-    private let editableTempoInterval = 10.0
-    
-    private var node = Node()
-    private var notePlayer: NotePlayer?
-    private var sheetView: SheetView?, textIndex: Int?
-    private var type = SlideType.all
-    private var sourceFilterType = SourceFilterType.fqSmp, isSourceFilterLast = false
-    private var overtoneType = OvertoneType.evenScale
-    private var beganSP = Point(), beganTime = Rational(0),
-                beganTimeframeTime = Rational(0), beganText: Text?,
-                beganTimeframe: Timeframe?,
-                beganInP = Point(), beganTextOrigin = Point()
-    private var beganOctave = Rational(0), secIndex = 0,
-                noteIndex: Int?, beganNoteBeatRange: Range<Rational>?,
-                noteIndexes = [Int](), currentBeatNoteIndexes = [Int](),
-                beganScore: Score?, beganDeltaNoteBeat = Rational(),
-                oldNotePitch: Rational?, oldNoteBeat: Rational?,
-                minScorePitch = Rational(0), maxScorePitch = Rational(0)
-    private var beganStartBeat = Rational(0)
-    private var beganReverb = 0.0, oldReverb = 0.0,
-                beganIsShownSpectrogram = false, oldIsShownSpectrogram = false,
-                beganEnvelope = Envelope()
-    private var beganPitch: Rational?
-    private var beganOvertone = Overtone()
-    private var beganSourceFilterIndex = 0, beganSourceFilter = SourceFilter(),
-                beganSourceFilterFq = 0.0, beganSourceFilterSmp = 0.0
-    private var beganAnimationOption: AnimationOption?
-    private var beganTimeframes = [Int: Timeframe]()
-    private var beganTempo: Rational = 1, oldTempo: Rational = 1
-    
-    func send(_ event: DragEvent) {
-        guard isEditingSheet else {
-            document.stop(with: event)
-            return
-        }
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
-            ?? event.screenPoint
-        let p = document.convertScreenToWorld(sp)
-        switch event.phase {
-        case .began:
-            document.cursor = .arrow
-            
-            if let sheetView = document.sheetView(at: p) {
-                let inP = sheetView.convertFromWorld(p)
-                if let (ti, timeframe) = sheetView.timeframeTuple(at: inP) {
-                    let textView = sheetView.textsView.elementViews[ti]
-                    
-                    beganSP = sp
-                    self.sheetView = sheetView
-                    textIndex = ti
-                    beganTime = sheetView.animationView.beat(atX: inP.x)
-                    beganTimeframe = timeframe
-                    beganScore = timeframe.score
-                    beganEnvelope = timeframe.score?.tone.envelope ?? .init()
-                    beganText = textView.model
-                    beganTimeframeTime = timeframe.beatRange.start
-                    beganInP = inP
-                    beganTextOrigin = textView.model.origin
-                    
-                    let maxD = textView.nodeRatio
-                    * 15.0 * document.screenToWorldScale
-                    let maxMD = textView.nodeRatio
-                    * 10.0 * document.screenToWorldScale
-                    
-                    let inTP = textView.convert(inP, from: sheetView.node)
-                    if textView.containsScore(inTP),
-                       let timeframe = textView.model.timeframe,
-                       let score = timeframe.score,
-                       let pitch = document.pitch(from: textView, at: inTP),
-                       let ni = textView.noteIndex(at: inTP,
-                                                   maxDistance: maxD) {
-                        
-                        let note = score.notes[ni]
-                        let nf = textView.noteFrame(from: note,
-                                                    score, timeframe)
-                        let nfsw = nf.width * document.worldToScreenScale
-                        let dx = nfsw.clipped(min: 3, max: 30,
-                                              newMin: 1, newMax: 10)
-                            * document.screenToWorldScale
-                        if abs(inTP.x - nf.minX) < dx {
-                            type = .startNote
-                        } else if abs(inTP.x - nf.maxX) < dx {
-                            type = .endNote
-                        } else {
-                            type = .moveNote
-                        }
-                        noteIndex = ni
-                        noteIndexes = document.isSelectSelectedNoneCursor(at: p) ?
-                        document.selectedNoteIndexes(from: textView) :
-                            [ni]
-                        beganScore = score
-                        beganPitch = pitch
-                        let interval = document
-                            .currentNoteTimeInterval(from: textView.model)
-                        let nsBeat = textView.beat(atX: inP.x,
-                                                   interval: interval)
-                        - timeframe.beatRange.start - timeframe.localStartBeat
-                        
-                        currentBeatNoteIndexes = noteIndexes.filter {  score.notes[$0].beatRange.contains(note.beatRange.center) }
-                        
-                        beganStartBeat = nsBeat
-                        let dBeat = note.beatRange.start + timeframe.beatRange.start + timeframe.localStartBeat
-                        - (note.beatRange.start + timeframe.beatRange.start + timeframe.localStartBeat).interval(scale: interval)
-                        beganDeltaNoteBeat = -dBeat
-                        beganNoteBeatRange = note.beatRange
-                        oldNotePitch = note.pitch
-                        
-                        let volume = sheetView.isPlaying ?
-                        score.volume * 0.1 : score.volume
-                        if let notePlayer = sheetView.notePlayer {
-                            self.notePlayer = notePlayer
-                            notePlayer.notes = currentBeatNoteIndexes.map { score.convertPitchToWorld(score.notes[$0]) }
-                            notePlayer.tone = score.tone
-                            notePlayer.volume = volume
-                        } else {
-                            notePlayer = try? NotePlayer(notes: currentBeatNoteIndexes.map { score.convertPitchToWorld(score.notes[$0]) },
-                                                         score.tone,
-                                                         volume: volume,
-                                                         pan: score.pan,
-                                                         tempo: Double(timeframe.tempo))
-                            sheetView.notePlayer = notePlayer
-                        }
-                        notePlayer?.play()
-                    } else if textView.tempoPositionBeat(inTP,
-                                                 maxDistance: maxD) != nil,
-                              let timeframe = textView.model.timeframe {
-                        type = .tempo
-                        
-                        beganTempo = timeframe.tempo
-                        oldTempo = beganTempo
-                        
-                        beganTimeframes = sheetView.textsView.elementViews.enumerated().reduce(into: [Int: Timeframe]()) { (dic, v) in
-                            if beganTempo == v.element.model.timeframe?.tempo {
-                                dic[v.offset] = v.element.model.timeframe
-                            }
-                        }
-                        if beganTempo == sheetView.model.animation.tempo {
-                            beganAnimationOption = sheetView.model.animation.option
-                        }
-                        
-                        document.cursor = .arrowWith(string: SheetView.tempoString(fromTempo: timeframe.tempo))
-                    } else if textView.containsIsShownSpectrogram(inTP),
-                              let isShownSpectrogram = textView.model.timeframe?.isShownSpectrogram {
-                        type = .isShownSpectrogram
-                        beganIsShownSpectrogram = isShownSpectrogram
-                        oldIsShownSpectrogram = isShownSpectrogram
-                    } else if let (i, sourceFilterType, isLast) = textView.sourceFilterType(at: inTP, maxDistance: 25.0 * document.screenToWorldScale),
-                               let tone = textView.model.timeframe?.score?.tone,
-                              let nfq = textView.sourceFilterFq(atX: inP.x),
-                              let nSmp = textView.sourceFilterSmp(atY: inP.y) {
-                        type = .sourceFilter
-                        self.beganSourceFilterIndex = i
-                        self.beganSourceFilter = tone.sourceFilter
-                        self.sourceFilterType = sourceFilterType
-                        self.isSourceFilterLast = isLast
-                        self.beganSourceFilterFq = nfq
-                        self.beganSourceFilterSmp = nSmp
-                    } else if textView.containsOctave(inTP),
-                              let score = textView.model.timeframe?.score,
-                              let pitch = document.pitch(from: textView, at: inTP) {
-                        type = .octave
-                        
-                        beganPitch = pitch
-                        beganScore = score
-                        beganOctave = score.octave
-                    } else if textView.containsAttack(inTP) {
-                        type = .attack
-                    } else if textView.containsDecayAndSustain(inTP) {
-                        type = .decayAndSustain
-                    } else if textView.containsRelease(inTP) {
-                        type = .release
-                    } else if abs(inTP.x - textView.x(atBeat: timeframe.beatRange.start)) < maxMD {
-                        type = .startBeatOrOctave
-                        let inTP = textView.convertFromWorld(p)
-                        if let score = timeframe.score,
-                           let pitch = document.pitch(from: textView,
-                                                      at: inTP) {
-                            beganPitch = pitch
-                            beganScore = score
-                            beganOctave = score.octave
-                        }
-                    } else if abs(inTP.x - textView.x(atBeat: timeframe.beatRange.end)) < maxMD {
-                        type = .endBeat
-                    } else if let score = textView.model.timeframe?.score,
-                              let pitch = document.pitch(from: textView, at: inTP),
-                              let sf = textView.scoreFrame,
-                              abs(inTP.y - sf.minY) < maxMD {
-                        type = .pitchStart
-                        
-                        beganPitch = pitch
-                        minScorePitch = score.pitchRange.start
-                        maxScorePitch = score.pitchRange.end
-                    } else if let score = textView.model.timeframe?.score,
-                              let pitch = document.pitch(from: textView, at: inTP),
-                              let sf = textView.scoreFrame,
-                              abs(inTP.y - sf.maxY) < maxMD {
-                        type = .pitchLength
-                        
-                        minScorePitch = pitch - score.pitchRange.length
-                    } else if let aOvertoneType = textView.overtoneType(at: inTP),
-                               let tone = textView.model.timeframe?.score?.tone {
-                        type = .overtone
-                        overtoneType = aOvertoneType
-                        
-                        beganOvertone = tone.overtone
-                    } else {
-                        type = .all
-                    }
-                } else if let (textView, ti, _, _) = sheetView.textTuple(at: inP) {
-                    
-                    type = .all
-                    
-                    beganSP = sp
-                    self.sheetView = sheetView
-                    beganText = textView.model
-                    textIndex = ti
-                    beganInP = inP
-                    beganTextOrigin = textView.model.origin
-                }
-            }
-        case .changed:
-            if let sheetView = sheetView,
-               let ti = textIndex, ti < sheetView.model.texts.count,
-               let timeframe = sheetView.textsView.elementViews[ti].model.timeframe {
-               
-                let textView = sheetView.textsView.elementViews[ti]
-                let inP = sheetView.convertFromWorld(p)
-                
-                switch type {
-                case .all:
-                    let nh = Double(document.currentNotePitchInterval(from: textView.model)) * ScoreLayout.noteHeight * textView.nodeRatio
-                    let px = (beganTextOrigin.x + inP.x - beganInP.x)
-                    let py = (beganTextOrigin.y + inP.y - beganInP.y)
-                        .interval(scale: nh)
-                    
-                    let interval = document
-                        .currentNoteTimeInterval(from: textView.model)
-                    let beat = textView.beat(atX: px,
-                                             interval: interval)
-                    if beat != timeframe.beatRange.start
-                        || py != textView.model.origin.y {
-                        
-                        var text = textView.model
-                        text.timeframe?.beatRange.start = beat
-                        text.origin.x = sheetView.animationView
-                            .x(atSec: timeframe.sec(fromBeat: beat))
-                        text.origin.y = py
-                        sheetView.textsView.elementViews[ti].model = text
-                        if textView.model.timeframe?.score != nil {
-                            sheetView.updateOtherNotes()
-                        }
-                        document.updateSelects()
-                    }
-                case .isShownSpectrogram:
-                    let inTP = textView.convertFromWorld(p)
-                    let isShownSpectrogram = inTP.y > (textView.isShownSpectrogramFrame?.midY ?? 0)
-                    textView.isShownSpectrogram = isShownSpectrogram
-                case .octave:
-                    let inTP = textView.convertFromWorld(p)
-//                    let di = Rational((sp.y - beganSP.y) / 20,
-//                                      intervalScale: Rational(1, 12))
-                    if var score = beganScore, let beganPitch,
-                       let pitch = document.pitch(from: textView, at: inTP) {
-                        let dph = pitch - beganPitch
-                        
-                        let octave = (beganOctave - dph / 12)
-                            .clipped(min: Score.minOctave,
-                                     max: Score.maxOctave)
-                        if octave != textView.model.timeframe?.score?.octave {
-                            
-                            score.octave = octave
-                            
-                            textView.model.timeframe?.score = score
-                            
-                            sheetView.updateOtherNotes()
-                        }
-                    }
-                case .tempo:
-                    let di = (sp.x - beganSP.x) / editableTempoInterval
-                    let tempo = Rational(Double(beganTempo) - di,
-                                         intervalScale: Rational(1, 4))
-                        .clipped(Music.tempoRange)
-                    if tempo != oldTempo {
-                        beganTimeframes.forEach {
-                            sheetView.textsView.elementViews[$0.key].model.timeframe?.tempo = tempo
-                        }
-                        if beganAnimationOption != nil {
-                            sheetView.animationView.tempo = tempo
-                        }
-                        sheetView.updateOtherNotes()
-                        
-                        document.updateSelects()
-                        
-                        document.cursor = .arrowWith(string: SheetView.tempoString(fromTempo: tempo))
-                        
-                        oldTempo = tempo
-                    }
-                case .attack:
-                    if let score = timeframe.score,
-                       let ti = textIndex {
-                       
-                        let screenScale = document.screenToWorldScale
-                        / 50 / textView.nodeRatio
-                        let attack = ((sp.x - beganSP.x) * screenScale
-                                        + beganEnvelope.attack.squareRoot())
-                            .clipped(min: 0, max: 1).squared
-                        if attack != score.tone.envelope.attack {
-                            var timeframe = timeframe
-                            timeframe.score?.tone.envelope.attack = attack
-                            sheetView.textsView.elementViews[ti].model.timeframe = timeframe
-                            sheetView.sequencer?.scoreNoders[timeframe.id]?.tone.envelope.attack = attack
-                        }
-                    }
-                case .decayAndSustain:
-                    if let score = timeframe.score,
-                       var tone = timeframe.score?.tone,
-                       let ti = textIndex {
-                       
-                        let screenScale = document.screenToWorldScale
-                        / 50 / textView.nodeRatio
-                        let decay = ((sp.x - beganSP.x) * screenScale
-                                        + beganEnvelope.decay.squareRoot())
-                            .clipped(min: 0, max: 1).squared
-                        let nSmp = ((sp.y - beganSP.y) * screenScale
-                                    + Volume(amp: beganEnvelope.sustain).smp)
-                            .clipped(min: 0, max: 1)
-                        let sustain = Volume(smp: nSmp).amp
-                        if decay != score.tone.envelope.decay
-                            || sustain != score.tone.envelope.sustain {
-                            
-                            var timeframe = timeframe
-                            tone.envelope.decay = decay
-                            tone.envelope.sustain = sustain
-                            timeframe.score?.tone = tone
-                            sheetView.textsView.elementViews[ti].model.timeframe = timeframe
-                            
-                            sheetView.sequencer?.scoreNoders[timeframe.id]?.startSec = Double(sheetView.playingSec ?? 0)
-                            sheetView.sequencer?.scoreNoders[timeframe.id]?.tone = tone
-                        }
-                    }
-                case .release:
-                    if let score = timeframe.score,
-                       let ti = textIndex {
-                       
-                        let screenScale = document.screenToWorldScale
-                        / 50 / textView.nodeRatio
-                        let release = ((sp.x - beganSP.x) * screenScale
-                                        + beganEnvelope.release.squareRoot())
-                            .clipped(min: 0, max: 1).squared
-                        if release != score.tone.envelope.release {
-                            var timeframe = timeframe
-                            timeframe.score?.tone.envelope.release = release
-                            sheetView.textsView.elementViews[ti].model.timeframe = timeframe
-                            sheetView.sequencer?.scoreNoders[timeframe.id]?.tone.envelope.release = release
-                        }
-                    }
-                case .overtone:
-                    if let score = timeframe.score,
-                       let ti = textIndex {
-                       
-                        var tone = score.tone
-                        switch overtoneType {
-                        case .evenScale:
-                            let y = (sp.y - beganSP.y) / 5 * 0.0625
-                            let v = (y + beganOvertone.evenScale).clipped(min: 0, max: 1)
-                            tone.overtone.evenScale = v
-                        case .oddScale:
-                            let y = (sp.y - beganSP.y) / 5 * 0.0625
-                            let v = (y + beganOvertone.oddScale).clipped(min: 0, max: 1)
-                            tone.overtone.oddScale = v
-                        }
-                        
-                        var timeframe = timeframe
-                        timeframe.score?.tone = tone
-                        sheetView.textsView.elementViews[ti].model.timeframe = timeframe
-                        
-                        sheetView.sequencer?.scoreNoders[timeframe.id]?.startSec = Double(sheetView.playingSec ?? 0)
-                        sheetView.sequencer?.scoreNoders[timeframe.id]?.tone = tone
-                    }
-                case .sourceFilter:
-                    if let score = timeframe.score,
-                       let ti = textIndex, 
-                        let nfq = textView.sourceFilterFq(atX: inP.x),
-                        let nSmp = textView.sourceFilterSmp(atY: inP.y) {
-                        
-                        let ndp = sp - beganSP
-                        var tone = score.tone
-
-                        if isSourceFilterLast {
-                            let scale = ndp.x.clipped(min: -200, max: 200, newMin: -2, newMax: 2) + 1
-                            tone.sourceFilter = beganSourceFilter.multiplyFq(scale)
-                        } else {
-                            let firstV = beganSourceFilter[beganSourceFilterIndex, sourceFilterType]
-
-                            let preFq = beganSourceFilterIndex - 1 >= 0 ?
-                            tone.sourceFilter.fqSmps[beganSourceFilterIndex - 1].x : 0
-                            let nextFq = beganSourceFilterIndex + 1 < tone.sourceFilter.fqSmps.count ?
-                            tone.sourceFilter.fqSmps[beganSourceFilterIndex + 1].x : SourceFilter.maxFq
-                            
-                            let nx = (firstV.x + nfq - beganSourceFilterFq).clipped(min: preFq, max: nextFq)
-                            let ny = (firstV.y + nSmp - beganSourceFilterSmp).clipped(min: 0, max: 1)
-                            let ntp = Point(nx, ny)
-                            if ntp != score.tone.sourceFilter[beganSourceFilterIndex, sourceFilterType] {
-                                tone.sourceFilter[beganSourceFilterIndex, sourceFilterType] = ntp
-                            }
-                        }
-                        
-                        var timeframe = timeframe
-                        timeframe.score?.tone = tone
-                        sheetView.textsView.elementViews[ti].model.timeframe = timeframe
-                        
-                        sheetView.sequencer?.scoreNoders[timeframe.id]?.startSec = Double(sheetView.playingSec ?? 0)
-                        sheetView.sequencer?.scoreNoders[timeframe.id]?.tone = tone
-                    }
-                case .startBeatOrOctave:
-                    let inTP = textView.convertFromWorld(p)
-                    var isOctave = false
-                    if let beganOctave = textView.model.timeframe?.score?.octave, let beganPitch,
-                       let pitch = document.pitch(from: textView, at: inTP) {
-                        let dph = pitch - beganPitch
-                        
-                        let octave = (beganOctave - dph / 12)
-                            .clipped(min: Score.minOctave,
-                                     max: Score.maxOctave)
-                        if octave != beganOctave {
-                            isOctave = true
-                        }
-                    }
-                    let interval = document
-                        .currentNoteTimeInterval(from: textView.model)
-                    let beat = min(textView.beat(atX: inP.x,
-                                                 interval: interval),
-                                   timeframe.beatRange.end)
-                    var isStartBeat = false
-                    if beat != timeframe.beatRange.start {
-                        isStartBeat = true
-                    }
-                    
-                    if isOctave || isStartBeat {
-                        let isNStartBeat: Bool
-                        if isOctave && isStartBeat {
-                            isNStartBeat = abs(sp.x - beganSP.x) > abs(sp.y - beganSP.y)
-                        } else {
-                            isNStartBeat = !isOctave
-                        }
-                        
-                        if isNStartBeat {
-                            type = .startBeat
-                            self.send(event)
-                        } else {
-                            type = .octave
-                            self.send(event)
-                        }
-                    }
-                case .startBeat:
-                    let interval = document
-                        .currentNoteTimeInterval(from: textView.model)
-                    let beat = min(textView.beat(atX: inP.x,
-                                                 interval: interval),
-                                   timeframe.beatRange.end)
-                    if beat != timeframe.beatRange.start {
-                        let dBeat = timeframe.beatRange.start - beat
-                        var text = textView.model
-                        text.timeframe?.localStartBeat += dBeat
-                        text.timeframe?.beatRange.start -= dBeat
-                        text.timeframe?.beatRange.length += dBeat
-                        text.origin.x = sheetView.animationView
-                            .x(atSec: timeframe.sec(fromBeat: beat))
-                        sheetView.textsView.elementViews[ti].model = text
-                        if textView.model.timeframe?.score != nil {
-                            sheetView.updateOtherNotes()
-                        }
-                        document.updateSelects()
-                    }
-                case .endBeat:
-                    let interval = document
-                        .currentNoteTimeInterval(from: textView.model)
-                    let beat = max(textView.beat(atX: inP.x,
-                                                 interval: interval),
-                                   timeframe.beatRange.start)
-                    if beat != timeframe.beatRange.end {
-                        var timeframe = timeframe
-                        timeframe.beatRange.end = beat
-                        sheetView.textsView.elementViews[ti].model
-                            .timeframe = timeframe
-                        if textView.model.timeframe?.score != nil {
-                            sheetView.updateOtherNotes()
-                        }
-                        document.updateSelects()
-                    }
-                case .pitchStart:
-                    let dph = textView.pitch(fromHeight: inP.y - beganInP.y,
-                                             interval: Rational(1, 60))
-                    let nPitch = (minScorePitch + dph)
-                        .interval(scale: 1)
-                        .clipped(min: -100, max: maxScorePitch)
-                    let range = nPitch ..< maxScorePitch
-                    let dPitch = nPitch - minScorePitch
-                    
-                    var text = textView.model
-                    text.timeframe?.score?.pitchRange = range
-                    text.origin.y = beganTextOrigin.y
-                        + textView.height(fromPitch: dPitch)
-                    sheetView.textsView.elementViews[ti].model = text
-                    sheetView.updateOtherNotes()
-                case .pitchLength:
-                    let inTP = textView.convertFromWorld(p)
-                    if let pitch = document.pitch(from: textView, at: inTP) {
-                        let phl = (pitch - minScorePitch)
-                            .clipped(min: 1, max: 12 * 12)
-                        if phl != timeframe.score?.pitchRange.length {
-                            sheetView.textsView.elementViews[ti].model.timeframe?.score?.pitchRange.length = phl
-                            sheetView.updateOtherNotes()
-                        }
-                    }
-                case .startNote:
-                    let inTP = textView.convertFromWorld(p)
-                    if let timeframe = textView.model.timeframe,
-                       let score = textView.model.timeframe?.score,
-                       let beganPitch = beganPitch,
-                       let beganScore = beganScore,
-                       let beganBeatRange = beganNoteBeatRange,
-                       let ni = noteIndex, ni < score.notes.count,
-                       let pitch = document.pitch(from: textView, at: inTP) {
-                        
-                        let interval = document
-                            .currentNoteTimeInterval(from: textView.model)
-                        let nsBeat = textView.beat(atX: inP.x,
-                                                   interval: interval)
-                        - timeframe.beatRange.start
-                        - timeframe.localStartBeat
-                        
-                        let dBeat = nsBeat - beganBeatRange.start
-                        
-                        let neBeat = beganBeatRange.end
-                        let beatRange = nsBeat < neBeat ?
-                            nsBeat ..< neBeat : neBeat ..< nsBeat
-                        var timeframe = timeframe
-                        timeframe.score?.notes[ni].beatRange = beatRange
-                        timeframe.score?.notes[ni].pitch = pitch
-                        
-                        let dPitch = pitch - beganPitch
-                        for i in noteIndexes {
-                            if i < score.notes.count {
-                                let beganNote = beganScore.notes[i]
-                                timeframe.score?.notes[i].pitch = dPitch + beganNote.pitch
-                                
-                                let nsBeat = beganNote.beatRange.start + dBeat
-                                let neBeat = beganNote.beatRange.end
-                                let beatRange = nsBeat < neBeat ? nsBeat ..< neBeat : neBeat ..< nsBeat
-                                timeframe.score?.notes[i].beatRange = beatRange
-                            }
-                        }
-                        
-                        if pitch != oldNotePitch || nsBeat != oldNoteBeat {
-                            sheetView.textsView.elementViews[ti]
-                                .model.timeframe = timeframe
-                            sheetView.updateOtherNotes()
-                            oldNoteBeat = nsBeat
-                            
-                            if pitch != oldNotePitch {
-                                notePlayer?.notes = currentBeatNoteIndexes.map { timeframe.score!
-                                    .convertPitchToWorld(timeframe.score!.notes[$0]) }
-                                oldNotePitch = pitch
-                            }
-                            document.updateSelects()
-                        }
-                    }
-                case .endNote:
-                    let inTP = textView.convertFromWorld(p)
-                    if let timeframe = textView.model.timeframe,
-                       let score = textView.model.timeframe?.score,
-                       let beganBeatRange = beganNoteBeatRange,
-                       let beganPitch = beganPitch,
-                       let beganScore = beganScore,
-                       let ni = noteIndex, ni < score.notes.count,
-                       let pitch = document.pitch(from: textView, at: inTP) {
-                        
-                        let interval = document
-                            .currentNoteTimeInterval(from: textView.model)
-                        let neBeat = textView.beat(atX: inP.x,
-                                                   interval: interval)
-                        - timeframe.beatRange.start
-                        - timeframe.localStartBeat
-                        
-                        let dBeat = neBeat - beganBeatRange.end
-                        
-                        let nsBeat = beganBeatRange.start
-                        let beatRange = nsBeat < neBeat ?
-                            nsBeat ..< neBeat : neBeat ..< nsBeat
-                        var timeframe = timeframe
-                        timeframe.score?.notes[ni].beatRange = beatRange
-                        timeframe.score?.notes[ni].pitch = pitch
-                        
-                        let dph = pitch - beganPitch
-                        for i in noteIndexes {
-                            if i < score.notes.count {
-                                let beganNote = beganScore.notes[i]
-                                timeframe.score?.notes[i].pitch = dph + beganNote.pitch
-                                
-                                let nsBeat = beganNote.beatRange.start
-                                let neBeat = beganNote.beatRange.end + dBeat
-                                let beatRange = nsBeat < neBeat ? nsBeat ..< neBeat : neBeat ..< nsBeat
-                                timeframe.score?.notes[i].beatRange = beatRange
-                            }
-                        }
-                        
-                        if pitch != oldNotePitch || neBeat != oldNoteBeat {
-                            sheetView.textsView.elementViews[ti].model.timeframe = timeframe
-                            sheetView.updateOtherNotes()
-                            oldNoteBeat = neBeat
-                            
-                            if pitch != oldNotePitch {
-                                notePlayer?.notes = currentBeatNoteIndexes.map { timeframe.score!
-                                    .convertPitchToWorld(timeframe.score!.notes[$0]) }
-                                oldNotePitch = pitch
-                            }
-                            document.updateSelects()
-                        }
-                    }
-                case .moveNote:
-                    let inTP = textView.convertFromWorld(p)
-                    if let timeframe = textView.model.timeframe,
-                       let score = textView.model.timeframe?.score,
-                       let ni = noteIndex, ni < score.notes.count,
-                       let beganBeatRange = beganNoteBeatRange,
-                       let beganPitch = beganPitch,
-                       let beganScore = beganScore,
-                       let pitch = document.pitch(from: textView, at: inTP) {
-                       
-                        let interval = document
-                            .currentNoteTimeInterval(from: textView.model)
-                        let nsBeat = textView.beat(atX: inP.x,
-                                                   interval: interval)
-                        - timeframe.beatRange.start
-                        - timeframe.localStartBeat
-                        
-                        let dBeat = nsBeat - beganStartBeat + beganDeltaNoteBeat
-                        
-                        var timeframe = timeframe
-                        timeframe.score?.notes[ni].beatRange.start = dBeat + beganBeatRange.start
-                        timeframe.score?.notes[ni].pitch = pitch
-                        
-                        let dph = pitch - beganPitch
-                        for i in noteIndexes {
-                            if i < score.notes.count {
-                                let beganNote = beganScore.notes[i]
-                                timeframe.score?.notes[i].pitch = dph + beganNote.pitch
-                                timeframe.score?.notes[i].beatRange.start = dBeat + beganNote.beatRange.start
-                            }
-                        }
-                        
-                        if pitch != oldNotePitch || nsBeat != oldNoteBeat {
-                            sheetView.textsView.elementViews[ti].model.timeframe = timeframe
-                            sheetView.updateOtherNotes()
-                            oldNoteBeat = nsBeat
-                            
-                            if pitch != oldNotePitch {
-                                notePlayer?.notes = currentBeatNoteIndexes.map { timeframe.score!
-                                    .convertPitchToWorld(timeframe.score!.notes[$0]) }
-                                oldNotePitch = pitch
-                            }
-                            document.updateSelects()
-                        }
-                        
-//                        node = textView
-                    }
-                }
-            }
-        case .ended:
-            notePlayer?.stop()
-            node.removeFromParent()
-            
-            if type == .startBeat || type == .endBeat
-                || type == .startNote || type == .endNote
-                || type == .moveNote
-                || type == .octave
-                || type == .all {
-                
-                sheetView?.updatePlaying()
-            }
-            
-            if type == .all || type == .pitchStart
-                || type == .startBeat || type == .endBeat {
-                
-                if let sheetView = sheetView,
-                    let ti = textIndex, ti < sheetView.model.texts.count,
-                    let beganText = beganText {
-                    
-                    let text = sheetView.textsView.elementViews[ti].model
-                    if text != beganText {
-                        sheetView.newUndoGroup()
-                        sheetView.captureText(text, old: beganText, at: ti)
-                    }
-                }
-            } else if let sheetView {
-                var isNewUndoGroup = false
-                func updateUndoGroup() {
-                    if !isNewUndoGroup {
-                        sheetView.newUndoGroup()
-                        isNewUndoGroup = true
-                    }
-                }
-                if let beganAnimationOption, sheetView.model.animation.option != beganAnimationOption {
-                    updateUndoGroup()
-                    sheetView.capture(option: sheetView.model.animation.option,
-                                      oldOption: beganAnimationOption)
-                }
-                if !beganTimeframes.isEmpty {
-                    for (ti, beganTimeframe) in beganTimeframes {
-                        guard ti < sheetView.model.texts.count else { continue }
-                        if type != .tempo, let beganScore = beganTimeframe.score {
-                           let score = sheetView.textsView.elementViews[ti].model.timeframe?.score
-                           if score != beganScore {
-                               updateUndoGroup()
-                               sheetView.captureScore(score, old: beganScore, at: ti)
-                           }
-                        } else {
-                            let text = sheetView.textsView.elementViews[ti].model
-                            if text.timeframe != beganTimeframe {
-                                var beganText = text
-                                beganText.timeframe = beganTimeframe
-                                updateUndoGroup()
-                                sheetView.captureText(text, old: beganText, at: ti)
-                            }
-                        }
-                    }
-                } else if let ti = textIndex,
-                            ti < sheetView.model.texts.count,
-                            let beganScore = beganScore {
-                    let score = sheetView.textsView.elementViews[ti].model.timeframe?.score
-                    if score != beganScore {
-                        updateUndoGroup()
-                        sheetView.captureScore(score, old: beganScore, at: ti)
-                    }
-                }
-            }
-            
-            document.cursor = Document.defaultCursor
-        }
-    }
-}
-
 final class Slider: DragEditor {
     let document: Document
     
@@ -2289,7 +1535,9 @@ final class Slider: DragEditor {
     enum SlideType {
         case keyframe(KeyframeSlider)
         case animation(AnimationSlider)
-        case timeframe(TimeframeSlider)
+        case score(ScoreSlider)
+        case content(ContentSlider)
+        case text(TextSlider)
         case none
     }
     private var type = SlideType.none
@@ -2298,7 +1546,9 @@ final class Slider: DragEditor {
         switch type {
         case .keyframe(let keyframeSlider): keyframeSlider.updateNode()
         case .animation(let keyframeDurationSlider): keyframeDurationSlider.updateNode()
-        case .timeframe(let timeframeSlider): timeframeSlider.updateNode()
+        case .score(let scoreSlider): scoreSlider.updateNode()
+        case .content(let contentSlider): contentSlider.updateNode()
+        case .text(let textSlider): textSlider.updateNode()
         case .none: break
         }
     }
@@ -2311,11 +1561,16 @@ final class Slider: DragEditor {
             
             if let sheetView = document.sheetView(at: p) {
                 let inP = sheetView.convertFromWorld(p)
-                if sheetView.containsTimeframe(inP)
-                    || sheetView.textTuple(at: inP) != nil {
-                    
-                    type = .timeframe(TimeframeSlider(document))
-                } else if sheetView.containsTimeline(inP) {
+                if let ci = sheetView.contentIndex(at: inP, scale: document.screenToWorldScale),
+                          sheetView.model.contents[ci].timeOption != nil {
+                    type = .content(ContentSlider(document))
+                } else if let ti = sheetView.textIndex(at: inP),
+                           sheetView.model.texts[ti].timeOption != nil {
+                    type = .text(TextSlider(document))
+                } else if sheetView.scoreView.containsTimeline(inP) 
+                            || sheetView.scoreView.noteIndex(at: inP, maxDistance: 15 * document.screenToWorldScale) != nil {
+                    type = .score(ScoreSlider(document))
+                } else if sheetView.animationView.containsTimeline(inP) {
                     type = .animation(AnimationSlider(document))
                 } else {
                     type = .keyframe(KeyframeSlider(document))
@@ -2328,8 +1583,12 @@ final class Slider: DragEditor {
             keyframeSlider.send(event)
         case .animation(let keyframeDurationSlider):
             keyframeDurationSlider.send(event)
-        case .timeframe(let timeframeSlider):
-            timeframeSlider.send(event)
+        case .score(let scoreSlider):
+            scoreSlider.send(event)
+        case .content(let contentSlider):
+            contentSlider.send(event)
+        case .text(let textSlider):
+            textSlider.send(event)
         case .none: break
         }
     }
@@ -2366,7 +1625,7 @@ final class KeyframeInserter: InputKeyEditor {
                 
                 sheetView.selectedFrameIndexes = []
                 
-                if sheetView.containsTimeline(inP) {
+                if sheetView.animationView.containsTimeline(inP) {
                     let animationView = sheetView.animationView
                     let animation = animationView.model
                     
@@ -2433,45 +1692,70 @@ final class KeyframeInserter: InputKeyEditor {
                             animationView.updateTimeline()
                         }
                     }
-                } else if let (ti, timeframe) = sheetView.timeframeTuple(at: inP) {
+                } else if let noteI = sheetView.scoreView.noteIndex(at: inP,
+                                                                    maxDistance: 15 * document.screenToWorldScale) {
+                    let scoreView = sheetView.scoreView
                     
-                    let textView = sheetView.textsView.elementViews[ti]
-                    
-                    let maxD = textView.nodeRatio
-                    * 15.0 * document.screenToWorldScale
-                    let inTP = textView.convert(inP, from: sheetView.node)
-                    if textView.containsScore(inTP),
-                       let score = timeframe.score {
+                    let maxD = 15 * document.screenToWorldScale
+                    let score = scoreView.model
+                    let scoreP = scoreView.convertFromWorld(p)
+                    if let sfi = scoreView.sourceFilterIndex(at: scoreP, at: noteI) {
+                        let p = scoreView.sourceFilterFqAndSmp(at: scoreP, at: noteI)
+                        let fq = p.x, smp = p.y
+                        let oldTone = score.notes[noteI].tone
+                        var tone = oldTone
+                        tone.sourceFilter.fqSmps.insert(.init(fq, smp), at: sfi + 1)
+                        tone.sourceFilter.noiseTs.insert(0, at: sfi + 1)
+                        tone.sourceFilter.noiseFqSmps.insert(.init(fq, 0), at: sfi + 1)
                         
-                        if let (ni, pitT) = textView.pitT(at: inTP,
-                                                          maxDistance: maxD) {
-                            let (preFq, nextFq) = textView.pitbendPreNext(notes: score.notes, at: ni)
-                            var pitbend = textView
-                                .pitbend(from: score.notes[ni], tempo: timeframe.tempo,
+                        let nis = (0 ..< score.notes.count).filter { score.notes[$0].tone.id == tone.id }
+                        
+                        sheetView.newUndoGroup()
+                        sheetView.set(ToneValue(tone: tone, noteIndexes: nis),
+                                      old: ToneValue(tone: oldTone, noteIndexes: nis))
+                        
+                        sheetView.updatePlaying()
+                    } else {
+                        if let (ni, pitT) = scoreView.pitT(at: scoreP, maxDistance: maxD) {
+                            let (preFq, nextFq) = scoreView.pitbendPreNext(notes: score.notes, at: ni)
+                            var pitbend = scoreView
+                                .pitbend(from: score.notes[ni], tempo: score.tempo,
                                          preFq: preFq, nextFq: nextFq)
                             let pit = pitbend.pit(atT: pitT)
                             pitbend.pits.append(pit)
-                            pitbend.pits.sort(by: { $0.t < $1.t })
-                            var score = score
-                            score.notes[ni].pitbend = pitbend
+                            pitbend.pits.sort { $0.t < $1.t }
+                            var note = score.notes[ni]
+                            note.pitbend = pitbend
                             
                             sheetView.newUndoGroup()
-                            sheetView.replaceScore(score, at: ti)
+                            sheetView.replace(note, at: ni)
                             
                             sheetView.updatePlaying()
                         }
-                    } else if var score = timeframe.score,
-                              textView.containsSourceFilter(inTP),
-                              let i = textView.sourceFilterIndex(atX: inTP.x),
-                              let fq = textView.sourceFilterFq(atX: inTP.x) {
-                        let smp = score.tone.sourceFilter.smp(atFq: fq)
-                        let noiseT = score.tone.sourceFilter.noiseT(atFq: fq)
-                        score.tone.sourceFilter.fqSmps.insert(.init(fq, smp), at: i + 1)
-                        score.tone.sourceFilter.noiseTs.insert(noiseT, at: i + 1)
-                        score.tone.sourceFilter.noiseFqSmps.insert(.init(fq, smp * noiseT), at: i + 1)
+                    }
+                } else if let ci = sheetView.contentIndex(at: inP, scale: document.screenToWorldScale) {
+                    let contentView = sheetView.contentsView.elementViews[ci]
+                    if contentView.model.timeOption == nil {
+                        var content = contentView.model
+                        let startBeat = sheetView.animationView.beat(atX: content.origin.x)
+                        content.timeOption = .init(beatRange: startBeat ..< (4 + startBeat),
+                                                   tempo: sheetView.nearestTempo(at: inP) ?? Music.defaultTempo)
                         
                         sheetView.newUndoGroup()
-                        sheetView.replaceScore(score, at: ti)
+                        sheetView.replace(IndexValue(value: content, index: ci))
+                        
+                        sheetView.updatePlaying()
+                    }
+                } else if let ti = sheetView.textIndex(at: inP) {
+                    let textView = sheetView.textsView.elementViews[ti]
+                    if textView.model.timeOption == nil {
+                        var text = textView.model
+                        let startBeat = sheetView.animationView.beat(atX: text.origin.x)
+                        text.timeOption = .init(beatRange: startBeat ..< (4 + startBeat),
+                                                tempo: sheetView.nearestTempo(at: inP) ?? Music.defaultTempo)
+                        
+                        sheetView.newUndoGroup()
+                        sheetView.replace([IndexValue(value: text, index: ti)])
                         
                         sheetView.updatePlaying()
                     }
@@ -2525,60 +1809,6 @@ final class KeyframeCutter: InputKeyEditor {
         case .ended:
             linesNode.removeFromParent()
             
-            document.cursor = Document.defaultCursor
-        }
-    }
-}
-
-final class ScoreAdder: InputKeyEditor {
-    let document: Document
-    let isEditingSheet: Bool
-    
-    init(_ document: Document) {
-        self.document = document
-        isEditingSheet = document.isEditingSheet
-    }
-    
-    func send(_ event: InputKeyEvent) {
-        guard isEditingSheet else {
-            document.stop(with: event)
-            return
-        }
-        if document.isPlaying(with: event) {
-            document.stopPlaying(with: event)
-        }
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
-            ?? event.screenPoint
-        let p = document.convertScreenToWorld(sp)
-        switch event.phase {
-        case .began:
-            document.cursor = .arrow
-            
-            if let sheetView = document.madeSheetView(at: p) {
-                var inP = sheetView.convertFromWorld(p)
-                inP.y = inP.y.interval(scale: ScoreLayout.noteHeight)
-                
-                let beat = sheetView.animationView.beat(atX: inP.x).rounded()
-                let maxBeat = sheetView.animationView.beat(atX: sheetView.bounds.maxX - Sheet.textPadding.width)
-                let nBeatDur = min(max(1, (maxBeat - beat).rounded()),
-                                   Timeframe.defaultBeatDuration)
-                let beatRange = Range(start: beat, length: nBeatDur)
-                let score = Score()
-                let tempo = sheetView.nearestTempo(at: inP)
-                    ?? Music.defaultTempo
-                let timeframe = Timeframe(beatRange: beatRange, score: score,
-                                          tempo: tempo)
-                let text = Text(string: "_", origin: inP, timeframe: timeframe)
-                
-                sheetView.newUndoGroup()
-                sheetView.append(text)
-                
-                document.updateEditorNode()
-                document.updateSelects()
-            }
-        case .changed:
-            break
-        case .ended:
             document.cursor = Document.defaultCursor
         }
     }

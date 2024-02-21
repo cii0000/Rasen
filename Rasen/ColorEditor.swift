@@ -265,6 +265,7 @@ final class ColorEditor: Editor {
         return [Node(attitude: .init(position: p - Point(0, fy)), path: path,
                      fillType: .color(.content))]
     }
+    
     func panNodes(fromPan pan: Double, firstPan: Double, at p: Point) -> [Node] {
         let panW = 50.0
         
@@ -310,110 +311,168 @@ final class ColorEditor: Editor {
                      fillType: .color(.content))]
     }
     
-    private var beganPan = 0.0, oldPan = 0.0
-    var isChangePan = false, isFirstChangedVolumeAmp = false
-    func changePan(with event: DragEvent) {
+    private var isChangeVolumeAmp = false, isChangePit = false
+    private var sheetView: SheetView?
+    private var beganNotes = [Int: Note]()
+    private var beganNotePits = [Int: (note: Note, pits: [Int: Pit])]()
+    private var beganContents = [Int: Content]()
+    private var beganSP = Point(), beganVolume = Volume()
+    private var notePlayer: NotePlayer?
+    func changeVolumeAmp(with event: DragEvent) {
         guard isEditingSheet else {
             document.stop(with: event)
             return
         }
         
         let sp = event.screenPoint
-        let p = document.convertScreenToWorld(event.screenPoint)
         switch event.phase {
         case .began:
             document.cursor = .arrow
             
-            beganSP = event.screenPoint
-            
+            beganSP = sp
+            let p = document.convertScreenToWorld(sp)
             if let sheetView = document.sheetView(at: p) {
-                let inP = sheetView.convertFromWorld(p)
-                if let (ti, _) = sheetView.timeframeTuple(at: inP) {
-                    let textView = sheetView.textsView.elementViews[ti]
-                    if let pan = textView.model.timeframe?.pan {
-                        
-                        beganPan = pan
-                        oldPan = pan
-                        
-                        self.textI = ti
-                        
-                        let fs = document.selections
-                            .map { $0.rect }
-                            .map { sheetView.convertFromWorld($0) }
-                        beganTimeframes = sheetView.textsView.elementViews.enumerated().reduce(into: [Int: Timeframe]()) { (dic, v) in
-                            if fs.contains(where: { v.element.transformedScoreFrame.intersects($0) }),
-                               let timeframe = v.element.model.timeframe,
-                               timeframe.pan != nil {
-                                dic[v.offset] = timeframe
+                self.sheetView = sheetView
+                
+                func updateWithSelections() {
+                    let fs = document.selections
+                        .map { $0.rect }
+                        .map { sheetView.convertFromWorld($0) }
+                    if !fs.isEmpty {
+                        beganContents = sheetView.contentsView.elementViews.enumerated().reduce(into: [Int: Content]()) { (dic, v) in
+                            if fs.contains(where: { v.element.transformedTimelineFrame?.intersects($0) ?? false }),
+                                v.element.model.type.isAudio {
+                                
+                                dic[v.offset] = v.element.model
                             }
                         }
-                        
-                        lightnessNode.children = panNodes(fromPan: beganPan, firstPan: beganPan, at: p)
-                        document.rootNode.append(child: lightnessNode)
                     }
                 }
+                func updateNotePlayer(atNote ni: Int, with score: Score) {
+                    let note = score.notes[ni]
+                    let volume = sheetView.isPlaying ? note.volume * 0.1 : note.volume
+                    if let notePlayer = sheetView.notePlayer {
+                        self.notePlayer = notePlayer
+                        notePlayer.notes = [note]
+                        notePlayer.volume = volume
+                    } else {
+                        notePlayer = try? NotePlayer(notes: [note],
+                                                     volume: volume, pan: note.pan)
+                        sheetView.notePlayer = notePlayer
+                    }
+                    notePlayer?.play()
+                }
+                
+                let sheetP = sheetView.convertFromWorld(p)
+                if let ni = sheetView.scoreView.noteIndex(at: sheetP,
+                                                          maxDistance: 15 * document.screenToWorldScale) {
+                    let scoreView = sheetView.scoreView
+                    let score = scoreView.model
+                    
+                    let scoreP = scoreView.convertFromWorld(p)
+                    let maxD = 5 * document.screenToWorldScale
+                    if scoreView.isFullEdit,
+                       let (ni, pitI, pit, _) = scoreView.pitbendTuple(at: scoreP, maxDistance: maxD) {
+                        isChangePit = true
+                        beganVolume = Volume(amp: pit.amp)
+                        
+                        if document.isSelect(at: p) {
+//                            let noteIs = document.selectedNoteIndexes(from: scoreView)
+//                            beganNotes = noteIs.reduce(into: .init()) { $0[$1] = score.notes[$1] }
+                        }
+                        beganNotePits[ni] = (score.notes[ni], [pitI: pit])
+                        
+                        updateNotePlayer(atNote: ni, with: score)//
+                    } else {
+                        isChangePit = false
+                        beganVolume = score.notes[ni].volume
+                        
+                        if document.isSelect(at: p) {
+                            let noteIs = document.selectedNoteIndexes(from: scoreView)
+                            beganNotes = noteIs.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
+                        }
+                        beganNotes[ni] = score.notes[ni]
+                        
+                        updateNotePlayer(atNote: ni, with: score)
+                    }
+                } else if let ci = sheetView.contentIndex(at: sheetP, scale: document.screenToWorldScale),
+                          sheetView.model.contents[ci].type.isAudio {
+                    let content = sheetView.contentsView.elementViews[ci].model
+                    beganVolume = content.volume
+                    
+                    updateWithSelections()
+                    beganContents[ci] = content
+                }
+                
+                lightnessNode.children = volumeNodes(from: beganVolume, firstVolume: beganVolume, at: p)
+                document.rootNode.append(child: lightnessNode)
             }
         case .changed:
-            if let sheetView = noteSheetView,
-               let textI, textI < sheetView.textsView.elementViews.count {
-                
-                let textView = sheetView.textsView.elementViews[textI]
-                
-                let dPan = (sp.x - beganSP.x)
-                    * (document.screenToWorldScale / 50 / textView.nodeRatio)
-                let oPan = (beganPan + dPan)
-                    .clipped(min: -1, max: 1)
-                let pan: Double
-                if oldPan < 0 && oPan > 0 {
-                    pan = oPan > 0.05 ? oPan - 0.05 : 0
-                } else if oldPan > 0 && oPan < 0 {
-                    pan = oPan < -0.05 ? oPan + 0.05 : 0
+            guard let sheetView else { return }
+            
+            let dSmp = (sp.y - beganSP.y) * (document.screenToWorldScale / 50)
+            let smp = (beganVolume.smp + dSmp).clipped(min: 0, max: Volume.maxSmp)
+            let volume = Volume(smp: smp)
+            let scale = beganVolume.amp == 0 ? 1 : volume.amp / beganVolume.amp
+            
+            func newVolume(from otherVolume: Volume) -> Volume {
+                if beganVolume == otherVolume {
+                    volume
+                } else if beganVolume.amp == 0 {
+                    .init(smp: (otherVolume.smp + dSmp).clipped(min: 0, max: Volume.maxSmp))
                 } else {
-                    pan = oPan
-                    oldPan = pan
+                    .init(amp: (otherVolume.amp * scale).clipped(min: 0, max: Volume.maxAmp))
                 }
-                
-                if !beganTimeframes.isEmpty {
-                    for (ti, textView) in sheetView.textsView.elementViews.enumerated() {
-                        guard let beganTimeframePan = beganTimeframes[ti]?.pan else { continue }
-                        
-                        let pan = (beganTimeframePan + dPan)
-                                .clipped(min: -1, max: 1)
-                        
-                        textView.model.timeframe?.pan = pan
-                        
-                        if textView.model.timeframe?.content == nil {
-                            textView.isUpdatedAudioCache = false
-                        }
-                        
-                        if let timeframe = textView.model.timeframe {
-                            sheetView.sequencer?.mixings[timeframe.id]?
-                                .pan = Float(pan)
-                        }
-                    }
-                } else {
-                    textView.model.timeframe?.pan = pan
-                    
-                    if textView.model.timeframe?.content == nil {
-                        textView.isUpdatedAudioCache = false
-                    }
-                    
-                    if let timeframe = textView.model.timeframe {
-                        sheetView.sequencer?.mixings[timeframe.id]?
-                            .pan = Float(pan)
-                    }
-                }
-                
-                lightnessNode.children = panNodes(fromPan: pan,
-                                                  firstPan: beganPan,
-                                                  at: document.convertScreenToWorld(beganSP))
             }
+            
+            let scoreView = sheetView.scoreView
+            let score = scoreView.model
+            if isChangePit {
+                for (ni, beganNotePit) in beganNotePits {
+                    guard ni < score.notes.count else { continue }
+                    for (pi, beganPit) in beganNotePit.pits {
+                        guard pi < score.notes[ni].pitbend.pits.count else { continue }
+                        let nVolume = newVolume(from: beganPit.volume)
+                        scoreView.model.notes[ni].pitbend.pits[pi].volume = nVolume
+                        
+                        if beganPit.volume == beganVolume {
+                            notePlayer?.notes = [score.notes[ni]]
+//                            sheetView.sequencer?.scoreNoders[score.id].notewaveDic
+                        }
+                    }
+                }
+            } else {
+                for (ni, beganNote) in beganNotes {
+                    guard ni < score.notes.count else { continue }
+                    let nVolume = newVolume(from: beganNote.volume)
+                    scoreView.model.notes[ni].volume = nVolume
+                    
+                    if beganNote.volume == beganVolume {
+                        notePlayer?.notes = [score.notes[ni]]
+//                            sheetView.sequencer?.scoreNoders[score.id].notewaveDic
+                    }
+                }
+            }
+            
+            if !beganContents.isEmpty {
+                for (ci, beganContent) in beganContents {
+                    guard ci < sheetView.contentsView.elementViews.count else { continue }
+                    let contentView = sheetView.contentsView.elementViews[ci]
+                    let nVolume = newVolume(from: beganContent.volume)
+                    contentView.model.volume = nVolume
+                    sheetView.sequencer?.mixings[beganContent.id]?.volume = .init(nVolume.amp)
+                }
+            }
+            
+            lightnessNode.children = volumeNodes(from: volume,
+                                                 firstVolume: beganVolume,
+                                                 at: document.convertScreenToWorld(beganSP))
         case .ended:
             notePlayer?.stop()
             
             lightnessNode.removeFromParent()
             
-            if let sheetView = noteSheetView {
+            if let sheetView {
                 var isNewUndoGroup = false
                 func updateUndoGroup() {
                     if !isNewUndoGroup {
@@ -421,32 +480,47 @@ final class ColorEditor: Editor {
                         isNewUndoGroup = true
                     }
                 }
-                if !beganTimeframes.isEmpty {
-                    for (ti, beganTimeframe) in beganTimeframes {
-                        guard ti < sheetView.model.texts.count else { continue }
-                        if let beganScore = beganTimeframe.score {
-                           let score = sheetView.textsView.elementViews[ti].model.timeframe?.score
-                           if score != beganScore {
-                               updateUndoGroup()
-                               sheetView.captureScore(score, old: beganScore, at: ti)
-                           }
-                        } else {
-                            let text = sheetView.textsView.elementViews[ti].model
-                            if text.timeframe != beganTimeframe {
-                                var beganText = text
-                                beganText.timeframe = beganTimeframe
-                                updateUndoGroup()
-                                sheetView.captureText(text, old: beganText, at: ti)
-                            }
+                
+                let scoreView = sheetView.scoreView
+                let score = scoreView.model
+                if isChangePit {
+                    var noteIVs = [IndexValue<Note>](), oldNoteIVs = [IndexValue<Note>]()
+                    for (ni, beganNotePit) in beganNotePits {
+                        guard ni < score.notes.count else { continue }
+                        let note = scoreView.model.notes[ni]
+                        if beganNotePit.note != note {
+                            noteIVs.append(.init(value: note, index: ni))
+                            oldNoteIVs.append(.init(value: beganNotePit.note, index: ni))
                         }
                     }
-                } else if let ti = textI,
-                            ti < sheetView.model.texts.count,
-                            let beganScore = beganScore {
-                    let score = sheetView.textsView.elementViews[ti].model.timeframe?.score
-                    if score != beganScore {
+                    if !noteIVs.isEmpty {
                         updateUndoGroup()
-                        sheetView.captureScore(score, old: beganScore, at: ti)
+                        sheetView.capture(noteIVs, old: oldNoteIVs)
+                    }
+                } else {
+                    var noteIVs = [IndexValue<Note>](), oldNoteIVs = [IndexValue<Note>]()
+                    for (ni, beganNote) in beganNotes {
+                        guard ni < score.notes.count else { continue }
+                        let note = scoreView.model.notes[ni]
+                        if beganNote != note {
+                            noteIVs.append(.init(value: note, index: ni))
+                            oldNoteIVs.append(.init(value: beganNote, index: ni))
+                        }
+                    }
+                    if !noteIVs.isEmpty {
+                        updateUndoGroup()
+                        sheetView.capture(noteIVs, old: oldNoteIVs)
+                    }
+                }
+                
+                if !beganContents.isEmpty {
+                    for (ci, beganContent) in beganContents {
+                        guard ci < sheetView.contentsView.elementViews.count else { continue }
+                        let content = sheetView.contentsView.elementViews[ci].model
+                        if content != beganContent {
+                            updateUndoGroup()
+                            sheetView.capture(content, old: beganContent, at: ci)
+                        }
                     }
                 }
             }
@@ -455,23 +529,11 @@ final class ColorEditor: Editor {
         }
     }
     
-    var notePlayer: NotePlayer?
-    var isChangeVolumeAmp = false
-    var noteSheetView: SheetView?, noteTextIndex: Int?, noteIndexes = [Int]()
-    var isPit = false
-    var textI: Int?, noteI: Int?, pitI: Int?,
-        beganScore: Score?, beganContent: Content?, beganPit: Pit?, beganPitbend: Pitbend?
-    var beganTimeframes = [Int: Timeframe]()
-    var beganVolumes = [Volume](), beganSP = Point(), firstScore: Score?
-    var firstNoteIndex = 0, beganVolume = Volume(), isChangeScoreVolume = false
-    func changeVolumeAmp(with event: DragEvent) {
+    private var isChangePan = false
+    private var beganPan = 0.0, oldPan = 0.0
+    func changePan(with event: DragEvent) {
         guard isEditingSheet else {
             document.stop(with: event)
-            return
-        }
-        
-        if isChangePan {
-            changePan(with: event)
             return
         }
         
@@ -480,293 +542,104 @@ final class ColorEditor: Editor {
         case .began:
             document.cursor = .arrow
             
-            beganSP = event.screenPoint
-            let p = document.convertScreenToWorld(event.screenPoint)
-            if let sheetView = noteSheetView, let ti = noteTextIndex {
-                let textView = sheetView.textsView.elementViews[ti]
-                if let timeframe = textView.model.timeframe,
-                   let score = timeframe.score {
-                    
-                    firstScore = score
-                    
-                    let inP = sheetView.convertFromWorld(p)
-                    isPit = false
-                    if let (ti, _) = sheetView.timeframeTuple(at: inP) {
-                        let textView = sheetView.textsView.elementViews[ti]
-                    
-                        let inTP = textView.convert(inP, from: sheetView.node)
-                        let maxD = textView.nodeRatio
-                        * 5.0 * document.screenToWorldScale
-                        if textView.containsScore(inTP),
-                           let (ni, pitI, pit, pitbend) = textView.pitbendTuple(at: inTP,
-                                                                  maxDistance: maxD) {
-                            
-                            self.textI = ti
-                            self.noteI = ni
-                            self.pitI = pitI
-                            beganScore = textView.model.timeframe?.score
-                            beganPit = pit
-                            beganPitbend = pitbend
-                            isPit = true
-                        }
-                    }
-                    
-                    if !isPit {
-                        if isChangeScoreVolume {
-                            beganVolume = score.volume
-                            let fs = document.selections
-                                .map { $0.rect }
-                                .map { sheetView.convertFromWorld($0) }
-                            beganTimeframes = sheetView.textsView.elementViews.enumerated().reduce(into: [Int: Timeframe]()) { (dic, v) in
-                                if fs.contains(where: { v.element.transformedScoreFrame.intersects($0) }),
-                                   let timeframe = v.element.model.timeframe,
-                                   timeframe.volume != nil {
-                                    dic[v.offset] = timeframe
-                                }
+            beganSP = sp
+            let p = document.convertScreenToWorld(sp)
+            if let sheetView = document.sheetView(at: p) {
+                self.sheetView = sheetView
+                
+                //
+                
+                func updateWithSelections() {
+                    let fs = document.selections
+                        .map { $0.rect }
+                        .map { sheetView.convertFromWorld($0) }
+                    if !fs.isEmpty {
+                        beganContents = sheetView.contentsView.elementViews.enumerated().reduce(into: [Int: Content]()) { (dic, v) in
+                            if fs.contains(where: { v.element.transformedTimelineFrame?.intersects($0) ?? false }),
+                                v.element.model.type.isAudio {
+                                
+                                dic[v.offset] = v.element.model
                             }
-                        } else {
-                            beganVolume = score.notes[firstNoteIndex].volume
-                            if document.isSelect(at: p) {
-                                noteIndexes = document.selectedNoteIndexes(from: textView)
-                                beganVolumes = noteIndexes.map { score.notes[$0].volume }
-                            } else {
-                                noteIndexes = [firstNoteIndex]
-                                beganVolumes = [beganVolume]
-                            }
-                            
-                            let note = score.notes[firstNoteIndex]
-                            let volume = sheetView.isPlaying ?
-                            score.volume * 0.1 : score.volume
-                            if let notePlayer = sheetView.notePlayer {
-                                self.notePlayer = notePlayer
-                                notePlayer.notes = [score.convertPitchToWorld(note)]
-                                notePlayer.tone = score.tone
-                                notePlayer.volume = volume
-                            } else {
-                                notePlayer = try? NotePlayer(notes: [score.convertPitchToWorld(note)],
-                                                             score.tone,
-                                                             volume: volume,
-                                                             pan: score.pan,
-                                                             tempo: Double(timeframe.tempo))
-                                sheetView.notePlayer = notePlayer
-                            }
-                            notePlayer?.play()
-                        }
-                    }
-                } else if let timeframe = textView.model.timeframe,
-                    let content = timeframe.content {
-                    
-                    let inP = sheetView.convertFromWorld(p)
-                    if let (ti, _) = sheetView.timeframeTuple(at: inP) {
-                        let textView = sheetView.textsView.elementViews[ti]
-                    
-                        let inTP = textView.convert(inP, from: sheetView.node)
-                        if textView.containsTimeframe(inTP) {
-                            self.textI = ti
-                            
-                            beganVolume = content.volume
-                            let fs = document.selections
-                                .map { $0.rect }
-                                .map { sheetView.convertFromWorld($0) }
-                            beganTimeframes = sheetView.textsView.elementViews.enumerated().reduce(into: [Int: Timeframe]()) { (dic, v) in
-                                if fs.contains(where: { v.element.transformedScoreFrame.intersects($0) }),
-                                   let timeframe = v.element.model.timeframe,
-                                   timeframe.volume != nil {
-                                    dic[v.offset] = timeframe
-                                }
-                            }
-                            
-                            beganContent = textView.model.timeframe?.content
                         }
                     }
                 }
                 
-                lightnessNode.children = volumeNodes(from: beganVolume, firstVolume: beganVolume, at: p)
+                let sheetP = sheetView.convertFromWorld(p)
+                if let ci = sheetView.contentIndex(at: sheetP, scale: document.screenToWorldScale),
+                          sheetView.model.contents[ci].type.isAudio {
+                    let content = sheetView.contentsView.elementViews[ci].model
+                    beganPan = content.pan
+                    
+                    updateWithSelections()
+                    beganContents[ci] = content
+                }
+                
+                lightnessNode.children = panNodes(fromPan: beganPan, firstPan: beganPan, at: p)
                 document.rootNode.append(child: lightnessNode)
             }
         case .changed:
-            let dsp = event.screenPoint - beganSP
-            if !isFirstChangedVolumeAmp, abs(dsp.x) > abs(dsp.y) {
-                isChangePan = true
-                
-                lightnessNode.removeFromParent()
-                
-                var nEvent = event
-                nEvent.phase = .began
-                changePan(with: nEvent)
-                changePan(with: event)
-                
-                return
-            }
-            isFirstChangedVolumeAmp = true
+            guard let sheetView else { return }
             
-            if isPit {
-                if let sheetView = noteSheetView,
-                    let textI, textI < sheetView.textsView.elementViews.count {
-                    
-                    let textView = sheetView.textsView.elementViews[textI]
-                    if let score = textView.model.timeframe?.score,
-                       let noteI, noteI < score.notes.count,
-                       let pitI, let beganPit, let beganPitbend,
-                       pitI < beganPitbend.pits.count {
-                        
-                        let dp = sp - beganSP
-                        var pitbend = beganPitbend
-                        var pit = pitbend.pits[pitI]
-                        pit.amp = (beganPit.amp + dp.y / 100).clipped(min: 0, max: Volume.maxAmp)
-                        pitbend.pits[pitI] = pit
-                        textView.model.timeframe?.score?.notes[noteI].pitbend = pitbend
-                        
-                        lightnessNode.children = volumeNodes(from: Volume(amp: pit.amp), 
-                                                             firstVolume: beganVolume,
-                                                             at: document.convertScreenToWorld(beganSP))
-                    }
-                }
-            } else if let sheetView = noteSheetView, let ti = noteTextIndex {
-                let textView = sheetView.textsView.elementViews[ti]
-                let dSmp = (sp.y - beganSP.y)
-                    * (document.screenToWorldScale / 50 / textView.nodeRatio)
-                let smp = (beganVolume.smp + dSmp)
-                    .clipped(min: 0, max: Volume.maxSmp)
-                let volume = Volume(smp: smp)
-                
-                lightnessNode.children = volumeNodes(from: volume,
-                                                     firstVolume: beganVolume,
-                                                     at: document.convertScreenToWorld(beganSP))
-                
-                if isChangeScoreVolume {
-                    if !beganTimeframes.isEmpty {
-                        let scale = beganVolume.amp == 0 ?
-                        1 : volume.amp / beganVolume.amp
-                        for (ti, textView) in sheetView.textsView.elementViews.enumerated() {
-                            guard let beganTimeframeVolume = beganTimeframes[ti]?.volume else { continue }
-                            
-                            let volume: Volume
-                            if beganVolume.amp == 0 {
-                                let smp = (beganTimeframeVolume.smp + dSmp)
-                                    .clipped(min: 0, max: Volume.maxSmp)
-                                volume = Volume(smp: smp)
-                            } else {
-                                let amp = (beganTimeframeVolume.amp * scale)
-                                    .clipped(min: 0, max: Volume.maxAmp)
-                                volume = Volume(amp: amp)
-                            }
-                            
-                            textView.model.timeframe?.volume = volume
-                            
-                            if textView.model.timeframe?.content == nil {
-                                textView.isUpdatedAudioCache = false
-                            }
-                            
-                            if let timeframe = textView.model.timeframe {
-                                sheetView.sequencer?.mixings[timeframe.id]?
-                                    .volume = .init(volume.amp)
-                            }
-                        }
-                    } else {
-                        textView.model.timeframe?.volume = volume
-                        
-                        if textView.model.timeframe?.content == nil {
-                            textView.isUpdatedAudioCache = false
-                        }
-                        
-                        if let timeframe = textView.model.timeframe {
-                            sheetView.sequencer?.mixings[timeframe.id]?
-                                .volume = .init(volume.amp)
-                        }
-                    }
-                    return
-                }
-                
-                if let score = textView.model.timeframe?.score {
-                    if !noteIndexes.isEmpty,
-                              noteIndexes.count == beganVolumes.count {
-                        let scale = beganVolume.amp == 0 ?
-                            1 : volume.amp / beganVolume.amp
-                        for (i, ni) in noteIndexes.enumerated() {
-                            if ni < score.notes.count {
-                                let volume: Volume
-                                if beganVolume.amp == 0 {
-                                    let smp = (beganVolumes[i].smp + dSmp)
-                                        .clipped(min: 0, max: Volume.maxSmp)
-                                    volume = Volume(smp: smp)
-                                } else {
-                                    let amp = (beganVolumes[i].amp * scale)
-                                        .clipped(min: 0, max: Volume.maxAmp)
-                                    volume = Volume(amp: amp)
-                                }
-                                
-                                textView.model.timeframe?.score?.notes[ni].volume = volume
-                                
-                                if i == 0 {
-                                    notePlayer?.notes = [score
-                                        .convertPitchToWorld(score.notes[ni])]
-                                }
-                            }
-                        }
-                    }
+            let dPan = (sp.x - beganSP.x) * (document.screenToWorldScale / 50)
+            let oPan = (beganPan + dPan).clipped(min: -1, max: 1)
+            let pan: Double
+            if oldPan < 0 && oPan > 0 {
+                pan = oPan > 0.05 ? oPan - 0.05 : 0
+            } else if oldPan > 0 && oPan < 0 {
+                pan = oPan < -0.05 ? oPan + 0.05 : 0
+            } else {
+                pan = oPan
+                oldPan = pan
+            }
+            let ndPan = pan - beganPan
+            
+            func newPan(from otherPan: Double) -> Double {
+                if beganPan == otherPan {
+                    pan
+                } else {
+                    (beganPan + ndPan).clipped(min: -1, max: 1)
                 }
             }
+            
+            //
+            
+            if !beganContents.isEmpty {
+                for (ci, beganContent) in beganContents {
+                    guard ci < sheetView.contentsView.elementViews.count else { continue }
+                    let contentView = sheetView.contentsView.elementViews[ci]
+                    let nPan = newPan(from: beganContent.pan)
+                    contentView.model.pan = nPan
+                    sheetView.sequencer?.mixings[beganContent.id]?.pan = Float(nPan)
+                }
+            }
+            
+            lightnessNode.children = panNodes(fromPan: pan,
+                                              firstPan: beganPan,
+                                              at: document.convertScreenToWorld(beganSP))
         case .ended:
             notePlayer?.stop()
             
             lightnessNode.removeFromParent()
             
-            if isPit {
-                if let sheetView = noteSheetView,
-                   let textI, textI < sheetView.textsView.elementViews.count {
-                    
-                    let textView = sheetView.textsView.elementViews[textI]
-                    if let score = textView.model.timeframe?.score,
-                       score != beganScore {
-                        
+            if let sheetView {
+                var isNewUndoGroup = false
+                func updateUndoGroup() {
+                    if !isNewUndoGroup {
                         sheetView.newUndoGroup()
-                        sheetView.captureScore(score, old: beganScore,
-                                               at: textI)
+                        isNewUndoGroup = true
                     }
                 }
-            } else if let sheetView = noteSheetView,
-                let ti = noteTextIndex, ti < sheetView.model.texts.count {
                 
-                if isChangeScoreVolume {
-                    if !beganTimeframes.isEmpty {
-                        var isNewUndoGroup = false
-                        func updateUndoGroup() {
-                            if !isNewUndoGroup {
-                                sheetView.newUndoGroup()
-                                isNewUndoGroup = true
-                            }
+                //
+                
+                if !beganContents.isEmpty {
+                    for (ci, beganContent) in beganContents {
+                        guard ci < sheetView.contentsView.elementViews.count else { continue }
+                        let content = sheetView.contentsView.elementViews[ci].model
+                        if content != beganContent {
+                            updateUndoGroup()
+                            sheetView.capture(content, old: beganContent, at: ci)
                         }
-                        for (ti, beganTimeframe) in beganTimeframes {
-                            guard ti < sheetView.model.texts.count else { continue }
-                            if let beganScore = beganTimeframe.score {
-                               let score = sheetView.textsView.elementViews[ti].model.timeframe?.score
-                               if score != beganScore {
-                                   updateUndoGroup()
-                                   sheetView.captureScore(score, old: beganScore, at: ti)
-                               }
-                            } else {
-                                let text = sheetView.textsView.elementViews[ti].model
-                                if text.timeframe != beganTimeframe {
-                                    var beganText = text
-                                    beganText.timeframe = beganTimeframe
-                                    updateUndoGroup()
-                                    sheetView.captureText(text, old: beganText, at: ti)
-                                }
-                            }
-                        }
-                    } else if let firstScore {
-                        let score = sheetView.textsView.elementViews[ti].model.timeframe?.score
-                        if score != firstScore {
-                            sheetView.newUndoGroup()
-                            sheetView.captureScore(score, old: firstScore, at: ti)
-                        }
-                    }
-                } else {
-                    let score = sheetView.textsView.elementViews[ti].model.timeframe?.score
-                    if score != firstScore {
-                        sheetView.newUndoGroup()
-                        sheetView.captureScore(score, old: firstScore, at: ti)
                     }
                 }
             }
@@ -791,23 +664,17 @@ final class ColorEditor: Editor {
         if event.phase == .began {
             let p = document.convertScreenToWorld(event.screenPoint)
             if let sheetView = document.sheetView(at: p) {
-                if sheetView.model.texts.contains(where: { $0.timeframe?.score != nil }) {
-                    for (ti, textView) in sheetView.textsView.elementViews.enumerated() {
-                        let inTP = textView.convertFromWorld(p)
-                        if textView.containsScore(inTP) || textView.containsTimeframe(inTP) {
-                            isChangeVolumeAmp = true
-                            noteSheetView = sheetView
-                            noteTextIndex = ti
-                            if let ni = textView.noteIndex(at: inTP, maxDistance: 2.0 * document.screenToWorldScale) {
-                                firstNoteIndex = ni
-                                isChangeScoreVolume = false
-                            } else {
-                                isChangeScoreVolume = true
-                            }
-                            changeVolumeAmp(with: event)
-                            return
-                        }
-                    }
+                let sheetP = sheetView.convertFromWorld(p)
+                if sheetView.scoreView.noteIndex(at: sheetP,
+                                                 maxDistance: 15 * document.screenToWorldScale) != nil {
+                    isChangeVolumeAmp = true
+                    changeVolumeAmp(with: event)
+                    return
+                } else if let ci = sheetView.contentIndex(at: sheetP, scale: document.screenToWorldScale),
+                          sheetView.model.contents[ci].type.isAudio {
+                    isChangeVolumeAmp = true
+                    changeVolumeAmp(with: event)
+                    return
                 }
             }
         }
@@ -978,6 +845,29 @@ final class ColorEditor: Editor {
         if document.isPlaying(with: event) {
             document.stopPlaying(with: event)
         }
+        
+        if isChangePan {
+            changePan(with: event)
+            return
+        }
+        if event.phase == .began {
+            let p = document.convertScreenToWorld(event.screenPoint)
+            if let sheetView = document.sheetView(at: p) {
+                let sheetP = sheetView.convertFromWorld(p)
+                if sheetView.scoreView.noteIndex(at: sheetP,
+                                                 maxDistance: 15 * document.screenToWorldScale) != nil {
+                    isChangePan = true
+                    changePan(with: event)
+                    return
+                } else if let ci = sheetView.contentIndex(at: sheetP, scale: document.screenToWorldScale),
+                          sheetView.model.contents[ci].type.isAudio {
+                    isChangePan = true
+                    changePan(with: event)
+                    return
+                }
+            }
+        }
+        
         func updateTint() {
             let wp = document.convertScreenToWorld(event.screenPoint)
             let p = tintNode.convertFromWorld(wp)

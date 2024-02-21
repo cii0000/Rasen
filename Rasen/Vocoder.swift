@@ -103,6 +103,72 @@ extension vDSP {
     }
 }
 
+struct Wave: Codable, Hashable {
+    var amp = 0.0, fq = 1.0, offsetTime = 0.0, phase = 0.0
+}
+extension Wave {
+    func value(atT t: Double) -> Double {
+        amp * .sin((t - offsetTime) * fq * 2 * .pi + phase)
+    }
+    var isEmpty: Bool {
+        amp == 0 || fq == 0
+    }
+}
+
+struct Reswave: Codable, Hashable {
+    static let vibrato = Reswave(amp: 0.008 / 1.4321,
+                                 fqs: [6, 12],
+                                 phases: [0, .pi], fAlpha: 1)
+    static let voiceVibrato = Reswave(amp: 0.0055 / 1.4321,
+                                      fqs: [6, 12],
+                                      phases: [0, .pi], fAlpha: 1)
+    static let strongVibrato = Reswave(amp: 0.015 / 1.4321,
+                                       fqs: [6, 12],
+                                       phases: [0, .pi], fAlpha: 1)
+    static let tremolo = Reswave(amp: 0.125,
+                                 fqs: [6],
+                                 phases: [0], fAlpha: 1)
+    
+    var waves = [Wave()]
+    var beganTime = 0.0
+}
+extension Reswave {
+    init(amp: Double, fqs: [Double], phases: [Double] = [],
+         fAlpha: Double, beganTime: Double = 0) {
+        let f0 = fqs.first!
+        let sqfa = fAlpha * 0.5
+        let waves: [Wave]
+        if phases.isEmpty {
+            waves = fqs.map { fq in
+                Wave(amp: amp * (1 / ((fq / f0) ** sqfa)),
+                     fq: fq)
+            }
+        } else {
+            waves = fqs.enumerated().map { i, fq in
+                Wave(amp: amp * (1 / ((fq / f0) ** sqfa)),
+                     fq: fq, phase: phases[i])
+            }
+        }
+        self.init(waves: waves, beganTime: beganTime)
+    }
+    
+    func fqScale(atLocalTime t: Double) -> Double {
+        let t = t - beganTime
+        guard t >= 0 else { return 1 }//
+        return 2 ** (waves.sum { $0.value(atT: t) })
+    }
+    
+    func value(atLocalTime t: Double) -> Double {
+        let t = t - beganTime
+        guard t >= 0 else { return 0 }
+        return waves.sum { $0.value(atT: t) }
+    }
+    
+    var isEmpty: Bool {
+        waves.contains(where: { $0.isEmpty })
+    }
+}
+
 struct Rendnote {
     var fq: Double
     var sourceFilter: SourceFilter
@@ -116,19 +182,41 @@ struct Rendnote {
     var startDeltaSec: Double
     var volumeAmp: Double
     var waver: Waver
-    var tempo: Double
     var sampleRate: Double
     var dftCount: Int
     var id = UUID()
 }
 extension Rendnote {
-    static func seed(fromFq fq: Double, sec: Double,
-                     position: Point) -> UInt64 {
+    static func seed(fromFq fq: Double, sec: Double) -> UInt64 {
         var hasher = Hasher()
         hasher.combine(fq)
         hasher.combine(sec)
-        hasher.combine(position)
         return UInt64(abs(hasher.finalize()))
+    }
+    init(note: Note, score: Score, startSecDur: Double, sampleRate: Double) {
+        let startBeat = note.beatRange.start
+        let endBeat = note.beatRange.end
+        let snapBeat = startBeat.interval(scale: Rational(1, 4))
+        let sSec = Double(score.sec(fromBeat: startBeat)) + startSecDur
+        let eSec = Double(score.sec(fromBeat: endBeat)) + startSecDur
+        let snapSec = Double(score.sec(fromBeat: snapBeat)) + startSecDur
+        let dSec = sSec - snapSec
+        
+        let pitbend = note.pitbend.with(scale: eSec - sSec)
+        self.init(fq: note.fq,
+                  sourceFilter: note.tone.sourceFilter,
+                  formantFilterInterpolation: nil,
+                  deltaFormantFilterInterpolation: nil,
+                  fAlpha: 1,
+                  seed: Rendnote.seed(fromFq: note.fq, sec: sSec),
+                  overtone: note.tone.overtone,
+                  pitbend: pitbend,
+                  secRange: sSec ..< eSec,
+                  startDeltaSec: dSec,
+                  volumeAmp: note.volumeAmp,
+                  waver: .init(envelope: note.envelope, pitbend: pitbend),
+                  sampleRate: sampleRate,
+                  dftCount: Audio.defaultDftCount)
     }
 }
 extension Rendnote {
@@ -419,21 +507,6 @@ extension Rendnote {
                         let sec = Double(i) * rSampleRate
                         let vbScale = pitbend.fqScale(atT: sec)
                         phase += vbScale * fqScale
-//                        let vScale = waver.isEmptyVibrato ?
-//                        1 :
-//                        waver.vibrato.fqScale120(atLocalTime: sec, tempo: tempo)
-//
-//                        let firstScale = waver.isEmptyFirstPitchbend ?
-//                        1 :
-//                        waver.firstFqScale(atLocalSec: sec)
-//
-//                        let lastScale = waver.isEmptyLastPitchbend || releaseSec == nil ?
-//                        1 :
-//                        waver.lastFqScale(atLocalReleaseTime: sec - releaseSec!)
-//
-//                        let vbScale = pitbend.fqScale(atT: sec)
-//                        phase += vScale * firstScale * lastScale * vbScale
-//                        * fqScale
                         phase = phase.loop(start: 0, end: dCount)
                     }
                     samples = nSamples
@@ -602,7 +675,7 @@ extension vDSP {
 }
 
 struct SourceFilter: Hashable, Codable {
-    static let maxFq = 22050.0
+    static let maxFq = 22050.0, maxMel = 4000.0
     
     var fqSmps = [Point(0, 1), Point(4000, 0)]
     var noiseFqSmps = [Point(0, 0), Point(4000, 0)]
@@ -805,6 +878,9 @@ extension SourceFilter {
         fqSmps.isEmpty
     }
     
+    func smp(atMel mel: Double) -> Double {
+        smp(atFq: Mel.fq(fromMel: mel))
+    }
     func smp(atFq fq: Double) -> Double {
         guard !fqSmps.isEmpty else { return 1 }
         var preFq = fqSmps.first!.x, preSmp = fqSmps.first!.y
@@ -827,6 +903,9 @@ extension SourceFilter {
         return fqSmps.last!.y
     }
     
+    func amp(atMel mel: Double) -> Double {
+        amp(atFq: Mel.fq(fromMel: mel))
+    }
     func amp(atFq fq: Double) -> Double {
         guard !fqSmps.isEmpty else { return 1 }
         var preFq = fqSmps.first!.x, preSmp = fqSmps.first!.y
@@ -848,13 +927,16 @@ extension SourceFilter {
         }
         return Volume(smp: fqSmps.last!.y).amp
     }
+    func noiseT(atMel mel: Double) -> Double {
+        noiseT(atFq: Mel.fq(fromMel: mel))
+    }
     func noiseT(atFq fq: Double) -> Double {
         guard !noiseFqSmps.isEmpty else { return 0 }
         
         var preFq = noiseFqSmps.first!.x
         guard fq >= preFq else { return noiseTs.first! }
         for scale in noiseFqSmps {
-            let nextFq = scale.x, nextSmp = scale.y
+            let nextFq = scale.x
             guard preFq < nextFq else {
                 preFq = nextFq
                 continue
@@ -865,6 +947,9 @@ extension SourceFilter {
             preFq = nextFq
         }
         return noiseTs.last!
+    }
+    func noiseAmp(atMel mel: Double) -> Double {
+        noiseAmp(atFq: Mel.fq(fromMel: mel))
     }
     func noiseAmp(atFq fq: Double) -> Double {
         guard !noiseFqSmps.isEmpty else { return 0 }
@@ -888,6 +973,9 @@ extension SourceFilter {
         }
         return Volume(smp: noiseFqSmps.last!.y).amp
     }
+    func noisedAmp(atMel mel: Double) -> Double {
+        noisedAmp(atFq: Mel.fq(fromMel: mel))
+    }
     func noisedAmp(atFq fq: Double) -> Double {
         let amp = amp(atFq: fq)
         let noiseAmp = noiseAmp(atFq: fq)
@@ -897,111 +985,66 @@ extension SourceFilter {
 
 struct Waver {
     let envelope: Envelope
-    let vibrato: Reswave
-    let tremolo: Reswave
-    var pitbend: Pitbend
-    
-    let isLinearAttack, isLinearRelease: Bool
-    
-    let attack, decay, smpSustain, release: Double
-    let attackAndDecay, ampSustain: Double
+    let pitbend: Pitbend
+    let attack, decay, sustainSmp, release: Double
+    let attackAndDecay, sustainAmp: Double
     let rAttack, rDecay, rSustain, rRelease: Double
     
-    let firstVibrato: Reswave?
-    
-    let isEmptyVibrato: Bool
-    let isEmptytremolo: Bool
-    
-    init(_ tone: Tone,
-         pitbend: Pitbend = Pitbend()) {
-        self.init(envelope: tone.envelope,
-                  pitbend: pitbend)
-    }
-    
-    init(envelope: Envelope = Envelope(attack: 0.02, decay: 0,
-                                       sustain: 1, release: 0.08),
-         isLinearAttack: Bool = false,
-         isLinearRelease: Bool = false,
-         firstVibrato: Reswave? = nil,
-         vibrato: Reswave = Reswave(),
-         tremolo: Reswave = Reswave(),
-         pitbend: Pitbend = Pitbend()) {
-        
+    init(envelope: Envelope, pitbend: Pitbend) {
         self.envelope = envelope
-        self.isLinearAttack = isLinearAttack
-        self.isLinearRelease = isLinearRelease
-        self.firstVibrato = firstVibrato
-        self.vibrato = vibrato
-        self.tremolo = tremolo
         self.pitbend = pitbend
         
-        attack = max(envelope.attack, 0)
-        decay = envelope.decay
-        ampSustain = envelope.sustain
-        smpSustain = Volume(amp: envelope.sustain).smp
-        release = max(envelope.release, 0)
+        attack = max(envelope.attackSec, 0)
+        decay = envelope.decaySec
+        sustainAmp = envelope.sustainAmp
+        sustainSmp = Volume(amp: envelope.sustainAmp).smp
+        release = max(envelope.releaseSec, 0)
         attackAndDecay = attack + decay
         rAttack = 1 / attack
         rDecay = 1 / decay
-        rSustain = 1 / smpSustain
+        rSustain = 1 / sustainSmp
         rRelease = 1 / release
-        
-        isEmptyVibrato = vibrato.isEmpty
-        isEmptytremolo = tremolo.isEmpty
     }
 }
 extension Waver {
     func duration(fromSecLength sl: Double) -> Double {
         sl < attackAndDecay ? attackAndDecay + release : sl + release
     }
-    func volume(atTime t: Double, releaseTime: Double?,
-                startTime: Double) -> Double {
-        if let rt = releaseTime {
-            return volume(atLocalTime: t - startTime,
-                          releaseLocalTime: rt - startTime)
+    func volumeAmp(atTime t: Double, releaseTime rt: Double?,
+                   startTime: Double) -> Double {
+        if let rt {
+            volumeAmp(atLocalTime: t - startTime,
+                      releaseLocalTime: rt - startTime)
         } else {
-            return volume(atLocalTime: t - startTime,
-                          releaseLocalTime: nil)
+            volumeAmp(atLocalTime: t - startTime,
+                      releaseLocalTime: nil)
         }
     }
-    func volume(atLocalTime t: Double,
-                releaseLocalTime rt: Double?) -> Double {
-        guard t >= 0 else { return 0 }
-        
-        if attack > 0 && t < attack {
-            let n = (t * rAttack)
-            return isLinearAttack ? n : Volume(smp: n).amp
-        }
-        let nt = t - attack
-        
-        if decay > 0 && nt < decay {
-            if isLinearAttack {
-                return Double.linear(1, ampSustain, t: nt * rDecay)
-            } else {
-                let n = Double.linear(1, smpSustain, t: nt * rDecay)
-                return Volume(smp: n).amp
-            }
-        } else if let rt = rt {
-            let rt = rt < attackAndDecay ? attackAndDecay : rt
-            if t < rt {
-                return ampSustain
-            } else {
-                let nnt = t - rt
-                if release > 0 && nnt < release {
-                    if isLinearRelease {
-                        return Double.linear(ampSustain, 0,
-                                             t: (nnt * rRelease))
-                    } else {
-                        let n = Double.linear(smpSustain, 0,
-                                              t: (nnt * rRelease))
-                        return Volume(smp: n).amp
-                    }
-                } else {
-                    return 0
-                }
-            }
+    func volumeAmp(atLocalTime t: Double,
+                   releaseLocalTime rt: Double?) -> Double {
+        if t < 0 {
+            return 0
+        } else if attack > 0 && t < attack {
+            return Volume(smp: t * rAttack).amp
         } else {
-            return ampSustain
+            let nt = t - attack
+            if decay > 0 && nt < decay {
+                return Volume(smp: .linear(1, sustainSmp, t: nt * rDecay)).amp
+            } else if let rt {
+                let rt = rt < attackAndDecay ? attackAndDecay : rt
+                if t < rt {
+                    return sustainAmp
+                } else {
+                    let nnt = t - rt
+                    if release > 0 && nnt < release {
+                        return Volume(smp: .linear(sustainSmp, 0, t: nnt * rRelease)).amp
+                    } else {
+                        return 0
+                    }
+                }
+            } else {
+                return sustainAmp
+            }
         }
     }
 }
@@ -1013,7 +1056,7 @@ struct Notewave {
     let samples: [Double]
 }
 extension Notewave {
-    func sample(at i: Int, tempo: Double,
+    func sample(at i: Int,
                 sec: Double, releaseSec: Double? = nil,
                 volumeAmp: Double, from waver: Waver,
                 atPhase phase: inout Double) -> Double {
@@ -1022,14 +1065,9 @@ extension Notewave {
         if !isLoop && phase >= count { return 0 }
         phase = phase.loop(start: 0, end: count)
         
-        let nVolumeAmp = waver.isEmptytremolo ?
-            volumeAmp :
-            volumeAmp * (1 + waver.tremolo.value120(atLocalTime: sec,
-                                                    tempo: tempo))
-        
         let n: Double
         if phase.isInteger {
-            n = samples[Int(phase)] * nVolumeAmp
+            n = samples[Int(phase)] * volumeAmp
         } else {
             let sai = Int(phase)
             
@@ -1045,35 +1083,27 @@ extension Notewave {
                 (isLoop ? samples[1] : 0)
             let t = phase - Double(sai)
             let sy = Double.spline(a0, a1, a2, a3, t: t)
-            n = sy * nVolumeAmp
+            n = sy * volumeAmp
         }
         
-        let vScale = waver.isEmptyVibrato ?
-            1 :
-        waver.vibrato.fqScale120(atLocalTime: sec, tempo: tempo)
-        
-//            let vbScale = waver.pitbend.isEmpty ?
-//                1 : waver.pitbend.fqScale(atT: sec)
-        phase += vScale// * vbScale
-        * fqScale
-        
+//        let vbScale = waver.pitbend.isEmpty ?
+//        1 : waver.pitbend.fqScale(atT: sec)
+        phase += fqScale// * vbScale
         phase = phase.loop(start: 0, end: count)
         
         return n
     }
     
-    static func phase(tempo: Double,
-                      sec: Double, releaseSec: Double? = nil,
+    static func phase(sec: Double, releaseSec: Double? = nil,
                       from waver: Waver,
                       atPhase phase: inout Double,
                       fqScale: Double, samplesCount: Int) {
         let vbScale = waver.pitbend.isEmpty ?
             1 : waver.pitbend.fqScale(atT: sec)
-        phase += vbScale * fqScale
+        phase += fqScale * vbScale
         phase = phase.loop(0 ..< Double(samplesCount))
     }
-    static func phaseScale(tempo: Double,
-                           sec: Double, releaseSec: Double? = nil,
+    static func phaseScale(sec: Double, releaseSec: Double? = nil,
                            from waver: Waver) -> Double {
         let vbScale = waver.pitbend.isEmpty ?
             1 : waver.pitbend.fqScale(atT: sec)

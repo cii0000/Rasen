@@ -144,54 +144,56 @@ message PBDate {
     double timestamp = 1;
 }
 
+message PBContentTimeOption {
+    PBRationalRange beatRange = 1;
+    PBRational localStartBeat = 2;
+    PBRational tempo = 3;
+}
+
 message PBImage {
     bytes data = 1;
 }
 
 message PBContent {
-    string name = 5;
+    string name = 1;
     double volumeAmp = 2;
     double pan = 3;
+    PBSize size = 4;
+    PBPoint origin = 5;
+    bool isShownSpectrogram = 6;
+    oneof ContentTimeOptionOptional {
+        PBContentTimeOption timeOption = 7;
+    }
+    PBUUID id = 8;
 }
 
 message PBPit {
     double t = 1;
     double pitch = 2;
     double amp = 3;
+    double pan = 4;
 }
 message PBPitbend {
     repeated PBPit pits = 1;
 }
 
-message PBNote {
-    PBRational pitch = 7;
-    PBPitbend pitbend = 8;
-    PBRationalRange beatRange = 2;
-    double volumeAmp = 3;
-    string lyric = 4;
-    bool isBreath = 5;
-    bool isVibrato = 6;
-    bool isVowelReduction = 9;
-}
-
-enum PBMusicScaleType {
-    major = 0;
-    minor = 1;
-    hexaMajor = 2;
-    hexaMinor = 3;
-    pentaMajor = 4;
-    pentaMinor = 5;
-    dorian = 6;
-    wholeTone = 7;
-    chromatic = 8;
-    aNone = 9;
-}
-
 message PBEnvelope {
-    double attack = 1;
-    double decay = 2;
-    double sustain = 3;
-    double release = 4;
+    double attackSec = 1;
+    double decaySec = 2;
+    double sustainAmp = 3;
+    double releaseSec = 4;
+    PBUUID id = 5;
+}
+
+message PBNote {
+    PBRational pitch = 1;
+    PBPitbend pitbend = 2;
+    PBRationalRange beatRange = 3;
+    double volumeAmp = 4;
+    double pan = 5;
+    PBTone tone = 6;
+    PBEnvelope envelope = 7;
+    string lyric = 8;
 }
 
 message PBFormant {
@@ -207,43 +209,34 @@ message PBFormant {
 message PBFormantFilter {
     repeated PBFormant formants = 1;
 }
-message PBSourceFilter {
-    repeated PBPoint fqSmps = 1;
-    repeated double noiseTs = 2;
-}
 
 message PBOvertone {
     double evenScale = 1;
     double oddScale = 2;
 }
 
+message PBSourceFilter {
+    repeated PBPoint fqSmps = 1;
+    repeated double noiseTs = 2;
+}
+
 message PBTone {
-    PBEnvelope envelope = 1;
-    PBOvertone overtone = 3;
-    PBSourceFilter sourceFilter = 4;
-    PBUUID id = 6;
+    PBOvertone overtone = 1;
+    PBSourceFilter sourceFilter = 2;
+    PBUUID id = 3;
 }
 
-message PBScore {
-    PBTone tone = 1;
-    repeated PBNote notes = 2;
-    double volumeAmp = 8;
-    double pan = 11;
-    PBRational octave = 10;
-    PBRationalRange pitchRange = 9;
-}
-
-message PBTimeframe {
+message PBScoreOption {
     PBRationalRange beatRange = 1;
-    oneof contentOptional {
-        PBContent content = 2;
-    }
-    oneof scoreOptional {
-        PBScore score = 3;
-    }
-    PBRational tempo = 5;
-    PBRational localStartBeat = 6;
-    bool isShownSpectrogram = 7;
+    PBRational tempo = 2;
+    bool enabled = 3;
+}
+message PBScore {
+    repeated PBNote notes = 1;
+    PBRationalRange beatRange = 2;
+    PBRational tempo = 3;
+    bool enabled = 4;
+    PBUUID id = 5;
 }
 
 message PBAudio {
@@ -254,16 +247,21 @@ message PBLocale {
     string identifier = 1;
 }
 
+message PBTextTimeOption {
+    PBRationalRange beatRange = 1;
+    PBRational tempo = 2;
+}
+
 message PBText {
     string string = 1;
     PBOrientation orientation = 2;
     double size = 3;
     double widthCount = 4;
     PBPoint origin = 5;
-    oneof timeframeOptional {
-        PBTimeframe timeframe = 6;
-    }
     PBLocale locale = 7;
+    oneof timeOptionOptional {
+        PBTextTimeOption timeOption = 8;
+    }
 }
 
 message PBBorder {
@@ -335,9 +333,11 @@ enum PBPreviousNext {
 
 message PBSheet {
     PBAnimation animation = 6;
+    PBScore score = 10;
     PBPicture picture = 1;
     PBPicture draftPicture = 2;
     repeated PBText texts = 3;
+    repeated PBContent contents = 11;
     repeated PBBorder borders = 4;
     repeated PBRect rects = 9;
     PBUUColor backgroundUUColor = 5;
@@ -396,6 +396,14 @@ message PBTextIndexValue {
     PBText value = 1;
     int64 index = 2;
 }
+message PBNoteIndexValue {
+    PBNote value = 1;
+    int64 index = 2;
+}
+message PBContentIndexValue {
+    PBContent value = 1;
+    int64 index = 2;
+}
 message PBBorderIndexValue {
     PBBorder value = 1;
     int64 index = 2;
@@ -406,10 +414,6 @@ message PBKeyframeIndexValue {
 }
 message PBKeyframeOptionIndexValue {
     PBKeyframeOption value = 1;
-    int64 index = 2;
-}
-message PBContentIndexValue {
-    PBContent value = 1;
     int64 index = 2;
 }
 
@@ -426,6 +430,10 @@ message PBPlaneValue {
     repeated PBPlane planes = 1;
     repeated PBIntIndexValue moveIndexValues = 2;
     int64 index = 3;
+}
+message PBToneValue {
+    PBTone tone = 1;
+    repeated int64 noteIndexes = 2;
 }
 message PBTextValue {
     string string = 1;
@@ -444,12 +452,6 @@ message PBTextValueIndexValue {
     PBTextValue value = 1;
     int64 index = 2;
 }
-message PBScoreIndexValue {
-    oneof valueOptional {
-        PBScore value = 1;
-    }
-    int64 index = 2;
-}
 message PBSheetValue {
     repeated PBLine lines = 1;
     repeated PBPlane planes = 2;
@@ -460,6 +462,7 @@ message PBSheetValue {
     repeated PBKeyframe keyframes = 7;
     int64 keyframeBeganIndex = 8;
 }
+
 message PBInt64Array {
     repeated int64 value = 1;
 }
@@ -512,8 +515,14 @@ message PBInterOptionIndexValueArrayIndexValueArray {
 message PBPlaneIndexValueArray {
     repeated PBPlaneIndexValue value = 1;
 }
+message PBNoteIndexValueArray {
+    repeated PBNoteIndexValue value = 1;
+}
 message PBTextIndexValueArray {
     repeated PBTextIndexValue value = 1;
+}
+message PBContentIndexValueArray {
+    repeated PBContentIndexValue value = 1;
 }
 message PBBorderIndexValueArray {
     repeated PBBorderIndexValue value = 1;
@@ -523,9 +532,6 @@ message PBKeyframeIndexValueArray {
 }
 message PBKeyframeOptionIndexValueArray {
     repeated PBKeyframeOptionIndexValue value = 1;
-}
-message PBContentIndexValueArray {
-    repeated PBContentIndexValue value = 1;
 }
 
 message PBSheetUndoItem {
@@ -568,8 +574,15 @@ message PBSheetUndoItem {
         PBPlaneIndexValueArrayIndexValueArray insertDraftKeyPlanes = 38;
         PBIntArrayIndexValueArray removeDraftKeyPlanes = 39;
         PBInterOptionIndexValueArrayIndexValueArray setLineIDs = 31;
-        PBScoreIndexValue replaceScore = 33;
         PBAnimationOption setAnimationOption = 40;
+        PBNoteIndexValueArray insertNotes = 42;
+        PBNoteIndexValueArray replaceNotes = 43;
+        PBInt64Array removeNotes = 44;
+        PBToneValue changedTones = 45;
+        PBContentIndexValueArray insertContents = 46;
+        PBContentIndexValueArray replaceContents = 47;
+        PBInt64Array removeContents = 48;
+        PBScoreOption setScoreOption = 49;
     }
 }
 message PBWorldUndoItem {
@@ -630,7 +643,8 @@ message PBPastableObject {
         PBUUColor uuColor = 8;
         PBAnimation animation = 9;
         PBInterOptionsValue ids = 10;
-        PBTimeframe timeframe = 11;
+        PBScore score = 11;
+        PBContent content = 22;
         PBImage image = 21;
         PBRationalRange beatRange = 12;
         double normalizationValue = 13;

@@ -1170,11 +1170,11 @@ final class Document {
         }
     }
     func updateTextViewsWithCamera(in sheetView: SheetView) {
-        sheetView.textsView.elementViews.forEach {
-            $0.isFullEdit = isFullEditNoteTimeInterval(from: $0.model)
-        }
-        sheetView.animationView.isFullEdit
-        = isFullEditNoteTimeInterval(fromScale: 1)
+        let isFullEdit = isFullEditNoteTimeInterval(fromScale: 1)
+        sheetView.textsView.elementViews.forEach { $0.isFullEdit = isFullEdit }
+        sheetView.contentsView.elementViews.forEach { $0.isFullEdit = isFullEdit }
+        sheetView.scoreView.isFullEdit = isFullEdit
+        sheetView.animationView.isFullEdit = isFullEdit
     }
     
     var colorSpace = Color.defaultColorSpace
@@ -1325,18 +1325,17 @@ final class Document {
                         }
                     }
                     
-                    for textView in sheetView.textsView.elementViews {
-                        if let timeframe = textView.model.timeframe,
-                           let score = timeframe.score {
-                            let nis = selectedNoteIndexes(from: textView)
-                            if !nis.isEmpty {
-                                let rects = nis
-                                    .map { textView.noteFrame(from: score.notes[$0], score, timeframe) }
-                                    .map { textView.convertToWorld($0) }
-                                for rect in rects {
-                                    if rect.intersects(selection.rect) {
-                                        sNotes.append(rect)
-                                    }
+                    let scoreView = sheetView.scoreView
+                    if scoreView.model.enabled {
+                        let score = sheetView.scoreView.model
+                        let nis = selectedNoteIndexes(from: scoreView)
+                        if !nis.isEmpty {
+                            let rects = nis
+                                .map { scoreView.noteFrame(from: score.notes[$0]) }
+                                .map { scoreView.convertToWorld($0) }
+                            for rect in rects {
+                                if rect.intersects(selection.rect) {
+                                    sNotes.append(rect)
                                 }
                             }
                         }
@@ -2498,36 +2497,22 @@ final class Document {
         return .texture(texture)
     }
     
-    func containsScoreOrAnimation(with event: Event) -> Bool {
-        let sp = lastEditedSheetScreenCenterPositionNoneCursor
-            ?? event.screenPoint
+    func containsAllTimeline(with event: Event) -> Bool {
+        let sp = lastEditedSheetScreenCenterPositionNoneCursor ?? event.screenPoint
         let p = convertScreenToWorld(sp)
         guard let sheetView = sheetView(at: p) else { return false }
         let inP = sheetView.convertFromWorld(p)
-        return sheetView.containsTimeline(inP)
-        || sheetView.containsTimeframe(inP)
-    }
-    func containsScore(with event: Event) -> Bool {
-        let sp = lastEditedSheetScreenCenterPositionNoneCursor
-            ?? event.screenPoint
-        let p = convertScreenToWorld(sp)
-        if let sheetView = sheetView(at: p), sheetView.containsTimeframe(sheetView.convertFromWorld(p)) {
-            return true
-        } else {
-            return false
-        }
+        return sheetView.animationView.containsTimeline(inP)
+        || sheetView.containsOtherTimeline(inP, scale: screenToWorldScale)
     }
     func isPlaying(with event: Event) -> Bool {
-        let sp = lastEditedSheetScreenCenterPositionNoneCursor
-            ?? event.screenPoint
+        let sp = lastEditedSheetScreenCenterPositionNoneCursor ?? event.screenPoint
         let p = convertScreenToWorld(sp)
         if let sheetView = sheetView(at: p), sheetView.isPlaying {
             return true
         }
         for shp in aroundSheetpos(atCenter: intPosition(at: p)) {
-            if let sheetView = sheetView(at: shp.shp),
-                sheetView.isPlaying {
-                
+            if let sheetView = sheetView(at: shp.shp), sheetView.isPlaying {
                 return true
             }
         }
@@ -2927,9 +2912,9 @@ final class Document {
         return sheetView
     }
     
-    func firstTimetracks(from shp: Sheetpos) -> [Timetrack] {
+    func firstAudiotracks(from shp: Sheetpos) -> [Audiotrack] {
         guard let sheetView = sheetViewValue(at: shp)?.view else { return [] }
-        var firstTimetracks = [Timetrack]()
+        var firstAudiotracks = [Audiotrack]()
         var nip = IntPoint((sheetView.previousSheetView != nil ? -2 : -1) + shp.x, shp.y)
         while true {
             let shp = sheetPosition(at: nip)
@@ -2938,18 +2923,18 @@ final class Document {
                let sr = sheetRecorders[id],
                let sheet = sr.sheetRecord.decodedValue {
                 
-                firstTimetracks.append(sheet.timetrack)
+                firstAudiotracks.append(sheet.audiotrack)
                 
                 nip.x -= 1
             } else {
                 break
             }
         }
-        return firstTimetracks
+        return firstAudiotracks
     }
-    func lastTimetracks(from shp: Sheetpos) -> [Timetrack] {
+    func lastAudiotracks(from shp: Sheetpos) -> [Audiotrack] {
         guard let sheetView = sheetViewValue(at: shp)?.view else { return [] }
-        var lastTimetracks = [Timetrack]()
+        var lastAudiotracks = [Audiotrack]()
         var nip = IntPoint((sheetView.nextSheetView != nil ? 2 : 1) + shp.x, shp.y)
         while true {
             let shp = sheetPosition(at: nip)
@@ -2958,14 +2943,14 @@ final class Document {
                let sr = sheetRecorders[id],
                let sheet = sr.sheetRecord.decodedValue {
                 
-                lastTimetracks.append(sheet.timetrack)
+                lastAudiotracks.append(sheet.audiotrack)
                 
                 nip.x += 1
             } else {
                 break
             }
         }
-        return lastTimetracks
+        return lastAudiotracks
     }
     
     func sheetPosition(at sid: SheetID) -> Sheetpos? {
@@ -3524,48 +3509,36 @@ final class Document {
     func isFullEditNoteTimeInterval(fromScale scale: Double) -> Bool {
         camera.logScale * scale < -3
     }
-    func isFullEditNoteTimeInterval(from text: Text) -> Bool {
-        isFullEditNoteTimeInterval(fromScale: text.font.defaultRatio)
-    }
-    func currentNoteTimeInterval(fromScale scale: Double) -> Rational {
+    func currentNoteTimeInterval(fromScale scale: Double = 1) -> Rational {
         isFullEditNoteTimeInterval(fromScale: scale) ?
             Rational(1, 48) : Rational(1, 12)
-    }
-    func currentNoteTimeInterval(from text: Text) -> Rational {
-        currentNoteTimeInterval(fromScale: text.font.defaultRatio)
     }
     func currentKeyframeTimeInterval(fromScale scale: Double) -> Rational {
         isFullEditNoteTimeInterval(fromScale: scale) ?
             Rational(1, 24) : Rational(1, 4)
     }
-    func currentNotePitchInterval(from text: Text) -> Rational {
-        camera.logScale * text.font.defaultRatio < -3 ?
-            Rational(1, 12) : 1
+    func currentNotePitchInterval() -> Rational {
+        camera.logScale < -3 ? Rational(1, 12) : 1
     }
-    func pitch(from textView: SheetTextView, at inTP: Point) -> Rational? {
-        textView.pitch(atY: inTP.y,
-                       interval: currentNotePitchInterval(from: textView.model))
+    func pitch(from scoreView: ScoreView, at scoreP: Point) -> Rational {
+        scoreView.pitch(atY: scoreP.y, interval: currentNotePitchInterval())
     }
-    func smoothPitch(from textView: SheetTextView, at inTP: Point) -> Double? {
-        textView.smoothPitch(atY: inTP.y)
+    func smoothPitch(from scoreView: ScoreView, at scoreP: Point) -> Double? {
+        scoreView.smoothPitch(atY: scoreP.y)
     }
     
-    func selectedNoteIndexes(from textView: SheetTextView) -> [Int] {
-        guard let timeframe = textView.model.timeframe,
-              let score = timeframe.score else { return [] }
+    func selectedNoteIndexes(from scoreView: ScoreView) -> [Int] {
         let fs = selections
             .map { $0.rect }
-            .map { textView.convertFromWorld($0) }
-        return textView.noteFrames(score, timeframe).enumerated().compactMap { (i, f) in
+            .map { scoreView.convertFromWorld($0) }
+        return scoreView.noteFrames.enumerated().compactMap { (i, f) in
             fs.contains(where: { f.intersects($0) }) ? i : nil
         }
     }
-    func selectedNoteIndexes(from textView: SheetTextView,
+    func selectedNoteIndexes(from scoreView: ScoreView,
                              path: Path) -> [Int] {
-        guard let timeframe = textView.model.timeframe,
-              let score = timeframe.score else { return [] }
-        let path = textView.convertFromWorld(path)
-        return textView.noteFrames(score, timeframe).enumerated().compactMap { (i, f) in
+        let path = scoreView.convertFromWorld(path)
+        return scoreView.noteFrames.enumerated().compactMap { (i, f) in
             path.intersects(f) ? i : nil
         }
     }

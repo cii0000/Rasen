@@ -232,7 +232,7 @@ final class RunEditor: InputKeyEditor {
             }
             return
         }
-        if document.containsScoreOrAnimation(with: event) {
+        if document.containsAllTimeline(with: event) {
             let player = Player(document)
             player.send(event)
             var event = event
@@ -244,55 +244,39 @@ final class RunEditor: InputKeyEditor {
             return
         }
         
-        defer {
-            if event.phase == .began {
-                document.closeAllPanels(at: p)
-            }
-        }
-        
         switch event.phase {
         case .began:
             document.cursor = .arrow
             
+            document.closeAllPanels(at: p)
+            
             let shp = document.sheetPosition(at: p)
             guard let sheetView = document.sheetView(at: shp) else { break }
             let inP = sheetView.convertFromWorld(p)
-            
             if let (textView, ti, _, _) = sheetView.textTuple(at: inP) {
                 let text = textView.model
                 
-                if URL(webString: text.string)?.openInBrowser() ?? false {
-                    return
-                }
+                if URL(webString: text.string)?.openInBrowser() ?? false { return }
                 
                 if text.string == "Waveform draw" {
-                    var nti: Int?, minD = Double.infinity
-                    for (oti, textView) in sheetView.textsView.elementViews.enumerated() {
-                        let d = textView.model.origin.distance(inP)
-                        if textView.model.timeframe != nil,
-                           oti != ti, d < min(minD, 500) {
-                            nti = oti
-                            minD = d
+                    var view: SheetContentView?, minD = Double.infinity
+                    for contentView in sheetView.contentsView.elementViews {
+                        if contentView.model.timeOption != nil {
+                            let d = contentView.mainLineDistance(contentView.convertFromWorld(p))
+                            if d < min(minD, 500) {
+                                view = contentView
+                                minD = d
+                            }
                         }
                     }
-                    guard let nti else { return }
                     
-                    let textView = sheetView.textsView.elementViews[nti]
-                    
-                    func spectrogramNode(from sheetView: SheetView,
-                                         b: UInt8 = 0) -> Node? {
-                        guard let timeframe = textView.model.timeframe,
-                              let pcmBuffer = timeframe.renderedPCMBuffer else { return nil }
-                        
-                        let eSec = 0.0
-                        let eW = textView.width(atSecDuration: eSec)
+                    if let view, let pcmBuffer = view.pcmBuffer {
                         let allW = sheetView.bounds.width - Sheet.textPadding.width * 2
-                        let tW = textView.width(atBeatDuration: timeframe.localBeatRange?.length ?? 0) + eW * 2
-                        
+                        let tW = view.width(atBeatDuration: view.localBeatRange?.length ?? 0)
                         let dx = text.origin.x
                         let wx = Sheet.textPadding.width - dx
                         
-                        let fx = textView.x(atBeat: timeframe.beatRange.start + (timeframe.localBeatRange?.start ?? 0)) - eW
+                        let fx = view.x(atBeat: (view.beatRange?.start ?? 0) + (view.localBeatRange?.start ?? 0))
                         let pw = inP.x - fx
                         let firstX = -wx + pw
                         
@@ -328,44 +312,47 @@ final class RunEditor: InputKeyEditor {
                                                     Point(-wx + allW, rangeY * 2))))
                         let path = Path(pathlines)
                         
-                        
-                        let wy = (textView.scoreFrame?.maxY ?? textView.timeRangeFrame?.maxY ?? 0) + 0.5 * textView.nodeRatio
-                        
-                        return Node(name: "spectrogram",
-                                    attitude: .init(position: .init(wx, wy)),
-                                    path: path,
-                                    lineWidth: 0.5,
-                                    lineType: .color(.content))
-                    }
-                    
-                    if let sNode = spectrogramNode(from: sheetView) {
-                        textView.node.children
+                        let wy = view.spectrgramY + 0.5
+                        let sNode = Node(name: "spectrogram",
+                                         attitude: .init(position: .init(wx, wy)),
+                                         path: path,
+                                         lineWidth: 0.5,
+                                         lineType: .color(.content))
+                        view.node.children
                             .filter { $0.name == sNode.name }
                             .forEach { $0.removeFromParent() }
-                        textView.node.append(child: sNode)
+                        view.node.append(child: sNode)
                         return
                     }
-                } else if text.string == "All formant" {
-                    let vs = [184.997, 207.652, 233.082, 246.942, 277.183, 311.127]
-                    var nvs = [(Int, Int, Double)]()
-                    for i in 1 ... 30 {
-                        for (j, v) in vs.enumerated() {
-                            nvs.append((j - 3, i, v * Double(i)))
+                } else if text.string == "Loudness get" {
+                    if let sheetView = document.sheetView(at: p) {
+                        let maxD = 15 * document.screenToWorldScale
+                        var minD = Double.infinity, minContentView: SheetContentView?
+                        for contentView in sheetView.contentsView.elementViews {
+                            let d = contentView.mainLineDistance(contentView.convertFromWorld(p))
+                            if d < minD && d < maxD {
+                                minD = d
+                                minContentView = contentView
+                            }
+                        }
+                        
+                        if let contentView = minContentView {
+                            if let buffer = contentView.model.pcmBuffer {
+                                let lufs = buffer.integratedLoudness
+                                let db = buffer.samplePeakDb
+                                document.show("Sound".localized
+                                              + "\n\t\("Loudness".localized): \(lufs.string(digitsCount: 4)) LUFS"
+                                              + "\n\t\("Sample Peak".localized): \(db.string(digitsCount: 4)) dB",
+                                              at: p)
+                                return
+                            }
+                        } else if let buffer = sheetView.model.pcmBuffer {
+                            let lufs = buffer.integratedLoudness
+                            let db = buffer.samplePeakDb
+                            document.show("Sheet".localized + "\n\t\("Loudness".localized): \(lufs.string(digitsCount: 4)) LUFS" + "\n\t\("Sample Peak".localized): \(db.string(digitsCount: 4)) dB", at: p)
+                            return
                         }
                     }
-                    let ns = nvs.sorted(by: { $0.2 < $1.2 })
-                    var str = ""
-                    for (i, j, v) in ns {
-                        str += "\(i)\t\(j)\t\(v.string(digitsCount: 3))\n"
-                    }
-                    let t0 = Text(string: str, size: 20, origin: inP)
-                    sheetView.newUndoGroup()
-                    sheetView.append(t0)
-                    
-                    return
-                } else if text.string == "Make animation" {
-                    AnimationMaker(document).send(atScreen: sp)
-                    return
                 }
                 // writeMovie loop: 10
                 
@@ -752,365 +739,6 @@ extension RunEditor {
                 sheetView.removeText(at: i)
             }
             sheetView.append(nt)
-        }
-    }
-}
-
-final class AnimationMaker {
-    let document: Document
-    
-    init(_ document: Document) {
-        self.document = document
-    }
-    
-    func send(atScreen sp: Point) {
-        let p = document.convertScreenToWorld(sp)
-        let shp = document.sheetPosition(at: p)
-        guard let sheetView = document.sheetView(at: shp) else { return }
-        
-        let inP = sheetView.convertFromWorld(p)
-            if let (ti, timeframe) = sheetView.timeframeTuple(at: inP),
-             let score = timeframe.score {
-                
-                let ms = score.notes.map { $0.lyric }
-                let smi = ms.count - 1
-                //                    let ls2 = sheetView.model.keyframes[smi].picture.lines
-                if score.notes.count >= ms.count && sheetView.model.animation.keyframes.count >= ms.count {
-                    if !(0 ..< ms.count).contains(where: { score.notes[$0].lyric !=  ms[$0] }) {
-                        
-                        let st = Rational(1, 2)
-                        let sst = Rational(7, 16)
-                        let ssst = Rational(1, 8)
-                        
-                        var str = ms.reduce(into: "") { $0 += $1 + " " }
-                        var notes = Array(score.notes[..<ms.count])
-                        var nks = [IndexValue<Keyframe>](), nki = ms.count
-                        var t = sheetView.model.animation.localBeat(at: ms.count)
-                        for (m0i, m0) in ms.enumerated() {
-                            for (m1i, m1) in ms.enumerated() {
-                                str += m0 + m1 + " "
-                                let ft = t,
-                                    midT = t + st,
-                                    lt = t + st * 2
-                                var nt = t + st
-                                notes.append(Note(pitch: 0, beatRange: t ..< nt, lyric: m0))
-                                t = nt
-                                nt = t + st
-                                notes.append(Note(pitch: 0, beatRange: t ..< nt, lyric: m1))
-                                
-                                let ols0 = sheetView.model.animation.keyframes[m0i].picture.lines
-                                var ls1Dic = [UUID: Line]()
-                                for line in sheetView.model.animation.keyframes[m0 == m1 ? smi : m1i].picture.lines {
-                                    ls1Dic[line.id] = line
-                                }
-                                var ls0 = [Line](), ls1 = [Line]()
-                                for ol0 in ols0 {
-                                    if var l1 = ls1Dic[ol0.id] {
-                                        var l0 = ol0
-                                        l0.interType = .key
-                                        l1.interType = .key
-                                        ls0.append(l0)
-                                        ls1.append(l1)
-                                    }
-                                }
-                                
-                                nks.append(IndexValue(value: Keyframe(picture: Picture(lines: ls0),  beatDuration: midT - sst - ft), index: nki))
-                                nki += 1
-                                
-                                var kt = midT - sst
-                                let drt = Rational(1, Keyframe.defaultFrameRate)
-                                while kt < midT + sst {
-                                    let keys = m0 == m1 ? [Interpolation.Key(value: 0.0, time: Double(midT - sst), type: .spline),
-                                                           Interpolation.Key(value: 0.125 * 0.5, time: Double(midT - ssst), type: .spline),
-                                                           Interpolation.Key(value: 0.5 * 0.5, time: Double(midT), type: .spline),
-                                                           Interpolation.Key(value: 0.125 * 0.5, time: Double(midT + ssst), type: .spline),
-                                                           Interpolation.Key(value: 0, time: Double(midT + sst), type: .spline)] :
-                                    [Interpolation.Key(value: 0.0, time: Double(midT - sst), type: .spline),
-                                     Interpolation.Key(value: 0.125, time: Double(midT - ssst), type: .spline),
-                                     Interpolation.Key(value: 0.7, time: Double(midT), type: .spline),
-                                     Interpolation.Key(value: 0.875, time: Double(midT + ssst), type: .spline),
-                                     Interpolation.Key(value: 1, time: Double(midT + sst), type: .spline)]
-                                    let ip = Interpolation(keys: keys, duration: Double(midT + sst))
-                                    let lt = ip.monoValue(withTime: Double(kt))!
-                                    let lines = (0 ..< ls0.count).map {
-                                        var l = Line.linear(ls0[$0], ls1[$0],
-                                                            t: lt)
-                                        l.id = ls0[$0].id
-                                        l.interType =
-                                        kt == midT - sst
-                                        || kt == midT - ssst
-                                        || kt == midT
-                                        || kt == midT + ssst
-                                        || kt == midT + sst ?
-                                            .key : .interpolated
-                                        return l
-                                    }
-                                    nks.append(IndexValue(value: Keyframe(picture: Picture(lines: lines),  beatDuration: drt), index: nki))
-                                    nki += 1
-                                    kt += drt
-                                }
-                                
-                                nks.append(IndexValue(value: Keyframe(picture: Picture(lines: m0 == m1 ? ls0 : ls1),  beatDuration: lt - kt), index: nki))
-                                nki += 1
-                                
-                                t = nt + st * 2
-                                nks.append(IndexValue(value: Keyframe(beatDuration: st * 2), index: nki))
-                                nki += 1
-                            }
-                        }
-                        
-                        var text = sheetView.textsView.elementViews[ti].model
-                        text.string = str
-                        text.timeframe?.score?.notes = notes
-                        
-                        sheetView.newUndoGroup()
-                        sheetView.replace([IndexValue(value: text, index: ti)])
-                        if ms.count < sheetView.model.animation.keyframes.count {
-                            sheetView.removeKeyframes(at: Array(ms.count ..< sheetView.model.animation.keyframes.count))
-                        }
-                        sheetView.insert(nks)
-                    }
-                }
-                return
-            }
-        
-        
-        var oSheetView: SheetView?
-        for niv in document.aroundSheetpos(atCenter: shp.int()) {
-            if let nSheetView = document.sheetView(at: niv.shp) {
-                oSheetView = nSheetView
-                break
-            }
-        }
-        guard let oSheetView = oSheetView else { return }
-        
-        var latins = [(tr: Range<Rational>,
-                       latin: String,
-                       isSplit: Bool)]()
-        for textView in sheetView.textsView.elementViews {
-            if let timeframe = textView.model.timeframe,
-               let score = timeframe.score, score.isVoice {
-                
-                for note in score.notes.sorted(by: { $0.beatRange.start < $1.beatRange.start }) {
-                    let latin = note.lyric.applyingTransform(.latinToHiragana,
-                                                             reverse: true) ?? note.lyric
-                    if !latin.isEmpty {
-                        latins.append((note.beatRange,
-                                       String(latin.last!),
-                                       note.isBreath))
-                    }
-                }
-                
-                break
-            }
-        }
-        
-        guard !latins.isEmpty else { return }
-        
-        var oLatins = [[String]: (tr0: Range<Rational>,
-                                  tr1: Range<Rational>)]()
-        for textView in oSheetView.textsView.elementViews {
-            if let timeframe = textView.model.timeframe,
-               let score = timeframe.score, score.isVoice {
-                
-                let nNotes = score.notes.sorted(by: { $0.beatRange.start < $1.beatRange.start })
-                guard !nNotes.isEmpty else { continue }
-                
-                var lylicNotes = [nNotes[0]]
-                for i in 1 ..< nNotes.count {
-                    let preN = nNotes[i - 1]
-                    let nextN = nNotes[i]
-                    if preN.beatRange.end < nextN.beatRange.start || preN.isBreath {
-                        let nextI = lylicNotes.count >= 2 ? 1 : 0
-                        oLatins[lylicNotes.map { $0.lyric }]
-                        = (lylicNotes[0].beatRange,
-                           lylicNotes[nextI].beatRange)
-                        lylicNotes = [nNotes[i]]
-                    } else {
-                        lylicNotes.append(nNotes[i])
-                    }
-                }
-                if !lylicNotes.isEmpty {
-                    oLatins[lylicNotes.map { $0.lyric }]
-                    = (lylicNotes[.first].beatRange,
-                       lylicNotes[.last].beatRange)
-                }
-                
-                break
-            }
-        }
-        
-        var keyTimes = [Int: Int](), preKI: Int?, preOEKI: Int?
-        for ni in 0 ..< latins.count {
-            func appendSplit(at ni: Int) {
-                let latin = latins[ni]
-                let pn = [latin.latin]
-                if let oLatin = oLatins[pn] {
-                    let at = latin.tr.start
-                    let bt = at + min(latin.tr.length,
-                                      oLatin.tr0.length)
-                    let ct = at + latin.tr.length
-                    let oStartT = oLatin.tr0.start
-                    let oEndT = oLatin.tr0.end
-                    print(at, bt, ct)
-                    guard let aki = sheetView.model.animation.indexInCount(atBeat: at),
-                          let bki = sheetView.model.animation.indexInCount(atBeat: bt),
-                          let cki = sheetView.model.animation.indexInCount(atBeat: ct),
-                          let ooeki = oSheetView.model.animation.indexInCount(atBeat: oEndT) else { return }
-                    let oeki = ooeki - 1
-                    
-                    if let preKI = preKI, let preOEKI = preOEKI {
-                        if preKI < aki {
-                            for ki in preKI ..< aki {
-                                keyTimes[ki] = preOEKI
-                            }
-                        }
-                    }
-                    
-                    for ki in aki ..< bki {
-                        let t = sheetView.model.animation.localBeat(at: ki) - at + oStartT
-                        let oki = oSheetView.model.animation.index(atBeat: t)
-                        keyTimes[ki] = oki
-                    }
-                    for ki in bki ..< cki {
-                        keyTimes[ki] = oeki
-                    }
-                    
-                    preKI = cki
-                    preOEKI = oeki
-                } else {
-                    preKI = nil
-                    preOEKI = nil
-                }
-            }
-            if ni > 0 && latins[ni - 1].isSplit {
-                appendSplit(at: ni - 1)
-            } else if ni > 0 {
-                let preL = latins[ni - 1]
-                let nextL = latins[ni]
-                let pn = [preL.latin, nextL.latin]
-                let rvPN = [nextL.latin, preL.latin]
-                if let oLatin = oLatins[pn] ?? oLatins[rvPN] {
-                    let isReversed = oLatins[pn] == nil
-                    let centerT = nextL.tr.start
-                    let oCenterT = oLatin.tr1.start
-                    let at = preL.tr.start
-                    let bt = max(at, centerT - oLatin.tr0.length)
-                    let dt = nextL.tr.end
-                    let ct = min(dt, centerT + oLatin.tr1.length)
-                    let oStartT = oCenterT - (centerT - bt)
-                    let oEndT = oCenterT + (ct - centerT)
-                    
-                    guard let aki = sheetView.model.animation.indexInCount(atBeat: at),
-                          let bki = sheetView.model.animation.indexInCount(atBeat: bt),
-                          let cki = sheetView.model.animation.indexInCount(atBeat: ct),
-                          let dki = sheetView.model.animation.indexInCount(atBeat: dt),
-                          let ooski = oSheetView.model.animation.indexInCount(atBeat: oStartT),
-                          let ooeki = oSheetView.model.animation.indexInCount(atBeat: oEndT) else { continue }
-                    let moski = isReversed ? ooeki - 1 : ooski
-                    let moeki = isReversed ? ooski : ooeki
-                    
-                    let oski = isReversed ? ooeki - 1 : ooski
-                    let oeki = isReversed ? ooski : ooeki - 1
-                    
-                    if let preKI = preKI, let preOEKI = preOEKI {
-                        if preKI < bki {
-                            for ki in preKI ..< bki {
-                                keyTimes[ki] = preOEKI
-                            }
-                        }
-                    } else {
-                        for ki in aki ..< bki {
-                            keyTimes[ki] = oski
-                        }
-                    }
-                    
-                    for ki in bki ..< cki {
-                        let t = cki == bki ?
-                        1 : Rational(ki - bki) / Rational(cki - bki)
-                        let oki = Int(Rational.linear(Rational(moski),
-                                                      Rational(moeki),
-                                                      t: t))
-                        keyTimes[ki] = oki
-                    }
-                    
-                    for ki in cki ..< dki {
-                        keyTimes[ki] = oeki
-                    }
-                    preKI = dki
-                    preOEKI = oeki
-                } else {
-                    preKI = nil
-                    preOEKI = nil
-                }
-            }
-            if ni == latins.count - 1 && latins[ni].isSplit {
-                appendSplit(at: ni)
-            }
-        }
-        
-        let appLIVs = keyTimes
-            .sorted(by: { $0.key < $1.key })
-            .map { ($0.key, oSheetView.model.animation.keyframes[$0.value].picture.lines) }
-            .filter { !$0.1.isEmpty }
-            .sorted(by: { $0.0 < $1.0 })
-        var appendLIVs = appLIVs.map {
-            IndexValue(value: $0.1, index: $0.0)
-        }
-        
-        let appPIVs = keyTimes
-            .sorted(by: { $0.key < $1.key })
-            .map { ($0.key, oSheetView.model.animation.keyframes[$0.value].picture.planes) }
-            .filter { !$0.1.isEmpty }
-            .sorted(by: { $0.0 < $1.0 })
-        var appendPIVs = appPIVs.map {
-            IndexValue(value: $0.1.filter { $0.uuColor.value.opacity > 0 }, index: $0.0)
-        }
-        
-        if let li = sheetView.lineTuple(at: inP, scale: 1 / document.worldToScreenScale)?.lineIndex {
-            
-            let line = sheetView.linesView.elementViews[li].model
-            let isFirst = inP.distance(line.firstPoint) < inP.distance(line.lastPoint)
-            let p = isFirst ? line.firstPoint : line.lastPoint
-            let id = line.id
-            for vi in 0 ..< appendLIVs.count {
-                let v = appendLIVs[vi]
-                let lines =
-                sheetView.animationView.elementViews[v.index].model.picture.lines
-                if let nLine = lines.first(where: { $0.id == id }) {
-                    let np = isFirst ? nLine.firstPoint : nLine.lastPoint
-                    
-                    if np != p {
-                        let dp = np - p
-                        let t = Transform(translation: dp)
-                        appendLIVs[vi].value = appendLIVs[vi].value.map { $0 * t }
-                    }
-                }
-            }
-            for vi in 0 ..< appendPIVs.count {
-                let v = appendPIVs[vi]
-                let lines =
-                sheetView.animationView.elementViews[v.index].model.picture.lines
-                if let nLine = lines.first(where: { $0.id == id }) {
-                    let np = isFirst ? nLine.firstPoint : nLine.lastPoint
-                    
-                    if np != p {
-                        let dp = np - p
-                        let t = Transform(translation: dp)
-                        appendPIVs[vi].value = appendPIVs[vi].value.map { $0 * t }
-                    }
-                }
-            }
-        }
-        
-        if !appendLIVs.isEmpty || !appendPIVs.isEmpty {
-            sheetView.newUndoGroup()
-            if !appendLIVs.isEmpty {
-                sheetView.appendKeyLines(appendLIVs)
-            }
-            if !appendPIVs.isEmpty {
-                sheetView.appendKeyPlanes(appendPIVs)
-            }
         }
     }
 }

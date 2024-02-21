@@ -17,138 +17,27 @@
 
 import AVFAudio
 
-struct Timeframe: Hashable, Codable {
+struct ContentTimeOption: Codable, Hashable, BeatRangeType {
     var beatRange = 0 ..< Rational(0)
     var localStartBeat = Rational(0)
-    var content: Content?
-    var score: Score?
     var tempo = Music.defaultTempo
-    var isPlaying = false
-    var isShownSpectrogram = false
-    var id = UUID()
 }
-extension Timeframe {
-    static let defaultBeatDuration = Rational(16)
-    static let defaultBeatRange = 0 ..< defaultBeatDuration
-}
-extension Timeframe: Protobuf {
-    init(_ pb: PBTimeframe) throws {
+extension ContentTimeOption: Protobuf {
+    init(_ pb: PBContentTimeOption) throws {
         beatRange = (try? RationalRange(pb.beatRange).value) ?? 0 ..< 0
-        if case .content(let content)? = pb.contentOptional {
-            self.content = try? Content(content)
-        } else {
-            content = nil
-        }
-        if case .score(let score)? = pb.scoreOptional {
-            self.score = try? Score(score)
-        } else {
-            score = nil
-        }
-        tempo = (try? Rational(pb.tempo))?.clipped(Music.tempoRange) ?? Music.defaultTempo
         localStartBeat = (try? Rational(pb.localStartBeat)) ?? 0
-        isShownSpectrogram = pb.isShownSpectrogram
+        tempo = (try? Rational(pb.tempo))?.clipped(Music.tempoRange) ?? Music.defaultTempo
     }
-    var pb: PBTimeframe {
+    var pb: PBContentTimeOption {
         .with {
             $0.beatRange = RationalRange(value: beatRange).pb
-            if let content = content {
-                $0.contentOptional = .content(content.pb)
-            } else {
-                $0.contentOptional = nil
+            if localStartBeat != 0 {
+                $0.localStartBeat = localStartBeat.pb
             }
-            if let score = score {
-                $0.scoreOptional = .score(score.pb)
-            } else {
-                $0.scoreOptional = nil
-            }
-            $0.tempo = tempo.pb
-            $0.localStartBeat = localStartBeat.pb
-            $0.isShownSpectrogram = isShownSpectrogram
-        }
-    }
-}
-extension Timeframe: TempoContainer {
-    var secRange: Range<Rational> {
-        secRange(fromBeat: beatRange)
-    }
-}
-extension Timeframe {
-    var duration: Rational {
-        beatRange.length
-    }
-    var volume: Volume? {
-        get {
-            content?.type != .image ? content?.volume ?? score?.volume : nil
-        }
-        set {
-            guard let newValue = newValue else { return }
-            if content != nil {
-                content?.volume = newValue
-            } else {
-                score?.volume = newValue
+            if tempo != Music.defaultTempo {
+                $0.tempo = tempo.pb
             }
         }
-    }
-    var pan: Double? {
-        get {
-            content?.type != .image ? content?.pan ?? score?.pan : nil
-        }
-        set {
-            guard let newValue = newValue else { return }
-            if content != nil {
-                content?.pan = newValue
-            } else {
-                score?.pan = newValue
-            }
-        }
-    }
-    var localBeatRange: Range<Rational>? {
-        if let content {
-            let beatDur = Timeframe.beat(fromSec: content.secDuration,
-                                         tempo: tempo,
-                                         beatRate: Keyframe.defaultFrameRate,
-                                         rounded: .up)
-            return Range(start: localStartBeat,
-                         length: beatDur)
-        } else if let score {
-            var range = score.beatRange
-            range?.start += localStartBeat
-            return range
-        } else {
-            return nil
-        }
-    }
-    var isAudio: Bool {
-        (content?.type.isAudio ?? false) || score != nil
-    }
-    var spectrogram: Spectrogram? {
-        if let n = content?.spectrogram {
-            return n
-        } else if let renderedNoneDelayPCMBuffer {
-            return Spectrogram.default(renderedNoneDelayPCMBuffer)
-        } else {
-            return nil
-        }
-    }
-    var renderedNoneDelayPCMBuffer: PCMBuffer? {
-        var n = self
-        n.beatRange.start = 0
-        let seq = Sequencer(timetracks: [.init(timeframes: [(Point(), n)])],
-                            isAsync: false, startSec: 0,
-                            perceptionDelaySec: 0)
-        return try? seq?.buffer(sampleRate: Audio.defaultExportSampleRate,
-                                progressHandler: { _, _ in })
-    }
-    var renderedPCMBuffer: PCMBuffer? {
-        var n = self
-        n.beatRange.start = 0
-        let seq = Sequencer(timetracks: [.init(timeframes: [(Point(), n)])],
-                            isAsync: false, startSec: 0)
-        return try? seq?.buffer(sampleRate: Audio.defaultExportSampleRate,
-                                progressHandler: { _, _ in })
-    }
-    var pcmBuffer: PCMBuffer? {
-        content?.pcmBuffer
     }
 }
 
@@ -198,6 +87,14 @@ struct Content: Hashable, Codable {
         var isDuration: Bool {
             self == .movie || self == .sound
         }
+        var displayName: String {
+            switch self {
+            case .movie: "Movie".localized
+            case .sound: "Sound".localized
+            case .image: "Image".localized
+            case .none: "None".localized
+            }
+        }
     }
     static func type(from url: URL) -> ContentType {
         switch url.pathExtension {
@@ -209,9 +106,6 @@ struct Content: Hashable, Codable {
         }
     }
     
-    var volume = Volume(smp: 1)
-    var pan = 0.0
-    
     let name: String
     let url: URL
     let type: ContentType
@@ -219,16 +113,32 @@ struct Content: Hashable, Codable {
     let volumeValues: [Double]
     let image: Image?
     
-    init(name: String, volume: Volume = Volume(smp: 1), pan: Double = 0) {
-        self.volume = volume
-        self.pan = pan
+    var volume = Volume(smp: 1)
+    var pan = 0.0
+    var size = Size(width: 100, height: 100)
+    var origin = Point()
+    var isShownSpectrogram = false
+    var timeOption: ContentTimeOption?
+    var id = UUID()
+    
+    init(name: String = "empty", volume: Volume = Volume(smp: 1), pan: Double = 0,
+         size: Size = Size(width: 100, height: 100), origin: Point = Point(),
+         isShownSpectrogram: Bool = false, timeOption: ContentTimeOption? = nil) {
         self.name = name
         url = URL.contents.appending(component: name)
         type = Self.type(from: url)
         secDuration = type.isDuration ? Self.duration(from: url) : 0
         volumeValues = type.isDuration ?
-            (try? Content.volumeValues(url: url)) ?? [] : []
+        (try? Content.volumeValues(url: url)) ?? [] : []
         image = Image(url: url)
+        
+        self.volume = volume
+        self.pan = pan
+        self.size = size
+        self.origin = origin
+        self.isShownSpectrogram = isShownSpectrogram
+        self.timeOption = timeOption
+        
         if type.isDuration, let lufs = integratedLoudness, lufs > -14 {
             let gain = Loudness.normalizeLoudnessScale(inputLoudness: lufs,
                                                        targetLoudness: -14)
@@ -267,6 +177,27 @@ struct Content: Hashable, Codable {
             0
         }
     }
+}
+extension Content {
+    var localBeatRange: Range<Rational>? {
+        if let timeOption {
+            let beatDur = ContentTimeOption.beat(fromSec: secDuration,
+                                                 tempo: timeOption.tempo,
+                                                 beatRate: Keyframe.defaultFrameRate,
+                                                 rounded: .up)
+            return Range(start: timeOption.localStartBeat, length: beatDur)
+        } else {
+            return nil
+        }
+    }
+    
+    var imageFrame: Rect? {
+        if type == .image {
+            Rect(origin: origin, size: size)
+        } else {
+            nil
+        }
+    }
     
     var pcmBuffer: PCMBuffer? {
         try? AVAudioPCMBuffer.from(url: url)
@@ -286,21 +217,40 @@ struct Content: Hashable, Codable {
 }
 extension Content: Protobuf {
     init(_ pb: PBContent) throws {
-        volume = .init(amp: ((try? pb.volumeAmp.notNaN()) ?? 1)
-            .clipped(min: 0, max: Volume.maxAmp))
-        pan = pb.pan.clipped(min: -1, max: 1)
         name = pb.name
         url = URL.contents.appending(component: name)
         type = Content.type(from: url)
         secDuration = type.isDuration ? Content.duration(from: url) : 0
         volumeValues = type.isDuration ? ((try? Content.volumeValues(url: url)) ?? []) : []
         image = type == .image ? Image(url: url) : nil
+        
+        volume = .init(amp: ((try? pb.volumeAmp.notNaN()) ?? 1)
+            .clipped(min: 0, max: Volume.maxAmp))
+        pan = pb.pan.clipped(min: -1, max: 1)
+        size = (try? .init(pb.size)) ?? .init(width: 100, height: 100)
+        origin = (try? .init(pb.origin)) ?? .init()
+        isShownSpectrogram = pb.isShownSpectrogram
+        self.timeOption = if case .timeOption(let timeOption)? = pb.contentTimeOptionOptional {
+            try? .init(timeOption)
+        } else {
+            nil
+        }
+        id = (try? .init(pb.id)) ?? .init()
     }
     var pb: PBContent {
         .with {
             $0.name = name
             $0.volumeAmp = volume.amp
             $0.pan = pan
+            $0.size = size.pb
+            $0.origin = origin.pb
+            $0.isShownSpectrogram = isShownSpectrogram
+            $0.contentTimeOptionOptional = if let timeOption {
+                .timeOption(timeOption.pb)
+            } else {
+                nil
+            }
+            $0.id = id.pb
         }
     }
 }

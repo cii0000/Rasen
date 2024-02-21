@@ -52,11 +52,6 @@ final class NotePlayer {
             playNote()
         }
     }
-    var tone: Tone {
-        didSet {
-            noder.tone = tone
-        }
-    }
     var volume: Volume {
         get { noder.volume }
         set { noder.volume = newValue }
@@ -67,21 +62,19 @@ final class NotePlayer {
     
     struct NotePlayerError: Error {}
     
-    init(notes: [Note], _ tone: Tone, volume: Volume, pan: Double,
-         tempo: Double, reverb: Double = Audio.defaultReverb) throws {
+    init(notes: [Note], volume: Volume = .init(smp: Volume.mainSmp), pan: Double = 0,
+         reverb: Double = Audio.defaultReverb) throws {
         
-        guard let sequencer = Sequencer(timetracks: [],
+        guard let sequencer = Sequencer(audiotracks: [],
                                         isAsync: true, startSec: 0) else {
             throw NotePlayerError()
         }
         self.notes = notes
-        self.tone = tone
         self.sequencer = sequencer
-        noder = .init(rendnotes: [], tone: tone, tempo: tempo,
+        noder = .init(rendnotes: [],
                       startSec: 0, isAsync: true,
                       volumeAmp: volume.amp, pan: pan, reverb: reverb)
         sequencer.append(noder, id: UUID())
-//        sequencer.reverbNode.wetDryMix = Float(reverb) * 100
     }
     deinit {
         sequencer.endEngine()
@@ -111,18 +104,16 @@ final class NotePlayer {
             noteIDs.insert(noteID)
             let fq = note.fq
             return .init(fq: fq,
-                         sourceFilter: tone.sourceFilter.union(.init(FormantFilter().with(lyric: note.lyric))),
+                         sourceFilter: note.tone.sourceFilter.union(.init(FormantFilter().with(lyric: note.mainLyric))),
                          formantFilterInterpolation: nil,
                          fAlpha: 1,
-                         seed: Rendnote.seed(fromFq: fq, sec: .infinity,
-                                             position: Point()),
-                         overtone: tone.overtone,
+                         seed: Rendnote.seed(fromFq: fq, sec: .infinity),
+                         overtone: note.tone.overtone,
                          pitbend: note.pitbend,
                          secRange: -.infinity ..< .infinity,
                          startDeltaSec: 0,
                          volumeAmp: note.volumeAmp,
-                         waver: .init(tone),
-                         tempo: noder.tempo,
+                         waver: .init(envelope: note.envelope, pitbend: .init()),
                          sampleRate: noder.format.sampleRate,
                          dftCount: Audio.defaultDftCount,
                          id: noteID)
@@ -145,7 +136,8 @@ final class NotePlayer {
         
         isPlaying = false
         
-        timer.start(afterTime: tone.envelope.release + NotePlayer.stopEngineSec,
+        timer.start(afterTime: max(NotePlayer.stopEngineSec, 
+                                   (notes.maxValue { $0.envelope.releaseSec }) ?? 0),
                     dispatchQueue: .main) {
         } waitClosure: {
         } cancelClosure: {
@@ -278,8 +270,8 @@ final class AVAudioScoreNoder {
     fileprivate weak var sequencer: Sequencer?
     fileprivate var node: AVAudioSourceNode!
     let format: AVAudioFormat
-    var reverb: Double
     
+    var reverb: Double
     var volume: Volume {
         get { Volume(amp: Double(node.volume)) }
         set { node.volume = Float(newValue.amp) }
@@ -296,40 +288,28 @@ final class AVAudioScoreNoder {
     var isAsync = true
     var isSyncFirst = true
     
-    var tone = Tone() {
-        didSet {
-            if tone != oldValue {
-                let waver = Waver(tone), sourceFilter = tone.sourceFilter
-                for i in 0 ..< rendnotes.count {
-                    rendnotes[i].overtone = tone.overtone
-                    rendnotes[i].waver = waver
-                    rendnotes[i].sourceFilter = sourceFilter
-                    
-//                    if let dsi = rendnotes[i].deltaFormantFilterInterpolation {
-//                        let ns = tone.spectlope
-//                        rendnotes[i].formantFilterInterpolation?.keys = dsi.keys.map {
-//                            .init(value: $0.value.multiply(ns),
-//                                  time: $0.time, type: $0.type)
-//                        }
-//                    }
-                }
-            }
-            
-            if !tone.isEqualWave(oldValue) {
-                notewaveDic = [:]
-                
-                cancelWorkItems()
-                updateRendnotes()
-            }
-        }
+    func update(_ note: Note, at i: Int) {
+        rendnotes[i].overtone = note.tone.overtone
+        rendnotes[i].waver = .init(envelope: note.envelope, pitbend: note.pitbend)
+        rendnotes[i].sourceFilter = note.tone.sourceFilter
+//        cancelWorkItems()
+//        updateRendnotes()
     }
-    private(set) var tempo = 120.0 {
-        didSet {
-            notewaveDic = [:]
-            
-            cancelWorkItems()
-            updateRendnotes()
+    func insert(_ noteIVs: [IndexValue<Note>]) {
+        noteIVs.map { IndexValue(value: $0.value, index: $0.index) }
+    }
+    func replace(_ noteIVs: [IndexValue<Note>]) {
+        for iv in noteIVs {
+            let i = iv.index, note = iv.value
+            rendnotes[i].overtone = note.tone.overtone
+            rendnotes[i].waver = .init(envelope: note.envelope, pitbend: note.pitbend)
+            rendnotes[i].sourceFilter = note.tone.sourceFilter
         }
+//        cancelWorkItems()
+//        updateRendnotes()
+    }
+    func remove(at noteIs: [Int]) {
+        rendnotes.remove(at: noteIs)
     }
     
     deinit {
@@ -404,8 +384,7 @@ final class AVAudioScoreNoder {
             overtone: Overtone,
             pitbend: Pitbend,
             secDur: Double,
-            startDeltaSec: Double,
-            tempo: Double
+            startDeltaSec: Double
         
         init(_ rendnote: Rendnote) {
             fq = rendnote.fq
@@ -422,8 +401,6 @@ final class AVAudioScoreNoder {
                 .duration(fromSecLength: rendnote.secRange.length)
             secDur = loopDuration
             startDeltaSec = rendnote.startDeltaSec
-            
-            tempo = rendnote.tempo
         }
     }
     private(set) var notewaveDic = [NotewaveID: Notewave]()
@@ -446,15 +423,13 @@ final class AVAudioScoreNoder {
     
     let semaphore = DispatchSemaphore(value: 1)
     
-    init(rendnotes: [Rendnote], tone: Tone, tempo: Double,
+    init(rendnotes: [Rendnote],
          format: AVAudioFormat = AVAudioFormat(standardFormatWithSampleRate: Audio.defaultSampleRate, channels: 1)!,
          startSec: Double, isAsync: Bool,
          volumeAmp: Double, pan: Double, reverb: Double = Audio.defaultReverb) {
         
         self.rendnotes = rendnotes
-        self.tone = tone
         self.format = format
-        self.tempo = tempo
         self.isAsync = isAsync
         self.startSec = startSec
         self.reverb = reverb
@@ -607,7 +582,7 @@ final class AVAudioScoreNoder {
                     let nSec = Double(i) * rSampleRate + sec
                     guard nSec >= memowave.startSec else { continue }
                     let waverAmp = waver
-                        .volume(atTime: nSec,
+                        .volumeAmp(atTime: nSec,
                                 releaseTime: memowave.releaseSec,
                                 startTime: memowave.startSec)
                     let pitbendAmp = waver.pitbend
@@ -617,7 +592,6 @@ final class AVAudioScoreNoder {
                     
                     frames[i] += Float(notewave
                         .sample(at: i,
-                                tempo: tempo,
                                 sec: nSec - memowave.startSec,
                                 volumeAmp: nVolumeAmp,
                                 from: waver,
@@ -667,18 +641,12 @@ final class Sequencer {
     
     let secoundDuration: Double
     
-    init?(timetracks: [Timetrack], isAsync: Bool, startSec: Double,
+    init?(audiotracks: [Audiotrack], isAsync: Bool, startSec: Double,
           perceptionDelaySec: Double = 0.05,
           clipHandler: ((Float) -> ())? = nil) {
-        let timetracks = timetracks.filter { !$0.isEmpty }
+        let audiotracks = audiotracks.filter { !$0.isEmpty }
         
-        struct TrackKey: Hashable {
-            var tone: Tone, volumeAmp: Double,
-                pan: Double, tempo: Rational
-        }
         struct Track {
-            var tone: Tone, volumeAmp: Double,
-                pan: Double, tempo: Rational
             var rendnotes: [Rendnote]
             var id: UUID
         }
@@ -691,151 +659,77 @@ final class Sequencer {
         var reverbs = [UUID: AVAudioUnitReverb]()
         var allReverbNodes = [AVAudioUnitReverb]()
         
-        var tracks = [TrackKey: Track](), sSecDur = perceptionDelaySec
-        for (tti, timetrack) in timetracks.enumerated() {
-            let secDur = timetrack.secDuration
+        var sSecDur = perceptionDelaySec
+        var scoreNodes = [(node: AVAudioSourceNode, reverbNode: AVAudioUnitReverb)]()
+        var scoreNoders = [UUID: AVAudioScoreNoder]()
+        for audiotrack in audiotracks {
+            let secDur = audiotrack.secDuration
             guard secDur > 0 else { continue }
-            for (position, timeframe) in timetrack.timeframes {
-                guard timeframe.isAudio
-                        && timeframe.beatRange.length > 0
-                        && timeframe.beatRange.end > 0 else { continue }
-                
-                if let pcmBuffer = timeframe.pcmBuffer,
-                   let volume = timeframe.volume,
-                   let localBeatRange = timeframe.localBeatRange {
+            for value in audiotrack.values {
+                guard value.beatRange.length > 0 && value.beatRange.end > 0 else { continue }
+                switch value {
+                case .score(let score):
+                    guard !score.notes.isEmpty else { continue }
+                    let rendnotes = Score.rendnotes(from: score, startSecDur: sSecDur)
+                    guard !rendnotes.isEmpty else { continue }
                     
-                    let beatRange = timeframe.beatRange, dSec: Double
-                    
-                    if timeframe.score != nil {
-                        let emptyTimetrack = Timetrack(timeframes: [(Point(), .init(beatRange: 0 ..< 4))])
-                        dSec = Double(emptyTimetrack.secDuration)
-                    } else {
-                        dSec = 0
-                    }
-                    
-                    let sBeat = beatRange.start + max(localBeatRange.start, 0)
-                    let inSBeat = min(localBeatRange.start, 0)
-                    let eBeat = beatRange.start + min(localBeatRange.end, beatRange.length)
-                    let startSec = Double(timeframe
-                        .sec(fromBeat: sBeat)) - dSec + sSecDur
-                    let contentStartSec = Double(timeframe
-                        .sec(fromBeat: inSBeat))
-                    let secDur = Double(timeframe
-                        .sec(fromBeat: max(eBeat - sBeat, 0))) + dSec * 2
-                    let noder = AVAudioPCMNoder(pcmBuffer: pcmBuffer,
-                                                startTime: startSec,
-                                                contentStartTime: contentStartSec,
-                                                duration: secDur,
-                                                volumeAmp: volume.amp,
-                                                pan: timeframe.pan ?? 0)
+                    let noder = AVAudioScoreNoder(rendnotes: rendnotes,
+                                                  startSec: startSec,
+                                                  isAsync: isAsync,
+                                                  volumeAmp: 1, pan: 0)
                     
                     let reverbNode = AVAudioUnitReverb()
                     reverbNode.loadFactoryPreset(.mediumHall)
                     reverbNode.wetDryMix = Float(Audio.defaultReverb) * 100
-                    reverbs[timeframe.id] = reverbNode
+                    reverbs[score.id] = reverbNode
+                    
+                    scoreNodes.append((noder.node, reverbNode))
+                    
+                    scoreNoders[score.id] = noder
+                    mixings[score.id] = noder.node
+                    allMainNodes.append(noder.node)
+                    allReverbNodes.append(reverbNode)
+                case .sound(let content):
+                    guard content.type.isAudio,
+                          let timeOption = content.timeOption,
+                          let localBeatRange = content.localBeatRange,
+                          let pcmBuffer = content.pcmBuffer else { continue }
+                    let beatRange = timeOption.beatRange
+                    let sBeat = beatRange.start + max(localBeatRange.start, 0)
+                    let inSBeat = min(localBeatRange.start, 0)
+                    let eBeat = beatRange.start + min(localBeatRange.end, beatRange.length)
+                    let startSec = Double(timeOption.sec(fromBeat: sBeat)) + sSecDur
+                    let contentStartSec = Double(timeOption.sec(fromBeat: inSBeat))
+                    let secDur = Double(timeOption.sec(fromBeat: max(eBeat - sBeat, 0)))
+                    let noder = AVAudioPCMNoder(pcmBuffer: pcmBuffer,
+                                                startTime: startSec,
+                                                contentStartTime: contentStartSec,
+                                                duration: secDur,
+                                                volumeAmp: content.volume.amp,
+                                                pan: content.pan)
+                    
+                    let reverbNode = AVAudioUnitReverb()
+                    reverbNode.loadFactoryPreset(.mediumHall)
+                    reverbNode.wetDryMix = Float(Audio.defaultReverb) * 100
+                    reverbs[content.id] = reverbNode
                     
                     pcmNodes.append((noder.node, reverbNode))
                     
-                    pcmNoders[timeframe.id] = noder
-                    mixings[timeframe.id] = noder.node
+                    pcmNoders[content.id] = noder
+                    mixings[content.id] = noder.node
                     allMainNodes.append(noder.node)
                     allReverbNodes.append(reverbNode)
-                    continue
-                }
-                
-                guard let score = timeframe.score,
-                      !score.notes.isEmpty else { continue }
-                
-                var timeframe = timeframe
-                func update(at tti: Int,
-                            fol: FirstOrLast) -> Bool {
-                    guard (0 ..< timetracks.count).contains(tti) else { return false }
-                    let oTimetrack = timetracks[tti]
-                    var minTimeframe: Timeframe?, minDS = Double.infinity
-                    for (oPosition, oTimeframe) in oTimetrack.timeframes {
-                        if let score = oTimeframe.score, score.isVoice {
-                            let ds = position.distanceSquared(oPosition)
-                            if ds < minDS {
-                                minDS = ds
-                                minTimeframe = oTimeframe
-                            }
-                        }
-                    }
-                    guard let nMinTimeframe = minTimeframe else { return false }
-                    let beatDur = oTimetrack.secDuration
-                    var note = nMinTimeframe.score!.sortedNotes[fol]
-                    switch fol {
-                    case .first:
-                        let sSec = note.beatRange.start + beatDur
-                        let eSec = note.beatRange.end + beatDur
-                        note.beatRange = sSec ..< eSec
-                        timeframe.score?.notes.append(note)
-                    case .last:
-                        let sSec = note.beatRange.start - beatDur
-                        let eSec = note.beatRange.end - beatDur
-                        note.beatRange = sSec ..< eSec
-                        timeframe.score?.notes.insert(note, at: 0)
-                    }
-                    return true
-                }
-                let isUsingFirst = !update(at: tti - 1, fol: .last)
-                let isUsingLast = !update(at: tti + 1, fol: .first)
-                
-                let rendnotes = Score.rendnotes(from: score, timeframe,
-                                                position: position,
-                                                startSecDur: sSecDur,
-                                                isUsingFirst: isUsingFirst,
-                                                isUsingLast: isUsingLast)
-                let value = TrackKey(tone: score.tone,
-                                     volumeAmp: score.volumeAmp,
-                                     pan: score.pan,
-                                     tempo: timeframe.tempo)
-                if tracks[value] != nil {
-                    tracks[value]?.rendnotes += rendnotes
-                } else {
-                    tracks[value] = .init(tone: score.tone,
-                                          volumeAmp: score.volumeAmp,
-                                          pan: score.pan,
-                                          tempo: timeframe.tempo,
-                                          rendnotes: rendnotes,
-                                          id: timeframe.id)
                 }
             }
             
-            sSecDur += Double(timetrack.secDuration)
+            sSecDur += Double(audiotrack.secDuration)
         }
-        tracks = tracks.filter { !$0.value.rendnotes.isEmpty }
         
         let engine = AVAudioEngine()
         
         let mixerNode = AVAudioMixerNode()
         engine.attach(mixerNode)
         self.mixerNode = mixerNode
-        
-        var scoreNodes = [(node: AVAudioSourceNode,
-                           reverbNode: AVAudioUnitReverb)]()
-        var scoreNoders = [UUID: AVAudioScoreNoder]()
-        
-        for (_, track) in tracks {
-            let noder = AVAudioScoreNoder(rendnotes: track.rendnotes,
-                                          tone: track.tone,
-                                          tempo: Double(track.tempo),
-                                          startSec: startSec,
-                                          isAsync: isAsync,
-                                          volumeAmp: track.volumeAmp,
-                                          pan: track.pan)
-            
-            let reverbNode = AVAudioUnitReverb()
-            reverbNode.loadFactoryPreset(.mediumHall)
-            reverbNode.wetDryMix = Float(Audio.defaultReverb) * 100
-            reverbs[track.id] = reverbNode
-            
-            scoreNodes.append((noder.node, reverbNode))
-            scoreNoders[track.id] = noder
-            mixings[track.id] = noder.node
-            allMainNodes.append(noder.node)
-            allReverbNodes.append(reverbNode)
-        }
         
         secoundDuration = sSecDur
         
@@ -865,7 +759,7 @@ final class Sequencer {
         self.scoreNodes = scoreNodes
         self.scoreNoders = scoreNoders
         
-        if let clipHandler = clipHandler {
+        if let clipHandler {
             mixerNode.installTap(onBus: 0, bufferSize: 512, format: nil) { buffer, time in
                 guard !buffer.isEmpty else { return }
                 var peak: Float = 0.0
@@ -1444,8 +1338,8 @@ struct Spectrogram {
                     print("NaN:", ssmp.smp)
                     continue
                 }
-                bitmap[x, y, 0] = ssmp.pan < 0 ? UInt8(rgamma(-ssmp.pan * Self.redRatio) * alpha * Double(UInt8.max)) : 0
-                bitmap[x, y, 1] = ssmp.pan > 0 ? UInt8(rgamma(ssmp.pan * Self.greenRatio) * alpha * Double(UInt8.max)) : 0
+                bitmap[x, y, 0] = ssmp.pan > 0 ? UInt8(rgamma(ssmp.pan * Self.redRatio) * alpha * Double(UInt8.max)) : 0
+                bitmap[x, y, 1] = ssmp.pan < 0 ? UInt8(rgamma(-ssmp.pan * Self.greenRatio) * alpha * Double(UInt8.max)) : 0
                 bitmap[x, y, 2] = UInt8(b * alpha * Double(UInt8.max))
                 bitmap[x, y, 3] = UInt8(alpha * Double(UInt8.max))
             }

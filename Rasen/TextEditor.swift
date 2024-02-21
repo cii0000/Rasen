@@ -15,6 +15,128 @@
 // You should have received a copy of the GNU General Public License
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
+import struct Foundation.UUID
+
+final class TextSlider: DragEditor {
+    let document: Document
+    let isEditingSheet: Bool
+    
+    init(_ document: Document) {
+        self.document = document
+        isEditingSheet = document.isEditingSheet
+    }
+    
+    enum SlideType {
+        case all, startBeat, endBeat
+    }
+    
+    private var sheetView: SheetView?, textI: Int?, beganText: Text?
+    private var type = SlideType.all
+    private var beganSP = Point(), beganInP = Point()
+    
+    func send(_ event: DragEvent) {
+        guard isEditingSheet else {
+            document.stop(with: event)
+            return
+        }
+        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+            ?? event.screenPoint
+        let p = document.convertScreenToWorld(sp)
+        switch event.phase {
+        case .began:
+            document.cursor = .arrow
+            
+            if let sheetView = document.sheetView(at: p),
+                let ci = sheetView.textIndex(at: sheetView.convertFromWorld(p)) {
+                
+                let sheetP = sheetView.convertFromWorld(p)
+                let textView = sheetView.textsView.elementViews[ci]
+                let text = textView.model
+                
+                beganSP = sp
+                beganInP = sheetP
+                self.sheetView = sheetView
+                beganText = text
+                textI = ci
+                
+                let maxMD = 10 * document.screenToWorldScale
+                
+                if let timeOption = text.timeOption {
+                    if abs(sheetP.x - sheetView.animationView.x(atBeat: timeOption.beatRange.start)) < maxMD {
+                        type = .startBeat
+                    } else if abs(sheetP.x - sheetView.animationView.x(atBeat: timeOption.beatRange.end)) < maxMD {
+                        type = .endBeat
+                    } else {
+                        type = .all
+                    }
+                }
+            }
+        case .changed:
+            if let sheetView, let beganText,
+               let textI, textI < sheetView.textsView.elementViews.count {
+                
+                let sheetP = sheetView.convertFromWorld(p)
+                let textView = sheetView.textsView.elementViews[textI]
+                let text = textView.model
+                
+                switch type {
+                case .all:
+                    let p = beganText.origin + sheetP - beganInP
+                    let interval = document.currentNoteTimeInterval()
+                    let beat = max(min(sheetView.animationView.beat(atX: p.x, interval: interval),
+                                   sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: interval)),
+                                   sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval) - (text.timeOption?.beatRange.length ?? 0))
+                    var timeOption = text.timeOption
+                    timeOption?.beatRange.start = beat
+                    textView.set(timeOption, origin: Point(sheetView.animationView.x(atBeat: beat), p.y))
+                    document.updateSelects()
+                case .startBeat:
+                    if var timeOption = text.timeOption {
+                        let interval = document.currentNoteTimeInterval()
+                        let beat = min(sheetView.animationView.beat(atX: sheetP.x, interval: interval),
+                                       sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: interval),
+                                       timeOption.beatRange.end)
+                        if beat != timeOption.beatRange.start {
+                            let dBeat = timeOption.beatRange.start - beat
+                            timeOption.beatRange.start -= dBeat
+                            timeOption.beatRange.length += dBeat
+                            textView.set(timeOption, origin: .init(sheetView.animationView
+                                .x(atBeat: timeOption.beatRange.start), text.origin.y))
+                            document.updateSelects()
+                        }
+                    }
+                case .endBeat:
+                    if let beganTimeOption = beganText.timeOption {
+                        let interval = document.currentNoteTimeInterval()
+                        let beat = max(sheetView.animationView.beat(atX: sheetP.x, interval: interval),
+                                       sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval),
+                                       beganTimeOption.beatRange.start)
+                        if beat != text.timeOption?.beatRange.end {
+                            var beatRange = beganTimeOption.beatRange
+                            beatRange.end = beat
+                            textView.timeOption?.beatRange = beatRange
+                            document.updateSelects()
+                        }
+                    }
+                }
+            }
+        case .ended:
+            if let sheetView, let beganText,
+               let textI, textI < sheetView.textsView.elementViews.count {
+               
+                let textView = sheetView.textsView.elementViews[textI]
+                if textView.model != beganText {
+                    sheetView.newUndoGroup()
+                    sheetView.capture(textView.model, old: beganText, at: textI)
+                }
+                sheetView.updatePlaying()
+            }
+            
+            document.cursor = Document.defaultCursor
+        }
+    }
+}
+
 final class Finder: InputKeyEditor {
     let document: Document
     
@@ -84,17 +206,14 @@ final class Looker: InputKeyEditor {
             document.cursor = .arrow
             
             let p = document.convertScreenToWorld(event.screenPoint)
-            let isClose = !show(for: p)
-            if isClose {
-                document.closeLookingUpNode()
-            }
+            show(for: p)
         case .changed:
             break
         case .ended:
             document.cursor = Document.defaultCursor
         }
     }
-    func show(for p: Point) -> Bool {
+    func show(for p: Point) {
         let d = 5 / document.worldToScreenScale
         if !document.isEditingSheet {
             if let sid = document.sheetID(at: document.sheetPosition(at: p)),
@@ -108,7 +227,6 @@ final class Looker: InputKeyEditor {
             } else {
                 document.show("Root".localized, at: p)
             }
-            return true
         } else if document.isSelect(at: p), !document.selections.isEmpty {
             if let selection = document.multiSelection.firstSelection(at: p) {
                 if let sheetView = document.sheetView(at: p),
@@ -122,7 +240,7 @@ final class Looker: InputKeyEditor {
                         
                     }
                 } else if let sheetView = document.sheetView(at: p),
-                          let (node, hMaxMel, _) = sheetView.spectrogramNode(at: sheetView.convertFromWorld(p)) {
+                          let (node, hMaxMel) = sheetView.spectrogramNode(at: sheetView.convertFromWorld(p)) {
                     let nSelection = sheetView.convertFromWorld(selection)
                     let rect = node.convertFromWorld(selection.rect)
                     let minY = rect.minY - 0.5, maxY = rect.maxY - 0.5
@@ -136,38 +254,29 @@ final class Looker: InputKeyEditor {
                     let minSec: Rational = sheetView.animationView.sec(atX: nSelection.rect.minX)
                     let maxSec: Rational = sheetView.animationView.sec(atX: nSelection.rect.maxX)
                     document.show("Δ\(Double(maxSec - minSec).string(digitsCount: 4)) sec, Δ\(maxFq - minFq) Hz", at: p)
-                } else if let sheetView = document.sheetView(at: p),
-                          let ti = sheetView.timeframeIndex(at: sheetView.convertFromWorld(p)) {
-                    let textView = sheetView.textsView.elementViews[ti]
-                    let inTP = textView.convertFromWorld(p)
-                    if textView.containsScore(inTP),
-                       let timeframe = textView.model.timeframe,
-                       let score = timeframe.score {
+                } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+                    let scoreView = sheetView.scoreView
+                    let score = scoreView.model
+                    let nis = document.selectedNoteIndexes(from: scoreView)
+                    if !nis.isEmpty {
+                        let notes = nis.map { score.notes[$0] }
+                        let minNote = notes.min { $0.pitch < $1.pitch }!
+                        let maxNote = notes.max { $0.pitch < $1.pitch }!
                         
-                        let nis = document.selectedNoteIndexes(from: textView)
-                        if !nis.isEmpty {
-                            let notes = nis.map { score.convertPitchToWorld(score.notes[$0]) }
-                            
-                            let minNote = notes.min { $0.pitch < $1.pitch }!
-                            let maxNote = notes.max { $0.pitch < $1.pitch }!
-                            
-                            let str = "\(minNote.octavePitchString) ... \(maxNote.octavePitchString)  (\(minNote.fq.string(digitsCount: 3)) ... \(maxNote.fq.string(digitsCount: 3)) Hz)".localized
-                            document.show(str, at: p)
-                        }
+                        let str = "\(minNote.octavePitchString) ... \(maxNote.octavePitchString)  (\(minNote.fq.string(digitsCount: 3)) ... \(maxNote.fq.string(digitsCount: 3)) Hz)".localized
+                        document.show(str, at: p)
                     }
+                } else {
+                    document.show("No selection".localized, at: p)
                 }
             }
-            return true
         } else if let (_, _) = document.worldBorder(at: p, distance: d) {
             document.show("Border".localized, at: p)
-            return true
         } else if let (_, _, _) = document.border(at: p, distance: d) {
             document.show("Border".localized, at: p)
-            return true
         } else if let sheetView = document.sheetView(at: p),
                   let lineView = sheetView.lineTuple(at: sheetView.convertFromWorld(p), scale: 1 / document.worldToScreenScale)?.lineView {
             document.show("Line".localized + "\n\t\("Length".localized):  \(lineView.model.length().string(digitsCount: 4))", at: p)
-            return true
         } else if let sheetView = document.sheetView(at: p),
                   let (textView, _, i, _) = sheetView.textTuple(at: sheetView.convertFromWorld(p)) {
             
@@ -178,40 +287,25 @@ final class Looker: InputKeyEditor {
             } else {
                 document.show("Text".localized, at: p)
             }
-            return true
         } else if let sheetView = document.sheetView(at: p),
-                  let (note, score) = sheetView.noteAndScore(at: sheetView.convertFromWorld(p), scale: document.screenToWorldScale) {
-            let note = score.convertPitchToWorld(note)
+                  let note = sheetView.note(at: sheetView.convertFromWorld(p),
+                                            scale: document.screenToWorldScale) {
             let fq = note.fq
             let fqStr = "\(note.octavePitchString) (\(fq.string(digitsCount: 3)) Hz)".localized
             document.show(fqStr, at: p)
-            return true
         } else if let sheetView = document.sheetView(at: p),
-                  let (_, timeframe) = sheetView.timeframeTuple(at: sheetView.convertFromWorld(p)),
-                  let lufs = timeframe.content?.integratedLoudness,
-                  let db = timeframe.content?.samplePeakDb {
-            
-            document.show("Sound".localized + "\n\t\("Loudness".localized): \(lufs.string(digitsCount: 4)) LUFS" + "\n\t\("Sample Peak".localized): \(db.string(digitsCount: 4)) dB", at: p)
-            
-            return true
+                    let ci = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
+                                                    scale: document.screenToWorldScale) {
+            let content = sheetView.contentsView.elementViews[ci].model
+            document.show(content.type.displayName, at: p)
+        } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+            let scoreView = sheetView.scoreView
+            let pitch = Pitch(value: document.pitch(from: scoreView, at: scoreView.convertFromWorld(p)))
+            let fqStr = "\(pitch.octaveString) (\(pitch.fq.string(digitsCount: 3)) Hz)".localized
+            document.show(fqStr, at: p)
         } else if let sheetView = document.sheetView(at: p),
-                  let (_, timeframe) = sheetView.timeframeTuple(at: sheetView.convertFromWorld(p)),
-                  let buffer = timeframe.renderedPCMBuffer {
-            
-            let inP = sheetView.convertFromWorld(p)
-            let lufs = buffer.integratedLoudness
-            let db = buffer.samplePeakDb
-            let sec: Rational = sheetView.animationView.sec(atX: inP.x)
-            document.show("Score".localized
-                          + "\n\t\(Double(sec).string(digitsCount: 4)) sec"
-                          + "\n\t\("Loudness".localized): \(lufs.string(digitsCount: 4)) LUFS"
-                          + "\n\t\("Sample Peak".localized): \(db.string(digitsCount: 4)) dB",
-                          at: p)
-            
-            return true
-        } else if let sheetView = document.sheetView(at: p),
-                  let (node, maxMel, textView) = sheetView.spectrogramNode(at: sheetView.convertFromWorld(p)) {
-            let y = node.convertFromWorld(p).y - 0.5 * textView.nodeRatio
+                  let (node, maxMel) = sheetView.spectrogramNode(at: sheetView.convertFromWorld(p)) {
+            let y = node.convertFromWorld(p).y
             let h = node.path.bounds?.height ?? 0
             let mel = y.clipped(min: 0, max: h, newMin: 0, newMax: maxMel)
             let fq = Mel.fq(fromMel: mel)
@@ -220,14 +314,6 @@ final class Looker: InputKeyEditor {
             let nfq = Pitch(value: pitchRat).fq
             let fqStr = "\(Pitch(value: pitchRat).octaveString) (\(nfq.string(digitsCount: 3)) Hz)".localized
             document.show(fqStr, at: p)
-            return true
-        } else if let sheetView = document.sheetView(at: p),
-                  let buffer = sheetView.model.pcmBuffer {
-            
-            let lufs = buffer.integratedLoudness
-            let db = buffer.samplePeakDb
-            document.show("Sheet".localized + "\n\t\("Loudness".localized): \(lufs.string(digitsCount: 4)) LUFS" + "\n\t\("Sample Peak".localized): \(db.string(digitsCount: 4)) dB", at: p)
-            return true
         } else if !document.isDefaultUUColor(at: p) {
             let colorOwners = document.readColorOwners(at: p)
             if !colorOwners.isEmpty,
@@ -236,11 +322,12 @@ final class Looker: InputKeyEditor {
                 
                 let rgba = plane.uuColor.value.rgba
                 document.show("Face".localized + "\n\t\("Area".localized):  \(plane.topolygon.area.string(digitsCount: 4))\n\tsRGB: \(rgba.r) \(rgba.g) \(rgba.b)", at: p)
-                return true
+            } else {
+                document.show("Background".localized, at: p)
             }
+        } else {
+            document.show("Background".localized, at: p)
         }
-        
-        return false
     }
     
     func showDefinition(string: String,
@@ -668,39 +755,23 @@ final class TextEditor: Editor {
         }
         
         let p = document.convertScreenToWorld(event.screenPoint)
-        if !event.isRepeat,
-           let sheetView = document.sheetView(at: p) {
-            let inP = sheetView.convertFromWorld(p)
-            if let (ti, timeframe) = sheetView.timeframeTuple(at: inP) {
-                let textView = sheetView.textsView.elementViews[ti]
-                let maxD = textView.nodeRatio
-                * 15.0 * document.screenToWorldScale
-                
-                let inTP = textView.convert(inP, from: sheetView.node)
-                if textView.containsScore(inTP),
-                   var score = timeframe.score,
-                   let ni = textView.noteIndex(at: inTP,
-                                               maxDistance: maxD) {
-                    
-                    let key = (event.inputKeyType.name.applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? "").lowercased()
-                    if key == "^" {
-                        score.notes[ni].isBreath = true
-                    } else if key == "~" {
-                        score.notes[ni].isVibrato = true
-                    } else if key == "/" {
-                        score.notes[ni].isVowelReduction = true
-                    } else if event.inputKeyType == .delete, !score.notes[ni].lyric.isEmpty {
-                        score.notes[ni].lyric.removeLast()
-                    } else if event.inputKeyType != .delete {
-                        score.notes[ni].lyric += key
-                    }
-                    
-                    var timeframe = timeframe
-                    timeframe.score = score
-                    sheetView.newUndoGroup()
-                    sheetView.replaceScore(score, at: ti)
-                    return
+        if !event.isRepeat, let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+            let scoreView = sheetView.scoreView
+            let scoreP = scoreView.convertFromWorld(p)
+            let maxD = 15 * document.screenToWorldScale
+            if let ni = scoreView.noteIndex(at: scoreP, maxDistance: maxD) {
+                var note = scoreView.model.notes[ni]
+                let key = (event.inputKeyType.name
+                    .applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? "").lowercased()
+                if event.inputKeyType == .delete, !note.lyric.isEmpty {
+                    note.lyric.removeLast()
+                } else if event.inputKeyType != .delete {
+                    note.lyric += key
                 }
+                
+                sheetView.newUndoGroup()
+                sheetView.replace(note, at: ni)
+                return
             }
         }
         
@@ -1027,8 +1098,7 @@ final class TextEditor: Editor {
                     in sheetView: SheetView) {
         guard let i = sheetView.textsView.elementViews
                 .firstIndex(of: textView) else { return }
-        if textView.model.string.isEmpty
-             && textView.model.timeframe == nil {
+        if textView.model.string.isEmpty {
             sheetView.removeText(at: i)
             if editingTextView != nil {
                 editingSheetView = nil
@@ -1322,11 +1392,6 @@ final class TextEditor: Editor {
     }
 }
 
-struct ScoreLayout {
-    static let noteHeight = 6.0
-    static let spectrumAmplitudeWidth = 3.0
-}
-
 final class TextView<T: BinderProtocol>: View {
     typealias Model = Text
     typealias Binder = T
@@ -1341,12 +1406,11 @@ final class TextView<T: BinderProtocol>: View {
     var replacedRange: Range<String.Index>?
     var selectedRange: Range<String.Index>?
     var selectedLineLocation = 0.0
-    var isUpdatedAudioCache = true
     
     var isFullEdit = false {
         didSet {
             guard isFullEdit != oldValue else { return }
-            if let node = timeframeNode.children.first(where: { $0.name == "isFullEdit" }) {
+            if let node = timelineNode.children.first(where: { $0.name == "isFullEdit" }) {
                 node.isHidden = !isFullEdit
             }
         }
@@ -1399,7 +1463,10 @@ final class TextView<T: BinderProtocol>: View {
             borderNode.isHidden = isHiddenSelectedRange
         }
     }
-    var spectrogramMaxMel: Double?
+    
+    let id = UUID()
+    
+    let timelineNode = Node()
     var timeNode: Node?, currentVolumeNode: Node?
     var peakVolume = Volume() {
         didSet {
@@ -1409,7 +1476,7 @@ final class TextView<T: BinderProtocol>: View {
     }
     func updateFromPeakVolume() {
         guard let node = currentVolumeNode,
-              let frame = scoreFrame ?? timeRangeFrame else { return }
+              let frame = timelineFrame else { return }
         let smp = peakVolume.smp
             .clipped(min: 0, max: Volume.maxSmp, newMin: 0, newMax: 1)
         let y = frame.height * smp
@@ -1421,44 +1488,6 @@ final class TextView<T: BinderProtocol>: View {
         }
     }
     
-    func set(otherNotesTempo120: [Note]) {
-        guard let timeframe = model.timeframe else {
-            otherNotes = []
-            return
-        }
-        let octavePitch = timeframe.score?.octavePitch ?? 0
-        let tempo = timeframe.tempo
-        self.otherNotes = otherNotesTempo120.map {
-            var note = $0
-            note.apply(toTempo: tempo, fromTempo: 120)
-            note.beatRange.start
-            -= timeframe.localStartBeat + timeframe.beatRange.start
-            note.pitch -= octavePitch
-            note.volumeAmp *= (timeframe.volume?.amp ?? 0)
-            return note
-        }
-    }
-    private(set) var otherNotes = [Note]() {
-        didSet {
-            guard otherNotes != oldValue else { return }
-            updateWithTimeframe()
-        }
-    }
-    func notesTempo120() -> [Note] {
-        guard let timeframe = model.timeframe,
-              let score = timeframe.score else { return [] }
-        let notes = score.clippedNotes(inBeatRange: timeframe.beatRange,
-                                       localStartBeat: timeframe.localStartBeat)
-        return notes.map {
-            var note = $0
-            note.apply(toTempo: 120, fromTempo: timeframe.tempo)
-            note.pitch += score.octavePitch
-            return note
-        }
-    }
-    
-    let timeframeNode = Node()
-    
     init(binder: Binder, keyPath: BinderKeyPath) {
         self.binder = binder
         self.keyPath = keyPath
@@ -1466,18 +1495,17 @@ final class TextView<T: BinderProtocol>: View {
         typesetter = binder[keyPath: keyPath].typesetter
         
         node = Node(children: [markedRangeNode, replacedRangeNode,
-                               cursorNode, borderNode, timeframeNode, clippingNode],
+                               cursorNode, borderNode, timelineNode, clippingNode],
                     attitude: Attitude(position: binder[keyPath: keyPath].origin),
                     fillType: .color(.content))
         updateLineWidth()
         updatePath()
         
         updateCursor()
-        updateWithTimeframe()
-        updateSpectrogram()
+        updateTimeline()
     }
 }
-extension TextView {
+extension TextView {    
     func updateWithModel() {
         node.attitude.position = model.origin
         updateLineWidth()
@@ -1490,30 +1518,16 @@ extension TextView {
         markedRangeNode.lineWidth = Line.defaultLineWidth * ratio
         replacedRangeNode.lineWidth = Line.defaultLineWidth * 1.5 * ratio
     }
-    func updateAudioCache() {
-        if !isUpdatedAudioCache,
-           let timeframe = model.timeframe, timeframe.score != nil {
-            isUpdatedAudioCache = true
-            
-            // update
-        }
-    }
     func updateTypesetter() {
         typesetter = model.typesetter
         updatePath()
         
         updateMarkedRange()
         updateCursor()
-        updateWithTimeframe()
+        updateTimeline()
     }
     func updatePath() {
-        //        if let volumeFrame = volumeFrame, let timeRangeFrame = timeRangeFrame {
-        //            var path = typesetter.path()
-        //            path.pathlines += [Pathline(volumeFrame), Pathline(timeRangeFrame)]
-        //            node.path = path
-        //        } else {
         node.path = typesetter.path()
-        //        }
         borderNode.path = typesetter.maxTypelineWidthPath
         
         updateClippingNode()
@@ -1541,80 +1555,43 @@ extension TextView {
         }
     }
     var frameRate: Int { Keyframe.defaultFrameRate }
-    func updateWithTimeframe() {
-        if let timeframe = model.timeframe {
-            timeframeNode.children = self.timeframeNode(timeframe,
-                                                        ratio: nodeRatio,
-                                                        frameRate: frameRate,
-                                                        textSize: model.size,
-                                                        otherNotes: otherNotes,
-                                                        from: typesetter)
+    func updateTimeline() {
+        if let timeOption = model.timeOption {
+            timelineNode.children = self.timelineNode(timeOption, from: typesetter)
             
-            let timeNode = Node(lineWidth: 3 * nodeRatio,
-                                lineType: .color(.content))
-            let volumeNode = Node(lineWidth: 1 * nodeRatio,
-                                  lineType: .color(.background))
+            let timeNode = Node(lineWidth: 3, lineType: .color(.content))
+            let volumeNode = Node(lineWidth: 1, lineType: .color(.background))
             timeNode.append(child: volumeNode)
-            timeframeNode.children.append(timeNode)
+            timelineNode.children.append(timeNode)
             self.timeNode = timeNode
             self.currentVolumeNode = volumeNode
-        } else if !timeframeNode.children.isEmpty {
-            timeframeNode.children = []
+        } else if !timelineNode.children.isEmpty {
+            timelineNode.children = []
+            self.timeNode = nil
+            self.currentVolumeNode = nil
         }
     }
     
-    func updateSpectrogram() {
-        node.children
-            .filter { $0.name == "spectrogram" }
-            .forEach { $0.removeFromParent() }
-        guard model.timeframe?.isShownSpectrogram ?? false else { return }
-        
-        guard let timeframe = model.timeframe,
-              let sm = timeframe.spectrogram else { return }
-        
-        let firstX = x(atBeat: timeframe.beatRange.start + (timeframe.score != nil ? 0 : timeframe.localStartBeat))
-        let y = (scoreFrame?.maxY ?? timeRangeFrame?.maxY ?? 0) + 0.5 * nodeRatio
-        let allBeat = timeframe.score != nil ?
-        timeframe.beatRange.length : timeframe.localBeatRange?.length ?? 0
-        let allW = width(atBeatDuration: allBeat)
-        var nodes = [Node](), maxH = 0.0
-        func spNode(width: Int, at xi: Int) -> Node? {
-            guard let image = sm.image(width: width, at: xi),
-                  let texture = Texture(image: image,
-                                        isOpaque: false,
-                                        colorSpace: .sRGB) else { return nil }
-            let w = allW * Double(width) / Double(sm.frames.count)
-            let h = 256 * sm.maxFq / Audio.defaultExportSampleRate
-            maxH = max(maxH, h)
-            let x = allW * Double(xi) / Double(sm.frames.count)
-            return Node(name: "spectrogram",
-                        attitude: .init(position: .init(x, 0)),
-                        path: Path(Rect(width: w, height: h)),
-                        fillType: .texture(texture))
+    func set(_ timeOption: TextTimeOption?, origin: Point) {
+        binder[keyPath: keyPath].timeOption = timeOption
+        binder[keyPath: keyPath].origin = origin
+        node.attitude.position = origin
+        updateTimeline()
+        updateClippingNode()
+    }
+    var timeOption: TextTimeOption? {
+        get { model.timeOption }
+        set {
+            binder[keyPath: keyPath].timeOption = newValue
+            updateTimeline()
         }
-        (0 ..< (sm.frames.count / 1024)).forEach { xi in
-            if let node = spNode(width: 1024,
-                                 at: xi * 1024) {
-                nodes.append(node)
-            }
+    }
+    var origin: Point {
+        get { model.origin }
+        set {
+            binder[keyPath: keyPath].origin = newValue
+            node.attitude.position = newValue
         }
-        let lastCount = sm.frames.count % 1024
-        if lastCount > 0 {
-            let xi = sm.frames.count / 1024
-            if let node = spNode(width: lastCount,
-                                 at: xi * 1024) {
-                nodes.append(node)
-            }
-        }
-        
-        let sNode = Node(name: "spectrogram",
-                         children: nodes,
-                         attitude: .init(position: .init(firstX, y)),
-                         path: Path(Rect(width: allW, height: maxH)))
-        
-        self.spectrogramMaxMel = Mel.mel(fromFq: sm.maxFq)
-        
-        node.append(child: sNode)
     }
     
     func x(atSec sec: Rational) -> Double {
@@ -1624,7 +1601,7 @@ extension TextView {
         sec * Sheet.secWidth + Sheet.textPadding.width - model.origin.x
     }
     func x(atBeat beat: Rational) -> Double {
-        x(atSec: model.timeframe?.sec(fromBeat: beat) ?? 0)
+        x(atSec: model.timeOption?.sec(fromBeat: beat) ?? 0)
     }
     
     func width(atSecDuration sec: Rational) -> Double {
@@ -1634,7 +1611,7 @@ extension TextView {
         sec * Sheet.secWidth
     }
     func width(atBeatDuration beatDur: Rational) -> Double {
-        width(atSecDuration: model.timeframe?.sec(fromBeat: beatDur) ?? 0)
+        width(atSecDuration: model.timeOption?.sec(fromBeat: beatDur) ?? 0)
     }
     
     func sec(atX x: Double, interval: Rational) -> Rational {
@@ -1648,247 +1625,60 @@ extension TextView {
     }
     
     func beat(atX x: Double, interval: Rational) -> Rational {
-        model.timeframe?.beat(fromSec: sec(atX: x),
+        model.timeOption?.beat(fromSec: sec(atX: x),
                               interval: interval) ?? 0
     }
     func beat(atX x: Double) -> Rational {
         beat(atX: x, interval: Rational(1, frameRate))
     }
     
-    func pitch(fromHeight h: Double, interval: Rational) -> Rational {
-        Rational(h / (ScoreLayout.noteHeight * nodeRatio),
-                 intervalScale: interval)
-    }
-    func pitch(atY y: Double, interval: Rational) -> Rational? {
-        guard let score = model.timeframe?.score,
-              let f = scoreFrame else { return nil }
-        let nh = ScoreLayout.noteHeight * nodeRatio
-        let t = (y - f.minY - nh / 2) / nh
-        return Rational(t, intervalScale: interval)
-        + score.pitchRange.start
-    }
-    func smoothPitch(atY y: Double) -> Double? {
-        guard let score = model.timeframe?.score,
-              let f = scoreFrame else { return nil }
-        let nh = ScoreLayout.noteHeight * nodeRatio
-        let t = (y - f.minY - nh / 2) / nh
-        return t + Double(score.pitchRange.start)
-    }
-    func height(fromPitch pitch: Rational) -> Double {
-        height(fromPitch: pitch, noteHeight: ScoreLayout.noteHeight * nodeRatio)
-    }
-    func height(fromPitch pitch: Rational, noteHeight nh: Double) -> Double {
-        Double(pitch) * nh
-    }
-    func height(fromPitch pitch: Double, noteHeight nh: Double) -> Double {
-        pitch * nh
+    var beatRange: Range<Rational>? {
+        model.timeOption?.beatRange
     }
     
-    var nodeRatio: Double { model.size / Font.defaultSize }
-    
-    func timeframeNode(_ timeframe: Timeframe, ratio: Double,
-                       frameRate: Int, textSize: Double,
-                       otherNotes: [Note],
-                       from typesetter: Typesetter,
-                       padding: Double = 7) -> [Node] {
-        let lw = 1.0 * ratio
-        let sBeat = max(timeframe.beatRange.start, -10000),
-            eBeat = min(timeframe.beatRange.end, 10000)
+    func timelineNode(_ timeOption: TextTimeOption, from typesetter: Typesetter) -> [Node] {
+        let sBeat = max(timeOption.beatRange.start, -10000),
+            eBeat = min(timeOption.beatRange.end, 10000)
         guard sBeat <= eBeat else { return [] }
         let sx = self.x(atBeat: sBeat)
         let ex = self.x(atBeat: eBeat)
-        let lastB = typesetter.firstReturnBounds ?? Rect()
-        let y = lastB.minY
-        let nh = ScoreLayout.noteHeight * ratio
-        let knobW = 2 * ratio, knobH = 12 * ratio
-        let vy = (typesetter.lastBounds ?? Rect()).midY
-        let knobRadius = 2 * ratio
-        let lp = typesetter.lastBounds?.maxXMidYPoint ?? Point()
-        let vw = lp.x + padding * ratio
         
-        var boxNodes = [Node]()
-        var textNodes = [Node]()
+        let lw = 1.0
+        let knobW = 2.0, knobH = 12.0
+        let timelineHalfHeight = Sheet.timelineHalfHeight
+        
+        let y = (typesetter.firstReturnBounds?.minY ?? 0) + timelineHalfHeight
+        let sy = y - timelineHalfHeight
+        let ey = y + timelineHalfHeight
+        
         var contentPathlines = [Pathline]()
         var subBorderPathlines = [Pathline]()
         var fullEditBorderPathlines = [Pathline]()
         var borderPathlines = [Pathline]()
-        var contentRatioLinePathlines = [Pathline]()
-        var noteLineNodes = [Node]()
-        var noteOctaveLinePathlines = [Pathline]()
-        var noteChordLinePathlines = [Pathline]()
-        var noteKnobPathlines = [Pathline]()
         
-        func timeStringFrom(time: Rational,
-                            frameRate: Int) -> String {
-            if time >= 60 {
-                let c = Int(time * Rational(frameRate))
-                let s = c / frameRate
-                let minutes = s / 60
-                let sec = s - minutes * 60
-                let frame = c - s * frameRate
-                let minutesStr = String(format: "%d", minutes)
-                let secStr = String(format: "%02d", sec)
-                let frameStr = String(format: "%02d", frame)
-                return minutesStr + ":" + secStr + "." + frameStr
-            } else {
-                let c = Int(time * Rational(frameRate))
-                let s = c / frameRate
-                let sec = s
-                let frame = c - s * frameRate
-                let secStr = String(format: "%d", sec)
-                let frameStr = String(format: "%02d", frame)
-                return secStr + "." + frameStr
-            }
-        }
-        
-        if let localBeatRange = timeframe.localBeatRange {
-            if localBeatRange.start < 0 {
-                
-                let beat = -min(localBeatRange.start, 0)
-                - min(timeframe.beatRange.start, 0)
-                let timeText = Text(string: timeStringFrom(time: beat, frameRate: frameRate),
-                                    size: textSize * Font.smallSize / Font.defaultSize)
-                let h = timeframe.score != nil ?
-                self.height(fromPitch: timeframe.score!.pitchRange.length,
-                            noteHeight: nh) :
-                0
-                let timeP = Point(sx + 1, y + nh + h)
-                textNodes.append(Node(attitude: Attitude(position: timeP),
-                                      path: Path(timeText.typesetter,
-                                                 isPolygon: false),
-                                      fillType: .color(.content)))
-            } else if localBeatRange.start > 0 {
-                let ssx = x(atBeat: localBeatRange.start + timeframe.beatRange.start)
-                contentPathlines.append(Pathline(Rect(x: ssx - ratio / 4,
-                                                      y: y - 3 * ratio,
-                                                      width: ratio / 2,
-                                                      height: 6 * ratio)))
-            }
-        }
-        
-        if let localBeatRange = timeframe.localBeatRange {
-            if timeframe.beatRange.start + localBeatRange.end
-                > timeframe.beatRange.end {
-                
-                let beat = timeframe.beatRange.length - localBeatRange.start
-                
-                let timeText = Text(string: timeStringFrom(time: beat, frameRate: frameRate),
-                                    size: textSize * Font.smallSize / Font.defaultSize)
-                let timeFrame = timeText.frame ?? Rect()
-                let h = timeframe.score != nil ?
-                self.height(fromPitch: timeframe.score!.pitchRange.length,
-                            noteHeight: nh) :
-                0
-                let timeP = Point(ex - timeFrame.width - 2, y + nh + h)
-                textNodes.append(Node(attitude: Attitude(position: timeP),
-                                      path: Path(timeText.typesetter,
-                                                 isPolygon: false),
-                                      fillType: .color(.content)))
-            } else if localBeatRange.end < timeframe.beatRange.length {
-                let ssx = x(atBeat: localBeatRange.end + timeframe.beatRange.start)
-                contentPathlines.append(Pathline(Rect(x: ssx - ratio / 4,
-                                                      y: y - 3 * ratio,
-                                                      width: ratio / 2,
-                                                      height: 6 * ratio)))
-            }
-        }
-        
-        if let content = timeframe.content {
-            if !content.volumeValues.isEmpty {
-                let sSec = timeframe.sec(fromBeat: max(-timeframe.localStartBeat, 0))
-                let msSec = timeframe.sec(fromBeat: timeframe.localStartBeat)
-                let csSec = timeframe.sec(fromBeat: timeframe.beatRange.start)
-                let beatDur = Timeframe.beat(fromSec: content.secDuration,
-                                             tempo: timeframe.tempo,
-                                             beatRate: Keyframe.defaultFrameRate,
-                                             rounded: .up)
-                let eSec = timeframe
-                    .sec(fromBeat: min(timeframe.beatRange.end - (timeframe.localStartBeat + timeframe.beatRange.start),
-                                       beatDur))
-                let si = Int((sSec * Content.volumeFrameRate).rounded())
-                    .clipped(min: 0, max: content.volumeValues.count - 1)
-                let msi = Int((msSec * Content.volumeFrameRate).rounded())
-                let ei = Int((eSec * Content.volumeFrameRate).rounded())
-                    .clipped(min: 0, max: content.volumeValues.count - 1)
-                let vt = content.volume.smp
-                    .clipped(min: 0, max: Volume.maxSmp,
-                             newMin: lw / nh, newMax: 1)
-                if si < ei {
-                    let line = Line(controls: (si ... ei).map { i in
-                        let sec = Rational(i + msi) / Content.volumeFrameRate + csSec
-                        return .init(point: .init(x(atSec: sec), y),
-                                     pressure: content.volumeValues[i] * vt)
-                    })
-                    
-                    let pan = timeframe.score?.pan ?? 0
-                    let color = Self.panColor(pan: pan,
-                                              brightness: 0.25)
-                    noteLineNodes += [Node(path: .init(line),
-                                           lineWidth: nh,
-                                           lineType: .color(color))]
-                }
-            }
-            
-            if let image = content.image,
-               let texture = Texture(image: image, isOpaque: false,
-                                     colorSpace: .sRGB) {
-                var parent: Node?
-                node.allParents { node, stop in
-                    if node.bounds != nil {
-                        parent = node
-                        stop = true
-                    }
-                }
-                
-                let parentSize: Size =
-                if let parent, let pb = parent.bounds {
-                    pb.size
-                } else {
-                    Sheet.defaultBounds.size
-                }
-                
-                let size = (image.size / 2)
-                    .snapped(parentSize * 0.95)
-                * textSize / Font.defaultSize
-                boxNodes.append(Node(name: "content",
-                                     path: Path(Rect(size: size)),
-                                     fillType: .texture(texture)))
-            }
-        }
-        
-        contentPathlines.append(.init(Rect(x: sx - ratio, y: y - knobH / 2,
+        contentPathlines.append(.init(Rect(x: sx - 1, y: y - knobH / 2,
                                            width: knobW, height: knobH)))
-        contentPathlines.append(.init(Rect(x: ex - ratio, y: y - knobH / 2,
+        contentPathlines.append(.init(Rect(x: ex - 1, y: y - knobH / 2,
                                            width: knobW, height: knobH)))
-        contentPathlines.append(.init(Rect(x: sx + ratio, y: y - lw / 2,
-                                           width: ex - sx - ratio * 2,
-                                           height: lw)))
+        contentPathlines.append(.init(Rect(x: sx + 1, y: y - lw / 2,
+                                           width: ex - sx - 2, height: lw)))
         
-        let secRange = timeframe.secRange
+        let secRange = timeOption.secRange
         for sec in Int(secRange.start.rounded(.up)) ..< Int(secRange.end.rounded(.up)) {
             let sec = Rational(sec)
             let secX = x(atSec: sec)
-            contentPathlines.append(.init(Rect(x: secX - lw / 2,
-                                               y: y - ratio * 2,
-                                               width: lw,
-                                               height: ratio * 4)))
+            contentPathlines.append(.init(Rect(x: secX - lw / 2, y: y - 2,
+                                               width: lw, height: 4)))
         }
         
-        let h = if let score = timeframe.score {
-            self.height(fromPitch: score.pitchRange.length,
-                                noteHeight: nh)
-        } else {
-            knobH / 2 + knobW
-        }
-        
-        let roundedSBeat = timeframe.beatRange.start.rounded(.down)
+        let roundedSBeat = timeOption.beatRange.start.rounded(.down)
         let deltaBeat = Rational(1, 48)
         let beatR1 = Rational(1, 4), beatR2 = Rational(1, 12)
         let beat1 = Rational(2), beat2 = Rational(4)
         var cBeat = roundedSBeat
-        while cBeat <= timeframe.beatRange.end {
-            if cBeat >= timeframe.beatRange.start {
-                let olw: Double = if cBeat % beat2 == 0 {
+        while cBeat <= timeOption.beatRange.end {
+            if cBeat >= timeOption.beatRange.start {
+                let lw: Double = if cBeat % beat2 == 0 {
                     2
                 } else if cBeat % beat1 == 0 {
                     1.5
@@ -1901,17 +1691,14 @@ extension TextView {
                 } else {
                     0.125
                 }
-                let lw = olw * ratio
                 
                 let beatX = x(atBeat: cBeat)
                 
-                let rect = Rect(x: beatX - lw / 2,
-                                y: y - knobH / 2 - knobW,
-                                width: lw,
-                                height: h + knobH / 2 + knobW)
+                let rect = Rect(x: beatX - lw / 2, y: sy,
+                                width: lw, height: ey - sy)
                 if cBeat % 1 == 0 {
                     subBorderPathlines.append(Pathline(rect))
-                } else if lw == 0.125 {
+                } else if lw == 0.125 || lw == 0.25 {
                     fullEditBorderPathlines.append(Pathline(rect))
                 } else {
                     borderPathlines.append(Pathline(rect))
@@ -1920,480 +1707,10 @@ extension TextView {
             cBeat += deltaBeat
         }
         
-        if let score = timeframe.score {
-            let beat = timeframe.beatRange.start
-            let notes = score.sortedNotes.map {
-                var note = $0
-                note.volumeAmp *= score.volumeAmp
-                note.tone = score.tone//
-                note.pan = score.pan//
-                note.beatRange.start += beat + timeframe.localStartBeat
-                return note
-            }
-            let otherNotes = otherNotes.map {
-                var note = $0
-                note.beatRange.start += beat + timeframe.localStartBeat
-                return note
-            }
-            
-            let pitchRange = score.pitchRange
-            if let range = Range<Int>(pitchRange) {
-                var isAppendOctaveText = false
-                for pitch in range {
-                    for k in 0 ..< 12 {
-                        let pitch = Rational(pitch - 1) + Rational(k, 12)
-                        let sh = self.height(fromPitch: pitch - pitchRange.start,
-                                             noteHeight: nh)
-                        
-                        fullEditBorderPathlines.append(.init(Rect(x: sx, y: y + sh + nh / 2 - lw * 0.125 / 2,
-                                                                  width: ex - sx, height: lw * 0.125)))
-                    }
-                    
-                    let sh = self.height(fromPitch: Rational(pitch) - pitchRange.start,
-                                         noteHeight: nh)
-                    let hlw = lw / 2
-                    borderPathlines.append(.init(Rect(x: sx, y: y + sh + nh / 2 - hlw / 2,
-                                                      width: ex - sx, height: hlw)))
-                    
-                    let mod = (pitch + Int(score.scaleKey)).mod(12)
-                    if mod == 3 || mod == 6 || mod == 9 {
-                        let sh = self.height(fromPitch: Rational(pitch) - pitchRange.start,
-                                             noteHeight: nh)
-                        let lw = mod == 6 ? lw : lw / 2
-                        contentPathlines.append(Pathline(Rect(x: sx - ratio * 3,
-                                                              y: y + sh + nh / 2 - lw / 2,
-                                                              width: ratio * 3,
-                                                              height: lw)))
-                    } else if mod == 0 {
-                        let sh = self.height(fromPitch: Rational(pitch) - pitchRange.start,
-                                             noteHeight: nh)
-                        
-                        let plw = lw * 2
-                        contentPathlines.append(Pathline(Rect(x: sx - ratio * 3,
-                                                              y: y + sh + nh / 2 - plw / 2,
-                                                              width: ratio * 3,
-                                                              height: plw)))
-                        
-                        let octaveText = Text(string: "\(Int(Rational(pitch) + score.octavePitch) / 12)",
-                                                 size: Font.smallSize * ratio)
-                        textNodes.append(Node(attitude: Attitude(position: Point(sx - ratio * 3 - (octaveText.frame?.width ?? 0) - ratio, y + sh + nh / 2)),
-                                              path: octaveText.typesetter.path(),
-                                              fillType: .color(.content)))
-                        isAppendOctaveText = true
-                    }
-                }
-                if !isAppendOctaveText {
-                    let pitch = Rational((range.lowerBound + range.upperBound) / 2)
-                    let movedPitch = pitch + score.octavePitch
-                    let nPitch = Pitch(value: movedPitch)
-                    let octaveText = Text(string: "\(nPitch.octave).\(String(format: "%02d", Int(nPitch.unison)))",
-                                          size: Font.smallSize * 0.75 * ratio)
-                    
-                    let sh = self.height(fromPitch: pitch - pitchRange.start,
-                                         noteHeight: nh)
-                    textNodes.append(Node(attitude: Attitude(position: Point(sx - ratio * 2 - (octaveText.frame?.width ?? 0) - ratio, y + sh + nh / 2)),
-                                          path: octaveText.typesetter.path(),
-                                          fillType: .color(.content)))
-                }
-                
-                let unisonsSet = Set((otherNotes + notes).compactMap { Int($0.pitch.rounded().mod(12)) })
-                for pitch in range {
-                    guard unisonsSet
-                        .contains(pitch.mod(12)) else { continue }
-                    let sh = self.height(fromPitch: Rational(pitch) - pitchRange.start,
-                                         noteHeight: nh)
-                    subBorderPathlines.append(Pathline(Rect(x: sx, y: y + sh + nh / 2 - lw / 2,
-                                                            width: ex - sx, height: lw)))
-                }
-            }
-            
-            var brps = [(Range<Rational>, Int)]()
-            let preBeat = max(beat, sBeat)
-            let nextBeat = min(beat + timeframe.beatRange.length, eBeat)
-            
-            func appendOctaves(_ note: Note, isChord: Bool) {
-                var nNote = note
-                while true {
-                    nNote.pitch -= 12
-                    guard nNote.pitch > 0 && nNote.pitch < pitchRange.length else { break }
-                    
-                    let (aNoteLinePathlines, _, _)
-                    = notePathlines(from: nNote, y: y + nh / 2,
-                                    preFq: nil, nextFq: nil, tempo: timeframe.tempo)
-                    if isChord {
-                        noteChordLinePathlines += aNoteLinePathlines
-                    } else {
-                        noteOctaveLinePathlines += aNoteLinePathlines
-                    }
-                }
-                
-                nNote = note
-                var count = 1
-                while true {
-                    nNote.pitch += 12
-                    count += 1
-                    guard nNote.pitch > 0 && nNote.pitch < pitchRange.length else { break }
-                    
-                    let (aNoteLinePathlines, _, _)
-                    = notePathlines(from: nNote, y: y + nh / 2,
-                                    preFq: nil, nextFq: nil, tempo: timeframe.tempo)
-                    if isChord {
-                        noteChordLinePathlines += aNoteLinePathlines
-                    } else {
-                        noteOctaveLinePathlines += aNoteLinePathlines
-                    }
-                }
-            }
-            let nNotes = notes
-            for (i, note) in nNotes.enumerated() {
-                guard pitchRange.contains(note.pitch) else { continue }
-                var beatRange = note.beatRange
-                
-                guard beatRange.end > preBeat
-                        && beatRange.start < nextBeat
-                        && note.volumeAmp >= Volume.minAmp
-                        && note.volumeAmp <= Volume.maxAmp else { continue }
-                
-                if beatRange.start < preBeat {
-                    beatRange.length -= preBeat - beatRange.start
-                    beatRange.start = preBeat
-                }
-                if beatRange.end > nextBeat {
-                    beatRange.end = nextBeat
-                }
-                
-                var note = nNotes[i]
-                note.pitch -= pitchRange.start
-                
-                let isChord = note.isChord
-                if isChord {
-                    brps.append((beatRange, note.roundedPitch))
-                }
-                appendOctaves(note, isChord: isChord)
-                
-                let (preFq, nextFq) = pitbendPreNext(notes: nNotes, at: i)
-                let (aNoteLinePathlines, aNoteKnobPathlines, lyricPath)
-                = notePathlines(from: note, y: y + nh / 2,
-                                preFq: preFq, nextFq: nextFq, tempo: timeframe.tempo)
-                
-                let pan = timeframe.score?.pan ?? 0
-                noteLineNodes += aNoteLinePathlines.enumerated().map {
-                    let color = Self.panColor(pan: pan,
-                                              brightness: 0.25)
-                    return Node(path: Path([$0.element]),
-                                lineWidth: nh,
-                                lineType: .color(color))
-                }
-                
-                noteKnobPathlines += aNoteKnobPathlines
-                if let lyricPath {
-                    textNodes.append(.init(path: lyricPath, fillType: .color(.content)))
-                }
-            }
-            
-            for note in otherNotes {
-                guard pitchRange.contains(note.pitch) else { continue }
-                
-                let isChord = note.isChord
-                var note = note
-                note.pitch -= pitchRange.start
-                
-                let (aNoteLinePathlines, _, _)
-                = notePathlines(from: note, y: y + nh / 2,
-                                preFq: nil, nextFq: nil, tempo: timeframe.tempo)
-                if isChord {
-                    noteChordLinePathlines += aNoteLinePathlines
-                } else {
-                    noteOctaveLinePathlines += aNoteLinePathlines
-                }
-                
-                appendOctaves(note, isChord: isChord)
-            }
-            
-            let trs = Chord.splitedTimeRanges(timeRanges: brps)
-            for (tr, pitchs) in trs {
-                let ps = pitchs.sorted()
-                guard let chord = Chord(pitchs: ps),
-                      chord.typers.count <= 8 else { continue }
-                
-                var typersDic = [Int: [(typer: Chord.ChordTyper,
-                                        typerIndex: Int,
-                                        isInvrsion: Bool)]]()
-                for (ti, typer) in chord.typers.sorted(by: { $0.index < $1.index }).enumerated() {
-                    let inversionUnisons = typer.inversionUnisons
-                    var j = typer.index
-                    let fp = ps[j]
-                    for i in 0 ..< typer.type.unisons.count {
-                        guard j < ps.count else { break }
-                        if typersDic[j] != nil {
-                            typersDic[j]?.append((typer,
-                                                  ti,
-                                                  typer.inversion == i))
-                        } else {
-                            typersDic[j] = [(typer,
-                                             ti,
-                                             typer.inversion == i)]
-                        }
-                        while j + 1 < ps.count,
-                              !inversionUnisons.contains(ps[j + 1] - fp) {
-                            j += 1
-                        }
-                        j += 1
-                    }
-                }
-                
-                for (i, typers) in typersDic {
-                    let pitch = Rational(ps[i])
-                    let nsx = x(atBeat: tr.start), nex = x(atBeat: tr.end)
-                    let sh = self.height(fromPitch: pitch,
-                                         noteHeight: nh)
-                    let d = 1.0 * ratio
-                    let nw = 4.0 * Double(chord.typers.count - 1) * ratio
-                    func appendChordLine(at ti: Int,
-                                         isInversion: Bool,
-                                         _ typer: Chord.ChordTyper) {
-                        let tlw = 0.5 * ratio
-                        let lw =
-                        switch typer.type {
-                        case .octave: 7 * tlw
-                        case .major, .power: 5 * tlw
-                        case .suspended: 3 * tlw
-                        case .minor: 7 * tlw
-                        case .augmented: 5 * tlw
-                        case .flatfive: 3 * tlw
-                        case .diminish, .tritone: 1 * tlw
-                        }
-                        
-                        let x = -nw / 2 + 4.0 * Double(ti) * ratio
-                        let fx = (nex + nsx) / 2 + x - lw / 2
-                        let fy0 = y + sh + nh / 2 + ratio, fy1 = y + sh + nh / 2 - ratio - d
-                        
-                        let minorCount =
-                        switch typer.type {
-                        case .minor: 4
-                        case .augmented: 3
-                        case .flatfive: 2
-                        case .diminish: 1
-                        case .tritone: 1
-                        default: 0
-                        }
-                        
-                        if minorCount > 0 {
-                            for i in 0 ..< minorCount {
-                                let id = Double(i) * 2 * tlw
-                                contentPathlines.append(Pathline(Rect(x: fx + id, y: fy0,
-                                                                      width: tlw, height: d - tlw)))
-                                contentPathlines.append(Pathline(Rect(x: fx, y: fy0 + d - tlw,
-                                                                      width: lw, height: tlw)))
-                                
-                                contentPathlines.append(Pathline(Rect(x: fx + id, y: fy1 + tlw,
-                                                                      width: tlw, height: d - tlw)))
-                                contentPathlines.append(Pathline(Rect(x: fx, y: fy1,
-                                                                      width: lw, height: tlw)))
-                            }
-                        } else {
-                            contentPathlines.append(Pathline(Rect(x: fx, y: fy0,
-                                                                  width: lw, height: d)))
-                            contentPathlines.append(Pathline(Rect(x: fx, y: fy1,
-                                                                  width: lw, height: d)))
-                        }
-                        if isInversion {
-                            let ilw = 1 * ratio
-                            contentPathlines.append(Pathline(Rect(x: fx - ilw, y: fy0 + ilw,
-                                                                  width: lw + 2 * ilw, height: ilw)))
-                            contentPathlines.append(Pathline(Rect(x: fx - ilw, y: fy1 - ilw,
-                                                                  width: lw + 2 * ilw, height: ilw)))
-                        }
-                    }
-                    for (_, typerTuple) in typers.enumerated() {
-                        appendChordLine(at: typerTuple.typerIndex,
-                                        isInversion: typerTuple.isInvrsion,
-                                        typerTuple.typer)
-                    }
-                }
-            }
-            
-            var vx = vw + ratio * padding
-            
-            let tone = score.tone
-            
-            let overtoneW = 6.0 * ratio
-            let overtoneDW = 6.0 * ratio
-            let oh = 14 * ratio
-            let hoh = oh / 2
-            
-            boxNodes.append(Node(name: "overtone",
-                                 path: Path(Rect(x: vx,
-                                                 y: vy - hoh,
-                                                 width: overtoneDW * 6,
-                                                 height: oh).outset(by: 4 * ratio))))
-            
-            contentRatioLinePathlines.append(.init([Point(vx + overtoneW / 2 - overtoneDW / 2, vy - hoh + ratio),
-                                                    Point(vx + overtoneW / 2 + overtoneDW * 4 + overtoneDW / 2, vy - hoh + ratio)]))
-            
-            contentRatioLinePathlines.append(.init([Point(vx + overtoneW / 2, vy - hoh + ratio),
-                                                    Point(vx + overtoneW / 2, vy + hoh - ratio)]))
-            
-            vx += overtoneDW
-            
-            let evenP = Point(vx + overtoneW / 2,
-                              vy - hoh + ratio + (oh - 2 * ratio) * tone.overtone.evenScale)
-            contentRatioLinePathlines.append(.init([Point(vx + overtoneW / 2,
-                                                          vy - hoh + ratio),
-                                                    evenP]))
-            contentPathlines.append(.init(circleRadius: 2 * ratio,
-                                          position: evenP))
-            
-            vx += overtoneDW
-            
-            let oddP = Point(vx + overtoneW / 2,
-                             vy - hoh + ratio + (oh - 2 * ratio) * tone.overtone.oddScale)
-            contentRatioLinePathlines.append(.init([Point(vx + overtoneW / 2,
-                                                          vy - hoh + ratio),
-                                                    oddP]))
-            contentPathlines.append(.init(circleRadius: 2 * ratio,
-                                          position: oddP))
-            
-            vx += overtoneDW
-            
-            let evenP2 = Point(vx + overtoneW / 2,
-                               vy - hoh + ratio + (oh - 2 * ratio) * tone.overtone.evenScale)
-            contentRatioLinePathlines.append(.init([Point(vx + overtoneW / 2,
-                                                          vy - hoh + ratio),
-                                                    evenP2]))
-            
-            vx += overtoneDW
-            
-            let oddP2 = Point(vx + overtoneW / 2,
-                              vy - hoh + ratio + (oh - 2 * ratio) * tone.overtone.oddScale)
-            contentRatioLinePathlines.append(.init([Point(vx + overtoneW / 2,
-                                                          vy - hoh + ratio),
-                                                    oddP2]))
-            vx += overtoneDW + ratio * padding
-            
-            let sf = tone.sourceFilter
-
-            let fh = 12 * ratio
-            let hfh = fh / 2
-            let octaveCount = 7.0
-            let spW = octaveCount * 20 * ratio
-            let spy = vy - hfh
-            let sffp = Point(vx, spy)
-            let sflp = Point(vx + spW, spy)
-            
-            func sourceFilterX(atFq fq: Double) -> Double {
-                let t = Mel.mel(fromFq: fq)
-                    .clipped(min: 0, max: 4000, newMin: 0, newMax: 1)
-                return vx + spW * t
-            }
-            func sourceFilterY(atSmp smp: Double) -> Double {
-                vy - hfh + smp * fh
-            }
-            func sourceFilterP(at p: Point) -> Point {
-                .init(sourceFilterX(atFq: p.x),
-                      sourceFilterY(atSmp: p.y))
-            }
-            
-            borderPathlines += (1 ... 10).map {
-                .init(Rect(x: sourceFilterX(atFq: Pitch(octave: $0, step: .c).fq),
-                           y: sffp.y,
-                           width: 0.5 * ratio, height: fh))
-            }
-            
-            var lastP = Point()
-            var noisePs = [Point](capacity: sf.fqSmps.count)
-            var ps = [Point](capacity: sf.fqSmps.count)
-            for (i, fqSmp) in sf.fqSmps.enumerated() {
-                let noiseSmp = sf.noiseFqSmps[i]
-                
-                let editNoiseP = sourceFilterP(at: sf[i, .editFqNoiseSmp])
-                let noiseFP = Point(editNoiseP.x, spy)
-                let noiseP = sourceFilterP(at: noiseSmp)
-//                contentRatioLinePathlines.append(.init([noiseFP, noiseP],
-//                                                       isClosed: false))
-                contentPathlines.append(Pathline(circleRadius: knobRadius / 2,
-                                                 position: editNoiseP))
-                
-                let p = sourceFilterP(at: fqSmp)
-                contentPathlines.append(Pathline(circleRadius: knobRadius * 0.75,
-                                                 position: p))
-                
-                if i == 0 {
-                    noisePs.append(Point(sffp.x, noiseP.y))
-                    ps.append(Point(sffp.x, p.y))
-                }
-                
-                noisePs.append(noiseP)
-                ps.append(p)
-                
-                lastP = p
-                
-                if i == sf.fqSmps.count - 1 {
-                    noisePs.append(Point(sflp.x, noiseP.y))
-                    ps.append(Point(sflp.x, p.y))
-                }
-            }
-            if !ps.isEmpty && !noisePs.isEmpty {
-//                let nps = [sffp, sflp] + noisePs.reversed()
-//                borderPathlines += [.init(nps, isClosed: false)]
-                
-                contentRatioLinePathlines += [.init(noisePs, isClosed: false),
-                                              .init(ps, isClosed: false)]
-            }
-            
-            contentRatioLinePathlines += [.init([sffp, sflp],
-                                                isClosed: false)]
-            
-            contentPathlines.append(Pathline(circleRadius: knobRadius,
-                                             position: Point(lastP.x + ratio * 2, sflp.y)))
-            
-            boxNodes.append(Node(name: "sourceFilter",
-                                 path: Path(Rect(x: vx,
-                                                 y: vy - hfh,
-                                                 width: spW,
-                                                 height: fh).outset(by: 4 * ratio))))
-            
-            contentPathlines.append(Pathline(Rect(x: sx - ratio / 2, y: y,
-                                                  width: ratio, height: h + ratio / 2)))
-            contentPathlines.append(Pathline(Rect(x: ex - ratio / 2, y: y,
-                                                  width: ratio, height: h + ratio / 2)))
-            contentPathlines.append(Pathline(Rect(x: sx, y: y + h - ratio / 2,
-                                                  width: ex - sx, height: ratio)))
-        }
-        
-        let tempoBeat = timeframe.beatRange.start.rounded(.down) + 1
-        if tempoBeat < timeframe.beatRange.end {
-            let np = Point(x(atBeat: tempoBeat), y + h)
-            contentPathlines.append(Pathline(circleRadius: knobRadius,
-                                             position: np))
-        }
-        
-        if timeframe.isAudio {
-            let sprBeat = timeframe.beatRange.start.rounded(.down) + Rational(1, 2)
-            if sprBeat < timeframe.beatRange.end {
-                let sprH = 5 * ratio
-                let sprKnobW = knobH, sprKbobH = knobW
-                let np = Point(x(atBeat: sprBeat), y + h)
-                contentPathlines.append(Pathline(Rect(x: np.x - ratio / 2,
-                                                      y: np.y,
-                                                      width: ratio,
-                                                      height: sprH)))
-                if timeframe.isShownSpectrogram {
-                    contentPathlines.append(Pathline(Rect(x: np.x - sprKnobW / 2,
-                                                          y: np.y + sprH - sprKbobH / 2,
-                                                          width: sprKnobW,
-                                                          height: sprKbobH)))
-                } else {
-                    contentPathlines.append(Pathline(Rect(x: np.x - sprKnobW / 2,
-                                                          y: np.y - sprKbobH / 2,
-                                                          width: sprKnobW,
-                                                          height: sprKbobH)))
-                }
-                
-                boxNodes.append(Node(name: "isShownSpectrogram",
-                                     path: Path(Rect(x: np.x, y: np.y,
-                                                     width: sprKnobW, height: sprH))))
-            }
+        let tempoBeat = timeOption.beatRange.start.rounded(.down) + 1
+        if tempoBeat < timeOption.beatRange.end {
+            let np = Point(x(atBeat: tempoBeat), sy)
+            contentPathlines.append(Pathline(Rect(x: np.x - 1, y: np.y - 2, width: 2, height: 4)))
         }
         
         var nodes = [Node]()
@@ -2408,90 +1725,45 @@ extension TextView {
             nodes.append(Node(path: Path(borderPathlines),
                               fillType: .color(.border)))
         }
-        if !noteOctaveLinePathlines.isEmpty {
-            nodes += noteOctaveLinePathlines.enumerated().map {
-                return Node(path: Path([$0.element]),
-                            lineWidth: nh,
-                            lineType: .color(.border))
-            }
-        }
-        if !noteChordLinePathlines.isEmpty {
-            nodes += noteChordLinePathlines.enumerated().map {
-                return Node(path: Path([$0.element]),
-                            lineWidth: nh,
-                            lineType: .color(.subBorder))
-            }
-        }
         if !subBorderPathlines.isEmpty {
             nodes.append(Node(path: Path(subBorderPathlines),
                               fillType: .color(.subBorder)))
         }
-        nodes += noteLineNodes
         if !contentPathlines.isEmpty {
             nodes.append(Node(path: Path(contentPathlines),
                               fillType: .color(.content)))
         }
-        if !contentRatioLinePathlines.isEmpty {
-            nodes.append(Node(path: Path(contentRatioLinePathlines),
-                              lineWidth: ratio,
-                              lineType: .color(.content)))
-        }
-        if !noteKnobPathlines.isEmpty {
-            nodes.append(Node(path: Path(noteKnobPathlines),
-                              fillType: .color(.background)))
-        }
-        nodes += boxNodes
-        nodes += textNodes
         
         return nodes
     }
     
-    static func panColor(pan: Double, brightness l: Double) -> Color {
-        pan == 0 ?
-        Color(red: l, green: l, blue: l) :
-            (pan < 0 ?
-             Color(red: -pan * Spectrogram.editRedRatio * (1 - l) + l, green: l, blue: l) :
-                Color(red: l, green: pan * Spectrogram.editGreenRatio * (1 - l) + l, blue: l))
-    }
-    
     func updateTimeNode(atSec sec: Rational) {
-        if let timeNode = timeNode,
-           let frame = scoreFrame ?? timeRangeFrame {
-            
+        if let frame = timelineFrame, let timeNode {
             let x = self.x(atSec: sec)
             if x >= frame.minX && x < frame.maxX {
                 timeNode.path = Path([Point(), Point(0, frame.height)])
                 timeNode.attitude.position = Point(x, frame.minY)
-                updateFromPeakVolume()
             } else {
                 timeNode.path = Path()
-                currentVolumeNode?.path = Path()
             }
         } else {
             timeNode?.path = Path()
-            currentVolumeNode?.path = Path()
         }
     }
     
-    var timeframeFrame: Rect? {
-        timeRangeFrame?.union(scoreFrame).union(contentFrame)
+    func containsTimeline(_ p : Point) -> Bool {
+        timelineFrame?.contains(p) ?? false
     }
-    
-    func containsTimeRange(_ p : Point) -> Bool {
-        timeRangeFrame?.contains(p) ?? false
+    var timelineFrame: Rect? {
+        guard let timeOption = model.timeOption else { return nil }
+        let sx = x(atBeat: timeOption.beatRange.start)
+        let ex = x(atBeat: timeOption.beatRange.end)
+        let y = typesetter.firstReturnBounds?.minY ?? 0
+        return Rect(x: sx, y: y,
+                    width: ex - sx, height: Sheet.timelineHalfHeight * 2).outset(by: 3)
     }
-    var timeRangeFrame: Rect? {
-        guard let timeframe = model.timeframe else { return nil }
-        let sx = x(atBeat: timeframe.beatRange.start)
-        let ex = x(atBeat: timeframe.beatRange.end)
-        let lastB = typesetter.firstReturnBounds ?? Rect()
-        let y = lastB.minY
-        let ratio = nodeRatio
-        return Rect(x: sx, y: y - 6 * ratio,
-                    width: ex - sx, height: 12 * ratio).outset(by: 3 * ratio)
-    }
-    var transformedTimeRangeFrame: Rect? {
-        if var f = timeRangeFrame {
+    var transformedTimelineFrame: Rect? {
+        if var f = timelineFrame {
             f.origin.y += model.origin.y
             return f
         } else {
@@ -2499,685 +1771,35 @@ extension TextView {
         }
     }
     
-    var isShownSpectrogram: Bool {
-        get {
-            model.timeframe?.isShownSpectrogram ?? false
-        }
-        set {
-            let oldValue = model.timeframe?.isShownSpectrogram ?? false
-            model.timeframe?.isShownSpectrogram = newValue
-            if newValue != oldValue {
-                updateSpectrogram()
-            }
-        }
-    }
-    func containsIsShownSpectrogram(_ p: Point) -> Bool {
-        paddingIsShownSpectrogramFrame?.contains(p) ?? false
-    }
-    var isShownSpectrogramFrame: Rect? {
-        guard model.timeframe?.isShownSpectrogram != nil else { return nil }
-        if let node = timeframeNode.children.first(where: { $0.name == "isShownSpectrogram" }) {
-            return node.transformedBounds
-        } else {
-            return nil
-        }
-    }
-    var paddingIsShownSpectrogramFrame: Rect? {
-        isShownSpectrogramFrame?.outset(by: 3 * nodeRatio)
-    }
-    
-    func containsOctave(_ p: Point) -> Bool {
-        octaveFrame?.contains(p) ?? false
-    }
-    var octaveFrame: Rect? {
-        guard model.timeframe?.score != nil else { return nil }
-        if let node = timeframeNode.children.first(where: { $0.name == "octave" }) {
-            return node.transformedBounds?.outset(by: 5 * nodeRatio)
+    func tempoPositionBeat(_ p: Point, scale: Double) -> Rational? {
+        guard let timeOption = model.timeOption else { return nil }
+        let tempoBeat = timeOption.beatRange.start.rounded(.down) + 1
+        if tempoBeat < timeOption.beatRange.end {
+            let np = Point(x(atBeat: tempoBeat), timelineFrame?.minY ?? 0)
+            return np.distance(p) < 15 * scale ? tempoBeat : nil
         } else {
             return nil
         }
     }
     
-    func containsAttack(_ p: Point) -> Bool {
-        guard isFullEdit, let timeframe = model.timeframe, let score = timeframe.score,
-              let noteI = noteIndex(at: p, maxDistance: 5) else { return false }
-        
-        let nf = noteFrame(from: score.notes[noteI], score, timeframe)
-        return p.x < nf.minX + nf.width * 0.1
-    }
-    var attackFrame: Rect? {
-        guard model.timeframe?.score != nil else { return nil }
-        if let node = timeframeNode.children.first(where: { $0.name == "attack" }) {
-            return node.transformedBounds
-        } else {
-            return nil
-        }
-    }
-    var paddingAttackFrame: Rect? {
-        guard let f = attackFrame else { return nil }
-        let d = 5 * nodeRatio
-        return Rect(x: f.minX - d,
-                    y: f.minY - d,
-                    width: f.width + d,
-                    height: f.height + d * 2)
+    func contains(_ p: Point) -> Bool {
+        containsTimeline(p)
+        || (bounds?.contains(p) ?? false)
     }
     
-    func containsDecayAndSustain(_ p: Point) -> Bool {
-        guard isFullEdit, let timeframe = model.timeframe, let score = timeframe.score,
-              let noteI = noteIndex(at: p, maxDistance: 5) else { return false }
-        
-        let nf = noteFrame(from: score.notes[noteI], score, timeframe)
-        return p.y > nf.minY + nf.height * 0.9
-    }
-    var decayAndSustainFrame: Rect? {
-        guard model.timeframe?.score != nil else { return nil }
-        if let node = timeframeNode.children.first(where: { $0.name == "decayAndSustain" }) {
-            return node.transformedBounds
-        } else {
-            return nil
-        }
-    }
-    var paddingDecayAndSustainFrame: Rect? {
-        guard let f = decayAndSustainFrame else { return nil }
-        let d = 5 * nodeRatio
-        return Rect(x: f.minX,
-                    y: f.minY - d,
-                    width: f.width,
-                    height: f.height + d * 2)
-    }
-    
-    func containsRelease(_ p: Point) -> Bool {
-        guard isFullEdit, let timeframe = model.timeframe, let score = timeframe.score,
-              let noteI = noteIndex(at: p, maxDistance: 5) else { return false }
-        
-        let nf = noteFrame(from: score.notes[noteI], score, timeframe)
-        return p.x > nf.minX + nf.width * 0.9
-    }
-    var releaseFrame: Rect? {
-        guard model.timeframe?.score != nil else { return nil }
-        if let node = timeframeNode.children.first(where: { $0.name == "release" }) {
-            return node.transformedBounds
-        } else {
-            return nil
-        }
-    }
-    var paddingReleaseFrame: Rect? {
-        guard let f = releaseFrame else { return nil }
-        let d = 5 * nodeRatio
-        return Rect(x: f.minX,
-                    y: f.minY - d,
-                    width: f.width + d,
-                    height: f.height + d * 2)
-    }
-    
-    func overtonePosition(at type: OvertoneType) -> Point? {
-        guard let f = overtoneFrame,
-              let tone = model.timeframe?.score?.tone else { return nil }
-        let ratio = nodeRatio
-        let vx = f.minX + 4 * ratio, vy = f.minY + 4 * ratio
-        let overtoneW = 6.0 * ratio
-        let overtoneDW = 6.0 * ratio
-        let oh = 14 * ratio
-        return switch type {
-        case .evenScale:
-            .init(vx + overtoneDW + overtoneW / 2,
-                  vy + ratio + (oh - 2 * ratio) * tone.overtone.evenScale)
-        case .oddScale:
-            .init(vx + overtoneDW * 2 + overtoneW / 2,
-                  vy + ratio + (oh - 2 * ratio) * tone.overtone.oddScale)
-        }
-    }
-    func overtoneType(at p: Point) -> OvertoneType? {
-        guard let f = overtoneFrame, f.contains(p) else { return nil }
-        var minDS = Double.infinity, minType: OvertoneType?
-        for type in OvertoneType.allCases {
-            guard let op = overtonePosition(at: type) else { continue }
-            let ds = op.distanceSquared(p)
-            if ds < minDS {
-                minDS = ds
-                minType = type
-            }
-        }
-        return minType
-    }
-    func containsOvertone(_ p: Point) -> Bool {
-        overtoneFrame?.contains(p) ?? false
-    }
-    var overtoneFrame: Rect? {
-        guard model.timeframe?.score != nil else { return nil }
-        if let node = timeframeNode.children.first(where: { $0.name == "overtone" }) {
-            return node.transformedBounds
-        } else {
-            return nil
-        }
-    }
-    
-    func sourceFilterFq(atX x: Double,
-                       octaveCount: Double = 7,
-                       octaveWidth: Double = 20) -> Double? {
-        guard let f = sourceFilterFrame else { return nil }
-        let ratio = nodeRatio
-        let spx = f.minX + 4 * ratio
-        let spW = octaveCount * octaveWidth * ratio
-        let mel = ((x - spx) / spW).clipped(min: 0, max: 1,
-                                            newMin: 0, newMax: 4000)
-        return Mel.fq(fromMel: mel)
-    }
-    func sourceFilterX(atFq fq: Double,
-                      octaveCount: Double = 7,
-                      octaveWidth: Double = 20) -> Double? {
-        guard let f = sourceFilterFrame else { return nil }
-        let ratio = nodeRatio
-        let spx = f.minX + 4 * ratio
-        let spW = octaveCount * octaveWidth * ratio
-        let t = Mel.mel(fromFq: fq)
-            .clipped(min: 0, max: 4000, newMin: 0, newMax: 1)
-        return spx + spW * t
-    }
-    func sourceFilterIndex(atX x: Double) -> Int? {
-        guard let sourceFilter = model.timeframe?.score?.tone.sourceFilter,
-              let fq = sourceFilterFq(atX: x) else { return nil }
-        for (i, fqSmp) in sourceFilter.fqSmps.enumerated().reversed() {
-            if fq >= fqSmp.x {
-                return i
-            }
-        }
-        return nil
-    }
-    func sourceFilterY(atSmp smp: Double, height: Double = 12) -> Double? {
-        guard let f = sourceFilterFrame else { return nil }
-        let ratio = nodeRatio
-        let spy = f.minY + 4 * ratio
-        let fh = height * ratio
-        return spy + smp * fh
-    }
-    func sourceFilterSmp(atY y: Double, height: Double = 12) -> Double? {
-        guard let f = sourceFilterFrame else { return nil }
-        let ratio = nodeRatio
-        let spy = f.minY + 4 * ratio
-        let fh = height * ratio
-        return (y - spy) / fh
-    }
-    
-    func sourceFilterType(at p: Point,
-                       maxDistance: Double) -> (i: Int, type: SourceFilterType, isLast: Bool)? {
-        guard let f = sourceFilterFrame, f.contains(p),
-              let score = model.timeframe?.score else { return nil }
-        
-        let ratio = nodeRatio
-        let spy = f.minY + 4 * ratio
-        
-        func sourceFilterP(at p: Point) -> Point {
-            .init(sourceFilterX(atFq: p.x)!,
-                  sourceFilterY(atSmp: p.y)!)
-        }
-        
-        var ps = [(p: Point, i: Int, type: SourceFilterType)](), lastP = Point()
-        let sf = score.tone.sourceFilter
-        for (i, fqSmp) in sf.fqSmps.enumerated() {
-            let enp = sourceFilterP(at: sf[i, .editFqNoiseSmp])
-            let p = sourceFilterP(at: fqSmp)
-            
-            ps.append((enp, i, .editFqNoiseSmp))
-            ps.append((p, i, .fqSmp))
-            lastP = p
-        }
-        
-        let maxDS = maxDistance * maxDistance
-        var minDS = Double.infinity, minI: Int?, minType = SourceFilterType.fqSmp
-        
-        for fpt in ps {
-            let ds = fpt.p.distanceSquared(p)
-            if ds < minDS && ds < maxDS {
-                minDS = ds
-                minI = fpt.i
-                minType = fpt.type
-            }
-        }
-        
-        if let minI, minType == .editFqNoiseSmp && sourceFilterP(at: sf.fqSmps[minI]).distance(sourceFilterP(at: sf[minI, .editFqNoiseSmp])) < ratio * 2 {
-            minType = .fqSmp
-        }
-        
-        let np = Point(lastP.x + ratio * 2, spy)
-        let ds = np.distanceSquared(p)
-        if ds < minDS && ds < maxDS {
-            return (score.tone.sourceFilter.fqSmps.count - 1, minType, true)
-        } else if let minI {
-            return (minI, minType, false)
-        } else {
-            return nil
-        }
-    }
-    func containsSourceFilter(_ p: Point) -> Bool {
-        sourceFilterFrame?.contains(p) ?? false
-    }
-    var sourceFilterFrame: Rect? {
-        guard model.timeframe?.score != nil else { return nil }
-        if let node = timeframeNode.children.first(where: { $0.name == "sourceFilter" }) {
-            return node.transformedBounds
-        } else {
-            return nil
-        }
-    }
-    
-    func containsContent(_ p: Point) -> Bool {
-        contentFrame?.contains(p) ?? false
-    }
-    var contentFrame: Rect? {
-        guard model.timeframe?.content != nil else { return nil }
-        if let node = timeframeNode.children.first(where: { $0.name == "content" }) {
-            return node.transformedBounds
-        } else {
-            return nil
-        }
-    }
-    
-    func tempoPositionBeat(_ p: Point, maxDistance: Double) -> Rational? {
-        guard let timeframe = model.timeframe else { return nil }
-        let tempoBeat = timeframe.beatRange.start.rounded(.down) + 1
-        if tempoBeat < timeframe.beatRange.end {
-            let np = if let scoreFrame {
-                Point(x(atBeat: tempoBeat), scoreFrame.maxY)
-            } else {
-                Point(x(atBeat: tempoBeat), timeRangeFrame?.maxY ?? 0)
-            }
-            return np.distance(p) < maxDistance ? tempoBeat : nil
-        } else {
-            return nil
-        }
-    }
-    
-    func containsTone(_ p: Point) -> Bool {
-        toneFrame?.contains(p) ?? false
-    }
-    var toneFrame: Rect? {
-        guard model.timeframe?.score != nil else { return nil }
-        return overtoneFrame + sourceFilterFrame
-    }
-    
-    func containsScore(_ p: Point) -> Bool {
-        paddingScoreFrame?.contains(p) ?? false
-    }
-    var scoreFrame: Rect? {
-        guard let timeframe = model.timeframe,
-              let score = timeframe.score else { return nil }
-        let h = self.height(fromPitch: score.pitchRange.length)
-        let sx = self.x(atBeat: timeframe.beatRange.start)
-        let ex = self.x(atBeat: timeframe.beatRange.end)
+    func mainLineDistance(_ p: Point) -> Double? {
+        guard model.timeOption != nil else { return nil }
         let lastB = typesetter.firstReturnBounds ?? Rect()
         let y = lastB.minY
-        return Rect(x: sx, y: y, width: ex - sx, height: h)
+        return abs(p.y - y)
     }
-    var transformedScoreFrame: Rect? {
-        if var sf = scoreFrame {
-            sf.origin.y += model.origin.y
-            return sf
-        } else {
-            return nil
-        }
-    }
-    var paddingScoreFrame: Rect? {
-        scoreFrame?.outset(by: 3 * nodeRatio)
-    }
-    
-    func containsTimeframe(_ p: Point) -> Bool {
-        containsTimeRange(p)
-        || containsIsShownSpectrogram(p)
-        || containsScore(p)
-        || containsTone(p) || containsContent(p)
-    }
-    var endTimeFrame: Rect? {
-        guard let timeframe = model.timeframe else { return nil }
-        
-        let ratio = nodeRatio
-        let t = timeframe.beatRange.end
-        let sx = self.x(atBeat: t)
-        let ex = self.x(atBeat: t)
-        let lastB = typesetter.firstReturnBounds ?? Rect()
-        let y = lastB.minY
-        
-        return Rect(x: sx, y: y - 6 * ratio, width: ex - sx, height: 12 * ratio)
-            .outset(by: 3 * ratio)
-    }
-    
     func containsMainLine(_ p: Point, distance: Double) -> Bool {
-        guard containsTimeframe(p) else { return false }
-        let lastB = typesetter.firstReturnBounds ?? Rect()
-        let y = lastB.minY
-        return abs(p.y - y) < distance
-    }
-    
-    func noteFrame(from note: Note,
-                   _ score: Score, _ timeframe: Timeframe) -> Rect {
-        let ratio = nodeRatio
-        
-        let lastB = typesetter.firstReturnBounds ?? Rect()
-        let y = lastB.minY
-        
-        let nh = ScoreLayout.noteHeight * ratio
-        
-        let sh = self.height(fromPitch: note.pitch - score.pitchRange.lowerBound,
-                             noteHeight: nh)
-        let nx = x(atBeat: note.beatRange.start + timeframe.beatRange.start + timeframe.localStartBeat)
-        let w = note.beatRange.length == 0 ?
-        width(atBeatDuration: Rational(1, 96)) :
-        x(atBeat: note.beatRange.end + timeframe.beatRange.start + timeframe.localStartBeat) - nx
-        return Rect(x: nx, y: y + sh, width: w, height: nh)
-    }
-    func noteFrames(_ score: Score, _ timeframe: Timeframe) -> [Rect] {
-        let ratio = nodeRatio
-        let lastB = typesetter.firstReturnBounds ?? Rect()
-        let y = lastB.minY
-        let nh = ScoreLayout.noteHeight * ratio
-        return score.notes.compactMap { note in
-            guard score.pitchRange.contains(note.pitch) else { return nil }
-            let sh = self.height(fromPitch: note.pitch - score.pitchRange.lowerBound,
-                                 noteHeight: nh)
-            let nx = x(atBeat: note.beatRange.start + timeframe.beatRange.start + timeframe.localStartBeat)
-            let w = note.beatRange.length == 0 ?
-            1.0 * ratio :
-            x(atBeat: note.beatRange.end + timeframe.beatRange.start + timeframe.localStartBeat) - nx
-            return Rect(x: nx, y: y + sh, width: w, height: nh)
-        }
-    }
-    func noteNode(from note: Note, at i: Int?, y: Double,
-                  color: Color = .content) -> Node {
-        Node(children: noteNodes(from: note, at: i, y: y, color: color))
-    }
-    func noteNodes(from note: Note, at i: Int?, y: Double,
-                   color: Color = .content) -> [Node] {
-        guard let timeframe = model.timeframe, let score = timeframe.score else { return [] }
-        let ratio = nodeRatio
-        let noteHeight = ScoreLayout.noteHeight * ratio
-        
-//        let lastB = typesetter.firstReturnBounds ?? Rect()
-        let y = y + noteHeight / 2
-        let (preFq, nextFq) = i != nil ? pitbendPreNext(notes: score.notes, at: i!) : (nil, nil)
-        let (linePathlines, knobPathlines, lyricPath) = notePathlines(from: note, y: y,
-                                                                      preFq: preFq, nextFq: nextFq,
-                                                                      tempo: timeframe.tempo)
-        
-        let lyricNodes: [Node]
-        if let lyricPath {
-            lyricNodes = [Node(path: lyricPath,
-                               fillType: .color(color))]
-        } else {
-            lyricNodes = []
-        }
-        
-        let pan = timeframe.score?.pan ?? 0
-        let nodes = linePathlines.enumerated().map {
-            let color = Self.panColor(pan: pan,
-                                      brightness: 0.25)
-            return Node(path: Path([$0.element]),
-                        lineWidth: noteHeight,
-                        lineType: .color(color))
-        }
-        
-        return nodes + [Node(path: Path(knobPathlines),
-                             fillType: .color(.background))] + lyricNodes
-    }
-    func notePathlines(from note: Note, y: Double,
-                       preFq: Double?, nextFq: Double?,
-                       tempo: Rational) -> (linePathlines: [Pathline], knobPathlines: [Pathline],
-                                            lyricPath: Path?) {
-        let ratio = nodeRatio
-        let noteHeight = ScoreLayout.noteHeight * ratio
-        let nx = self.x(atBeat: note.beatRange.start)
-        let ny = self.height(fromPitch: note.pitch,
-                             noteHeight: noteHeight) + y
-        let nw = width(atBeatDuration: note.beatRange.length == 0 ? Rational(1, 96) : note.beatRange.length)
-        if note.volumeAmp == 0 {
-            let d = ratio - ratio / 4
-            var line0 = Line(edge: .init(.init(nx, ny - d), .init(nx + nw, ny - d)))
-            line0.controls = line0.controls.map {
-                .init(point: $0.point,
-                      weight: $0.weight,
-                      pressure: $0.pressure / noteHeight / 2)
-            }
-            var line1 = Line(edge: .init(.init(nx, ny + d), .init(nx + nw, ny + d)))
-            line1.controls = line1.controls.map {
-                .init(point: $0.point,
-                      weight: $0.weight,
-                      pressure: $0.pressure / noteHeight / 2)
-            }
-            
-            return ([.init(line0), .init(line1)], [], nil)
-        }
-        
-        func lyricPath(at p: Point) -> Path? {
-            if !note.lyric.isEmpty || note.isBreath || note.isVibrato || note.isVowelReduction {
-                let lyricText = Text(string: "\(note.lyric)" + (note.isBreath ? "^" : "") + (note.isVibrato ? "~" : "") + (note.isVowelReduction ? "/" : ""),
-                                     size: Font.smallSize * ratio)
-                let typesetter = lyricText.typesetter
-                return typesetter.path() * Transform(translationX: p.x, y: p.y - typesetter.height / 2)
-            } else {
-                return nil
-            }
-        }
-        
-        let smpT = note.volume.smp
-            .clipped(min: 0, max: Volume.maxSmp, newMin: 0, newMax: 1) + 1 / noteHeight
-        if !note.pitbend.isEmpty || (note.pitbend.isEmpty && !note.lyric.isEmpty) {
-            let pitbend = pitbend(from: note, tempo: tempo, preFq: preFq, nextFq: nextFq)
-            let secDur = Double(Timeframe.sec(fromBeat: note.beatRange.length, tempo: tempo))
-            
-            var line = pitbend.line(secDuration: secDur,
-                                    envelope: note.tone.envelope) ?? Line()
-            line.controls = line.controls.map {
-                .init(point: .init($0.point.x / secDur * nw + nx,
-                                   self.height(fromPitch: $0.point.y * 12,
-                                               noteHeight: noteHeight) + ny),
-                      weight: $0.weight,
-                      pressure: $0.pressure * smpT)
-            }
-            
-            let knobPathlines = pitbend.pits.map {
-                Pathline(circleRadius: 0.5 * nodeRatio,
-                         position: .init($0.t * nw + nx,
-                                         self.height(fromPitch: $0.pitch * 12,
-                                                     noteHeight: noteHeight) + ny))
-            }
-            
-            let lp = (line.controls.first?.point ?? .init(nx, ny)) + .init(0, -noteHeight / 2)
-            return ((line.isEmpty ? [] : [.init(line)]), knobPathlines, lyricPath(at: lp))
-        } else {
-            let env = note.tone.envelope
-            let attackW = width(atSecDuration: env.attack)
-            let sustain = Volume(amp: note.volume.amp * env.sustain).smp
-                .clipped(min: 0, max: Volume.maxSmp, newMin: 0, newMax: 1) + 1 / noteHeight
-            let line = Line(controls: [.init(point: Point(nx, ny), pressure: 0),
-                                       .init(point: Point(nx + attackW, ny), pressure: smpT),
-                                       .init(point: Point(nx + attackW, ny), pressure: smpT),
-                                       .init(point: Point(nx + attackW + width(atSecDuration: env.decay), ny), pressure: sustain),
-                                       .init(point: Point(nx + attackW + width(atSecDuration: env.decay), ny), pressure: sustain),
-                                       .init(point: Point(nx + nw, ny), pressure: sustain),
-                                       .init(point: Point(nx + nw, ny), pressure: sustain),
-                                       .init(point: Point(nx + nw + width(atSecDuration: env.release), ny), pressure: 0)])
-            return ([.init(line)], [], lyricPath(at: .init(nx, ny - noteHeight / 2)))
-        }
-    }
-    
-    func pitbendPreNext(notes: [Note], at i: Int) -> (preFq: Double?, nextFq: Double?) {
-        let note = notes[i]
-        guard !note.lyric.isEmpty else { return (nil, nil) }
-        var preFq, nextFq: Double?
-        
-        var minD = Rational.max
-        for j in (0 ..< i).reversed() {
-            guard !notes[j].lyric.isEmpty else { continue }
-            guard notes[j].beatRange.end == note.beatRange.start else { break }
-            let d = abs(note.pitch - notes[j].pitch)
-            if d < Pitbend.enabledRecoilPitchDistance, d < minD {
-                preFq = notes[j].fq
-                minD = d
-            }
-        }
-        
-        minD = .max
-        for j in i + 1 ..< notes.count {
-            guard !notes[j].lyric.isEmpty else { continue }
-            guard notes[j].beatRange.start == note.beatRange.end else { break }
-            let d = abs(note.pitch - notes[j].pitch)
-            if d < Pitbend.enabledRecoilPitchDistance, d < minD {
-                preFq = notes[j].fq
-                minD = d
-            }
-        }
-        return (preFq, nextFq)
-    }
-    func pitbend(from note: Note, tempo: Rational,
-                 preFq: Double?, nextFq: Double?) -> Pitbend {
-        if !note.pitbend.isEmpty || (note.pitbend.isEmpty && !note.lyric.isEmpty) {
-            if !note.pitbend.isEmpty {
-                return note.pitbend
-            } else {
-                let isVowel = Phoneme.isSyllabicJapanese(Phoneme.phonemes(fromHiragana: note.lyric))
-                return Pitbend(isVibrato: note.isVibrato,
-                               duration: Double(Timeframe.sec(fromBeat: note.beatRange.length, tempo: tempo)),
-                               fq: note.fq,
-                               isVowel: isVowel,
-                               previousFq: preFq, nextFq: nextFq)
-            }
-        } else {
-            return Pitbend()
-        }
-    }
-    
-    func pitT(at p: Point,
-              maxDistance maxD: Double) -> (noteI: Int, pitT: Double)? {
-        guard let timeframe = model.timeframe,
-              let score = timeframe.score else { return nil }
-        
-        var minNoteI: Int?, minPitT: Double?, minD = Double.infinity
-        for noteI in 0 ..< score.notes.count {
-            let note = score.notes[noteI]
-            let (preFq, nextFq) = pitbendPreNext(notes: score.notes, at: noteI)
-            let pitbend = pitbend(from: note, tempo: timeframe.tempo, preFq: preFq, nextFq: nextFq)
-            
-            let f = noteFrame(from: note, score, timeframe)
-            let sh = self.height(fromPitch: note.pitch - score.pitchRange.start,
-                                 noteHeight: f.height)
-            if f.width > 0 && p.x >= f.minX && p.x <= f.maxX {
-                let t = (p.x - f.minX) / f.width
-                let pit = pitbend.pit(atT: t)
-                
-                let y = self.height(fromPitch: pit.pitch * 12 + .init(note.pitch - score.pitchRange.start),
-                                    noteHeight: f.height) + f.midY - sh
-                let d = y.distance(p.y)
-                if d < minD && d < maxD {
-                    minNoteI = noteI
-                    minPitT = t
-                    minD = d
-                }
-            }
-        }
-        
-        if let minNoteI, let minPitT {
-            return (minNoteI, minPitT)
-        } else {
-            return nil
-        }
-    }
-    
-    func pitbendTuple(at p: Point,
-                      maxDistance maxD: Double) -> (noteI: Int, pitI: Int,
-                                                    pit: Pit,
-                                                    pitbend: Pitbend)? {
-        guard let timeframe = model.timeframe,
-              let score = timeframe.score else { return nil }
-        
-        let maxDS = maxD * maxD
-        var minNoteI: Int?, minPitI: Int?,
-            minPit: Pit?, minPitbend: Pitbend?,
-            minDS = Double.infinity
-        for noteI in 0 ..< score.notes.count {
-            let note = score.notes[noteI]
-            let (preFq, nextFq) = pitbendPreNext(notes: score.notes, at: noteI)
-            let pitbend = pitbend(from: note, tempo: timeframe.tempo, preFq: preFq, nextFq: nextFq)
-            let f = noteFrame(from: note, score, timeframe)
-            let sh = self.height(fromPitch: note.pitch - score.pitchRange.start,
-                                 noteHeight: f.height)
-            for (pitI, pit) in pitbend.pits.enumerated() {
-                let pitP = Point(pit.t * f.width + f.minX,
-                                 self.height(fromPitch: pit.pitch * 12 + .init(note.pitch - score.pitchRange.start),
-                                                     noteHeight: f.height) + f.midY - sh)
-                let ds = pitP.distanceSquared(p)
-                if ds < minDS && ds < maxDS {
-                    minNoteI = noteI
-                    minPitI = pitI
-                    minPit = pit
-                    minPitbend = pitbend
-                    minDS = ds
-                }
-            }
-        }
-        
-        if let minNoteI, let minPitI, let minPit, let minPitbend {
-            return (minNoteI, minPitI, minPit, minPitbend)
-        } else {
-            return nil
-        }
-    }
-    
-    func noteIndex(at p: Point, maxDistance: Double) -> Int? {
-        guard let timeframe = model.timeframe,
-              let score = timeframe.score,
-              containsScore(p) else { return nil }
-        
-        let ratio = nodeRatio
-        let sBeat = max(timeframe.beatRange.start, -10000),
-            eBeat = min(timeframe.beatRange.end, 10000)
-        guard sBeat <= eBeat else { return nil }
-        let lastB = typesetter.firstReturnBounds ?? Rect()
-        let y = lastB.minY
-        let nh = ScoreLayout.noteHeight * ratio
-        
-        let pitchRange = score.pitchRange
-        let beat = timeframe.beatRange.start
-        let preBeat = max(beat, sBeat)
-        let nextBeat = min(beat + timeframe.beatRange.length, eBeat)
-        
-        let maxDS = maxDistance * maxDistance
-        var minI: Int?, minDS = Double.infinity
-        for (i, note) in score.notes.enumerated() {
-            guard pitchRange.contains(note.pitch) else { continue }
-            var beatRange = note.beatRange
-            beatRange.start += beat + timeframe.localStartBeat
-            
-            guard beatRange.end > preBeat
-                    && beatRange.start < nextBeat
-                    && note.volumeAmp >= Volume.minAmp
-                    && note.volumeAmp <= Volume.maxAmp else { continue }
-            
-            if beatRange.start < preBeat {
-                beatRange.length -= preBeat - beatRange.start
-                beatRange.start = preBeat
-            }
-            if beatRange.end > nextBeat {
-                beatRange.end = nextBeat
-            }
-            
-            let sh = self.height(fromPitch: note.pitch - pitchRange.start,
-                                 noteHeight: nh)
-            let nx = x(atBeat: beatRange.start)
-            let nw = beatRange.length == 0 ?
-                width(atBeatDuration: Rational(1, 96)) :
-                x(atBeat: beatRange.end) - nx
-            let noteF = Rect(x: nx, y: y + sh, width: nw, height: nh)
-            
-            let ds = noteF.distanceSquared(p)
-            if ds < minDS && ds < maxDS {
-                minDS = ds
-                minI = i
-            }
-        }
-        return minI
+        guard containsTimeline(p), let d = mainLineDistance(p) else { return false }
+        return d < distance
     }
     
     private func updateMarkedRange() {
-        if let markedRange = markedRange {
+        if let markedRange {
             var mPathlines = [Pathline]()
             let delta = markedRangeNode.lineWidth
             for edge in typesetter.underlineEdges(for: markedRange,
@@ -3188,7 +1810,8 @@ extension TextView {
         } else {
             markedRangeNode.path = Path()
         }
-        if let replacedRange = replacedRange {
+        
+        if let replacedRange {
             var rPathlines = [Pathline]()
             let delta = markedRangeNode.lineWidth
             for edge in typesetter.underlineEdges(for: replacedRange,
@@ -3201,7 +1824,7 @@ extension TextView {
         }
     }
     fileprivate func updateCursor() {
-        if let selectedRange = selectedRange {
+        if let selectedRange {
             cursorNode.path = typesetter.cursorPath(at: selectedRange.lowerBound)
         } else {
             cursorNode.path = Path()
@@ -3230,37 +1853,37 @@ extension TextView {
     }
     
     var bounds: Rect? {
-        if let timeframeFrame {
+        if let timelineFrame {
             let rect = typesetter.spacingTypoBoundsEnabledEmpty
-            return timeframeFrame.union(rect)
+            return timelineFrame.union(rect)
         } else {
             return typesetter.spacingTypoBoundsEnabledEmpty
         }
     }
     var transformedBounds: Rect? {
-        if let bounds = bounds {
-            return bounds * node.localTransform
+        if let bounds {
+            bounds * node.localTransform
         } else {
-            return nil
+            nil
         }
     }
     
     var clippableBounds: Rect? {
-        if let timeframeFrame {
+        if let timelineFrame {
             if let rect = typesetter.typoBounds {
-                return timeframeFrame.union(rect)
+                timelineFrame.union(rect)
             } else {
-                return nil
+                nil
             }
         } else {
-            return typesetter.typoBounds
+            typesetter.typoBounds
         }
     }
     var transformedClippableBounds: Rect? {
         if let bounds = clippableBounds {
-            return bounds * node.localTransform
+            bounds * node.localTransform
         } else {
-            return nil
+            nil
         }
     }
     
@@ -3270,10 +1893,10 @@ extension TextView {
     }
     func transformedTypoBounds(with range: Range<String.Index>) -> Rect? {
         let b = typesetter.typoBounds(for: range)
-        if let b = b {
-            return b * node.localTransform
+        return if let b {
+            b * node.localTransform
         } else {
-            return nil
+            nil
         }
     }
     

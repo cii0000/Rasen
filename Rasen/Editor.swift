@@ -272,7 +272,7 @@ final class DraftEditor: Editor {
             } else {
                 if let sheetView = document.sheetView(at: p) {
                     let inP = sheetView.convertFromWorld(p)
-                    if sheetView.containsTimeline(inP),
+                    if sheetView.animationView.containsTimeline(inP),
                        let ki = sheetView.animationView.keyframeIndex(at: inP) {
                         
                         let animationView = sheetView.animationView
@@ -342,7 +342,7 @@ final class DraftEditor: Editor {
             } else {
                 if let sheetView = document.sheetView(at: p) {
                     let inP = sheetView.convertFromWorld(p)
-                    if sheetView.containsTimeline(inP),
+                    if sheetView.animationView.containsTimeline(inP),
                        let ki = sheetView.animationView.keyframeIndex(at: inP) {
                         
                         let animationView = sheetView.animationView
@@ -620,20 +620,6 @@ final class SoundExporter: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class LyricsExporter: InputKeyEditor {
-    let editor: IOEditor
-    
-    init(_ document: Document) {
-        editor = IOEditor(document)
-    }
-    
-    func send(_ event: InputKeyEvent) {
-        editor.export(with: event, .lyrics)
-    }
-    func updateNode() {
-        editor.updateNode()
-    }
-}
 final class CaptionExporter: InputKeyEditor {
     let editor: IOEditor
     
@@ -829,40 +815,42 @@ final class IOEditor: Editor {
             let xCount = max(1, Int(Double(contentURLs.count).squareRoot()))
             for url in contentURLs {
                 if let sheetView = document.madeSheetView(at: shp + dshp) {
-                    let np = contentURLs.count == 1 ?
-                        sheetView.convertFromWorld(fp) : Point(10, 10)
-                    let tempo = sheetView.tempo(at: np) ?? Music.defaultTempo
+                    let np = contentURLs.count == 1 ? sheetView.convertFromWorld(fp) : Point(10, 10)
                     let filename = url.lastPathComponent
                     let name = UUID().uuidString + "." + url.pathExtension
                     
                     try? document.contentsDirectory.copy(name: name, from: url)
                     
-                    let content = Content(name: name)
-                    let interval = document
-                        .currentNoteTimeInterval(fromScale: 1)
-                    let startBeat = sheetView.animationView
-                        .beat(atX: np.x, interval: interval)
-                    let beatDur = Timeframe.beat(fromSec: content.secDuration,
-                                                 tempo: tempo,
-                                                 beatRate: Keyframe.defaultFrameRate,
-                                                 rounded: .up)
-                    let beatRange = Range(start: startBeat, length: beatDur)
-                    var text = Text(string: filename,
-                                    timeframe: Timeframe(beatRange: beatRange, content: content, tempo: tempo))
-                    
-                    let nnp = text.origin + np
                     let log10Scale: Double = .log10(document.worldToScreenScale)
                     let clipScale = max(0.0, log10Scale)
                     let decimalPlaces = Int(clipScale + 2)
-                    text.origin = nnp.rounded(decimalPlaces: decimalPlaces)
+                    let nnp = np.rounded(decimalPlaces: decimalPlaces)
+                    
+                    var content = Content(name: name, origin: nnp)
                     if let size = content.image?.size {
-                        let size = size / 2
-                        if size.width < Sheet.width || size.height < Sheet.height {
-                            text.size *= min(size.width / Sheet.width, size.height / Sheet.height)
+                        var size = size / 2
+                        if size.width > Sheet.width || size.height > Sheet.height {
+                            size *= min(Sheet.width / size.width, Sheet.height / size.height)
                         }
+                        content.size = size
                     }
+                    if content.type.isDuration {
+                        let tempo = sheetView.nearestTempo(at: np) ?? Music.defaultTempo
+                        let interval = document.currentNoteTimeInterval(fromScale: 1)
+                        let startBeat = sheetView.animationView.beat(atX: np.x, interval: interval)
+                        let beatDur = ContentTimeOption.beat(fromSec: content.secDuration,
+                                                             tempo: tempo,
+                                                             beatRate: Keyframe.defaultFrameRate,
+                                                             rounded: .up)
+                        let beatRange = Range(start: startBeat, length: beatDur)
+                        content.timeOption = .init(beatRange: beatRange, tempo: tempo)
+                    }
+                    
+                    var text = Text(string: filename, origin: nnp)
+                    text.origin.y -= (content.type.isDuration ? text.size : text.size / 2) + 4
                     sheetView.newUndoGroup()
                     sheetView.append(text)
+                    sheetView.append(content)
                 }
                 
                 dshp.x += 1
@@ -981,7 +969,7 @@ final class IOEditor: Editor {
     
     enum ExportType {
         case image, pdf, gif, movie, highQualityMovie,
-             sound, lyrics, caption, documentWithHistory, document
+             sound, caption, documentWithHistory, document
         var isDocument: Bool {
             self == .document || self == .documentWithHistory
         }
@@ -1156,8 +1144,6 @@ final class IOEditor: Editor {
                                  size: nSize, at: ioResult)
             case .sound:
                 self.exportSound(from: nvs, at: ioResult)
-            case .lyrics:
-                self.exportLyrics(from: nvs, at: ioResult)
             case .caption:
                 self.exportCaption(from: nvs, at: ioResult)
             case .highQualityMovie:
@@ -1228,7 +1214,6 @@ final class IOEditor: Editor {
                 }
                 return fileSize
             case .sound: break
-            case .lyrics: break
             case .documentWithHistory:
                 let sids = nvs.reduce(into: [Sheetpos: SheetID]()) {
                     $0[$1.shp] = self.document.sheetID(at: $1.shp)
@@ -1258,8 +1243,6 @@ final class IOEditor: Editor {
             Movie.FileType.mp4
         case .sound:
             Content.FileType.wav
-        case .lyrics:
-            Lyrics.FileType.musicxml
         case .caption:
             Caption.FileType.scc
         case .document:
@@ -1610,37 +1593,37 @@ final class IOEditor: Editor {
                     if isStop { break }
                 }
                 
-                var timetracks = [Timetrack]()
+                var audiotracks = [Audiotrack]()
                 
                 if !isStop {
                     for (i, v) in vs.enumerated() {
-                        var timetrack: Timetrack?
+                        var audiotrack: Audiotrack?
                         if let sid = self.document.sheetID(at: v.shp),
                            let sheet = self.document.renderableSheet(at: sid) {
                             
-                            timetrack += sheet.timetrack
+                            audiotrack += sheet.audiotrack
                         }
                         var shp = v.shp
                         shp.y -= 1
                         while let sid = self.document.sheetID(at: shp),
                               let sheet = self.document.renderableSheet(at: sid),
-                              sheet.enabledTimetrack {
+                              sheet.enabledAudiotrack {
                             
-                            timetrack += sheet.timetrack
+                            audiotrack += sheet.audiotrack
                             shp.y -= 1
                         }
                         shp = v.shp
                         shp.y += 1
                         while let sid = self.document.sheetID(at: shp),
                               let sheet = self.document.renderableSheet(at: sid),
-                              sheet.enabledTimetrack {
+                              sheet.enabledAudiotrack {
                             
-                            timetrack += sheet.timetrack
+                            audiotrack += sheet.audiotrack
                             shp.y += 1
                         }
                         
-                        if let timetrack = timetrack {
-                            timetracks.append(timetrack)
+                        if let audiotrack = audiotrack {
+                            audiotracks.append(audiotrack)
                         }
                         
                         let t = (Double(i) / Double(vs.count - 1)) * 0.1 + 0.7
@@ -1648,7 +1631,7 @@ final class IOEditor: Editor {
                         if isStop { break }
                     }
                     if !isStop {
-                        if let sequencer = Sequencer(timetracks: timetracks,
+                        if let sequencer = Sequencer(audiotracks: audiotracks,
                                                      isAsync: false, startSec: 0) {
                             try movie.writeAudio(from: sequencer) { t, stop in
                                 progressHandler(t * 0.2 + 0.8, &isStop)
@@ -1712,20 +1695,20 @@ final class IOEditor: Editor {
         func export(progressHandler: (Double, inout Bool) -> (),
                     completionHandler handler: @escaping (Error?) -> ()) {
             do {
-                var timetracks = [Timetrack]()
+                var audiotracks = [Audiotrack]()
                 
                 var isStop = false
                 for (i, v) in vs.enumerated() {
                     if let sid = self.document.sheetID(at: v.shp),
                        let sheet = self.document.renderableSheet(at: sid) {
-                        timetracks.append(sheet.timetrack)
+                        audiotracks.append(sheet.audiotrack)
                     }
                     let t = 0.2 * Double(i) / Double(vs.count - 1)
                     progressHandler(t, &isStop)
                     if isStop { break }
                 }
                 if !isStop {
-                    if let sequencer = Sequencer(timetracks: timetracks,
+                    if let sequencer = Sequencer(audiotracks: audiotracks,
                                                  isAsync: false, startSec: 0) {
                         try sequencer.export(url: ioResult.url,
                                              sampleRate: Audio.defaultExportSampleRate) { (t, stop) in
@@ -1744,71 +1727,6 @@ final class IOEditor: Editor {
         }
         
         let message = "Exporting Sound".localized
-        let progressPanel = ProgressPanel(message: message)
-        self.document.rootNode.show(progressPanel)
-        do {
-            try ioResult.remove()
-            
-            DispatchQueue.global().async {
-                export(progressHandler: { (progress, isStop) in
-                    if progressPanel.isCancel {
-                        isStop = true
-                    } else {
-                        DispatchQueue.main.async {
-                            progressPanel.progress = progress
-                        }
-                    }
-                }, completionHandler: { error in
-                    DispatchQueue.main.async {
-                        if let error = error {
-                            self.document.rootNode.show(error)
-                        } else {
-                            do {
-                                try ioResult.setAttributes()
-                            } catch {
-                                self.document.rootNode.show(error)
-                            }
-                        }
-                        progressPanel.closePanel()
-                        self.end()
-                    }
-                })
-            }
-        } catch {
-            self.document.rootNode.show(error)
-            progressPanel.closePanel()
-            self.end()
-        }
-    }
-    
-    func exportLyrics(from vs: [SelectingValue], at ioResult: IOResult) {
-        func export(progressHandler: (Double, inout Bool) -> (),
-                    completionHandler handler: @escaping (Error?) -> ()) {
-            do {
-                var timetracks = [Timetrack]()
-                
-                var isStop = false
-                for (i, v) in vs.enumerated() {
-                    if let sid = self.document.sheetID(at: v.shp),
-                       let sheet = self.document.renderableSheet(at: sid) {
-                        timetracks.append(sheet.timetrack)
-                    }
-                    let t = Double(i) / Double(vs.count - 1)
-                    progressHandler(t, &isStop)
-                    if isStop { break }
-                }
-                if !isStop {
-                    let lyrics = try Lyrics(timetracks: timetracks)
-                    try lyrics.write(to: ioResult.url)
-                }
-                
-                handler(nil)
-            } catch {
-                handler(error)
-            }
-        }
-        
-        let message = "Exporting Lyrics".localized
         let progressPanel = ProgressPanel(message: message)
         self.document.rootNode.show(progressPanel)
         do {

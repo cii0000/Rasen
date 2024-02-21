@@ -124,6 +124,8 @@ final class PlaneView<T: BinderProtocol>: View {
 typealias SheetPlaneView = PlaneView<SheetBinder>
 
 typealias SheetTextView = TextView<SheetBinder>
+typealias SheetNoteView = NoteView<SheetBinder>
+typealias SheetContentView = ContentView<SheetBinder>
 
 final class BorderView<T: BinderProtocol>: View {
     typealias Model = Border
@@ -457,7 +459,7 @@ final class AnimationView: View {
     }
     
     func containsTimeline(_ p: Point) -> Bool {
-        transformedPaddingTimelineBounds?.contains(p) ?? false
+        model.enabled ? (transformedPaddingTimelineBounds?.contains(p) ?? false) : false
     }
     var transformedPaddingTimelineBounds: Rect? {
         guard var b = paddingTimelineBounds else { return nil }
@@ -536,8 +538,8 @@ final class AnimationView: View {
         let iKnobW = width(atBeatDuration: Rational(1, frameRate)),
             iKnobH = interpolatedKnobHeight
         let centerY = 0.0
-        let sy = centerY - paddingTimelineHeight * 7 / 16
-        let ey = centerY + paddingTimelineHeight * 7 / 16
+        let sy = centerY - Sheet.timelineHalfHeight
+        let ey = centerY + Sheet.timelineHalfHeight
         let w = ex - sx, h = ey - sy
         
         let iSet = Set(selectedFrameIndexes)
@@ -681,13 +683,10 @@ final class AnimationView: View {
                                         height: lw)))
         }
         
-        let knobRadius = 2.0
-        
         let tempoBeat = model.beatRange.start.rounded(.down) + 1
         if tempoBeat < model.beatRange.end {
-            let np = Point(x(atBeat: tempoBeat), ey)
-            pathlines.append(Pathline(circleRadius: knobRadius,
-                                      position: np))
+            let np = Point(x(atBeat: tempoBeat), sy)
+            pathlines.append(Pathline(Rect(x: np.x - 1, y: np.y - 2, width: 2, height: 4)))
         }
         
         var nodes = [Node]()
@@ -1043,12 +1042,12 @@ final class AnimationView: View {
         let np = Point(x(atBeat:model.beatRange.end), ey)
         return np.distance(p) < 10.0 * scale
     }
-    func tempoPositionBeat(_ p: Point, maxDistance: Double) -> Rational? {
+    func tempoPositionBeat(_ p: Point, scale: Double) -> Rational? {
         let tempoBeat = model.beatRange.start.rounded(.down) + 1
         if tempoBeat < model.beatRange.end {
-            let ey = model.timelineY + paddingTimelineHeight * 7 / 16
-            let np = Point(x(atBeat: tempoBeat), ey)
-            return np.distance(p) < maxDistance ? tempoBeat : nil
+            let sy = model.timelineY - paddingTimelineHeight * 7 / 16
+            let np = Point(x(atBeat: tempoBeat), sy)
+            return np.distance(p) < 15 * scale ? tempoBeat : nil
         } else {
             return nil
         }
@@ -1086,6 +1085,8 @@ final class SheetView: View {
     var draftPlanesView: ArrayView<SheetPlaneView> {
         keyframeView.draftPlanesView
     }
+    let scoreView: ScoreView
+    let contentsView: ArrayView<SheetContentView>
     let textsView: ArrayView<SheetTextView>
     let bordersView: ArrayView<SheetBorderView>
     
@@ -1098,6 +1099,10 @@ final class SheetView: View {
         
         animationView = AnimationView(binder: binder,
                                       keyPath: keyPath.appending(path: \Model.animation))
+        scoreView =  ScoreView(binder: binder,
+                               keyPath: keyPath.appending(path: \Model.score))
+        contentsView = ArrayView(binder: binder,
+                                 keyPath: keyPath.appending(path: \Model.contents))
         textsView = ArrayView(binder: binder,
                               keyPath: keyPath.appending(path: \Model.texts))
         bordersView = ArrayView(binder: binder,
@@ -1106,20 +1111,16 @@ final class SheetView: View {
         node = Node(children: [animationView.previousNextNode,
                                animationView.node,
                                animationView.timeNode,
+                               scoreView.node,
+                               contentsView.node,
                                textsView.node,
                                bordersView.node])
         
         updateBackground()
         updateWithKeyframeIndex()
-        updateTimeframes()
         updateTimeline()
         
         animationView.isSelected = true
-        
-//        if model.isPlaying {
-//            isPlaying = true
-//            updateWithIsPlaying()
-//        }
     }
     deinit {
         playingTimer?.cancel()
@@ -1131,11 +1132,12 @@ final class SheetView: View {
         planesView.updateWithModel()
         draftLinesView.updateWithModel()
         draftPlanesView.updateWithModel()
+        scoreView.updateWithModel()
+        contentsView.updateWithModel()
         textsView.updateWithModel()
         bordersView.updateWithModel()
         
         updateBackground()
-        updateTimeframes()
         updateTimeline()
     }
     func updateWithKeyframeIndex() {
@@ -1153,8 +1155,11 @@ final class SheetView: View {
         get { node.bounds ?? Sheet.defaultBounds }
         set {
             node.path = .init(newValue)
-            textsView.elementViews.forEach { $0.updateClippingNode() }
             animationView.bounds = newValue
+            scoreView.bounds = newValue
+            scoreView.updateClippingNode()
+            contentsView.elementViews.forEach { $0.updateClippingNode() }
+            textsView.elementViews.forEach { $0.updateClippingNode() }
             bordersView.elementViews.forEach { $0.bounds = newValue }
         }
     }
@@ -1179,16 +1184,6 @@ final class SheetView: View {
     }
     func unselectKeyframes() {
         animationView.selectedFrameIndexes = []
-    }
-    
-    func updateTimeframes() {
-        let notes = textsView.elementViews.enumerated().reduce(into: [Int: [Note]]()) { $0[$1.offset] = $1.element.notesTempo120() }
-        textsView.elementViews.enumerated().forEach { (ti, tv) in
-            tv.set(otherNotesTempo120: notes.flatMap { ti == $0.key ? [] : $0.value })
-        }
-    }
-    func updateOtherNotes() {
-        updateTimeframes()
     }
     
     func timeSliderRect(atSec sec: Rational) -> Rect {
@@ -1230,10 +1225,6 @@ final class SheetView: View {
         return Rect(x: btx - knobW / 2, y: tlY - knobH / 2,
                     width: knobW, height: knobH)
     }
-    func containsTimeline(_ p: Point) -> Bool {
-        model.enabledAnimation ?
-            animationView.containsTimeline(p) : false
-    }
     
     func interporatedTimelineNodes(from ids: [UUID]) -> [Node] {
         animationView.interporatedTimelineNodes(from: ids)
@@ -1274,49 +1265,85 @@ final class SheetView: View {
         return Node(children: nodes + timeNodes)
     }
     
-    var isHiddenTimeframeTimeNode = true
-    func showTimeframeTimeNodeFromMainBeat() {
-        showTimeframeTimeNode(atBeat: animationView.model.mainBeat)
+    var isHiddenOtherTimeNode = true
+    func showOtherTimeNodeFromMainBeat() {
+        showOtherTimeNode(atBeat: animationView.model.mainBeat)
     }
-    func showTimeframeTimeNode(atBeat beat: Rational) {
-        if isHiddenTimeframeTimeNode {
-            let ids = playingTimeframeIDs
+    func showOtherTimeNode(atBeat beat: Rational) {
+        if isHiddenOtherTimeNode {
+            let ids = playingOtherTimelineIDs
             let sec = animationView.model.sec(fromBeat: beat)
+            
+            scoreView.timeNode?.path = Path()
+            if ids.isEmpty || ids.contains(scoreView.model.id) {
+                scoreView.timeNode?.lineType = .color(.content)
+                scoreView.updateTimeNode(atSec: sec)
+                scoreView.peakVolume = .init()
+                scoreView.timeNode?.lineWidth = isPlaying ? 3 : 1
+                scoreView.timeNode?.isHidden = false
+            } else {
+                scoreView.timeNode?.isHidden = true
+            }
+            
+            for contentView in contentsView.elementViews {
+                contentView.timeNode?.path = Path()
+                guard ids.isEmpty || ids.contains(contentView.model.id) else {
+                    contentView.timeNode?.isHidden = true
+                    continue
+                }
+                contentView.timeNode?.lineType = .color(.content)
+                contentView.updateTimeNode(atSec: sec)
+                contentView.peakVolume = .init()
+                contentView.timeNode?.lineWidth = isPlaying ? 3 : 1
+                contentView.timeNode?.isHidden = false
+            }
             for textView in textsView.elementViews {
                 textView.timeNode?.path = Path()
-                guard let id = textView.model.timeframe?.id,
-                      ids.isEmpty || ids.contains(id) else {
+                guard ids.isEmpty || ids.contains(textView.id) else {
                     textView.timeNode?.isHidden = true
                     continue
                 }
                 textView.timeNode?.lineType = .color(.content)
                 textView.updateTimeNode(atSec: sec)
                 textView.peakVolume = .init()
-                textView.timeNode?.lineWidth = (isPlaying ? 3 : 1) * textView.nodeRatio
+                textView.timeNode?.lineWidth = isPlaying ? 3 : 1
                 textView.timeNode?.isHidden = false
             }
-            isHiddenTimeframeTimeNode = false
+            isHiddenOtherTimeNode = false
         } else {
-            updateTimeframeTimeNode(atBeat: beat)
+            updateOtherTimeNode(atBeat: beat)
         }
     }
-    private func updateTimeframeTimeNode(atBeat beat: Rational) {
-        let ids = playingTimeframeIDs
+    private func updateOtherTimeNode(atBeat beat: Rational) {
+        let ids = playingOtherTimelineIDs
         let sec = model.animation.sec(fromBeat: beat)
+        if ids.isEmpty || ids.contains(scoreView.model.id) {
+            scoreView.updateTimeNode(atSec: sec)
+        }
+        for contentView in contentsView.elementViews {
+            guard ids.isEmpty || ids.contains(contentView.model.id) else { continue }
+            contentView.updateTimeNode(atSec: sec)
+        }
         for textView in textsView.elementViews {
-            guard let id = textView.model.timeframe?.id,
-                  ids.isEmpty || ids.contains(id) else { continue }
+            guard ids.isEmpty || ids.contains(textView.id) else { continue }
             textView.updateTimeNode(atSec: sec)
         }
     }
-    func hideTimeframeTimeNode() {
-        if !isHiddenTimeframeTimeNode {
+    func hideOtherTimeNode() {
+        if !isHiddenOtherTimeNode {
+            scoreView.timeNode?.path = Path()
+            scoreView.currentVolumeNode?.path = Path()
+            scoreView.timeNode?.isHidden = true
+            
+            for contentView in contentsView.elementViews {
+                contentView.timeNode?.path = Path()
+                contentView.timeNode?.isHidden = true
+            }
             for textView in textsView.elementViews {
                 textView.timeNode?.path = Path()
-                textView.currentVolumeNode?.path = Path()
                 textView.timeNode?.isHidden = true
             }
-            isHiddenTimeframeTimeNode = true
+            isHiddenOtherTimeNode = true
         }
     }
     
@@ -1357,19 +1384,18 @@ final class SheetView: View {
                      fillType: .color(.content))]
     }
     
-    func tempoPositionBeat(_ p: Point, maxDistance: Double) -> Rational? {
-        guard containsTimeline(p)
-                || containsTimeframe(p) else { return nil }
+    func tempoPositionBeat(_ p: Point, scale: Double) -> Rational? {
+        guard animationView.containsTimeline(p)
+                || containsOtherTimeline(p, scale: scale) else { return nil }
         
-        if let tempoBeat = animationView
-            .tempoPositionBeat(p, maxDistance: maxDistance) {
-            
+        if let tempoBeat = animationView.tempoPositionBeat(p, scale: scale) {
+            return tempoBeat
+        }
+        if let tempoBeat = scoreView.tempoPositionBeat(p, scale: scale) {
             return tempoBeat
         }
         for textView in textsView.elementViews {
-            if let tempoBeat = textView
-                .tempoPositionBeat(p, maxDistance: maxDistance) {
-                
+            if let tempoBeat = textView.tempoPositionBeat(p, scale: scale) {
                 return tempoBeat
             }
         }
@@ -1399,37 +1425,52 @@ final class SheetView: View {
                                     fillType: .color(.content))])
     }
     
-    func containsTimeframe(_ p: Point) -> Bool {
+    func containsOtherTimeline(_ p: Point, scale: Double) -> Bool {
+        if scoreView.containsNote(scoreView.convert(p, from: node), scale: scale) {
+            return true
+        }
+        for view in contentsView.elementViews {
+            if view.containsTimeline(view.convert(p, from: node)) {
+                return true
+            }
+        }
         for view in textsView.elementViews {
-            if view.containsTimeframe(view.convert(p, from: node)) {
+            if view.containsTimeline(view.convert(p, from: node)) {
                 return true
             }
         }
         return false
     }
-    func containsTimeRange(_ p: Point) -> Bool {
-        for view in textsView.elementViews {
-            if view.containsTimeRange(view.convert(p, from: node)) {
-                return true
-            }
-        }
-        return false
-    }
-    func timeframeIndex(at p: Point) -> Int? {
-        for (i, view) in textsView.elementViews.enumerated() {
-            if view.containsTimeframe(view.convert(p, from: node)) {
+    
+    func contentIndex(at p: Point, scale: Double) -> Int? {
+        for (i, view) in contentsView.elementViews.enumerated().reversed() {
+            if view.contains(view.convert(p, from: node), scale: scale) {
                 return i
             }
         }
         return nil
     }
-    func timeframeTuple(at p: Point) -> (i: Int, timeframe: Timeframe)? {
-        for (i, view) in textsView.elementViews.enumerated() {
-            if view.containsTimeframe(view.convert(p, from: node)) {
-                return (i, view.model.timeframe!)
+    func contentIndexAndView(at p: Point, scale: Double) -> (Int, SheetContentView)? {
+        if let ci = contentIndex(at: p, scale: scale) {
+            (ci, contentsView.elementViews[ci])
+        } else {
+            nil
+        }
+    }
+    func textIndex(at p: Point) -> Int? {
+        for (i, view) in textsView.elementViews.enumerated().reversed() {
+            if view.contains(view.convert(p, from: node)) {
+                return i
             }
         }
         return nil
+    }
+    func textIndexAndView(at p: Point) -> (Int, SheetTextView)? {
+        if let ti = textIndex(at: p) {
+            (ti, textsView.elementViews[ti])
+        } else {
+            nil
+        }
     }
     
     func slidableKeyframeIndex(at inP: Point,
@@ -1546,11 +1587,11 @@ final class SheetView: View {
                 previousPlayingTempo: Rational = 120,
                 nextPlayingTempo: Rational = 120,
                 firstSec: Rational?
-    private var willPlaySec: Rational?, playingTimeframeIDs = Set<UUID>()
+    private var willPlaySec: Rational?, playingOtherTimelineIDs = Set<UUID>()
     private var playingFrameRate: Rational = 24, firstDeltaSec: Rational = 0
     private var waringDate: Date?
-    var firstTimetracks = [Timetrack]()
-    var lastTimetracks = [Timetrack]()
+    var firstAudiotracks = [Audiotrack]()
+    var lastAudiotracks = [Audiotrack]()
     let frameRate = Keyframe.defaultFrameRate
     var isPlaying = false {
         didSet {
@@ -1585,7 +1626,7 @@ final class SheetView: View {
             centerNode = nil
             topNode = nil
             
-            showTimeframeTimeNode(atBeat: model.animation.mainBeat)
+            showOtherTimeNode(atBeat: model.animation.mainBeat)
             
             playingSheetIndex = 0
             playingCaption = nil
@@ -1610,31 +1651,30 @@ final class SheetView: View {
                 animationView.timeNode.children = timeSliders
             }
             
-            var timetracks = [Timetrack]()
+            var audiotracks = [Audiotrack]()
             var deltaSec: Rational = 0
-            for timetrack in firstTimetracks {
-                timetracks.append(timetrack)
-                deltaSec += timetrack.secDuration
+            for audiotrack in firstAudiotracks {
+                audiotracks.append(audiotrack)
+                deltaSec += audiotrack.secDuration
             }
             
             var minFrameRate = model.mainFrameRate
             
             if let sheetView = previousSheetView {
-                var timetrack = sheetView.model.timetrack
-                if let aTimetrack = sheetView.bottomSheetView?.model.timetrack {
-                    timetrack += aTimetrack.moved(Point(0, -bounds.height))
+                var audiotrack = sheetView.model.audiotrack
+                if let aAudiotrack = sheetView.bottomSheetView?.model.audiotrack {
+                    audiotrack += aAudiotrack
                 }
-                if let aTimetrack = sheetView.topSheetView?.model.timetrack {
-                    timetrack += aTimetrack.moved(Point(0, bounds.height))
+                if let aAudiotrack = sheetView.topSheetView?.model.audiotrack {
+                    audiotrack += aAudiotrack
                 }
-                if playingTimeframeIDs.isEmpty {
-                    timetrack.timeframes
-                        .append((Point(),
-                                .init(beatRange: 0 ..< sheetView.model.animationBeatDuration,
-                                      tempo: sheetView.model.animation.tempo)))
+                if playingOtherTimelineIDs.isEmpty {
+                    audiotrack.values
+                        .append(.score(.init(beatRange: 0 ..< sheetView.model.animationBeatDuration,
+                                             tempo: sheetView.model.animation.tempo)))
                 }
-                timetracks.append(timetrack)
-                deltaSec += timetrack.secDuration
+                audiotracks.append(audiotrack)
+                deltaSec += audiotrack.secDuration
                 previousPlayingTempo = sheetView.model.animation.tempo
                 
                 minFrameRate = min(minFrameRate,
@@ -1642,72 +1682,74 @@ final class SheetView: View {
             }
             firstDeltaSec = deltaSec
             
-            var timetrack = model.timetrack
-            if let aTimetrack = bottomSheetView?.model.timetrack {
-                timetrack += aTimetrack.moved(Point(0, -bounds.height))
+            var audiotrack = model.audiotrack
+            if let aAudiotrack = bottomSheetView?.model.audiotrack {
+                audiotrack += aAudiotrack
             }
-            if let aTimetrack = topSheetView?.model.timetrack {
-                timetrack += aTimetrack.moved(Point(0, bounds.height))
+            if let aAudiotrack = topSheetView?.model.audiotrack {
+                audiotrack += aAudiotrack
             }
-            if playingTimeframeIDs.isEmpty {
-                timetrack.timeframes
-                    .append((Point(),
-                             .init(beatRange: 0 ..< model.animationBeatDuration,
-                                  tempo: model.animation.tempo)))
+            if playingOtherTimelineIDs.isEmpty {
+                audiotrack.values
+                    .append(.score(.init(beatRange: 0 ..< model.animationBeatDuration,
+                                          tempo: model.animation.tempo)))
             }
-            timetracks.append(timetrack)
+            audiotracks.append(audiotrack)
             let mainSec = model.animation.sec(fromBeat: beat)
             deltaSec += mainSec
             playingTempo = model.animation.tempo
             willPlaySec = mainSec
             
             if let sheetView = nextSheetView {
-                var timetrack = sheetView.model.timetrack
-                if let aTimetrack = sheetView.bottomSheetView?.model.timetrack {
-                    timetrack += aTimetrack.moved(Point(0, -bounds.height))
+                var audiotrack = sheetView.model.audiotrack
+                if let aAudiotrack = sheetView.bottomSheetView?.model.audiotrack {
+                    audiotrack += aAudiotrack
                 }
-                if let aTimetrack = sheetView.topSheetView?.model.timetrack {
-                    timetrack += aTimetrack.moved(Point(0, bounds.height))
+                if let aAudiotrack = sheetView.topSheetView?.model.audiotrack {
+                    audiotrack += aAudiotrack
                 }
-                if playingTimeframeIDs.isEmpty {
-                    timetrack.timeframes
-                        .append((Point(),
-                                 .init(beatRange: 0 ..< sheetView.model.animationBeatDuration,
-                                      tempo: sheetView.model.animation.tempo)))
+                if playingOtherTimelineIDs.isEmpty {
+                    audiotrack.values
+                        .append(.score(.init(beatRange: 0 ..< sheetView.model.animationBeatDuration,
+                                             tempo: sheetView.model.animation.tempo)))
                 }
-                timetracks.append(timetrack)
+                audiotracks.append(audiotrack)
                 nextPlayingTempo = sheetView.model.animation.tempo
                 
                 minFrameRate = min(minFrameRate,
                                    sheetView.model.mainFrameRate)
             }
             
-            if !playingTimeframeIDs.isEmpty {
-                for i in 0 ..< timetracks.count {
-                    timetracks[i].timeframes.removeAll {
-                        !playingTimeframeIDs.contains($0.value.id)
+            if !playingOtherTimelineIDs.isEmpty {
+                for i in 0 ..< audiotracks.count {
+                    audiotracks[i].values.removeAll {
+                        !playingOtherTimelineIDs.contains($0.id)
                     }
                 }
             }
             
-            for timetrack in lastTimetracks {
-                timetracks.append(timetrack)
+            for audiotrack in lastAudiotracks {
+                audiotracks.append(audiotrack)
             }
             
-            if timetracks.contains(where: { !$0.isEmpty }) {
-                let sequencer = Sequencer(timetracks: timetracks,
+            if audiotracks.contains(where: { !$0.isEmpty }) {
+                let sequencer = Sequencer(audiotracks: audiotracks,
                                           isAsync: true,
                                           startSec: Double(playingSec)) { [weak self] (peak) in
                     DispatchQueue.main.async {
                         guard let self else { return }
                         if (self.waringDate == nil
                             || Date().timeIntervalSince(self.waringDate!) > 1 / 10.0)
-                            && !self.isHiddenTimeframeTimeNode {
+                            && !self.isHiddenOtherTimeNode {
                             
                             let peakVolume = Volume(amp: Double(peak))
                             for textView in self.textsView.elementViews {
                                 textView.peakVolume = peakVolume
                             }
+                            for contentView in self.contentsView.elementViews {
+                                contentView.peakVolume = peakVolume
+                            }
+                            self.scoreView.peakVolume = peakVolume
                             self.waringDate = Date()
                         }
                     }
@@ -1746,10 +1788,10 @@ final class SheetView: View {
             topNode = nil
 //            playingCaptions = []
 //            playingCaption = nil
-//                linesView.node.isHidden = false
-//                planesView.node.isHidden = false
-//                draftLinesView.node.isHidden = false
-//                draftPlanesView.node.isHidden = false
+//            linesView.node.isHidden = false
+//            planesView.node.isHidden = false
+//            draftLinesView.node.isHidden = false
+//            draftPlanesView.node.isHidden = false
             updateWithKeyframeIndex()
 //            previousSheetView = nil
 //            nextSheetView = nil
@@ -1762,18 +1804,15 @@ final class SheetView: View {
             playingSecRange = nil
             firstSec = nil
             
-            firstTimetracks = []
-            lastTimetracks = []
+            firstAudiotracks = []
+            lastAudiotracks = []
             
-            hideTimeframeTimeNode()
+            hideOtherTimeNode()
             
             updatePreviousNext()
             
             sequencer?.endEngine()
             sequencer = nil
-        }
-        if binder[keyPath: keyPath].animation.isPlaying != isPlaying {
-            binder[keyPath: keyPath].animation.isPlaying = isPlaying
         }
     }
     var playingSec: Rational? {
@@ -1851,9 +1890,9 @@ final class SheetView: View {
             }
             
             if sheetView == self {
-                showTimeframeTimeNode(atBeat: playingBeat)
+                showOtherTimeNode(atBeat: playingBeat)
             } else {
-                hideTimeframeTimeNode()
+                hideOtherTimeNode()
             }
         }
     }
@@ -1909,7 +1948,7 @@ final class SheetView: View {
             let fi = previousSheetView != nil && playingSecRange == nil ?
                 -1 : 0
             if playingSheetIndex == fi {
-                if firstTimetracks.isEmpty && lastTimetracks.isEmpty {
+                if firstAudiotracks.isEmpty && lastAudiotracks.isEmpty {
                     let sSec = playingSecRange?.start ?? 0
                     sequencer?.currentPositionInSec
                     = Double(sSec + (fi == -1 ? 0 : firstDeltaSec))
@@ -1928,7 +1967,7 @@ final class SheetView: View {
     var playingSecRange: Range<Rational>?
     func play(atSec sec: Rational? = nil,
               inSec playingSecRange: Range<Rational>? = nil,
-              timeframeIDs: Set<UUID> = []) {
+              otherTimelineIDs: Set<UUID> = []) {
         if isPlaying {
             isPlaying = false
         }
@@ -1936,12 +1975,12 @@ final class SheetView: View {
             firstSec = sec
         }
         self.playingSecRange = playingSecRange
-        self.playingTimeframeIDs = timeframeIDs
+        self.playingOtherTimelineIDs = otherTimelineIDs
         isPlaying = true
     }
     func stop() {
         playingSecRange = nil
-        playingTimeframeIDs = []
+        playingOtherTimelineIDs = []
         isPlaying = false
     }
     func updatePlaying() {
@@ -1955,87 +1994,102 @@ final class SheetView: View {
         }
     }
     
-    func notes(from timeframe: Timeframe) -> [Note] {
-        timeframe.score?.movedNotes(inBeatRange: timeframe.beatRange,
-                                    beatDuration: model.allBeatDuration,
-                                    atStartBeat: 0) ?? []
-    }
-    func noteAndScore(at inP: Point, scale: Double) -> (note: Note, score: Score)? {
-        guard let (ti, _) = timeframeTuple(at: inP) else { return nil }
-        let textView = textsView.elementViews[ti]
-        let inTP = textView.convert(inP, from: node)
-        if textView.containsScore(inTP),
-           let timeframe = textView.model.timeframe,
-           let score = timeframe.score,
-           let ni = textView.noteIndex(at: inTP,
-                                       maxDistance: textView.nodeRatio * 15.0 * scale) {
-            return (score.notes[ni], score)
+    func updateCaption() {
+        guard isPlaying else { return }
+        
+        let timeSliders = !model.enabledAnimation ?
+        [] :
+        [Node(path: Path(timeSliderRect(atSec: firstSec ?? model.animation.localSec)),
+                  fillType: .color(.content))]
+        
+        guard let playingSec else { return }
+        
+        let sheetView = playingSheetView
+        let playingBeat = sheetView.model.animation
+            .beat(fromSec: Double(playingSec), beatRate: 60)
+        
+        let caption = model.caption(atBeat: playingBeat)
+        playingCaption = caption
+        if let caption = caption {
+            let nodes = caption.nodes(in: model.mainFrame ?? bounds)
+            playingCaptionNodes = nodes
+            animationView.timeNode.children = timeSliders + nodes
+        } else {
+            playingCaptionNodes = []
+            animationView.timeNode.children = timeSliders
         }
-        return nil
-    }
-    func pitchRange(from timeframe: Timeframe) -> ClosedRange<Rational>? {
-        timeframe.score?.pitchRange(inBeatRange: timeframe.beatRange,
-                                    beatDuration: model.allBeatDuration,
-                                    atStartBeat: 0)
     }
     
-    func spectrogramNode(at p: Point) -> (node: Node, maxMel: Double,
-                                          textView: SheetTextView)? {
-        for textView in textsView.elementViews {
+    func notes(from score: Score) -> [Note] {
+        score.movedNotes(inBeatRange: score.beatRange,
+                         beatDuration: model.allBeatDuration,
+                         atStartBeat: 0)
+    }
+    func note(at inP: Point, scale: Double) -> Note? {
+        guard scoreView.model.enabled else { return nil }
+        let inTP = scoreView.convert(inP, from: node)
+        return if let ni = scoreView.noteIndex(at: inTP, maxDistance: 15 * scale) {
+            scoreView.model.notes[ni]
+        } else {
+            nil
+        }
+    }
+    func pitchRange(from score: Score) -> ClosedRange<Rational>? {
+        score.pitchRange(inBeatRange: score.beatRange,
+                         beatDuration: model.allBeatDuration,
+                         atStartBeat: 0)
+    }
+    
+    func spectrogramNode(at p: Point) -> (node: Node, maxMel: Double)? {
+        for contentView in contentsView.elementViews {
             var nNode: Node?
-            textView.node.allChildren { node, stop in
+            contentView.node.allChildren { node, stop in
                 if node.name.hasPrefix("spectrogram"),
                    node.contains(node.convert(p, from: self.node)) {
                     stop = true
                     nNode = node
                 }
             }
-            if let nNode, let maxMel = textView.spectrogramMaxMel {
-                return (nNode, maxMel, textView)
+            if let nNode, let maxMel = contentView.spectrogramMaxMel {
+                return (nNode, maxMel)
             }
         }
         return nil
     }
     
-    func tempo(at p: Point) -> Rational? {
-        if let i = nearestScoreIndex(at: p) {
-            textsView.elementViews[i].model.timeframe?.tempo
-        } else {
-            nil
-        }
-    }
-    func scaleKey(at p: Point) -> Rational? {
-        if let i = nearestScoreIndex(at: p) {
-            textsView.elementViews[i].model.timeframe?.score?.scaleKey
-        } else {
-            nil
-        }
-    }
-    func nearestScoreIndex(at p: Point) -> Int? {
-        var minI: Int?, minDS = Double.infinity
-        for (i, textView) in textsView.elementViews.enumerated() {
-            let ds = textView.transformedScoreFrame?.distanceSquared(p) ?? 0
-            if ds < minDS {
-                minI = i
-                minDS = ds
-            }
-        }
-        return minI
-    }
     func nearestTempo(at p: Point) -> Rational? {
         var minTempo: Rational?, minDS = Double.infinity
-        for textView in textsView.elementViews {
-            guard textView.model.timeframe?.tempo != nil else { continue }
-            let ds = textView.transformedScoreFrame?.distanceSquared(p) ?? 0
+        
+        if scoreView.model.enabled {
+            let ds = scoreView.transformedTimelineFrame?.distanceSquared(p) ?? 0
             if ds < minDS {
-                minTempo = textView.model.timeframe?.tempo
+                minTempo = scoreView.model.tempo
                 minDS = ds
             }
         }
-        let ds = animationView.transformedPaddingTimelineBounds?.distanceSquared(p) ?? 0
-        if ds < minDS {
-            minTempo = animationView.model.tempo
-            minDS = ds
+        
+        for contentView in contentsView.elementViews {
+            guard let tempo = contentView.model.timeOption?.tempo else { continue }
+            let ds = contentView.transformedTimelineFrame?.distanceSquared(p) ?? 0
+            if ds < minDS {
+                minTempo = tempo
+                minDS = ds
+            }
+        }
+        for textView in textsView.elementViews {
+            guard let tempo = textView.model.timeOption?.tempo else { continue }
+            let ds = textView.transformedTimelineFrame?.distanceSquared(p) ?? 0
+            if ds < minDS {
+                minTempo = tempo
+                minDS = ds
+            }
+        }
+        if animationView.model.enabled {
+            let ds = animationView.transformedPaddingTimelineBounds?.distanceSquared(p) ?? 0
+            if ds < minDS {
+                minTempo = animationView.model.tempo
+                minDS = ds
+            }
         }
         return minTempo
     }
@@ -2626,9 +2680,8 @@ final class SheetView: View {
         case .insertTexts(let tivs):
             insertNode(tivs)
             
-            if tivs.contains(where: { $0.value.timeframe?.isAudio ?? false }) {
-                updatePlaying()
-                updateOtherNotes()
+            if isPlaying ? tivs.contains(where: { $0.value.timeOption != nil }) : false {
+                updateCaption()
             }
             
             tivs.forEach { textsView.elementViews[$0.index].updateClippingNode() }
@@ -2640,7 +2693,8 @@ final class SheetView: View {
                 return (rect, [])
             }
         case .removeTexts(let textIndexes):
-            let isUpdatePlaying = textIndexes.contains(where: { textsView.elementViews[$0].model.timeframe?.isAudio ?? false })
+            let isUpdateCaption = isPlaying ?
+            textIndexes.contains(where: { textsView.elementViews[$0].model.timeOption != nil }) : false
             
             if isMakeRect {
                 let rect = textIndexes.reduce(into: Rect?.none) {
@@ -2648,18 +2702,16 @@ final class SheetView: View {
                 }
                 removeTextsNode(at: textIndexes)
                 
-                if isUpdatePlaying {
-                    updatePlaying()
-                    updateOtherNotes()
+                if isUpdateCaption {
+                    updateCaption()
                 }
                 
                 return (rect, [])
             } else {
                 removeTextsNode(at: textIndexes)
                 
-                if isUpdatePlaying {
-                    updatePlaying()
-                    updateOtherNotes()
+                if isUpdateCaption {
+                    updateCaption()
                 }
             }
         case .replaceString(let ituv):
@@ -2685,9 +2737,20 @@ final class SheetView: View {
                         .transformedTypoBounds(with: nRange)
                 }
                 selectedTextView = textView
+                
+                if isPlaying ? textView.model.timeOption != nil : false {
+                    updateCaption()
+                }
+                
                 return (firstRect + lastRect, [])
             } else {
                 setNode(ituv)
+                
+                let textView = textsView.elementViews[ituv.index]
+                if isPlaying ? textView.model.timeOption != nil : false {
+                    updateCaption()
+                }
+                
                 selectedTextView = textsView.elementViews[ituv.index]
             }
         case .changedColors(let colorValue):
@@ -2796,7 +2859,6 @@ final class SheetView: View {
             }
             
             updateTimeline()
-            updateTimeframes()
             updatePreviousNext()
             
             if isMakeRect {
@@ -3126,41 +3188,114 @@ final class SheetView: View {
                     }
                 }
             }
-        case .replaceScore(let siv):
-            if isMakeRect {
-                let textView = textsView.elementViews[siv.index]
-                
-                let firstRect: Rect?
-                if let sf = textView.transformedScoreFrame {
-                    firstRect = sf
-                } else {
-                    firstRect = nil
-                }
-                
-                setNode(siv)
-                
-                let lastRect: Rect?
-                if let sf = textView.transformedScoreFrame {
-                    lastRect = sf
-                } else {
-                    lastRect = nil
-                }
-                
-                updateOtherNotes()
-                
-                return (firstRect + lastRect, [])
-            } else {
-                setNode(siv)
-                updateOtherNotes()
-            }
         case .setAnimationOption(let option):
             stop()
             binder[keyPath: keyPath].animation.option = option
             updateTimeline()
-            updateTimeframes()
             updatePreviousNext()
             if isMakeRect {
                 return (animationView.transformedPaddingTimelineBounds ?? node.bounds, [])
+            }
+        case .insertNotes(let nivs):
+            insertNode(nivs)
+            scoreView.updateTimeline()
+            sequencer?.scoreNoders[scoreView.model.id]?.insert(nivs)
+            if isMakeRect {
+                let rect = nivs.reduce(into: Rect?.none) {
+                    $0 += scoreView.notesView.elementViews[$1.index].node.bounds
+                }
+                return (rect, [])
+            }
+        case .replaceNotes(let nivs):
+            if isMakeRect {
+                var rect: Rect?
+                for niv in nivs {
+                    binder[keyPath: keyPath].score.notes[niv.index] = niv.value
+                    scoreView.notesView.elementViews[niv.index].updateWithModel()
+                    rect += scoreView.notesView.elementViews[niv.index].node.path.bounds
+                }
+                scoreView.updateTimeline()
+                sequencer?.scoreNoders[scoreView.model.id]?.replace(nivs)
+                return (rect, [])
+            } else {
+                for niv in nivs {
+                    binder[keyPath: keyPath].score.notes[niv.index] = niv.value
+                    scoreView.notesView.elementViews[niv.index].updateWithModel()
+                }
+                scoreView.updateTimeline()
+                sequencer?.scoreNoders[scoreView.model.id]?.replace(nivs)
+            }
+        case .removeNotes(noteIndexes: let noteIndexes):
+            if isMakeRect {
+                let rect = noteIndexes.reduce(into: Rect?.none) {
+                    $0 += scoreView.notesView.elementViews[$1].node.bounds
+                }
+                removeNotesNode(at: noteIndexes)
+                scoreView.updateTimeline()
+                sequencer?.scoreNoders[scoreView.model.id]?.remove(at: noteIndexes)
+                return (rect, [])
+            } else {
+                removeNotesNode(at: noteIndexes)
+                scoreView.updateTimeline()
+                sequencer?.scoreNoders[scoreView.model.id]?.remove(at: noteIndexes)
+            }
+        case .changedTones(let toneValue):
+            changeTonesNode(toneValue)
+            
+            if isMakeRect {
+                let rect = toneValue.noteIndexes.reduce(into: Rect?.none) {
+                    $0 += scoreView.notesView.elementViews[$1].node.bounds
+                }
+                return (rect, [])
+            }
+        case .insertContents(let civs):
+            insertNode(civs)
+            
+            civs.forEach { contentsView.elementViews[$0.index].updateClippingNode() }
+            
+            if isMakeRect {
+                let rect = civs.reduce(into: Rect?.none) {
+                    let contentView = contentsView.elementViews[$1.index]
+                    $0 += contentView.node.transformedBounds
+                }
+                return (rect, [])
+            }
+        case .replaceContents(let civs):
+            if isMakeRect {
+                var rect: Rect?
+                for civ in civs {
+                    binder[keyPath: keyPath].contents[civ.index] = civ.value
+                    contentsView.elementViews[civ.index].updateWithModel()
+                    rect += contentsView.elementViews[civ.index].node.transformedBounds
+                }
+                
+                civs.forEach { contentsView.elementViews[$0.index].updateClippingNode() }
+                
+                return (rect, [])
+            } else {
+                for civ in civs {
+                    binder[keyPath: keyPath].contents[civ.index] = civ.value
+                    contentsView.elementViews[civ.index].updateWithModel()
+                }
+                
+                civs.forEach { contentsView.elementViews[$0.index].updateClippingNode() }
+            }
+        case .removeContents(contentIndexes: let contentIndexes):
+            if isMakeRect {
+                let rect = contentIndexes.reduce(into: Rect?.none) {
+                    let contentView = contentsView.elementViews[$1]
+                    $0 += contentView.node.transformedBounds
+                }
+                removeContentsNode(at: contentIndexes)
+                return (rect, [])
+            } else {
+                removeContentsNode(at: contentIndexes)
+            }
+        case .setScoreOption(let option):
+            binder[keyPath: keyPath].score.option = option
+            scoreView.updateTimeline()
+            if isMakeRect {
+                return (scoreView.mainFrame, [])
             }
         }
         return (nil, [])
@@ -3267,9 +3402,7 @@ final class SheetView: View {
     private func setNode(_ ituv: IndexValue<TextValue>) {
         textsView.elementViews[ituv.index].set(ituv.value)
     }
-    private func setNode(_ siv: IndexValue<Score?>) {
-        textsView.elementViews[siv.index].model.timeframe?.score = siv.value
-    }
+    
     private func changeColorsNode(_ colorValue: ColorValue) {
         if !colorValue.planeIndexes.isEmpty {
             colorValue.planeIndexes.forEach {
@@ -3321,6 +3454,29 @@ final class SheetView: View {
             backgroundUUColor = colorValue.uuColor
         }
     }
+    
+    private func changeTonesNode(_ toneValue: ToneValue) {
+        if !toneValue.noteIndexes.isEmpty {
+            toneValue.noteIndexes.forEach {
+                scoreView.notesView.elementViews[$0].tone = toneValue.tone
+            }
+        }
+    }
+    
+    private func insertNode(_ nivs: [IndexValue<Note>]) {
+        scoreView.notesView.insert(nivs)
+    }
+    private func removeNotesNode(at noteIndexes: [Int]) {
+        scoreView.notesView.remove(at: noteIndexes)
+    }
+    
+    private func insertNode(_ civs: [IndexValue<Content>]) {
+        contentsView.insert(civs)
+    }
+    private func removeContentsNode(at contentIndexes: [Int]) {
+        contentsView.remove(at: contentIndexes)
+    }
+    
     private func insertNode(_ bivs: [IndexValue<Border>]) {
         bordersView.insert(bivs)
         let bounds = self.bounds
@@ -3542,6 +3698,123 @@ final class SheetView: View {
         append(undo: undoItem, redo: redoItem)
         set(redoItem)
     }
+    
+    func append(_ note: Note) {
+        append([note])
+    }
+    func append(_ notes: [Note]) {
+        let undoItem = SheetUndoItem.removeNotes(noteIndexes: Array(model.score.notes.count ..< (model.score.notes.count + notes.count)))
+        let redoItem = SheetUndoItem.insertNotes(notes.enumerated().map {
+            IndexValue(value: $0.element, index: model.score.notes.count + $0.offset)
+        })
+        append(undo: undoItem, redo: redoItem)
+        set(redoItem)
+    }
+    func captureAppend(_ note: Note) {
+        captureAppend([note])
+    }
+    func captureAppend(_ notes: [Note]) {
+        let undoItem = SheetUndoItem.removeNotes(noteIndexes: Array(model.score.notes.count ..< (model.score.notes.count + notes.count)))
+        let redoItem = SheetUndoItem.insertNotes(notes.enumerated().map {
+            IndexValue(value: $0.element, index: model.score.notes.count + $0.offset)
+        })
+        append(undo: undoItem, redo: redoItem)
+    }
+    func insert(_ nivs: [IndexValue<Note>]) {
+        let undoItem = SheetUndoItem.removeNotes(noteIndexes: nivs.map { $0.index })
+        let redoItem = SheetUndoItem.insertNotes(nivs)
+        append(undo: undoItem, redo: redoItem)
+        set(redoItem)
+    }
+    
+    func capture(_ note: Note, old oldNote: Note, at ni: Int) {
+        capture([.init(value: note, index: ni)], old: [.init(value: oldNote, index: ni)])
+    }
+    func capture(_ values: [IndexValue<Note>], old oldValues: [IndexValue<Note>]) {
+        let undoItem = SheetUndoItem.replaceNotes(oldValues)
+        let redoItem = SheetUndoItem.replaceNotes(values)
+        append(undo: undoItem, redo: redoItem)
+    }
+    func replace(_ note: Note, at ni: Int) {
+        replace([.init(value: note, index: ni)])
+    }
+    func replace(_ values: [IndexValue<Note>]) {
+        let undoItem = SheetUndoItem.replaceNotes(values.map { IndexValue(value: model.score.notes[$0.index], index: $0.index) })
+        let redoItem = SheetUndoItem.replaceNotes(values)
+        append(undo: undoItem, redo: redoItem)
+        set(redoItem)
+    }
+    
+    func removeNote(at i: Int) {
+        let undoItem = SheetUndoItem.insertNotes([IndexValue(value: model.score.notes[i],
+                                                             index: i)])
+        let redoItem = SheetUndoItem.removeNotes(noteIndexes: [i])
+        append(undo: undoItem, redo: redoItem)
+        set(redoItem)
+    }
+    func removeNote(at noteIndexes: [Int]) {
+        let nivs = noteIndexes.map {
+            IndexValue(value: model.score.notes[$0], index: $0)
+        }
+        let undoItem = SheetUndoItem.insertNotes(nivs)
+        let redoItem = SheetUndoItem.removeNotes(noteIndexes: noteIndexes)
+        append(undo: undoItem, redo: redoItem)
+        set(redoItem)
+    }
+    
+    func capture(_ tone: Tone, old oldTone: Tone, at ni: Int) {
+        capture(ToneValue(tone: tone, noteIndexes: [ni]),
+                old: ToneValue(tone: oldTone, noteIndexes: [ni]))
+    }
+    func capture(_ toneValue: ToneValue, old oldToneValue: ToneValue) {
+        let undoItem = SheetUndoItem.changedTones(oldToneValue)
+        let redoItem = SheetUndoItem.changedTones(toneValue)
+        append(undo: undoItem, redo: redoItem)
+    }
+    func replace(_ tone: Tone, at ni: Int) {
+        replace(tone, at: [ni])
+    }
+    func replace(_ tone: Tone, at nis: [Int]) {
+        set(ToneValue(tone: tone, noteIndexes: nis),
+            old: ToneValue(tone: model.score.notes[nis[0]].tone, noteIndexes: nis))
+    }
+    func set(_ toneValue: ToneValue, old oldToneValue: ToneValue) {
+        let undoItem = SheetUndoItem.changedTones(oldToneValue)
+        let redoItem = SheetUndoItem.changedTones(toneValue)
+        append(undo: undoItem, redo: redoItem)
+        set(redoItem)
+    }
+    
+    func append(_ content: Content) {
+        let undoItem = SheetUndoItem.removeContents(contentIndexes: [model.contents.count])
+        let redoItem = SheetUndoItem.insertContents([IndexValue(value: content,
+                                                                index: model.contents.count)])
+        append(undo: undoItem, redo: redoItem)
+        set(redoItem)
+    }
+    func capture(_ content: Content, old oldContent: Content, at i: Int) {
+        let undoItem = SheetUndoItem.replaceContents([IndexValue(value: oldContent, index: i)])
+        let redoItem = SheetUndoItem.replaceContents([IndexValue(value: content, index: i)])
+        append(undo: undoItem, redo: redoItem)
+    }
+    func replace(_ content: Content, at i: Int) {
+        replace(IndexValue(value: content, index: i))
+    }
+    func replace(_ contentValue: IndexValue<Content>) {
+        let undoItem = SheetUndoItem.replaceContents([IndexValue(value: model.contents[contentValue.index],
+                                                                 index: contentValue.index)])
+        let redoItem = SheetUndoItem.replaceContents([contentValue])
+        append(undo: undoItem, redo: redoItem)
+        set(redoItem)
+    }
+    func removeContent(at i: Int) {
+        let undoItem = SheetUndoItem.insertContents([IndexValue(value: model.contents[i],
+                                                                index: i)])
+        let redoItem = SheetUndoItem.removeContents(contentIndexes: [i])
+        append(undo: undoItem, redo: redoItem)
+        set(redoItem)
+    }
+    
     func append(_ border: Border) {
         let undoItem = SheetUndoItem.removeBorders(borderIndexes: [model.borders.count])
         let redoItem = SheetUndoItem.insertBorders([IndexValue(value: border,
@@ -3556,6 +3829,7 @@ final class SheetView: View {
         append(undo: undoItem, redo: redoItem)
         set(redoItem)
     }
+    
     func insert(_ kivs: [IndexValue<Keyframe>]) {
         let undoItem = SheetUndoItem.removeKeyframes(keyframeIndexes: kivs.map { $0.index })
         let redoItem = SheetUndoItem.insertKeyframes(kivs)
@@ -3625,6 +3899,18 @@ final class SheetView: View {
     func capture(option: AnimationOption, oldOption: AnimationOption) {
         let undoItem = SheetUndoItem.setAnimationOption(oldOption)
         let redoItem = SheetUndoItem.setAnimationOption(option)
+        append(undo: undoItem, redo: redoItem)
+    }
+    
+    func set(_ option: ScoreOption) {
+        let undoItem = SheetUndoItem.setScoreOption(model.score.option)
+        let redoItem = SheetUndoItem.setScoreOption(option)
+        append(undo: undoItem, redo: redoItem)
+        set(redoItem)
+    }
+    func capture(_ option: ScoreOption, old oldOption: ScoreOption) {
+        let undoItem = SheetUndoItem.setScoreOption(oldOption)
+        let redoItem = SheetUndoItem.setScoreOption(option)
         append(undo: undoItem, redo: redoItem)
     }
     
@@ -3824,7 +4110,8 @@ final class SheetView: View {
         append(undo: undoItem, redo: redoItem)
         set(redoItem)
     }
-    func captureText(_ text: Text, old oldText: Text, at i: Int) {
+    
+    func capture(_ text: Text, old oldText: Text, at i: Int) {
         let undoItem1 = SheetUndoItem.insertTexts([IndexValue(value: oldText, index: i)])
         let redoItem1 = SheetUndoItem.removeTexts(textIndexes: [i])
         append(undo: undoItem1, redo: redoItem1)
@@ -3832,51 +4119,6 @@ final class SheetView: View {
         let undoItem0 = SheetUndoItem.removeTexts(textIndexes: [i])
         let redoItem0 = SheetUndoItem.insertTexts([IndexValue(value: text, index: i)])
         append(undo: undoItem0, redo: redoItem0)
-    }
-    func captureTimeframe(_ timeframe: Timeframe?, old oldTimeframe: Timeframe?, at i: Int) {
-        var text = model.texts[i]
-        text.timeframe = timeframe
-        var oldText = model.texts[i]
-        oldText.timeframe = oldTimeframe
-        
-        let undoItem1 = SheetUndoItem.insertTexts([IndexValue(value: oldText, index: i)])
-        let redoItem1 = SheetUndoItem.removeTexts(textIndexes: [i])
-        append(undo: undoItem1, redo: redoItem1)
-        
-        let undoItem0 = SheetUndoItem.removeTexts(textIndexes: [i])
-        let redoItem0 = SheetUndoItem.insertTexts([IndexValue(value: text, index: i)])
-        append(undo: undoItem0, redo: redoItem0)
-    }
-    func replaceTimeframe(_ timeframe: Timeframe?, at i: Int) {
-        var text = model.texts[i]
-        text.timeframe = timeframe
-        let oldText = model.texts[i]
-        
-        let undoItem1 = SheetUndoItem.insertTexts([IndexValue(value: oldText, index: i)])
-        let redoItem1 = SheetUndoItem.removeTexts(textIndexes: [i])
-        append(undo: undoItem1, redo: redoItem1)
-        set(redoItem1)
-        
-        let undoItem0 = SheetUndoItem.removeTexts(textIndexes: [i])
-        let redoItem0 = SheetUndoItem.insertTexts([IndexValue(value: text, index: i)])
-        append(undo: undoItem0, redo: redoItem0)
-        set(redoItem0)
-    }
-    func captureScore(_ score: Score?, old oldScore: Score?, at i: Int) {
-        let undoItem = SheetUndoItem.replaceScore(IndexValue(value: oldScore,
-                                                              index: i))
-        let redoItem = SheetUndoItem.replaceScore(IndexValue(value: score, index: i))
-        append(undo: undoItem, redo: redoItem)
-    }
-    func replaceScore(_ score: Score?, at i: Int) {
-        replaceScore(IndexValue(value: score, index: i))
-    }
-    func replaceScore(_ scoreValue: IndexValue<Score?>) {
-        let undoItem = SheetUndoItem.replaceScore(IndexValue(value: model.texts[scoreValue.index].timeframe?.score,
-                                                              index: scoreValue.index))
-        let redoItem = SheetUndoItem.replaceScore(scoreValue)
-        append(undo: undoItem, redo: redoItem)
-        set(redoItem)
     }
     
     func captureLine(_ line: Line, old oldLine: Line, at i: Int) {
@@ -4566,26 +4808,115 @@ final class SheetView: View {
                     }
                 }
             }
-        case .replaceScore(let siv):
-            updateFirstReverse()
-            guard siv.index < model.texts.count else {
-                history[result.version]
-                    .values[result.valueIndex].error()
-                break
-            }
-            let text = model.texts[siv.index]
-            if text.timeframe?.score != siv.value {
-                let nsiv = IndexValue(value: text.timeframe?.score,
-                                      index: siv.index)
-                history[result.version].values[result.valueIndex]
-                    .saveUndoItemValue?.set(.replaceScore(nsiv), type: reversedType)
-            }
             
         case .setAnimationOption(let option):
             let oldOption = model.animation.option
             if oldOption != option {
                 history[result.version].values[result.valueIndex]
                     .saveUndoItemValue?.set(.setAnimationOption(oldOption), type: reversedType)
+            }
+            
+        case .insertNotes(let nivs):
+            updateFirstReverse()
+            let maxI = nivs.max { $0.index < $1.index }?.index
+            if let maxI = maxI, maxI < model.score.notes.count {
+                let oldNIVS = nivs.map { IndexValue(value: model.score.notes[$0.index],
+                                                    index: $0.index) }
+                if oldNIVS != nivs {
+                    history[result.version].values[result.valueIndex]
+                        .saveUndoItemValue?.set(.insertNotes(oldNIVS), type: reversedType)
+                }
+            } else {
+                history[result.version]
+                    .values[result.valueIndex].error()
+            }
+        case .replaceNotes(let nivs):
+            updateFirstReverse()
+            func error() {
+                history[result.version]
+                    .values[result.valueIndex].error()
+            }
+            let notes = model.score.notes
+            for niv in nivs {
+                if niv.index >= notes.count {
+                    error()
+                    break
+                }
+                if niv.value != notes[niv.index] {
+                    error()
+                    break
+                }
+            }
+        case .removeNotes(let noteIndexes):
+            updateFirstReverse()
+            let oldNIS = noteIndexes.filter { $0 < model.score.notes.count + noteIndexes.count }.sorted()
+            if oldNIS != noteIndexes {
+                history[result.version].values[result.valueIndex]
+                    .saveUndoItemValue?.set(.removeNotes(noteIndexes: oldNIS), type: reversedType)
+            }
+        case .changedTones(let toneValue):
+            updateFirstReverse()
+            func error() {
+                history[result.version]
+                    .values[result.valueIndex].error()
+            }
+            
+            if !toneValue.noteIndexes.isEmpty {
+                let maxNISI = toneValue.noteIndexes.max { $0 < $1 }
+                if let maxNISI = maxNISI, maxNISI < model.score.notes.count {
+                    for i in toneValue.noteIndexes {
+                        if model.score.notes[i].tone != toneValue.tone {
+                            error()
+                            break
+                        }
+                    }
+                } else {
+                    error()
+                }
+            }
+        case .insertContents(let civs):
+            updateFirstReverse()
+            let maxI = civs.max { $0.index < $1.index }?.index
+            if let maxI = maxI, maxI < model.contents.count {
+                let oldCIVS = civs.map { IndexValue(value: model.contents[$0.index],
+                                                    index: $0.index) }
+                if oldCIVS != civs {
+                    history[result.version].values[result.valueIndex]
+                        .saveUndoItemValue?.set(.insertContents(oldCIVS), type: reversedType)
+                }
+            } else {
+                history[result.version]
+                    .values[result.valueIndex].error()
+            }
+        case .replaceContents(let civs):
+            updateFirstReverse()
+            func error() {
+                history[result.version]
+                    .values[result.valueIndex].error()
+            }
+            let contents = model.contents
+            for civ in civs {
+                if civ.index >= contents.count {
+                    error()
+                    break
+                }
+                if civ.value != contents[civ.index] {
+                    error()
+                    break
+                }
+            }
+        case .removeContents(let contentIndexes):
+            updateFirstReverse()
+            let oldCIS = contentIndexes.filter { $0 < model.contents.count + contentIndexes.count }.sorted()
+            if oldCIS != contentIndexes {
+                history[result.version].values[result.valueIndex]
+                    .saveUndoItemValue?.set(.removeContents(contentIndexes: oldCIS), type: reversedType)
+            }
+        case .setScoreOption(let option):
+            let oldOption = model.score.option
+            if oldOption != option {
+                history[result.version].values[result.valueIndex]
+                    .saveUndoItemValue?.set(.setScoreOption(oldOption), type: reversedType)
             }
         }
         
@@ -5372,37 +5703,6 @@ final class SheetView: View {
                         .undoItemValue?.undoItem = .setLineIDs(oldKvs)
                 }
             }
-        case .replaceScore(var siv):
-            updateFirstReverse()
-            guard !model.texts.isEmpty else {
-                history[result.version]
-                    .values[result.valueIndex].error()
-                break
-            }
-            var isChanged = false
-            if siv.index >= model.texts.count {
-                siv.index = model.texts.count - 1
-                isChanged = true
-            }
-            let oldScore = model.texts[siv.index].timeframe?.score
-            let nsiv = IndexValue(value: oldScore,
-                                  index: siv.index)
-            if isChanged {
-                history[result.version]
-                    .values[result.valueIndex].saveUndoItemValue
-                    = UndoItemValue(undoItem: .replaceScore(nsiv),
-                                    redoItem: .replaceScore(siv),
-                                    isReversed: isUndo)
-            } else {
-                switch result.type {
-                case .undo:
-                    history[result.version].values[result.valueIndex]
-                        .undoItemValue?.redoItem = .replaceScore(nsiv)
-                case .redo:
-                    history[result.version].values[result.valueIndex]
-                        .undoItemValue?.undoItem = .replaceScore(nsiv)
-                }
-            }
             
         case .setAnimationOption:
             let oldOption = model.animation.option
@@ -5413,6 +5713,166 @@ final class SheetView: View {
             case .redo:
                 history[result.version].values[result.valueIndex]
                     .undoItemValue?.undoItem = .setAnimationOption(oldOption)
+            }
+            
+        case .insertNotes(var nivs):
+            updateFirstReverse()
+            var isChanged = false, notesCount = model.score.notes.count
+            nivs.enumerated().forEach { (k, iv) in
+                if iv.index > notesCount {
+                    nivs[k].index = notesCount
+                    isChanged = true
+                }
+                notesCount += 1
+            }
+            if isChanged {
+                history[result.version].values[result.valueIndex].saveUndoItemValue
+                    = UndoItemValue(undoItem: .removeNotes(noteIndexes: nivs.map { $0.index }),
+                                    redoItem: .insertNotes(nivs),
+                                    isReversed: isUndo)
+            }
+        case .replaceNotes(let nivs):
+            updateFirstReverse()
+            var isError = false
+            func error() {
+                history[result.version]
+                    .values[result.valueIndex].error()
+                isError = true
+            }
+            let notes = model.score.notes
+            var oldNIVs = [IndexValue<Note>]()
+            for niv in nivs {
+                if niv.index >= notes.count {
+                    error()
+                    break
+                }
+                oldNIVs.append(IndexValue(value: notes[niv.index],
+                                          index: niv.index))
+            }
+            if !isError {
+                switch result.type {
+                case .undo:
+                    history[result.version].values[result.valueIndex]
+                        .undoItemValue?.redoItem = .replaceNotes(oldNIVs)
+                case .redo:
+                    history[result.version].values[result.valueIndex]
+                        .undoItemValue?.undoItem = .replaceNotes(oldNIVs)
+                }
+            }
+        case .removeNotes(var noteIndexes):
+            updateFirstReverse()
+            let nis = noteIndexes.filter { $0 < model.score.notes.count }.sorted()
+            if noteIndexes != nis {
+                noteIndexes = nis
+                let nivs = noteIndexes.map {
+                    IndexValue(value: model.score.notes[$0], index: $0)
+                }
+                history[result.version].values[result.valueIndex].saveUndoItemValue
+                    = UndoItemValue(undoItem: .insertNotes(nivs),
+                                    redoItem: .removeNotes(noteIndexes: nis),
+                                    isReversed: isUndo)
+            }
+        case .changedTones(var toneValue):
+            updateFirstReverse()
+            var isChanged = false, isError = false
+            if !toneValue.noteIndexes.isEmpty {
+                let nis = toneValue.noteIndexes.filter {
+                    $0 < model.score.notes.count
+                }
+                if toneValue.noteIndexes != nis {
+                    toneValue.noteIndexes = nis
+                    isChanged = true
+                }
+            }
+            
+            if !isError {
+                var oToneValue = toneValue
+                if let ni = oToneValue.noteIndexes.first {
+                    oToneValue.tone = model.score.notes[ni].tone
+                }
+                
+                if isChanged {
+                    history[result.version].values[result.valueIndex].saveUndoItemValue
+                        = UndoItemValue(undoItem: .changedTones(oToneValue),
+                                        redoItem: .changedTones(toneValue),
+                                        isReversed: isUndo)
+                } else {
+                    switch result.type {
+                    case .undo:
+                        history[result.version].values[result.valueIndex]
+                            .undoItemValue?.redoItem = .changedTones(oToneValue)
+                    case .redo:
+                        history[result.version].values[result.valueIndex]
+                            .undoItemValue?.undoItem = .changedTones(oToneValue)
+                    }
+                }
+            }
+        case .insertContents(var civs):
+            updateFirstReverse()
+            var isChanged = false, contentsCount = model.contents.count
+            civs.enumerated().forEach { (k, iv) in
+                if iv.index > contentsCount {
+                    civs[k].index = contentsCount
+                    isChanged = true
+                }
+                contentsCount += 1
+            }
+            if isChanged {
+                history[result.version].values[result.valueIndex].saveUndoItemValue
+                    = UndoItemValue(undoItem: .removeContents(contentIndexes: civs.map { $0.index }),
+                                    redoItem: .insertContents(civs),
+                                    isReversed: isUndo)
+            }
+        case .replaceContents(let civs):
+            updateFirstReverse()
+            var isError = false
+            func error() {
+                history[result.version]
+                    .values[result.valueIndex].error()
+                isError = true
+            }
+            let contents = model.contents
+            var oldCIVs = [IndexValue<Content>]()
+            for civ in civs {
+                if civ.index >= contents.count {
+                    error()
+                    break
+                }
+                oldCIVs.append(IndexValue(value: contents[civ.index],
+                                          index: civ.index))
+            }
+            if !isError {
+                switch result.type {
+                case .undo:
+                    history[result.version].values[result.valueIndex]
+                        .undoItemValue?.redoItem = .replaceContents(oldCIVs)
+                case .redo:
+                    history[result.version].values[result.valueIndex]
+                        .undoItemValue?.undoItem = .replaceContents(oldCIVs)
+                }
+            }
+        case .removeContents(var contentIndexes):
+            updateFirstReverse()
+            let cis = contentIndexes.filter { $0 < model.contents.count }.sorted()
+            if contentIndexes != cis {
+                contentIndexes = cis
+                let civs = contentIndexes.map {
+                    IndexValue(value: model.contents[$0], index: $0)
+                }
+                history[result.version].values[result.valueIndex].saveUndoItemValue
+                    = UndoItemValue(undoItem: .insertContents(civs),
+                                    redoItem: .removeContents(contentIndexes: cis),
+                                    isReversed: isUndo)
+            }
+        case .setScoreOption:
+            let oldOption = model.score.option
+            switch result.type {
+            case .undo:
+                history[result.version].values[result.valueIndex]
+                    .undoItemValue?.redoItem = .setScoreOption(oldOption)
+            case .redo:
+                history[result.version].values[result.valueIndex]
+                    .undoItemValue?.undoItem = .setScoreOption(oldOption)
             }
         }
     }

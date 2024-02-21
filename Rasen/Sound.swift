@@ -18,6 +18,57 @@
 import struct Foundation.UUID
 import struct Foundation.Data
 
+struct LyricsUnison: Hashable, Codable {
+    enum Step: Int32, Hashable, Codable, CaseIterable {
+        case c = 0, d = 2, e = 4, f = 5, g = 7, a = 9, b = 11
+    }
+    enum Accidental: Int32, Hashable, Codable, CaseIterable {
+        case none = 0, flat = -1, sharp = 1
+    }
+    
+    var step = Step.c, accidental = Accidental.none
+    
+    init(_ step: Step, _ accidental: Accidental = .none) {
+        self.step = step
+        self.accidental = accidental
+    }
+    init(unison: Int, isSharp: Bool) {
+        switch unison {
+        case 0: self = .init(.c)
+        case 1: self = isSharp ? .init(.c, .sharp) : .init(.d, .flat)
+        case 2: self = .init(.d)
+        case 3: self = isSharp ? .init(.d, .sharp) : .init(.e, .flat)
+        case 4: self = .init(.e)
+        case 5: self = .init(.f)
+        case 6: self = isSharp ? .init(.f, .sharp) : .init(.g, .flat)
+        case 7: self = .init(.g)
+        case 8: self = isSharp ? .init(.g, .sharp) : .init(.a, .flat)
+        case 9: self = .init(.a)
+        case 10: self = isSharp ? .init(.a, .sharp) : .init(.b, .flat)
+        case 11: self = .init(.b)
+        default: fatalError()
+        }
+    }
+}
+extension LyricsUnison.Step {
+    var name: String {
+        switch self {
+        case .c: "C"
+        case .d: "D"
+        case .e: "E"
+        case .f: "F"
+        case .g: "G"
+        case .a: "A"
+        case .b: "B"
+        }
+    }
+}
+extension LyricsUnison {
+    var unison: Int {
+        (Int(step.rawValue) + Int(accidental.rawValue)).mod(12)
+    }
+}
+
 struct Pitch: Hashable, Codable {
     var value = Rational(0)
 }
@@ -70,37 +121,6 @@ enum MusicScaleType: Int32, Hashable, Codable, CaseIterable {
          dorian,
          wholeTone, chromatic,
          none
-}
-extension MusicScaleType: Protobuf {
-    init(_ pb: PBMusicScaleType) throws {
-        switch pb {
-        case .major: self = .major
-        case .minor: self = .minor
-        case .hexaMajor: self = .hexaMajor
-        case .hexaMinor: self = .hexaMinor
-        case .pentaMajor: self = .pentaMajor
-        case .pentaMinor: self = .pentaMinor
-        case .dorian: self = .dorian
-        case .wholeTone: self = .wholeTone
-        case .chromatic: self = .chromatic
-        case .aNone: self = .none
-        case .UNRECOGNIZED: self = .none
-        }
-    }
-    var pb: PBMusicScaleType {
-        switch self {
-        case .major: .major
-        case .minor: .minor
-        case .hexaMajor: .hexaMajor
-        case .hexaMinor: .hexaMinor
-        case .pentaMajor: .pentaMajor
-        case .pentaMinor: .pentaMinor
-        case .dorian: .dorian
-        case .wholeTone: .wholeTone
-        case .chromatic: .chromatic
-        case .none: .aNone
-        }
-    }
 }
 extension MusicScaleType {
     private static let selfDic: [Set<Int>: Self] = {
@@ -173,9 +193,13 @@ struct Mel {
 }
 
 struct Pit: Codable, Hashable {
-    var t = 0.0, pitch = 0.0, amp = 1.0
+    var t = 0.0, pitch = 0.0, amp = 1.0, pan = 0.0
 }
 extension Pit {
+    var volume: Volume {
+        get { .init(amp: amp) }
+        set { amp = newValue.amp }
+    }
     var smp: Double {
         get { Volume(amp: amp).smp }
         set { amp = Volume(smp: newValue).amp }
@@ -408,19 +432,19 @@ extension Pitbend {
         guard !isEmpty else { return nil }
         let dSec = 1 / Double(count)
         let interpolation = interpolation
-        let waver = Waver(envelope: envelope)
+        let waver = Waver(envelope: envelope, pitbend: self)
         var sec = 0.0, cs = [Line.Control]()
         while sec < secDuration {
             if let v = interpolation.monoValue(withTime: sec / secDuration) {
                 cs.append(.init(point: .init(sec, v.pitch),
-                                pressure: Volume(amp: Volume(smp: v.smp).amp * waver.volume(atTime: sec, releaseTime: nil, startTime: 0)).smp))
+                                pressure: Volume(amp: Volume(smp: v.smp).amp * waver.volumeAmp(atTime: sec, releaseTime: nil, startTime: 0)).smp))
             }
             sec += dSec
         }
         cs.append(.init(point: .init(secDuration,
                                      cs.last?.point.y ?? 0),
                         pressure: cs.last?.pressure ?? 0))
-        cs.append(.init(point: .init(secDuration + envelope.release,
+        cs.append(.init(point: .init(secDuration + envelope.releaseSec,
                                      cs.last?.point.y ?? 0),
                         pressure: 0))
         
@@ -428,22 +452,111 @@ extension Pitbend {
     }
 }
 
-struct Noterial {
-    
+struct Overtone: Hashable, Codable {
+    var evenScale = 1.0
+    var oddScale = 1.0
+}
+extension Overtone: Protobuf {
+    init(_ pb: PBOvertone) throws {
+        evenScale = ((try? pb.evenScale.notNaN()) ?? 0).clipped(min: 0, max: 1)
+        oddScale = ((try? pb.oddScale.notNaN()) ?? 0).clipped(min: 0, max: 1)
+    }
+    var pb: PBOvertone {
+        .with {
+            $0.evenScale = evenScale
+            $0.oddScale = oddScale
+        }
+    }
+}
+extension Overtone {
+    var isAll: Bool {
+        evenScale == 1 && oddScale == 1
+    }
+    var isOne: Bool {
+        evenScale == 0 && oddScale == 0
+    }
+    func scale(at i: Int) -> Double {
+        i == 1 ? 1 : (i % 2 == 0 ? evenScale : oddScale)
+    }
+}
+enum OvertoneType: Int, Hashable, Codable, CaseIterable {
+    case evenScale, oddScale
+}
+extension Overtone {
+    subscript(type: OvertoneType) -> Double {
+        get {
+            switch type {
+            case .evenScale: evenScale
+            case .oddScale: oddScale
+            }
+        }
+        set {
+            switch type {
+            case .evenScale: evenScale = newValue
+            case .oddScale: oddScale = newValue
+            }
+        }
+    }
+}
+
+struct Tone: Hashable, Codable {
+    var overtone = Overtone()
+    var sourceFilter = SourceFilter()
+    var id = UUID()
+}
+extension Tone: Protobuf {
+    init(_ pb: PBTone) throws {
+        overtone = (try? .init(pb.overtone)) ?? .init()
+        sourceFilter = (try? .init(pb.sourceFilter)) ?? .init()
+        id = (try? .init(pb.id)) ?? .init()
+    }
+    var pb: PBTone {
+        .with {
+            $0.overtone = overtone.pb
+            $0.sourceFilter = sourceFilter.pb
+            $0.id = id.pb
+        }
+    }
+}
+
+struct Envelope: Hashable, Codable {
+    var attackSec = 0.02, decaySec = 0.04,
+        sustainAmp = Volume(smp: 0.95).amp, releaseSec = 0.06
+    var id = UUID()
+}
+extension Envelope: Protobuf {
+    init(_ pb: PBEnvelope) throws {
+        attackSec = try pb.attackSec.notNaN().clipped(min: 0, max: 1)
+        decaySec = try pb.decaySec.notNaN().clipped(min: 0, max: 1)
+        sustainAmp = try pb.sustainAmp.notNaN().clipped(min: 0, max: 1)
+        releaseSec = try pb.releaseSec.notNaN().clipped(min: 0, max: 1)
+        id = (try? .init(pb.id)) ?? .init()
+    }
+    var pb: PBEnvelope {
+        .with {
+            $0.attackSec = attackSec
+            $0.decaySec = decaySec
+            $0.sustainAmp = sustainAmp
+            $0.releaseSec = releaseSec
+            $0.id = id.pb
+        }
+    }
 }
 
 struct Note {
+    static let defaultVolume = Volume(smp: 0.5)
+    //pitbend
+    //tonebend
+    //envelope
+    //lyric
     var pitch = Rational(0)
     var pitbend = Pitbend()
     var beatRange = 0 ..< Rational(1, 4)
-    var volumeAmp = Volume.mainAmp
+    var volumeAmp = defaultVolume.amp
     var pan = 0.0
     var tone = Tone()
+    var envelope = Envelope()
     var lyric = ""
-    
-    var isBreath = false
-    var isVibrato = false
-    var isVowelReduction = false
 }
 extension Note: Protobuf {
     init(_ pb: PBNote) throws {
@@ -452,10 +565,10 @@ extension Note: Protobuf {
         beatRange = (try? RationalRange(pb.beatRange).value) ?? 0 ..< Rational(1, 4)
         volumeAmp = ((try? pb.volumeAmp.notInfiniteAndNAN()) ?? 0)
             .clipped(min: Volume.minAmp, max: Volume.maxAmp)
+        pan = pb.pan.clipped(min: -1, max: 1)
+        tone = (try? Tone(pb.tone)) ?? Tone()
+        envelope = (try? Envelope(pb.envelope)) ?? .init()
         lyric = pb.lyric
-        isBreath = pb.isBreath
-        isVibrato = pb.isVibrato
-        isVowelReduction = pb.isVowelReduction
     }
     var pb: PBNote {
         .with {
@@ -463,15 +576,27 @@ extension Note: Protobuf {
             $0.pitbend = pitbend.pb
             $0.beatRange = RationalRange(value: beatRange).pb
             $0.volumeAmp = volumeAmp
+            $0.pan = pan
+            $0.tone = tone.pb
+            $0.envelope = envelope.pb
             $0.lyric = lyric
-            $0.isBreath = isBreath
-            $0.isVibrato = isVibrato
-            $0.isVowelReduction = isVowelReduction
         }
     }
 }
 extension Note: Hashable, Codable {}
 extension Note {
+    var mainLyric: String {
+        lyric.filter { !"^~/".contains($0) }
+    }
+    var isBreath: Bool {
+        lyric.contains("^")
+    }
+    var isVibrato: Bool {
+        lyric.contains("~")
+    }
+    var isVowelReduction: Bool {
+        lyric.contains("/")
+    }
     var isChord: Bool {
         volumeAmp == 0
     }
@@ -503,6 +628,12 @@ extension Note {
     
     var octavePitchString: String {
         Pitch(value: pitch).octaveString
+    }
+    
+    func smp(atSec sec: Double) -> Double {
+        let waver = Waver(envelope: envelope, pitbend: pitbend)
+        let amp = waver.volumeAmp(atTime: sec, releaseTime: nil, startTime: 0)
+        return Volume(amp: amp * volumeAmp).smp
     }
 }
 
@@ -809,265 +940,99 @@ extension Chord: CustomStringConvertible {
     }
 }
 
-struct Envelope: Hashable, Codable {
-    var attack = 0.02, decay = 0.04,
-        sustain = Volume(smp: 0.95).amp, release = 0.06
+struct ScoreOption {
+    var beatRange = 0 ..< Rational(16)
+    var tempo = Music.defaultTempo
+    var enabled = false
 }
-extension Envelope: Protobuf {
-    init(_ pb: PBEnvelope) throws {
-        attack = try pb.attack.notNaN().clipped(min: 0, max: 1)
-        decay = try pb.decay.notNaN().clipped(min: 0, max: 1)
-        sustain = try pb.sustain.notNaN().clipped(min: 0, max: 1)
-        release = try pb.release.notNaN().clipped(min: 0, max: 1)
+extension ScoreOption: Protobuf {
+    init(_ pb: PBScoreOption) throws {
+        beatRange = (try? RationalRange(pb.beatRange).value) ?? 0 ..< 0
+        tempo = (try? Rational(pb.tempo))?.clipped(Music.tempoRange) ?? Music.defaultTempo
+        enabled = pb.enabled
     }
-    var pb: PBEnvelope {
+    var pb: PBScoreOption {
         .with {
-            $0.attack = attack
-            $0.decay = decay
-            $0.sustain = sustain
-            $0.release = release
-        }
-    }
-}
-
-struct Overtone: Hashable, Codable {
-    var evenScale = 1.0
-    var oddScale = 1.0
-}
-extension Overtone: Protobuf {
-    init(_ pb: PBOvertone) throws {
-        evenScale = ((try? pb.evenScale.notNaN()) ?? 0).clipped(min: 0, max: 1)
-        oddScale = ((try? pb.oddScale.notNaN()) ?? 0).clipped(min: 0, max: 1)
-    }
-    var pb: PBOvertone {
-        .with {
-            $0.evenScale = evenScale
-            $0.oddScale = oddScale
-        }
-    }
-}
-extension Overtone {
-    var isAll: Bool {
-        evenScale == 1 && oddScale == 1
-    }
-    var isOne: Bool {
-        evenScale == 0 && oddScale == 0
-    }
-    func scale(at i: Int) -> Double {
-        i == 1 ? 1 : (i % 2 == 0 ? evenScale : oddScale)
-    }
-}
-enum OvertoneType: Int, Hashable, Codable, CaseIterable {
-    case evenScale, oddScale
-}
-extension Overtone {
-    subscript(type: OvertoneType) -> Double {
-        get {
-            switch type {
-            case .evenScale: evenScale
-            case .oddScale: oddScale
+            $0.beatRange = RationalRange(value: beatRange).pb
+            if tempo != Music.defaultTempo {
+                $0.tempo = tempo.pb
             }
-        }
-        set {
-            switch type {
-            case .evenScale: evenScale = newValue
-            case .oddScale: oddScale = newValue
-            }
+            $0.enabled = enabled
         }
     }
 }
+extension ScoreOption: Hashable, Codable {}
 
-struct Tone: Hashable, Codable {
-    var envelope = Envelope()
-    var overtone = Overtone()
-    var sourceFilter = SourceFilter()
-}
-extension Tone: Protobuf {
-    init(_ pb: PBTone) throws {
-        envelope = (try? Envelope(pb.envelope)) ?? .init()
-        overtone = (try? Overtone(pb.overtone)) ?? .init()
-        sourceFilter = (try? SourceFilter(pb.sourceFilter)) ?? .init()
-    }
-    var pb: PBTone {
-        .with {
-            $0.envelope = envelope.pb
-            $0.overtone = overtone.pb
-            $0.sourceFilter = sourceFilter.pb
-        }
-    }
-}
-extension Tone {
-    func isEqualTimebend(_ other: Self) -> Bool {
-        envelope == other.envelope
-    }
-    func isEqualWave(_ other: Self) -> Bool {
-        overtone == other.overtone
-        && sourceFilter == other.sourceFilter
-    }
-}
-
-struct Wave: Codable, Hashable {
-    var amp = 0.0, fq = 1.0, offsetTime = 0.0, phase = 0.0
-}
-extension Wave {
-    func value(atT t: Double) -> Double {
-        amp * .sin((t - offsetTime) * fq * 2 * .pi + phase)
-    }
-    func value120(atT t: Double, tempo: Double) -> Double {
-        amp * .sin((t - offsetTime) * fq * (tempo / 120) * 2 * .pi + phase)
-    }
-    var isEmpty: Bool {
-        amp == 0 || fq == 0
-    }
-}
-
-struct Reswave: Codable, Hashable {
-    static let vibrato = Reswave(amp: 0.008 / 1.4321,
-                                 fqs: [6, 12],
-                                 phases: [0, .pi], fAlpha: 1)
-    static let voiceVibrato = Reswave(amp: 0.0055 / 1.4321,
-                                      fqs: [6, 12],
-                                      phases: [0, .pi], fAlpha: 1)
-    static let strongVibrato = Reswave(amp: 0.015 / 1.4321,
-                                       fqs: [6, 12],
-                                       phases: [0, .pi], fAlpha: 1)
-    static let tremolo = Reswave(amp: 0.125,
-                                 fqs: [6],
-                                 phases: [0], fAlpha: 1)
-    
-    var waves = [Wave()]
-    var beganTime = 0.0
-}
-extension Reswave {
-    init(amp: Double, fqs: [Double], phases: [Double] = [],
-         fAlpha: Double, beganTime: Double = 0) {
-        let f0 = fqs.first!
-        let sqfa = fAlpha * 0.5
-        let waves: [Wave]
-        if phases.isEmpty {
-            waves = fqs.map { fq in
-                Wave(amp: amp * (1 / ((fq / f0) ** sqfa)),
-                     fq: fq)
-            }
-        } else {
-            waves = fqs.enumerated().map { i, fq in
-                Wave(amp: amp * (1 / ((fq / f0) ** sqfa)),
-                     fq: fq, phase: phases[i])
-            }
-        }
-        self.init(waves: waves, beganTime: beganTime)
-    }
-    
-    func fqScale(atLocalTime t: Double) -> Double {
-        let t = t - beganTime
-        guard t >= 0 else { return 1 }//
-        return 2 ** (waves.sum { $0.value(atT: t) })
-    }
-    func fqScale120(atLocalTime t: Double,
-                            tempo: Double) -> Double {
-        let t = t - beganTime
-        guard t >= 0 else { return 1 }
-        return 2 ** (waves.sum { $0.value120(atT: t, tempo: tempo) })
-    }
-    
-    func value(atLocalTime t: Double) -> Double {
-        let t = t - beganTime
-        guard t >= 0 else { return 0 }
-        return waves.sum { $0.value(atT: t) }
-    }
-    func value120(atLocalTime t: Double,
-                            tempo: Double) -> Double {
-        let t = t - beganTime
-        guard t >= 0 else { return 0 }
-        return waves.sum { $0.value120(atT: t, tempo: tempo) }
-    }
-    
-    var isEmpty: Bool {
-        waves.contains(where: { $0.isEmpty })
-    }
-}
-
-struct Score {
-    static let minOctave = -Rational(1), maxOctave = Rational(12)
+struct Score: BeatRangeType {
+    static let pitchRange = Rational(-1 * 12) ..< Rational(11 * 12)
     
     var notes = [Note]()
-    var volumeAmp = Volume(smp: 0.5).amp
-    var pan = 0.0
-    var tone = Tone()
-    var octave = Rational(4)
-    var pitchRange = Rational(-12 * 3) ..< Rational(12 * 2)
+    var beatRange = 0 ..< Rational(16)
+    var tempo = Music.defaultTempo
+    var enabled = false
+    var id = UUID()
 }
 extension Score: Protobuf {
     init(_ pb: PBScore) throws {
         notes = pb.notes.compactMap { try? Note($0) }
-        volumeAmp = ((try? pb.volumeAmp.notNaN()) ?? 1)
-            .clipped(min: 0, max: Volume.maxAmp)
-        pan = pb.pan.clipped(min: -1, max: 1)
-        tone = (try? Tone(pb.tone)) ?? Tone()
-        octave = ((try? Rational(pb.octave)) ?? 4)
-            .clipped(min: Self.minOctave, max: Self.maxOctave)
-        pitchRange = (try? RationalRange(pb.pitchRange).value) ?? Rational(-3) ..< Rational(14)
-        if pitchRange.isEmpty {
-            pitchRange = pitchRange.lowerBound ..< (pitchRange.lowerBound + 1)
-        }
+        beatRange = (try? RationalRange(pb.beatRange).value) ?? 0 ..< 0
+        tempo = (try? Rational(pb.tempo))?.clipped(Music.tempoRange) ?? Music.defaultTempo
+        enabled = pb.enabled
+        id = (try? .init(pb.id)) ?? .init()
     }
     var pb: PBScore {
         .with {
             $0.notes = notes.map { $0.pb }
-            $0.volumeAmp = volumeAmp
-            $0.pan = pan
-            $0.tone = tone.pb
-            $0.octave = octave.pb
-            $0.pitchRange = RationalRange(value: pitchRange).pb
+            $0.beatRange = RationalRange(value: beatRange).pb
+            $0.tempo = tempo.pb
+            $0.enabled = enabled
+            $0.id = id.pb
         }
     }
 }
 extension Score: Hashable, Codable {}
 extension Score {
-    var beatRange: Range<Rational>? {
+    var spectrogram: Spectrogram? {
+        if let renderedNoneDelayPCMBuffer {
+            Spectrogram.default(renderedNoneDelayPCMBuffer)
+        } else {
+            nil
+        }
+    }
+    var renderedNoneDelayPCMBuffer: PCMBuffer? {
+        var n = self
+        n.beatRange.start = 0
+        let seq = Sequencer(audiotracks: [.init(values: [.score(n)])],
+                            isAsync: false, startSec: 0,
+                            perceptionDelaySec: 0)
+        return try? seq?.buffer(sampleRate: Audio.defaultExportSampleRate,
+                                progressHandler: { _, _ in })
+    }
+    var renderedPCMBuffer: PCMBuffer? {
+        var n = self
+        n.beatRange.start = 0
+        let seq = Sequencer(audiotracks: [.init(values: [.score(n)])],
+                            isAsync: false, startSec: 0)
+        return try? seq?.buffer(sampleRate: Audio.defaultExportSampleRate,
+                                progressHandler: { _, _ in })
+    }
+    
+    var localMaxBeatRange: Range<Rational>? {
         guard !notes.isEmpty else { return nil }
         let minV = notes.min(by: { $0.beatRange.lowerBound < $1.beatRange.lowerBound })!.beatRange.lowerBound
         let maxV = notes.max(by: { $0.beatRange.upperBound < $1.beatRange.upperBound })!.beatRange.upperBound
         return minV ..< maxV
     }
     
-    var volume: Volume {
-        get { Volume(amp: volumeAmp) }
-        set { volumeAmp = newValue.amp }
-    }
-    var isVoice: Bool {
-        notes.contains { !$0.lyric.isEmpty }
-    }
-    var octavePitch: Rational {
-        octave * 12
-    }
-    var sortedNotes: [Note] {
-        notes.sorted { $0.beatRange.start < $1.beatRange.start }
-    }
-    var scaleKey: Rational {
-        get { octave.decimalPart * 12 }
-        set { octave = Rational(octave.integralPart) + newValue }
-    }
     var scaleType: MusicScaleType? {
         .init(pitchs: notes.map { Int($0.pitch.rounded()) })
-    }
-    
-    func convertPitchToWorld(_ note: Note) -> Note {
-        var note = note
-        note.pitch += octavePitch
-        return note
-    }
-    
-    func pitchRange(fromScaleKey scaleKey: Int) -> Range<Rational> {
-        let scalePitch = octavePitch + Rational(scaleKey)
-        return pitchRange + scalePitch
     }
     
     func splitedTimeRanges(at indexes: [Int]) -> [Range<Rational>: Set<Int>] {
         var brps = [(Range<Rational>, Int)]()
         for (i, note) in notes.enumerated() {
             guard indexes.contains(i),
-                  pitchRange.contains(note.pitch) else { continue }
+                  Self.pitchRange.contains(note.pitch) else { continue }
             brps.append((note.beatRange, note.roundedPitch))
         }
         return Chord.splitedTimeRanges(timeRanges: brps)
@@ -1086,7 +1051,7 @@ extension Score {
         let preBeat = inBeatRange.start
         let nextBeat = inBeatRange.end
         for note in notes {
-            guard pitchRange.contains(note.pitch) else { continue }
+            guard Self.pitchRange.contains(note.pitch) else { continue }
             var beatRange = note.beatRange
             beatRange.start += inBeatRange.start + localStartBeat
             
@@ -1174,23 +1139,20 @@ extension Score {
     func movedNotes(inBeatRange beatRange: Range<Rational>,
                     beatDuration: Rational,
                     atStartBeat startBeat: Rational) -> [Note] {
-        guard volumeAmp > 0, !notes.isEmpty else { return [] }
+        guard !notes.isEmpty else { return [] }
         guard beatRange.length > 0 && beatRange.end > 0
                 && beatRange.start < beatDuration else { return [] }
         var notes = [Note]()
         let preBeat = beatRange.start,
             nextBeat = min(beatRange.end, beatDuration)
         for note in notes {
-            guard pitchRange.contains(note.pitch) else { continue }
-            var note = convertPitchToWorld(note)
+            guard Self.pitchRange.contains(note.pitch) else { continue }
+            var note = note
             guard note.beatRange.length > 0
                     && note.beatRange.end > preBeat
                     && note.beatRange.start < nextBeat
-                    && note.pitch >= 0
-                    && note.pitch < 256
                     && note.volumeAmp >= Volume.minAmp
                     && note.volumeAmp <= Volume.maxAmp else { continue }
-            
             if note.beatRange.start < preBeat {
                 note.beatRange.length -= preBeat - note.beatRange.start
                 note.beatRange.start = preBeat
@@ -1205,11 +1167,25 @@ extension Score {
         return notes
     }
 }
+extension Score {
+    var option: ScoreOption {
+        get {
+            .init(beatRange: beatRange, tempo: tempo, enabled: enabled)
+        }
+        set {
+            beatRange = newValue.beatRange
+            tempo = newValue.tempo
+            enabled = newValue.enabled
+        }
+    }
+}
 
 struct Music {
     static let defaultTempo: Rational = 120
     static let minTempo = Rational(1, 4), maxTempo: Rational = 10000
     static let tempoRange = minTempo ... maxTempo
+    static let defaultBeatDuration = Rational(16)
+    static let defaultBeatRange = 0 ..< defaultBeatDuration
 }
 protocol TempoType {
     var tempo: Rational { get }
@@ -1237,8 +1213,7 @@ extension TempoType {
         beat * 60 / tempo
     }
     func secRange(fromBeat beatRange: Range<Rational>) -> Range<Rational> {
-        sec(fromBeat: beatRange.lowerBound)
-        ..< sec(fromBeat: beatRange.upperBound)
+        sec(fromBeat: beatRange.lowerBound) ..< sec(fromBeat: beatRange.upperBound)
     }
     func beat(fromSec sec: Rational) -> Rational {
         sec * tempo / 60
@@ -1260,37 +1235,60 @@ extension TempoType {
         Int(Double(beat) * 60 / Double(tempo) * Double(frameRate))
     }
 }
-
-protocol TempoContainer: TempoType {
+protocol BeatRangeType: TempoType {
     var beatRange: Range<Rational> { get }
-    var isPlaying: Bool { get }
+}
+extension BeatRangeType {
+    var secRange: Range<Rational> {
+        secRange(fromBeat: beatRange)
+    }
 }
 
-struct Timetrack {
-    var timeframes = [(position: Point, value: Timeframe)]()
+struct Audiotrack {
+    enum Value: BeatRangeType {
+        case score(Score)
+        case sound(Content)
+        
+        var tempo: Rational {
+            switch self {
+            case .score(let score): score.tempo
+            case .sound(let content): content.timeOption?.tempo ?? Music.defaultTempo
+            }
+        }
+        var beatRange: Range<Rational> {
+            switch self {
+            case .score(let score): score.beatRange
+            case .sound(let content): content.timeOption?.beatRange ?? 0 ..< 0
+            }
+        }
+        var id: UUID {
+            switch self {
+            case .score(let score): score.id
+            case .sound(let content): content.id
+            }
+        }
+    }
+    var values = [Value]()
 }
-extension Timetrack {
+extension Audiotrack {
     var secDuration: Rational {
-        timeframes.reduce(0) { max($0, $1.value.secRange.upperBound) }
+        values.reduce(0) { max($0, $1.secRange.upperBound) }
     }
     static func + (lhs: Self, rhs: Self) -> Self {
-        .init(timeframes: lhs.timeframes + rhs.timeframes)
+        .init(values: lhs.values + rhs.values)
     }
     static func += (lhs: inout Self, rhs: Self) {
-        lhs.timeframes += rhs.timeframes
+        lhs.values += rhs.values
     }
     static func += (lhs: inout Self?, rhs: Self) {
         if lhs == nil {
             lhs = rhs
         } else {
-            lhs?.timeframes += rhs.timeframes
+            lhs?.values += rhs.values
         }
     }
     var isEmpty: Bool {
-        timeframes.isEmpty
-    }
-    func moved(_ p: Point) -> Timetrack {
-        .init(timeframes: timeframes.map { ($0.position + p, $0.value) })
+        values.isEmpty
     }
 }
 
