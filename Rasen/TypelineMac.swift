@@ -22,7 +22,7 @@ import struct Foundation.NSRange
 import CoreText
 
 struct Font {
-    static let jpName = "Gensen-Medium"
+    static let jpName = "GensenJP-Medium"
     static let cnName = "GensenCN-Medium"
     static let hkName = "GensenHK-Medium"
     static let krName = "GensenKR-Medium"

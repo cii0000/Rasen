@@ -14,16 +14,11 @@
 		233160D4223AAFF400FCAFEF /* Text.swift in Sources */ = {isa = PBXBuildFile; fileRef = 233160D3223AAFF400FCAFEF /* Text.swift */; };
 		2331701521F439DF008F21D6 /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; fileRef = 2331701721F439DF008F21D6 /* InfoPlist.strings */; };
 		2336474F2186D70300DA7B55 /* Polygon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2336474E2186D70300DA7B55 /* Polygon.swift */; };
-		2340EF7F2AAE14FC00FD874F /* GensenHK-Medium.otf in Resources */ = {isa = PBXBuildFile; fileRef = 2340EF7B2AAE14FB00FD874F /* GensenHK-Medium.otf */; };
-		2340EF802AAE14FC00FD874F /* GensenTW-Medium.otf in Resources */ = {isa = PBXBuildFile; fileRef = 2340EF7C2AAE14FB00FD874F /* GensenTW-Medium.otf */; };
-		2340EF812AAE14FC00FD874F /* GensenCN-Medium.otf in Resources */ = {isa = PBXBuildFile; fileRef = 2340EF7D2AAE14FB00FD874F /* GensenCN-Medium.otf */; };
-		2340EF822AAE14FC00FD874F /* GensenKR-Medium.otf in Resources */ = {isa = PBXBuildFile; fileRef = 2340EF7E2AAE14FC00FD874F /* GensenKR-Medium.otf */; };
 		2346B2A726ECC125008AA04C /* SheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2346B2A626ECC124008AA04C /* SheetView.swift */; };
 		234E31762426EED900D8B0AE /* ObjectEx0.swift in Sources */ = {isa = PBXBuildFile; fileRef = 234E31752426EED900D8B0AE /* ObjectEx0.swift */; };
 		234ED98822AB80D30012B057 /* History.swift in Sources */ = {isa = PBXBuildFile; fileRef = 234ED98722AB80D30012B057 /* History.swift */; };
 		234ED98C22AE484E0012B057 /* Protobuf.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 234ED98B22AE484E0012B057 /* Protobuf.pb.swift */; };
 		234F2A522382798A00107A1D /* UndoEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 234F2A512382798A00107A1D /* UndoEditor.swift */; };
-		235BAA622AAC7D6500D9A684 /* Gensen-Medium.otf in Resources */ = {isa = PBXBuildFile; fileRef = 235BAA612AAC7D6500D9A684 /* Gensen-Medium.otf */; };
 		235BF0CC21771B0F00EEFABE /* Shaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = 235BF0CB21771B0F00EEFABE /* Shaders.metal */; };
 		236195A42B7C7EBB00CF0B2F /* ScoreEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 236195A32B7C7EBB00CF0B2F /* ScoreEditor.swift */; };
 		236195A62B7C7EC500CF0B2F /* ContentEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 236195A52B7C7EC500CF0B2F /* ContentEditor.swift */; };
@@ -66,6 +61,11 @@
 		23BD590924BBEB5B00C948D0 /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = 23BD590824BBEB5B00C948D0 /* SwiftProtobuf */; };
 		23C0A9C2237ED0010054ECCC /* Editor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23C0A9C1237ED0010054ECCC /* Editor.swift */; };
 		23C4BC0A28F9344500DEF37E /* Voice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23C4BC0928F9344500DEF37E /* Voice.swift */; };
+		23C5B4142B903EB60081127C /* GensenCN-Medium.otf in Resources */ = {isa = PBXBuildFile; fileRef = 23C5B40F2B903EB50081127C /* GensenCN-Medium.otf */; };
+		23C5B4152B903EB60081127C /* GensenHK-Medium.otf in Resources */ = {isa = PBXBuildFile; fileRef = 23C5B4102B903EB50081127C /* GensenHK-Medium.otf */; };
+		23C5B4162B903EB60081127C /* GensenKR-Medium.otf in Resources */ = {isa = PBXBuildFile; fileRef = 23C5B4112B903EB50081127C /* GensenKR-Medium.otf */; };
+		23C5B4172B903EB60081127C /* GensenJP-Medium.otf in Resources */ = {isa = PBXBuildFile; fileRef = 23C5B4122B903EB60081127C /* GensenJP-Medium.otf */; };
+		23C5B4182B903EB60081127C /* GensenTW-Medium.otf in Resources */ = {isa = PBXBuildFile; fileRef = 23C5B4132B903EB60081127C /* GensenTW-Medium.otf */; };
 		23C8C6D225E21C1B009FEA85 /* Typesetter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23C8C6D125E21C1B009FEA85 /* Typesetter.swift */; };
 		23C8C6D525E21CCB009FEA85 /* TypelineMac.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23C8C6D425E21CCB009FEA85 /* TypelineMac.swift */; };
 		23D75E0125F0AA5900583878 /* Double2x2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23D75E0025F0AA5900583878 /* Double2x2.swift */; };
@@ -93,17 +93,12 @@
 		2331701621F439DF008F21D6 /* ja */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ja; path = ja.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		2331701921F43AFA008F21D6 /* Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		2336474E2186D70300DA7B55 /* Polygon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Polygon.swift; sourceTree = "<group>"; };
-		2340EF7B2AAE14FB00FD874F /* GensenHK-Medium.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "GensenHK-Medium.otf"; sourceTree = "<group>"; };
-		2340EF7C2AAE14FB00FD874F /* GensenTW-Medium.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "GensenTW-Medium.otf"; sourceTree = "<group>"; };
-		2340EF7D2AAE14FB00FD874F /* GensenCN-Medium.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "GensenCN-Medium.otf"; sourceTree = "<group>"; };
-		2340EF7E2AAE14FC00FD874F /* GensenKR-Medium.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "GensenKR-Medium.otf"; sourceTree = "<group>"; };
 		2346B2A626ECC124008AA04C /* SheetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SheetView.swift; sourceTree = "<group>"; };
 		234E31752426EED900D8B0AE /* ObjectEx0.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectEx0.swift; sourceTree = "<group>"; };
 		234ED98722AB80D30012B057 /* History.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = History.swift; sourceTree = "<group>"; };
 		234ED98922AE2BB10012B057 /* Protobuf.proto */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.protobuf; path = Protobuf.proto; sourceTree = "<group>"; };
 		234ED98B22AE484E0012B057 /* Protobuf.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Protobuf.pb.swift; sourceTree = "<group>"; };
 		234F2A512382798A00107A1D /* UndoEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UndoEditor.swift; sourceTree = "<group>"; };
-		235BAA612AAC7D6500D9A684 /* Gensen-Medium.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Gensen-Medium.otf"; sourceTree = "<group>"; };
 		235BF0CB21771B0F00EEFABE /* Shaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Shaders.metal; sourceTree = "<group>"; };
 		236195A32B7C7EBB00CF0B2F /* ScoreEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreEditor.swift; sourceTree = "<group>"; };
 		236195A52B7C7EC500CF0B2F /* ContentEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentEditor.swift; sourceTree = "<group>"; };
@@ -149,6 +144,11 @@
 		23B9940A24E8F214000D544F /* Acknowledgments.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = Acknowledgments.txt; sourceTree = "<group>"; };
 		23C0A9C1237ED0010054ECCC /* Editor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Editor.swift; sourceTree = "<group>"; };
 		23C4BC0928F9344500DEF37E /* Voice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Voice.swift; sourceTree = "<group>"; };
+		23C5B40F2B903EB50081127C /* GensenCN-Medium.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "GensenCN-Medium.otf"; sourceTree = "<group>"; };
+		23C5B4102B903EB50081127C /* GensenHK-Medium.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "GensenHK-Medium.otf"; sourceTree = "<group>"; };
+		23C5B4112B903EB50081127C /* GensenKR-Medium.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "GensenKR-Medium.otf"; sourceTree = "<group>"; };
+		23C5B4122B903EB60081127C /* GensenJP-Medium.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "GensenJP-Medium.otf"; sourceTree = "<group>"; };
+		23C5B4132B903EB60081127C /* GensenTW-Medium.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "GensenTW-Medium.otf"; sourceTree = "<group>"; };
 		23C8C6D125E21C1B009FEA85 /* Typesetter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typesetter.swift; sourceTree = "<group>"; };
 		23C8C6D425E21CCB009FEA85 /* TypelineMac.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypelineMac.swift; sourceTree = "<group>"; };
 		23D75E0025F0AA5900583878 /* Double2x2.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Double2x2.swift; sourceTree = "<group>"; };
@@ -183,11 +183,11 @@
 		2340EF7A2AAE14D200FD874F /* Fonts */ = {
 			isa = PBXGroup;
 			children = (
-				235BAA612AAC7D6500D9A684 /* Gensen-Medium.otf */,
-				2340EF7D2AAE14FB00FD874F /* GensenCN-Medium.otf */,
-				2340EF7B2AAE14FB00FD874F /* GensenHK-Medium.otf */,
-				2340EF7E2AAE14FC00FD874F /* GensenKR-Medium.otf */,
-				2340EF7C2AAE14FB00FD874F /* GensenTW-Medium.otf */,
+				23C5B40F2B903EB50081127C /* GensenCN-Medium.otf */,
+				23C5B4102B903EB50081127C /* GensenHK-Medium.otf */,
+				23C5B4122B903EB60081127C /* GensenJP-Medium.otf */,
+				23C5B4112B903EB50081127C /* GensenKR-Medium.otf */,
+				23C5B4132B903EB60081127C /* GensenTW-Medium.otf */,
 			);
 			path = Fonts;
 			sourceTree = "<group>";
@@ -371,14 +371,14 @@
 			buildActionMask = 2147483647;
 			files = (
 				2331701521F439DF008F21D6 /* InfoPlist.strings in Resources */,
+				23C5B4152B903EB60081127C /* GensenHK-Medium.otf in Resources */,
+				23C5B4172B903EB60081127C /* GensenJP-Medium.otf in Resources */,
+				23C5B4182B903EB60081127C /* GensenTW-Medium.otf in Resources */,
 				2321DCF121AD1B5400F8B5C5 /* Localizable.strings in Resources */,
-				2340EF802AAE14FC00FD874F /* GensenTW-Medium.otf in Resources */,
-				235BAA622AAC7D6500D9A684 /* Gensen-Medium.otf in Resources */,
+				23C5B4162B903EB60081127C /* GensenKR-Medium.otf in Resources */,
+				23C5B4142B903EB60081127C /* GensenCN-Medium.otf in Resources */,
 				23B9940B24E8F214000D544F /* Acknowledgments.txt in Resources */,
-				2340EF7F2AAE14FC00FD874F /* GensenHK-Medium.otf in Resources */,
 				23A7287B216CF1B6000A7350 /* Assets.xcassets in Resources */,
-				2340EF812AAE14FC00FD874F /* GensenCN-Medium.otf in Resources */,
-				2340EF822AAE14FC00FD874F /* GensenKR-Medium.otf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

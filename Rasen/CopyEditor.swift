@@ -1438,6 +1438,7 @@ final class CopyEditor: Editor {
                     var nText = text
                     nText.origin *= fScale
                     nText.size *= fScale
+                    selectingLineNode.children = [nText.node]
                     self.textNode = nText.node
                     self.textFrame = nText.frame
                     textScale = document.worldToScreenScale

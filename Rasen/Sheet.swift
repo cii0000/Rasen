@@ -1790,6 +1790,9 @@ extension Animation: BeatRangeType {
     var localBeatDuration: Rational {
         keyframes.reduce(Rational(0)) { $0 + $1.beatDuration }
     }
+    var localBeatRange: Range<Rational> {
+        0 ..< localBeatDuration
+    }
     var localBeat: Rational {
         get { rootBeat.loop(0 ..< localBeatDuration) }
         set { rootBeat = newValue }

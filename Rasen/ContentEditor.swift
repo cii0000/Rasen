@@ -479,41 +479,10 @@ extension ContentView {
                                                width: lw, height: 4)))
         }
         
-        let roundedSBeat = timeOption.beatRange.start.rounded(.down)
-        let deltaBeat = Rational(1, 48)
-        let beatR1 = Rational(1, 4), beatR2 = Rational(1, 12)
-        let beat1 = Rational(2), beat2 = Rational(4)
-        var cBeat = roundedSBeat
-        while cBeat <= timeOption.beatRange.end {
-            if cBeat >= timeOption.beatRange.start {
-                let lw: Double = if cBeat % beat2 == 0 {
-                    2
-                } else if cBeat % beat1 == 0 {
-                    1.5
-                } else if cBeat % 1 == 0 {
-                    1
-                } else if cBeat % beatR1 == 0 {
-                    0.5
-                } else if cBeat % beatR2 == 0 {
-                    0.25
-                } else {
-                    0.125
-                }
-                
-                let beatX = x(atBeat: cBeat)
-                
-                let rect = Rect(x: beatX - lw / 2, y: sy,
-                                width: lw, height: ey - sy)
-                if cBeat % 1 == 0 {
-                    subBorderPathlines.append(Pathline(rect))
-                } else if lw == 0.125 || lw == 0.25 {
-                    fullEditBorderPathlines.append(Pathline(rect))
-                } else {
-                    borderPathlines.append(Pathline(rect))
-                }
-            }
-            cBeat += deltaBeat
-        }
+        makeBeatPathlines(in: timeOption.beatRange, sy: sy, ey: ey,
+                          subBorderPathlines: &subBorderPathlines,
+                          fullEditBorderPathlines: &fullEditBorderPathlines,
+                          borderPathlines: &borderPathlines)
         
         if content.type.isAudio {
             let sprH = ContentLayout.spectrogramHeight
