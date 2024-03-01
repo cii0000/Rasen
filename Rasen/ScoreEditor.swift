@@ -15,20 +15,72 @@
 // You should have received a copy of the GNU General Public License
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
-protocol TimelineView: View {
+protocol TimelineView: View, TempoType {
+    func x(atBeat beat: Rational) -> Double
+    func x(atBeat beat: Double) -> Double
     func x(atSec sec: Rational) -> Double
     func x(atSec sec: Double) -> Double
-    func x(atBeat beat: Rational) -> Double
-    func width(atSecDuration sec: Rational) -> Double
-    func width(atSecDuration sec: Double) -> Double
     func width(atBeatDuration beatDur: Rational) -> Double
-    func sec(atX x: Double, interval: Rational) -> Rational
-    func sec(atX x: Double) -> Rational
-    func sec(atX x: Double) -> Double
+    func width(atBeatDuration beatDur: Double) -> Double
+    func width(atSecDuration secDur: Rational) -> Double
+    func width(atSecDuration secDur: Double) -> Double
     func beat(atX x: Double, interval: Rational) -> Rational
     func beat(atX x: Double) -> Rational
+    func beat(atX x: Double) -> Double
+    func beatDuration(atWidth w: Double) -> Double
+    func sec(atX x: Double, interval: Rational) -> Rational
+    func sec(atX x: Double) -> Rational
+    var origin: Point { get }
+    var frameRate: Int { get }
     var beatRange: Range<Rational>? { get }
     var localBeatRange: Range<Rational>? { get }
+}
+extension TimelineView {
+    func x(atBeat beat: Rational) -> Double {
+        x(atBeat: Double(beat))
+    }
+    func x(atBeat beat: Double) -> Double {
+        beat * Sheet.beatWidth + Sheet.textPadding.width - origin.x
+    }
+    func x(atSec sec: Rational) -> Double {
+        x(atBeat: beat(fromSec: sec))
+    }
+    func x(atSec sec: Double) -> Double {
+        x(atBeat: beat(fromSec: sec))
+    }
+    
+    func width(atBeatDuration beatDur: Rational) -> Double {
+        width(atBeatDuration: Double(beatDur))
+    }
+    func width(atBeatDuration beatDur: Double) -> Double {
+        beatDur * Sheet.beatWidth
+    }
+    func width(atSecDuration secDur: Rational) -> Double {
+        width(atBeatDuration: beat(fromSec: secDur))
+    }
+    func width(atSecDuration secDur: Double) -> Double {
+        width(atBeatDuration: beat(fromSec: secDur))
+    }
+    
+    func beat(atX x: Double, interval: Rational) -> Rational {
+        Rational(beat(atX: x), intervalScale: interval)
+    }
+    func beat(atX x: Double) -> Rational {
+        beat(atX: x, interval: Rational(1, frameRate))
+    }
+    func beat(atX x: Double) -> Double {
+        (x - Sheet.textPadding.width) / Sheet.beatWidth
+    }
+    func beatDuration(atWidth w: Double) -> Double {
+        w / Sheet.beatWidth
+    }
+    
+    func sec(atX x: Double, interval: Rational) -> Rational {
+        sec(fromBeat: beat(atX: x, interval: interval))
+    }
+    func sec(atX x: Double) -> Rational {
+        sec(atX: x, interval: Rational(1, frameRate))
+    }
 }
 protocol SpectrgramView: TimelineView {
     var pcmBuffer: PCMBuffer? { get }
@@ -788,6 +840,8 @@ extension ScoreView {
         }
     }
     
+    var frameRate: Int { Keyframe.defaultFrameRate }
+    
     var tempo: Rational {
         get { model.tempo }
         set {
@@ -796,43 +850,12 @@ extension ScoreView {
         }
     }
     
-    func x(atSec sec: Rational) -> Double {
-        x(atSec: Double(sec))
+    var origin: Point { .init() }
+    var beatRange: Range<Rational>? {
+        model.beatRange
     }
-    func x(atSec sec: Double) -> Double {
-        sec * Sheet.beatWidth + Sheet.textPadding.width
-    }
-    func x(atBeat beat: Rational) -> Double {
-        x(atSec: model.sec(fromBeat: beat))
-    }
-    
-    func width(atSecDuration sec: Rational) -> Double {
-        width(atSecDuration: Double(sec))
-    }
-    func width(atSecDuration sec: Double) -> Double {
-        sec * Sheet.beatWidth
-    }
-    func width(atBeatDuration beatDur: Rational) -> Double {
-        width(atSecDuration: model.sec(fromBeat: beatDur))
-    }
-    
-    var frameRate: Int { Keyframe.defaultFrameRate }
-    
-    func sec(atX x: Double, interval: Rational) -> Rational {
-        Rational(sec(atX: x), intervalScale: interval)
-    }
-    func sec(atX x: Double) -> Rational {
-        sec(atX: x, interval: Rational(1, frameRate))
-    }
-    func sec(atX x: Double) -> Double {
-        (x - Sheet.textPadding.width) / Sheet.beatWidth
-    }
-    
-    func beat(atX x: Double, interval: Rational) -> Rational {
-        model.beat(fromSec: sec(atX: x), interval: interval)
-    }
-    func beat(atX x: Double) -> Rational {
-        beat(atX: x, interval: Rational(1, frameRate))
+    var localBeatRange: Range<Rational>? {
+        model.localMaxBeatRange
     }
     
     func pitch(atY y: Double, interval: Rational) -> Rational {
@@ -852,13 +875,6 @@ extension ScoreView {
     }
     func y(fromPitch pitch: Double, noteHeight nh: Double) -> Double {
         pitch * nh + ScoreLayout.pitchPadding
-    }
-    
-    var beatRange: Range<Rational>? {
-        model.beatRange
-    }
-    var localBeatRange: Range<Rational>? {
-        model.localMaxBeatRange
     }
     
     func append(_ note: Note) {
@@ -920,6 +936,8 @@ extension ScoreView {
         var borderPathlines = [Pathline]()
         
         func timeStringFrom(time: Rational, frameRate: Int) -> String {
+            let minusStr = time < 0 ? "-" : ""
+            let time = abs(time)
             if time >= 60 {
                 let c = Int(time * Rational(frameRate))
                 let s = c / frameRate
@@ -929,7 +947,7 @@ extension ScoreView {
                 let minutesStr = String(format: "%d", minutes)
                 let secStr = String(format: "%02d", sec)
                 let frameStr = String(format: "%02d", frame)
-                return minutesStr + ":" + secStr + "." + frameStr
+                return minusStr + minutesStr + ":" + secStr + "." + frameStr
             } else {
                 let c = Int(time * Rational(frameRate))
                 let s = c / frameRate
@@ -937,7 +955,7 @@ extension ScoreView {
                 let frame = c - s * frameRate
                 let secStr = String(format: "%d", sec)
                 let frameStr = String(format: "%02d", frame)
-                return secStr + "." + frameStr
+                return minusStr + secStr + "." + frameStr
             }
         }
         
@@ -1492,12 +1510,18 @@ extension ScoreView {
         let t = noteT(atX: x, at: noteI)
         return self.y(fromPitch: note.pitbend.pitch(atT: t) + Double(note.pitch))
     }
+    func noteH(atX x: Double, at noteI: Int) -> Double {
+        let note = model.notes[noteI]
+        let t = noteT(atX: x, at: noteI)
+        return noteHeight * Volume(amp: note.pitbend.amp(atT: t) * note.volumeAmp).smp
+    }
     
     func overtoneType(at p: Point, at noteI: Int) -> (noteI: Int, type: OvertoneType)? {
         guard isFullEdit else { return nil }
         
         let noteY = noteY(atX: p.x, at: noteI)
-        if abs(noteY) > 1 && abs(noteY) < 1.2 {
+        let noteH = noteH(atX: p.x, at: noteI)
+        if abs(noteY) > noteH / 2 {
             let type: OvertoneType = noteY < 0 ? .evenScale : .oddScale
             return (noteI, type)
         } else {

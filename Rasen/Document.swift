@@ -3511,11 +3511,11 @@ final class Document {
     }
     func currentNoteTimeInterval(fromScale scale: Double = 1) -> Rational {
         isFullEditNoteTimeInterval(fromScale: scale) ?
-            Rational(1, 48) : Rational(1, 12)
+            Rational(1, 48) : Rational(1, 4)
     }
     func currentKeyframeTimeInterval(fromScale scale: Double) -> Rational {
         isFullEditNoteTimeInterval(fromScale: scale) ?
-            Rational(1, 24) : Rational(1, 4)
+            Rational(1, 48) : Rational(1, 4)
     }
     func currentNotePitchInterval() -> Rational {
         camera.logScale < -3 ? Rational(1, 12) : 1

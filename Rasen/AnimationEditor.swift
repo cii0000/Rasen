@@ -985,7 +985,7 @@ final class AnimationSlider: DragEditor {
                 animationIndex = 0, keyframeIndex = 0
     private var type = SlideType.key
     private var beganSP = Point(), beganInP = Point(),
-                beganTimelineX = 0.0,
+                beganTimelineX = 0.0, beganKeyframeX = 0.0,
                 beganKeyframeBeatDuration = Rational(0)
     
     private var beganTempo: Rational = 1, oldTempo: Rational = 1
@@ -1031,7 +1031,7 @@ final class AnimationSlider: DragEditor {
                         keyframeIndex = minI
                         let keyframe = animationView.model.keyframes[keyframeIndex]
                         beganKeyframeBeatDuration = keyframe.beatDuration
-                        
+                        beganKeyframeX = sheetView.animationView.x(atBeat: animationView.model.localBeat(at: minI) + keyframe.beatDuration)
                         lastBeats.append((event.time, animationView.model.localBeat(at: minI) + keyframe.beatDuration))
                     } else if animationView.isStartBeat(at: inP, scale: document.screenToWorldScale) {
                         
@@ -1153,7 +1153,7 @@ final class AnimationSlider: DragEditor {
 //                    let dSec = animationView.secDuration(atWidth: dp.x)
                     let interval = document
                         .currentKeyframeTimeInterval(fromScale: 1)
-                    let dBeat = animationView.beat(atX: inP.x,
+                    let dBeat = animationView.beat(atX: beganKeyframeX + inP.x - beganInP.x,
                                                    interval: interval)
                     let nDur = dBeat - animationView.model.localBeat(at: keyframeIndex)
 //
@@ -1737,7 +1737,7 @@ final class KeyframeInserter: InputKeyEditor {
                     let contentView = sheetView.contentsView.elementViews[ci]
                     if contentView.model.timeOption == nil {
                         var content = contentView.model
-                        let startBeat = sheetView.animationView.beat(atX: content.origin.x)
+                        let startBeat: Rational = sheetView.animationView.beat(atX: content.origin.x)
                         content.timeOption = .init(beatRange: startBeat ..< (4 + startBeat),
                                                    tempo: sheetView.nearestTempo(at: inP) ?? Music.defaultTempo)
                         
@@ -1750,7 +1750,7 @@ final class KeyframeInserter: InputKeyEditor {
                     let textView = sheetView.textsView.elementViews[ti]
                     if textView.model.timeOption == nil {
                         var text = textView.model
-                        let startBeat = sheetView.animationView.beat(atX: text.origin.x)
+                        let startBeat: Rational = sheetView.animationView.beat(atX: text.origin.x)
                         text.timeOption = .init(beatRange: startBeat ..< (4 + startBeat),
                                                 tempo: sheetView.nearestTempo(at: inP) ?? Music.defaultTempo)
                         

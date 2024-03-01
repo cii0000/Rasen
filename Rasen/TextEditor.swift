@@ -32,7 +32,7 @@ final class TextSlider: DragEditor {
     
     private var sheetView: SheetView?, textI: Int?, beganText: Text?
     private var type = SlideType.all
-    private var beganSP = Point(), beganInP = Point()
+    private var beganSP = Point(), beganInP = Point(), beganTextEndP = Point()
     
     func send(_ event: DragEvent) {
         guard isEditingSheet else {
@@ -57,6 +57,9 @@ final class TextSlider: DragEditor {
                 beganInP = sheetP
                 self.sheetView = sheetView
                 beganText = text
+                if let timeOption = text.timeOption {
+                    beganTextEndP = .init(sheetView.animationView.x(atBeat: timeOption.beatRange.end), text.origin.y)
+                }
                 textI = ci
                 
                 let maxMD = 10 * document.screenToWorldScale
@@ -81,19 +84,20 @@ final class TextSlider: DragEditor {
                 
                 switch type {
                 case .all:
-                    let p = beganText.origin + sheetP - beganInP
+                    let np = beganText.origin + sheetP - beganInP
                     let interval = document.currentNoteTimeInterval()
-                    let beat = max(min(sheetView.animationView.beat(atX: p.x, interval: interval),
+                    let beat = max(min(sheetView.animationView.beat(atX: np.x, interval: interval),
                                    sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: interval)),
                                    sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval) - (text.timeOption?.beatRange.length ?? 0))
                     var timeOption = text.timeOption
                     timeOption?.beatRange.start = beat
-                    textView.set(timeOption, origin: Point(sheetView.animationView.x(atBeat: beat), p.y))
+                    textView.set(timeOption, origin: Point(sheetView.animationView.x(atBeat: beat), np.y))
                     document.updateSelects()
                 case .startBeat:
                     if var timeOption = text.timeOption {
+                        let np = beganText.origin + sheetP - beganInP
                         let interval = document.currentNoteTimeInterval()
-                        let beat = min(sheetView.animationView.beat(atX: sheetP.x, interval: interval),
+                        let beat = min(sheetView.animationView.beat(atX: np.x, interval: interval),
                                        sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: interval),
                                        timeOption.beatRange.end)
                         if beat != timeOption.beatRange.start {
@@ -107,8 +111,9 @@ final class TextSlider: DragEditor {
                     }
                 case .endBeat:
                     if let beganTimeOption = beganText.timeOption {
+                        let np = beganTextEndP + sheetP - beganInP
                         let interval = document.currentNoteTimeInterval()
-                        let beat = max(sheetView.animationView.beat(atX: sheetP.x, interval: interval),
+                        let beat = max(sheetView.animationView.beat(atX: np.x, interval: interval),
                                        sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval),
                                        beganTimeOption.beatRange.start)
                         if beat != text.timeOption?.beatRange.end {
@@ -1584,6 +1589,7 @@ extension TextView {
         set {
             binder[keyPath: keyPath].timeOption = newValue
             updateTimeline()
+            updateClippingNode()
         }
     }
     var origin: Point {
@@ -1591,6 +1597,7 @@ extension TextView {
         set {
             binder[keyPath: keyPath].origin = newValue
             node.attitude.position = newValue
+            updateClippingNode()
         }
     }
     
@@ -1602,44 +1609,6 @@ extension TextView {
             binder[keyPath: keyPath].timeOption?.tempo = newValue
             updateTimeline()
         }
-    }
-    
-    func x(atSec sec: Rational) -> Double {
-        x(atSec: Double(sec))
-    }
-    func x(atSec sec: Double) -> Double {
-        sec * Sheet.beatWidth + Sheet.textPadding.width - model.origin.x
-    }
-    func x(atBeat beat: Rational) -> Double {
-        x(atSec: model.timeOption?.sec(fromBeat: beat) ?? 0)
-    }
-    
-    func width(atSecDuration sec: Rational) -> Double {
-        width(atSecDuration: Double(sec))
-    }
-    func width(atSecDuration sec: Double) -> Double {
-        sec * Sheet.beatWidth
-    }
-    func width(atBeatDuration beatDur: Rational) -> Double {
-        width(atSecDuration: model.timeOption?.sec(fromBeat: beatDur) ?? 0)
-    }
-    
-    func sec(atX x: Double, interval: Rational) -> Rational {
-        Rational(sec(atX: x), intervalScale: interval)
-    }
-    func sec(atX x: Double) -> Rational {
-        sec(atX: x, interval: Rational(1, frameRate))
-    }
-    func sec(atX x: Double) -> Double {
-        (x - Sheet.textPadding.width) / Sheet.beatWidth
-    }
-    
-    func beat(atX x: Double, interval: Rational) -> Rational {
-        model.timeOption?.beat(fromSec: sec(atX: x),
-                              interval: interval) ?? 0
-    }
-    func beat(atX x: Double) -> Rational {
-        beat(atX: x, interval: Rational(1, frameRate))
     }
     
     var beatRange: Range<Rational>? {

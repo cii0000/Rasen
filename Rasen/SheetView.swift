@@ -544,14 +544,6 @@ final class AnimationView: TimelineView {
         }
     }
     
-    var beatRange: Range<Rational>? {
-        model.beatRange
-    }
-    
-    var localBeatRange: Range<Rational>? {
-        model.localBeatRange
-    }
-    
     func updateTimeline() {
         if model.enabled {
             timelineNode.children = timelineNodes() + [clippingNode]
@@ -1008,44 +1000,12 @@ final class AnimationView: TimelineView {
                      fillType: .color(.selected))]
     }
     
-    func x(atSec sec: Rational) -> Double {
-        x(atSec: Double(sec))
+    var origin: Point { .init(0, timelineY) }
+    var beatRange: Range<Rational>? {
+        model.beatRange
     }
-    func x(atSec sec: Double) -> Double {
-        sec * Sheet.secWidth + Sheet.textPadding.width
-    }
-    func x(atBeat beat: Rational) -> Double {
-        x(atSec: model.sec(fromBeat: beat))
-    }
-    
-    func width(atSecDuration secDur: Rational) -> Double {
-        width(atSecDuration: Double(secDur))
-    }
-    func width(atSecDuration secDur: Double) -> Double {
-        secDur * Sheet.secWidth
-    }
-    func width(atBeatDuration beatDur: Rational) -> Double {
-        width(atSecDuration: model.sec(fromBeat: beatDur))
-    }
-    
-    func sec(atX x: Double, interval: Rational) -> Rational {
-        Rational(sec(atX: x), intervalScale: interval)
-    }
-    func sec(atX x: Double) -> Rational {
-        sec(atX: x, interval: Rational(1, frameRate))
-    }
-    func sec(atX x: Double) -> Double {
-        (x - Sheet.textPadding.width) / Sheet.secWidth
-    }
-    func secDuration(atWidth w: Double) -> Double {
-        w / Sheet.secWidth
-    }
-    
-    func beat(atX x: Double, interval: Rational) -> Rational {
-        model.beat(fromSec: sec(atX: x), interval: interval) - model.beatRange.start
-    }
-    func beat(atX x: Double) -> Rational {
-        beat(atX: x, interval: Rational(1, frameRate))
+    var localBeatRange: Range<Rational>? {
+        model.localBeatRange
     }
     
     func isStartBeat(at p: Point, scale: Double) -> Bool {
@@ -1054,11 +1014,7 @@ final class AnimationView: TimelineView {
     func isEndBeat(at p: Point, scale: Double) -> Bool {
         abs(p.x - x(atBeat: model.beatRange.end)) < 10.0 * scale
     }
-    func isLoopBeat(at p: Point, scale: Double) -> Bool {
-        let ey = model.timelineY + paddingTimelineHeight * 7 / 16
-        let np = Point(x(atBeat:model.beatRange.end), ey)
-        return np.distance(p) < 10.0 * scale
-    }
+    
     func tempoPositionBeat(_ p: Point, scale: Double) -> Rational? {
         let tempoBeat = model.beatRange.start.rounded(.down) + 1
         if tempoBeat < model.beatRange.end {
@@ -3715,9 +3671,9 @@ final class SheetView: View {
         captureAppend([note])
     }
     func captureAppend(_ notes: [Note]) {
-        let undoItem = SheetUndoItem.removeNotes(noteIndexes: Array(model.score.notes.count ..< (model.score.notes.count + notes.count)))
+        let undoItem = SheetUndoItem.removeNotes(noteIndexes: Array((model.score.notes.count - notes.count) ..< (model.score.notes.count)))
         let redoItem = SheetUndoItem.insertNotes(notes.enumerated().map {
-            IndexValue(value: $0.element, index: model.score.notes.count + $0.offset)
+            IndexValue(value: $0.element, index: model.score.notes.count - notes.count + $0.offset)
         })
         append(undo: undoItem, redo: redoItem)
     }

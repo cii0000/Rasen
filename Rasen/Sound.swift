@@ -1177,6 +1177,9 @@ extension TempoType {
     func beat(fromSec sec: Rational) -> Rational {
         sec * tempo / 60
     }
+    func beat(fromSec sec: Double) -> Double {
+        sec * Double(tempo) / 60
+    }
     func beat(fromSec sec: Double,
               beatRate: Int,
               rounded rule: FloatingPointRoundingRule = .toNearestOrAwayFromZero) -> Rational {
