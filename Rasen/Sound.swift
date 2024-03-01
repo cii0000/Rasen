@@ -964,7 +964,7 @@ extension ScoreOption: Protobuf {
 extension ScoreOption: Hashable, Codable {}
 
 struct Score: BeatRangeType {
-    static let pitchRange = Rational(-1 * 12) ..< Rational(11 * 12)
+    static let pitchRange = Rational(0, 12) ..< Rational(11 * 12)
     
     var notes = [Note]()
     var beatRange = 0 ..< Rational(16)
@@ -1124,47 +1124,6 @@ extension Score {
             }
         }
         return nNotes
-    }
-    func pitchRange(inBeatRange beatRange: Range<Rational>,
-                    beatDuration: Rational,
-                    atStartBeat startBeat: Rational) -> ClosedRange<Rational>? {
-        let notes = movedNotes(inBeatRange: beatRange,
-                               beatDuration: beatDuration,
-                               atStartBeat: startBeat)
-        guard let minPitch = notes.min(by: { $0.pitch < $1.pitch })?.pitch,
-              let maxPitch = notes.max(by: { $0.pitch < $1.pitch })?.pitch else { return nil }
-        return minPitch ... maxPitch
-    }
-    
-    func movedNotes(inBeatRange beatRange: Range<Rational>,
-                    beatDuration: Rational,
-                    atStartBeat startBeat: Rational) -> [Note] {
-        guard !notes.isEmpty else { return [] }
-        guard beatRange.length > 0 && beatRange.end > 0
-                && beatRange.start < beatDuration else { return [] }
-        var notes = [Note]()
-        let preBeat = beatRange.start,
-            nextBeat = min(beatRange.end, beatDuration)
-        for note in notes {
-            guard Self.pitchRange.contains(note.pitch) else { continue }
-            var note = note
-            guard note.beatRange.length > 0
-                    && note.beatRange.end > preBeat
-                    && note.beatRange.start < nextBeat
-                    && note.volumeAmp >= Volume.minAmp
-                    && note.volumeAmp <= Volume.maxAmp else { continue }
-            if note.beatRange.start < preBeat {
-                note.beatRange.length -= preBeat - note.beatRange.start
-                note.beatRange.start = preBeat
-            }
-            if note.beatRange.end > nextBeat {
-                note.beatRange.end = nextBeat
-            }
-            note.beatRange.start += startBeat
-            
-            notes.append(note)
-        }
-        return notes
     }
 }
 extension Score {

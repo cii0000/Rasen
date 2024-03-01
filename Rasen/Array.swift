@@ -48,6 +48,11 @@ extension Array {
             insert(iv.value, at: iv.index)
         }
     }
+    mutating func replace(_ ivs: [IndexValue<Element>]) {
+        for iv in ivs {
+            self[iv.index] = iv.value
+        }
+    }
     subscript(firstOrLast: FirstOrLast) -> Element {
         get {
             switch firstOrLast {

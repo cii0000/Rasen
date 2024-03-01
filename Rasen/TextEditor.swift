@@ -1554,7 +1554,7 @@ extension TextView {
             clippingNode.isHidden = true
         }
     }
-    var frameRate: Int { Keyframe.defaultFrameRate }
+    
     func updateTimeline() {
         if let timeOption = model.timeOption {
             timelineNode.children = self.timelineNode(timeOption, from: typesetter)
@@ -1594,11 +1594,21 @@ extension TextView {
         }
     }
     
+    var frameRate: Int { Keyframe.defaultFrameRate }
+    
+    var tempo: Rational {
+        get { model.timeOption?.tempo ?? 0 }
+        set {
+            binder[keyPath: keyPath].timeOption?.tempo = newValue
+            updateTimeline()
+        }
+    }
+    
     func x(atSec sec: Rational) -> Double {
         x(atSec: Double(sec))
     }
     func x(atSec sec: Double) -> Double {
-        sec * Sheet.secWidth + Sheet.textPadding.width - model.origin.x
+        sec * Sheet.beatWidth + Sheet.textPadding.width - model.origin.x
     }
     func x(atBeat beat: Rational) -> Double {
         x(atSec: model.timeOption?.sec(fromBeat: beat) ?? 0)
@@ -1608,7 +1618,7 @@ extension TextView {
         width(atSecDuration: Double(sec))
     }
     func width(atSecDuration sec: Double) -> Double {
-        sec * Sheet.secWidth
+        sec * Sheet.beatWidth
     }
     func width(atBeatDuration beatDur: Rational) -> Double {
         width(atSecDuration: model.timeOption?.sec(fromBeat: beatDur) ?? 0)
@@ -1621,7 +1631,7 @@ extension TextView {
         sec(atX: x, interval: Rational(1, frameRate))
     }
     func sec(atX x: Double) -> Double {
-        (x - Sheet.textPadding.width) / Sheet.secWidth
+        (x - Sheet.textPadding.width) / Sheet.beatWidth
     }
     
     func beat(atX x: Double, interval: Rational) -> Rational {
@@ -1647,42 +1657,44 @@ extension TextView {
         let ex = self.x(atBeat: eBeat)
         
         let lw = 1.0
-        let knobW = 2.0, knobH = 12.0
+        let knobW = Sheet.knobWidth, knobH = Sheet.knobHeight
         let timelineHalfHeight = Sheet.timelineHalfHeight
+        let rulerH = Sheet.rulerHeight
         
-        let y = (typesetter.firstReturnBounds?.minY ?? 0) + timelineHalfHeight
-        let sy = y - timelineHalfHeight
-        let ey = y + timelineHalfHeight
+        let centerY = (typesetter.firstReturnBounds?.minY ?? 0) + timelineHalfHeight
+        let sy = centerY - timelineHalfHeight
+        let ey = centerY + timelineHalfHeight
         
         var contentPathlines = [Pathline]()
         var subBorderPathlines = [Pathline]()
         var fullEditBorderPathlines = [Pathline]()
         var borderPathlines = [Pathline]()
         
-        contentPathlines.append(.init(Rect(x: sx - 1, y: y - knobH / 2,
+        contentPathlines.append(.init(Rect(x: sx - 1, y: centerY - knobH / 2,
                                            width: knobW, height: knobH)))
-        contentPathlines.append(.init(Rect(x: ex - 1, y: y - knobH / 2,
+        contentPathlines.append(.init(Rect(x: ex - 1, y: centerY - knobH / 2,
                                            width: knobW, height: knobH)))
-        contentPathlines.append(.init(Rect(x: sx + 1, y: y - lw / 2,
+        contentPathlines.append(.init(Rect(x: sx + 1, y: centerY - lw / 2,
                                            width: ex - sx - 2, height: lw)))
-        
-        let secRange = timeOption.secRange
-        for sec in Int(secRange.start.rounded(.up)) ..< Int(secRange.end.rounded(.up)) {
-            let sec = Rational(sec)
-            let secX = x(atSec: sec)
-            contentPathlines.append(.init(Rect(x: secX - lw / 2, y: y - 2,
-                                               width: lw, height: 4)))
-        }
         
         makeBeatPathlines(in: timeOption.beatRange, sy: sy, ey: ey,
                           subBorderPathlines: &subBorderPathlines,
                           fullEditBorderPathlines: &fullEditBorderPathlines,
                           borderPathlines: &borderPathlines)
         
+        let secRange = timeOption.secRange
+        for sec in Int(secRange.start.rounded(.up)) ..< Int(secRange.end.rounded(.up)) {
+            let sec = Rational(sec)
+            guard secRange.contains(sec) else { continue }
+            let secX = x(atSec: sec)
+            contentPathlines.append(.init(Rect(x: secX - lw / 2, y: sy - rulerH / 2,
+                                               width: lw, height: rulerH)))
+        }
         let tempoBeat = timeOption.beatRange.start.rounded(.down) + 1
         if tempoBeat < timeOption.beatRange.end {
             let np = Point(x(atBeat: tempoBeat), sy)
-            contentPathlines.append(Pathline(Rect(x: np.x - 1, y: np.y - 2, width: 2, height: 4)))
+            contentPathlines.append(Pathline(Rect(x: np.x - 1, y: np.y - rulerH / 2,
+                                                  width: 2, height: rulerH)))
         }
         
         var nodes = [Node]()
@@ -1842,11 +1854,7 @@ extension TextView {
     
     var clippableBounds: Rect? {
         if let timelineFrame {
-            if let rect = typesetter.typoBounds {
-                timelineFrame.union(rect)
-            } else {
-                nil
-            }
+            timelineFrame.union(typesetter.typoBounds)
         } else {
             typesetter.typoBounds
         }

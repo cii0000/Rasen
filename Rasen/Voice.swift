@@ -18,21 +18,17 @@
 import RealModule
 
 extension Score {
-    static func rendnotes(from score: Score, startSecDur: Double,
+    static func rendnotes(from score: Score, startSec: Double,
                           sampleRate: Double = Audio.defaultSampleRate) -> [Rendnote] {
         let preBeat = score.beatRange.start, nextBeat = score.beatRange.end
         var notes: [Note] = score.notes.sorted { $0.beatRange.start < $1.beatRange.start }.compactMap { note in
             guard Score.pitchRange.contains(note.pitch) else { return nil }
-            
             var note = note
             note.beatRange.start += preBeat
-            guard note.beatRange.length > 0
-                    && note.beatRange.end > preBeat
-                    && note.beatRange.start < nextBeat
-                    && note.volumeAmp >= Volume.minAmp
-                    && note.volumeAmp <= Volume.maxAmp else {
+            guard note.beatRange.length > 0 && note.beatRange.intersects(score.beatRange) else {
                 return nil
             }
+            
             if note.beatRange.start < preBeat {
                 note.beatRange.length -= preBeat - note.beatRange.start
                 note.beatRange.start = preBeat
@@ -41,13 +37,12 @@ extension Score {
                 note.beatRange.end = nextBeat
             }
             
-            note.volumeAmp = note.volumeAmp
-                .clipped(min: Volume.minAmp, max: Volume.maxAmp)
+            note.volumeAmp = note.volumeAmp.clipped(min: Volume.minAmp, max: Volume.maxAmp)
             return note
         }
         
         guard score.notes.contains(where: { !$0.lyric.isEmpty }) else {
-            return notes.map { .init(note: $0, score: score, startSecDur: startSecDur,
+            return notes.map { .init(note: $0, score: score, startSec: startSec,
                                      sampleRate: sampleRate) }
         }
         
@@ -78,24 +73,31 @@ extension Score {
             let startBeat = note.beatRange.start
             let endBeat = note.beatRange.end
             let snapBeat = startBeat.interval(scale: Rational(1, 4))
-            let sSec = Double(score.sec(fromBeat: startBeat)) + startSecDur
-            let eSec = Double(score.sec(fromBeat: endBeat)) + startSecDur
-            let snapSec = Double(score.sec(fromBeat: snapBeat)) + startSecDur
+            let sSec = Double(score.sec(fromBeat: startBeat)) + startSec
+            let eSec = Double(score.sec(fromBeat: endBeat)) + startSec
+            let snapSec = Double(score.sec(fromBeat: snapBeat)) + startSec
             let dSec = sSec - snapSec
             noteSecTuples.append((sSec ..< eSec, dSec))
         }
+        
+        let baseFormantFilter = FormantFilter()
+        
+//        let moras = notes.map { Mora(hiragana: $0.mainLyric,
+//                                     fq: $0.fq,
+//                                     previousMora: nil,
+//                                     nextMora: nil,
+//                                     isVowelReduction: $0.isVowelReduction,
+//                                     from: baseFormantFilter) }
         
         var nNotes = [Rendnote](capacity: notes.count)
         var previousMora: Mora? // with all notes
         for (ni, note) in notes.enumerated() {
             guard !note.lyric.isEmpty else {
                 previousMora = nil
-                nNotes.append(.init(note: note, score: score, startSecDur: startSecDur,
+                nNotes.append(.init(note: note, score: score, startSec: startSec,
                                     sampleRate: sampleRate))
                 continue
             }
-            
-            let baseFormantFIlter = FormantFilter()
             
             let deltaSecToNext: Double, nextMora: Mora?
             if ni + 1 < notes.count {
@@ -108,7 +110,7 @@ extension Score {
                                         previousMora: nil,
                                         nextMora: nil,
                                         isVowelReduction: note.isVowelReduction,
-                                        from: baseFormantFIlter) {
+                                        from: baseFormantFilter) {
                     deltaSecToNext = dstn
                         + aNextMora.deltaSyllabicStartSec
                         - aNextMora.onsetSecDur
@@ -128,11 +130,10 @@ extension Score {
                                   previousMora: previousMora,
                                   nextMora: nextMora,
                                   isVowelReduction: note.isVowelReduction,
-                                  from: baseFormantFIlter) else {
+                                  from: baseFormantFilter) else {
                 previousMora = nil
                 continue
             }
-            
             guard mora.syllabics != [.sokuon] else {
                 previousMora = nextMora != nil ? mora : nil
                 continue
@@ -206,7 +207,7 @@ extension Score {
                 let waver = Waver(envelope: envelope, pitbend: pitbend)
                 let si = mora.formantFilterInterpolation(fromDuration: nDur + releaseSec)
                 let dsi = Interpolation(keys: si.keys.map {
-                    .init(value: $0.value.divide(baseFormantFIlter),
+                    .init(value: $0.value.divide(baseFormantFilter),
                           time: $0.time, type: $0.type)
                 }, duration: si.duration)
                 nNotes.append(.init(fq: note.fq,

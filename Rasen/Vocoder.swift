@@ -193,13 +193,13 @@ extension Rendnote {
         hasher.combine(sec)
         return UInt64(abs(hasher.finalize()))
     }
-    init(note: Note, score: Score, startSecDur: Double, sampleRate: Double) {
+    init(note: Note, score: Score, startSec: Double, sampleRate: Double) {
         let startBeat = note.beatRange.start
         let endBeat = note.beatRange.end
         let snapBeat = startBeat.interval(scale: Rational(1, 4))
-        let sSec = Double(score.sec(fromBeat: startBeat)) + startSecDur
-        let eSec = Double(score.sec(fromBeat: endBeat)) + startSecDur
-        let snapSec = Double(score.sec(fromBeat: snapBeat)) + startSecDur
+        let sSec = Double(score.sec(fromBeat: startBeat)) + startSec
+        let eSec = Double(score.sec(fromBeat: endBeat)) + startSec
+        let snapSec = Double(score.sec(fromBeat: snapBeat)) + startSec
         let dSec = sSec - snapSec
         
         let pitbend = note.pitbend.with(scale: eSec - sSec)

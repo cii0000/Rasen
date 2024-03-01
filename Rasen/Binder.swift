@@ -74,6 +74,11 @@ extension View {
             updateWithModel()
         }
     }
+    var unupdateModel: Model {
+        get { binder[keyPath: keyPath] }
+        set { binder[keyPath: keyPath] = newValue }
+    }
+    
     func convertFromWorld<T: AppliableTransform>(_ value: T) -> T {
         node.convertFromWorld(value)
     }

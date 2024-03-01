@@ -124,7 +124,6 @@ final class PlaneView<T: BinderProtocol>: View {
 typealias SheetPlaneView = PlaneView<SheetBinder>
 
 typealias SheetTextView = TextView<SheetBinder>
-typealias SheetNoteView = NoteView<SheetBinder>
 typealias SheetContentView = ContentView<SheetBinder>
 
 final class BorderView<T: BinderProtocol>: View {
@@ -270,8 +269,7 @@ final class AnimationView: TimelineView {
     let timeNode = Node()
     let timelineNode = Node()
     let boundsNode = Node(lineWidth: 1, lineType: .color(.content))
-    let clippingNode = Node(isHidden: true,
-                            lineWidth: 4, lineType: .color(.warning))
+    let clippingNode = Node(isHidden: true, lineWidth: 4, lineType: .color(.warning))
     
     var isPlaying = false
     var bounds = Sheet.defaultBounds {
@@ -511,7 +509,7 @@ final class AnimationView: TimelineView {
         return b
     }
     func transformedKeyframeBounds(at i: Int) -> Rect? {
-        let knobW = 2.0, knobH = knobHeight
+        let knobW = Sheet.knobWidth, knobH = Sheet.knobHeight
         let iKnobW = width(atBeatDuration: Rational(1, frameRate)),
             iKnobH = interpolatedKnobHeight
         let centerY = 0.0
@@ -578,15 +576,15 @@ final class AnimationView: TimelineView {
     func updateTimelineAtCurrentKeyframe() {
         updateTimelime(atKeyframe: model.index)
     }
-    let paddingTimelineHeight = Animation.timelineY * 2, rulerHeight = 4.0,
-        interpolatedKnobHeight = 4.0, knobHeight = 12.0, paddingWidth = 5.0
+    let paddingTimelineHeight = Animation.timelineY * 2, interpolatedKnobHeight = 4.0, paddingWidth = 5.0
     func timelineNodes() -> [Node] {
         let beatRange = model.beatRange
         let sBeat = max(beatRange.start, -10000),
             eBeat = min(beatRange.end, 10000)
         let sx = x(atBeat: sBeat), ex = x(atBeat: eBeat)
         let lw = 1.0
-        let knobW = 2.0, knobH = knobHeight
+        let knobW = Sheet.knobWidth, knobH = Sheet.knobHeight
+        let rulerH = Sheet.rulerHeight
         let iKnobW = width(atBeatDuration: Rational(1, frameRate)),
             iKnobH = interpolatedKnobHeight
         let centerY = 0.0
@@ -596,13 +594,13 @@ final class AnimationView: TimelineView {
         
         let iSet = Set(selectedFrameIndexes)
         
-        var pathlines = [Pathline](),
+        var contentPathlines = [Pathline](),
             borderPathlines = [Pathline](), subBorderPathlines = [Pathline]()
         var fullEditBorderPathlines = [Pathline]()
         var selectedPathlines = [Pathline]()
         
-        pathlines.append(.init(Rect(x: sx, y: centerY - lw / 2,
-                                    width: w, height: lw)))
+        contentPathlines.append(.init(Rect(x: sx, y: centerY - lw / 2,
+                                           width: w, height: lw)))
         
         makeBeatPathlines(in: beatRange, sy: sy, ey: ey,
                           subBorderPathlines: &subBorderPathlines,
@@ -628,7 +626,7 @@ final class AnimationView: TimelineView {
                 if iSet.contains(i) {
                     selectedPathlines.append(pathline)
                 } else {
-                    pathlines.append(pathline)
+                    contentPathlines.append(pathline)
                 }
                 topD = knobW * 2
             } else {
@@ -643,7 +641,7 @@ final class AnimationView: TimelineView {
                 if iSet.contains(i) {
                     selectedPathlines.append(pathline)
                 } else {
-                    pathlines.append(pathline)
+                    contentPathlines.append(pathline)
                 }
                 bottomD = knobW * 2
             } else {
@@ -651,34 +649,22 @@ final class AnimationView: TimelineView {
             }
             
             let pathline = keyframe.isKey ?
-                Pathline(Rect(x: kx - knobW / 2,
-                              y: centerY - nKnobH / 2 + bottomD,
-                              width: knobW, height: nKnobH - bottomD - topD)) :
-                Pathline(Rect(x: kx - iKnobW / 2,
-                              y: centerY - nKnobH / 2 + bottomD,
-                              width: iKnobW, height: nKnobH - bottomD - topD))
+            Pathline(Rect(x: kx - knobW / 2,
+                          y: centerY - nKnobH / 2 + bottomD,
+                          width: knobW, height: nKnobH - bottomD - topD)) :
+            Pathline(Rect(x: kx - iKnobW / 2,
+                          y: centerY - nKnobH / 2 + bottomD,
+                          width: iKnobW, height: nKnobH - bottomD - topD))
             if iSet.contains(i) {
                 selectedPathlines.append(pathline)
             } else {
-                pathlines.append(pathline)
+                contentPathlines.append(pathline)
             }
         }
         let kx = ex
-        pathlines.append(.init(Rect(x: kx - knobW / 2,
-                                    y: centerY - knobH / 2,
-                                    width: knobW, height: knobH)))
-        
-        let secRange = model.secRange
-        for sec in Int(secRange.start.rounded(.up)) ..< Int(secRange.end.rounded(.up)) {
-            let sec = Rational(sec)
-            if model.secRange(fromBeat: beatRange).contains(sec) {
-                let tx = x(atSec: sec)
-                pathlines.append(.init(Rect(x: tx - lw / 2,
-                                            y: centerY - rulerHeight / 2,
-                                            width: lw,
-                                            height: rulerHeight)))
-            }
-        }
+        contentPathlines.append(.init(Rect(x: kx - knobW / 2,
+                                           y: centerY - knobH / 2,
+                                           width: knobW, height: knobH)))
         
         if isSelected {
             let d = if let (i, iBeat) = model.indexAndInternalBeat(atRootBeat: model.localBeat) {
@@ -687,28 +673,37 @@ final class AnimationView: TimelineView {
                 lw / 2
             }
             
-            pathlines.append(.init(Rect(x: mainBeatX - lw / 2,
-                                        y: sy,
-                                        width: lw,
-                                        height: (centerY - d - knobW) - sy)))
-            pathlines.append(.init(Rect(x: mainBeatX - lw * 3,
-                                        y: sy - lw,
-                                        width: lw * 6,
-                                        height: lw)))
-            pathlines.append(.init(Rect(x: mainBeatX - lw / 2,
-                                        y: centerY + d + knobW,
-                                        width: lw,
-                                        height: ey - (centerY + d + knobW))))
-            pathlines.append(.init(Rect(x: mainBeatX - lw * 3,
-                                        y: ey,
-                                        width: lw * 6,
-                                        height: lw)))
+            contentPathlines.append(.init(Rect(x: mainBeatX - lw / 2,
+                                               y: sy,
+                                               width: lw,
+                                               height: (centerY - d - knobW) - sy)))
+            contentPathlines.append(.init(Rect(x: mainBeatX - lw * 3,
+                                               y: sy - lw,
+                                               width: lw * 6,
+                                               height: lw)))
+            contentPathlines.append(.init(Rect(x: mainBeatX - lw / 2,
+                                               y: centerY + d + knobW,
+                                               width: lw,
+                                               height: ey - (centerY + d + knobW))))
+            contentPathlines.append(.init(Rect(x: mainBeatX - lw * 3,
+                                               y: ey,
+                                               width: lw * 6,
+                                               height: lw)))
         }
         
+        let secRange = model.secRange
+        for sec in Int(secRange.start.rounded(.up)) ..< Int(secRange.end.rounded(.up)) {
+            let sec = Rational(sec)
+            guard secRange.contains(sec) else { continue }
+            let secX = x(atSec: sec)
+            contentPathlines.append(.init(Rect(x: secX - lw / 2, y: sy - rulerH / 2,
+                                               width: lw, height: rulerH)))
+        }
         let tempoBeat = model.beatRange.start.rounded(.down) + 1
         if tempoBeat < model.beatRange.end {
             let np = Point(x(atBeat: tempoBeat), sy)
-            pathlines.append(Pathline(Rect(x: np.x - 1, y: np.y - 2, width: 2, height: 4)))
+            contentPathlines.append(Pathline(Rect(x: np.x - 1, y: np.y - rulerH / 2,
+                                                  width: 2, height: rulerH)))
         }
         
         var nodes = [Node]()
@@ -726,8 +721,8 @@ final class AnimationView: TimelineView {
             nodes.append(Node(path: Path(subBorderPathlines),
                               fillType: .color(.subBorder)))
         }
-        if !pathlines.isEmpty {
-            nodes.append(Node(path: Path(pathlines),
+        if !contentPathlines.isEmpty {
+            nodes.append(Node(path: Path(contentPathlines),
                               fillType: .color(.content)))
         }
         if !selectedPathlines.isEmpty {
@@ -972,7 +967,7 @@ final class AnimationView: TimelineView {
         guard !ids.isEmpty else { return [] }
         let idSet = Set(ids)
         
-        let knobW = 2.0, knobH = knobHeight
+        let knobW = Sheet.knobWidth, knobH = Sheet.knobHeight
         let iKnobW = width(atBeatDuration: Rational(1, frameRate)),
             iKnobH = interpolatedKnobHeight
         let nb = bounds.insetBy(dx: Sheet.textPadding.width, dy: 0)
@@ -1179,7 +1174,6 @@ final class SheetView: View {
             node.path = .init(newValue)
             animationView.bounds = newValue
             scoreView.bounds = newValue
-            scoreView.updateClippingNode()
             contentsView.elementViews.forEach { $0.updateClippingNode() }
             textsView.elementViews.forEach { $0.updateClippingNode() }
             bordersView.elementViews.forEach { $0.bounds = newValue }
@@ -1296,15 +1290,15 @@ final class SheetView: View {
             let ids = playingOtherTimelineIDs
             let sec = animationView.model.sec(fromBeat: beat)
             
-            scoreView.timeNode?.path = Path()
+            scoreView.timeNode.path = Path()
             if ids.isEmpty || ids.contains(scoreView.model.id) {
-                scoreView.timeNode?.lineType = .color(.content)
+                scoreView.timeNode.lineType = .color(.content)
                 scoreView.updateTimeNode(atSec: sec)
                 scoreView.peakVolume = .init()
-                scoreView.timeNode?.lineWidth = isPlaying ? 3 : 1
-                scoreView.timeNode?.isHidden = false
+                scoreView.timeNode.lineWidth = isPlaying ? 3 : 1
+                scoreView.timeNode.isHidden = false
             } else {
-                scoreView.timeNode?.isHidden = true
+                scoreView.timeNode.isHidden = true
             }
             
             for contentView in contentsView.elementViews {
@@ -1353,9 +1347,9 @@ final class SheetView: View {
     }
     func hideOtherTimeNode() {
         if !isHiddenOtherTimeNode {
-            scoreView.timeNode?.path = Path()
-            scoreView.currentVolumeNode?.path = Path()
-            scoreView.timeNode?.isHidden = true
+            scoreView.timeNode.path = Path()
+            scoreView.currentVolumeNode.path = Path()
+            scoreView.timeNode.isHidden = true
             
             for contentView in contentsView.elementViews {
                 contentView.timeNode?.path = Path()
@@ -2042,11 +2036,6 @@ final class SheetView: View {
         }
     }
     
-    func notes(from score: Score) -> [Note] {
-        score.movedNotes(inBeatRange: score.beatRange,
-                         beatDuration: model.allBeatDuration,
-                         atStartBeat: 0)
-    }
     func note(at inP: Point, scale: Double) -> Note? {
         guard scoreView.model.enabled else { return nil }
         let inTP = scoreView.convert(inP, from: node)
@@ -2055,11 +2044,6 @@ final class SheetView: View {
         } else {
             nil
         }
-    }
-    func pitchRange(from score: Score) -> ClosedRange<Rational>? {
-        score.pitchRange(inBeatRange: score.beatRange,
-                         beatDuration: model.allBeatDuration,
-                         atStartBeat: 0)
     }
     
     func spectrogramNode(at p: Point) -> (node: Node, maxMel: Double)? {
@@ -3220,11 +3204,11 @@ final class SheetView: View {
             }
         case .insertNotes(let nivs):
             insertNode(nivs)
-            scoreView.updateTimeline()
-            sequencer?.scoreNoders[scoreView.model.id]?.insert(nivs)
+            scoreView.updateScore()
+            sequencer?.scoreNoders[scoreView.model.id]?.insert(nivs, with: scoreView.model)
             if isMakeRect {
                 let rect = nivs.reduce(into: Rect?.none) {
-                    $0 += scoreView.notesView.elementViews[$1.index].node.bounds
+                    $0 += scoreView.noteFrame(from: $1.value)
                 }
                 return (rect, [])
             }
@@ -3233,32 +3217,30 @@ final class SheetView: View {
                 var rect: Rect?
                 for niv in nivs {
                     binder[keyPath: keyPath].score.notes[niv.index] = niv.value
-                    scoreView.notesView.elementViews[niv.index].updateWithModel()
-                    rect += scoreView.notesView.elementViews[niv.index].node.path.bounds
+                    rect += scoreView.noteFrame(from: niv.value)
                 }
-                scoreView.updateTimeline()
-                sequencer?.scoreNoders[scoreView.model.id]?.replace(nivs)
+                scoreView.updateScore()
+                sequencer?.scoreNoders[scoreView.model.id]?.replace(nivs, with: scoreView.model)
                 return (rect, [])
             } else {
                 for niv in nivs {
                     binder[keyPath: keyPath].score.notes[niv.index] = niv.value
-                    scoreView.notesView.elementViews[niv.index].updateWithModel()
                 }
-                scoreView.updateTimeline()
-                sequencer?.scoreNoders[scoreView.model.id]?.replace(nivs)
+                scoreView.updateScore()
+                sequencer?.scoreNoders[scoreView.model.id]?.replace(nivs, with: scoreView.model)
             }
         case .removeNotes(noteIndexes: let noteIndexes):
             if isMakeRect {
                 let rect = noteIndexes.reduce(into: Rect?.none) {
-                    $0 += scoreView.notesView.elementViews[$1].node.bounds
+                    $0 += scoreView.noteFrame(at: $1)
                 }
                 removeNotesNode(at: noteIndexes)
-                scoreView.updateTimeline()
+                scoreView.updateScore()
                 sequencer?.scoreNoders[scoreView.model.id]?.remove(at: noteIndexes)
                 return (rect, [])
             } else {
                 removeNotesNode(at: noteIndexes)
-                scoreView.updateTimeline()
+                scoreView.updateScore()
                 sequencer?.scoreNoders[scoreView.model.id]?.remove(at: noteIndexes)
             }
         case .changedTones(let toneValue):
@@ -3266,7 +3248,7 @@ final class SheetView: View {
             
             if isMakeRect {
                 let rect = toneValue.noteIndexes.reduce(into: Rect?.none) {
-                    $0 += scoreView.notesView.elementViews[$1].node.bounds
+                    $0 += scoreView.noteFrame(at: $1)
                 }
                 return (rect, [])
             }
@@ -3316,6 +3298,7 @@ final class SheetView: View {
         case .setScoreOption(let option):
             binder[keyPath: keyPath].score.option = option
             scoreView.updateTimeline()
+            scoreView.updateScore()
             if isMakeRect {
                 return (scoreView.mainFrame, [])
             }
@@ -3478,18 +3461,14 @@ final class SheetView: View {
     }
     
     private func changeTonesNode(_ toneValue: ToneValue) {
-        if !toneValue.noteIndexes.isEmpty {
-            toneValue.noteIndexes.forEach {
-                scoreView.notesView.elementViews[$0].tone = toneValue.tone
-            }
-        }
+        toneValue.noteIndexes.forEach { scoreView[$0].tone = toneValue.tone }
     }
     
     private func insertNode(_ nivs: [IndexValue<Note>]) {
-        scoreView.notesView.insert(nivs)
+        scoreView.insert(nivs)
     }
     private func removeNotesNode(at noteIndexes: [Int]) {
-        scoreView.notesView.remove(at: noteIndexes)
+        scoreView.remove(at: noteIndexes)
     }
     
     private func insertNode(_ civs: [IndexValue<Content>]) {

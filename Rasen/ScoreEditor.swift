@@ -412,9 +412,9 @@ final class ScoreSlider: DragEditor {
                         var env = scoreView.model.notes[ni].envelope
                         env.attackSec = attackSec
                         env.id = beganEnvelope.id
-                        scoreView.notesView.elementViews[ni].model.envelope = env
+                        scoreView[ni].envelope = env
                     }
-                    sheetView.sequencer?.scoreNoders[score.id]?.replace(beganNotes.map { IndexValue(value: $0.value, index: $0.key) })
+                    sheetView.sequencer?.scoreNoders[score.id]?.replace(beganNotes.map { IndexValue(value: $0.value, index: $0.key) }, with: scoreView.model)
                 case .decayAndSustain:
                     let screenScale = document.screenToWorldScale / 50
                     let decaySec = ((sp.x - beganSP.x) * screenScale
@@ -431,9 +431,9 @@ final class ScoreSlider: DragEditor {
                         env.decaySec = decaySec
                         env.sustainAmp = sustainAmp
                         env.id = beganEnvelope.id
-                        scoreView.notesView.elementViews[ni].model.envelope = env
+                        scoreView[ni].envelope = env
                     }
-                    sheetView.sequencer?.scoreNoders[score.id]?.replace(beganNotes.map { IndexValue(value: $0.value, index: $0.key) })
+                    sheetView.sequencer?.scoreNoders[score.id]?.replace(beganNotes.map { IndexValue(value: $0.value, index: $0.key) }, with: scoreView.model)
                 case .release:
                     let screenScale = document.screenToWorldScale / 50
                     let releaseSec = ((sp.x - beganSP.x) * screenScale
@@ -445,9 +445,9 @@ final class ScoreSlider: DragEditor {
                         var env = scoreView.model.notes[ni].envelope
                         env.releaseSec = releaseSec
                         env.id = beganEnvelope.id
-                        scoreView.notesView.elementViews[ni].model.envelope = env
+                        scoreView[ni].envelope = env
                     }
-                    sheetView.sequencer?.scoreNoders[score.id]?.replace(beganNotes.map { IndexValue(value: $0.value, index: $0.key) })
+                    sheetView.sequencer?.scoreNoders[score.id]?.replace(beganNotes.map { IndexValue(value: $0.value, index: $0.key) }, with: scoreView.model)
                     
                 case .overtone:
                     var overtone = beganOvertone
@@ -467,9 +467,9 @@ final class ScoreSlider: DragEditor {
                         var tone = scoreView.model.notes[ni].tone
                         tone.overtone = overtone
                         tone.id = beganTone.id
-                        scoreView.notesView.elementViews[ni].model.tone = tone
+                        scoreView[ni].tone = tone
                     }
-                    sheetView.sequencer?.scoreNoders[score.id]?.replace(beganNotes.map { IndexValue(value: $0.value, index: $0.key) })
+                    sheetView.sequencer?.scoreNoders[score.id]?.replace(beganNotes.map { IndexValue(value: $0.value, index: $0.key) }, with: scoreView.model)
                 case .sourceFilter:
                     if let noteI, noteI < score.notes.count {
                         let fqSmp = scoreView.sourceFilterFqAndSmp(at: scoreP, at: noteI)
@@ -491,9 +491,9 @@ final class ScoreSlider: DragEditor {
                             var tone = scoreView.model.notes[ni].tone
                             tone.sourceFilter = sourceFilter
                             tone.id = beganTone.id
-                            scoreView.notesView.elementViews[ni].model.tone = tone
+                            scoreView[ni].tone = tone
                         }
-                        sheetView.sequencer?.scoreNoders[score.id]?.replace(beganNotes.map { IndexValue(value: $0.value, index: $0.key) })
+                        sheetView.sequencer?.scoreNoders[score.id]?.replace(beganNotes.map { IndexValue(value: $0.value, index: $0.key) }, with: scoreView.model)
                     }
                     
                 case .startNote:
@@ -517,14 +517,13 @@ final class ScoreSlider: DragEditor {
                                 let beatRange = nsBeat < neBeat ? nsBeat ..< neBeat : neBeat ..< nsBeat
                                 note.beatRange = beatRange
                                 
-                                scoreView.notesView.elementViews[ni].model = note
+                                scoreView[ni] = note
                             }
                             
                             oldNoteBeat = nsBeat
                             
                             if pitch != oldNotePitch {
-                                notePlayer?.notes = currentBeatNoteIndexes
-                                    .map { scoreView.notesView.elementViews[$0].model }
+                                notePlayer?.notes = currentBeatNoteIndexes.map { scoreView[$0] }
                                 oldNotePitch = pitch
                             }
                             document.updateSelects()
@@ -551,14 +550,13 @@ final class ScoreSlider: DragEditor {
                                 let beatRange = nsBeat < neBeat ? nsBeat ..< neBeat : neBeat ..< nsBeat
                                 note.beatRange = beatRange
                                 
-                                scoreView.notesView.elementViews[ni].model = note
+                                scoreView[ni] = note
                             }
                             
                             oldNoteBeat = neBeat
                             
                             if pitch != oldNotePitch {
-                                notePlayer?.notes = currentBeatNoteIndexes
-                                    .map { scoreView.notesView.elementViews[$0].model }
+                                notePlayer?.notes = currentBeatNoteIndexes.map { scoreView[$0] }
                                 oldNotePitch = pitch
                             }
                             document.updateSelects()
@@ -581,14 +579,13 @@ final class ScoreSlider: DragEditor {
                                 note.pitch = dPitch + beganNote.pitch
                                 note.beatRange.start = dBeat + beganNote.beatRange.start
                                 
-                                scoreView.notesView.elementViews[ni].model = note
+                                scoreView[ni] = note
                             }
                             
                             oldNoteBeat = nsBeat
                             
                             if pitch != oldNotePitch {
-                                notePlayer?.notes = currentBeatNoteIndexes
-                                    .map { scoreView.notesView.elementViews[$0].model }
+                                notePlayer?.notes = currentBeatNoteIndexes.map { scoreView[$0] }
                                 oldNotePitch = pitch
                             }
                             document.updateSelects()
@@ -679,36 +676,6 @@ struct ScoreLayout {
     static let pitchPadding = 15.0
 }
 
-final class NoteView<T: BinderProtocol>: View {
-    typealias Model = Note
-    typealias Binder = T
-    let binder: Binder
-    var keyPath: BinderKeyPath
-    let node: Node
-    
-    var previousMora: Mora?, nextMora: Mora?
-    
-    init(binder: Binder, keyPath: BinderKeyPath) {
-        self.binder = binder
-        self.keyPath = keyPath
-        
-        node = Node()//
-    }
-}
-extension NoteView {
-    func updateWithModel() {
-        
-    }
-    
-    var tone: Tone {
-        get { model.tone }
-        set {
-            binder[keyPath: keyPath].tone = newValue
-            updateWithModel()
-        }
-    }
-}
-
 final class ScoreView: TimelineView {
     typealias Model = Score
     typealias Binder = SheetBinder
@@ -719,14 +686,19 @@ final class ScoreView: TimelineView {
     var isFullEdit = false {
         didSet {
             guard isFullEdit != oldValue else { return }
+            if let node = timelineNode.children.first(where: { $0.name == "isFullEdit" }) {
+                node.isHidden = !isFullEdit
+            }
             if let node = scoreNode.children.first(where: { $0.name == "isFullEdit" }) {
                 node.isHidden = !isFullEdit
             }
         }
     }
     
+    let currentVolumeNode = Node(lineWidth: 1, lineType: .color(.background))
+    let timeNode = Node(lineWidth: 3, lineType: .color(.content))
+    
     var spectrogramMaxMel: Double?
-    var timeNode: Node?, currentVolumeNode: Node?
     var peakVolume = Volume() {
         didSet {
             guard peakVolume != oldValue else { return }
@@ -734,16 +706,14 @@ final class ScoreView: TimelineView {
         }
     }
     func updateFromPeakVolume() {
-        guard let node = currentVolumeNode else { return }
         let frame = mainFrame
-        let smp = peakVolume.smp
-            .clipped(min: 0, max: Volume.maxSmp, newMin: 0, newMax: 1)
+        let smp = peakVolume.smp.clipped(min: 0, max: Volume.maxSmp, newMin: 0, newMax: 1)
         let y = frame.height * smp
-        node.path = Path([Point(), Point(0, y)])
+        currentVolumeNode.path = Path([Point(), Point(0, y)])
         if abs(peakVolume.amp) < Audio.clippingAmp {
-            node.lineType = .color(.background)
+            currentVolumeNode.lineType = .color(.background)
         } else {
-            node.lineType = .color(.warning)
+            currentVolumeNode.lineType = .color(.warning)
         }
     }
     
@@ -751,28 +721,27 @@ final class ScoreView: TimelineView {
         didSet {
             guard bounds != oldValue else { return }
             updateTimeline()
+            updateScore()
+            updateClippingNode()
         }
     }
     var mainFrame: Rect {
         bounds.inset(by: Sheet.textPadding)
     }
     
-    let scoreNode = Node()
-    let clippingNode = Node(isHidden: true,
-                            lineWidth: 4, lineType: .color(.warning))
-    
-    let notesView: ArrayView<SheetNoteView>
+    let timelineNode = Node(), scoreNode = Node(), notesNode = Node()
+    let clippingNode = Node(isHidden: true, lineWidth: 4, lineType: .color(.warning))
     
     init(binder: Binder, keyPath: BinderKeyPath) {
         self.binder = binder
         self.keyPath = keyPath
         
-        notesView = ArrayView(binder: binder,
-                              keyPath: keyPath.appending(path: \Model.notes))
+        timeNode.children = [currentVolumeNode]
         
-        node = Node(children: [scoreNode, notesView.node, clippingNode])
-        updatePath()
+        node = Node(children: [timelineNode, scoreNode, notesNode, timeNode, clippingNode])
+        updateClippingNode()
         updateTimeline()
+        updateScore()
     }
 }
 extension ScoreView {
@@ -780,9 +749,7 @@ extension ScoreView {
     
     func updateWithModel() {
         updateTimeline()
-    }
-    func updatePath() {
-        updateClippingNode()
+        updateScore()
     }
     func updateClippingNode() {
         var parent: Node?
@@ -806,21 +773,18 @@ extension ScoreView {
             clippingNode.isHidden = true
         }
     }
-    var frameRate: Int { Keyframe.defaultFrameRate }
     func updateTimeline() {
         if model.enabled {
-            scoreNode.children = self.timelineNode(model, frameRate: frameRate)
-            
-            let timeNode = Node(lineWidth: 3, lineType: .color(.content))
-            let volumeNode = Node(lineWidth: 1, lineType: .color(.background))
-            timeNode.append(child: volumeNode)
-            scoreNode.children.append(timeNode)
-            self.timeNode = timeNode
-            self.currentVolumeNode = volumeNode
+            timelineNode.children = self.timelineNodes()
+        } else {
+            timelineNode.children = []
+        }
+    }
+    func updateScore() {
+        if model.enabled {
+            scoreNode.children = self.scoreNodes()
         } else {
             scoreNode.children = []
-            self.timeNode = nil
-            self.currentVolumeNode = nil
         }
     }
     
@@ -836,7 +800,7 @@ extension ScoreView {
         x(atSec: Double(sec))
     }
     func x(atSec sec: Double) -> Double {
-        sec * Sheet.secWidth + Sheet.textPadding.width
+        sec * Sheet.beatWidth + Sheet.textPadding.width
     }
     func x(atBeat beat: Rational) -> Double {
         x(atSec: model.sec(fromBeat: beat))
@@ -846,11 +810,13 @@ extension ScoreView {
         width(atSecDuration: Double(sec))
     }
     func width(atSecDuration sec: Double) -> Double {
-        sec * Sheet.secWidth
+        sec * Sheet.beatWidth
     }
     func width(atBeatDuration beatDur: Rational) -> Double {
         width(atSecDuration: model.sec(fromBeat: beatDur))
     }
+    
+    var frameRate: Int { Keyframe.defaultFrameRate }
     
     func sec(atX x: Double, interval: Rational) -> Rational {
         Rational(sec(atX: x), intervalScale: interval)
@@ -859,7 +825,7 @@ extension ScoreView {
         sec(atX: x, interval: Rational(1, frameRate))
     }
     func sec(atX x: Double) -> Double {
-        (x - Sheet.textPadding.width) / Sheet.secWidth
+        (x - Sheet.textPadding.width) / Sheet.beatWidth
     }
     
     func beat(atX x: Double, interval: Rational) -> Rational {
@@ -895,7 +861,41 @@ extension ScoreView {
         model.localMaxBeatRange
     }
     
-    func timelineNode(_ score: Score, frameRate: Int, padding: Double = 7) -> [Node] {
+    func append(_ note: Note) {
+        unupdateModel.notes.append(note)
+        updateScore()
+    }
+    func insert(_ note: Note, at noteI: Int) {
+        unupdateModel.notes.insert(note, at: noteI)
+    }
+    func insert(_ nivs: [IndexValue<Note>]) {
+        unupdateModel.notes.insert(nivs)
+        updateScore()
+    }
+    func replace(_ nivs: [IndexValue<Note>]) {
+        unupdateModel.notes.replace(nivs)
+        updateScore()
+    }
+    func remove(at noteI: Int) {
+        unupdateModel.notes.remove(at: noteI)
+        updateScore()
+    }
+    func remove(at noteIs: [Int]) {
+        unupdateModel.notes.remove(at: noteIs)
+        updateScore()
+    }
+    subscript(noteI: Int) -> Note {
+        get {
+            unupdateModel.notes[noteI]
+        }
+        set {
+            unupdateModel.notes[noteI] = newValue
+            updateScore()
+        }
+    }
+    
+    func timelineNodes() -> [Node] {
+        let score = model
         let sBeat = max(score.beatRange.start, -10000),
             eBeat = min(score.beatRange.end, 10000)
         guard sBeat <= eBeat else { return [] }
@@ -903,7 +903,8 @@ extension ScoreView {
         let ex = self.x(atBeat: eBeat)
         
         let lw = 1.0
-        let knobW = 2.0, knobH = 12.0
+        let knobW = Sheet.knobWidth, knobH = Sheet.knobHeight
+        let rulerH = Sheet.rulerHeight
         let pitchRange = Score.pitchRange
         let nh = noteHeight
         let y = ScoreLayout.pitchPadding, timelineHalfHeight = Sheet.timelineHalfHeight
@@ -917,10 +918,6 @@ extension ScoreView {
         var subBorderPathlines = [Pathline]()
         var fullEditBorderPathlines = [Pathline]()
         var borderPathlines = [Pathline]()
-        var noteLineNodes = [Node]()
-        var noteOctaveLinePathlines = [Pathline]()
-        var noteChordLinePathlines = [Pathline]()
-        var noteKnobPathlines = [Pathline]()
         
         func timeStringFrom(time: Rational, frameRate: Int) -> String {
             if time >= 60 {
@@ -957,10 +954,8 @@ extension ScoreView {
                                        fillType: .color(.content)))
             } else if localBeatRange.start > 0 {
                 let ssx = x(atBeat: localBeatRange.start + score.beatRange.start)
-                contentPathlines.append(Pathline(Rect(x: ssx - 1 / 4,
-                                                      y: y - 3,
-                                                      width:  1 / 2,
-                                                      height: 6)))
+                contentPathlines.append(Pathline(Rect(x: ssx - 1 / 4, y: y - 3,
+                                                      width:  1 / 2, height: 6)))
             }
             
             if score.beatRange.start + localBeatRange.end > score.beatRange.end {
@@ -976,10 +971,8 @@ extension ScoreView {
                                        fillType: .color(.content)))
             } else if localBeatRange.end < score.beatRange.length {
                 let ssx = x(atBeat: localBeatRange.end + score.beatRange.start)
-                contentPathlines.append(Pathline(Rect(x: ssx - 1 / 4,
-                                                      y: y - 3,
-                                                      width: 1 / 2,
-                                                      height: 6)))
+                contentPathlines.append(Pathline(Rect(x: ssx - 1 / 4, y: y - 3,
+                                                      width: 1 / 2, height: 6)))
             }
         }
         
@@ -990,67 +983,56 @@ extension ScoreView {
         contentPathlines.append(.init(Rect(x: sx + 1, y: y - lw / 2,
                                            width: ex - sx - 2, height: lw)))
         
-        let secRange = score.secRange
-        for sec in Int(secRange.start.rounded(.up)) ..< Int(secRange.end.rounded(.up)) {
-            let sec = Rational(sec)
-            let secX = x(atSec: sec)
-            contentPathlines.append(.init(Rect(x: secX - lw / 2,
-                                               y: y - 2,
-                                               width: lw,
-                                               height: 4)))
-        }
-        
         makeBeatPathlines(in: score.beatRange, sy: sy, ey: ey,
                           subBorderPathlines: &subBorderPathlines,
                           fullEditBorderPathlines: &fullEditBorderPathlines,
                           borderPathlines: &borderPathlines)
         
-        let beat = score.beatRange.start
-        let notes = score.notes.map {
-            var note = $0
-            note.beatRange.start += beat
-            return note
-        }
-        
         if let range = Range<Int>(pitchRange) {
             var isAppendOctaveText = false
             for pitch in range {
+                let raPitch = Rational(pitch)
+                
                 for k in 0 ..< 12 {
-                    let pitch = Rational(pitch - 1) + Rational(k, 12)
-                    let py = self.y(fromPitch: pitch, noteHeight: nh)
-                    
-                    fullEditBorderPathlines.append(.init(Rect(x: sx, y: py - lw * 0.125 / 2,
-                                                              width: ex - sx, height: lw * 0.125)))
+                    let pitch = raPitch + Rational(k, 12)
+                    if pitchRange.contains(pitch) {
+                        let py = self.y(fromPitch: pitch, noteHeight: nh)
+                        
+                        fullEditBorderPathlines.append(.init(Rect(x: sx, y: py - lw * 0.125 / 2,
+                                                                  width: ex - sx, height: lw * 0.125)))
+                    }
                 }
                 
-                let py = self.y(fromPitch: Rational(pitch), noteHeight: nh)
-                let hlw = lw / 2
-                borderPathlines.append(.init(Rect(x: sx, y: py - hlw / 2,
-                                                  width: ex - sx, height: hlw)))
-                
-                let mod = pitch.mod(12)
-                if mod == 3 || mod == 6 || mod == 9 {
-                    let my = self.y(fromPitch: Rational(pitch), noteHeight: nh)
-                    let lw = mod == 6 ? lw : lw / 2
-                    contentPathlines.append(Pathline(Rect(x: sx - 3,
-                                                          y: my - lw / 2,
-                                                          width: 3,
-                                                          height: lw)))
-                } else if mod == 0 {
-                    let my = self.y(fromPitch: Rational(pitch), noteHeight: nh)
+                if pitchRange.contains(raPitch) {
+                    let py = self.y(fromPitch: raPitch, noteHeight: nh)
+                    let hlw = lw / 2
+                    borderPathlines.append(.init(Rect(x: sx, y: py - hlw / 2,
+                                                      width: ex - sx, height: hlw)))
                     
-                    let plw = lw * 2
-                    contentPathlines.append(Pathline(Rect(x: sx - 3,
-                                                          y: my - plw / 2,
-                                                          width: 3,
-                                                          height: plw)))
-                    
-                    let octaveText = Text(string: "\(Int(Rational(pitch)) / 12)",
-                                             size: Font.smallSize)
-                    scoreNodes.append(Node(attitude: Attitude(position: Point(sx - 3 - (octaveText.frame?.width ?? 0) - 1, my)),
-                                          path: octaveText.typesetter.path(),
-                                          fillType: .color(.content)))
-                    isAppendOctaveText = true
+                    let mod = pitch.mod(12)
+                    if mod == 3 || mod == 6 || mod == 9 {
+                        let my = self.y(fromPitch: raPitch, noteHeight: nh)
+                        let lw = mod == 6 ? lw : lw / 2
+                        contentPathlines.append(Pathline(Rect(x: sx - 3,
+                                                              y: my - lw / 2,
+                                                              width: 3,
+                                                              height: lw)))
+                    } else if mod == 0 {
+                        let my = self.y(fromPitch: raPitch, noteHeight: nh)
+                        
+                        let plw = lw * 2
+                        contentPathlines.append(Pathline(Rect(x: sx - 3,
+                                                              y: my - plw / 2,
+                                                              width: 3,
+                                                              height: plw)))
+                        
+                        let octaveText = Text(string: "\(Int(raPitch) / 12)",
+                                              size: Font.smallSize)
+                        scoreNodes.append(Node(attitude: Attitude(position: Point(sx - 3 - (octaveText.frame?.width ?? 0) - 1, my)),
+                                              path: octaveText.typesetter.path(),
+                                              fillType: .color(.content)))
+                        isAppendOctaveText = true
+                    }
                 }
             }
             if !isAppendOctaveText {
@@ -1065,14 +1047,77 @@ extension ScoreView {
                                       path: octaveText.typesetter.path(),
                                       fillType: .color(.content)))
             }
-            
-            let unisonsSet = Set(notes.compactMap { Int($0.pitch.rounded().mod(12)) })
-            for pitch in range {
-                guard unisonsSet.contains(pitch.mod(12)) else { continue }
-                let py = self.y(fromPitch: Rational(pitch), noteHeight: nh)
-                subBorderPathlines.append(Pathline(Rect(x: sx, y: py - lw / 2,
-                                                        width: ex - sx, height: lw)))
-            }
+        }
+        
+        contentPathlines.append(Pathline(Rect(x: sx - 1 / 2, y: y,
+                                              width: 1, height: h + 1 / 2)))
+        contentPathlines.append(Pathline(Rect(x: ex - 1 / 2, y: y,
+                                              width: 1, height: h + 1 / 2)))
+        contentPathlines.append(Pathline(Rect(x: sx, y: y + h - 1 / 2,
+                                              width: ex - sx, height: 1)))
+        
+        let secRange = score.secRange
+        for sec in Int(secRange.start.rounded(.up)) ..< Int(secRange.end.rounded(.up)) {
+            let sec = Rational(sec)
+            guard secRange.contains(sec) else { continue }
+            let secX = x(atSec: sec)
+            contentPathlines.append(.init(Rect(x: secX - lw / 2, y: sy - rulerH / 2,
+                                               width: lw, height: rulerH)))
+        }
+        let tempoBeat = score.beatRange.start.rounded(.down) + 1
+        if tempoBeat < score.beatRange.end {
+            let np = Point(x(atBeat: tempoBeat), sy)
+            contentPathlines.append(Pathline(Rect(x: np.x - 1, y: np.y - rulerH / 2,
+                                                  width: 2, height: rulerH)))
+        }
+        
+        var nodes = [Node]()
+        
+        if !fullEditBorderPathlines.isEmpty {
+            nodes.append(Node(name: "isFullEdit",
+                              isHidden: !isFullEdit,
+                              path: Path(fullEditBorderPathlines),
+                              fillType: .color(.border)))
+        }
+        if !borderPathlines.isEmpty {
+            nodes.append(Node(path: Path(borderPathlines),
+                              fillType: .color(.border)))
+        }
+        if !subBorderPathlines.isEmpty {
+            nodes.append(Node(path: Path(subBorderPathlines),
+                              fillType: .color(.subBorder)))
+        }
+        if !contentPathlines.isEmpty {
+            nodes.append(Node(path: Path(contentPathlines),
+                              fillType: .color(.content)))
+        }
+        nodes += scoreNodes
+        
+        return nodes
+    }
+    
+    func scoreNodes() -> [Node] {
+        let score = model
+        let sBeat = max(score.beatRange.start, -10000),
+            eBeat = min(score.beatRange.end, 10000)
+        guard sBeat <= eBeat else { return [] }
+        
+        let pitchRange = Score.pitchRange
+        let nh = noteHeight
+        
+        var scoreNodes = [Node]()
+        var contentPathlines = [Pathline]()
+        var subBorderPathlines = [Pathline]()
+        var fullEditPathlines = [Pathline]()
+        var noteLineNodes = [Node]()
+        var noteOctaveLinePathlines = [Pathline]()
+        var noteChordLinePathlines = [Pathline]()
+        
+        let beat = score.beatRange.start
+        let notes = score.notes.map {
+            var note = $0
+            note.beatRange.start += beat
+            return note
         }
         
         var brps = [(Range<Rational>, Int)]()
@@ -1081,6 +1126,20 @@ extension ScoreView {
         
         func appendOctaves(_ note: Note, isChord: Bool) {
             var nNote = note
+            
+            func appendScalePathlines(with note: Note) {
+                let py = self.y(fromPitch: note.pitch, noteHeight: nh)
+                let nsx = x(atBeat: note.beatRange.start)
+                let nex = x(atBeat: note.beatRange.end)
+                let d = (nex - nsx) * 8
+                let ld = nh * Volume(amp: note.volume.amp * (note.pitbend.pits.last?.amp ?? 1)).smp / 2
+                subBorderPathlines.append(Pathline([Point(nex, py + ld), 
+                                                    Point(nex, py - ld),
+                                                    Point(nex + d, py)]))
+            }
+            
+            appendScalePathlines(with: nNote)
+            
             while true {
                 nNote.pitch -= 12
                 guard nNote.pitch > 0 && nNote.pitch < pitchRange.length else { break }
@@ -1093,6 +1152,8 @@ extension ScoreView {
                 } else {
                     noteOctaveLinePathlines += aNoteLinePathlines
                 }
+                
+                appendScalePathlines(with: nNote)
             }
             
             nNote = note
@@ -1110,18 +1171,16 @@ extension ScoreView {
                 } else {
                     noteOctaveLinePathlines += aNoteLinePathlines
                 }
+                
+                appendScalePathlines(with: nNote)
             }
         }
+        
         let nNotes = notes
         for (i, note) in nNotes.enumerated() {
             guard pitchRange.contains(note.pitch) else { continue }
             var beatRange = note.beatRange
-            
-            guard beatRange.end > preBeat
-                    && beatRange.start < nextBeat
-                    && note.volumeAmp >= Volume.minAmp
-                    && note.volumeAmp <= Volume.maxAmp else { continue }
-            
+            guard beatRange.end > preBeat && beatRange.start < nextBeat else { continue }
             if beatRange.start < preBeat {
                 beatRange.length -= preBeat - beatRange.start
                 beatRange.start = preBeat
@@ -1145,8 +1204,7 @@ extension ScoreView {
             
             let pan = note.pan
             noteLineNodes += aNoteLinePathlines.enumerated().map {
-                var color = Self.panColor(pan: pan,
-                                          brightness: 0.25)
+                var color = Self.panColor(pan: pan, brightness: 0.25)
                 if case .line(let line) = $0.element.elements.first {
                     color = .init(lightness: line.uuColor.value.lightness, a: color.a, b: color.b)
                 }
@@ -1155,7 +1213,7 @@ extension ScoreView {
                             lineType: .color(color))
             }
             
-            noteKnobPathlines += aNoteKnobPathlines
+            fullEditPathlines += aNoteKnobPathlines
             if let lyricPath {
                 scoreNodes.append(.init(path: lyricPath, fillType: .color(.content)))
             }
@@ -1164,8 +1222,7 @@ extension ScoreView {
         let trs = Chord.splitedTimeRanges(timeRanges: brps)
         for (tr, pitchs) in trs {
             let ps = pitchs.sorted()
-            guard let chord = Chord(pitchs: ps),
-                  chord.typers.count <= 8 else { continue }
+            guard let chord = Chord(pitchs: ps), chord.typers.count <= 8 else { continue }
             
             var typersDic = [Int: [(typer: Chord.ChordTyper,
                                     typerIndex: Int,
@@ -1177,13 +1234,9 @@ extension ScoreView {
                 for i in 0 ..< typer.type.unisons.count {
                     guard j < ps.count else { break }
                     if typersDic[j] != nil {
-                        typersDic[j]?.append((typer,
-                                              ti,
-                                              typer.inversion == i))
+                        typersDic[j]?.append((typer, ti, typer.inversion == i))
                     } else {
-                        typersDic[j] = [(typer,
-                                         ti,
-                                         typer.inversion == i)]
+                        typersDic[j] = [(typer, ti, typer.inversion == i)]
                     }
                     while j + 1 < ps.count,
                           !inversionUnisons.contains(ps[j + 1] - fp) {
@@ -1199,12 +1252,9 @@ extension ScoreView {
                 let cy = self.y(fromPitch: pitch, noteHeight: nh)
                 let d = 1.0
                 let nw = 4.0 * Double(chord.typers.count - 1)
-                func appendChordLine(at ti: Int,
-                                     isInversion: Bool,
-                                     _ typer: Chord.ChordTyper) {
+                func appendChordLine(at ti: Int, isInversion: Bool, _ typer: Chord.ChordTyper) {
                     let tlw = 0.5
-                    let lw =
-                    switch typer.type {
+                    let lw = switch typer.type {
                     case .octave: 7 * tlw
                     case .major, .power: 5 * tlw
                     case .suspended: 3 * tlw
@@ -1218,8 +1268,7 @@ extension ScoreView {
                     let fx = (nex + nsx) / 2 + x - lw / 2
                     let fy0 = cy + 1, fy1 = cy - 1 - d
                     
-                    let minorCount =
-                    switch typer.type {
+                    let minorCount = switch typer.type {
                     case .minor: 4
                     case .augmented: 3
                     case .flatfive: 2
@@ -1263,30 +1312,13 @@ extension ScoreView {
             }
         }
         
-        contentPathlines.append(Pathline(Rect(x: sx - 1 / 2, y: y,
-                                              width: 1, height: h + 1 / 2)))
-        contentPathlines.append(Pathline(Rect(x: ex - 1 / 2, y: y,
-                                              width: 1, height: h + 1 / 2)))
-        contentPathlines.append(Pathline(Rect(x: sx, y: y + h - 1 / 2,
-                                              width: ex - sx, height: 1)))
-        
-        let tempoBeat = score.beatRange.start.rounded(.down) + 1
-        if tempoBeat < score.beatRange.end {
-            let np = Point(x(atBeat: tempoBeat), sy)
-            contentPathlines.append(Pathline(Rect(x: np.x - 1, y: np.y - 2, width: 2, height: 4)))
-        }
-        
         var nodes = [Node]()
         
-        if !fullEditBorderPathlines.isEmpty {
+        if !fullEditPathlines.isEmpty {
             nodes.append(Node(name: "isFullEdit",
                               isHidden: !isFullEdit,
-                              path: Path(fullEditBorderPathlines),
-                              fillType: .color(.border)))
-        }
-        if !borderPathlines.isEmpty {
-            nodes.append(Node(path: Path(borderPathlines),
-                              fillType: .color(.border)))
+                              path: Path(fullEditPathlines),
+                              fillType: .color(.background)))
         }
         if !noteOctaveLinePathlines.isEmpty {
             nodes += noteOctaveLinePathlines.enumerated().map {
@@ -1311,10 +1343,6 @@ extension ScoreView {
             nodes.append(Node(path: Path(contentPathlines),
                               fillType: .color(.content)))
         }
-        if !noteKnobPathlines.isEmpty {
-            nodes.append(Node(path: Path(noteKnobPathlines),
-                              fillType: .color(.background)))
-        }
         nodes += scoreNodes
         
         return nodes
@@ -1329,7 +1357,7 @@ extension ScoreView {
     }
     
     func updateTimeNode(atSec sec: Rational) {
-        if let timeNode = timeNode {
+        if model.enabled {
             let frame = mainFrame
             let x = self.x(atSec: sec)
             if x >= frame.minX && x < frame.maxX {
@@ -1338,11 +1366,11 @@ extension ScoreView {
                 updateFromPeakVolume()
             } else {
                 timeNode.path = Path()
-                currentVolumeNode?.path = Path()
+                currentVolumeNode.path = Path()
             }
-        } else {
-            timeNode?.path = Path()
-            currentVolumeNode?.path = Path()
+        } else if !timeNode.path.isEmpty {
+            timeNode.path = Path()
+            currentVolumeNode.path = Path()
         }
     }
     
@@ -1544,6 +1572,9 @@ extension ScoreView {
         return mainLineDistance(p) < distance
     }
     
+    func noteFrame(at noteI: Int) -> Rect {
+        noteFrame(from: model.notes[noteI])
+    }
     func noteFrame(from note: Note) -> Rect {
         let score = model
         let nh = noteHeight

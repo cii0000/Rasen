@@ -54,7 +54,7 @@ final class NotePlayer {
     }
     var volume: Volume {
         get { noder.volume }
-        set { noder.volume = newValue }
+        set { noder.volume = .init(amp: newValue.amp.clipped(min: Volume.minAmp, max: Volume.maxAmp)) }
     }
     var sequencer: Sequencer
     var noder: AVAudioScoreNoder
@@ -288,28 +288,123 @@ final class AVAudioScoreNoder {
     var isAsync = true
     var isSyncFirst = true
     
-    func update(_ note: Note, at i: Int) {
-        rendnotes[i].overtone = note.tone.overtone
-        rendnotes[i].waver = .init(envelope: note.envelope, pitbend: note.pitbend)
-        rendnotes[i].sourceFilter = note.tone.sourceFilter
-//        cancelWorkItems()
-//        updateRendnotes()
-    }
-    func insert(_ noteIVs: [IndexValue<Note>]) {
-        noteIVs.map { IndexValue(value: $0.value, index: $0.index) }
-    }
-    func replace(_ noteIVs: [IndexValue<Note>]) {
-        for iv in noteIVs {
-            let i = iv.index, note = iv.value
-            rendnotes[i].overtone = note.tone.overtone
-            rendnotes[i].waver = .init(envelope: note.envelope, pitbend: note.pitbend)
-            rendnotes[i].sourceFilter = note.tone.sourceFilter
+    func insert(_ noteIVs: [IndexValue<Note>], with score: Score) {
+        let nvs = noteIVs.map { IndexValue(value: Rendnote(note: $0.value, score: score,
+                                                           startSec: startSec,
+                                                           sampleRate: format.sampleRate), 
+                                           index: $0.index) }
+        
+        let oNwids = Set(rendnotes.map { NotewaveID($0) })
+        
+        rendnotes.insert(nvs)
+        
+        let vs = nvs.reduce(into: [NotewaveID: Rendnote]()) {
+            $0[NotewaveID($1.value)] = $1.value
         }
-//        cancelWorkItems()
-//        updateRendnotes()
+        for (nNwid, v) in vs {
+            guard !oNwids.contains(nNwid) else { continue }
+            
+            workItems[nNwid]?.item?.cancel()
+            workItems[nNwid]?.item = nil
+            
+            var item: DispatchWorkItem?
+            item = DispatchWorkItem(qos: .userInitiated) { [weak self] in
+                guard !(item?.isCancelled ?? true) else {
+                    DispatchQueue.main.async { [weak self] in
+                        self?.workItems[nNwid]?.item = nil
+                        self?.workItems[nNwid] = nil
+                    }
+                    item = nil
+                    return
+                }
+                
+                let notewave = v.notewave()
+                
+                DispatchQueue.main.async { [weak self] in
+                    self?.notewaveDic[nNwid] = notewave
+                    self?.workItems[nNwid]?.item = nil
+                    self?.workItems[nNwid] = nil
+                }
+                item = nil
+            }
+            
+            workItems[nNwid] = .init(item: item!)
+            DispatchQueue.global(qos: .userInitiated).async(execute: item!)
+        }
+    }
+    func replace(_ note: Note, at i: Int, with score: Score) {
+        replace([.init(value: note, index: i)], with: score)
+    }
+    func replace(_ noteIVs: [IndexValue<Note>], with score: Score) {
+        let nvs = noteIVs.map { IndexValue(value: Rendnote(note: $0.value, score: score,
+                                                           startSec: startSec,
+                                                           sampleRate: format.sampleRate),
+                                           index: $0.index) }
+        
+        nvs.forEach { rendnotes[$0.index] = $0.value }
+        
+        let vs = nvs.reduce(into: [NotewaveID: Rendnote]()) {
+            $0[NotewaveID($1.value)] = $1.value
+        }
+        for (key, v) in vs {
+            workItems[key]?.item?.cancel()
+            workItems[key]?.item = nil
+            
+            var item: DispatchWorkItem?
+            item = DispatchWorkItem(qos: .userInitiated) { [weak self] in
+                guard !(item?.isCancelled ?? true) else {
+                    DispatchQueue.main.async { [weak self] in
+                        self?.workItems[key]?.item = nil
+                        self?.workItems[key] = nil
+                    }
+                    item = nil
+                    return
+                }
+                
+                let notewave = v.notewave()
+                
+                DispatchQueue.main.async { [weak self] in
+                    self?.notewaveDic[key] = notewave
+                    self?.workItems[key]?.item = nil
+                    self?.workItems[key] = nil
+                }
+                item = nil
+            }
+            
+            workItems[key] = .init(item: item!)
+            DispatchQueue.global(qos: .userInitiated).async(execute: item!)
+        }
+    }
+    func replaceVolumeOrPan(_ noteIVs: [IndexValue<Note>], with score: Score) {
+        let nvs = noteIVs.map { IndexValue(value: Rendnote(note: $0.value, score: score,
+                                                           startSec: startSec,
+                                                           sampleRate: format.sampleRate),
+                                           index: $0.index) }
+        nvs.forEach {
+            rendnotes[$0.index].volumeAmp = $0.value.volumeAmp
+            rendnotes[$0.index].waver = $0.value.waver
+            rendnotes[$0.index].pitbend = $0.value.pitbend
+            
+            let rendnoteID = rendnotes[$0.index].id
+            memowaves[rendnoteID]?.volumeAmp = $0.value.volumeAmp
+            memowaves[rendnoteID]?.waver = $0.value.waver
+            memowaves[rendnoteID]?.pitbend = $0.value.pitbend
+        }
     }
     func remove(at noteIs: [Int]) {
+        let oNwids = Set(noteIs.map { NotewaveID(rendnotes[$0]) })
+        
+        noteIs.forEach { memowaves[rendnotes[$0].id] = nil }
         rendnotes.remove(at: noteIs)
+        
+        let nNwids = Set(rendnotes.map { NotewaveID($0) })
+        
+        for oNwid in oNwids {
+            guard !nNwids.contains(oNwid) else { continue }
+            workItems[oNwid]?.item?.cancel()
+            workItems[oNwid]?.item = nil
+            notewaveDic[oNwid] = nil
+        }
     }
     
     deinit {
@@ -340,7 +435,8 @@ final class AVAudioScoreNoder {
         let sortedINWIDs = insertNWIDs.sorted {
             $0.value.secRange.start < $1.value.secRange.start
         }
-        let si = sortedINWIDs.enumerated().reversed().first { ($0.element.value.secRange.start * 16 - 1) / 16 <= startSec }?.offset ?? 0
+        let si = sortedINWIDs.enumerated().reversed()
+            .first { ($0.element.value.secRange.start * 16 - 1) / 16 <= startSec }?.offset ?? 0
         let loopedINWIDs = sortedINWIDs.loop(from: si)
         let firstSec = loopedINWIDs.first?.value.secRange.start ?? 0
         for nwid in loopedINWIDs {
@@ -659,7 +755,7 @@ final class Sequencer {
         var reverbs = [UUID: AVAudioUnitReverb]()
         var allReverbNodes = [AVAudioUnitReverb]()
         
-        var sSecDur = perceptionDelaySec
+        var sSec = perceptionDelaySec
         var scoreNodes = [(node: AVAudioSourceNode, reverbNode: AVAudioUnitReverb)]()
         var scoreNoders = [UUID: AVAudioScoreNoder]()
         for audiotrack in audiotracks {
@@ -670,7 +766,7 @@ final class Sequencer {
                 switch value {
                 case .score(let score):
                     guard !score.notes.isEmpty else { continue }
-                    let rendnotes = Score.rendnotes(from: score, startSecDur: sSecDur)
+                    let rendnotes = Score.rendnotes(from: score, startSec: sSec)
                     guard !rendnotes.isEmpty else { continue }
                     
                     let noder = AVAudioScoreNoder(rendnotes: rendnotes,
@@ -698,7 +794,7 @@ final class Sequencer {
                     let sBeat = beatRange.start + max(localBeatRange.start, 0)
                     let inSBeat = min(localBeatRange.start, 0)
                     let eBeat = beatRange.start + min(localBeatRange.end, beatRange.length)
-                    let startSec = Double(timeOption.sec(fromBeat: sBeat)) + sSecDur
+                    let startSec = Double(timeOption.sec(fromBeat: sBeat)) + sSec
                     let contentStartSec = Double(timeOption.sec(fromBeat: inSBeat))
                     let secDur = Double(timeOption.sec(fromBeat: max(eBeat - sBeat, 0)))
                     let noder = AVAudioPCMNoder(pcmBuffer: pcmBuffer,
@@ -722,7 +818,7 @@ final class Sequencer {
                 }
             }
             
-            sSecDur += Double(audiotrack.secDuration)
+            sSec += Double(audiotrack.secDuration)
         }
         
         let engine = AVAudioEngine()
@@ -731,7 +827,7 @@ final class Sequencer {
         engine.attach(mixerNode)
         self.mixerNode = mixerNode
         
-        secoundDuration = sSecDur
+        secoundDuration = sSec
         
         for (node, reverbNode) in pcmNodes {
             engine.attach(node)

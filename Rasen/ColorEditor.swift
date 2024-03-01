@@ -436,8 +436,11 @@ final class ColorEditor: Editor {
                         scoreView.model.notes[ni].pitbend.pits[pi].volume = nVolume
                         
                         if beganPit.volume == beganVolume {
-                            notePlayer?.notes = [score.notes[ni]]
-//                            sheetView.sequencer?.scoreNoders[score.id].notewaveDic
+                            notePlayer?.notes = [scoreView.model.notes[ni]]//
+                            
+                            sheetView.sequencer?.scoreNoders[score.id]?
+                                .replaceVolumeOrPan([.init(value: scoreView.model.notes[ni], index: ni)],
+                                                    with: scoreView.model)
                         }
                     }
                 }
@@ -448,8 +451,11 @@ final class ColorEditor: Editor {
                     scoreView.model.notes[ni].volume = nVolume
                     
                     if beganNote.volume == beganVolume {
-                        notePlayer?.notes = [score.notes[ni]]
-//                            sheetView.sequencer?.scoreNoders[score.id].notewaveDic
+                        notePlayer?.notes = [scoreView.model.notes[ni]]//
+                        
+                        sheetView.sequencer?.scoreNoders[score.id]?
+                            .replaceVolumeOrPan([.init(value: scoreView.model.notes[ni], index: ni)],
+                                                with: scoreView.model)
                     }
                 }
             }

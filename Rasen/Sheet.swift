@@ -2106,9 +2106,9 @@ extension Sheet {
     static let defaultAnimationBounds = Rect(width: 400, height: 300)
     static let defalutBackgroundUUColor = UU(Color.background, id: .zero)
     static let textPadding = Size(width: 16, height: 15)
-    static let secWidth = 60.0, secPadding = 16.0
+    static let beatWidth = 60.0, secPadding = 16.0
     static let timelineHalfHeight = 12.0
-    static let knobWidth = 2.0, knobHeight = 12.0
+    static let knobWidth = 2.0, knobHeight = 12.0, rulerHeight = 4.0
 }
 extension Sheet {
     var picture: Picture {

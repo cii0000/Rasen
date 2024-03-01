@@ -1020,7 +1020,7 @@ final class LineEditor: Editor {
                 }
                 notePlayer?.play()
                 
-                sheetView.scoreView.notesView.append(note)
+                sheetView.scoreView.append(note)
 //                    let noteNode = scoreView.noteNode(from: note)
 //                    noteNode.attitude.position
 //                        = scoreView.node.attitude.position
@@ -1056,7 +1056,7 @@ final class LineEditor: Editor {
                     self.notePitch = pitch
                 }
                 
-                sheetView.scoreView.model.notes[ni] = note
+                sheetView.scoreView[ni] = note
 //                    tempLineNode?.children
 //                        = scoreView.noteNode(from: note).children
             }
