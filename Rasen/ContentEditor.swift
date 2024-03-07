@@ -90,7 +90,7 @@ final class ContentSlider: DragEditor {
                 switch type {
                 case .all:
                     let np = beganContent.origin + sheetP - beganInP
-                    let interval = document.currentNoteTimeInterval()
+                    let interval = document.currentNoteTimeInterval
                     let beat = max(min(sheetView.animationView.beat(atX: np.x, interval: interval),
                                    sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: interval)),
                                    sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval) - (content.timeOption?.beatRange.length ?? 0))
@@ -101,7 +101,7 @@ final class ContentSlider: DragEditor {
                 case .startBeat:
                     if var timeOption = content.timeOption {
                         let np = beganContent.origin + sheetP - beganInP
-                        let interval = document.currentNoteTimeInterval()
+                        let interval = document.currentNoteTimeInterval
                         let beat = min(sheetView.animationView.beat(atX: np.x, interval: interval),
                                        sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: interval),
                                        timeOption.beatRange.end)
@@ -120,7 +120,7 @@ final class ContentSlider: DragEditor {
                 case .endBeat:
                     if var timeOption = content.timeOption {
                         let np = beganContentEndP + sheetP - beganInP
-                        let interval = document.currentNoteTimeInterval()
+                        let interval = document.currentNoteTimeInterval
                         let beat = max(sheetView.animationView.beat(atX: np.x, interval: interval),
                                        sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval),
                                        timeOption.beatRange.start)
@@ -292,7 +292,6 @@ extension ContentView {
         set {
             binder[keyPath: keyPath].origin = newValue
             node.attitude.position = newValue
-            timelineNode.attitude.position = .init(-newValue.x, 0)
             updateClippingNode()
         }
     }
@@ -308,9 +307,17 @@ extension ContentView {
         set {
             binder[keyPath: keyPath].timeOption?.tempo = newValue
             updateTimeline()
+            
+//            if let spctrogram {
+//                let allBeat = content.localBeatRange?.length ?? 0
+//                let allW = width(atBeatDuration: allBeat)
+//            }
         }
     }
     
+    var timeLineCenterY: Double {
+        model.type.isDuration ? 0 : -Sheet.timelineHalfHeight
+    }
     var beatRange: Range<Rational>? {
         model.timeOption?.beatRange
     }
@@ -379,7 +386,7 @@ extension ContentView {
             if localBeatRange.start < 0 {
                 let beat = -min(localBeatRange.start, 0)
                 - min(timeOption.beatRange.start, 0)
-                let timeText = Text(string: timeStringFrom(time: beat, frameRate: frameRate),
+                let timeText = Text(string: timeStringFrom(time: beat, frameRate: 48),
                                     size: Font.smallSize)
                 let timeP = Point(sx + 1, y + noteHeight)
                 textNodes.append(Node(attitude: Attitude(position: timeP),
@@ -396,7 +403,7 @@ extension ContentView {
             if timeOption.beatRange.start + localBeatRange.end > timeOption.beatRange.end {
                 let beat = timeOption.beatRange.length - localBeatRange.start
                 
-                let timeText = Text(string: timeStringFrom(time: beat, frameRate: frameRate),
+                let timeText = Text(string: timeStringFrom(time: beat, frameRate: 48),
                                     size: Font.smallSize)
                 let timeFrame = timeText.frame ?? Rect()
                 let timeP = Point(ex - timeFrame.width - 2, y + noteHeight)
@@ -485,12 +492,6 @@ extension ContentView {
             let secX = x(atSec: sec)
             contentPathlines.append(.init(Rect(x: secX - lw / 2, y: sy - rulerH / 2,
                                                width: lw, height: rulerH)))
-        }
-        let tempoBeat = timeOption.beatRange.start.rounded(.down) + 1
-        if tempoBeat < timeOption.beatRange.end {
-            let np = Point(x(atBeat: tempoBeat), sy)
-            contentPathlines.append(Pathline(Rect(x: np.x - 1, y: np.y - rulerH / 2,
-                                                  width: 2, height: rulerH)))
         }
         
         var nodes = [Node]()
@@ -596,11 +597,26 @@ extension ContentView {
         }
     }
     
+    var bounds: Rect? {
+        if let timelineFrame {
+            return timelineFrame.union(contentFrame)
+        } else {
+            return contentFrame
+        }
+    }
+    var transformedBounds: Rect? {
+        if let bounds {
+            bounds * node.localTransform
+        } else {
+            nil
+        }
+    }
+    
     var clippableBounds: Rect? {
         if let timelineFrame {
-            timelineFrame.union(model.imageFrame?.bounds)
+            timelineFrame.union(contentFrame)
         } else {
-            model.imageFrame?.bounds
+            contentFrame
         }
     }
     var transformedClippableBounds: Rect? {
@@ -643,24 +659,18 @@ extension ContentView {
             Rect(x: timelineFrame.minX + ContentLayout.spectrogramX - Sheet.knobHeight / 2,
                  y: Sheet.timelineHalfHeight - Sheet.knobWidth / 2,
                  width: Sheet.knobHeight,
-                 height: ContentLayout.spectrogramHeight + Sheet.knobWidth).outset(by: scale * 3).contains(p)
+                 height: ContentLayout.spectrogramHeight + Sheet.knobWidth)
+            .outset(by: scale * 3)
+            .contains(p)
         } else {
             false
         }
     }
     
     func contains(_ p: Point, scale: Double) -> Bool {
-        containsTimeline(p)
+        containsContent(p)
+        || containsTimeline(p)
         || containsIsShownSpectrogram(p, scale: scale)
-        || containsContent(p)
-    }
-    
-    func mainLineDistance(_ p: Point) -> Double {
-        abs(p.y - (timelineFrame?.midY ?? 0))
-    }
-    func containsMainLine(_ p: Point, distance: Double) -> Bool {
-        guard containsTimeline(p) else { return false }
-        return mainLineDistance(p) < distance
     }
     
     func isShownSpectrogram(at p :Point) -> Bool {

@@ -161,8 +161,8 @@ extension Score {
                                     formantFilterInterpolation: nil,
                                     deltaFormantFilterInterpolation: nil,
                                     fAlpha: 1,
-                                    seed: Rendnote.seed(fromFq: fq, sec: nsSec),
-                                    overtone: note.tone.overtone,
+                                    noiseSeed: Rendnote.seed(fromFq: fq, sec: nsSec),
+                                    overtone: note.firstTone.overtone,
                                     pitbend: .init(),
                                     secRange: nsSec ..< neSec,
                                     startDeltaSec: nsSec - snapSSec,
@@ -211,12 +211,12 @@ extension Score {
                           time: $0.time, type: $0.type)
                 }, duration: si.duration)
                 nNotes.append(.init(fq: note.fq,
-                                    sourceFilter: note.tone.sourceFilter,
+                                    sourceFilter: note.firstTone.noiseSourceFilter(isNoise: note.isNoise),
                                     formantFilterInterpolation: si,
                                     deltaFormantFilterInterpolation: dsi,
                                     fAlpha: 1,
-                                    seed: Rendnote.seed(fromFq: fq, sec: mainSec),
-                                    overtone: note.tone.overtone,
+                                    noiseSeed: Rendnote.seed(fromFq: fq, sec: mainSec),
+                                    overtone: note.firstTone.overtone,
                                     pitbend: pitbend,
                                     secRange: nsSec ..< neSec,
                                     startDeltaSec: nsSec - snapSSec,
@@ -236,37 +236,6 @@ extension Score {
 struct Formant: Hashable, Codable {
     var sdFq = 0.0, sFq = 0.0, eFq = 0.0, edFq = 0.0,
         smp = 0.0, noiseT = 0.0, edSmp = 0.0, edNoiseT = 0.0
-}
-extension Formant: Protobuf {
-    init(_ pb: PBFormant) throws {
-        sdFq = max(0, ((try? pb.sdFq.notNaN()) ?? 0))
-        sFq = max(0, ((try? pb.sFq.notNaN()) ?? 0))
-        eFq = max(0, ((try? pb.eFq.notNaN()) ?? 0))
-        edFq = max(0, ((try? pb.edFq.notNaN()) ?? 0))
-        smp = Volume(amp: pb.amp.clipped(min: Volume.minAmp,
-                                         max: Volume.maxAmp)).smp
-        noiseT = ((try? pb.noiseT.notNaN()) ?? 0).clipped(min: 0, max: 1)
-        edSmp = Volume(amp: pb.edAmp.clipped(min: Volume.minAmp,
-                                             max: Volume.maxAmp)).smp
-        edNoiseT = ((try? pb.edNoiseT.notNaN()) ?? 0).clipped(min: 0, max: 1)
-        if sFq > eFq {
-            let n = sFq
-            sFq = eFq
-            eFq = n
-        }
-    }
-    var pb: PBFormant {
-        .with {
-            $0.sdFq = sdFq
-            $0.sFq = sFq
-            $0.eFq = eFq
-            $0.edFq = edFq
-            $0.amp = Volume(smp: smp).amp
-            $0.noiseT = noiseT
-            $0.edAmp = Volume(smp: edSmp).amp
-            $0.edNoiseT = edNoiseT
-        }
-    }
 }
 extension Formant: Interpolatable {
     static func linear(_ f0: Self, _ f1: Self, t: Double) -> Self {
@@ -983,7 +952,7 @@ struct Onset: Hashable, Codable {
     var sec = 0.0
     var attackSec = 0.01
     var releaseSec = 0.02
-    var sourceFilter: SourceFilter
+    var sourceFilter: NoiseSourceFilter
 }
 extension Onset {
     var volumeAmp: Double {
@@ -1006,7 +975,7 @@ struct Mora: Hashable, Codable {
     var fq: Double
     var onsets: [Onset]
     var syllabics: [Phoneme]
-    var sourceFilter: SourceFilter
+    var sourceFilter: NoiseSourceFilter
     var deltaSyllabicStartSec = 0.0
     var deltaSinStartSec = 0.0
     var onsetSecDur: Double
@@ -1045,7 +1014,7 @@ struct Mora: Hashable, Codable {
             
             let ɯSl = baseFormantFilter.with(phoneme: .ɯ)
             
-            sourceFilter = SourceFilter()
+            sourceFilter = NoiseSourceFilter()
             onsets = []
             firstKeyFormantFilters = [.init(ɯSl, sec: 0)]
             firstMainFormantFilter = firstKeyFormantFilters.first!.formantFilter
@@ -1054,7 +1023,7 @@ struct Mora: Hashable, Codable {
         case .breath:
             syllabics.append(phonemes.last!)
             
-            sourceFilter = SourceFilter()
+            sourceFilter = NoiseSourceFilter()
             onsets = []
             
             let aSl = baseFormantFilter.with(phoneme: .a)
@@ -1068,7 +1037,7 @@ struct Mora: Hashable, Codable {
                                 attackSec: 0.02,
                                 sourceFilter: .init(npsl)))
             
-            let sf = SourceFilter(noiseFqSmps: [Point(0, 0),
+            let sf = NoiseSourceFilter(noiseFqSmps: [Point(0, 0),
                                                 Point(1000, 0),
                                                 Point(2000, 0.56),
                                                 Point(8000, 1),
@@ -1200,9 +1169,9 @@ struct Mora: Hashable, Codable {
                 let isK = oph == .k || oph == .kj
                 let isJ = oph == .kj || oph == .gj
                 
-                let sf: SourceFilter, volume: Volume
+                let sf: NoiseSourceFilter, volume: Volume
                 if isJ || syllabics.first == .e {
-                    sf = SourceFilter(fqSmps: [Point(0, 0.56),
+                    sf = NoiseSourceFilter(fqSmps: [Point(0, 0.56),
                                                Point(2800, 0.61),
                                                Point(3000, 1),
                                                Point(3400, 1),
@@ -1213,7 +1182,7 @@ struct Mora: Hashable, Codable {
                 } else {
                     switch syllabics.first {
                     case .o:
-                        sf = SourceFilter(fqSmps: [Point(0, 0.56),
+                        sf = NoiseSourceFilter(fqSmps: [Point(0, 0.56),
                                                    Point(800, 0.61),
                                                    Point(1000, 1),
                                                    Point(1600, 1),
@@ -1221,7 +1190,7 @@ struct Mora: Hashable, Codable {
                                                    Point(5800, 0.4),
                                                    Point(6000, 0)])
                     default:
-                        sf = SourceFilter(fqSmps: [Point(0, 0.56),
+                        sf = NoiseSourceFilter(fqSmps: [Point(0, 0.56),
                                                    Point(1400, 0.61),
                                                    Point(1600, 1),
                                                    Point(2500, 1),
@@ -1244,7 +1213,7 @@ struct Mora: Hashable, Codable {
                 let tTl = 0.05, tOTl = 0.01
                 let dTl = 0.04, dOTl = 0.01
                 let isT = oph == .t
-                let sf = SourceFilter(noiseFqSmps: [Point(0, 0),
+                let sf = NoiseSourceFilter(noiseFqSmps: [Point(0, 0),
                                                     Point(4300, 0),
                                                     Point(4500, 1),
                                                     Point(4900, 1),
@@ -1263,7 +1232,7 @@ struct Mora: Hashable, Codable {
                 let pTl = 0.05, pOTl = 0.01
                 let bTl = 0.04, bOTl = 0.01
                 let isP = oph == .p || oph == .pj
-                let sf = SourceFilter(noiseFqSmps: [Point(0, 0),
+                let sf = NoiseSourceFilter(noiseFqSmps: [Point(0, 0),
                                                     Point(600, 0),
                                                     Point(700, 0.85),
                                                     Point(1100, 0.9),
@@ -1301,7 +1270,7 @@ struct Mora: Hashable, Codable {
                     volume = .init(smp: 0.65)
                 default: fatalError()
                 }
-                let sf = SourceFilter(noiseFqSmps: [Point(0, 0),
+                let sf = NoiseSourceFilter(noiseFqSmps: [Point(0, 0),
                                                     Point(2600, 0),
                                                     Point(2800, 0.3),
                                                     Point(5800, 0.46),
@@ -1321,7 +1290,7 @@ struct Mora: Hashable, Codable {
                 let olt = onsets.last!.attackSec + onsets.last!.releaseSec
                 if oph == .ts {
                     let ootl = 0.01
-                    let sf = SourceFilter(noiseFqSmps: [Point(0, 0),
+                    let sf = NoiseSourceFilter(noiseFqSmps: [Point(0, 0),
                                                         Point(4300, 0),
                                                         Point(4500, 1),
                                                         Point(4900, 1),
@@ -1357,7 +1326,7 @@ struct Mora: Hashable, Codable {
                     volume = .init(smp: 0.62)
                 default: fatalError()
                 }
-                let sf = SourceFilter(noiseFqSmps: [Point(0, 0),
+                let sf = NoiseSourceFilter(noiseFqSmps: [Point(0, 0),
                                                     Point(900, 0),
                                                     Point(1000, 0.1),
                                                     Point(3800, 0.2),
@@ -1377,7 +1346,7 @@ struct Mora: Hashable, Codable {
                 let olt = onsets.last!.attackSec + onsets.last!.releaseSec
                 if oph == .tɕ {
                     let ootl = 0.01
-                    let sf = SourceFilter(noiseFqSmps: [Point(0, 0),
+                    let sf = NoiseSourceFilter(noiseFqSmps: [Point(0, 0),
                                                         Point(4300, 0),
                                                         Point(4500, 1),
                                                         Point(4900, 1),
@@ -1413,7 +1382,7 @@ struct Mora: Hashable, Codable {
                     = previousMora?.syllabics == [.sokuon]
                     || isVowelReduction ? 1.5 : 1
                 let çTl = 0.06 * sokuonScale
-                let sf = SourceFilter(noiseFqSmps: [Point(0, 0),
+                let sf = NoiseSourceFilter(noiseFqSmps: [Point(0, 0),
                                                     Point(3100, 0),
                                                     Point(3300, 1),
                                                     Point(4100, 1),
@@ -1437,7 +1406,7 @@ struct Mora: Hashable, Codable {
                     = previousMora?.syllabics == [.sokuon]
                     || isVowelReduction ? 1.5 : 1
                 let ɸTl = 0.06 * sokuonScale
-                let sf = SourceFilter(noiseFqSmps: [Point(0, 0),
+                let sf = NoiseSourceFilter(noiseFqSmps: [Point(0, 0),
                                                     Point(1800, 0),
                                                     Point(2000, 0.52),
                                                     Point(5200, 0.7),
@@ -1520,7 +1489,7 @@ struct Mora: Hashable, Codable {
         
         if firstType == .dakuon {
             let dakuTl = onsetSecDur * 0.9
-            let sf = SourceFilter(fqSmps: [Point(0, 1),
+            let sf = NoiseSourceFilter(fqSmps: [Point(0, 1),
                                            Point(400, 1),
                                            Point(700, 0.56),
                                            Point(2500, 0.43),

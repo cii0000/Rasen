@@ -224,7 +224,7 @@ extension TimelineView {
         let roundedSBeat = beatRange.start.rounded(.down)
         let deltaBeat = Rational(1, 48)
         let beatR1 = Rational(1, 4), beatR2 = Rational(1, 12)
-        let beat1 = Rational(2), beat2 = Rational(4)
+        let beat0 = Rational(1), beat1 = Rational(2), beat2 = Rational(4)
         var cBeat = roundedSBeat
         while cBeat <= beatRange.end {
             if cBeat >= beatRange.start {
@@ -232,7 +232,7 @@ extension TimelineView {
                     2
                 } else if cBeat % beat1 == 0 {
                     1.5
-                } else if cBeat % 1 == 0 {
+                } else if cBeat % beat0 == 0 {
                     1
                 } else if cBeat % beatR1 == 0 {
                     0.5
@@ -246,8 +246,8 @@ extension TimelineView {
                 
                 let rect = Rect(x: beatX - lw / 2, y: sy,
                                 width: lw, height: ey - sy)
-                if cBeat % 1 == 0 {
-                    subBorderPathlines.append(Pathline(rect))
+                if cBeat % beat0 == 0 {
+                    borderPathlines.append(Pathline(rect))
                 } else if lw == 0.125 || lw == 0.25 {
                     fullEditBorderPathlines.append(Pathline(rect))
                 } else {
@@ -691,12 +691,6 @@ final class AnimationView: TimelineView {
             contentPathlines.append(.init(Rect(x: secX - lw / 2, y: sy - rulerH / 2,
                                                width: lw, height: rulerH)))
         }
-        let tempoBeat = model.beatRange.start.rounded(.down) + 1
-        if tempoBeat < model.beatRange.end {
-            let np = Point(x(atBeat: tempoBeat), sy)
-            contentPathlines.append(Pathline(Rect(x: np.x - 1, y: np.y - rulerH / 2,
-                                                  width: 2, height: rulerH)))
-        }
         
         var nodes = [Node]()
         if !fullEditBorderPathlines.isEmpty {
@@ -1001,6 +995,7 @@ final class AnimationView: TimelineView {
     }
     
     var origin: Point { .init(0, timelineY) }
+    var timeLineCenterY: Double { 0 }
     var beatRange: Range<Rational>? {
         model.beatRange
     }
@@ -1251,7 +1246,7 @@ final class SheetView: View {
                 scoreView.timeNode.lineType = .color(.content)
                 scoreView.updateTimeNode(atSec: sec)
                 scoreView.peakVolume = .init()
-                scoreView.timeNode.lineWidth = isPlaying ? 3 : 1
+                scoreView.timeNode.lineWidth = isPlaying ? 4 : 1
                 scoreView.timeNode.isHidden = false
             } else {
                 scoreView.timeNode.isHidden = true
@@ -1356,22 +1351,24 @@ final class SheetView: View {
                      fillType: .color(.content))]
     }
     
-    func tempoPositionBeat(_ p: Point, scale: Double) -> Rational? {
-        guard animationView.containsTimeline(p)
-                || containsOtherTimeline(p, scale: scale) else { return nil }
-        
-        if let tempoBeat = animationView.tempoPositionBeat(p, scale: scale) {
-            return tempoBeat
+    func containsTempo(_ p: Point, maxDistance: Double) -> Bool {
+        if animationView.containsSec(p, maxDistance: maxDistance) {
+            return true
         }
-        if let tempoBeat = scoreView.tempoPositionBeat(p, scale: scale) {
-            return tempoBeat
+        if scoreView.containsSec(p, maxDistance: maxDistance) {
+            return true
         }
         for textView in textsView.elementViews {
-            if let tempoBeat = textView.tempoPositionBeat(p, scale: scale) {
-                return tempoBeat
+            if textView.containsSec(p, maxDistance: maxDistance) {
+                return true
             }
         }
-        return nil
+        for contentView in contentsView.elementViews {
+            if contentView.containsSec(p, maxDistance: maxDistance) {
+                return true
+            }
+        }
+        return false
     }
     
     func tempoString(from animationView: AnimationView) -> String {
@@ -1398,7 +1395,8 @@ final class SheetView: View {
     }
     
     func containsOtherTimeline(_ p: Point, scale: Double) -> Bool {
-        if scoreView.containsNote(scoreView.convert(p, from: node), scale: scale) {
+        if scoreView.containsNote(scoreView.convert(p, from: node), scale: scale)
+            || scoreView.containsTimeline(scoreView.convert(p, from: node)) {
             return true
         }
         for view in contentsView.elementViews {
@@ -1642,7 +1640,7 @@ final class SheetView: View {
                 }
                 if playingOtherTimelineIDs.isEmpty {
                     audiotrack.values
-                        .append(.score(.init(beatRange: 0 ..< sheetView.model.animationBeatDuration,
+                        .append(.score(.init(beatDuration: sheetView.model.animationBeatDuration,
                                              tempo: sheetView.model.animation.tempo)))
                 }
                 audiotracks.append(audiotrack)
@@ -1663,8 +1661,8 @@ final class SheetView: View {
             }
             if playingOtherTimelineIDs.isEmpty {
                 audiotrack.values
-                    .append(.score(.init(beatRange: 0 ..< model.animationBeatDuration,
-                                          tempo: model.animation.tempo)))
+                    .append(.score(.init(beatDuration: model.animationBeatDuration,
+                                         tempo: model.animation.tempo)))
             }
             audiotracks.append(audiotrack)
             let mainSec = model.animation.sec(fromBeat: beat)
@@ -1682,7 +1680,7 @@ final class SheetView: View {
                 }
                 if playingOtherTimelineIDs.isEmpty {
                     audiotrack.values
-                        .append(.score(.init(beatRange: 0 ..< sheetView.model.animationBeatDuration,
+                        .append(.score(.init(beatDuration: sheetView.model.animationBeatDuration,
                                              tempo: sheetView.model.animation.tempo)))
                 }
                 audiotracks.append(audiotrack)
@@ -1994,8 +1992,8 @@ final class SheetView: View {
     
     func note(at inP: Point, scale: Double) -> Note? {
         guard scoreView.model.enabled else { return nil }
-        let inTP = scoreView.convert(inP, from: node)
-        return if let ni = scoreView.noteIndex(at: inTP, maxDistance: 15 * scale) {
+        let scoreP = scoreView.convert(inP, from: node)
+        return if let ni = scoreView.noteIndex(at: scoreP, scale: scale) {
             scoreView.model.notes[ni]
         } else {
             nil
@@ -3164,7 +3162,7 @@ final class SheetView: View {
             sequencer?.scoreNoders[scoreView.model.id]?.insert(nivs, with: scoreView.model)
             if isMakeRect {
                 let rect = nivs.reduce(into: Rect?.none) {
-                    $0 += scoreView.noteFrame(from: $1.value)
+                    $0 += scoreView.noteFrame(at: $1.index)
                 }
                 return (rect, [])
             }
@@ -3173,7 +3171,7 @@ final class SheetView: View {
                 var rect: Rect?
                 for niv in nivs {
                     binder[keyPath: keyPath].score.notes[niv.index] = niv.value
-                    rect += scoreView.noteFrame(from: niv.value)
+                    rect += scoreView.noteFrame(at: niv.index)
                 }
                 scoreView.updateScore()
                 sequencer?.scoreNoders[scoreView.model.id]?.replace(nivs, with: scoreView.model)
@@ -3207,6 +3205,27 @@ final class SheetView: View {
                     $0 += scoreView.noteFrame(at: $1)
                 }
                 return (rect, [])
+            }
+        case .insertDraftNotes(let nivs):
+            insertDraftNode(nivs)
+            scoreView.updateDraftNotes()
+            if isMakeRect {
+                let rect = nivs.reduce(into: Rect?.none) {
+                    $0 += scoreView.draftNoteFrame(at: $1.index)
+                }
+                return (rect, [])
+            }
+        case .removeDraftNotes(noteIndexes: let noteIndexes):
+            if isMakeRect {
+                let rect = noteIndexes.reduce(into: Rect?.none) {
+                    $0 += scoreView.draftNoteFrame(at: $1)
+                }
+                removeDraftNotesNode(at: noteIndexes)
+                scoreView.updateDraftNotes()
+                return (rect, [])
+            } else {
+                removeDraftNotesNode(at: noteIndexes)
+                scoreView.updateDraftNotes()
             }
         case .insertContents(let civs):
             insertNode(civs)
@@ -3425,6 +3444,13 @@ final class SheetView: View {
     }
     private func removeNotesNode(at noteIndexes: [Int]) {
         scoreView.remove(at: noteIndexes)
+    }
+    
+    private func insertDraftNode(_ nivs: [IndexValue<Note>]) {
+        scoreView.insertDraft(nivs)
+    }
+    private func removeDraftNotesNode(at noteIndexes: [Int]) {
+        scoreView.removeDraft(at: noteIndexes)
     }
     
     private func insertNode(_ civs: [IndexValue<Content>]) {
@@ -3731,13 +3757,42 @@ final class SheetView: View {
     func replace(_ tone: Tone, at ni: Int) {
         replace(tone, at: [ni])
     }
+    func replace(_ envelope: Envelope, at ni: Int) {
+        var note = model.score.notes[ni]
+        note.envelope = envelope
+        replace(note, at: ni)
+    }
     func replace(_ tone: Tone, at nis: [Int]) {
         set(ToneValue(tone: tone, noteIndexes: nis),
             old: ToneValue(tone: model.score.notes[nis[0]].tone, noteIndexes: nis))
     }
+    func replace(_ envelope: Envelope, at nis: [Int]) {
+        let nivs = nis.map {
+            var note = model.score.notes[$0]
+            note.envelope = envelope
+            return IndexValue(value: note, index: $0)
+        }
+        replace(nivs)
+    }
     func set(_ toneValue: ToneValue, old oldToneValue: ToneValue) {
         let undoItem = SheetUndoItem.changedTones(oldToneValue)
         let redoItem = SheetUndoItem.changedTones(toneValue)
+        append(undo: undoItem, redo: redoItem)
+        set(redoItem)
+    }
+    
+    func insertDraft(_ nivs: [IndexValue<Note>]) {
+        let undoItem = SheetUndoItem.removeDraftNotes(noteIndexes: nivs.map { $0.index })
+        let redoItem = SheetUndoItem.insertDraftNotes(nivs)
+        append(undo: undoItem, redo: redoItem)
+        set(redoItem)
+    }
+    func removeDraftNotes(at noteIndexes: [Int]) {
+        let nivs = noteIndexes.map {
+            IndexValue(value: model.score.draftNotes[$0], index: $0)
+        }
+        let undoItem = SheetUndoItem.insertDraftNotes(nivs)
+        let redoItem = SheetUndoItem.removeDraftNotes(noteIndexes: noteIndexes)
         append(undo: undoItem, redo: redoItem)
         set(redoItem)
     }
@@ -4831,6 +4886,26 @@ final class SheetView: View {
                     error()
                 }
             }
+        case .insertDraftNotes(let nivs):
+            updateFirstReverse()
+            let maxI = nivs.max { $0.index < $1.index }?.index
+            if let maxI = maxI, maxI < model.score.notes.count {
+                let oldNIVS = nivs.map { IndexValue(value: model.score.notes[$0.index],
+                                                    index: $0.index) }
+                if oldNIVS != nivs {
+                    history[result.version].values[result.valueIndex]
+                        .saveUndoItemValue?.set(.insertDraftNotes(oldNIVS), type: reversedType)
+                }
+            } else {
+                history[result.version].values[result.valueIndex].error()
+            }
+        case .removeDraftNotes(let noteIndexes):
+            updateFirstReverse()
+            let oldNIS = noteIndexes.filter { $0 < model.score.notes.count + noteIndexes.count }.sorted()
+            if oldNIS != noteIndexes {
+                history[result.version].values[result.valueIndex]
+                    .saveUndoItemValue?.set(.removeDraftNotes(noteIndexes: oldNIS), type: reversedType)
+            }
         case .insertContents(let civs):
             updateFirstReverse()
             let maxI = civs.max { $0.index < $1.index }?.index
@@ -5764,6 +5839,35 @@ final class SheetView: View {
                     }
                 }
             }
+        case .insertDraftNotes(var nivs):
+            updateFirstReverse()
+            var isChanged = false, notesCount = model.score.notes.count
+            nivs.enumerated().forEach { (k, iv) in
+                if iv.index > notesCount {
+                    nivs[k].index = notesCount
+                    isChanged = true
+                }
+                notesCount += 1
+            }
+            if isChanged {
+                history[result.version].values[result.valueIndex].saveUndoItemValue
+                    = UndoItemValue(undoItem: .removeDraftNotes(noteIndexes: nivs.map { $0.index }),
+                                    redoItem: .insertDraftNotes(nivs),
+                                    isReversed: isUndo)
+            }
+        case .removeDraftNotes(var noteIndexes):
+            updateFirstReverse()
+            let nis = noteIndexes.filter { $0 < model.score.notes.count }.sorted()
+            if noteIndexes != nis {
+                noteIndexes = nis
+                let nivs = noteIndexes.map {
+                    IndexValue(value: model.score.notes[$0], index: $0)
+                }
+                history[result.version].values[result.valueIndex].saveUndoItemValue
+                    = UndoItemValue(undoItem: .insertDraftNotes(nivs),
+                                    redoItem: .removeDraftNotes(noteIndexes: nis),
+                                    isReversed: isUndo)
+            }
         case .insertContents(var civs):
             updateFirstReverse()
             var isChanged = false, contentsCount = model.contents.count
@@ -5902,6 +6006,22 @@ final class SheetView: View {
                 Path(convertFromWorld($0.rect))
                     .contains(planeView.node.path)
             }) { pi } else { nil }
+        }
+    }
+    func noteIndexes(from selections: [Selection]) -> [Int] {
+        let fs = selections
+            .map { $0.rect }
+            .map { scoreView.convertFromWorld($0) }
+        return (0 ..< scoreView.model.notes.count).compactMap { i in
+            fs.contains(where: { scoreView.intersectsNote($0, at: i) }) ? i : nil
+        }
+    }
+    func draftNoteIndexes(from selections: [Selection]) -> [Int] {
+        let fs = selections
+            .map { $0.rect }
+            .map { scoreView.convertFromWorld($0) }
+        return (0 ..< scoreView.model.draftNotes.count).compactMap { i in
+            fs.contains(where: { scoreView.intersectsDraftNote($0, at: i) }) ? i : nil
         }
     }
     
@@ -6525,6 +6645,17 @@ final class SheetView: View {
                     previousNext: .none,
                     at: model.animation.index)
             }
+        }
+    }
+    
+    func changeToDraft(withNoteInexes nis: [Int]) {
+        if !nis.isEmpty {
+            let notes = model.score.notes[nis]
+            removeNote(at: nis)
+            let ni = model.score.draftNotes.count
+            insertDraft(notes.enumerated().map {
+                IndexValue(value: $0.element, index: ni + $0.offset)
+            })
         }
     }
     

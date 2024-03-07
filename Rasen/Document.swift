@@ -1170,7 +1170,7 @@ final class Document {
         }
     }
     func updateTextViewsWithCamera(in sheetView: SheetView) {
-        let isFullEdit = isFullEditNoteTimeInterval(fromScale: 1)
+        let isFullEdit = isFullEditNoteTimeInterval
         sheetView.textsView.elementViews.forEach { $0.isFullEdit = isFullEdit }
         sheetView.contentsView.elementViews.forEach { $0.isFullEdit = isFullEdit }
         sheetView.scoreView.isFullEdit = isFullEdit
@@ -1270,7 +1270,7 @@ final class Document {
         var rectsSet = Set<Rect>()
         var rects = [Rect](), isSelectedText = false, selectedCount = 0
         var firstOrientation = Orientation.horizontal, lineNodes = [Node]()
-        var sLines = [Line](),sNotes = [Rect]()
+        var sLines = [Line]()
         var addedLineIndexes = Set<IntPoint>()
         var cr: Rect?, oldRect: Rect?
         for selection in selections {
@@ -1325,18 +1325,31 @@ final class Document {
                         }
                     }
                     
+//                    for (li, lineView) in sheetView.linesView.elementViews.enumerated() {
+//                        let sli = IntPoint(si, li)
+//                        if !addedLineIndexes.contains(sli),
+//                            lineView.intersects(rectInSheet) {
+//                            if case .line(let line) =  lineView.node.path.pathlines.first?.elements.first,
+//                               case .color(let color) = lineView.node.lineType {//
+//                                
+//                                var nLine = sheetView.convertToWorld(line)
+//                                nLine.uuColor.value = color//
+//                                sLines.append(nLine)
+//                                addedLineIndexes.insert(sli)
+//                            }
+//                        }
+//                    }
+                    
                     let scoreView = sheetView.scoreView
                     if scoreView.model.enabled {
                         let score = sheetView.scoreView.model
-                        let nis = selectedNoteIndexes(from: scoreView)
+                        let nis = sheetView.noteIndexes(from: selections)
                         if !nis.isEmpty {
-                            let rects = nis
-                                .map { scoreView.noteFrame(from: score.notes[$0]) }
-                                .map { scoreView.convertToWorld($0) }
-                            for rect in rects {
-                                if rect.intersects(selection.rect) {
-                                    sNotes.append(rect)
-                                }
+                            for ni in nis {
+                                var nLine = scoreView.noteLine(from: score.notes[ni])
+                                nLine = sheetView.convertToWorld(nLine)
+                                nLine.uuColor.value = .selected
+                                sLines.append(nLine)
                             }
                         }
                     }
@@ -1413,24 +1426,24 @@ final class Document {
             }
         }
         
-        let sNotesSet = Set(sNotes)
-        for key in selectedNoteNodes.keys {
-            if !sNotesSet.contains(key) {
-                selectedNoteNodes[key]?.removeFromParent()
-                selectedNoteNodes[key] = nil
-            }
-        }
-        for sNote in sNotes {
-            if selectedNoteNodes[sNote] == nil {
-                
-                let node = Node(path: Path(sNote),
-                                lineWidth: worldLineWidth * 1.5,
-                                lineType: .color(.selected),
-                                fillType: .color(.subSelected))
-                selectedNoteNodes[sNote] = node
-                selectedNotesNode?.append(child: node)
-            }
-        }
+//        let sNotesSet = Set(sNotes)
+//        for key in selectedNoteNodes.keys {
+//            if !sNotesSet.contains(key) {
+//                selectedNoteNodes[key]?.removeFromParent()
+//                selectedNoteNodes[key] = nil
+//            }
+//        }
+//        for sNote in sNotes {
+//            if selectedNoteNodes[sNote] == nil {
+//                
+//                let node = Node(path: Path(sNote),
+//                                lineWidth: worldLineWidth * 1.5,
+//                                lineType: .color(.selected),
+//                                fillType: .color(.subSelected))
+//                selectedNoteNodes[sNote] = node
+//                selectedNotesNode?.append(child: node)
+//            }
+//        }
         
         selectedFrames = rects
         self.isSelectedText = isSelectedText && selectedCount == 1
@@ -3506,41 +3519,27 @@ final class Document {
         }
     }
     
-    func isFullEditNoteTimeInterval(fromScale scale: Double) -> Bool {
-        camera.logScale * scale < -3
+    var worldKnobEditDistance: Double {
+        Sheet.knobEditDistance * screenToWorldScale
     }
-    func currentNoteTimeInterval(fromScale scale: Double = 1) -> Rational {
-        isFullEditNoteTimeInterval(fromScale: scale) ?
-            Rational(1, 48) : Rational(1, 4)
+    
+    var isFullEditNoteTimeInterval: Bool {
+        camera.logScale < -3
     }
-    func currentKeyframeTimeInterval(fromScale scale: Double) -> Rational {
-        isFullEditNoteTimeInterval(fromScale: scale) ?
-            Rational(1, 48) : Rational(1, 4)
+    var currentNoteTimeInterval: Rational {
+        isFullEditNoteTimeInterval ? Sheet.fullEditBeatInterval : Sheet.beatInterval
     }
-    func currentNotePitchInterval() -> Rational {
-        camera.logScale < -3 ? Rational(1, 12) : 1
+    var currentKeyframeTimeInterval: Rational {
+        currentNoteTimeInterval
+    }
+    var currentNotePitchInterval: Rational {
+        isFullEditNoteTimeInterval ? Rational(1, 12) : 1
     }
     func pitch(from scoreView: ScoreView, at scoreP: Point) -> Rational {
-        scoreView.pitch(atY: scoreP.y, interval: currentNotePitchInterval())
+        scoreView.pitch(atY: scoreP.y, interval: currentNotePitchInterval)
     }
     func smoothPitch(from scoreView: ScoreView, at scoreP: Point) -> Double? {
         scoreView.smoothPitch(atY: scoreP.y)
-    }
-    
-    func selectedNoteIndexes(from scoreView: ScoreView) -> [Int] {
-        let fs = selections
-            .map { $0.rect }
-            .map { scoreView.convertFromWorld($0) }
-        return scoreView.noteFrames.enumerated().compactMap { (i, f) in
-            fs.contains(where: { f.intersects($0) }) ? i : nil
-        }
-    }
-    func selectedNoteIndexes(from scoreView: ScoreView,
-                             path: Path) -> [Int] {
-        let path = scoreView.convertFromWorld(path)
-        return scoreView.noteFrames.enumerated().compactMap { (i, f) in
-            path.intersects(f) ? i : nil
-        }
     }
     
     static let mapScale = 16

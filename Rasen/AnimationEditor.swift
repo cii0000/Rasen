@@ -714,7 +714,7 @@ final class Player: InputKeyEditor {
                     let shp = document.sheetPosition(at: ip)
                     if !filledShps.contains(shp),
                        let aSheetView = document.sheetView(at: shp),
-                       aSheetView.model.enabledAudiotrack {
+                       aSheetView.model.enabledTimeline {
                         
                         filledShps.insert(shp)
                         return aSheetView
@@ -767,7 +767,7 @@ final class Player: InputKeyEditor {
                     let scoreP = scoreView.convertFromWorld(p)
                     let score = scoreView.model
                     if let ni = scoreView.noteIndex(at: scoreP,
-                                                    maxDistance: 10 * document.screenToWorldScale) {
+                                                    scale: document.screenToWorldScale) {
                         let beat = score.notes[ni].beatRange.start + score.beatRange.start
                         sec = score.sec(fromBeat: beat) - Rational(1, 16)
                         secRange = score.secRange
@@ -964,6 +964,144 @@ final class FrameSlideEditor: Editor {
     }
 }
 
+final class TempoSlider: DragEditor {
+    let document: Document
+    let isEditingSheet: Bool
+    
+    init(_ document: Document) {
+        self.document = document
+        isEditingSheet = document.isEditingSheet
+    }
+    
+    private let editableTempoInterval = 10.0
+    
+    private var node = Node()
+    private var sheetView: SheetView?
+    private var beganSP = Point(), beganInP = Point()
+    private var beganTempo: Rational = 1, oldTempo: Rational = 1
+    private var beganAnimationOption: AnimationOption?, beganScoreOption: ScoreOption?,
+                beganContents = [Int: Content](),
+                beganTexts = [Int: Text]()
+    
+    func send(_ event: DragEvent) {
+        guard isEditingSheet else {
+            document.stop(with: event)
+            return
+        }
+        if document.isPlaying(with: event) {
+            document.stopPlaying(with: event)
+        }
+        
+        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+            ?? event.screenPoint
+        let p = document.convertScreenToWorld(sp)
+        
+        switch event.phase {
+        case .began:
+            document.cursor = .arrow
+            
+            if let sheetView = document.sheetView(at: p), sheetView.model.enabledTimeline {
+                beganSP = sp
+                self.sheetView = sheetView
+                let inP = sheetView.convertFromWorld(p)
+                beganInP = inP
+                if sheetView.containsTempo(inP, maxDistance: document.worldKnobEditDistance) {
+                    beganTempo = sheetView.model.animation.tempo
+                    oldTempo = beganTempo
+                    
+                    beganContents = sheetView.contentsView.elementViews.enumerated().reduce(into: .init()) { (dic, v) in
+                        if beganTempo == v.element.model.timeOption?.tempo {
+                            dic[v.offset] = v.element.model
+                        }
+                    }
+                    beganTexts = sheetView.textsView.elementViews.enumerated().reduce(into: .init()) { (dic, v) in
+                        if beganTempo == v.element.model.timeOption?.tempo {
+                            dic[v.offset] = v.element.model
+                        }
+                    }
+                    if beganTempo == sheetView.model.animation.tempo {
+                        beganAnimationOption = sheetView.model.animation.option
+                    }
+                    if beganTempo == sheetView.model.score.tempo {
+                        beganScoreOption = sheetView.model.score.option
+                    }
+                    
+                    document.cursor = .arrowWith(string: SheetView.tempoString(fromTempo: beganTempo))
+                }
+            }
+        case .changed:
+            if let sheetView = sheetView {
+                let di = (sp.x - beganSP.x) / editableTempoInterval
+                let tempo = Rational(Double(beganTempo) + di, intervalScale: Rational(1, 4))
+                    .clipped(Music.tempoRange)
+                if tempo != oldTempo {
+                    beganContents.forEach {
+                        sheetView.contentsView.elementViews[$0.key].tempo = tempo
+                    }
+                    beganTexts.forEach {
+                        sheetView.textsView.elementViews[$0.key].tempo = tempo
+                    }
+                    if beganAnimationOption != nil {
+                        sheetView.animationView.tempo = tempo
+                    }
+                    if beganScoreOption != nil {
+                        sheetView.scoreView.tempo = tempo
+                    }
+                    
+                    document.updateSelects()
+                    
+                    document.cursor = .arrowWith(string: SheetView.tempoString(fromTempo: tempo))
+                    
+                    oldTempo = tempo
+                }
+            }
+        case .ended:
+            node.removeFromParent()
+            
+            if let sheetView = sheetView {
+                var isNewUndoGroup = false
+                func updateUndoGroup() {
+                    if !isNewUndoGroup {
+                        sheetView.newUndoGroup()
+                        isNewUndoGroup = true
+                    }
+                }
+                
+                if let beganAnimationOption, sheetView.model.animation.option != beganAnimationOption {
+                    updateUndoGroup()
+                    sheetView.capture(option: sheetView.model.animation.option,
+                                      oldOption: beganAnimationOption)
+                }
+                if let beganScoreOption, sheetView.model.score.option != beganScoreOption {
+                    updateUndoGroup()
+                    sheetView.capture(sheetView.model.score.option,
+                                      old: beganScoreOption)
+                }
+                if !beganContents.isEmpty || !beganTexts.isEmpty {
+                    for (ci, beganContent) in beganContents {
+                        guard ci < sheetView.model.contents.count else { continue }
+                        let content = sheetView.contentsView.elementViews[ci].model
+                        if content != beganContent {
+                            updateUndoGroup()
+                            sheetView.capture(content, old: beganContent, at: ci)
+                        }
+                    }
+                    for (ti, beganText) in beganTexts {
+                        guard ti < sheetView.model.texts.count else { continue }
+                        let text = sheetView.textsView.elementViews[ti].model
+                        if text != beganText {
+                            updateUndoGroup()
+                            sheetView.capture(text, old: beganText, at: ti)
+                        }
+                    }
+                }
+            }
+            
+            document.cursor = Document.defaultCursor
+        }
+    }
+}
+
 final class AnimationSlider: DragEditor {
     let document: Document
     let isEditingSheet: Bool
@@ -974,25 +1112,18 @@ final class AnimationSlider: DragEditor {
     }
     
     enum SlideType {
-        case key, startBeat, tempo, all, none
+        case key, startBeat, all, none
     }
     
     private let indexInterval = 10.0
-    private let editableTempoInterval = 10.0
     
     private var node = Node()
-    private var sheetView: SheetView?,
-                animationIndex = 0, keyframeIndex = 0
+    private var sheetView: SheetView?, animationIndex = 0, keyframeIndex = 0
     private var type = SlideType.key
     private var beganSP = Point(), beganInP = Point(),
                 beganTimelineX = 0.0, beganKeyframeX = 0.0,
                 beganKeyframeBeatDuration = Rational(0)
-    
-    private var beganTempo: Rational = 1, oldTempo: Rational = 1
-    private var beganAnimationOption: AnimationOption?, beganScoreOption: ScoreOption?,
-                beganContents = [Int: Content](),
-                beganTexts = [Int: Text]()
-    
+    private var beganAnimationOption: AnimationOption?
     private var lastBeats = [(sec: Double, rootBeat: Rational)](capacity: 128)
     private var minLastSec = 1 / 12.0
     
@@ -1018,13 +1149,14 @@ final class AnimationSlider: DragEditor {
                 self.sheetView = sheetView
                 let inP = sheetView.convertFromWorld(p)
                 beganInP = inP
-                beganTimelineX = sheetView.animationView.x(atBeat: sheetView.animationView.model.beatRange.start)
+                beganTimelineX = sheetView.animationView
+                    .x(atBeat: sheetView.animationView.model.beatRange.start)
                 if sheetView.animationView.containsTimeline(inP) {
                     let animationView = sheetView.animationView
                     
                     if let minI = sheetView.animationView
                         .slidableKeyframeIndex(at: inP,
-                                               maxDistance: 15.0 * document.screenToWorldScale,
+                                               maxDistance: document.worldKnobEditDistance,
                                                enabledKeyOnly: true) {
                         
                         type = .key
@@ -1039,31 +1171,6 @@ final class AnimationSlider: DragEditor {
                         
                         beganAnimationOption = sheetView.model.animation.option
                         lastBeats.append((event.time, beganAnimationOption!.startBeat))
-                    } else if animationView.tempoPositionBeat(inP,
-                                                              scale: document.screenToWorldScale) != nil {
-                        type = .tempo
-                        
-                        beganTempo = animationView.tempo
-                        oldTempo = beganTempo
-                        
-                        beganContents = sheetView.contentsView.elementViews.enumerated().reduce(into: .init()) { (dic, v) in
-                            if beganTempo == v.element.model.timeOption?.tempo {
-                                dic[v.offset] = v.element.model
-                            }
-                        }
-                        beganTexts = sheetView.textsView.elementViews.enumerated().reduce(into: .init()) { (dic, v) in
-                            if beganTempo == v.element.model.timeOption?.tempo {
-                                dic[v.offset] = v.element.model
-                            }
-                        }
-                        if beganTempo == sheetView.model.animation.tempo {
-                            beganAnimationOption = sheetView.model.animation.option
-                        }
-                        if beganTempo == sheetView.model.score.tempo {
-                            beganScoreOption = sheetView.model.score.option
-                        }
-                        
-                        document.cursor = .arrowWith(string: SheetView.tempoString(fromTempo: beganTempo))
                     } else {
                         type = .none
                     }
@@ -1075,38 +1182,12 @@ final class AnimationSlider: DragEditor {
                 let inP = sheetView.convertFromWorld(p)
                 
                 switch type {
-                case .tempo:
-                    let di = (sp.x - beganSP.x) / editableTempoInterval
-                    let tempo = Rational(Double(beganTempo) - di,
-                                         intervalScale: Rational(1, 4))
-                        .clipped(Music.tempoRange)
-                    if tempo != oldTempo {
-                        beganContents.forEach {
-                            sheetView.contentsView.elementViews[$0.key].model.timeOption?.tempo = tempo
-                        }
-                        beganTexts.forEach {
-                            sheetView.textsView.elementViews[$0.key].model.timeOption?.tempo = tempo
-                        }
-                        if beganAnimationOption != nil {
-                            sheetView.animationView.tempo = tempo
-                        }
-                        if beganScoreOption != nil {
-                            sheetView.scoreView.tempo = tempo
-                        }
-                        
-                        document.updateSelects()
-                        
-                        document.cursor = .arrowWith(string: SheetView.tempoString(fromTempo: tempo))
-                        
-                        oldTempo = tempo
-                    }
                 case .all:
                     let nh = ScoreLayout.noteHeight
                     let px = beganTimelineX + inP.x - beganInP.x
                     let py = ((beganAnimationOption?.timelineY ?? 0) + inP.y - beganInP.y)
                         .interval(scale: nh)
-                    let interval = document
-                        .currentKeyframeTimeInterval(fromScale: 1)
+                    let interval = document.currentKeyframeTimeInterval
                     let beat = animationView.beat(atX: px,
                                                   interval: interval) + sheetView.model.animation.startBeat
                     if py != sheetView.animationView.timelineY
@@ -1129,8 +1210,7 @@ final class AnimationSlider: DragEditor {
                         }
                     }
                 case .startBeat:
-                    let interval = document
-                        .currentKeyframeTimeInterval(fromScale: 1)
+                    let interval = document.currentKeyframeTimeInterval
                     let beat = animationView.beat(atX: inP.x,
                                                   interval: interval) + sheetView.model.animation.startBeat
                     if beat != sheetView.model.animation.startBeat {
@@ -1151,8 +1231,7 @@ final class AnimationSlider: DragEditor {
                     }
                 case .key:
 //                    let dSec = animationView.secDuration(atWidth: dp.x)
-                    let interval = document
-                        .currentKeyframeTimeInterval(fromScale: 1)
+                    let interval = document.currentKeyframeTimeInterval
                     let dBeat = animationView.beat(atX: beganKeyframeX + inP.x - beganInP.x,
                                                    interval: interval)
                     let nDur = dBeat - animationView.model.localBeat(at: keyframeIndex)
@@ -1234,35 +1313,6 @@ final class AnimationSlider: DragEditor {
                                           oldBeatDuration: beganKeyframeBeatDuration,
                                           at: keyframeIndex)
                     }
-                case .tempo:
-                    if let beganAnimationOption, sheetView.model.animation.option != beganAnimationOption {
-                        updateUndoGroup()
-                        sheetView.capture(option: sheetView.model.animation.option,
-                                          oldOption: beganAnimationOption)
-                    }
-                    if let beganScoreOption, sheetView.model.score.option != beganScoreOption {
-                        updateUndoGroup()
-                        sheetView.capture(sheetView.model.score.option,
-                                          old: beganScoreOption)
-                    }
-                    if !beganContents.isEmpty || !beganTexts.isEmpty {
-                        for (ci, beganContent) in beganContents {
-                            guard ci < sheetView.model.contents.count else { continue }
-                            let content = sheetView.contentsView.elementViews[ci].model
-                            if content != beganContent {
-                                updateUndoGroup()
-                                sheetView.capture(content, old: beganContent, at: ci)
-                            }
-                        }
-                        for (ti, beganText) in beganTexts {
-                            guard ti < sheetView.model.texts.count else { continue }
-                            let text = sheetView.textsView.elementViews[ti].model
-                            if text != beganText {
-                                updateUndoGroup()
-                                sheetView.capture(text, old: beganText, at: ti)
-                            }
-                        }
-                    }
                 case .none: break
                 }
             }
@@ -1311,16 +1361,16 @@ final class LineSlider: DragEditor {
                 let inP = sheetView.convertFromWorld(p)
                 let scoreView = sheetView.scoreView
                 let scoreP = scoreView.convertFromWorld(p)
-                let maxD = 5.0 * document.screenToWorldScale
-                if let (ni, pitI, pit, pitbend) = scoreView.pitbendTuple(at: scoreP,
-                                                                         maxDistance: maxD) {
+                if scoreView.model.enabled,
+                   let (ni, pitI) = scoreView.pitbendTuple(at: scoreP,
+                                                           scale: document.screenToWorldScale) {
                     self.sheetView = sheetView
                     self.noteI = ni
                     self.pitI = pitI
                     beganSP = sp
                     beganNote = scoreView.model.notes[ni]
-                    beganPit = pit
-                    beganPitbend = pitbend
+                    beganPit = scoreView.model.notes[ni].pitbend.pits[pitI]
+                    beganPitbend = scoreView.model.notes[ni].pitbend
                     isPit = true
                 } else if let (lineView, li) = sheetView.lineTuple(at: inP,
                                                                    isSmall: false,
@@ -1347,6 +1397,31 @@ final class LineSlider: DragEditor {
                        let pitI, let beganPit, let beganPitbend, pitI < beganPitbend.pits.count {
                         
                         let dp = sp - beganSP
+                        
+//                        if let beganPitch, let beganBeatRange {
+//                            let pitch = document.pitch(from: scoreView, at: scoreP)
+//                            let interval = document.currentNoteTimeInterval
+//                            let neBeat = scoreView.beat(atX: sheetP.x, interval: interval)
+//                            
+//                            if pitch != oldNotePitch || neBeat != oldNoteBeat {
+//                                let dBeat = neBeat - beganBeatRange.end
+//                                let dPitch = pitch - beganPitch
+//                                let startBeat = sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval)
+//                                for (ni, beganNote) in beganNotes {
+//                                    guard ni < score.notes.count else { continue }
+//                                    
+//                                    var note = beganNote
+//                                    note.pitch = (dPitch + beganNote.pitch)
+//                                        .clipped(min: Score.pitchRange.start, max: Score.pitchRange.end)
+//                                    
+//                                    let nsBeat = beganNote.beatRange.start
+//                                    let neBeat = max(beganNote.beatRange.end + dBeat, startBeat)
+//                                    let beatRange = nsBeat < neBeat ? nsBeat ..< neBeat : neBeat ..< nsBeat
+//                                    note.beatRange = beatRange
+//                                }
+//                            }
+//                        }
+                        
                         var pitbend = beganPitbend
                         var pit = pitbend.pits[pitI]
                         pit.t = (beganPit.t + dp.x / 100)
@@ -1538,6 +1613,7 @@ final class Slider: DragEditor {
         case score(ScoreSlider)
         case content(ContentSlider)
         case text(TextSlider)
+        case tempo(TempoSlider)
         case none
     }
     private var type = SlideType.none
@@ -1549,6 +1625,7 @@ final class Slider: DragEditor {
         case .score(let scoreSlider): scoreSlider.updateNode()
         case .content(let contentSlider): contentSlider.updateNode()
         case .text(let textSlider): textSlider.updateNode()
+        case .tempo(let tempoSlider): tempoSlider.updateNode()
         case .none: break
         }
     }
@@ -1561,14 +1638,17 @@ final class Slider: DragEditor {
             
             if let sheetView = document.sheetView(at: p) {
                 let inP = sheetView.convertFromWorld(p)
-                if let ci = sheetView.contentIndex(at: inP, scale: document.screenToWorldScale),
+                if sheetView.containsTempo(inP, maxDistance: document.worldKnobEditDistance) {
+                    type = .tempo(TempoSlider(document))
+                } else if let ci = sheetView.contentIndex(at: inP, scale: document.screenToWorldScale),
                           sheetView.model.contents[ci].timeOption != nil {
                     type = .content(ContentSlider(document))
                 } else if let ti = sheetView.textIndex(at: inP),
                            sheetView.model.texts[ti].timeOption != nil {
                     type = .text(TextSlider(document))
                 } else if sheetView.scoreView.containsTimeline(inP) 
-                            || sheetView.scoreView.noteIndex(at: inP, maxDistance: 15 * document.screenToWorldScale) != nil {
+                            || sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
+                                                             scale: document.screenToWorldScale) != nil {
                     type = .score(ScoreSlider(document))
                 } else if sheetView.animationView.containsTimeline(inP) {
                     type = .animation(AnimationSlider(document))
@@ -1589,6 +1669,8 @@ final class Slider: DragEditor {
             contentSlider.send(event)
         case .text(let textSlider):
             textSlider.send(event)
+        case .tempo(let tempoSlider):
+            tempoSlider.send(event)
         case .none: break
         }
     }
@@ -1629,10 +1711,8 @@ final class KeyframeInserter: InputKeyEditor {
                     let animationView = sheetView.animationView
                     let animation = animationView.model
                     
-                    let interval = document
-                        .currentNoteTimeInterval(fromScale: 1)
-                    let oBeat = animationView.beat(atX: inP.x,
-                                                   interval: interval)
+                    let interval = document.currentNoteTimeInterval
+                    let oBeat = animationView.beat(atX: inP.x, interval: interval)
                     let beat = (oBeat - animation.beatRange.start)
                         .clipped(min: 0, max: animation.beatRange.length)
                     + animation.beatRange.start
@@ -1692,46 +1772,50 @@ final class KeyframeInserter: InputKeyEditor {
                             animationView.updateTimeline()
                         }
                     }
-                } else if let noteI = sheetView.scoreView.noteIndex(at: inP,
-                                                                    maxDistance: 15 * document.screenToWorldScale) {
+                } else if let noteI = sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
+                                                                    scale: document.screenToWorldScale) {
                     let scoreView = sheetView.scoreView
                     
-                    let maxD = 15 * document.screenToWorldScale
                     let score = scoreView.model
                     let scoreP = scoreView.convertFromWorld(p)
-                    if let sfi = scoreView.sourceFilterIndex(at: scoreP, at: noteI) {
-                        let p = scoreView.sourceFilterFqAndSmp(at: scoreP, at: noteI)
-                        let fq = p.x, smp = p.y
-                        let oldTone = score.notes[noteI].tone
+                    if let (pitI, pitchSmpI) = scoreView.pitIAndPitchSmpI(at: scoreP, at: noteI) {
+                        let pitchSmp = scoreView.tonePitchAndSmp(at: scoreP, at: noteI)
+                        let oldTone = score.notes[noteI].pitbend.pits[pitI].tone
                         var tone = oldTone
-                        tone.sourceFilter.fqSmps.insert(.init(fq, smp), at: sfi + 1)
-                        tone.sourceFilter.noiseTs.insert(0, at: sfi + 1)
-                        tone.sourceFilter.noiseFqSmps.insert(.init(fq, 0), at: sfi + 1)
+                        tone.pitchSmps.insert(pitchSmp, at: pitchSmpI + 1)
+                        tone.id = .init()
                         
-                        let nis = (0 ..< score.notes.count).filter { score.notes[$0].tone.id == tone.id }
+                        let nis = (0 ..< score.notes.count).filter { score.notes[$0].pitbend.pits.contains { $0.tone.id == oldTone.id } }
+                        
+                        let nivs = nis.map {
+                            var note = score.notes[$0]
+                            note.pitbend.pits = note.pitbend.pits.map {
+                                var pit = $0
+                                pit.tone = tone
+                                return pit
+                            }
+                            return IndexValue(value: note, index: $0)
+                        }
                         
                         sheetView.newUndoGroup()
-                        sheetView.set(ToneValue(tone: tone, noteIndexes: nis),
-                                      old: ToneValue(tone: oldTone, noteIndexes: nis))
+                        sheetView.replace(nivs)
+//                        sheetView.set(ToneValue(tone: tone, noteIndexes: nis),
+//                                      old: ToneValue(tone: oldTone, noteIndexes: nis))
                         
                         sheetView.updatePlaying()
                     } else {
-                        if let (ni, pitT) = scoreView.pitT(at: scoreP, maxDistance: maxD) {
-                            let (preFq, nextFq) = scoreView.pitbendPreNext(notes: score.notes, at: ni)
-                            var pitbend = scoreView
-                                .pitbend(from: score.notes[ni], tempo: score.tempo,
-                                         preFq: preFq, nextFq: nextFq)
-                            let pit = pitbend.pit(atT: pitT)
-                            pitbend.pits.append(pit)
-                            pitbend.pits.sort { $0.t < $1.t }
-                            var note = score.notes[ni]
-                            note.pitbend = pitbend
-                            
-                            sheetView.newUndoGroup()
-                            sheetView.replace(note, at: ni)
-                            
-                            sheetView.updatePlaying()
-                        }
+                        let pitT = scoreView.pitT(at: scoreP, at: noteI)
+                        var pitbend = score.notes[noteI].pitbend
+                        let pit = pitbend.pit(atT: pitT)
+                        pitbend.pits.append(pit)
+                        pitbend.pits.sort { $0.t < $1.t }
+                        var note = score.notes[noteI]
+                        note.pitbend = pitbend
+                        
+                        sheetView.newUndoGroup()
+                        sheetView.replace(note, at: noteI)
+                        
+                        sheetView.updatePlaying()
                     }
                 } else if let ci = sheetView.contentIndex(at: inP, scale: document.screenToWorldScale) {
                     let contentView = sheetView.contentsView.elementViews[ci]

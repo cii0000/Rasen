@@ -42,15 +42,27 @@ struct Biquad {
 }
 
 final class NotePlayer {
+    private var aNotes: [Note]
     var notes: [Note] {
-        didSet {
+        get { aNotes }
+        set {
+            let oldValue = aNotes
+            aNotes = newValue
             guard isPlaying,
-                    notes.count == oldValue.count ?
-                        (0 ..< notes.count).contains(where: { !notes[$0].isEqualOtherThanBeatRange(oldValue[$0]) }) :
+                    aNotes.count == oldValue.count ?
+                        (0 ..< notes.count).contains(where: { !aNotes[$0].isEqualOtherThanBeatRange(oldValue[$0]) }) :
                         true else { return }
             stopNote()
             playNote()
         }
+    }
+    func set(volume: Volume, at i: Int) {
+        aNotes[i].volume = volume
+        noder.rendnotes[i].volumeAmp = volume.amp
+    }
+    func set(pan: Double, at i: Int) {
+        aNotes[i].pan = pan
+//        noder.rendnotes = volume.amp
     }
     var volume: Volume {
         get { noder.volume }
@@ -69,7 +81,7 @@ final class NotePlayer {
                                         isAsync: true, startSec: 0) else {
             throw NotePlayerError()
         }
-        self.notes = notes
+        self.aNotes = notes
         self.sequencer = sequencer
         noder = .init(rendnotes: [],
                       startSec: 0, isAsync: true,
@@ -104,10 +116,10 @@ final class NotePlayer {
             noteIDs.insert(noteID)
             let fq = note.fq
             return .init(fq: fq,
-                         sourceFilter: note.tone.sourceFilter.union(.init(FormantFilter().with(lyric: note.mainLyric))),
+                         sourceFilter: note.firstTone.noiseSourceFilter(isNoise: note.isNoise),
                          formantFilterInterpolation: nil,
                          fAlpha: 1,
-                         seed: Rendnote.seed(fromFq: fq, sec: .infinity),
+                         noiseSeed: Rendnote.seed(fromFq: fq, sec: .infinity),
                          overtone: note.tone.overtone,
                          pitbend: note.pitbend,
                          secRange: -.infinity ..< .infinity,
@@ -473,7 +485,7 @@ final class AVAudioScoreNoder {
     
     struct NotewaveID: Hashable, Codable {
         var fq: Double,
-            sourceFilter: SourceFilter,
+            sourceFilter: NoiseSourceFilter,
             formantFilterInterpolation: Interpolation<FormantFilter>?,
             fAlpha: Double,
             seed: UInt64,
@@ -487,7 +499,7 @@ final class AVAudioScoreNoder {
             sourceFilter = rendnote.sourceFilter
             formantFilterInterpolation = rendnote.formantFilterInterpolation
             fAlpha = rendnote.fAlpha
-            seed = rendnote.seed
+            seed = rendnote.noiseSeed
             overtone = rendnote.overtone
             
             pitbend = rendnote.pitbend.withEnabledPitch
@@ -682,7 +694,7 @@ final class AVAudioScoreNoder {
                                 releaseTime: memowave.releaseSec,
                                 startTime: memowave.startSec)
                     let pitbendAmp = waver.pitbend
-                        .amp(atT: nSec - memowave.startSec)
+                        .stereo(atT: nSec - memowave.startSec).amp
                     let nVolumeAmp
                         = memowave.volumeAmp * waverAmp * pitbendAmp
                     

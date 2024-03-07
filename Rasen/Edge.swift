@@ -268,6 +268,11 @@ extension Edge {
         nearest(other).lengthSquared
     }
 }
+extension Edge: CustomStringConvertible {
+    var description: String {
+        "((\(p0.x), \(p0.y))--(\(p1.x), \(p1.y)))"
+    }
+}
 
 struct LinearLine {
     var p0, p1: Point

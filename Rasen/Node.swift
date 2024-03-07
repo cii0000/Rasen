@@ -82,6 +82,9 @@ final class Node {
         child.updateWorldTransform(worldTransform)
         child.setNeedsDisplay()
     }
+    func remove(atChild i: Array<Node>.Index) {
+        children[i].removeFromParent()
+    }
     func removeFromParent() {
         guard let parent = parent else { return }
         if let index = parent.backingChildren.firstIndex(where: { $0 === self }) {

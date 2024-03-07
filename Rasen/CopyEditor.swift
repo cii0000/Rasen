@@ -107,6 +107,7 @@ enum PastableObject {
     case normalizationRationalValue(_ normalizationRationalValue: Rational)
     case notesValue(_ notesValue: NotesValue)
     case tone(_ tone: Tone)
+    case envelope(_ envelope: Envelope)
 }
 extension PastableObject {
     static func typeName(with obj: Any) -> String {
@@ -161,6 +162,8 @@ extension PastableObject {
              PastableObject.typeName(with: notesValue)
         case .tone(let tone):
              PastableObject.typeName(with: tone)
+        case .envelope(let envelope):
+             PastableObject.typeName(with: envelope)
         }
     }
     init(data: Data, typeName: String) throws {
@@ -206,6 +209,8 @@ extension PastableObject {
             self = .notesValue(try NotesValue(serializedData: data))
         case PastableObject.objectTypeName(with: Tone.self):
             self = .tone(try Tone(serializedData: data))
+        case PastableObject.objectTypeName(with: Envelope.self):
+            self = .envelope(try Envelope(serializedData: data))
         default:
             throw PastableObject.PastableError()
         }
@@ -248,6 +253,8 @@ extension PastableObject {
              try? notesValue.serializedData()
         case .tone(let tone):
              try? tone.serializedData()
+        case .envelope(let envelope):
+             try? envelope.serializedData()
         }
     }
 }
@@ -293,6 +300,8 @@ extension PastableObject: Protobuf {
             self = .notesValue(try NotesValue(notesValue))
         case .tone(let tone):
             self = .tone(try Tone(tone))
+        case .envelope(let envelope):
+            self = .envelope(try Envelope(envelope))
         }
     }
     var pb: PBPastableObject {
@@ -334,6 +343,8 @@ extension PastableObject: Protobuf {
                 $0.value = .notesValue(notesValue.pb)
             case .tone(let tone):
                 $0.value = .tone(tone.pb)
+            case .envelope(let envelope):
+                $0.value = .envelope(envelope.pb)
             }
         }
     }
@@ -358,6 +369,7 @@ extension PastableObject: Codable {
         case normalizationRationalValue = "15"
         case notesValue = "13"
         case tone = "14"
+        case envelope = "21"
     }
     init(from decoder: Decoder) throws {
         var container = try decoder.unkeyedContainer()
@@ -399,6 +411,8 @@ extension PastableObject: Codable {
             self = .notesValue(try container.decode(NotesValue.self))
         case .tone:
             self = .tone(try container.decode(Tone.self))
+        case .envelope:
+            self = .envelope(try container.decode(Envelope.self))
         }
     }
     func encode(to encoder: Encoder) throws {
@@ -458,6 +472,9 @@ extension PastableObject: Codable {
         case .tone(let tone):
             try container.encode(CodingTypeKey.tone)
             try container.encode(tone)
+        case .envelope(let envelope):
+            try container.encode(CodingTypeKey.envelope)
+            try container.encode(envelope)
         }
     }
 }
@@ -653,16 +670,17 @@ final class CopyEditor: Editor {
             selectingLineNode.path = Path(rects.map { Pathline(sheetView.convertToWorld($0)) })
         } else if document.isSelectSelectedNoneCursor(at: p), !document.selections.isEmpty {
             if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
-               sheetView.scoreView.noteIndex(at: p, maxDistance: 15 * document.screenToWorldScale) != nil {
+               sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
+                                             scale: document.screenToWorldScale) != nil {//lassoCopy
                 
                 let scoreView = sheetView.scoreView
-                let nis = document.selectedNoteIndexes(from: scoreView)
+                let nis = sheetView.noteIndexes(from: document.selections)
                 if !nis.isEmpty {
-                    let inTP = scoreView.convertFromWorld(p)
-                    let pitch = document.pitch(from: scoreView, at: inTP)
+                    let scoreP = scoreView.convertFromWorld(p)
+                    let pitch = document.pitch(from: scoreView, at: scoreP)
                     let score = scoreView.model
-                    let interval = document.currentNoteTimeInterval()
-                    let t = scoreView.beat(atX: inTP.x, interval: interval)
+                    let interval = document.currentNoteTimeInterval
+                    let t = scoreView.beat(atX: scoreP.x, interval: interval)
                     let notes: [Note] = nis.map {
                         var note = score.notes[$0]
                         note.pitch -= pitch
@@ -672,9 +690,9 @@ final class CopyEditor: Editor {
                     if isSendPasteboard {
                         Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: notes))]
                     }
-                    let rects = nis
-                        .map { scoreView.noteFrame(from: score.notes[$0]) }
-                        .map { scoreView.convertToWorld($0) }
+                    let rects = document.isSelectedText ?
+                    document.selectedFrames :
+                    document.selections.map { $0.rect } + document.selectedFrames
                     let lw = Line.defaultLineWidth * 2 / document.worldToScreenScale
                     selectingLineNode.children = rects.map {
                         Node(path: Path($0),
@@ -856,45 +874,46 @@ final class CopyEditor: Editor {
                 selectingLineNode.lineWidth = document.worldLineWidth
                 selectingLineNode.path = Path(sheetView.convertToWorld(frame))
             }
+//        } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+//            
         } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
-                  let ni = sheetView.scoreView.noteIndex(at: sheetView.convertFromWorld(p),
-                                                         maxDistance: 15 * document.screenToWorldScale) {
+                  let noteI = sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
+                                                         scale: document.screenToWorldScale) {
             let scoreView = sheetView.scoreView
             let score = scoreView.model
             let scoreP = scoreView.convertFromWorld(p)
             
-            selectingLineNode.fillType = .color(.subSelected)
             selectingLineNode.lineType = .color(.selected)
             selectingLineNode.lineWidth = document.worldLineWidth
             
-            if scoreView.isFullEdit, let sfi = scoreView.sourceFilterIndex(at: scoreP, at: ni) {
-                var tone = score.notes[ni].tone
-                tone.sourceFilter.fqSmps.remove(at: sfi)
-                tone.sourceFilter.noiseTs.remove(at: sfi)
-                tone.sourceFilter.noiseFqSmps.remove(at: sfi)
-//                Pasteboard.shared.copiedObjects = [.formant(formant)]
-                sheetView.newUndoGroup()
-                sheetView.replace(tone, at: ni)
-                return true
+            if let result = scoreView.hitTestFullEdit(scoreP, scale: document.screenToWorldScale, at: noteI) {
+                switch result {
+                case .attack, .decay, .release:
+                    let envelope = score.notes[noteI].envelope
+                    Pasteboard.shared.copiedObjects = [.envelope(envelope)]
+                    
+                    //
+                case .pitchSmp(let pitI, _):
+                    let tone = score.notes[noteI].pitbend.pits[pitI].tone
+                    Pasteboard.shared.copiedObjects = [.tone(tone)]
+                    
+                    //
+                }
             } else {
                 let pitch = document.pitch(from: scoreView, at: scoreP)
-                let interval = document.currentNoteTimeInterval()
+                let interval = document.currentNoteTimeInterval
                 let beat = scoreView.beat(atX: scoreP.x, interval: interval)
-                var note = score.notes[ni]
+                var note = score.notes[noteI]
                 note.pitch -= pitch
                 note.beatRange.start -= beat
                 if isSendPasteboard {
                     Pasteboard.shared.copiedObjects
                     = [.notesValue(NotesValue(notes: [note]))]
                 }
-                let rects = [scoreView.noteFrame(from: score.notes[ni])]
+                let lines = [scoreView.noteLine(from: score.notes[noteI])]
                     .map { scoreView.convertToWorld($0) }
-                let lw = Line.defaultLineWidth * 2 / document.worldToScreenScale
-                selectingLineNode.children = rects.map {
-                    Node(path: Path($0),
-                         lineWidth: lw,
-                         lineType: .color(.selected),
-                         fillType: .color(.subSelected))
+                selectingLineNode.children = lines.map {
+                    Node(path: Path($0), lineWidth: $0.size * 1.5, lineType: .color(.selected))
                 }
             }
             return true
@@ -1031,21 +1050,21 @@ final class CopyEditor: Editor {
             } else {
                 if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
                    sheetView.scoreView
-                    .noteIndex(at: sheetView.convertFromWorld(p),
-                               maxDistance: 15 * document.screenToWorldScale) != nil {
+                    .containsNote(sheetView.scoreView.convertFromWorld(p),
+                               scale: document.screenToWorldScale) {
                     
                     let scoreView = sheetView.scoreView
-                    let inTP = scoreView.convertFromWorld(p)
-                    let pitch = document.pitch(from: scoreView, at: inTP)
-                    let nis = document.selectedNoteIndexes(from: scoreView)
+                    let scoreP = scoreView.convertFromWorld(p)
+                    let pitch = document.pitch(from: scoreView, at: scoreP)
+                    let nis = sheetView.noteIndexes(from: document.selections)
                     if !nis.isEmpty {
-                        let interval = document.currentNoteTimeInterval()
-                        let t = scoreView.beat(atX: inTP.x, interval: interval)
+                        let interval = document.currentNoteTimeInterval
+                        let beat = scoreView.beat(atX: scoreP.x, interval: interval)
                         let score = scoreView.model
                         let notes: [Note] = nis.map {
                             var note = score.notes[$0]
                             note.pitch -= pitch
-                            note.beatRange.start -= t
+                            note.beatRange.start -= beat
                             return note
                         }
                         
@@ -1190,46 +1209,78 @@ final class CopyEditor: Editor {
                 return true
             }
         } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
-                    let ni = sheetView.scoreView.noteIndex(at: sheetView.convertFromWorld(p), 
-                                                           maxDistance: 15 * document.screenToWorldScale) {
+                  let noteI = sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
+                                                            scale: document.screenToWorldScale) {
             let scoreView = sheetView.scoreView
             let score = scoreView.model
             let scoreP = scoreView.convertFromWorld(p)
-            if let sfi = scoreView.sourceFilterIndex(at: scoreP, at: ni) {
-                var tone = score.notes[ni].tone
-                tone.sourceFilter.fqSmps.remove(at: sfi)
-                tone.sourceFilter.noiseTs.remove(at: sfi)
-                tone.sourceFilter.noiseFqSmps.remove(at: sfi)
-//                Pasteboard.shared.copiedObjects = [.formant(formant)]
-                sheetView.newUndoGroup()
-                sheetView.replace(tone, at: ni)
-                return true
-            } else if let (ni, pitI, _, pitbend) = scoreView
-                .pitbendTuple(at: scoreP, maxDistance: 15 * document.screenToWorldScale),
-                   !pitbend.pits.isEmpty {
-                
-                var pitbend = pitbend
+            if let result = scoreView.hitTestFullEdit(scoreP, scale: document.screenToWorldScale, at: noteI) {
+                switch result {
+                case .attack, .decay, .release:
+                    let envelope = score.notes[noteI].envelope
+                    Pasteboard.shared.copiedObjects = [.envelope(envelope)]
+                    
+                    sheetView.newUndoGroup()
+                    sheetView.replace(Envelope(), at: noteI)
+                    
+                    sheetView.updatePlaying()
+                case .pitchSmp(let pitI, let pitchSmpI):
+                    let oldTone = score.notes[noteI].pitbend.pits[pitI].tone
+                    var tone = oldTone
+                    if tone.pitchSmps.count <= 1 {
+                        tone = .init()
+                    } else {
+                        tone.pitchSmps.remove(at: pitchSmpI)
+                    }
+                    tone.id = .init()
+                    
+                    let nis = (0 ..< score.notes.count).filter { score.notes[$0].pitbend.pits.contains { $0.tone.id == oldTone.id } }
+                    
+                    let nivs = nis.map {
+                        var note = score.notes[$0]
+                        note.pitbend.pits = note.pitbend.pits.map {
+                            var pit = $0
+                            pit.tone = tone
+                            return pit
+                        }
+                        return IndexValue(value: note, index: $0)
+                    }
+                    
+                    sheetView.newUndoGroup()
+                    sheetView.replace(nivs)
+                        
+//                    var tone = score.notes[noteI].pitbend.pits[pitI].tone
+//                    tone.pitchSmps.remove(at: pitchSmpI)
+                    
+    //                Pasteboard.shared.copiedObjects = [.formant(formant)]
+//                    sheetView.newUndoGroup()
+//                    sheetView.replace(tone, at: noteI)
+                    return true
+                }
+            } else if let (noteI, pitI) = scoreView.pitbendTuple(at: scoreP,
+                                                                 scale: document.screenToWorldScale) {
+                var pitbend = score.notes[noteI].pitbend
                 pitbend.pits.remove(at: pitI)
-                var note = score.notes[ni]
+                var note = score.notes[noteI]
                 note.pitbend = pitbend
 
                 sheetView.newUndoGroup()
-                sheetView.replace(note, at: ni)
+                sheetView.replace(note, at: noteI)
                 
                 sheetView.updatePlaying()
                 return true
             } else {
                 let pitch = document.pitch(from: scoreView, at: scoreP)
-                let interval = document.currentNoteTimeInterval()
+                let interval = document.currentNoteTimeInterval
                 let beat = scoreView.beat(atX: scoreP.x, interval: interval)
-                var note = score.notes[ni]
+                var note = score.notes[noteI]
                 note.pitch -= pitch
                 note.beatRange.start -= beat
                 
                 Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [note]))]
                 
                 sheetView.newUndoGroup()
-                sheetView.removeNote(at: ni)
+                sheetView.removeNote(at: noteI)
                 
                 sheetView.updatePlaying()
                 return true
@@ -1668,17 +1719,20 @@ final class CopyEditor: Editor {
             let scoreView = sheetView.scoreView
             let scoreP = scoreView.convertFromWorld(p)
             let pitch = document.pitch(from: scoreView, at: scoreP)
-            let score = scoreView.model
-            let interval = document.currentNoteTimeInterval()
-            let t = scoreView.beat(atX: scoreP.x, interval: interval) + score.beatRange.start
+            let interval = document.currentNoteTimeInterval
+            let beat = scoreView.beat(atX: scoreP.x, interval: interval)
             
             var notes = notes
             for j in 0 ..< notes.count {
                 notes[j].pitch += pitch - Score.pitchRange.start
-                notes[j].beatRange.start += t
+                notes[j].beatRange.start += beat
             }
             
-            selectingLineNode.children = notes.map { scoreView.noteNode(from: $0, at: nil) }
+            selectingLineNode.children = notes.map {
+                let node = scoreView.noteNode(from: $0)
+                node.attitude = Attitude(position: sheetView.convertToWorld(Point()))
+                return node
+            }
         }
         
         switch pasteObject {
@@ -1723,6 +1777,8 @@ final class CopyEditor: Editor {
         case .notesValue(let notesValue):
             updateNotes(notesValue.notes)
         case .tone:
+            break
+        case .envelope:
             break
         }
     }
@@ -2322,7 +2378,7 @@ final class CopyEditor: Editor {
             
             if content.type.isDuration {
                 let tempo = sheetView.nearestTempo(at: sheetP) ?? Music.defaultTempo
-                let interval = document.currentNoteTimeInterval(fromScale: 1)
+                let interval = document.currentNoteTimeInterval
                 let startBeat = sheetView.animationView.beat(atX: sheetP.x, interval: interval)
                 let beatDur = ContentTimeOption.beat(fromSec: content.secDuration,
                                                      tempo: tempo,
@@ -2361,7 +2417,7 @@ final class CopyEditor: Editor {
             content.origin -= Point(content.size.width / 2, content.size.height / 2)
             
             if content.type.isDuration {
-                let interval = document.currentNoteTimeInterval(fromScale: 1)
+                let interval = document.currentNoteTimeInterval
                 let startBeat = sheetView.animationView.beat(atX: sheetP.x, interval: interval)
                 let tempo = sheetView.nearestTempo(at: sheetP) ?? Music.defaultTempo
                 let beatDur = if let nbr = content.timeOption?.beatRange {
@@ -2416,12 +2472,18 @@ final class CopyEditor: Editor {
             let scoreView = sheetView.scoreView
             let scoreP = scoreView.convertFromWorld(p)
             let pitch = document.pitch(from: scoreView, at: scoreP)
-            let interval = document.currentNoteTimeInterval()
+            let interval = document.currentNoteTimeInterval
             let t = scoreView.beat(atX: scoreP.x, interval: interval)
             var notes = notesValue.notes
+            let startBeat = sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval)
+            let endBeat = sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: interval)
             for j in 0 ..< notes.count {
                 notes[j].pitch += pitch
                 notes[j].beatRange.start += t
+                
+                notes[j].pitch = notes[j].pitch
+                    .clipped(min: Score.pitchRange.start, max: Score.pitchRange.end)
+                notes[j].beatRange.start = max(min(notes[j].beatRange.start, endBeat), startBeat - notes[j].beatRange.length)
             }
             sheetView.newUndoGroup()
             sheetView.append(notes)
@@ -2431,11 +2493,11 @@ final class CopyEditor: Editor {
             guard let sheetView = document.sheetView(at: shp) else { return }
             if sheetView.model.score.enabled {
                 let scoreView = sheetView.scoreView
-                let maxD = 15 * document.screenToWorldScale
-                if let ni = scoreView.noteIndex(at: scoreView.convertFromWorld(p), maxDistance: maxD) {
+                if let noteI = scoreView.noteIndex(at: scoreView.convertFromWorld(p),
+                                                scale: document.screenToWorldScale) {
                     if document.isSelect(at: p) {
                         let score = scoreView.model
-                        let nis = document.selectedNoteIndexes(from: scoreView)
+                        let nis = sheetView.noteIndexes(from: document.selections)
                             .filter { score.notes[$0].tone != tone }
                         if !nis.isEmpty {
                             sheetView.newUndoGroup()
@@ -2445,7 +2507,31 @@ final class CopyEditor: Editor {
                         }
                     } else {
                         sheetView.newUndoGroup()
-                        sheetView.replace(tone, at: ni)
+                        sheetView.replace(tone, at: noteI)
+                        
+                        sheetView.updatePlaying()
+                    }
+                }
+            }
+        case .envelope(let envelope):
+            guard let sheetView = document.sheetView(at: shp) else { return }
+            if sheetView.model.score.enabled {
+                let scoreView = sheetView.scoreView
+                if let noteI = scoreView.noteIndex(at: scoreView.convertFromWorld(p),
+                                                scale: document.screenToWorldScale) {
+                    if document.isSelect(at: p) {
+                        let score = scoreView.model
+                        let nis = sheetView.noteIndexes(from: document.selections)
+                            .filter { score.notes[$0].envelope != envelope }
+                        if !nis.isEmpty {
+                            sheetView.newUndoGroup()
+                            sheetView.replace(envelope, at: nis)
+                            
+                            sheetView.updatePlaying()
+                        }
+                    } else {
+                        sheetView.newUndoGroup()
+                        sheetView.replace(envelope, at: noteI)
                         
                         sheetView.updatePlaying()
                     }
@@ -2474,6 +2560,7 @@ final class CopyEditor: Editor {
         case .normalizationRationalValue: false
         case .notesValue: true
         case .tone: false
+        case .envelope: false
         }
     }
     
@@ -2936,26 +3023,20 @@ final class LineColorCopier: InputKeyEditor {
             return true
         } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
             let scoreView = sheetView.scoreView
-            let maxD = 15 * document.screenToWorldScale
-            if let ni = scoreView.noteIndex(at: scoreView.convertFromWorld(p), maxDistance: maxD) {
+            if let noteI = scoreView.noteIndex(at: scoreView.convertFromWorld(p),
+                                               scale: document.screenToWorldScale) {
                 let score = scoreView.model
-                let tone = score.notes[ni].tone
+                let tone = score.notes[noteI].tone
                 if isSendPasteboard {
                     Pasteboard.shared.copiedObjects = [.tone(tone)]
                 }
                 
-                let (preFq, nextFq) = scoreView.pitbendPreNext(notes: score.notes, at: ni)
-                let (linePathlines, _, _) = scoreView.notePathlines(from: score.notes[ni],
-                                                                    preFq: preFq, nextFq: nextFq,
-                                                                    tempo: score.tempo)
-                let path = scoreView.convertToWorld(Path(linePathlines))
-                
                 let scale = 1 / document.worldToScreenScale
                 let lw = Line.defaultLineWidth
-                let selectedNode = Node(path: path,
-                                        lineWidth: max(lw * 1.5, lw * 2.5 * scale, 1 * scale),
-                                        lineType: .color(.selected))
-                selectingLineNode.children = [selectedNode]
+                let nlw = max(lw * 1.5, lw * 2.5 * scale, 1 * scale)
+                let noteNode = scoreView.noteNode(from: score.notes[noteI], color: .selected, lineWidth: nlw)
+                noteNode.attitude.position = scoreView.node.convertToWorld(Point())
+                selectingLineNode.children = [noteNode]
                 
                 return true
             }

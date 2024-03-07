@@ -167,11 +167,24 @@ message PBContent {
     PBUUID id = 8;
 }
 
+message PBStereo {
+    double amp = 1;
+    double pan = 2;
+    PBUUID id = 3;
+}
+
+message PBTone {
+    double evenAmp = 1;
+    double oddAmp = 2;
+    repeated PBPoint fqAmps = 3;
+    PBUUID id = 4;
+}
+
 message PBPit {
     double t = 1;
     double pitch = 2;
-    double amp = 3;
-    double pan = 4;
+    PBStereo stereo = 3;
+    PBTone tone = 4;
 }
 message PBPitbend {
     repeated PBPit pits = 1;
@@ -193,47 +206,20 @@ message PBNote {
     double pan = 5;
     PBTone tone = 6;
     PBEnvelope envelope = 7;
+    bool isNoise = 10;
     string lyric = 8;
-}
-
-message PBFormant {
-    double sdFq = 1;
-    double sFq = 2;
-    double eFq = 3;
-    double edFq = 4;
-    double amp = 5;
-    double noiseT = 6;
-    double edAmp = 7;
-    double edNoiseT = 8;
-}
-message PBFormantFilter {
-    repeated PBFormant formants = 1;
-}
-
-message PBOvertone {
-    double evenScale = 1;
-    double oddScale = 2;
-}
-
-message PBSourceFilter {
-    repeated PBPoint fqSmps = 1;
-    repeated double noiseTs = 2;
-}
-
-message PBTone {
-    PBOvertone overtone = 1;
-    PBSourceFilter sourceFilter = 2;
-    PBUUID id = 3;
+    PBUUID id = 9;
 }
 
 message PBScoreOption {
-    PBRationalRange beatRange = 1;
+    PBRational beatDuration = 1;
     PBRational tempo = 2;
     bool enabled = 3;
 }
 message PBScore {
     repeated PBNote notes = 1;
-    PBRationalRange beatRange = 2;
+    repeated PBNote draftNotes = 6;
+    PBRational beatDuration = 2;
     PBRational tempo = 3;
     bool enabled = 4;
     PBUUID id = 5;
@@ -583,6 +569,8 @@ message PBSheetUndoItem {
         PBContentIndexValueArray replaceContents = 47;
         PBInt64Array removeContents = 48;
         PBScoreOption setScoreOption = 49;
+        PBNoteIndexValueArray insertDraftNotes = 50;
+        PBInt64Array removeDraftNotes = 51;
     }
 }
 message PBWorldUndoItem {
@@ -651,5 +639,6 @@ message PBPastableObject {
         PBRational normalizationRationalValue = 16;
         PBNotesValue notesValue = 14;
         PBTone tone = 15;
+        PBEnvelope envelope = 23;
     }
 }

@@ -435,7 +435,12 @@ extension Bezier {
             return BezierIntersection(t: t, otherT: et,
                                       otherDirection: direction, point: p)
         }
-        if d > 0 {
+        if da == 0 {
+            let t = -dc / db
+            if let bi = intersection(with: t) {
+                return [bi]
+            }
+        } else if d > 0 {
             let sd = d.squareRoot(), rda = 1 / da
             let t0 = 0.5 * (sd - db) * rda, t1 = 0.5 * (-sd - db) * rda
             if let bi0 = intersection(with: t0) {
@@ -476,7 +481,12 @@ extension Bezier {
             + 2 * a * cp.x + 2 * b * cp.y
         let dc = a * p0.x + b * p0.y + c
         let d = db * db - 4 * da * dc
-        if d > 0 {
+        if da == 0 {
+            let t = -dc / db
+            if t >= 0 && t <= 1 {
+                return [position(withT: t)]
+            }
+        } else if d > 0 {
             let sd = d.squareRoot(), rda = 1 / da
             let t0 = 0.5 * (sd - db) * rda, t1 = 0.5 * (-sd - db) * rda
             if t0 >= 0 && t0 <= 1 {

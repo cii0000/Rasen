@@ -259,20 +259,36 @@ final class DraftEditor: Editor {
                     if document.selections.contains(where: { ssFrame.intersects($0.rect) }),
                        let sheetView = document.sheetView(at: shp) {
                         
-                        let lis = sheetView.lineIndexes(from: document.selections)
-                        let pis = sheetView.planeIndexes(from: document.selections)
-                        if !lis.isEmpty {
-                            sheetView.newUndoGroup()
-                            sheetView.changeToDraft(withLineInexes: lis,
-                                                    planeInexes: pis)
-                            document.updateSelects()
+                        if sheetView.model.score.enabled {
+                            let nis = sheetView.noteIndexes(from: document.selections)
+                            if !nis.isEmpty {
+                                sheetView.newUndoGroup()
+                                sheetView.changeToDraft(withNoteInexes: nis)
+                                document.updateSelects()
+                            }
+                        } else {
+                            let lis = sheetView.lineIndexes(from: document.selections)
+                            let pis = sheetView.planeIndexes(from: document.selections)
+                            if !lis.isEmpty {
+                                sheetView.newUndoGroup()
+                                sheetView.changeToDraft(withLineInexes: lis,
+                                                        planeInexes: pis)
+                                document.updateSelects()
+                            }
                         }
                     }
                 }
             } else {
                 if let sheetView = document.sheetView(at: p) {
                     let inP = sheetView.convertFromWorld(p)
-                    if sheetView.animationView.containsTimeline(inP),
+                    if sheetView.model.score.enabled {
+                        let nis = (0 ..< sheetView.model.score.notes.count).map { $0 }
+                        if !nis.isEmpty {
+                            sheetView.newUndoGroup()
+                            sheetView.changeToDraft(withNoteInexes: nis)
+                            document.updateSelects()
+                        }
+                    } else if sheetView.animationView.containsTimeline(inP),
                        let ki = sheetView.animationView.keyframeIndex(at: inP) {
                         
                         let animationView = sheetView.animationView
@@ -280,8 +296,7 @@ final class DraftEditor: Editor {
                         let isSelected = animationView.selectedFrameIndexes.contains(ki)
                         let indexes = isSelected ?
                             animationView.selectedFrameIndexes.sorted() : [ki]
-                        let kiovs: [IndexValue<KeyframeOption>]
-                        = indexes.compactMap {
+                        let kiovs: [IndexValue<KeyframeOption>] = indexes.compactMap {
                             let k = animationView.model.keyframes[$0]
                             guard k.previousNext != .previousAndNext else { return nil }
                             let ko = KeyframeOption(beatDuration: k.beatDuration,
@@ -327,11 +342,33 @@ final class DraftEditor: Editor {
                         if ssFrame.intersects(selection.rect),
                            let sheetView = document.sheetView(at: shp) {
                            
-                            let line = Line(selection.rect.inset(by: -0.5))
-                            let nLine = sheetView.convertFromWorld(line)
-                            if let v = sheetView.removeDraft(with: nLine, at: p) {
-                                value += v
-                           }
+                            if sheetView.model.score.enabled {
+                                let nis = sheetView.draftNoteIndexes(from: document.selections)
+                                if !nis.isEmpty {
+                                    let scoreView = sheetView.scoreView
+                                    let scoreP = scoreView.convertFromWorld(p)
+                                    let pitch = document.pitch(from: scoreView, at: scoreP)
+                                    let interval = document.currentNoteTimeInterval
+                                    let beat = scoreView.beat(atX: scoreP.x, interval: interval)
+                                    let notes: [Note] = nis.map {
+                                        var note = scoreView.model.draftNotes[$0]
+                                        note.pitch -= pitch
+                                        note.beatRange.start -= beat
+                                        return note
+                                    }
+                                    
+                                    sheetView.newUndoGroup()
+                                    sheetView.removeDraftNotes(at: nis)
+                                    
+                                    Pasteboard.shared.copiedObjects = [.notesValue(.init(notes: notes))]//
+                                }
+                            } else {
+                                let line = Line(selection.rect.inset(by: -0.5))
+                                let nLine = sheetView.convertFromWorld(line)
+                                if let v = sheetView.removeDraft(with: nLine, at: p) {
+                                    value += v
+                                }
+                            }
                         }
                     }
                 }
@@ -342,7 +379,27 @@ final class DraftEditor: Editor {
             } else {
                 if let sheetView = document.sheetView(at: p) {
                     let inP = sheetView.convertFromWorld(p)
-                    if sheetView.animationView.containsTimeline(inP),
+                    if sheetView.model.score.enabled {
+                        let nis = (0 ..< sheetView.model.score.draftNotes.count).map { $0 }
+                        if !nis.isEmpty {
+                            let scoreView = sheetView.scoreView
+                            let scoreP = scoreView.convertFromWorld(p)
+                            let pitch = document.pitch(from: scoreView, at: scoreP)
+                            let interval = document.currentNoteTimeInterval
+                            let beat = scoreView.beat(atX: scoreP.x, interval: interval)
+                            let notes: [Note] = sheetView.model.score.draftNotes.map {
+                                var note = $0
+                                note.pitch -= pitch
+                                note.beatRange.start -= beat
+                                return note
+                            }
+                            
+                            sheetView.newUndoGroup()
+                            sheetView.removeDraftNotes(at: nis)
+                            
+                            Pasteboard.shared.copiedObjects = [.notesValue(.init(notes: notes))]//
+                        }
+                    } else if sheetView.animationView.containsTimeline(inP),
                        let ki = sheetView.animationView.keyframeIndex(at: inP) {
                         
                         let animationView = sheetView.animationView
@@ -836,7 +893,7 @@ final class IOEditor: Editor {
                     }
                     if content.type.isDuration {
                         let tempo = sheetView.nearestTempo(at: np) ?? Music.defaultTempo
-                        let interval = document.currentNoteTimeInterval(fromScale: 1)
+                        let interval = document.currentNoteTimeInterval
                         let startBeat = sheetView.animationView.beat(atX: np.x, interval: interval)
                         let beatDur = ContentTimeOption.beat(fromSec: content.secDuration,
                                                              tempo: tempo,
@@ -1607,7 +1664,7 @@ final class IOEditor: Editor {
                         shp.y -= 1
                         while let sid = self.document.sheetID(at: shp),
                               let sheet = self.document.renderableSheet(at: sid),
-                              sheet.enabledAudiotrack {
+                              sheet.enabledTimeline {
                             
                             audiotrack += sheet.audiotrack
                             shp.y -= 1
@@ -1616,7 +1673,7 @@ final class IOEditor: Editor {
                         shp.y += 1
                         while let sid = self.document.sheetID(at: shp),
                               let sheet = self.document.renderableSheet(at: sid),
-                              sheet.enabledAudiotrack {
+                              sheet.enabledTimeline {
                             
                             audiotrack += sheet.audiotrack
                             shp.y += 1

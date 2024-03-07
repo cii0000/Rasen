@@ -266,6 +266,23 @@ final class ColorEditor: Editor {
                      fillType: .color(.content))]
     }
     
+    func smpNodes(fromSmp scale: Double, firstSmp: Double, at p: Point) -> [Node] {
+        let vh = 50.0
+        let vKnobW = 8.0, vKbobH = 2.0
+        let vx = 0.0, vy = 0.0
+        let y = scale.clipped(min: 0, max: 1)
+        let fy = firstSmp.clipped(min: 0, max: 1)
+        let path = Path([Pathline(Polygon(points: [Point(vx, vy),
+                                                   Point(vx + 1.5, vy + vh),
+                                                   Point(vx - 1.5, vy + vh)])),
+                         Pathline(Rect(x: vx - vKnobW / 2,
+                                       y: vy + y - vKbobH / 2,
+                                       width: vKnobW,
+                                       height: vKbobH))])
+        return [Node(attitude: .init(position: p - Point(0, fy)), path: path,
+                     fillType: .color(.content))]
+    }
+    
     func panNodes(fromPan pan: Double, firstPan: Double, at p: Point) -> [Node] {
         let panW = 50.0
         
@@ -311,7 +328,7 @@ final class ColorEditor: Editor {
                      fillType: .color(.content))]
     }
     
-    private var isChangeVolumeAmp = false, isChangePit = false
+    private var isChangeVolump = false, isChangePit = false
     private var sheetView: SheetView?
     private var beganNotes = [Int: Note]()
     private var beganNotePits = [Int: (note: Note, pits: [Int: Pit])]()
@@ -350,7 +367,7 @@ final class ColorEditor: Editor {
                 }
                 func updateNotePlayer(atNote ni: Int, with score: Score) {
                     let note = score.notes[ni]
-                    let volume = sheetView.isPlaying ? note.volume * 0.1 : note.volume
+                    let volume = Volume(smp: sheetView.isPlaying ? 0.1 : 1.0)
                     if let notePlayer = sheetView.notePlayer {
                         self.notePlayer = notePlayer
                         notePlayer.notes = [note]
@@ -364,17 +381,19 @@ final class ColorEditor: Editor {
                 }
                 
                 let sheetP = sheetView.convertFromWorld(p)
-                if let ni = sheetView.scoreView.noteIndex(at: sheetP,
-                                                          maxDistance: 15 * document.screenToWorldScale) {
+                if let ni = sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
+                                                          scale: document.screenToWorldScale) {
                     let scoreView = sheetView.scoreView
                     let score = scoreView.model
                     
                     let scoreP = scoreView.convertFromWorld(p)
-                    let maxD = 5 * document.screenToWorldScale
                     if scoreView.isFullEdit,
-                       let (ni, pitI, pit, _) = scoreView.pitbendTuple(at: scoreP, maxDistance: maxD) {
+                       let (ni, pitI) = scoreView.pitbendTuple(at: scoreP,
+                                                               scale: document.screenToWorldScale) {
+                        let pit = score.notes[ni].pitbend.pits[pitI]
+                        
                         isChangePit = true
-                        beganVolume = Volume(amp: pit.amp)
+                        beganVolume = Volume(amp: score.notes[ni].volumeAmp * pit.stereo.amp)
                         
                         if document.isSelect(at: p) {
 //                            let noteIs = document.selectedNoteIndexes(from: scoreView)
@@ -388,7 +407,7 @@ final class ColorEditor: Editor {
                         beganVolume = score.notes[ni].volume
                         
                         if document.isSelect(at: p) {
-                            let noteIs = document.selectedNoteIndexes(from: scoreView)
+                            let noteIs = sheetView.noteIndexes(from: document.selections)
                             beganNotes = noteIs.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
                         }
                         beganNotes[ni] = score.notes[ni]
@@ -432,11 +451,11 @@ final class ColorEditor: Editor {
                     guard ni < score.notes.count else { continue }
                     for (pi, beganPit) in beganNotePit.pits {
                         guard pi < score.notes[ni].pitbend.pits.count else { continue }
-                        let nVolume = newVolume(from: beganPit.volume)
-                        scoreView.model.notes[ni].pitbend.pits[pi].volume = nVolume
+                        let nVolume = newVolume(from: beganPit.stereo.volume)
+                        scoreView[ni].pitbend.pits[pi].stereo.volume = nVolume
                         
-                        if beganPit.volume == beganVolume {
-                            notePlayer?.notes = [scoreView.model.notes[ni]]//
+                        if beganPit.stereo.volume == beganVolume {
+                            notePlayer?.set(volume: nVolume, at: 0)
                             
                             sheetView.sequencer?.scoreNoders[score.id]?
                                 .replaceVolumeOrPan([.init(value: scoreView.model.notes[ni], index: ni)],
@@ -448,7 +467,7 @@ final class ColorEditor: Editor {
                 for (ni, beganNote) in beganNotes {
                     guard ni < score.notes.count else { continue }
                     let nVolume = newVolume(from: beganNote.volume)
-                    scoreView.model.notes[ni].volume = nVolume
+                    scoreView[ni].volume = nVolume
                     
                     if beganNote.volume == beganVolume {
                         notePlayer?.notes = [scoreView.model.notes[ni]]//
@@ -534,6 +553,187 @@ final class ColorEditor: Editor {
             document.cursor = Document.defaultCursor
         }
     }
+    
+    private var isChangeOverrtone = false, overtoneType = OvertoneType.evenSmp
+    private var beganTone = Tone()
+    func changeOvertone(with event: DragEvent) {
+        guard isEditingSheet else {
+            document.stop(with: event)
+            return
+        }
+        
+        let sp = event.screenPoint
+        switch event.phase {
+        case .began:
+            document.cursor = .arrow
+            
+            beganSP = sp
+            let p = document.convertScreenToWorld(sp)
+            if let sheetView = document.sheetView(at: p) {
+                self.sheetView = sheetView
+                
+                func updateNotePlayer(atNote ni: Int, with score: Score) {
+                    let note = score.notes[ni]
+                    let volume = Volume(smp: sheetView.isPlaying ? 0.1 : 1.0)
+                    if let notePlayer = sheetView.notePlayer {
+                        self.notePlayer = notePlayer
+                        notePlayer.notes = [note]
+                        notePlayer.volume = volume
+                    } else {
+                        notePlayer = try? NotePlayer(notes: [note],
+                                                     volume: volume, pan: note.pan)
+                        sheetView.notePlayer = notePlayer
+                    }
+                    notePlayer?.play()
+                }
+                
+                let sheetP = sheetView.convertFromWorld(p)
+                if let ni = sheetView.scoreView.noteIndex(at: sheetP,
+                                                          scale: document.screenToWorldScale) {
+                    let scoreView = sheetView.scoreView
+                    let score = scoreView.model
+                    
+                    let scoreP = scoreView.convertFromWorld(p)
+                    if scoreView.isFullEdit,
+                       let (noteI, pitI) = scoreView.pitbendTuple(at: scoreP,
+                                                               scale: document.screenToWorldScale) {
+                        let pit = score.notes[noteI].pitbend.pits[pitI]
+                        let noteY = scoreView.noteY(atX: scoreP.x, at: noteI)
+                        let noteH = scoreView.noteH(atX: scoreP.x, at: noteI)
+                        if abs(scoreP.y - noteY) > noteH / 2 {
+                            overtoneType = scoreP.y > noteY ? .evenSmp : .oddSmp
+                            
+                            isChangePit = true
+                            beganTone = pit.tone
+                            
+                            if document.isSelect(at: p) {
+                                let noteIs = sheetView.noteIndexes(from: document.selections)
+                                beganNotes = noteIs.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
+                            } else {
+                                let id = beganTone.id
+                                beganNotes = score.notes.enumerated().reduce(into: [Int: Note]()) {
+                                    if $1.element.pitbend.pits.contains(where: { $0.tone.id == id }) {
+                                        $0[$1.offset] = $1.element
+                                    }
+                                }
+                            }
+                            beganNotes[ni] = score.notes[ni]
+                            
+                            beganNotePits[noteI] = (score.notes[noteI], [pitI: pit])
+                            
+                            updateNotePlayer(atNote: noteI, with: score)//
+                            
+                            lightnessNode.children = smpNodes(fromSmp: beganTone[overtoneType],
+                                                                   firstSmp: beganTone[overtoneType], at: p)
+                            document.rootNode.append(child: lightnessNode)
+                        }
+                    }
+                }
+            }
+        case .changed:
+            guard let sheetView else { return }
+            
+            let dSmp = (sp.y - beganSP.y) * (document.screenToWorldScale / 50)
+            let smp = (beganTone[overtoneType] + dSmp).clipped(min: 0, max: 1)
+            let scale = beganTone[overtoneType] == 0 ? 1 : smp / beganTone[overtoneType]
+            
+            func newSmp(from otherSmp: Double) -> Double {
+                if beganTone[overtoneType] == otherSmp {
+                    smp
+                } else if beganTone[overtoneType] == 0 {
+                    (otherSmp + dSmp).clipped(min: 0, max: 1)
+                } else {
+                    (otherSmp * scale).clipped(min: 0, max: 1)
+                }
+            }
+            
+            let scoreView = sheetView.scoreView
+            let score = scoreView.model
+            if isChangePit {
+                for (ni, beganNotePit) in beganNotePits {
+                    guard ni < score.notes.count else { continue }
+                    var note = scoreView[ni]
+                    for (pi, beganPit) in beganNotePit.pits {
+                        guard pi < score.notes[ni].pitbend.pits.count else { continue }
+                        if beganPit.tone.id == beganTone.id {
+                            let nSmp = newSmp(from: beganPit.tone[overtoneType])
+                            note.pitbend.pits[pi].tone[overtoneType] = nSmp
+                            
+//                            notePlayer?.notes = [scoreView[ni]]
+//                            sheetView.sequencer?.scoreNoders[score.id]?
+                        }
+                    }
+                    scoreView[ni] = note
+                }
+            }
+            
+            lightnessNode.children = smpNodes(fromSmp: smp,
+                                                   firstSmp: beganTone[overtoneType],
+                                                   at: document.convertScreenToWorld(beganSP))
+        case .ended:
+            notePlayer?.stop()
+            
+            lightnessNode.removeFromParent()
+            
+            if let sheetView {
+                var isNewUndoGroup = false
+                func updateUndoGroup() {
+                    if !isNewUndoGroup {
+                        sheetView.newUndoGroup()
+                        isNewUndoGroup = true
+                    }
+                }
+                
+                let scoreView = sheetView.scoreView
+                let score = scoreView.model
+                if isChangePit {
+                    var noteIVs = [IndexValue<Note>](), oldNoteIVs = [IndexValue<Note>]()
+                    for (ni, beganNotePit) in beganNotePits {
+                        guard ni < score.notes.count else { continue }
+                        let note = scoreView.model.notes[ni]
+                        if beganNotePit.note != note {
+                            noteIVs.append(.init(value: note, index: ni))
+                            oldNoteIVs.append(.init(value: beganNotePit.note, index: ni))
+                        }
+                    }
+                    if !noteIVs.isEmpty {
+                        updateUndoGroup()
+                        sheetView.capture(noteIVs, old: oldNoteIVs)
+                    }
+                }
+            }
+            
+            document.cursor = Document.defaultCursor
+        }
+    }
+    
+//    func a() {
+//        type = .overtone
+//        
+//        beganTone = score.notes[ni].tone
+//        beganOvertone = beganTone.overtone
+//        overtoneType = aOvertoneType
+//        
+//        if document.isSelect(at: p) {
+//            let noteIs = document.selectedNoteIndexes(from: scoreView)
+//            beganNotes = noteIs.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
+//        } else {
+//            let id = score.notes[ni].tone.id
+//            beganNotes = score.notes.enumerated().reduce(into: [Int: Note]()) {
+//                if id == $1.element.tone.id {
+//                    $0[$1.offset] = $1.element
+//                }
+//            }
+//        }
+//        beganNotes[ni] = score.notes[ni]
+//        
+//        currentBeatNoteIndexes = beganNotes.keys.sorted()
+//            .filter { score.notes[$0].beatRange.contains(note.beatRange.center) }
+//        
+//        
+//        
+//        
+//    }
     
     private var isChangePan = false
     private var beganPan = 0.0, oldPan = 0.0
@@ -663,22 +863,24 @@ final class ColorEditor: Editor {
             document.stopPlaying(with: event)
         }
         
-        if isChangeVolumeAmp {
+        if isChangeVolump {
             changeVolumeAmp(with: event)
             return
         }
         if event.phase == .began {
             let p = document.convertScreenToWorld(event.screenPoint)
             if let sheetView = document.sheetView(at: p) {
+                
+                
                 let sheetP = sheetView.convertFromWorld(p)
-                if sheetView.scoreView.noteIndex(at: sheetP,
-                                                 maxDistance: 15 * document.screenToWorldScale) != nil {
-                    isChangeVolumeAmp = true
+                if sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
+                                                 scale: document.screenToWorldScale) != nil {
+                    isChangeVolump = true
                     changeVolumeAmp(with: event)
                     return
                 } else if let ci = sheetView.contentIndex(at: sheetP, scale: document.screenToWorldScale),
                           sheetView.model.contents[ci].type.isAudio {
-                    isChangeVolumeAmp = true
+                    isChangeVolump = true
                     changeVolumeAmp(with: event)
                     return
                 }
@@ -860,8 +1062,8 @@ final class ColorEditor: Editor {
             let p = document.convertScreenToWorld(event.screenPoint)
             if let sheetView = document.sheetView(at: p) {
                 let sheetP = sheetView.convertFromWorld(p)
-                if sheetView.scoreView.noteIndex(at: sheetP,
-                                                 maxDistance: 15 * document.screenToWorldScale) != nil {
+                if sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
+                                                 scale: document.screenToWorldScale) != nil {
                     isChangePan = true
                     changePan(with: event)
                     return

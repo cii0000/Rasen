@@ -85,7 +85,7 @@ final class TextSlider: DragEditor {
                 switch type {
                 case .all:
                     let np = beganText.origin + sheetP - beganInP
-                    let interval = document.currentNoteTimeInterval()
+                    let interval = document.currentNoteTimeInterval
                     let beat = max(min(sheetView.animationView.beat(atX: np.x, interval: interval),
                                    sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: interval)),
                                    sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval) - (text.timeOption?.beatRange.length ?? 0))
@@ -96,7 +96,7 @@ final class TextSlider: DragEditor {
                 case .startBeat:
                     if var timeOption = text.timeOption {
                         let np = beganText.origin + sheetP - beganInP
-                        let interval = document.currentNoteTimeInterval()
+                        let interval = document.currentNoteTimeInterval
                         let beat = min(sheetView.animationView.beat(atX: np.x, interval: interval),
                                        sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: interval),
                                        timeOption.beatRange.end)
@@ -112,7 +112,7 @@ final class TextSlider: DragEditor {
                 case .endBeat:
                     if let beganTimeOption = beganText.timeOption {
                         let np = beganTextEndP + sheetP - beganInP
-                        let interval = document.currentNoteTimeInterval()
+                        let interval = document.currentNoteTimeInterval
                         let beat = max(sheetView.animationView.beat(atX: np.x, interval: interval),
                                        sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval),
                                        beganTimeOption.beatRange.start)
@@ -262,7 +262,7 @@ final class Looker: InputKeyEditor {
                 } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
                     let scoreView = sheetView.scoreView
                     let score = scoreView.model
-                    let nis = document.selectedNoteIndexes(from: scoreView)
+                    let nis = sheetView.noteIndexes(from: document.selections)
                     if !nis.isEmpty {
                         let notes = nis.map { score.notes[$0] }
                         let minNote = notes.min { $0.pitch < $1.pitch }!
@@ -293,10 +293,12 @@ final class Looker: InputKeyEditor {
                 document.show("Text".localized, at: p)
             }
         } else if let sheetView = document.sheetView(at: p),
-                  let note = sheetView.note(at: sheetView.convertFromWorld(p),
-                                            scale: document.screenToWorldScale) {
-            let fq = note.fq
-            let fqStr = "\(note.octavePitchString) (\(fq.string(digitsCount: 3)) Hz)".localized
+                  let noteI = sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
+                                                            scale: document.screenToWorldScale) {
+            let y = sheetView.scoreView.noteY(atX: sheetView.scoreView.convertFromWorld(p).x, at: noteI)
+            let pitch = Pitch(value: sheetView.scoreView.pitch(atY: y, interval: Rational(1, 12)))
+            let fq = pitch.fq
+            let fqStr = "\("Note".localized) \(pitch.octaveString) (\(fq.string(digitsCount: 3)) Hz)".localized
             document.show(fqStr, at: p)
         } else if let sheetView = document.sheetView(at: p),
                     let ci = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
@@ -763,8 +765,7 @@ final class TextEditor: Editor {
         if !event.isRepeat, let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
             let scoreView = sheetView.scoreView
             let scoreP = scoreView.convertFromWorld(p)
-            let maxD = 15 * document.screenToWorldScale
-            if let ni = scoreView.noteIndex(at: scoreP, maxDistance: maxD) {
+            if let ni = scoreView.noteIndex(at: scoreP, scale: document.screenToWorldScale) {
                 var note = scoreView.model.notes[ni]
                 let key = (event.inputKeyType.name
                     .applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? "").lowercased()
@@ -1611,6 +1612,9 @@ extension TextView {
         }
     }
     
+    var timeLineCenterY: Double {
+        (typesetter.firstReturnBounds?.minY ?? 0) + Sheet.timelineHalfHeight
+    }
     var beatRange: Range<Rational>? {
         model.timeOption?.beatRange
     }
@@ -1621,7 +1625,6 @@ extension TextView {
     func timelineNode(_ timeOption: TextTimeOption, from typesetter: Typesetter) -> [Node] {
         let sBeat = max(timeOption.beatRange.start, -10000),
             eBeat = min(timeOption.beatRange.end, 10000)
-        guard sBeat <= eBeat else { return [] }
         let sx = self.x(atBeat: sBeat)
         let ex = self.x(atBeat: eBeat)
         
@@ -1658,12 +1661,6 @@ extension TextView {
             let secX = x(atSec: sec)
             contentPathlines.append(.init(Rect(x: secX - lw / 2, y: sy - rulerH / 2,
                                                width: lw, height: rulerH)))
-        }
-        let tempoBeat = timeOption.beatRange.start.rounded(.down) + 1
-        if tempoBeat < timeOption.beatRange.end {
-            let np = Point(x(atBeat: tempoBeat), sy)
-            contentPathlines.append(Pathline(Rect(x: np.x - 1, y: np.y - rulerH / 2,
-                                                  width: 2, height: rulerH)))
         }
         
         var nodes = [Node]()
@@ -1724,31 +1721,9 @@ extension TextView {
         }
     }
     
-    func tempoPositionBeat(_ p: Point, scale: Double) -> Rational? {
-        guard let timeOption = model.timeOption else { return nil }
-        let tempoBeat = timeOption.beatRange.start.rounded(.down) + 1
-        if tempoBeat < timeOption.beatRange.end {
-            let np = Point(x(atBeat: tempoBeat), timelineFrame?.minY ?? 0)
-            return np.distance(p) < 15 * scale ? tempoBeat : nil
-        } else {
-            return nil
-        }
-    }
-    
     func contains(_ p: Point) -> Bool {
         containsTimeline(p)
         || (bounds?.contains(p) ?? false)
-    }
-    
-    func mainLineDistance(_ p: Point) -> Double? {
-        guard model.timeOption != nil else { return nil }
-        let lastB = typesetter.firstReturnBounds ?? Rect()
-        let y = lastB.minY
-        return abs(p.y - y)
-    }
-    func containsMainLine(_ p: Point, distance: Double) -> Bool {
-        guard containsTimeline(p), let d = mainLineDistance(p) else { return false }
-        return d < distance
     }
     
     private func updateMarkedRange() {

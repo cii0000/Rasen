@@ -326,7 +326,7 @@ final class RunEditor: InputKeyEditor {
                     }
                 } else if text.string == "Loudness get" {
                     if let sheetView = document.sheetView(at: p) {
-                        let maxD = 15 * document.screenToWorldScale
+                        let maxD = document.worldKnobEditDistance
                         var minD = Double.infinity, minContentView: SheetContentView?
                         for contentView in sheetView.contentsView.elementViews {
                             let d = contentView.mainLineDistance(contentView.convertFromWorld(p))

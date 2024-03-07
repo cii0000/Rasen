@@ -171,11 +171,11 @@ extension Reswave {
 
 struct Rendnote {
     var fq: Double
-    var sourceFilter: SourceFilter
+    var sourceFilter: NoiseSourceFilter
     var formantFilterInterpolation: Interpolation<FormantFilter>?
     var deltaFormantFilterInterpolation: Interpolation<FormantFilter>?
     var fAlpha: Double
-    var seed: UInt64
+    var noiseSeed: UInt64
     var overtone: Overtone
     var pitbend: Pitbend
     var secRange: Range<Double>
@@ -204,12 +204,12 @@ extension Rendnote {
         
         let pitbend = note.pitbend.with(scale: eSec - sSec)
         self.init(fq: note.fq,
-                  sourceFilter: note.tone.sourceFilter,
+                  sourceFilter: note.firstTone.noiseSourceFilter(isNoise: note.isNoise),
                   formantFilterInterpolation: nil,
                   deltaFormantFilterInterpolation: nil,
                   fAlpha: 1,
-                  seed: Rendnote.seed(fromFq: note.fq, sec: sSec),
-                  overtone: note.tone.overtone,
+                  noiseSeed: Rendnote.seed(fromFq: note.fq, sec: sSec),
+                  overtone: note.firstTone.overtone,
                   pitbend: pitbend,
                   secRange: sSec ..< eSec,
                   startDeltaSec: dSec,
@@ -233,7 +233,7 @@ extension Rendnote {
         
         let halfFFTSize = fftSize / 2
         let secLength = secRange.length.isInfinite ?
-            1 : secRange.length
+            1 : min(secRange.length, 100000)
         let releaseDur = self.waver.duration(fromSecLength: secLength)
         let nCount = Int((releaseDur * sampleRate).rounded(.up))
         
@@ -253,6 +253,7 @@ extension Rendnote {
             var i = 1
             return (0 ..< halfFFTSize).map { fqi in
                 let nfq = Double(fqi) / Double(halfFFTSize) * maxFq
+                guard nfq >= scaledFq else { return 0 }
                 while i + 1 < fqSmps.count, nfq > fqSmps[i].x { i += 1 }
                 let smp: Double
                 if let lastFqSmp = fqSmps.last, nfq >= lastFqSmp.x {
@@ -281,32 +282,32 @@ extension Rendnote {
                 return fq < cutFq && vsRange.contains(ni) ? ni : nil
             }
             
-            var nfq = scaledFq, fqi = 1
+            var nfq = scaledFq, fqI = 1
             if overtone.isAll {
                 while let ni = enabledIndex(atFq: nfq) {
                     let nii = Int(ni)
                     let sfScale = sourceFilter.amp(atFq: nfq * fqScale)
-                    vs[nii] = sfScale / (Double(fqi) ** sqfa)
-                    overtones[nii] = fqi
+                    vs[nii] = sfScale / (Double(fqI) ** sqfa)
+                    overtones[nii] = fqI
                     nfq += scaledFq
-                    fqi += 1
+                    fqI += 1
                 }
             } else if overtone.isOne {
                 if let ni = enabledIndex(atFq: nfq) {
                     let nii = Int(ni)
                     let sfScale = sourceFilter.amp(atFq: nfq * fqScale)
                     vs[nii] = sfScale
-                    overtones[nii] = fqi
+                    overtones[nii] = fqI
                 }
             } else {
                 while let ni = enabledIndex(atFq: nfq) {
                     let nii = Int(ni)
-                    let partsScale = overtone.scale(at: fqi)
-                    let sfScale = sourceFilter.amp(atFq: nfq * fqScale)
-                    vs[nii] = partsScale * sfScale / (Double(fqi) ** sqfa)
-                    overtones[nii] = fqi
+                    let overtoneSmp = overtone.smp(at: fqI)
+                    let sfSmp = sourceFilter.smp(atFq: nfq * fqScale)
+                    vs[nii] = Volume(smp: overtoneSmp * sfSmp).amp / (Double(fqI) ** sqfa)
+                    overtones[nii] = fqI
                     nfq += scaledFq
-                    fqi += 1
+                    fqI += 1
                 }
             }
             
@@ -369,30 +370,30 @@ extension Rendnote {
                     return vsRange.contains(ni) ? ni : nil
                 }
                 
-                var nfq = scaledFq, fqi = 1
+                var nfq = scaledFq, fqI = 1
                 if overtone.isAll {
                     while let ni = enabledIndex(atFq: nfq) {
                         let nii = Int(ni)
-                        vs[nii] = fqi > 0 ? 1 : 0
-                        overtones[nii] = fqi
+                        vs[nii] = fqI > 0 ? 1 : 0
+                        overtones[nii] = fqI
                         
                         nfq += scaledFq
-                        fqi += 1
+                        fqI += 1
                     }
                 } else if overtone.isOne {
                     if let ni = enabledIndex(atFq: nfq) {
                         let nii = Int(ni)
-                        vs[nii] = fqi > 0 ? 1 : 0
-                        overtones[nii] = fqi
+                        vs[nii] = fqI > 0 ? 1 : 0
+                        overtones[nii] = fqI
                     }
                 } else {
                     while let ni = enabledIndex(atFq: nfq) {
                         let nii = Int(ni)
-                        vs[nii] = fqi > 0 ? overtone.scale(at: fqi) : 0
-                        overtones[nii] = fqi
+                        vs[nii] = fqI > 0 ? Volume(smp: overtone.smp(at: fqI)).amp : 0
+                        overtones[nii] = fqI
                         
                         nfq += scaledFq
-                        fqi += 1
+                        fqI += 1
                     }
                 }
             } else {
@@ -402,32 +403,32 @@ extension Rendnote {
                 }
                 let sqfa = fAlpha * 0.5
                 
-                var nfq = scaledFq, fqi = 1
+                var nfq = scaledFq, fqI = 1
                 if overtone.isAll {
                     while let ni = enabledIndex(atFq: nfq) {
                         let nii = Int(ni)
                         let sfScale = sourceFilter.noisedAmp(atFq: nfq * fqScale)
-                        vs[nii] = sfScale / (Double(fqi) ** sqfa)
-                        overtones[nii] = fqi
+                        vs[nii] = sfScale / (Double(fqI) ** sqfa)
+                        overtones[nii] = fqI
                         nfq += scaledFq
-                        fqi += 1
+                        fqI += 1
                     }
                 } else if overtone.isOne {
                     if let ni = enabledIndex(atFq: nfq) {
                         let nii = Int(ni)
                         let sfScale = sourceFilter.noisedAmp(atFq: nfq * fqScale)
                         vs[nii] = sfScale
-                        overtones[nii] = fqi
+                        overtones[nii] = fqI
                     }
                 } else {
                     while let ni = enabledIndex(atFq: nfq) {
                         let nii = Int(ni)
-                        let partsScale = overtone.scale(at: fqi)
-                        let sfScale = sourceFilter.noisedAmp(atFq: nfq * fqScale)
-                        vs[nii] = partsScale * sfScale / (Double(fqi) ** sqfa)
-                        overtones[nii] = fqi
+                        let overtoneSmp = overtone.smp(at: fqI)
+                        let sfAmp = sourceFilter.noisedAmp(atFq: nfq * fqScale)
+                        vs[nii] = Volume(smp: overtoneSmp).amp * sfAmp / (Double(fqI) ** sqfa)
+                        overtones[nii] = fqI
                         nfq += scaledFq
-                        fqi += 1
+                        fqI += 1
                     }
                 }
             }
@@ -522,7 +523,7 @@ extension Rendnote {
                         let formantFilter = formantFilterInterpolation.value(withTime: sec)
                             ?? formantFilterInterpolation.keys.last?.value
                             ?? .empty
-                        let sourceFilter = sourceFilter.union(SourceFilter(formantFilter))
+                        let sourceFilter = sourceFilter.union(NoiseSourceFilter(formantFilter))
                         return vDSP.subtract(spectrum(from: sourceFilter.fqSmps),
                                              spectrum(from: sourceFilter.noiseFqSmps))
                     }
@@ -537,7 +538,7 @@ extension Rendnote {
         
         if isNoise {
             let noiseSamples = vDSP.gaussianNoise(count: nCount,
-                                                  seed: seed)
+                                                  seed: noiseSeed)
             
             var nNoiseSamples: [Double]
             if let formantFilterInterpolation {
@@ -550,7 +551,7 @@ extension Rendnote {
                     let formantFilter = formantFilterInterpolation.value(withTime: t)
                         ?? formantFilterInterpolation.keys.last?.value
                         ?? .empty
-                    let sourceFilter = SourceFilter(formantFilter)
+                    let sourceFilter = NoiseSourceFilter(formantFilter)
                     return spectrum(from: sourceFilter.noiseFqSmps)
                 }
                 nNoiseSamples = vDSP.apply(noiseSamples, scales: spectrogram)
@@ -674,65 +675,29 @@ extension vDSP {
     }
 }
 
-struct SourceFilter: Hashable, Codable {
+struct Overtone: Hashable, Codable {
+    var evenSmp = 1.0, oddSmp = 1.0
+}
+extension Overtone {
+    var isAll: Bool {
+        evenSmp == 1 && oddSmp == 1
+    }
+    var isOne: Bool {
+        evenSmp == 0 && oddSmp == 0
+    }
+    func smp(at i: Int) -> Double {
+        i == 1 ? 1 : (i % 2 == 0 ? evenSmp : oddSmp)
+    }
+}
+
+struct NoiseSourceFilter: Hashable, Codable {
     static let maxFq = 22050.0, maxMel = 4000.0
     
     var fqSmps = [Point(0, 1), Point(4000, 0)]
     var noiseFqSmps = [Point(0, 0), Point(4000, 0)]
     var noiseTs = [0.0, 0.0]
 }
-extension SourceFilter: Protobuf {
-    init(_ pb: PBSourceFilter) throws {
-        fqSmps = pb.fqSmps.compactMap { try? Point($0) }
-        fqSmps = fqSmps.map {
-            .init($0.x.clipped(min: 0, max: Self.maxFq),
-                  $0.y.clipped(min: 0, max: 1))
-        }.sorted { $0.x < $1.x }
-        
-        noiseTs = pb.noiseTs.map { $0.clipped(min: 0, max: 1) }
-        if noiseTs.count < fqSmps.count {
-            noiseTs += .init(repeating: 0, count: fqSmps.count - noiseTs.count)
-        } else if noiseTs.count > fqSmps.count {
-            noiseTs.removeLast(noiseTs.count - fqSmps.count)
-        }
-        noiseFqSmps = fqSmps.enumerated().map { .init($0.element.x, $0.element.y * noiseTs[$0.offset]) }
-    }
-    var pb: PBSourceFilter {
-        .with {
-            $0.fqSmps = fqSmps.map { $0.pb }
-            $0.noiseTs = noiseTs
-        }
-    }
-}
-enum SourceFilterType {
-    case fqSmp, fqNoiseSmp, editFqNoiseSmp
-}
-extension SourceFilter {
-    subscript(i: Int, type: SourceFilterType) -> Point {
-        get {
-            switch type {
-            case .fqSmp: fqSmps[i]
-            case .fqNoiseSmp: noiseFqSmps[i]
-            case .editFqNoiseSmp: .init(fqSmps[i].x, fqSmps[i].y * noiseTs[i] * 0.75)
-            }
-        }
-        set {
-            switch type {
-            case .fqSmp:
-                fqSmps[i] = newValue
-                noiseFqSmps[i] = .init(newValue.x, newValue.y * noiseTs[i])
-            case .fqNoiseSmp:
-                fqSmps[i].x = newValue.x
-                noiseTs[i] = (fqSmps[i].y == 0 ? 0 : newValue.y / fqSmps[i].y).clipped(min: 0, max: 1)
-                noiseFqSmps[i] = newValue
-            case .editFqNoiseSmp:
-                let smp = fqSmps[i].y
-                noiseTs[i] = (smp == 0 ? 0 : newValue.y / smp / 0.75).clipped(min: 0, max: 1)
-                noiseFqSmps[i] = .init(newValue.x, smp * noiseTs[i])
-                fqSmps[i].x = newValue.x
-            }
-        }
-    }
+extension NoiseSourceFilter {
     mutating func formMultiplyFq(_ x: Double) {
         fqSmps = fqSmps.map { .init($0.x * x, $0.y) }
         noiseFqSmps = noiseFqSmps.map { .init($0.x * x, $0.y) }
@@ -744,7 +709,7 @@ extension SourceFilter {
     }
 }
 
-extension SourceFilter {
+extension NoiseSourceFilter {
     init(fqSmps: [Point] = [], noiseFqSmps: [Point] = []) {
         if noiseFqSmps.isEmpty {
             self.noiseFqSmps = fqSmps.map { Point($0.x, 0) }
@@ -778,7 +743,7 @@ extension SourceFilter {
 //        other
     }
 }
-extension SourceFilter {
+extension NoiseSourceFilter {
     init(_ formantFilter: FormantFilter) {
         var ps = [Point]()
         ps.reserveCapacity(formantFilter.count * 4)
@@ -873,7 +838,7 @@ extension SourceFilter {
         self.init(fqSmps: ps, noiseFqSmps: ns, noiseTs: noiseTs)
     }
 }
-extension SourceFilter {
+extension NoiseSourceFilter {
     var isEmpty: Bool {
         fqSmps.isEmpty
     }

@@ -1428,11 +1428,17 @@ extension Line {
         return p * reciprocalCount
     }
     func minDistanceSquared(at p: Point) -> Double {
-        var minDSquared = Double.infinity
-        for b in bezierSequence {
-            minDSquared = min(minDSquared, b.minDistanceSquared(from: p))
+        if controls.count == 1 {
+            return controls[0].point.distanceSquared(p)
+        } else if controls.count == 2 {
+            return Edge(controls[0].point, controls[1].point).distanceSquared(from: p)
+        } else {
+            var minDSquared = Double.infinity
+            for b in bezierSequence {
+                minDSquared = min(minDSquared, b.minDistanceSquared(from: p))
+            }
+            return minDSquared
         }
-        return minDSquared
     }
     func nearestIndexValue(at p: Point) -> LineIndexValue {
         let v = nearest(at: p)
