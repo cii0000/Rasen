@@ -193,7 +193,7 @@ extension Rendnote {
         hasher.combine(sec)
         return UInt64(abs(hasher.finalize()))
     }
-    init(note: Note, score: Score, startSec: Double, sampleRate: Double) {
+    init(note: Note, score: Score, startSec: Double, sampleRate: Double = Audio.defaultSampleRate) {
         let startBeat = note.beatRange.start
         let endBeat = note.beatRange.end
         let snapBeat = startBeat.interval(scale: Rational(1, 4))
@@ -213,7 +213,7 @@ extension Rendnote {
                   pitbend: pitbend,
                   secRange: sSec ..< eSec,
                   startDeltaSec: dSec,
-                  volumeAmp: note.volumeAmp,
+                  volumeAmp: 1,
                   waver: .init(envelope: note.envelope, pitbend: pitbend),
                   sampleRate: sampleRate,
                   dftCount: Audio.defaultDftCount)

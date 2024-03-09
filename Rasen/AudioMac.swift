@@ -56,14 +56,6 @@ final class NotePlayer {
             playNote()
         }
     }
-    func set(volume: Volume, at i: Int) {
-        aNotes[i].volume = volume
-        noder.rendnotes[i].volumeAmp = volume.amp
-    }
-    func set(pan: Double, at i: Int) {
-        aNotes[i].pan = pan
-//        noder.rendnotes = volume.amp
-    }
     var volume: Volume {
         get { noder.volume }
         set { noder.volume = .init(amp: newValue.amp.clipped(min: Volume.minAmp, max: Volume.maxAmp)) }
@@ -74,7 +66,7 @@ final class NotePlayer {
     
     struct NotePlayerError: Error {}
     
-    init(notes: [Note], volume: Volume = .init(smp: Volume.mainSmp), pan: Double = 0,
+    init(notes: [Note], volume: Volume = .init(smp: Volume.maxSmp), pan: Double = 0,
          reverb: Double = Audio.defaultReverb) throws {
         
         guard let sequencer = Sequencer(audiotracks: [],
@@ -120,11 +112,11 @@ final class NotePlayer {
                          formantFilterInterpolation: nil,
                          fAlpha: 1,
                          noiseSeed: Rendnote.seed(fromFq: fq, sec: .infinity),
-                         overtone: note.tone.overtone,
+                         overtone: .init(),
                          pitbend: note.pitbend,
                          secRange: -.infinity ..< .infinity,
                          startDeltaSec: 0,
-                         volumeAmp: note.volumeAmp,
+                         volumeAmp: 1,
                          waver: .init(envelope: note.envelope, pitbend: .init()),
                          sampleRate: noder.format.sampleRate,
                          dftCount: Audio.defaultDftCount,
@@ -694,7 +686,7 @@ final class AVAudioScoreNoder {
                                 releaseTime: memowave.releaseSec,
                                 startTime: memowave.startSec)
                     let pitbendAmp = waver.pitbend
-                        .stereo(atT: nSec - memowave.startSec).amp
+                        .stereo(atT: nSec - memowave.startSec).amp.clipped(min: 0, max: 1)
                     let nVolumeAmp
                         = memowave.volumeAmp * waverAmp * pitbendAmp
                     
@@ -750,7 +742,7 @@ final class Sequencer {
     let secoundDuration: Double
     
     init?(audiotracks: [Audiotrack], isAsync: Bool, startSec: Double,
-          perceptionDelaySec: Double = 0.05,
+          perceptionDelaySec: Double = 0,
           clipHandler: ((Float) -> ())? = nil) {
         let audiotracks = audiotracks.filter { !$0.isEmpty }
         
@@ -778,7 +770,9 @@ final class Sequencer {
                 switch value {
                 case .score(let score):
                     guard !score.notes.isEmpty else { continue }
-                    let rendnotes = Score.rendnotes(from: score, startSec: sSec)
+                    let rendnotes = score.notes.sorted(by: { $0.beatRange.start < $1.beatRange.start }).map {
+                        Rendnote(note: $0, score: score, startSec: sSec)
+                    }
                     guard !rendnotes.isEmpty else { continue }
                     
                     let noder = AVAudioScoreNoder(rendnotes: rendnotes,

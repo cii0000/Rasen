@@ -999,7 +999,9 @@ final class LineEditor: Editor {
                      pitchSmps: [.init(Double(Score.pitchRange.start), 1),
                                  .init(Double(Score.pitchRange.end), 1)]) :
                 Tone()
-                let note = Note(pitch: pitch, beatRange: beatRange, tone: tone, isNoise: isStraight)
+                let note = Note(beatRange: beatRange, pitch: pitch,
+                                pitbend: .init([.init(t: 0, pitch: 0, tone: tone)]),
+                                isNoise: isStraight)
                 
                 noteIndex = count
                 notePitch = pitch
@@ -1012,10 +1014,8 @@ final class LineEditor: Editor {
                     notePlayer.notes = [note]
                     notePlayer.volume = volume
                 } else {
-                    let note = isStraight ? Note(pitch: pitch, beatRange: beatRange) : note
-                    notePlayer = try? NotePlayer(notes: [note],
-                                                 volume: volume,
-                                                 pan: note.pan)
+                    let note = isStraight ? Note(beatRange: beatRange, pitch: pitch) : note
+                    notePlayer = try? NotePlayer(notes: [note], volume: volume)
                     sheetView.notePlayer = notePlayer
                 }
                 notePlayer?.play()
@@ -1050,7 +1050,9 @@ final class LineEditor: Editor {
                      pitchSmps: [.init(Double(Score.pitchRange.start), 1),
                                  .init(Double(Score.pitchRange.end), 1)]) :
                 Tone()
-                let note = Note(pitch: pitch, beatRange: beatRange, tone: tone, isNoise: isStraight)
+                let note = Note(beatRange: beatRange, pitch: pitch,
+                                pitbend: .init([.init(t: 0, pitch: 0, tone: tone)]),
+                                isNoise: isStraight)
                 let isNote = notePitch != pitch
                 
                 if isNote {
@@ -1088,7 +1090,9 @@ final class LineEditor: Editor {
                      pitchSmps: [.init(Double(Score.pitchRange.start), 1),
                                  .init(Double(Score.pitchRange.end), 1)]) :
                 Tone()
-                let note = Note(pitch: pitch, beatRange: beatRange, tone: tone, isNoise: isStraight)
+                let note = Note(beatRange: beatRange, pitch: pitch,
+                                pitbend: .init([.init(t: 0, pitch: 0, tone: tone)]),
+                                isNoise: isStraight)
                     
 //                   sheetView.scoresView.elementViews[si]
 //                      .model.notes[ni] = note

@@ -102,24 +102,6 @@ extension ColorValue: Protobuf {
 }
 extension ColorValue: Codable {}
 
-struct ToneValue {
-    var tone: Tone
-    var noteIndexes: [Int]
-}
-extension ToneValue: Protobuf {
-    init(_ pb: PBToneValue) throws {
-        tone = try .init(pb.tone)
-        noteIndexes = pb.noteIndexes.map { max(.init($0), 0) }
-    }
-    var pb: PBToneValue {
-        .with {
-            $0.tone = tone.pb
-            $0.noteIndexes = noteIndexes.map { .init($0) }
-        }
-    }
-}
-extension ToneValue: Codable {}
-
 struct TextValue: Hashable, Codable {
     var string: String, replacedRange: Range<Int>,
         origin: Point?, size: Double?, widthCount: Double?
@@ -641,7 +623,6 @@ enum SheetUndoItem {
     case insertNotes(_ noteIndexValues: [IndexValue<Note>])
     case replaceNotes(_ noteIndexValue: [IndexValue<Note>])
     case removeNotes(noteIndexes: [Int])
-    case changedTones(_ toneValue: ToneValue)
     case insertDraftNotes(_ noteIndexValues: [IndexValue<Note>])
     case removeDraftNotes(noteIndexes: [Int])
     case insertContents(_ contentIndexValues: [IndexValue<Content>])
@@ -694,7 +675,6 @@ extension SheetUndoItem: UndoItem {
         case .insertNotes: .reversible
         case .replaceNotes: .lazyReversible
         case .removeNotes: .unreversible
-        case .changedTones: .lazyReversible
         case .insertDraftNotes: .reversible
         case .removeDraftNotes: .unreversible
         case .insertContents: .reversible
@@ -794,9 +774,6 @@ extension SheetUndoItem: UndoItem {
              self
         case .removeNotes:
              nil
-            
-        case .changedTones:
-             self
             
         case .insertDraftNotes(let nivs):
              .removeDraftNotes(noteIndexes: nivs.map { $0.index })
@@ -905,8 +882,6 @@ extension SheetUndoItem: Protobuf {
             self = .replaceNotes(try [IndexValue<Note>](notes))
         case .removeNotes(let noteIndexes):
             self = .removeNotes(noteIndexes: try [Int](noteIndexes))
-        case .changedTones(let toneValue):
-            self = .changedTones(try ToneValue(toneValue))
         case .insertDraftNotes(let noteIndexValues):
             self = .insertDraftNotes(try [IndexValue<Note>](noteIndexValues))
         case .removeDraftNotes(let noteIndexes):
@@ -1008,8 +983,6 @@ extension SheetUndoItem: Protobuf {
                 $0.value = .replaceNotes(nivs.pb)
             case .removeNotes(let nis):
                 $0.value = .removeNotes(nis.pb)
-            case .changedTones(let toneValue):
-                $0.value = .changedTones(toneValue.pb)
             case .insertDraftNotes(let noteIndexValues):
                 $0.value = .insertDraftNotes(noteIndexValues.pb)
             case .removeDraftNotes(let noteIndexes):
@@ -1070,7 +1043,6 @@ extension SheetUndoItem: Codable {
         case insertNotes = "41"
         case replaceNotes = "42"
         case removeNotes = "43"
-        case changedTones = "44"
         case insertDraftNotes = "49"
         case removeDraftNotes = "50"
         case insertContents = "45"
@@ -1166,8 +1138,6 @@ extension SheetUndoItem: Codable {
             self = .replaceNotes(try container.decode([IndexValue<Note>].self))
         case .removeNotes:
             self = .removeNotes(noteIndexes: try container.decode([Int].self))
-        case .changedTones:
-            self = .changedTones(try container.decode(ToneValue.self))
         case .insertDraftNotes:
             self = .insertDraftNotes(try container.decode([IndexValue<Note>].self))
         case .removeDraftNotes:
@@ -1311,9 +1281,6 @@ extension SheetUndoItem: Codable {
         case .removeNotes(let vs):
             try container.encode(CodingTypeKey.removeNotes)
             try container.encode(vs)
-        case .changedTones(let toneValue):
-            try container.encode(CodingTypeKey.changedTones)
-            try container.encode(toneValue)
         case .insertDraftNotes(let noteIndexValues):
             try container.encode(CodingTypeKey.insertDraftNotes)
             try container.encode(noteIndexValues)
@@ -1380,7 +1347,6 @@ extension SheetUndoItem: CustomStringConvertible {
         case .insertNotes: "insertNotes"
         case .replaceNotes: "replaceNotes"
         case .removeNotes: "removeNotes"
-        case .changedTones: "changedTones"
         case .insertDraftNotes: "insertDraftNotes"
         case .removeDraftNotes: "removeDraftNotes"
         case .insertContents: "insertContents"

@@ -1491,9 +1491,11 @@ extension Path {
         let s = lw / 2, rlw = Line.defaultLineWidth / lw
         
         func append(from m: Int) {
+            guard m < colors.count else { return }
             rgbas.append(colors[m].rgba)
         }
         func append(from m: Int, t: Double) {
+            guard m < colors.count else { return }
             let rgba = Color.linear(colors[m - 1], colors[m], t: t).rgba
             rgbas.append(rgba)
         }
@@ -1501,6 +1503,7 @@ extension Path {
         func appendFirstCap(_ p: Point, angle a: Double, radius r: Double,
                             arcAngle: Double = .pi / 2,
                             at m: Int) {
+            guard m < colors.count else { return }
             rgbas.append(colors[m].rgba)
             let c = r * arcAngle * 2
             let count = c.isNaN ? 4 : max(4, Int(c) * 2)
@@ -1550,6 +1553,7 @@ extension Path {
         func appendLastCap(_ p: Point, angle a: Double, radius r: Double,
                            arcAngle: Double = .pi / 2,
                            at m: Int) {
+            guard m < colors.count else { return }
             let c = r * arcAngle * 2
             let count = c.isNaN ? 4 : max(4, Int(c) * 2)
             for _ in (1 ... count).reversed() {

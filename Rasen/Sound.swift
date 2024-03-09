@@ -197,7 +197,8 @@ struct Mel {
 }
 
 struct Stereo: Codable, Hashable {
-    var amp = 1.0, pan = 0.0, id = UUID()
+    static let defaultAmp = Volume(smp: 0.5).amp
+    var amp = defaultAmp, pan = 0.0, id = UUID()
 }
 extension Stereo {
     init(smp: Double, pan: Double) {
@@ -271,7 +272,7 @@ extension Stereo: MonoInterpolatable {
 struct Tone: Hashable, Codable {
     var evenAmp = 1.0
     var oddAmp = 1.0
-    var fqAmps = [Point(0, Volume.mainAmp), Point(8000, Volume(smp: 0.1).amp)]//pitchAmps
+    var fqAmps = [Point(1, Volume.maxAmp), Point(8000, Volume(smp: 0.1).amp)]//pitchAmps
     var id = UUID()
 }
 extension Tone: Protobuf {
@@ -281,7 +282,7 @@ extension Tone: Protobuf {
         
         fqAmps = pb.fqAmps.compactMap { try? Point($0) }
         fqAmps = fqAmps.map {
-            .init($0.x.clipped(min: 0, max: NoiseSourceFilter.maxFq),
+            .init($0.x.clipped(min: 1, max: NoiseSourceFilter.maxFq),
                   $0.y.clipped(min: 0, max: 1))
         }.sorted { $0.x < $1.x }
         
@@ -514,7 +515,7 @@ extension Tone: MonoInterpolatable {
 }
 
 struct Pit: Codable, Hashable {
-    var t = 0.0, pitch = 0.0, stereo = Stereo(), tone = Tone()
+    var t = 0.0, pitch = 0.0, stereo = Stereo(), tone = Tone(), lyric = ""
 //    var beat = Rational(0), pitch = Rational(0)
 }
 extension Pit: Protobuf {
@@ -523,6 +524,7 @@ extension Pit: Protobuf {
         pitch = (try? pb.pitch.notInfiniteAndNAN()) ?? 0
         stereo = (try? .init(pb.stereo)) ?? .init()
         tone = (try? .init(pb.tone)) ?? .init()
+        lyric = pb.lyric
     }
     var pb: PBPit {
         .with {
@@ -530,6 +532,7 @@ extension Pit: Protobuf {
             $0.pitch = pitch
             $0.stereo = stereo.pb
             $0.tone = tone.pb
+            $0.lyric = lyric
         }
     }
 }
@@ -538,6 +541,22 @@ extension Pit {
         self.t = t
         self.pitch = pitch
         self.stereo = .init(amp: amp.clipped(min: 0, max: Volume.maxAmp))
+    }
+    init(t: Double, pitch: Double, smp: Double) {
+        self.t = t
+        self.pitch = pitch
+        self.stereo = .init(smp: smp.clipped(min: 0, max: Volume.maxSmp), pan: 0)
+    }
+}
+enum PitIDType {
+    case stereo, tone
+}
+extension Pit {
+    subscript(_ type: PitIDType) -> UUID {
+        switch type {
+        case .stereo: stereo.id
+        case .tone: tone.id
+        }
     }
 }
 
@@ -787,8 +806,8 @@ extension Pitbend {
         while sec < secDuration {
             if let v = interpolation.monoValue(withTime: sec / secDuration) {
                 let nv = 1 - Volume(amp: v.stereo.amp * waver.volumeAmp(atTime: sec, releaseTime: nil, startTime: 0)).smp
-                
-                cs.append(Self.panColor(pan: v.stereo.pan, brightness: nv))
+                let nnv = Color(lightness: nv * 100).rgba.r
+                cs.append(Self.panColor(pan: v.stereo.pan, brightness: Double(nnv)))
             }
             sec += dSec
         }
@@ -834,72 +853,51 @@ extension Envelope: Protobuf {
 }
 
 struct Note {
-    static let defaultVolume = Volume(smp: 0.5)
-    
     //controls
-    var pitch = Rational(0)
-    var pitbend = Pitbend()
     var beatRange = 0 ..< Rational(1, 4)
-    var volumeAmp = defaultVolume.amp
-    var pan = 0.0
-    var tone = Tone()
+    var pitch = Rational(0)
+    var pitbend = Pitbend([Pit(t: 0, pitch: 0, amp: Stereo.defaultAmp)])
     
     var envelope = Envelope()
     var isNoise = false
-    var lyric = ""//->control
     var id = UUID()
 }
 extension Note: Protobuf {
     init(_ pb: PBNote) throws {
+        beatRange = (try? RationalRange(pb.beatRange).value) ?? 0 ..< Rational(1, 4)
         pitch = (try? Rational(pb.pitch)) ?? 0
         pitbend = (try? Pitbend(pb.pitbend)) ?? .init()
-        beatRange = (try? RationalRange(pb.beatRange).value) ?? 0 ..< Rational(1, 4)
-        volumeAmp = ((try? pb.volumeAmp.notInfiniteAndNAN()) ?? 0)
-            .clipped(min: Volume.minAmp, max: Volume.maxAmp)
-        pan = pb.pan.clipped(min: -1, max: 1)
-        tone = (try? Tone(pb.tone)) ?? Tone()
+        if pitbend.isEmpty {
+            pitbend = .init([Pit(t: 0, pitch: 0, smp: 0.5)])
+        }
         envelope = (try? Envelope(pb.envelope)) ?? .init()
         isNoise = pb.isNoise
-        lyric = pb.lyric
         id = (try? UUID(pb.id)) ?? UUID()
     }
     var pb: PBNote {
         .with {
+            $0.beatRange = RationalRange(value: beatRange).pb
             $0.pitch = pitch.pb
             $0.pitbend = pitbend.pb
-            $0.beatRange = RationalRange(value: beatRange).pb
-            $0.volumeAmp = volumeAmp
-            $0.pan = pan
-            $0.tone = tone.pb
             $0.envelope = envelope.pb
             $0.isNoise = isNoise
-            $0.lyric = lyric
             $0.id = id.pb
         }
     }
 }
 extension Note: Hashable, Codable {}
 extension Note {
-    var mainLyric: String {
-        lyric.filter { !"^~/".contains($0) }
-    }
-    var isBreath: Bool {
-        lyric.contains("^")
-    }
-    var isVibrato: Bool {
-        lyric.contains("~")
-    }
-    var isVowelReduction: Bool {
-        lyric.contains("/")
-    }
-    
     var firstTone: Tone {
-        pitbend.pits.first?.tone ?? .init()
+        pitbend.pits.first!.tone
     }
     
-    var volume: Volume {
-        get { .init(amp: volumeAmp) }
-        set { volumeAmp = newValue.amp }
+    var pits: [Pit] {
+        get { pitbend.pits }
+        set { pitbend.pits = newValue }
+    }
+    
+    var octavePitchString: String {
+        Pitch(value: pitch).octaveString
     }
     var roundedPitch: Int {
         Int(pitch.rounded())
@@ -911,21 +909,8 @@ extension Note {
     func isEqualOtherThanBeatRange(_ other: Self) -> Bool {
         pitch == other.pitch
         && pitbend == other.pitbend
-        && volumeAmp == other.volumeAmp
-        && lyric == other.lyric
-        && isBreath == other.isBreath
-        && isVibrato == other.isVibrato
-        && isVowelReduction == other.isVowelReduction
-    }
-    
-    var octavePitchString: String {
-        Pitch(value: pitch).octaveString
-    }
-    
-    func smp(atSec sec: Double) -> Double {
-        let waver = Waver(envelope: envelope, pitbend: pitbend)
-        let amp = waver.volumeAmp(atTime: sec, releaseTime: nil, startTime: 0)
-        return Volume(amp: amp * volumeAmp).smp
+        && envelope == other.envelope
+        && isNoise == other.isNoise
     }
 }
 
@@ -1338,51 +1323,6 @@ extension Score {
         return Chord.splitedTimeRanges(timeRanges: brps)
     }
     
-    func pitbendPreNext(notes: [Note], at i: Int) -> (preFq: Double?, nextFq: Double?) {
-        let note = notes[i]
-        guard !note.lyric.isEmpty else { return (nil, nil) }
-        var preFq, nextFq: Double?
-        
-        var minD = Rational.max
-        for j in (0 ..< i).reversed() {
-            guard !notes[j].lyric.isEmpty else { continue }
-            guard notes[j].beatRange.end == note.beatRange.start else { break }
-            let d = abs(note.pitch - notes[j].pitch)
-            if d < Pitbend.enabledRecoilPitchDistance, d < minD {
-                preFq = notes[j].fq
-                minD = d
-            }
-        }
-        
-        minD = .max
-        for j in i + 1 ..< notes.count {
-            guard !notes[j].lyric.isEmpty else { continue }
-            guard notes[j].beatRange.start == note.beatRange.end else { break }
-            let d = abs(note.pitch - notes[j].pitch)
-            if d < Pitbend.enabledRecoilPitchDistance, d < minD {
-                preFq = notes[j].fq
-                minD = d
-            }
-        }
-        return (preFq, nextFq)
-    }
-    func pitbend(from note: Note, preFq: Double?, nextFq: Double?) -> Pitbend {
-        if !note.pitbend.isEmpty || (note.pitbend.isEmpty && !note.lyric.isEmpty) {
-            if !note.pitbend.isEmpty {
-                return note.pitbend
-            } else {
-                let isVowel = Phoneme.isSyllabicJapanese(Phoneme.phonemes(fromHiragana: note.lyric))
-                return Pitbend(isVibrato: note.isVibrato,
-                               duration: Double(sec(fromBeat: note.beatRange.length)),
-                               fq: note.fq,
-                               isVowel: isVowel,
-                               previousFq: preFq, nextFq: nextFq)
-            }
-        } else {
-            return .init()
-        }
-    }
-    
     func chordPitches(at range: Range<Rational>) -> [Int] {
         []//
     }
@@ -1516,13 +1456,9 @@ extension Audiotrack {
 }
 
 struct Volume: Hashable, Codable {
-    static let minSmp = 0.0
-    static let mainSmp = 1.0
-    static let maxSmp = 1.25
-    
-    static let minAmp = 0.0
-    static let mainAmp = 1.0
-    static let maxAmp = Volume(smp: maxSmp).amp
+    static let minSmp = 0.0, maxSmp = 1.0, smpRange = minSmp ... maxSmp
+    static let minAmp = 0.0, maxAmp = 1.0, ampRange = minAmp ... maxAmp
+    static let min = Self(amp: minAmp), max = Self(amp: maxAmp)
     
     var amp = 0.0
 }

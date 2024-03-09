@@ -769,7 +769,7 @@ final class Player: InputKeyEditor {
                     if let ni = scoreView.noteIndex(at: scoreP,
                                                     scale: document.screenToWorldScale) {
                         let beat = score.notes[ni].beatRange.start + score.beatRange.start
-                        sec = score.sec(fromBeat: beat) - Rational(1, 16)
+                        sec = score.sec(fromBeat: beat)
                         secRange = score.secRange
                         ids.insert(score.id)
                     } else if scoreView.containsMainLine(scoreP,
@@ -1362,14 +1362,16 @@ final class LineSlider: DragEditor {
                 let scoreView = sheetView.scoreView
                 let scoreP = scoreView.convertFromWorld(p)
                 if scoreView.model.enabled,
-                   let (ni, pitI) = scoreView.pitbendTuple(at: scoreP,
-                                                           scale: document.screenToWorldScale) {
+                   let (ni, pitI) = scoreView.noteAndPitI(at: scoreP,
+                                                           scale: document.screenToWorldScale),
+                   pitI > 0 {
+                    
                     self.sheetView = sheetView
                     self.noteI = ni
                     self.pitI = pitI
                     beganSP = sp
                     beganNote = scoreView.model.notes[ni]
-                    beganPit = scoreView.model.notes[ni].pitbend.pits[pitI]
+                    beganPit = scoreView.model.notes[ni].pits[pitI]
                     beganPitbend = scoreView.model.notes[ni].pitbend
                     isPit = true
                 } else if let (lineView, li) = sheetView.lineTuple(at: inP,
@@ -1779,10 +1781,11 @@ final class KeyframeInserter: InputKeyEditor {
                     let score = scoreView.model
                     let scoreP = scoreView.convertFromWorld(p)
                     if let (pitI, pitchSmpI) = scoreView.pitIAndPitchSmpI(at: scoreP, at: noteI) {
-                        let pitchSmp = scoreView.tonePitchAndSmp(at: scoreP, at: noteI)
+                        let pitchSmp = scoreView.pitchSmp(at: scoreP, at: noteI)
                         let oldTone = score.notes[noteI].pitbend.pits[pitI].tone
                         var tone = oldTone
-                        tone.pitchSmps.insert(pitchSmp, at: pitchSmpI + 1)
+                        let i = tone.pitchSmps.reversed().firstIndex(where: { pitchSmp.x > $0.x }) ?? 0
+                        tone.pitchSmps.insert(pitchSmp, at: i + 1)
                         tone.id = .init()
                         
                         let nis = (0 ..< score.notes.count).filter { score.notes[$0].pitbend.pits.contains { $0.tone.id == oldTone.id } }
@@ -1806,7 +1809,9 @@ final class KeyframeInserter: InputKeyEditor {
                     } else {
                         let pitT = scoreView.pitT(at: scoreP, at: noteI)
                         var pitbend = score.notes[noteI].pitbend
-                        let pit = pitbend.pit(atT: pitT)
+                        var pit = pitbend.pit(atT: pitT)
+                        pit.stereo.id = .init()
+                        pit.tone.id = .init()
                         pitbend.pits.append(pit)
                         pitbend.pits.sort { $0.t < $1.t }
                         var note = score.notes[noteI]

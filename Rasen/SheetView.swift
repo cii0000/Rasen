@@ -3197,15 +3197,6 @@ final class SheetView: View {
                 scoreView.updateScore()
                 sequencer?.scoreNoders[scoreView.model.id]?.remove(at: noteIndexes)
             }
-        case .changedTones(let toneValue):
-            changeTonesNode(toneValue)
-            
-            if isMakeRect {
-                let rect = toneValue.noteIndexes.reduce(into: Rect?.none) {
-                    $0 += scoreView.noteFrame(at: $1)
-                }
-                return (rect, [])
-            }
         case .insertDraftNotes(let nivs):
             insertDraftNode(nivs)
             scoreView.updateDraftNotes()
@@ -3433,10 +3424,6 @@ final class SheetView: View {
         if colorValue.isBackground {
             backgroundUUColor = colorValue.uuColor
         }
-    }
-    
-    private func changeTonesNode(_ toneValue: ToneValue) {
-        toneValue.noteIndexes.forEach { scoreView[$0].tone = toneValue.tone }
     }
     
     private func insertNode(_ nivs: [IndexValue<Note>]) {
@@ -3745,26 +3732,10 @@ final class SheetView: View {
         set(redoItem)
     }
     
-    func capture(_ tone: Tone, old oldTone: Tone, at ni: Int) {
-        capture(ToneValue(tone: tone, noteIndexes: [ni]),
-                old: ToneValue(tone: oldTone, noteIndexes: [ni]))
-    }
-    func capture(_ toneValue: ToneValue, old oldToneValue: ToneValue) {
-        let undoItem = SheetUndoItem.changedTones(oldToneValue)
-        let redoItem = SheetUndoItem.changedTones(toneValue)
-        append(undo: undoItem, redo: redoItem)
-    }
-    func replace(_ tone: Tone, at ni: Int) {
-        replace(tone, at: [ni])
-    }
     func replace(_ envelope: Envelope, at ni: Int) {
         var note = model.score.notes[ni]
         note.envelope = envelope
         replace(note, at: ni)
-    }
-    func replace(_ tone: Tone, at nis: [Int]) {
-        set(ToneValue(tone: tone, noteIndexes: nis),
-            old: ToneValue(tone: model.score.notes[nis[0]].tone, noteIndexes: nis))
     }
     func replace(_ envelope: Envelope, at nis: [Int]) {
         let nivs = nis.map {
@@ -3773,12 +3744,6 @@ final class SheetView: View {
             return IndexValue(value: note, index: $0)
         }
         replace(nivs)
-    }
-    func set(_ toneValue: ToneValue, old oldToneValue: ToneValue) {
-        let undoItem = SheetUndoItem.changedTones(oldToneValue)
-        let redoItem = SheetUndoItem.changedTones(toneValue)
-        append(undo: undoItem, redo: redoItem)
-        set(redoItem)
     }
     
     func insertDraft(_ nivs: [IndexValue<Note>]) {
@@ -4866,26 +4831,6 @@ final class SheetView: View {
                 history[result.version].values[result.valueIndex]
                     .saveUndoItemValue?.set(.removeNotes(noteIndexes: oldNIS), type: reversedType)
             }
-        case .changedTones(let toneValue):
-            updateFirstReverse()
-            func error() {
-                history[result.version]
-                    .values[result.valueIndex].error()
-            }
-            
-            if !toneValue.noteIndexes.isEmpty {
-                let maxNISI = toneValue.noteIndexes.max { $0 < $1 }
-                if let maxNISI = maxNISI, maxNISI < model.score.notes.count {
-                    for i in toneValue.noteIndexes {
-                        if model.score.notes[i].tone != toneValue.tone {
-                            error()
-                            break
-                        }
-                    }
-                } else {
-                    error()
-                }
-            }
         case .insertDraftNotes(let nivs):
             updateFirstReverse()
             let maxI = nivs.max { $0.index < $1.index }?.index
@@ -5804,41 +5749,6 @@ final class SheetView: View {
                                     redoItem: .removeNotes(noteIndexes: nis),
                                     isReversed: isUndo)
             }
-        case .changedTones(var toneValue):
-            updateFirstReverse()
-            var isChanged = false, isError = false
-            if !toneValue.noteIndexes.isEmpty {
-                let nis = toneValue.noteIndexes.filter {
-                    $0 < model.score.notes.count
-                }
-                if toneValue.noteIndexes != nis {
-                    toneValue.noteIndexes = nis
-                    isChanged = true
-                }
-            }
-            
-            if !isError {
-                var oToneValue = toneValue
-                if let ni = oToneValue.noteIndexes.first {
-                    oToneValue.tone = model.score.notes[ni].tone
-                }
-                
-                if isChanged {
-                    history[result.version].values[result.valueIndex].saveUndoItemValue
-                        = UndoItemValue(undoItem: .changedTones(oToneValue),
-                                        redoItem: .changedTones(toneValue),
-                                        isReversed: isUndo)
-                } else {
-                    switch result.type {
-                    case .undo:
-                        history[result.version].values[result.valueIndex]
-                            .undoItemValue?.redoItem = .changedTones(oToneValue)
-                    case .redo:
-                        history[result.version].values[result.valueIndex]
-                            .undoItemValue?.undoItem = .changedTones(oToneValue)
-                    }
-                }
-            }
         case .insertDraftNotes(var nivs):
             updateFirstReverse()
             var isChanged = false, notesCount = model.score.notes.count
@@ -6014,6 +5924,23 @@ final class SheetView: View {
             .map { scoreView.convertFromWorld($0) }
         return (0 ..< scoreView.model.notes.count).compactMap { i in
             fs.contains(where: { scoreView.intersectsNote($0, at: i) }) ? i : nil
+        }
+    }
+    func noteAndPitIndexes(from selections: [Selection]) -> [Int: [Int]] {
+        let fs = selections
+            .map { $0.rect }
+            .map { scoreView.convertFromWorld($0) }
+        return scoreView.model.notes.enumerated().reduce(into: [Int: [Int]]()) { (n, v) in
+            let noteI = v.offset, note = v.element
+            let pitIs = note.pits.enumerated().compactMap { (pitI, pit) in
+                fs.contains(where: { $0.contains(scoreView.pitPosition(atPitI: pitI, note: note)) }) ?
+                pitI : nil
+            }
+            n[noteI] = if pitIs.isEmpty {
+                fs.contains(where: { scoreView.intersectsNote($0, at: noteI) }) ? note.pits.count.array : []
+            } else {
+                pitIs
+            }
         }
     }
     func draftNoteIndexes(from selections: [Selection]) -> [Int] {

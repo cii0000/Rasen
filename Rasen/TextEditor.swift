@@ -765,18 +765,18 @@ final class TextEditor: Editor {
         if !event.isRepeat, let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
             let scoreView = sheetView.scoreView
             let scoreP = scoreView.convertFromWorld(p)
-            if let ni = scoreView.noteIndex(at: scoreP, scale: document.screenToWorldScale) {
-                var note = scoreView.model.notes[ni]
+            if let (noteI, pitI) = scoreView.noteAndPitI(at: scoreP, scale: document.screenToWorldScale) {
+                var note = scoreView.model.notes[noteI]
                 let key = (event.inputKeyType.name
                     .applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? "").lowercased()
-                if event.inputKeyType == .delete, !note.lyric.isEmpty {
-                    note.lyric.removeLast()
+                if event.inputKeyType == .delete, !note.pits[pitI].lyric.isEmpty {
+                    note.pits[pitI].lyric.removeLast()
                 } else if event.inputKeyType != .delete {
-                    note.lyric += key
+                    note.pits[pitI].lyric += key
                 }
                 
                 sheetView.newUndoGroup()
-                sheetView.replace(note, at: ni)
+                sheetView.replace(note, at: noteI)
                 return
             }
         }

@@ -223,6 +223,13 @@ extension Int {
         }
         return .int(y)
     }
+    
+    var range: Range<Int> {
+        0 ..< self
+    }
+    var array: [Int] {
+        range.map { $0 }
+    }
 }
 extension Int: Interpolatable {
     static func linear(_ f0: Int, _ f1: Int,

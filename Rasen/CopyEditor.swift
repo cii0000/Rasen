@@ -106,6 +106,7 @@ enum PastableObject {
     case normalizationValue(_ normalizationValue: Double)
     case normalizationRationalValue(_ normalizationRationalValue: Rational)
     case notesValue(_ notesValue: NotesValue)
+    case stereo(_ stereo: Stereo)
     case tone(_ tone: Tone)
     case envelope(_ envelope: Envelope)
 }
@@ -160,6 +161,8 @@ extension PastableObject {
              PastableObject.typeName(with: normalizationRationalValue)
         case .notesValue(let notesValue):
              PastableObject.typeName(with: notesValue)
+        case .stereo(let stereo):
+             PastableObject.typeName(with: stereo)
         case .tone(let tone):
              PastableObject.typeName(with: tone)
         case .envelope(let envelope):
@@ -207,6 +210,8 @@ extension PastableObject {
             self = .normalizationRationalValue(try Rational(serializedData: data))
         case PastableObject.objectTypeName(with: NotesValue.self):
             self = .notesValue(try NotesValue(serializedData: data))
+        case PastableObject.objectTypeName(with: Stereo.self):
+            self = .stereo(try Stereo(serializedData: data))
         case PastableObject.objectTypeName(with: Tone.self):
             self = .tone(try Tone(serializedData: data))
         case PastableObject.objectTypeName(with: Envelope.self):
@@ -251,6 +256,8 @@ extension PastableObject {
              try? normalizationRationalValue.serializedData()
         case .notesValue(let notesValue):
              try? notesValue.serializedData()
+        case .stereo(let stereo):
+             try? stereo.serializedData()
         case .tone(let tone):
              try? tone.serializedData()
         case .envelope(let envelope):
@@ -298,6 +305,8 @@ extension PastableObject: Protobuf {
             self = .normalizationRationalValue(try Rational(normalizationRationalValue))
         case .notesValue(let notesValue):
             self = .notesValue(try NotesValue(notesValue))
+        case .stereo(let stereo):
+            self = .stereo(try Stereo(stereo))
         case .tone(let tone):
             self = .tone(try Tone(tone))
         case .envelope(let envelope):
@@ -341,6 +350,8 @@ extension PastableObject: Protobuf {
                 $0.value = .normalizationRationalValue(normalizationRationalValue.pb)
             case .notesValue(let notesValue):
                 $0.value = .notesValue(notesValue.pb)
+            case .stereo(let stereo):
+                $0.value = .stereo(stereo.pb)
             case .tone(let tone):
                 $0.value = .tone(tone.pb)
             case .envelope(let envelope):
@@ -368,6 +379,7 @@ extension PastableObject: Codable {
         case normalizationValue = "12"
         case normalizationRationalValue = "15"
         case notesValue = "13"
+        case stereo = "22"
         case tone = "14"
         case envelope = "21"
     }
@@ -409,6 +421,8 @@ extension PastableObject: Codable {
             self = .normalizationRationalValue(try container.decode(Rational.self))
         case .notesValue:
             self = .notesValue(try container.decode(NotesValue.self))
+        case .stereo:
+            self = .stereo(try container.decode(Stereo.self))
         case .tone:
             self = .tone(try container.decode(Tone.self))
         case .envelope:
@@ -469,6 +483,9 @@ extension PastableObject: Codable {
         case .notesValue(let notesValue):
             try container.encode(CodingTypeKey.notesValue)
             try container.encode(notesValue)
+        case .stereo(let stereo):
+            try container.encode(CodingTypeKey.stereo)
+            try container.encode(stereo)
         case .tone(let tone):
             try container.encode(CodingTypeKey.tone)
             try container.encode(tone)
@@ -894,7 +911,7 @@ final class CopyEditor: Editor {
                     
                     //
                 case .pitchSmp(let pitI, _):
-                    let tone = score.notes[noteI].pitbend.pits[pitI].tone
+                    let tone = score.notes[noteI].pits[pitI].tone
                     Pasteboard.shared.copiedObjects = [.tone(tone)]
                     
                     //
@@ -1225,7 +1242,7 @@ final class CopyEditor: Editor {
                     
                     sheetView.updatePlaying()
                 case .pitchSmp(let pitI, let pitchSmpI):
-                    let oldTone = score.notes[noteI].pitbend.pits[pitI].tone
+                    let oldTone = score.notes[noteI].pits[pitI].tone
                     var tone = oldTone
                     if tone.pitchSmps.count <= 1 {
                         tone = .init()
@@ -1234,11 +1251,11 @@ final class CopyEditor: Editor {
                     }
                     tone.id = .init()
                     
-                    let nis = (0 ..< score.notes.count).filter { score.notes[$0].pitbend.pits.contains { $0.tone.id == oldTone.id } }
+                    let nis = (0 ..< score.notes.count).filter { score.notes[$0].pits.contains { $0.tone.id == oldTone.id } }
                     
                     let nivs = nis.map {
                         var note = score.notes[$0]
-                        note.pitbend.pits = note.pitbend.pits.map {
+                        note.pits = note.pits.map {
                             var pit = $0
                             pit.tone = tone
                             return pit
@@ -1249,7 +1266,7 @@ final class CopyEditor: Editor {
                     sheetView.newUndoGroup()
                     sheetView.replace(nivs)
                         
-//                    var tone = score.notes[noteI].pitbend.pits[pitI].tone
+//                    var tone = score.notes[noteI].pits[pitI].tone
 //                    tone.pitchSmps.remove(at: pitchSmpI)
                     
     //                Pasteboard.shared.copiedObjects = [.formant(formant)]
@@ -1257,13 +1274,17 @@ final class CopyEditor: Editor {
 //                    sheetView.replace(tone, at: noteI)
                     return true
                 }
-            } else if let (noteI, pitI) = scoreView.pitbendTuple(at: scoreP,
+            } else if let (noteI, pitI) = scoreView.noteAndPitI(at: scoreP,
                                                                  scale: document.screenToWorldScale) {
-                var pitbend = score.notes[noteI].pitbend
-                pitbend.pits.remove(at: pitI)
+                var pits = score.notes[noteI].pits
+                pits.remove(at: pitI)
                 var note = score.notes[noteI]
-                note.pitbend = pitbend
-
+                if pits.isEmpty {
+                    note.pits = [.init(t: 0, pitch: 0, amp: Stereo.defaultAmp)]
+                } else {
+                    note.pits = pits
+                }
+                
                 sheetView.newUndoGroup()
                 sheetView.replace(note, at: noteI)
                 
@@ -1776,6 +1797,8 @@ final class CopyEditor: Editor {
             break
         case .notesValue(let notesValue):
             updateNotes(notesValue.notes)
+        case .stereo:
+            break
         case .tone:
             break
         case .envelope:
@@ -2489,25 +2512,79 @@ final class CopyEditor: Editor {
             sheetView.append(notes)
             
             sheetView.updatePlaying()
-        case .tone(let tone):
+        case .stereo(let stereo):
             guard let sheetView = document.sheetView(at: shp) else { return }
             if sheetView.model.score.enabled {
                 let scoreView = sheetView.scoreView
-                if let noteI = scoreView.noteIndex(at: scoreView.convertFromWorld(p),
-                                                scale: document.screenToWorldScale) {
+                if let (noteI, pitI) = scoreView.noteAndPitI(at: scoreView.convertFromWorld(p),
+                                                             scale: document.screenToWorldScale) {
                     if document.isSelect(at: p) {
                         let score = scoreView.model
-                        let nis = sheetView.noteIndexes(from: document.selections)
-                            .filter { score.notes[$0].tone != tone }
-                        if !nis.isEmpty {
+                        let nis = sheetView.noteAndPitIndexes(from: document.selections)
+                        var nivs = [IndexValue<Note>]()
+                        for (noteI, pitIs) in nis {
+                            var note = score.notes[noteI], isChanged = false
+                            for pitI in pitIs {
+                                if note.pits[pitI].stereo != stereo {
+                                    note.pits[pitI].stereo = stereo
+                                    isChanged = true
+                                }
+                            }
+                            if isChanged {
+                                nivs.append(.init(value: note, index: noteI))
+                            }
+                        }
+                        if !nivs.isEmpty {
                             sheetView.newUndoGroup()
-                            sheetView.replace(tone, at: nis)
+                            sheetView.replace(nivs)
                             
                             sheetView.updatePlaying()
                         }
                     } else {
+                        var note = scoreView.model.notes[noteI]
+                        note.pits[pitI].stereo = stereo
+                        
                         sheetView.newUndoGroup()
-                        sheetView.replace(tone, at: noteI)
+                        sheetView.replace(note, at: noteI)
+                        
+                        sheetView.updatePlaying()
+                    }
+                }
+            }
+        case .tone(let tone):
+            guard let sheetView = document.sheetView(at: shp) else { return }
+            if sheetView.model.score.enabled {
+                let scoreView = sheetView.scoreView
+                if let (noteI, pitI) = scoreView.noteAndPitI(at: scoreView.convertFromWorld(p),
+                                                             scale: document.screenToWorldScale) {
+                    if document.isSelect(at: p) {
+                        let score = scoreView.model
+                        let nis = sheetView.noteAndPitIndexes(from: document.selections)
+                        var nivs = [IndexValue<Note>]()
+                        for (noteI, pitIs) in nis {
+                            var note = score.notes[noteI], isChanged = false
+                            for pitI in pitIs {
+                                if note.pits[pitI].tone != tone {
+                                    note.pits[pitI].tone = tone
+                                    isChanged = true
+                                }
+                            }
+                            if isChanged {
+                                nivs.append(.init(value: note, index: noteI))
+                            }
+                        }
+                        if !nivs.isEmpty {
+                            sheetView.newUndoGroup()
+                            sheetView.replace(nivs)
+                            
+                            sheetView.updatePlaying()
+                        }
+                    } else {
+                        var note = scoreView.model.notes[noteI]
+                        note.pits[pitI].tone = tone
+                        
+                        sheetView.newUndoGroup()
+                        sheetView.replace(note, at: noteI)
                         
                         sheetView.updatePlaying()
                     }
@@ -2559,6 +2636,7 @@ final class CopyEditor: Editor {
         case .normalizationValue: false
         case .normalizationRationalValue: false
         case .notesValue: true
+        case .stereo: false
         case .tone: false
         case .envelope: false
         }
@@ -3023,12 +3101,44 @@ final class LineColorCopier: InputKeyEditor {
             return true
         } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
             let scoreView = sheetView.scoreView
-            if let noteI = scoreView.noteIndex(at: scoreView.convertFromWorld(p),
-                                               scale: document.screenToWorldScale) {
+            if let (noteI, pitI) = scoreView.noteAndPitI(at: scoreView.convertFromWorld(p),
+                                                         scale: document.screenToWorldScale) {
                 let score = scoreView.model
-                let tone = score.notes[noteI].tone
-                if isSendPasteboard {
-                    Pasteboard.shared.copiedObjects = [.tone(tone)]
+                
+                if scoreView.isFullEdit {
+                    let tone = score.notes[noteI].pits[pitI].tone
+                    if isSendPasteboard {
+                        Pasteboard.shared.copiedObjects = [.tone(tone)]
+                    }
+                } else {
+                    let stereo = score.notes[noteI].pits[pitI].stereo
+                    if isSendPasteboard {
+                        Pasteboard.shared.copiedObjects = [.stereo(stereo)]
+                    }
+                }
+                
+                let scale = 1 / document.worldToScreenScale
+                let lw = Line.defaultLineWidth
+                let nlw = max(lw * 1.5, lw * 2.5 * scale, 1 * scale)
+                let noteNode = scoreView.noteNode(from: score.notes[noteI], color: .selected, lineWidth: nlw)
+                noteNode.attitude.position = scoreView.node.convertToWorld(Point())
+                selectingLineNode.children = [noteNode]
+                
+                return true
+            } else if let noteI = scoreView.noteIndex(at: scoreView.convertFromWorld(p),
+                                                      scale: document.screenToWorldScale) {
+                let score = scoreView.model
+                
+                if scoreView.isFullEdit {
+                    let tone = score.notes[noteI].pits[0].tone
+                    if isSendPasteboard {
+                        Pasteboard.shared.copiedObjects = [.tone(tone)]
+                    }
+                } else {
+                    let stereo = score.notes[noteI].pits[0].stereo
+                    if isSendPasteboard {
+                        Pasteboard.shared.copiedObjects = [.stereo(stereo)]
+                    }
                 }
                 
                 let scale = 1 / document.worldToScreenScale

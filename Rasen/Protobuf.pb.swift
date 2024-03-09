@@ -992,6 +992,8 @@ struct PBPit {
   /// Clears the value of `tone`. Subsequent reads from it will return its default value.
   mutating func clearTone() {self._tone = nil}
 
+  var lyric: String = String()
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -1047,84 +1049,61 @@ struct PBNote {
   // methods supported on all messages.
 
   var pitch: PBRational {
-    get {return _storage._pitch ?? PBRational()}
-    set {_uniqueStorage()._pitch = newValue}
+    get {return _pitch ?? PBRational()}
+    set {_pitch = newValue}
   }
   /// Returns true if `pitch` has been explicitly set.
-  var hasPitch: Bool {return _storage._pitch != nil}
+  var hasPitch: Bool {return self._pitch != nil}
   /// Clears the value of `pitch`. Subsequent reads from it will return its default value.
-  mutating func clearPitch() {_uniqueStorage()._pitch = nil}
+  mutating func clearPitch() {self._pitch = nil}
 
   var pitbend: PBPitbend {
-    get {return _storage._pitbend ?? PBPitbend()}
-    set {_uniqueStorage()._pitbend = newValue}
+    get {return _pitbend ?? PBPitbend()}
+    set {_pitbend = newValue}
   }
   /// Returns true if `pitbend` has been explicitly set.
-  var hasPitbend: Bool {return _storage._pitbend != nil}
+  var hasPitbend: Bool {return self._pitbend != nil}
   /// Clears the value of `pitbend`. Subsequent reads from it will return its default value.
-  mutating func clearPitbend() {_uniqueStorage()._pitbend = nil}
+  mutating func clearPitbend() {self._pitbend = nil}
 
   var beatRange: PBRationalRange {
-    get {return _storage._beatRange ?? PBRationalRange()}
-    set {_uniqueStorage()._beatRange = newValue}
+    get {return _beatRange ?? PBRationalRange()}
+    set {_beatRange = newValue}
   }
   /// Returns true if `beatRange` has been explicitly set.
-  var hasBeatRange: Bool {return _storage._beatRange != nil}
+  var hasBeatRange: Bool {return self._beatRange != nil}
   /// Clears the value of `beatRange`. Subsequent reads from it will return its default value.
-  mutating func clearBeatRange() {_uniqueStorage()._beatRange = nil}
-
-  var volumeAmp: Double {
-    get {return _storage._volumeAmp}
-    set {_uniqueStorage()._volumeAmp = newValue}
-  }
-
-  var pan: Double {
-    get {return _storage._pan}
-    set {_uniqueStorage()._pan = newValue}
-  }
-
-  var tone: PBTone {
-    get {return _storage._tone ?? PBTone()}
-    set {_uniqueStorage()._tone = newValue}
-  }
-  /// Returns true if `tone` has been explicitly set.
-  var hasTone: Bool {return _storage._tone != nil}
-  /// Clears the value of `tone`. Subsequent reads from it will return its default value.
-  mutating func clearTone() {_uniqueStorage()._tone = nil}
+  mutating func clearBeatRange() {self._beatRange = nil}
 
   var envelope: PBEnvelope {
-    get {return _storage._envelope ?? PBEnvelope()}
-    set {_uniqueStorage()._envelope = newValue}
+    get {return _envelope ?? PBEnvelope()}
+    set {_envelope = newValue}
   }
   /// Returns true if `envelope` has been explicitly set.
-  var hasEnvelope: Bool {return _storage._envelope != nil}
+  var hasEnvelope: Bool {return self._envelope != nil}
   /// Clears the value of `envelope`. Subsequent reads from it will return its default value.
-  mutating func clearEnvelope() {_uniqueStorage()._envelope = nil}
+  mutating func clearEnvelope() {self._envelope = nil}
 
-  var isNoise: Bool {
-    get {return _storage._isNoise}
-    set {_uniqueStorage()._isNoise = newValue}
-  }
-
-  var lyric: String {
-    get {return _storage._lyric}
-    set {_uniqueStorage()._lyric = newValue}
-  }
+  var isNoise: Bool = false
 
   var id: PBUUID {
-    get {return _storage._id ?? PBUUID()}
-    set {_uniqueStorage()._id = newValue}
+    get {return _id ?? PBUUID()}
+    set {_id = newValue}
   }
   /// Returns true if `id` has been explicitly set.
-  var hasID: Bool {return _storage._id != nil}
+  var hasID: Bool {return self._id != nil}
   /// Clears the value of `id`. Subsequent reads from it will return its default value.
-  mutating func clearID() {_uniqueStorage()._id = nil}
+  mutating func clearID() {self._id = nil}
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _pitch: PBRational? = nil
+  fileprivate var _pitbend: PBPitbend? = nil
+  fileprivate var _beatRange: PBRationalRange? = nil
+  fileprivate var _envelope: PBEnvelope? = nil
+  fileprivate var _id: PBUUID? = nil
 }
 
 struct PBScoreOption {
@@ -1909,21 +1888,24 @@ struct PBNoteIndexValue {
   // methods supported on all messages.
 
   var value: PBNote {
-    get {return _value ?? PBNote()}
-    set {_value = newValue}
+    get {return _storage._value ?? PBNote()}
+    set {_uniqueStorage()._value = newValue}
   }
   /// Returns true if `value` has been explicitly set.
-  var hasValue: Bool {return self._value != nil}
+  var hasValue: Bool {return _storage._value != nil}
   /// Clears the value of `value`. Subsequent reads from it will return its default value.
-  mutating func clearValue() {self._value = nil}
+  mutating func clearValue() {_uniqueStorage()._value = nil}
 
-  var index: Int64 = 0
+  var index: Int64 {
+    get {return _storage._index}
+    set {_uniqueStorage()._index = newValue}
+  }
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
 
-  fileprivate var _value: PBNote? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 struct PBContentIndexValue {
@@ -2091,29 +2073,6 @@ struct PBPlaneValue {
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
-}
-
-struct PBToneValue {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  var tone: PBTone {
-    get {return _tone ?? PBTone()}
-    set {_tone = newValue}
-  }
-  /// Returns true if `tone` has been explicitly set.
-  var hasTone: Bool {return self._tone != nil}
-  /// Clears the value of `tone`. Subsequent reads from it will return its default value.
-  mutating func clearTone() {self._tone = nil}
-
-  var noteIndexes: [Int64] = []
-
-  var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  init() {}
-
-  fileprivate var _tone: PBTone? = nil
 }
 
 struct PBTextValue {
@@ -2913,14 +2872,6 @@ struct PBSheetUndoItem {
     set {value = .removeNotes(newValue)}
   }
 
-  var changedTones: PBToneValue {
-    get {
-      if case .changedTones(let v)? = value {return v}
-      return PBToneValue()
-    }
-    set {value = .changedTones(newValue)}
-  }
-
   var insertContents: PBContentIndexValueArray {
     get {
       if case .insertContents(let v)? = value {return v}
@@ -3014,7 +2965,6 @@ struct PBSheetUndoItem {
     case insertNotes(PBNoteIndexValueArray)
     case replaceNotes(PBNoteIndexValueArray)
     case removeNotes(PBInt64Array)
-    case changedTones(PBToneValue)
     case insertContents(PBContentIndexValueArray)
     case replaceContents(PBContentIndexValueArray)
     case removeContents(PBInt64Array)
@@ -3194,10 +3144,6 @@ struct PBSheetUndoItem {
       }()
       case (.removeNotes, .removeNotes): return {
         guard case .removeNotes(let l) = lhs, case .removeNotes(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.changedTones, .changedTones): return {
-        guard case .changedTones(let l) = lhs, case .changedTones(let r) = rhs else { preconditionFailure() }
         return l == r
       }()
       case (.insertContents, .insertContents): return {
@@ -3624,6 +3570,14 @@ struct PBPastableObject {
     set {value = .notesValue(newValue)}
   }
 
+  var stereo: PBStereo {
+    get {
+      if case .stereo(let v)? = value {return v}
+      return PBStereo()
+    }
+    set {value = .stereo(newValue)}
+  }
+
   var tone: PBTone {
     get {
       if case .tone(let v)? = value {return v}
@@ -3660,6 +3614,7 @@ struct PBPastableObject {
     case normalizationValue(Double)
     case normalizationRationalValue(PBRational)
     case notesValue(PBNotesValue)
+    case stereo(PBStereo)
     case tone(PBTone)
     case envelope(PBEnvelope)
 
@@ -3735,6 +3690,10 @@ struct PBPastableObject {
       }()
       case (.notesValue, .notesValue): return {
         guard case .notesValue(let l) = lhs, case .notesValue(let r) = rhs else { preconditionFailure() }
+        return l == r
+      }()
+      case (.stereo, .stereo): return {
+        guard case .stereo(let l) = lhs, case .stereo(let r) = rhs else { preconditionFailure() }
         return l == r
       }()
       case (.tone, .tone): return {
@@ -3827,7 +3786,6 @@ extension PBKeyframeIndexValue: @unchecked Sendable {}
 extension PBKeyframeOptionIndexValue: @unchecked Sendable {}
 extension PBColorValue: @unchecked Sendable {}
 extension PBPlaneValue: @unchecked Sendable {}
-extension PBToneValue: @unchecked Sendable {}
 extension PBTextValue: @unchecked Sendable {}
 extension PBTextValue.OneOf_OriginOptional: @unchecked Sendable {}
 extension PBTextValue.OneOf_SizeOptional: @unchecked Sendable {}
@@ -5167,6 +5125,7 @@ extension PBPit: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase
     2: .same(proto: "pitch"),
     3: .same(proto: "stereo"),
     4: .same(proto: "tone"),
+    5: .same(proto: "lyric"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -5179,6 +5138,7 @@ extension PBPit: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase
       case 2: try { try decoder.decodeSingularDoubleField(value: &self.pitch) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._stereo) }()
       case 4: try { try decoder.decodeSingularMessageField(value: &self._tone) }()
+      case 5: try { try decoder.decodeSingularStringField(value: &self.lyric) }()
       default: break
       }
     }
@@ -5201,6 +5161,9 @@ extension PBPit: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase
     try { if let v = self._tone {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
     } }()
+    if !self.lyric.isEmpty {
+      try visitor.visitSingularStringField(value: self.lyric, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5209,6 +5172,7 @@ extension PBPit: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase
     if lhs.pitch != rhs.pitch {return false}
     if lhs._stereo != rhs._stereo {return false}
     if lhs._tone != rhs._tone {return false}
+    if lhs.lyric != rhs.lyric {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5312,135 +5276,61 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
     1: .same(proto: "pitch"),
     2: .same(proto: "pitbend"),
     3: .same(proto: "beatRange"),
-    4: .same(proto: "volumeAmp"),
-    5: .same(proto: "pan"),
-    6: .same(proto: "tone"),
     7: .same(proto: "envelope"),
     10: .same(proto: "isNoise"),
-    8: .same(proto: "lyric"),
     9: .same(proto: "id"),
   ]
 
-  fileprivate class _StorageClass {
-    var _pitch: PBRational? = nil
-    var _pitbend: PBPitbend? = nil
-    var _beatRange: PBRationalRange? = nil
-    var _volumeAmp: Double = 0
-    var _pan: Double = 0
-    var _tone: PBTone? = nil
-    var _envelope: PBEnvelope? = nil
-    var _isNoise: Bool = false
-    var _lyric: String = String()
-    var _id: PBUUID? = nil
-
-    static let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _pitch = source._pitch
-      _pitbend = source._pitbend
-      _beatRange = source._beatRange
-      _volumeAmp = source._volumeAmp
-      _pan = source._pan
-      _tone = source._tone
-      _envelope = source._envelope
-      _isNoise = source._isNoise
-      _lyric = source._lyric
-      _id = source._id
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._pitch) }()
-        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._pitbend) }()
-        case 3: try { try decoder.decodeSingularMessageField(value: &_storage._beatRange) }()
-        case 4: try { try decoder.decodeSingularDoubleField(value: &_storage._volumeAmp) }()
-        case 5: try { try decoder.decodeSingularDoubleField(value: &_storage._pan) }()
-        case 6: try { try decoder.decodeSingularMessageField(value: &_storage._tone) }()
-        case 7: try { try decoder.decodeSingularMessageField(value: &_storage._envelope) }()
-        case 8: try { try decoder.decodeSingularStringField(value: &_storage._lyric) }()
-        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._id) }()
-        case 10: try { try decoder.decodeSingularBoolField(value: &_storage._isNoise) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._pitch) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._pitbend) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._beatRange) }()
+      case 7: try { try decoder.decodeSingularMessageField(value: &self._envelope) }()
+      case 9: try { try decoder.decodeSingularMessageField(value: &self._id) }()
+      case 10: try { try decoder.decodeSingularBoolField(value: &self.isNoise) }()
+      default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      try { if let v = _storage._pitch {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-      } }()
-      try { if let v = _storage._pitbend {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-      } }()
-      try { if let v = _storage._beatRange {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-      } }()
-      if _storage._volumeAmp != 0 {
-        try visitor.visitSingularDoubleField(value: _storage._volumeAmp, fieldNumber: 4)
-      }
-      if _storage._pan != 0 {
-        try visitor.visitSingularDoubleField(value: _storage._pan, fieldNumber: 5)
-      }
-      try { if let v = _storage._tone {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
-      } }()
-      try { if let v = _storage._envelope {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
-      } }()
-      if !_storage._lyric.isEmpty {
-        try visitor.visitSingularStringField(value: _storage._lyric, fieldNumber: 8)
-      }
-      try { if let v = _storage._id {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
-      } }()
-      if _storage._isNoise != false {
-        try visitor.visitSingularBoolField(value: _storage._isNoise, fieldNumber: 10)
-      }
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._pitch {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    try { if let v = self._pitbend {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
+    try { if let v = self._beatRange {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._envelope {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+    } }()
+    try { if let v = self._id {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+    } }()
+    if self.isNoise != false {
+      try visitor.visitSingularBoolField(value: self.isNoise, fieldNumber: 10)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: PBNote, rhs: PBNote) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._pitch != rhs_storage._pitch {return false}
-        if _storage._pitbend != rhs_storage._pitbend {return false}
-        if _storage._beatRange != rhs_storage._beatRange {return false}
-        if _storage._volumeAmp != rhs_storage._volumeAmp {return false}
-        if _storage._pan != rhs_storage._pan {return false}
-        if _storage._tone != rhs_storage._tone {return false}
-        if _storage._envelope != rhs_storage._envelope {return false}
-        if _storage._isNoise != rhs_storage._isNoise {return false}
-        if _storage._lyric != rhs_storage._lyric {return false}
-        if _storage._id != rhs_storage._id {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs._pitch != rhs._pitch {return false}
+    if lhs._pitbend != rhs._pitbend {return false}
+    if lhs._beatRange != rhs._beatRange {return false}
+    if lhs._envelope != rhs._envelope {return false}
+    if lhs.isNoise != rhs.isNoise {return false}
+    if lhs._id != rhs._id {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -6855,36 +6745,70 @@ extension PBNoteIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
     2: .same(proto: "index"),
   ]
 
+  fileprivate class _StorageClass {
+    var _value: PBNote? = nil
+    var _index: Int64 = 0
+
+    static let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _value = source._value
+      _index = source._index
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._value) }()
-      case 2: try { try decoder.decodeSingularInt64Field(value: &self.index) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._value) }()
+        case 2: try { try decoder.decodeSingularInt64Field(value: &_storage._index) }()
+        default: break
+        }
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._value {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    if self.index != 0 {
-      try visitor.visitSingularInt64Field(value: self.index, fieldNumber: 2)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      try { if let v = _storage._value {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+      } }()
+      if _storage._index != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._index, fieldNumber: 2)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: PBNoteIndexValue, rhs: PBNoteIndexValue) -> Bool {
-    if lhs._value != rhs._value {return false}
-    if lhs.index != rhs.index {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._value != rhs_storage._value {return false}
+        if _storage._index != rhs_storage._index {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -7213,48 +7137,6 @@ extension PBPlaneValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
     if lhs.planes != rhs.planes {return false}
     if lhs.moveIndexValues != rhs.moveIndexValues {return false}
     if lhs.index != rhs.index {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension PBToneValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = "PBToneValue"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "tone"),
-    2: .same(proto: "noteIndexes"),
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._tone) }()
-      case 2: try { try decoder.decodeRepeatedInt64Field(value: &self.noteIndexes) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._tone {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    if !self.noteIndexes.isEmpty {
-      try visitor.visitPackedInt64Field(value: self.noteIndexes, fieldNumber: 2)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: PBToneValue, rhs: PBToneValue) -> Bool {
-    if lhs._tone != rhs._tone {return false}
-    if lhs.noteIndexes != rhs.noteIndexes {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -8243,7 +8125,6 @@ extension PBSheetUndoItem: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
     42: .same(proto: "insertNotes"),
     43: .same(proto: "replaceNotes"),
     44: .same(proto: "removeNotes"),
-    45: .same(proto: "changedTones"),
     46: .same(proto: "insertContents"),
     47: .same(proto: "replaceContents"),
     48: .same(proto: "removeContents"),
@@ -8784,19 +8665,6 @@ extension PBSheetUndoItem: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
           self.value = .removeNotes(v)
         }
       }()
-      case 45: try {
-        var v: PBToneValue?
-        var hadOneofValue = false
-        if let current = self.value {
-          hadOneofValue = true
-          if case .changedTones(let m) = current {v = m}
-        }
-        try decoder.decodeSingularMessageField(value: &v)
-        if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.value = .changedTones(v)
-        }
-      }()
       case 46: try {
         var v: PBContentIndexValueArray?
         var hadOneofValue = false
@@ -9053,10 +8921,6 @@ extension PBSheetUndoItem: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
     case .removeNotes?: try {
       guard case .removeNotes(let v)? = self.value else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 44)
-    }()
-    case .changedTones?: try {
-      guard case .changedTones(let v)? = self.value else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 45)
     }()
     case .insertContents?: try {
       guard case .insertContents(let v)? = self.value else { preconditionFailure() }
@@ -9553,6 +9417,7 @@ extension PBPastableObject: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
     13: .same(proto: "normalizationValue"),
     16: .same(proto: "normalizationRationalValue"),
     14: .same(proto: "notesValue"),
+    24: .same(proto: "stereo"),
     15: .same(proto: "tone"),
     23: .same(proto: "envelope"),
   ]
@@ -9800,6 +9665,19 @@ extension PBPastableObject: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
           self.value = .envelope(v)
         }
       }()
+      case 24: try {
+        var v: PBStereo?
+        var hadOneofValue = false
+        if let current = self.value {
+          hadOneofValue = true
+          if case .stereo(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.value = .stereo(v)
+        }
+      }()
       default: break
       }
     }
@@ -9886,6 +9764,10 @@ extension PBPastableObject: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
     case .envelope?: try {
       guard case .envelope(let v)? = self.value else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 23)
+    }()
+    case .stereo?: try {
+      guard case .stereo(let v)? = self.value else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 24)
     }()
     case nil: break
     }

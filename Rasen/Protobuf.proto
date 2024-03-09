@@ -185,6 +185,7 @@ message PBPit {
     double pitch = 2;
     PBStereo stereo = 3;
     PBTone tone = 4;
+    string lyric = 5;
 }
 message PBPitbend {
     repeated PBPit pits = 1;
@@ -202,12 +203,8 @@ message PBNote {
     PBRational pitch = 1;
     PBPitbend pitbend = 2;
     PBRationalRange beatRange = 3;
-    double volumeAmp = 4;
-    double pan = 5;
-    PBTone tone = 6;
     PBEnvelope envelope = 7;
     bool isNoise = 10;
-    string lyric = 8;
     PBUUID id = 9;
 }
 
@@ -417,10 +414,6 @@ message PBPlaneValue {
     repeated PBIntIndexValue moveIndexValues = 2;
     int64 index = 3;
 }
-message PBToneValue {
-    PBTone tone = 1;
-    repeated int64 noteIndexes = 2;
-}
 message PBTextValue {
     string string = 1;
     PBIntRange replacedRange = 2;
@@ -564,7 +557,6 @@ message PBSheetUndoItem {
         PBNoteIndexValueArray insertNotes = 42;
         PBNoteIndexValueArray replaceNotes = 43;
         PBInt64Array removeNotes = 44;
-        PBToneValue changedTones = 45;
         PBContentIndexValueArray insertContents = 46;
         PBContentIndexValueArray replaceContents = 47;
         PBInt64Array removeContents = 48;
@@ -638,6 +630,7 @@ message PBPastableObject {
         double normalizationValue = 13;
         PBRational normalizationRationalValue = 16;
         PBNotesValue notesValue = 14;
+        PBStereo stereo = 24;
         PBTone tone = 15;
         PBEnvelope envelope = 23;
     }
