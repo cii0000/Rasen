@@ -1183,7 +1183,7 @@ final class AnimationSlider: DragEditor {
                 
                 switch type {
                 case .all:
-                    let nh = ScoreLayout.noteHeight
+                    let nh = ScoreLayout.pitchHeight
                     let px = beganTimelineX + inP.x - beganInP.x
                     let py = ((beganAnimationOption?.timelineY ?? 0) + inP.y - beganInP.y)
                         .interval(scale: nh)
@@ -1774,53 +1774,63 @@ final class KeyframeInserter: InputKeyEditor {
                             animationView.updateTimeline()
                         }
                     }
-                } else if let noteI = sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
-                                                                    scale: document.screenToWorldScale) {
+                } else if sheetView.model.score.enabled {
                     let scoreView = sheetView.scoreView
-                    
-                    let score = scoreView.model
-                    let scoreP = scoreView.convertFromWorld(p)
-                    if let (pitI, pitchSmpI) = scoreView.pitIAndPitchSmpI(at: scoreP, at: noteI) {
-                        let pitchSmp = scoreView.pitchSmp(at: scoreP, at: noteI)
-                        let oldTone = score.notes[noteI].pitbend.pits[pitI].tone
-                        var tone = oldTone
-                        let i = tone.pitchSmps.reversed().firstIndex(where: { pitchSmp.x > $0.x }) ?? 0
-                        tone.pitchSmps.insert(pitchSmp, at: i + 1)
-                        tone.id = .init()
-                        
-                        let nis = (0 ..< score.notes.count).filter { score.notes[$0].pitbend.pits.contains { $0.tone.id == oldTone.id } }
-                        
-                        let nivs = nis.map {
-                            var note = score.notes[$0]
-                            note.pitbend.pits = note.pitbend.pits.map {
-                                var pit = $0
-                                pit.tone = tone
-                                return pit
+                    let scoreP = sheetView.scoreView.convertFromWorld(p)
+                    if let noteI = sheetView.scoreView.noteIndex(at: scoreP,
+                                                                 scale: document.screenToWorldScale) {
+                        let score = scoreView.model
+                        let scoreP = scoreView.convertFromWorld(p)
+                        if let (pitI, _) = scoreView.pitIAndPitchSmpI(at: scoreP, at: noteI) {
+                            let pitchSmp = scoreView.pitchSmp(at: scoreP, at: noteI)
+                            let oldTone = score.notes[noteI].pitbend.pits[pitI].tone
+                            var tone = oldTone
+                            let i = tone.pitchSmps.reversed().firstIndex(where: { pitchSmp.x > $0.x }) ?? 0
+                            tone.pitchSmps.insert(pitchSmp, at: i + 1)
+                            tone.id = .init()
+                            
+                            let nis = (0 ..< score.notes.count).filter { score.notes[$0].pitbend.pits.contains { $0.tone.id == oldTone.id } }
+                            
+                            let nivs = nis.map {
+                                var note = score.notes[$0]
+                                note.pitbend.pits = note.pitbend.pits.map {
+                                    var pit = $0
+                                    pit.tone = tone
+                                    return pit
+                                }
+                                return IndexValue(value: note, index: $0)
                             }
-                            return IndexValue(value: note, index: $0)
+                            
+                            sheetView.newUndoGroup()
+                            sheetView.replace(nivs)
+    //                        sheetView.set(ToneValue(tone: tone, noteIndexes: nis),
+    //                                      old: ToneValue(tone: oldTone, noteIndexes: nis))
+                            
+                            sheetView.updatePlaying()
+                        } else {
+                            let pitT = scoreView.pitT(at: scoreP, at: noteI)
+                            var pitbend = score.notes[noteI].pitbend
+                            var pit = pitbend.pit(atT: pitT)
+                            pit.stereo.id = .init()
+                            pit.tone.id = .init()
+                            pitbend.pits.append(pit)
+                            pitbend.pits.sort { $0.t < $1.t }
+                            var note = score.notes[noteI]
+                            note.pitbend = pitbend
+                            
+                            sheetView.newUndoGroup()
+                            sheetView.replace(note, at: noteI)
+                            
+                            sheetView.updatePlaying()
                         }
-                        
+                    } else if scoreView.containsTimeline(scoreP) {
+                        let interval = document.currentNoteTimeInterval
+                        let beat = scoreView.beat(atX: inP.x, interval: interval)
+                        var option = scoreView.model.option
+                        option.keyBeats.append(beat)
+                        option.keyBeats.sort()
                         sheetView.newUndoGroup()
-                        sheetView.replace(nivs)
-//                        sheetView.set(ToneValue(tone: tone, noteIndexes: nis),
-//                                      old: ToneValue(tone: oldTone, noteIndexes: nis))
-                        
-                        sheetView.updatePlaying()
-                    } else {
-                        let pitT = scoreView.pitT(at: scoreP, at: noteI)
-                        var pitbend = score.notes[noteI].pitbend
-                        var pit = pitbend.pit(atT: pitT)
-                        pit.stereo.id = .init()
-                        pit.tone.id = .init()
-                        pitbend.pits.append(pit)
-                        pitbend.pits.sort { $0.t < $1.t }
-                        var note = score.notes[noteI]
-                        note.pitbend = pitbend
-                        
-                        sheetView.newUndoGroup()
-                        sheetView.replace(note, at: noteI)
-                        
-                        sheetView.updatePlaying()
+                        sheetView.set(option)
                     }
                 } else if let ci = sheetView.contentIndex(at: inP, scale: document.screenToWorldScale) {
                     let contentView = sheetView.contentsView.elementViews[ci]

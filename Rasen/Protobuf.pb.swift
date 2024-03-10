@@ -1129,6 +1129,8 @@ struct PBScoreOption {
   /// Clears the value of `tempo`. Subsequent reads from it will return its default value.
   mutating func clearTempo() {self._tempo = nil}
 
+  var keyBeats: [PBRational] = []
+
   var enabled: Bool = false
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
@@ -1165,6 +1167,8 @@ struct PBScore {
   var hasTempo: Bool {return self._tempo != nil}
   /// Clears the value of `tempo`. Subsequent reads from it will return its default value.
   mutating func clearTempo() {self._tempo = nil}
+
+  var keyBeats: [PBRational] = []
 
   var enabled: Bool = false
 
@@ -5341,6 +5345,7 @@ extension PBScoreOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "beatDuration"),
     2: .same(proto: "tempo"),
+    4: .same(proto: "keyBeats"),
     3: .same(proto: "enabled"),
   ]
 
@@ -5353,6 +5358,7 @@ extension PBScoreOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
       case 1: try { try decoder.decodeSingularMessageField(value: &self._beatDuration) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._tempo) }()
       case 3: try { try decoder.decodeSingularBoolField(value: &self.enabled) }()
+      case 4: try { try decoder.decodeRepeatedMessageField(value: &self.keyBeats) }()
       default: break
       }
     }
@@ -5372,12 +5378,16 @@ extension PBScoreOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
     if self.enabled != false {
       try visitor.visitSingularBoolField(value: self.enabled, fieldNumber: 3)
     }
+    if !self.keyBeats.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.keyBeats, fieldNumber: 4)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: PBScoreOption, rhs: PBScoreOption) -> Bool {
     if lhs._beatDuration != rhs._beatDuration {return false}
     if lhs._tempo != rhs._tempo {return false}
+    if lhs.keyBeats != rhs.keyBeats {return false}
     if lhs.enabled != rhs.enabled {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -5391,6 +5401,7 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
     6: .same(proto: "draftNotes"),
     2: .same(proto: "beatDuration"),
     3: .same(proto: "tempo"),
+    7: .same(proto: "keyBeats"),
     4: .same(proto: "enabled"),
     5: .same(proto: "id"),
   ]
@@ -5407,6 +5418,7 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
       case 4: try { try decoder.decodeSingularBoolField(value: &self.enabled) }()
       case 5: try { try decoder.decodeSingularMessageField(value: &self._id) }()
       case 6: try { try decoder.decodeRepeatedMessageField(value: &self.draftNotes) }()
+      case 7: try { try decoder.decodeRepeatedMessageField(value: &self.keyBeats) }()
       default: break
       }
     }
@@ -5435,6 +5447,9 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
     if !self.draftNotes.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.draftNotes, fieldNumber: 6)
     }
+    if !self.keyBeats.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.keyBeats, fieldNumber: 7)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5443,6 +5458,7 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
     if lhs.draftNotes != rhs.draftNotes {return false}
     if lhs._beatDuration != rhs._beatDuration {return false}
     if lhs._tempo != rhs._tempo {return false}
+    if lhs.keyBeats != rhs.keyBeats {return false}
     if lhs.enabled != rhs.enabled {return false}
     if lhs._id != rhs._id {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}

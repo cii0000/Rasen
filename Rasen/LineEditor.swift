@@ -974,7 +974,7 @@ final class LineEditor: Editor {
     private var isDrawNote = false
     private var noteSheetView: SheetView?, notePitch: Rational?,
                 beganScore: Score?,
-                noteIndex: Int?, noteStartBeat: Rational?, notePlayer: NotePlayer?
+                noteI: Int?, noteStartBeat: Rational?, notePlayer: NotePlayer?
     func drawNote(with event: DragEvent, isStraight: Bool = false) {
         guard isEditingSheet else {
             document.stop(with: event)
@@ -992,7 +992,7 @@ final class LineEditor: Editor {
                 let score = scoreView.model
                 let count = score.notes.count
                 let interval = document.currentNoteTimeInterval
-                let beat = scoreView.beat(atX: inP.x, interval: interval) - score.beatRange.start
+                let beat = scoreView.beat(atX: inP.x, interval: interval)
                 let beatRange = beat ..< beat
                 let tone = isStraight ?
                 Tone(evenSmp: 1, oddSmp: 1,
@@ -1003,7 +1003,7 @@ final class LineEditor: Editor {
                                 pitbend: .init([.init(t: 0, pitch: 0, tone: tone)]),
                                 isNoise: isStraight)
                 
-                noteIndex = count
+                noteI = count
                 notePitch = pitch
                 noteStartBeat = beat
                 beganScore = score
@@ -1020,7 +1020,7 @@ final class LineEditor: Editor {
                 }
                 notePlayer?.play()
                 
-                sheetView.scoreView.append(note)
+                scoreView.append(note)
 //                    let noteNode = scoreView.noteNode(from: note)
 //                    noteNode.attitude.position
 //                        = scoreView.node.attitude.position
@@ -1034,7 +1034,7 @@ final class LineEditor: Editor {
         case .changed:
             let p = document.convertScreenToWorld(event.screenPoint)
             if let sheetView = noteSheetView, let notePitch,
-                let nsBeat = noteStartBeat, let ni = noteIndex {
+                let nsBeat = noteStartBeat, let noteI {
                 
                 let scoreView = sheetView.scoreView
                 let sheetP = sheetView.convertFromWorld(p)
@@ -1043,7 +1043,7 @@ final class LineEditor: Editor {
                     .clipped(min: Score.pitchRange.start, max: Score.pitchRange.end)
                 let score = scoreView.model
                 let interval = document.currentNoteTimeInterval
-                let beat = scoreView.beat(atX: sheetP.x, interval: interval) - score.beatRange.start
+                let beat = scoreView.beat(atX: sheetP.x, interval: interval)
                 let beatRange = beat > nsBeat ? nsBeat ..< beat : beat ..< nsBeat
                 let tone = isStraight ?
                 Tone(evenSmp: 1, oddSmp: 1,
@@ -1060,7 +1060,7 @@ final class LineEditor: Editor {
                     self.notePitch = pitch
                 }
                 
-                sheetView.scoreView[ni] = note
+                scoreView[noteI] = note
 //                    tempLineNode?.children
 //                        = scoreView.noteNode(from: note).children
                 
@@ -1071,7 +1071,7 @@ final class LineEditor: Editor {
             tempLineNode = nil
             
             let p = document.convertScreenToWorld(event.screenPoint)
-            if let sheetView = noteSheetView, let nsBeat = noteStartBeat {
+            if let sheetView = noteSheetView, let nsBeat = noteStartBeat, let noteI {
                 let scoreView = sheetView.scoreView
                 let score = scoreView.model
                 let sheetP = sheetView.convertFromWorld(p)
@@ -1079,28 +1079,28 @@ final class LineEditor: Editor {
                 let pitch = document.pitch(from: scoreView, at: scoreP)
                     .clipped(min: Score.pitchRange.start, max: Score.pitchRange.end)
                 let interval = document.currentNoteTimeInterval
-                let beat = scoreView.beat(atX: sheetP.x, interval: interval) - score.beatRange.start
+                let beat = scoreView.beat(atX: sheetP.x, interval: interval)
                 var beatRange = beat > nsBeat ? nsBeat ..< beat : beat ..< nsBeat
                 if beatRange.length == 0 {
-                    beatRange.length = Sheet.fullEditBeatInterval
+                    scoreView.remove(at: noteI)
+                } else {
+                    let tone = isStraight ?
+                    Tone(evenSmp: 1, oddSmp: 1,
+                         pitchSmps: [.init(Double(Score.pitchRange.start), 1),
+                                     .init(Double(Score.pitchRange.end), 1)]) :
+                    Tone()
+                    let note = Note(beatRange: beatRange, pitch: pitch,
+                                    pitbend: .init([.init(t: 0, pitch: 0, tone: tone)]),
+                                    isNoise: isStraight)
+                        
+    //                   sheetView.scoresView.elementViews[si]
+    //                      .model.notes[ni] = note
+                    
+                    sheetView.newUndoGroup()
+                    sheetView.captureAppend(note)
+    //                  sheetView.replaceScore(score, at: ti)
                 }
                 
-                let tone = isStraight ?
-                Tone(evenSmp: 1, oddSmp: 1,
-                     pitchSmps: [.init(Double(Score.pitchRange.start), 1),
-                                 .init(Double(Score.pitchRange.end), 1)]) :
-                Tone()
-                let note = Note(beatRange: beatRange, pitch: pitch,
-                                pitbend: .init([.init(t: 0, pitch: 0, tone: tone)]),
-                                isNoise: isStraight)
-                    
-//                   sheetView.scoresView.elementViews[si]
-//                      .model.notes[ni] = note
-                
-                sheetView.newUndoGroup()
-                sheetView.captureAppend(note)
-//                  sheetView.replaceScore(score, at: ti)
-                    
                 sheetView.updatePlaying()
             }
             

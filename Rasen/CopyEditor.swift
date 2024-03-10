@@ -1306,9 +1306,23 @@ final class CopyEditor: Editor {
                 sheetView.updatePlaying()
                 return true
             }
-        } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+        } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
+                  sheetView.scoreView.model.notes.isEmpty {
             var option = sheetView.model.score.option
             option.enabled = false
+            
+            sheetView.newUndoGroup()
+            sheetView.set(option)
+            return true
+        } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
+                    let keyBeatI = sheetView.scoreView.keyBeatIndex(at: sheetView.scoreView.convertFromWorld(p),
+                                                                    scale: document.screenToWorldScale) {
+            let keyBeat = sheetView.model.score.keyBeats[keyBeatI]
+            
+            var option = sheetView.model.score.option
+            option.keyBeats.remove(at: keyBeatI)
+            
+            Pasteboard.shared.copiedObjects = [.normalizationRationalValue(keyBeat)]
             
             sheetView.newUndoGroup()
             sheetView.set(option)
@@ -2516,8 +2530,8 @@ final class CopyEditor: Editor {
             guard let sheetView = document.sheetView(at: shp) else { return }
             if sheetView.model.score.enabled {
                 let scoreView = sheetView.scoreView
-                if let (noteI, pitI) = scoreView.noteAndPitI(at: scoreView.convertFromWorld(p),
-                                                             scale: document.screenToWorldScale) {
+                if let (noteI, pitI) = scoreView.noteAndPitIEnabledNote(at: scoreView.convertFromWorld(p),
+                                                                        scale: document.screenToWorldScale) {
                     if document.isSelect(at: p) {
                         let score = scoreView.model
                         let nis = sheetView.noteAndPitIndexes(from: document.selections)
@@ -2555,8 +2569,8 @@ final class CopyEditor: Editor {
             guard let sheetView = document.sheetView(at: shp) else { return }
             if sheetView.model.score.enabled {
                 let scoreView = sheetView.scoreView
-                if let (noteI, pitI) = scoreView.noteAndPitI(at: scoreView.convertFromWorld(p),
-                                                             scale: document.screenToWorldScale) {
+                if let (noteI, pitI) = scoreView.noteAndPitIEnabledNote(at: scoreView.convertFromWorld(p),
+                                                                        scale: document.screenToWorldScale) {
                     if document.isSelect(at: p) {
                         let score = scoreView.model
                         let nis = sheetView.noteAndPitIndexes(from: document.selections)
@@ -3101,53 +3115,70 @@ final class LineColorCopier: InputKeyEditor {
             return true
         } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
             let scoreView = sheetView.scoreView
-            if let (noteI, pitI) = scoreView.noteAndPitI(at: scoreView.convertFromWorld(p),
-                                                         scale: document.screenToWorldScale) {
+            let scoreP = scoreView.convertFromWorld(p)
+            if let (noteI, result) = scoreView.hitTestColor(scoreP,
+                                                            scale: document.screenToWorldScale) {
+                
+                func showPit(pitI: Int, isTone: Bool = false) {
+                    let pitP = scoreView.pitPosition(atPitI: pitI, noteI: noteI) + (isTone ? Point(0, scoreView.toneY) : Point())
+                    let scale = 1 / document.worldToScreenScale
+                    let lw = Line.defaultLineWidth
+                    let nlw = max(lw * 1.5, lw * 2.5 * scale, 1 * scale)
+                    let noteNode = Node(path: Path(circleRadius: nlw, position: pitP),
+                                        fillType: .color(.selected))
+                    noteNode.attitude.position = scoreView.node.convertToWorld(Point())
+                    selectingLineNode.children = [noteNode]
+                }
+                
                 let score = scoreView.model
                 
-                if scoreView.isFullEdit {
-                    let tone = score.notes[noteI].pits[pitI].tone
-                    if isSendPasteboard {
-                        Pasteboard.shared.copiedObjects = [.tone(tone)]
+                switch result {
+                case .note:
+                    if let pitI = scoreView.pitI(at: scoreP, scale: .infinity, at: noteI) {
+                        let stereo = score.notes[noteI].pits[pitI].stereo
+                        if isSendPasteboard {
+                            Pasteboard.shared.copiedObjects = [.stereo(stereo)]
+                        }
+                        showPit(pitI: pitI)
+                    } else {
+                        let stereo = score.notes[noteI].pits[0].stereo
+                        if isSendPasteboard {
+                            Pasteboard.shared.copiedObjects = [.stereo(stereo)]
+                        }
+                        let scale = 1 / document.worldToScreenScale
+                        let lw = Line.defaultLineWidth
+                        let nlw = max(lw * 1.5, lw * 2.5 * scale, 1 * scale)
+                        let noteNode = scoreView.noteNode(from: score.notes[noteI], color: .selected, lineWidth: nlw)
+                        noteNode.attitude.position = scoreView.node.convertToWorld(Point())
+                        selectingLineNode.children = [noteNode]
                     }
-                } else {
+                case .sustain:
+                    break
+                case .pit(let pitI):
                     let stereo = score.notes[noteI].pits[pitI].stereo
                     if isSendPasteboard {
                         Pasteboard.shared.copiedObjects = [.stereo(stereo)]
                     }
-                }
-                
-                let scale = 1 / document.worldToScreenScale
-                let lw = Line.defaultLineWidth
-                let nlw = max(lw * 1.5, lw * 2.5 * scale, 1 * scale)
-                let noteNode = scoreView.noteNode(from: score.notes[noteI], color: .selected, lineWidth: nlw)
-                noteNode.attitude.position = scoreView.node.convertToWorld(Point())
-                selectingLineNode.children = [noteNode]
-                
-                return true
-            } else if let noteI = scoreView.noteIndex(at: scoreView.convertFromWorld(p),
-                                                      scale: document.screenToWorldScale) {
-                let score = scoreView.model
-                
-                if scoreView.isFullEdit {
-                    let tone = score.notes[noteI].pits[0].tone
+                    showPit(pitI: pitI)
+                case .evenSmp(let pitI):
+                    let tone = score.notes[noteI].pits[pitI].tone
                     if isSendPasteboard {
                         Pasteboard.shared.copiedObjects = [.tone(tone)]
                     }
-                } else {
-                    let stereo = score.notes[noteI].pits[0].stereo
+                    showPit(pitI: pitI, isTone: true)
+                case .oddSmp(let pitI):
+                    let tone = score.notes[noteI].pits[pitI].tone
                     if isSendPasteboard {
-                        Pasteboard.shared.copiedObjects = [.stereo(stereo)]
+                        Pasteboard.shared.copiedObjects = [.tone(tone)]
                     }
+                    showPit(pitI: pitI, isTone: true)
+                case .pitchSmp(let pitI, _):
+                    let tone = score.notes[noteI].pits[pitI].tone
+                    if isSendPasteboard {
+                        Pasteboard.shared.copiedObjects = [.tone(tone)]
+                    }
+                    showPit(pitI: pitI, isTone: true)
                 }
-                
-                let scale = 1 / document.worldToScreenScale
-                let lw = Line.defaultLineWidth
-                let nlw = max(lw * 1.5, lw * 2.5 * scale, 1 * scale)
-                let noteNode = scoreView.noteNode(from: score.notes[noteI], color: .selected, lineWidth: nlw)
-                noteNode.attitude.position = scoreView.node.convertToWorld(Point())
-                selectingLineNode.children = [noteNode]
-                
                 return true
             }
         }

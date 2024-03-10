@@ -477,7 +477,7 @@ final class ColorEditor: Editor {
             guard let sheetView else { return }
             
             let dSmp = (sp.y - beganSP.y) * (document.screenToWorldScale / 100)
-            let smp = (beganSmp + dSmp).clipped(min: 0, max: Volume.maxSmp)
+            let smp = (beganSmp - dSmp).clipped(min: 0, max: Volume.maxSmp)
             let smpScale = beganSmp == 0 ? 0 : smp / beganSmp
             func newSmp(from otherSmp: Double) -> Double {
                 if beganSmp == otherSmp {

@@ -268,7 +268,7 @@ final class Looker: InputKeyEditor {
                         let minNote = notes.min { $0.pitch < $1.pitch }!
                         let maxNote = notes.max { $0.pitch < $1.pitch }!
                         
-                        let str = "\(minNote.octavePitchString) ... \(maxNote.octavePitchString)  (\(minNote.fq.string(digitsCount: 3)) ... \(maxNote.fq.string(digitsCount: 3)) Hz)".localized
+                        let str = "\(minNote.octavePitchString) ... \(maxNote.octavePitchString)  (\(minNote.fq.string(digitsCount: 1)) ... \(maxNote.fq.string(digitsCount: 1)) Hz)".localized
                         document.show(str, at: p)
                     }
                 } else {
@@ -298,7 +298,7 @@ final class Looker: InputKeyEditor {
             let y = sheetView.scoreView.noteY(atX: sheetView.scoreView.convertFromWorld(p).x, at: noteI)
             let pitch = Pitch(value: sheetView.scoreView.pitch(atY: y, interval: Rational(1, 12)))
             let fq = pitch.fq
-            let fqStr = "\("Note".localized) \(pitch.octaveString) (\(fq.string(digitsCount: 3)) Hz)".localized
+            let fqStr = "\("Note".localized) \(pitch.octaveString) (\(fq.string(digitsCount: 1)) Hz)".localized
             document.show(fqStr, at: p)
         } else if let sheetView = document.sheetView(at: p),
                     let ci = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
@@ -308,7 +308,7 @@ final class Looker: InputKeyEditor {
         } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
             let scoreView = sheetView.scoreView
             let pitch = Pitch(value: document.pitch(from: scoreView, at: scoreView.convertFromWorld(p)))
-            let fqStr = "\(pitch.octaveString) (\(pitch.fq.string(digitsCount: 3)) Hz)".localized
+            let fqStr = "\(pitch.octaveString) (\(pitch.fq.string(digitsCount: 1)) Hz)".localized
             document.show(fqStr, at: p)
         } else if let sheetView = document.sheetView(at: p),
                   let (node, maxMel) = sheetView.spectrogramNode(at: sheetView.convertFromWorld(p)) {
@@ -319,7 +319,7 @@ final class Looker: InputKeyEditor {
             let pitch = Pitch.pitch(fromFq: fq)
             let pitchRat = Rational(pitch, intervalScale: .init(1, 12))
             let nfq = Pitch(value: pitchRat).fq
-            let fqStr = "\(Pitch(value: pitchRat).octaveString) (\(nfq.string(digitsCount: 3)) Hz)".localized
+            let fqStr = "\(Pitch(value: pitchRat).octaveString) (\(nfq.string(digitsCount: 1)) Hz)".localized
             document.show(fqStr, at: p)
         } else if !document.isDefaultUUColor(at: p) {
             let colorOwners = document.readColorOwners(at: p)

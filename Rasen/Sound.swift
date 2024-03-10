@@ -579,8 +579,6 @@ extension Pitbend: Protobuf {
     }
 }
 extension Pitbend {
-    static let enabledRecoilPitchDistance: Rational = 12
-    
     init(recoilS0 s0: Double, s1: Double, s2: Double, s3: Double,
          y0: Double, y1: Double, y2: Double, y3: Double, ly: Double,
          v1Amp: Double) {
@@ -772,7 +770,7 @@ extension Pitbend {
     }
     
     func line(fromSecPerSplitCount count: Int = 24,
-              secDuration: Double,
+              secDuration: Double, isRelease: Bool = true,
               envelope: Envelope) -> Line? {
         guard !isEmpty else { return nil }
         let dSec = 1 / Double(count)
@@ -789,10 +787,11 @@ extension Pitbend {
         cs.append(.init(point: .init(secDuration,
                                      cs.last?.point.y ?? 0),
                         pressure: cs.last?.pressure ?? 0))
-        cs.append(.init(point: .init(secDuration + envelope.releaseSec,
-                                     cs.last?.point.y ?? 0),
-                        pressure: 0))
-        
+        if isRelease {
+            cs.append(.init(point: .init(secDuration + envelope.releaseSec,
+                                         cs.last?.point.y ?? 0),
+                            pressure: 0))
+        }
         return Line(controls: cs)
     }
     func lineColors(fromSecPerSplitCount count: Int = 24,
@@ -853,7 +852,6 @@ extension Envelope: Protobuf {
 }
 
 struct Note {
-    //controls
     var beatRange = 0 ..< Rational(1, 4)
     var pitch = Rational(0)
     var pitbend = Pitbend([Pit(t: 0, pitch: 0, amp: Stereo.defaultAmp)])
@@ -868,8 +866,12 @@ extension Note: Protobuf {
         pitch = (try? Rational(pb.pitch)) ?? 0
         pitbend = (try? Pitbend(pb.pitbend)) ?? .init()
         if pitbend.isEmpty {
-            pitbend = .init([Pit(t: 0, pitch: 0, smp: 0.5)])
+            pitbend = .init([Pit(t: 0, pitch: 0, smp: Stereo.defaultAmp)])
         }
+//        pits = pb.pits.compactMap { try? Pit($0) }.sorted(by: { $0.beat < $1.beat })
+//        if pits.isEmpty {
+//            pits = [Pit(t: 0, pitch: 0, amp: Stereo.defaultAmp)]
+//        }
         envelope = (try? Envelope(pb.envelope)) ?? .init()
         isNoise = pb.isNoise
         id = (try? UUID(pb.id)) ?? UUID()
@@ -916,8 +918,7 @@ extension Note {
 
 struct Chord: Hashable, Codable {
     enum ChordType: Hashable, Codable, CaseIterable, CustomStringConvertible {
-        case major, suspended, minor, augmented, flatfive, diminish,
-             octave, power, tritone
+        case major, suspended, minor, augmented, flatfive, diminish, power, tritone
         
         var description: String {
             switch self {
@@ -927,7 +928,6 @@ struct Chord: Hashable, Codable {
             case .augmented: "Aug"
             case .flatfive: "Fla"
             case .diminish: "Dim"
-            case .octave: "Oct"
             case .power: "Pow"
             case .tritone: "Tri"
             }
@@ -940,7 +940,6 @@ struct Chord: Hashable, Codable {
             case .augmented: [0, 4, 8]
             case .flatfive: [0, 4, 6]
             case .diminish: [0, 3, 6]
-            case .octave: [0, 12]
             case .power: [0, 7]
             case .tritone: [0, 6]
             }
@@ -953,13 +952,7 @@ struct Chord: Hashable, Codable {
             [.power]
         }
         static var cases1Count: [Self] {
-            [.octave, .tritone]
-        }
-        var containsOctave: Bool {
-            switch self {
-            case .octave: true
-            default: false
-            }
+            [.tritone]
         }
         var containsPower: Bool {
             switch self {
@@ -1016,9 +1009,9 @@ extension Chord {
     }
     
     init?(pitchs: [Int]) {
-        guard pitchs.count >= 2 else { return nil }
         let oPitchs = pitchs.sorted()
-        let pitchs = oPitchs.map { $0 - oPitchs[0] }
+        let pitchs = Set(oPitchs.map { ($0 - oPitchs[0]).mod(12) }).sorted()
+        guard pitchs.count >= 2 else { return nil }
         
         var typers = [ChordTyper]()
         for type in ChordType.cases3Count {
@@ -1040,8 +1033,7 @@ extension Chord {
                     if Set(pitchs).isSuperset(of: nvs) {
                         if !(typers.contains(where: { typer in typer.type.containsPower && Set(typer.inversionUnisons.map { $0 + pitchs[typer.index] }).isSuperset(of: nvs) })) {
                             
-                            typers.append(.init(type, inversion: i,
-                                                index: j))
+                            typers.append(.init(type, inversion: i, index: j))
                         }
                     }
                 }
@@ -1052,7 +1044,7 @@ extension Chord {
             for j in 0 ..< pitchs.count - (type.unisons.count - 1) {
                 let nvs = vs.map { $0 + pitchs[j] }
                 if Set(pitchs).isSuperset(of: nvs) {
-                    if !(typers.contains(where: { typer in (type == .octave ? typer.type.containsOctave : typer.type.containsTritone) && Set(typer.inversionUnisons.map { $0 + pitchs[typer.index] }).isSuperset(of: nvs) })) {
+                    if !(typers.contains(where: { typer in typer.type.containsTritone && Set(typer.inversionUnisons.map { $0 + pitchs[typer.index] }).isSuperset(of: nvs) })) {
                         
                         typers.append(.init(type, inversion: 0, index: j))
                     }
@@ -1173,8 +1165,7 @@ extension Chord {
             }
         }
         return notes.enumerated().compactMap {
-            npis.contains(tps[$0.offset].1) ?
-                $0.offset : nil
+            npis.contains(tps[$0.offset].1) ? $0.offset : nil
         }
     }
     
@@ -1219,6 +1210,7 @@ extension Chord: CustomStringConvertible {
 
 struct ScoreOption {
     var beatDuration = Rational(16)
+    var keyBeats = [Rational]()
     var tempo = Music.defaultTempo
     var enabled = false
 }
@@ -1228,12 +1220,14 @@ extension ScoreOption: Protobuf {
         if beatDuration < 0 {
             beatDuration = 0
         }
+        keyBeats = pb.keyBeats.compactMap { try? Rational($0) }
         tempo = (try? Rational(pb.tempo))?.clipped(Music.tempoRange) ?? Music.defaultTempo
         enabled = pb.enabled
     }
     var pb: PBScoreOption {
         .with {
             $0.beatDuration = beatDuration.pb
+            $0.keyBeats = keyBeats.map { $0.pb }
             if tempo != Music.defaultTempo {
                 $0.tempo = tempo.pb
             }
@@ -1250,6 +1244,7 @@ struct Score: BeatRangeType {
     var draftNotes = [Note]()
     var beatDuration = Rational(16)
     var tempo = Music.defaultTempo
+    var keyBeats: [Rational] = [4, 8, 12]
     var enabled = false
     var id = UUID()
 }
@@ -1261,6 +1256,7 @@ extension Score: Protobuf {
         if beatDuration < 0 {
             beatDuration = 0
         }
+        keyBeats = pb.keyBeats.compactMap { try? Rational($0) }
         tempo = (try? Rational(pb.tempo))?.clipped(Music.tempoRange) ?? Music.defaultTempo
         enabled = pb.enabled
         id = (try? .init(pb.id)) ?? .init()
@@ -1270,6 +1266,7 @@ extension Score: Protobuf {
             $0.notes = notes.map { $0.pb }
             $0.draftNotes = draftNotes.map { $0.pb }
             $0.beatDuration = beatDuration.pb
+            $0.keyBeats = keyBeats.map { $0.pb }
             $0.tempo = tempo.pb
             $0.enabled = enabled
             $0.id = id.pb
@@ -1323,17 +1320,30 @@ extension Score {
         return Chord.splitedTimeRanges(timeRanges: brps)
     }
     
-    func chordPitches(at range: Range<Rational>) -> [Int] {
-        []//
+    func chordPitches(atBeat range: Range<Rational>) -> [Int] {
+        var pitchLengths = [Int: Rational]()
+        for note in notes {
+            if let iRange = note.beatRange.intersection(range) {
+                let pitch = note.roundedPitch
+                if pitchLengths[pitch] != nil {
+                    pitchLengths[pitch]! += iRange.length
+                } else {
+                    pitchLengths[pitch] = iRange.length
+                }
+            }
+        }
+        let length = range.length / 8
+        return pitchLengths.filter { $0.value >= length }.keys.sorted()
     }
 }
 extension Score {
     var option: ScoreOption {
         get {
-            .init(beatDuration: beatDuration, tempo: tempo, enabled: enabled)
+            .init(beatDuration: beatDuration, keyBeats: keyBeats, tempo: tempo, enabled: enabled)
         }
         set {
             beatDuration = newValue.beatDuration
+            keyBeats = newValue.keyBeats
             tempo = newValue.tempo
             enabled = newValue.enabled
         }
