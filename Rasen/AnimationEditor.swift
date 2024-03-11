@@ -1640,7 +1640,7 @@ final class Slider: DragEditor {
             
             if let sheetView = document.sheetView(at: p) {
                 let inP = sheetView.convertFromWorld(p)
-                if sheetView.containsTempo(inP, maxDistance: document.worldKnobEditDistance) {
+                if sheetView.containsTempo(inP, maxDistance: document.worldKnobEditDistance * 0.5) {
                     type = .tempo(TempoSlider(document))
                 } else if let ci = sheetView.contentIndex(at: inP, scale: document.screenToWorldScale),
                           sheetView.model.contents[ci].timeOption != nil {

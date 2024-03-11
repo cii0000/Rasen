@@ -3262,9 +3262,7 @@ final class SheetView: View {
                 removeContentsNode(at: contentIndexes)
             }
         case .setScoreOption(let option):
-            binder[keyPath: keyPath].score.option = option
-            scoreView.updateTimeline()
-            scoreView.updateScore()
+            scoreView.option = option
             if isMakeRect {
                 return (scoreView.mainFrame, [])
             }

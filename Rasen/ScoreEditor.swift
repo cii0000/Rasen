@@ -170,7 +170,7 @@ final class ScoreSlider: DragEditor {
         case startNoteBeat, endNoteBeat, note,
              attack, decay, release,
              pitchSmp,
-             endBeat
+             keyBeats, endBeat
     }
     
     private let editableInterval = 5.0
@@ -180,14 +180,14 @@ final class ScoreSlider: DragEditor {
     private var notePlayer: NotePlayer?
     private var sheetView: SheetView?
     private var type: SlideType?, overtoneType = OvertoneType.evenSmp
-    private var beganSP = Point(), beganTime = Rational(0), beganInP = Point()
-    private var beganLocalStartPitch = Rational(0), secI = 0, noteI: Int?, pitI: Int?,
+    private var beganSP = Point(), beganTime = Rational(0), beganSheetP = Point()
+    private var beganLocalStartPitch = Rational(0), secI = 0, noteI: Int?, pitI: Int?, keyBeatI: Int?,
                 beganBeatRange: Range<Rational>?,
                 currentBeatNoteIndexes = [Int](),
                 beganDeltaNoteBeat = Rational(),
-                oldNotePitch: Rational?, oldNoteBeat: Rational?,
+                oldNotePitch: Rational?, oldBeat: Rational?,
                 minScorePitch = Rational(0), maxScorePitch = Rational(0)
-    private var beganStartBeat = Rational(0), beganPitch: Rational?
+    private var beganStartBeat = Rational(0), beganPitch: Rational?,  beganBeatX = 0.0, beganPitchY = 0.0
     private var beganTone = Tone(), beganOvertone = Overtone(), beganEnvelope = Envelope()
     private var pitchSmpI: Int?, beganPitchSmp = Point()
     private var beganScoreOption: ScoreOption?
@@ -212,7 +212,7 @@ final class ScoreSlider: DragEditor {
                 let score = scoreView.model
                 
                 beganSP = sp
-                beganInP = inP
+                beganSheetP = inP
                 self.sheetView = sheetView
                 beganTime = sheetView.animationView.beat(atX: inP.x)
                 
@@ -333,16 +333,15 @@ final class ScoreSlider: DragEditor {
                         currentBeatNoteIndexes = beganNotes.keys.sorted()
                             .filter { score.notes[$0].beatRange.contains(note.beatRange.center) }
                     case nil:
-                        let pitch = document.pitch(from: scoreView, at: scoreP)
                         let nsx = scoreView.x(atBeat: note.beatRange.start)
                         let nex = scoreView.x(atBeat: note.beatRange.end)
                         let nfsw = (nex - nsx) * document.worldToScreenScale
                         let dx = nfsw.clipped(min: 3, max: 30, newMin: 1, newMax: 10)
                         * document.screenToWorldScale
                         
-                        type = if abs(scoreP.x - nsx) < dx {
+                        type = if scoreP.x - nsx < dx {
                             .startNoteBeat
-                        } else if abs(scoreP.x - nex) < dx {
+                        } else if scoreP.x - nex > -dx {
                             .endNoteBeat
                         } else {
                             .note
@@ -350,12 +349,19 @@ final class ScoreSlider: DragEditor {
                         
                         let interval = document.currentNoteTimeInterval
                         let nsBeat = scoreView.beat(atX: inP.x, interval: interval)
-                        beganPitch = pitch
+                        beganPitch = note.pitch
                         beganStartBeat = nsBeat
                         let dBeat = note.beatRange.start - note.beatRange.start.interval(scale: interval)
                         beganDeltaNoteBeat = -dBeat
                         beganBeatRange = note.beatRange
                         oldNotePitch = note.pitch
+                        
+                        if type == .startNoteBeat || type == .note {
+                            beganBeatX = scoreView.x(atBeat: note.beatRange.start)
+                        } else {
+                            beganBeatX = scoreView.x(atBeat: note.beatRange.end)
+                        }
+                        beganPitchY = scoreView.y(fromPitch: note.pitch)
                         
                         if document.isSelect(at: p) {
                             let noteIs = sheetView.noteIndexes(from: document.selections)
@@ -366,7 +372,8 @@ final class ScoreSlider: DragEditor {
                         let beat = scoreView.beat(atX: scoreP.x)
                             .clipped(min: note.beatRange.start, max: note.beatRange.end)
                         currentBeatNoteIndexes = beganNotes.keys.sorted()
-                            .filter { score.notes[$0].beatRange.contains(beat) }
+                            .filter { score.notes[$0].beatRange.contains(beat) 
+                                || score.notes[$0].beatRange.end == beat }
                     }
                     
                     let volume = Volume(smp: sheetView.isPlaying ? 0.1 : 1)
@@ -380,11 +387,18 @@ final class ScoreSlider: DragEditor {
                         sheetView.notePlayer = notePlayer
                     }
                     notePlayer?.play()
+                } else if let keyBeatI = scoreView.keyBeatIndex(at: scoreP, scale: document.screenToWorldScale) {
+                    type = .keyBeats
+                    
+                    self.keyBeatI = keyBeatI
+                    beganScoreOption = score.option
+                    beganBeatX = scoreView.x(atBeat: score.keyBeats[keyBeatI])
                 } else if abs(scoreP.x - scoreView.x(atBeat: score.beatDuration)) < document.worldKnobEditDistance {
                     
                     type = .endBeat
                     
                     beganScoreOption = sheetView.model.score.option
+                    beganBeatX = scoreView.x(atBeat: score.beatDuration)
                 }
             }
         case .changed:
@@ -397,15 +411,16 @@ final class ScoreSlider: DragEditor {
                 switch type {
                 case .startNoteBeat:
                     if let beganPitch, let beganBeatRange {
-                        let pitch = document.pitch(from: scoreView, at: scoreP)
-                        let interval = document.currentNoteTimeInterval
-                        let nsBeat = scoreView.beat(atX: sheetP.x, interval: interval)
-                        
-                        if pitch != oldNotePitch || nsBeat != oldNoteBeat {
+                        let beatInterval = document.currentNoteTimeInterval
+                        let pitch = scoreView.pitch(atY: beganPitchY + sheetP.y - beganSheetP.y,
+                                                    interval: document.currentNotePitchInterval)
+                        let nsBeat = scoreView.beat(atX: beganBeatX + sheetP.x - beganSheetP.x,
+                                                    interval: beatInterval)
+                        if pitch != oldNotePitch || nsBeat != oldBeat {
                             let dBeat = nsBeat - beganBeatRange.start
                             let dPitch = pitch - beganPitch
                             
-                            let endBeat = sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: interval)
+                            let endBeat = sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: beatInterval)
                             
                             for (ni, beganNote) in beganNotes {
                                 guard ni < score.notes.count else { continue }
@@ -422,7 +437,7 @@ final class ScoreSlider: DragEditor {
                                 scoreView[ni] = note
                             }
                             
-                            oldNoteBeat = nsBeat
+                            oldBeat = nsBeat
                             
                             if pitch != oldNotePitch {
                                 notePlayer?.notes = currentBeatNoteIndexes.map { scoreView[$0] }
@@ -433,14 +448,15 @@ final class ScoreSlider: DragEditor {
                     }
                 case .endNoteBeat:
                     if let beganPitch, let beganBeatRange {
-                        let pitch = document.pitch(from: scoreView, at: scoreP)
-                        let interval = document.currentNoteTimeInterval
-                        let neBeat = scoreView.beat(atX: sheetP.x, interval: interval)
-                        
-                        if pitch != oldNotePitch || neBeat != oldNoteBeat {
+                        let beatInterval = document.currentNoteTimeInterval
+                        let pitch = scoreView.pitch(atY: beganPitchY + sheetP.y - beganSheetP.y,
+                                                    interval: document.currentNotePitchInterval)
+                        let neBeat = scoreView.beat(atX: beganBeatX + sheetP.x - beganSheetP.x,
+                                                    interval: beatInterval)
+                        if pitch != oldNotePitch || neBeat != oldBeat {
                             let dBeat = neBeat - beganBeatRange.end
                             let dPitch = pitch - beganPitch
-                            let startBeat = sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval)
+                            let startBeat = sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: beatInterval)
                             for (ni, beganNote) in beganNotes {
                                 guard ni < score.notes.count else { continue }
                                 
@@ -456,7 +472,7 @@ final class ScoreSlider: DragEditor {
                                 scoreView[ni] = note
                             }
                             
-                            oldNoteBeat = neBeat
+                            oldBeat = neBeat
                             
                             if pitch != oldNotePitch {
                                 notePlayer?.notes = currentBeatNoteIndexes.map { scoreView[$0] }
@@ -466,17 +482,18 @@ final class ScoreSlider: DragEditor {
                         }
                     }
                 case .note:
-                    if let beganPitch {
-                        let pitch = document.pitch(from: scoreView, at: scoreP)
-                        let interval = document.currentNoteTimeInterval
-                        let nsBeat = scoreView.beat(atX: sheetP.x, interval: interval)
-                        
-                        if pitch != oldNotePitch || nsBeat != oldNoteBeat {
-                            let dBeat = nsBeat - beganStartBeat + beganDeltaNoteBeat
+                    if let beganPitch, let beganBeatRange {
+                        let beatInterval = document.currentNoteTimeInterval
+                        let pitch = scoreView.pitch(atY: beganPitchY + sheetP.y - beganSheetP.y,
+                                                    interval: document.currentNotePitchInterval)
+                        let nsBeat = scoreView.beat(atX: beganBeatX + sheetP.x - beganSheetP.x,
+                                                    interval: beatInterval)
+                        if pitch != oldNotePitch || nsBeat != oldBeat {
+                            let dBeat = nsBeat - beganBeatRange.start
                             let dPitch = pitch - beganPitch
                             
-                            let startBeat = sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval)
-                            let endBeat = sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: interval)
+                            let startBeat = sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: beatInterval)
+                            let endBeat = sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: beatInterval)
                            
                             for (ni, beganNote) in beganNotes {
                                 guard ni < score.notes.count else { continue }
@@ -491,7 +508,7 @@ final class ScoreSlider: DragEditor {
                                 scoreView[ni] = note
                             }
                             
-                            oldNoteBeat = nsBeat
+                            oldBeat = nsBeat
                             
                             if pitch != oldNotePitch {
                                 notePlayer?.notes = currentBeatNoteIndexes.map { scoreView[$0] }
@@ -581,12 +598,39 @@ final class ScoreSlider: DragEditor {
 //                        sheetView.sequencer?.scoreNoders[score.id]?.replace(beganNotes.map { IndexValue(value: $0.value, index: $0.key) }, with: scoreView.model)
                     }
                     
+                case .keyBeats:
+                    if let keyBeatI, keyBeatI < score.keyBeats.count, let beganScoreOption {
+                        let interval = document.currentNoteTimeInterval
+                        let nBeat = scoreView.beat(atX: beganBeatX + sheetP.x - beganSheetP.x,
+                                                   interval: interval)
+                        if nBeat != oldBeat {
+                            let dBeat = nBeat - beganScoreOption.keyBeats[keyBeatI]
+                            let startBeat = sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval)
+                            let nkBeat = max(beganScoreOption.keyBeats[keyBeatI] + dBeat, startBeat)
+                            
+                            oldBeat = nkBeat
+                            
+                            var option = beganScoreOption
+                            option.keyBeats[keyBeatI] = nkBeat
+                            option.keyBeats.sort()
+                            scoreView.option = option
+                            document.updateSelects()
+                        }
+                    }
                 case .endBeat:
-                    let interval = document.currentNoteTimeInterval
-                    let beat = max(scoreView.beat(atX: sheetP.x, interval: interval), 0)
-                    if beat != score.beatDuration {
-                        scoreView.model.beatDuration = beat
-                        document.updateSelects()
+                    if let beganScoreOption {
+                        let interval = document.currentNoteTimeInterval
+                        let nBeat = scoreView.beat(atX: beganBeatX + sheetP.x - beganSheetP.x,
+                                                   interval: interval)
+                        if nBeat != oldBeat {
+                            let dBeat = nBeat - beganScoreOption.beatDuration
+                            let startBeat = sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval)
+                            let nkBeat = max(beganScoreOption.beatDuration + dBeat, startBeat)
+                            
+                            oldBeat = nkBeat
+                            scoreView.option.beatDuration = nkBeat
+                            document.updateSelects()
+                        }
                     }
                 }
             }
@@ -595,7 +639,7 @@ final class ScoreSlider: DragEditor {
             node.removeFromParent()
             
             if let sheetView {
-                if type == .endBeat {
+                if type == .keyBeats || type == .endBeat {
                     sheetView.updatePlaying()
                     if let beganScoreOption, sheetView.model.score.option != beganScoreOption {
                         sheetView.newUndoGroup()
@@ -861,6 +905,15 @@ extension ScoreView {
         pitch * pitchHeight + mainFrame.minY
     }
     
+    var option: ScoreOption {
+        get { model.option }
+        set {
+            unupdateModel.option = newValue
+            updateTimeline()
+            updateChord()
+        }
+    }
+    
     func append(_ note: Note) {
         unupdateModel.notes.append(note)
         octaveNode.append(child: octaveNode(from: note))
@@ -1049,9 +1102,7 @@ extension ScoreView {
     func chordPathlines() -> [Pathline] {
         let score = model
         let pitchRange = Score.pitchRange
-        let nh = pitchHeight
-        let sBeat = max(score.beatRange.start, -10000),
-            eBeat = min(score.beatRange.end, 10000)
+        let sBeat = max(score.beatRange.start, -10000), eBeat = min(score.beatRange.end, 10000)
         let sx = self.x(atBeat: sBeat)
         let ex = self.x(atBeat: eBeat)
         let lw = 1.0
@@ -1076,12 +1127,13 @@ extension ScoreView {
         }
         
         let chordBeats = score.keyBeats
+        guard !chordBeats.isEmpty else { return subBorderPathlines }
         
         let nChordBeats = chordBeats.filter { $0 < score.beatRange.end }.sorted()
         var preBeat: Rational = 0
         var chordRanges = nChordBeats.count.array.map {
-            let v = preBeat ..< chordBeats[$0]
-            preBeat = chordBeats[$0]
+            let v = preBeat ..< nChordBeats[$0]
+            preBeat = nChordBeats[$0]
             return v
         }
         chordRanges.append(preBeat ..< score.beatRange.end)
@@ -1096,111 +1148,81 @@ extension ScoreView {
             let pitchs = pitchs.sorted()
             guard let chord = Chord(pitchs: pitchs) else { continue }
             
-            var typersDic = [Int: [(typer: Chord.ChordTyper,
-                                    typerIndex: Int,
-                                    isInvrsion: Bool)]]()
-            for (ti, typer) in chord.typers.sorted(by: { $0.index < $1.index }).enumerated() {
-                let inversionUnisons = typer.inversionUnisons
-                var j = typer.index
-                let fp = pitchs[j]
-                for i in 0 ..< typer.type.unisons.count {
-                    guard j < pitchs.count else { break }
-                    if typersDic[j] != nil {
-                        typersDic[j]?.append((typer, ti, typer.inversion == i))
-                    } else {
-                        typersDic[j] = [(typer, ti, typer.inversion == i)]
-                    }
-                    while j + 1 < pitchs.count, !inversionUnisons.contains(pitchs[j + 1] - fp) {
-                        j += 1
-                    }
-                    j += 1
-                }
-            }
-            
             let nsx = x(atBeat: tr.start), nex = x(atBeat: tr.end)
             let maxTyperCount = min(chord.typers.count, Int((nex - nsx) / 5))
             let d = 2.0, nw = 5.0 * Double(maxTyperCount - 1)
             
-            for (i, typers) in typersDic {
-                func appendChordMark(at ti: Int, isInversion: Bool, _ typer: Chord.ChordTyper,
-                                     atY cy: Double) {
-                    let tlw = 0.5
-                    let lw = switch typer.type {
-                    case .major, .power: 5 * tlw
-                    case .suspended: 3 * tlw
-                    case .minor: 7 * tlw
-                    case .augmented: 5 * tlw
-                    case .flatfive: 3 * tlw
-                    case .diminish, .tritone: 1 * tlw
-                    }
-                    
-                    let x = -nw / 2 + 5.0 * Double(ti)
-                    let fx = (nex + nsx) / 2 + x - lw / 2
-                    let fy0 = cy + 1, fy1 = cy - 1 - d
-                    
-                    let minorCount = switch typer.type {
-                    case .minor: 4
-                    case .augmented: 3
-                    case .flatfive: 2
-                    case .diminish: 1
-                    case .tritone: 1
-                    default: 0
-                    }
-                    
-                    if minorCount > 0 {
-                        for i in 0 ..< minorCount {
-                            let id = Double(i) * 2 * tlw
-                            subBorderPathlines.append(Pathline(Rect(x: fx + id, y: fy0,
-                                                                    width: tlw, height: d - tlw)))
-                            subBorderPathlines.append(Pathline(Rect(x: fx, y: fy0 + d - tlw,
-                                                                    width: lw, height: tlw)))
-                            
-                            subBorderPathlines.append(Pathline(Rect(x: fx + id, y: fy1 + tlw,
-                                                                    width: tlw, height: d - tlw)))
-                            subBorderPathlines.append(Pathline(Rect(x: fx, y: fy1,
-                                                                    width: lw, height: tlw)))
-                        }
-                    } else {
-                        subBorderPathlines.append(Pathline(Rect(x: fx, y: fy0,
-                                                                width: lw, height: d)))
-                        subBorderPathlines.append(Pathline(Rect(x: fx, y: fy1,
-                                                                width: lw, height: d)))
-                    }
-                    if isInversion {
-                        let ilw = 1.0
-                        subBorderPathlines.append(Pathline(Rect(x: fx - ilw, y: fy0 + d,
-                                                                width: lw + 2 * ilw, height: ilw)))
-                        subBorderPathlines.append(Pathline(Rect(x: fx - ilw, y: fy1 - ilw,
-                                                                width: lw + 2 * ilw, height: ilw)))
-                    }
-                }
-                
-                func append(pitch: Rational) {
-                    let ilw = 2.0
-                    let y = self.y(fromPitch: pitch)
-                    subBorderPathlines.append(Pathline(Rect(x: nsx, y: y - ilw / 2,
+            let typers = chord.typers.sorted(by: { $0.type.rawValue < $1.type.rawValue })[..<maxTyperCount]
+            
+            if let range = Range<Int>(pitchRange) {
+                let ilw = 2.0
+                let unisonsSet = typers.reduce(into: Set<Int>()) { $0.formUnion($1.unisons) }
+                for pitch in range {
+                    let pitchUnison = pitch.mod(12)
+                    guard unisonsSet.contains(pitchUnison) else { continue }
+                    let py = self.y(fromPitch: Rational(pitch))
+                    subBorderPathlines.append(Pathline(Rect(x: nsx, y: py - ilw / 2,
                                                             width: nex - nsx, height: ilw)))
                     
-                    for (_, typerTuple) in typers.enumerated() {
-                        guard typerTuple.typerIndex < maxTyperCount else { continue }
-                        appendChordMark(at: typerTuple.typerIndex,
-                                        isInversion: typerTuple.isInvrsion,
-                                        typerTuple.typer, atY: y)
+                    for (ti, typer) in typers.enumerated() {
+                        if typer.unisons.contains(pitchUnison) {
+                            let isInversion = typer.mainUnison == pitchUnison
+                            
+                            let tlw = 0.5
+                            let x = -nw / 2 + 5.0 * Double(ti)
+                            let fx = (nex + nsx) / 2 + x - lw / 2
+                            let fy0 = py + 1, fy1 = py - 1 - d
+                            func appendMain(lineWidth lw: Double) {
+                                guard isInversion else { return }
+                                let ilw = 1.0
+                                subBorderPathlines.append(Pathline(Rect(x: fx - ilw, y: fy0 + d - ilw,
+                                                                        width: lw + 2 * ilw, height: ilw)))
+                                subBorderPathlines.append(Pathline(Rect(x: fx - ilw, y: fy1,
+                                                                        width: lw + 2 * ilw, height: ilw)))
+                            }
+                            func appendMinor(minorCount: Int, lineWidth lw: Double) {
+                                for i in 0 ..< minorCount {
+                                    let id = Double(i) * 2 * tlw
+                                    subBorderPathlines.append(Pathline(Rect(x: fx + id, y: fy0,
+                                                                            width: tlw, height: d - tlw)))
+                                    subBorderPathlines.append(Pathline(Rect(x: fx, y: fy0 + d - tlw,
+                                                                            width: lw, height: tlw)))
+                                    
+                                    subBorderPathlines.append(Pathline(Rect(x: fx + id, y: fy1 + tlw,
+                                                                            width: tlw, height: d - tlw)))
+                                    subBorderPathlines.append(Pathline(Rect(x: fx, y: fy1,
+                                                                            width: lw, height: tlw)))
+                                }
+                                appendMain(lineWidth: lw)
+                            }
+                            func appendMajor(lineWidth lw: Double) {
+                                subBorderPathlines.append(Pathline(Rect(x: fx, y: fy0,
+                                                                        width: lw, height: d)))
+                                subBorderPathlines.append(Pathline(Rect(x: fx, y: fy1,
+                                                                        width: lw, height: d)))
+                                appendMain(lineWidth: lw)
+                            }
+                            
+                            switch typer.type {
+                            case .power:
+                                appendMajor(lineWidth: 7 * tlw)
+                            case .major:
+                                appendMajor(lineWidth: 5 * tlw)
+                            case .suspended:
+                                appendMajor(lineWidth: 3 * tlw)
+                            case .minor:
+                                appendMinor(minorCount: 4, lineWidth: 7 * tlw)
+                            case .augmented:
+                                appendMinor(minorCount: 3, lineWidth: 5 * tlw)
+                            case .flatfive:
+                                appendMinor(minorCount: 2, lineWidth: 3 * tlw)
+                            case .diminish:
+                                appendMinor(minorCount: 1, lineWidth: 1 * tlw)
+                            case .tritone:
+                                appendMinor(minorCount: 1, lineWidth: 0.5 * tlw)
+                            }
+                        }
                     }
-                }
-                
-                var nPitch = Rational(pitchs[i])
-                append(pitch: nPitch)
-                while true {
-                    nPitch -= 12
-                    guard pitchRange.contains(nPitch) else { break }
-                    append(pitch: nPitch)
-                }
-                nPitch = Rational(pitchs[i])
-                while true {
-                    nPitch += 12
-                    guard pitchRange.contains(nPitch) else { break }
-                    append(pitch: nPitch)
                 }
             }
         }

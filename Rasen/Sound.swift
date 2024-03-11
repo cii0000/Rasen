@@ -917,30 +917,30 @@ extension Note {
 }
 
 struct Chord: Hashable, Codable {
-    enum ChordType: Hashable, Codable, CaseIterable, CustomStringConvertible {
-        case major, suspended, minor, augmented, flatfive, diminish, power, tritone
+    enum ChordType: Int, Hashable, Codable, CaseIterable, CustomStringConvertible {
+        case power, major, suspended, minor, augmented, flatfive, diminish, tritone
         
         var description: String {
             switch self {
+            case .power: "Pow"
             case .major: "Maj"
             case .suspended: "Sus"
             case .minor: "Min"
             case .augmented: "Aug"
             case .flatfive: "Fla"
             case .diminish: "Dim"
-            case .power: "Pow"
             case .tritone: "Tri"
             }
         }
         var unisons: [Int] {
             switch self {
+            case .power: [0, 7]
             case .major: [0, 4, 7]
             case .suspended: [0, 5, 7]
             case .minor: [0, 3, 7]
             case .augmented: [0, 4, 8]
             case .flatfive: [0, 4, 6]
             case .diminish: [0, 3, 6]
-            case .power: [0, 7]
             case .tritone: [0, 6]
             }
         }
@@ -977,82 +977,69 @@ struct Chord: Hashable, Codable {
     
     struct ChordTyper: Hashable, Codable, CustomStringConvertible {
         var type = ChordType.major
-        var inversion = 0
-        var index = 0
+        var mainUnison = 0
+        var unisons = Set<Int>()
         
-        init(_ type: ChordType, inversion: Int = 0, index: Int = 0) {
+        init(_ type: ChordType, unison: Int = 0) {
             self.type = type
-            self.inversion = inversion
-            self.index = index
-        }
-        
-        var inversionUnisons: [Int] {
-            Chord.loop(type.unisons, at: inversion)
+            self.mainUnison = unison
+            unisons = Set(type.unisons.map { ($0 + unison).mod(12) })
         }
         
         var description: String {
-            type.description + "\(inversion).\(index)"
-        }
-        var dispalyString: String {
-            type.description + "\(inversion)".toSubscript
+            type.description + "\(mainUnison)"
         }
     }
     
     var typers = [ChordTyper]()
-    var ratios = [Int]()
-    var cacophonyLevel = 0.0
 }
 extension Chord {
-    var concordance: Double {
-        .log2(cacophonyLevel)
-        .clipped(min: -0.5, max: 3, newMin: 1, newMax: 0)
-    }
-    
     init?(pitchs: [Int]) {
-        let oPitchs = pitchs.sorted()
-        let pitchs = Set(oPitchs.map { ($0 - oPitchs[0]).mod(12) }).sorted()
+        let pitchs = Set(pitchs.map { $0.mod(12) }).sorted()
         guard pitchs.count >= 2 else { return nil }
         
+        let pitchsSet = Set(pitchs)
+        
         var typers = [ChordTyper]()
+        
         for type in ChordType.cases3Count {
-            for i in 0 ..< type.inversionCount {
-                let vs = Self.loop(type.unisons, at: i)
-                for j in 0 ..< pitchs.count - (type.unisons.count - 1) {
-                    let nvs = vs.map { $0 + pitchs[j] }
-                    if Set(pitchs).isSuperset(of: nvs) {
-                        typers.append(.init(type, inversion: i, index: j))
-                    }
+            for j in 0 ..< pitchs.count {
+                let unison = pitchs[j]
+                let nUnisons = type.unisons.map { ($0 + unison).mod(12) }
+                if pitchsSet.isSuperset(of: nUnisons) {
+                    typers.append(.init(type, unison: unison))
                 }
             }
         }
+        
         for type in ChordType.cases2Count {
-            for i in 0 ..< type.inversionCount {
-                let vs = Self.loop(type.unisons, at: i)
-                for j in 0 ..< pitchs.count - (type.unisons.count - 1) {
-                    let nvs = vs.map { $0 + pitchs[j] }
-                    if Set(pitchs).isSuperset(of: nvs) {
-                        if !(typers.contains(where: { typer in typer.type.containsPower && Set(typer.inversionUnisons.map { $0 + pitchs[typer.index] }).isSuperset(of: nvs) })) {
-                            
-                            typers.append(.init(type, inversion: i, index: j))
-                        }
+            for j in 0 ..< pitchs.count {
+                let unison = pitchs[j]
+                let nUnisons = type.unisons.map { ($0 + unison).mod(12) }
+                if pitchsSet.isSuperset(of: nUnisons) {
+                    let nTyper = ChordTyper(type, unison: unison)
+                    if !typers.contains(where: { $0.unisons.isSuperset(of: nTyper.unisons) }) {
+                        typers.append(nTyper)
                     }
                 }
             }
         }
+        
         for type in ChordType.cases1Count {
-            let vs = type.unisons
-            for j in 0 ..< pitchs.count - (type.unisons.count - 1) {
-                let nvs = vs.map { $0 + pitchs[j] }
-                if Set(pitchs).isSuperset(of: nvs) {
-                    if !(typers.contains(where: { typer in typer.type.containsTritone && Set(typer.inversionUnisons.map { $0 + pitchs[typer.index] }).isSuperset(of: nvs) })) {
-                        
-                        typers.append(.init(type, inversion: 0, index: j))
+            for j in 0 ..< pitchs.count {
+                let unison = pitchs[j]
+                let nUnisons = type.unisons.map { ($0 + unison).mod(12) }
+                if pitchsSet.isSuperset(of: nUnisons) {
+                    let nTyper = ChordTyper(type, unison: unison)
+                    if !typers.contains(where: { $0.unisons.isSuperset(of: nTyper.unisons) }) {
+                        typers.append(nTyper)
                     }
                 }
             }
         }
         
         guard !typers.isEmpty else { return nil }
+        
         self.init(typers: typers)
     }
     
