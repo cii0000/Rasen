@@ -1144,26 +1144,22 @@ extension Sequencer {
     }
 }
 
+//Scalogram
 struct Spectrogram {
-    struct SSMP {
-        var smp = 0.0
-        var pan = 0.0
-    }
     struct Frame {
-        var time = 0.0
-        var ssmps = [SSMP]()
+        var sec = 0.0
+        var stereos = [Stereo]()
     }
     enum FqType {
         case linear, mel
     }
     
     var frames = [Frame]()
-    var ampCount = 0
+    var stereoCount = 0
     var maxFq = 0.0
     var secDuration = 0.0
     var type = FqType.linear
     
-    // Issue: Constant-Q or blend 1024 & 2048
     static func `default`(_ buffer: PCMBuffer) -> Self {
         self.init(buffer, windowSize: 2048, windowOverlap: 0.875,
                   type: .mel, isPan: true)
@@ -1195,24 +1191,24 @@ struct Spectrogram {
         
         let sampleRate = buffer.sampleRate
         let nd = 2 / Double(windowSize)
-        let ssmpCount = windowSize / 2
+        let stereoCount = windowSize / 2
         
         let inputIs = [Double](repeating: 0, count: windowSize)
         
         maxFq = sampleRate / 2
         
-        func unionSsmps(_ ssmpss: [[SSMP]]) -> [SSMP] {
+        func unionStereos(_ stereoss: [[Stereo]]) -> [Stereo] {
             if buffer.channelCount == 2 {
-                return (0 ..< ssmpCount).map {
+                return (0 ..< stereoCount).map {
                     guard $0 > 0 else { return .init() }
-                    let leftV = ssmpss[0][$0]
-                    let rightV = ssmpss[1][$0]
-                    let smp = (leftV.smp + rightV.smp) / 2
+                    let leftStereo = stereoss[0][$0]
+                    let rightStereo = stereoss[1][$0]
+                    let smp = (leftStereo.smp + rightStereo.smp) / 2
                     if isPan {
-                        let pan = leftV.smp != rightV.smp ?
-                        (leftV.smp < rightV.smp ?
-                         -(leftV.smp / (leftV.smp + rightV.smp) - 0.5) * 2 :
-                            (rightV.smp / (leftV.smp + rightV.smp) - 0.5) * 2) :
+                        let pan = leftStereo.smp != rightStereo.smp ?
+                        (leftStereo.smp < rightStereo.smp ?
+                         -(leftStereo.smp / (leftStereo.smp + rightStereo.smp) - 0.5) * 2 :
+                            (rightStereo.smp / (leftStereo.smp + rightStereo.smp) - 0.5) * 2) :
                         0
                         return .init(smp: smp, pan: pan)
                     } else {
@@ -1220,7 +1216,7 @@ struct Spectrogram {
                     }
                 }
             } else {
-                return ssmpss[0]
+                return stereoss[0]
             }
         }
         
@@ -1228,8 +1224,8 @@ struct Spectrogram {
         switch type {
         case .linear:
             for i in stride(from: 0, to: frameCount, by: overlapCount) {
-                let t = Double(i) / sampleRate
-                let ssmpss = (0 ..< buffer.channelCount).map { ci in
+                let sec = Double(i) / sampleRate
+                let stereoss: [[Stereo]] = (0 ..< buffer.channelCount).map { ci in
                     var wave = [Double](capacity: windowSize)
                     for j in (i - overlapCount) ..< (i - overlapCount + windowSize) {
                         wave.append(j >= 0 && j < frameCount ? Double(buffer[ci, j]) : 0)
@@ -1239,29 +1235,28 @@ struct Spectrogram {
                     let outputs = dft.transform(real: inputRs,
                                                 imaginary: inputIs)
                     
-                    var nAmps = (0 ..< ssmpCount).map {
+                    var nAmps = (0 ..< stereoCount).map {
                         $0 == 0 ?
                             0 :
                             Double.hypot(outputs.real[$0] / 2,
                                          outputs.imaginary[$0] / 2) * nd
                     }
-                    for x in (1 ..< ssmpCount).reversed() {
-                        for y in stride(from: x * 2, to: ssmpCount - 1, by: x) {
+                    for x in (1 ..< stereoCount).reversed() {
+                        for y in stride(from: x * 2, to: stereoCount - 1, by: x) {
                             nAmps[x] += nAmps[x] * nAmps[y]
                         }
                     }
                     
-                    return (0 ..< ssmpCount).map {
-                        let fq =  Double($0) / Double(ssmpCount) * maxFq
+                    return (0 ..< stereoCount).map {
+                        let fq =  Double($0) / Double(stereoCount) * maxFq
                         let db = Loudness.db40Phon(fromFq: fq)
                         return $0 == 0 ?
                             .init() :
-                        SSMP(smp: db * Volume(amp: nAmps[$0]).smp,
-                             pan: 0)
+                            .init(smp: db * Volume(amp: nAmps[$0]).smp, pan: 0)
                     }
                 }
-                let nssmps = unionSsmps(ssmpss)
-                frames.append(Frame(time: t, ssmps: nssmps))
+                let nStereos = unionStereos(stereoss)
+                frames.append(Frame(sec: sec, stereos: nStereos))
             }
         case .mel:
             func filterBank(minFq: Double,
@@ -1317,12 +1312,12 @@ struct Spectrogram {
             let filterBankCount = 512
             let filterBank = filterBank(minFq: 0,
                                         maxFq: maxFq,
-                                        sampleCount: ssmpCount,
+                                        sampleCount: stereoCount,
                                         filterBankCount: filterBankCount)
             
             for i in stride(from: 0, to: frameCount, by: overlapCount) {
-                let t = Double(i) / sampleRate
-                let ssmpss = (0 ..< buffer.channelCount).map { ci in
+                let sec = Double(i) / sampleRate
+                let stereoss: [[Stereo]] = (0 ..< buffer.channelCount).map { ci in
                     var wave = [Double](capacity: windowSize)
                     for j in (i - overlapCount) ..< (i - overlapCount + windowSize) {
                         wave.append(j >= 0 && j < frameCount ? Double(buffer[ci, j]) : 0)
@@ -1332,7 +1327,7 @@ struct Spectrogram {
                     let outputs = dft.transform(real: inputRs,
                                                 imaginary: inputIs)
                     
-                    let nAmps = (0 ..< ssmpCount).map {
+                    let nAmps = (0 ..< stereoCount).map {
                         $0 == 0 ?
                         0 :
                         Double.hypot(outputs.real[$0] / 2,
@@ -1340,8 +1335,8 @@ struct Spectrogram {
                     }
                     
                     var nSmps = nAmps.map { $0 == 0 ? 0 : Volume(amp: $0).smp }
-                    nSmps = (0 ..< ssmpCount).map {
-                        let fq =  Double($0) / Double(ssmpCount) * maxFq
+                    nSmps = (0 ..< stereoCount).map {
+                        let fq =  Double($0) / Double(stereoCount) * maxFq
                         let db = Loudness.db40PhonScale(fromFq: fq)
                         return db * nSmps[$0]
                     }
@@ -1354,12 +1349,12 @@ struct Spectrogram {
                                             CblasTrans, CblasTrans,
                                             1,
                                             filterBankCount,
-                                            ssmpCount,
+                                            stereoCount,
                                             1,
                                             nPtr.baseAddress,
                                             1,
                                             fPtr.baseAddress,
-                                            ssmpCount,
+                                            stereoCount,
                                             0,
                                             buffer.baseAddress, filterBankCount)
                             }
@@ -1368,34 +1363,34 @@ struct Spectrogram {
                         initializedCount = filterBankCount
                     }
                     
-                    let indices = vDSP.ramp(in: 0 ... Double(ssmpCount),
+                    let indices = vDSP.ramp(in: 0 ... Double(stereoCount),
                                             count: nf.count)
                     vDSP.linearInterpolate(values: nf,
                                            atIndices: indices,
                                            result: &nSmps)
                     
-                    return nSmps.map { SSMP(smp: $0, pan: 0) }
+                    return nSmps.map { .init(smp: $0, pan: 0) }
                 }
                 
-                let nssmps = unionSsmps(ssmpss)
-                frames.append(Frame(time: t, ssmps: nssmps))
+                let nStereos = unionStereos(stereoss)
+                frames.append(Frame(sec: sec, stereos: nStereos))
             }
         }
         
         var nMaxSmp = 0.0
         for frame in frames {
-            nMaxSmp = max(nMaxSmp, frame.ssmps.max(by: { $0.smp < $1.smp })!.smp)
+            nMaxSmp = max(nMaxSmp, frame.stereos.max(by: { $0.smp < $1.smp })!.smp)
         }
         let rMaxSmp = nMaxSmp == 0 ? 0 : 1 / nMaxSmp
         for i in 0 ..< frames.count {
-            for j in 0 ..< frames[i].ssmps.count {
-                frames[i].ssmps[j].smp = (frames[i].ssmps[j].smp * rMaxSmp)
+            for j in 0 ..< frames[i].stereos.count {
+                frames[i].stereos[j].smp = (frames[i].stereos[j].smp * rMaxSmp)
                     .clipped(min: 0, max: 1)
             }
         }
         
         self.frames = frames
-        ampCount = ssmpCount
+        self.stereoCount = stereoCount
         secDuration = Double(frameCount) / sampleRate
     }
     
@@ -1422,7 +1417,7 @@ struct Spectrogram {
     } ()
     
     func image(b: Double = 0, width: Int = 1024, at xi: Int = 0) -> Image? {
-        let h = ampCount
+        let h = stereoCount
         guard let bitmap
                 = Bitmap<UInt8>(width: width, height: h,
                                 colorSpace: .sRGB) else { return nil }
@@ -1434,14 +1429,14 @@ struct Spectrogram {
         
         for x in 0 ..< width {
             for y in 0 ..< h {
-                let ssmp = frames[x + xi].ssmps[h - 1 - y]
-                let alpha = rgamma(ssmp.smp > 0.5 ? ssmp.smp.clipped(min: 0.5, max: 1, newMin: 0.95, newMax: 1) : ssmp.smp * 0.95 / 0.5)
+                let stereo = frames[x + xi].stereos[h - 1 - y]
+                let alpha = rgamma(stereo.smp > 0.5 ? stereo.smp.clipped(min: 0.5, max: 1, newMin: 0.95, newMax: 1) : stereo.smp * 0.95 / 0.5)
                 guard !alpha.isNaN else {
-                    print("NaN:", ssmp.smp)
+                    print("NaN:", stereo.smp)
                     continue
                 }
-                bitmap[x, y, 0] = ssmp.pan > 0 ? UInt8(rgamma(ssmp.pan * Self.redRatio) * alpha * Double(UInt8.max)) : 0
-                bitmap[x, y, 1] = ssmp.pan < 0 ? UInt8(rgamma(-ssmp.pan * Self.greenRatio) * alpha * Double(UInt8.max)) : 0
+                bitmap[x, y, 0] = stereo.pan > 0 ? UInt8(rgamma(stereo.pan * Self.redRatio) * alpha * Double(UInt8.max)) : 0
+                bitmap[x, y, 1] = stereo.pan < 0 ? UInt8(rgamma(-stereo.pan * Self.greenRatio) * alpha * Double(UInt8.max)) : 0
                 bitmap[x, y, 2] = UInt8(b * alpha * Double(UInt8.max))
                 bitmap[x, y, 3] = UInt8(alpha * Double(UInt8.max))
             }

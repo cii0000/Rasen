@@ -1041,7 +1041,6 @@ final class LineEditor: Editor {
                 let scoreP = scoreView.convertFromWorld(p)
                 let pitch = document.pitch(from: scoreView, at: scoreP)
                     .clipped(min: Score.pitchRange.start, max: Score.pitchRange.end)
-                let score = scoreView.model
                 let interval = document.currentNoteTimeInterval
                 let beat = scoreView.beat(atX: sheetP.x, interval: interval)
                 let beatRange = beat > nsBeat ? nsBeat ..< beat : beat ..< nsBeat
@@ -1073,14 +1072,13 @@ final class LineEditor: Editor {
             let p = document.convertScreenToWorld(event.screenPoint)
             if let sheetView = noteSheetView, let nsBeat = noteStartBeat, let noteI {
                 let scoreView = sheetView.scoreView
-                let score = scoreView.model
                 let sheetP = sheetView.convertFromWorld(p)
                 let scoreP = scoreView.convertFromWorld(p)
                 let pitch = document.pitch(from: scoreView, at: scoreP)
                     .clipped(min: Score.pitchRange.start, max: Score.pitchRange.end)
                 let interval = document.currentNoteTimeInterval
                 let beat = scoreView.beat(atX: sheetP.x, interval: interval)
-                var beatRange = beat > nsBeat ? nsBeat ..< beat : beat ..< nsBeat
+                let beatRange = beat > nsBeat ? nsBeat ..< beat : beat ..< nsBeat
                 if beatRange.length == 0 {
                     scoreView.remove(at: noteI)
                 } else {
