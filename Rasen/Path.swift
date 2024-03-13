@@ -15,6 +15,37 @@
 // You should have received a copy of the GNU General Public License
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
+struct TriangleStrip: Hashable, Codable {
+    var points = [Point]()
+}
+extension TriangleStrip {
+    var bounds: Rect? {
+        points.bounds
+    }
+    var outlinePoints: [Point] {
+        guard !points.isEmpty else { return [] }
+        var i = 0, nPoints = [Point](capacity: points.count)
+        while i < points.count {
+            nPoints.append(points[i])
+            i += 2
+        }
+        if points.count % 2 != 0 {
+            nPoints.append(points[i - 1])
+        }
+        i -= 2
+        while i >= 0 {
+            nPoints.append(points[i + 1])
+            i -= 2
+        }
+        return nPoints
+    }
+}
+extension TriangleStrip: AppliableTransform {
+    static func * (lhs: Self, rhs: Transform) -> Self {
+        .init(points: lhs.points.map { $0 * rhs })
+    }
+}
+
 struct Pathline {
     enum Element {
         case linear(Point)
@@ -499,7 +530,7 @@ struct Path {
         didSet { updateBounds() }
     }
     var isPolygon = true, isCap = true, isTopolygon = false
-    private(set) var bounds: Rect?, typesetter: Typesetter?
+    private(set) var bounds: Rect?, typesetter: Typesetter?, triangleStrip: TriangleStrip?
     
     init() {}
     init(_ rect: Rect) {
@@ -567,23 +598,43 @@ struct Path {
         self.isTopolygon = isTopolygon
         updateBounds()
     }
-    init(_ typesetter: Typesetter, isPolygon: Bool = true, isCap: Bool = true) {
+    init(_ typesetter: Typesetter, isPolygon: Bool = true, isCap: Bool = false) {
         self.typesetter = typesetter
         self.pathlines = typesetter.pathlines
         self.isPolygon = isPolygon
         self.isCap = isCap
         updateBounds()
     }
+    init(_ triangleStrip: TriangleStrip) {
+        self.triangleStrip = triangleStrip
+        self.pathlines = [.init(triangleStrip.outlinePoints)]
+        isCap = false
+        updateBounds()
+    }
     
     private mutating func updateBounds() {
         bounds = pathlines.reduce(into: Rect?.none) { $0 += $1.bounds }
     }
+    
+    private init(pathlines: [Pathline], isPolygon: Bool, isCap: Bool, isTopolygon: Bool,
+                 bounds: Rect?, typesetter: Typesetter?, triangleStrip: TriangleStrip?) {
+        self.pathlines = pathlines
+        self.isPolygon = isPolygon
+        self.isCap = isCap
+        self.isTopolygon = isTopolygon
+        self.bounds = bounds
+        self.typesetter = typesetter
+        self.triangleStrip = triangleStrip
+    }
 }
 extension Path: AppliableTransform {
     static func * (lhs: Path, rhs: Transform) -> Path {
-        Path(lhs.pathlines.map { $0 * rhs },
-             isPolygon: lhs.isPolygon, isCap: lhs.isCap,
-             isTopolygon: lhs.isTopolygon)
+        let nPathlines = lhs.pathlines.map { $0 * rhs }
+        let bounds = nPathlines.reduce(into: Rect?.none) { $0 += $1.bounds }
+        let nTriangleStrip = lhs.triangleStrip != nil ? lhs.triangleStrip! * rhs : nil
+        return .init(pathlines: nPathlines,
+                     isPolygon: lhs.isPolygon, isCap: lhs.isCap, isTopolygon: lhs.isTopolygon,
+                     bounds: bounds, typesetter: lhs.typesetter, triangleStrip: nTriangleStrip)
     }
 }
 extension Path {
@@ -1010,6 +1061,14 @@ extension Path {
     }
     func fillPointsData(withQuality quality: Double = 1) -> (pointsData: [Float],
                                                              counts: [Int]) {
+        if let triangleStrip {
+            return (triangleStrip.points.reduce(into: [Float](capacity: triangleStrip.points.count * 4)) {
+                $0.append(Float($1.x))
+                $0.append(Float($1.y))
+                $0.append(0)
+                $0.append(1)
+            }, [triangleStrip.points.count])
+        }
         if isTopolygon {
             let topoly = topolygon(withQuality: quality)
             do {
@@ -1485,6 +1544,9 @@ extension Path {
         return (npd, nCounts)
     }
     
+    func fillColorsDataWith(_ colors: [Color]) -> [RGBA] {
+        colors.map { $0.rgba }
+    }
     func lineColorsDataWith(_ colors: [Color], lineWidth lw: Double,
                             quality: Double = 1) -> [RGBA] {
         var rgbas = [RGBA](), k = 0

@@ -51,34 +51,50 @@ extension Interpolation {
         keys.append(key)
     }
     
-    func valueEnabledFirstLast(withT t: Double) -> Value? {
+    func valueEnabledFirstLast(withT t: Double, isLoop: Bool = true) -> Value? {
         if t <= 0 {
             return keys.first?.value
         } else if t >= duration {
             return keys.last?.value
         } else {
             if let result = timeResult(withTime: t) {
-                return value(with: result)
+                return value(with: result, isLoop: isLoop)
             } else {
                 return nil
             }
         }
     }
-    func value(withTime t: Double) -> Value? {
+    func value(withTime t: Double, isLoop: Bool = true) -> Value? {
         if let result = timeResult(withTime: t) {
-            return value(with: result)
+            return value(with: result, isLoop: isLoop)
         } else {
             return nil
         }
     }
-    func value(with timeResult: TimeResult) -> Value? {
+    func value(with timeResult: TimeResult, isLoop: Bool = true) -> Value? {
         guard !keys.isEmpty else { return nil }
         let i1 = timeResult.index
         let k1 = keys[i1]
         guard k1.type == .spline && keys.count > 1,
            timeResult.sectionTime > 0 else { return k1.value }
-        let k0 = keys[i1 - 1 < 0 ? keys.count - 1 : i1 - 1]
+        if !isLoop && i1 + 1 >= keys.count {
+            return k1.value
+        }
         let k2 = keys[i1 + 1 >= keys.count ? 0 : i1 + 1]
+        if !isLoop && i1 - 1 < 0 {
+            let t = timeResult.internalTime / timeResult.sectionTime
+            if i1 + 2 >= keys.count {
+                return Value.linear(k1.value, k2.value, t: t)
+            } else {
+                let k3 = keys[i1 + 2]
+                return Value.firstSpline(k1.value, k2.value, k3.value, t: t)
+            }
+        }
+        let k0 = keys[i1 - 1 < 0 ? keys.count - 1 : i1 - 1]
+        if !isLoop && i1 + 2 >= keys.count {
+            let t = timeResult.internalTime / timeResult.sectionTime
+            return Value.lastSpline(k0.value, k1.value, k2.value, t: t)
+        }
         let k3 = keys[i1 + 2 >= keys.count ? i1 + 2 - keys.count : i1 + 2]
         let t = timeResult.internalTime / timeResult.sectionTime
         if k2.type == .spline {
@@ -96,22 +112,58 @@ extension Interpolation {
             }
         }
     }
-    func monoValue(withTime t: Double) -> Value? {
+    
+    func monoValueEnabledFirstLast(withT t: Double, isLoop: Bool = true) -> Value? {
+        if t <= 0 {
+            return keys.first?.value
+        } else if t >= duration {
+            return keys.last?.value
+        } else {
+            if let result = timeResult(withTime: t) {
+                return monoValue(with: result, isLoop: isLoop)
+            } else {
+                return nil
+            }
+        }
+    }
+    func monoValue(withTime t: Double, isLoop: Bool = true) -> Value? {
         if let result = timeResult(withTime: t) {
-            return monoValue(with: result)
+            return monoValue(with: result, isLoop: isLoop)
         } else {
             return nil
         }
     }
-    func monoValue(with timeResult: TimeResult) -> Value? {
+    func monoValue(with timeResult: TimeResult, isLoop: Bool = true) -> Value? {
         guard !keys.isEmpty else { return nil }
         let i1 = timeResult.index
         let k1 = keys[i1]
         guard k1.type == .spline && keys.count > 1,
            timeResult.sectionTime > 0 else { return k1.value }
+        if !isLoop && i1 + 1 >= keys.count {
+            return k1.value
+        }
         let k2 = keys[i1 + 1 >= keys.count ? 0 : i1 + 1]
         guard k1.value != k2.value else { return k1.value }
+        if !isLoop && i1 - 1 < 0 {
+            let t = timeResult.internalTime / timeResult.sectionTime
+            if i1 + 2 >= keys.count {
+                return Value.linear(k1.value, k2.value, t: t)
+            } else {
+                let k3 = keys[i1 + 2]
+                let ms = Monospline(x1: k1.time, x2: k2.time,
+                                    x3: k3.time, t: t)
+                return Value.firstMonospline(k1.value, k2.value, k3.value,
+                                             with: ms)
+            }
+        }
         let k0 = keys[i1 - 1 < 0 ? keys.count - 1 : i1 - 1]
+        if !isLoop && i1 + 2 >= keys.count {
+            let t = timeResult.internalTime / timeResult.sectionTime
+            let ms = Monospline(x0: k0.time, x1: k1.time,
+                                x2: k2.time, t: t)
+            return Value.lastMonospline(k0.value, k1.value, k2.value,
+                                        with: ms)
+        }
         let k3 = keys[i1 + 2 >= keys.count ? i1 + 2 - keys.count : i1 + 2]
         let t = timeResult.internalTime / timeResult.sectionTime
         if k2.type == .spline {

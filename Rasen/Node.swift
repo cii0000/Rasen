@@ -320,6 +320,7 @@ final class Node {
     
     enum FillType: Equatable {
         case color(Color)
+        case colors([Color])
         case texture(Texture)
     }
     var fillType: FillType? {
@@ -340,6 +341,7 @@ final class Node {
     }
     private var fillColorBufferUpdateType = UpdateType.none
     private var fillColorBuffer: Buffer?
+    private var fillColorsBuffer: Buffer?
     private var fillTextureBuffer: Buffer?
     private var fillTexture: Texture?
     private var isFillOpaque = false
@@ -348,11 +350,19 @@ final class Node {
             switch fillType {
             case .color(let color):
                 fillColorBuffer = Renderer.shared.colorBuffer(with: color)
+                fillColorsBuffer = nil
                 fillTextureBuffer = nil
                 fillTexture = nil
                 isFillOpaque = color.opacity == 1
+            case .colors(let colors):
+                let colorsData = path.fillColorsDataWith(colors)
+                fillColorBuffer = nil
+                fillColorsBuffer = Renderer.shared.device.makeBuffer(colorsData)
+                fillTextureBuffer = nil
+                isFillOpaque = false
             case .texture(let texture):
                 fillColorBuffer = nil
+                fillColorsBuffer = nil
                 
                 let device = Renderer.shared.device
                 let pointsData = path.fillTexturePointsData()
@@ -367,6 +377,7 @@ final class Node {
                 isFillOpaque = texture.isOpaque
             }
         } else {
+            fillColorBuffer = nil
             fillColorBuffer = nil
             fillTextureBuffer = nil
             fillTexture = nil
@@ -500,7 +511,8 @@ final class Node {
                  fillPathBuffer: Buffer?, lineType: LineType?, lineColorBufferUpdateType: UpdateType,
                  lineColorBuffer: Buffer?, lineColorsBuffer: Buffer?, isLineOpaque: Bool,
                  fillType: FillType?, fillColorBufferUpdateType: UpdateType,
-                 fillColorBuffer: Buffer?, fillTextureBuffer: Buffer?, fillTexture: Texture?,
+                 fillColorBuffer: Buffer?, fillColorsBuffer: Buffer?,
+                 fillTextureBuffer: Buffer?, fillTexture: Texture?,
                  isFillOpaque: Bool) {
         
         self.name = name
@@ -533,6 +545,7 @@ final class Node {
         self.fillType = fillType
         self.fillColorBufferUpdateType = fillColorBufferUpdateType
         self.fillColorBuffer = fillColorBuffer
+        self.fillColorsBuffer = fillColorsBuffer
         self.fillTextureBuffer = fillTextureBuffer
         self.fillTexture = fillTexture
         self.isFillOpaque = isFillOpaque
@@ -573,7 +586,7 @@ final class Node {
              isLineOpaque: isLineOpaque,
              fillType: fillType,
              fillColorBufferUpdateType: fillColorBufferUpdateType,
-             fillColorBuffer: fillColorBuffer,
+             fillColorBuffer: fillColorBuffer, fillColorsBuffer: fillColorsBuffer,
              fillTextureBuffer: fillTextureBuffer,
              fillTexture: fillTexture,
              isFillOpaque: isFillOpaque)
@@ -622,9 +635,10 @@ extension Node {
             lineColorsBuffer = nil
             lineColorBufferUpdateType = .update
         }
-        if fillColorBuffer != nil
+        if fillColorBuffer != nil || fillColorsBuffer != nil
             || fillTextureBuffer != nil || fillTexture != nil {
             fillColorBuffer = nil
+            fillColorsBuffer = nil
             fillTextureBuffer = nil
             fillTexture = nil
             fillColorBufferUpdateType = .update
@@ -714,6 +728,13 @@ extension Node {
                     }
                     ctx.setVertex(fillPathBuffer, at: 0)
                     ctx.setVertex(fillColorBuffer, at: 1)
+                    ctx.setVertex(bytes: transformBytes,
+                                  length: transformLength, at: 2)
+                    ctx.drawTriangleStrip(with: fillPathBufferVertexCounts)
+                } else if let fillColorsBuffer {
+                    ctx.setColorsPipeline()
+                    ctx.setVertex(fillPathBuffer, at: 0)
+                    ctx.setVertex(fillColorsBuffer, at: 1)
                     ctx.setVertex(bytes: transformBytes,
                                   length: transformLength, at: 2)
                     ctx.drawTriangleStrip(with: fillPathBufferVertexCounts)

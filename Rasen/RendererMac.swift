@@ -3093,6 +3093,8 @@ extension Node {
                         ctx.drawPath(using: .fill)
                         ctx.setShouldAntialias(true)
                     }
+                case .colors(let colors):
+                    break//
                 case .texture(let texture):
                     if let cgImage = texture.cgImage, let b = bounds {
                         ctx.draw(cgImage, in: b.cg)
@@ -3117,7 +3119,8 @@ extension Node {
                     }
                     ctx.addPath(cgPath)
                     ctx.fillPath()
-                case .gradient: break
+                case .gradient(let colors):
+                    break//
                 }
             }
         }

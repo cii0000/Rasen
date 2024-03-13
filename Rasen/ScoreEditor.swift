@@ -1152,7 +1152,7 @@ extension ScoreView {
             let maxTyperCount = min(chord.typers.count, Int((nex - nsx) / 5))
             let d = 2.0, nw = 5.0 * Double(maxTyperCount - 1)
             
-            let typers = chord.typers.sorted(by: { $0.type.rawValue < $1.type.rawValue })[..<maxTyperCount]
+            let typers = chord.typers.sorted(by: { $0.type.rawValue > $1.type.rawValue })[..<maxTyperCount]
             
             if let range = Range<Int>(pitchRange) {
                 let ilw = 2.0
@@ -1288,6 +1288,7 @@ extension ScoreView {
         let nh = pitchHeight
         return Node(path: Path(subBorderPathlines), lineWidth: nh, lineType: .color(.subBorder))
     }
+    
     func draftNoteNode(from note: Note) -> Node {
         let noteNode = noteNode(from: note)
         var color = Color.draft
@@ -1302,96 +1303,49 @@ extension ScoreView {
         }
         return noteNode
     }
-    func noteNode(from note: Note) -> Node {
-        var nodes = [Node]()
-        let (linePathlines, overtonePathlines, lineColors, knobPathlines, fullEditKnobPathlines, lyricPaths) = notePathlineTuple(from: note)
-        
-        let nh = pitchHeight
-        nodes += linePathlines.map {
-            .init(path: Path([$0]),
-                  lineWidth: nh,
-                  lineType: lineColors.count == 1 ? .color(lineColors[0]) : .gradient(lineColors))
+    
+    func noteNode(from note: Note, color: Color? = nil, lineWidth: Double? = nil) -> Node {
+        guard note.beatRange.length > 0 else {
+            return .init(path: Path(Rect(.init(x(atBeat: note.beatRange.start),
+                                               y(fromPitch: note.pitch)),
+                                         distance: 0)),
+                         fillType: .color(color != nil ? color! : .content))
         }
-        
-        var overtoneColor = Self.octaveColor(at: Int(Pitch(value: note.pitch).unison))
-        if !note.pitch.isInteger {
-            overtoneColor.chroma *= 0.1
-        }
-        nodes += overtonePathlines.map {
-            .init(path: Path([$0]),
-                  lineWidth: nh,
-                  lineType: .color(overtoneColor))
-        }
-        
-        nodes += lyricPaths.map {
-            .init(path: $0, fillType: .color(.content))
-        }
-        
-        nodes += knobPathlines.map {
-            .init(path: .init([$0]), fillType: .color(.background))
-        }
-        nodes += fullEditKnobPathlines.map {
-            .init(name: "isFullEdit", isHidden: !isFullEdit, path: .init([$0]), fillType: .color(.background))
-        }
-        
-        let boundingBox = nodes.reduce(into: Rect?.none) { $0 += $1.drawableBounds }
-        return Node(children: nodes, path: boundingBox != nil ? Path(boundingBox!) : .init())
-    }
-    func noteNode(from note: Note, color: Color, lineWidth: Double) -> Node {
-        var nodes = [Node]()
-        let (linePathlines, overtonePathlines, _, _, _, lyricPaths) = notePathlineTuple(from: note)
-        
-        nodes += linePathlines.map {
-            .init(path: Path([$0]), lineWidth: lineWidth, lineType: .color(color))
-        }
-        
-        nodes += overtonePathlines.map {
-            .init(path: Path([$0]), lineWidth: lineWidth, lineType: .color(color))
-        }
-        
-        nodes += lyricPaths.map {
-            .init(path: $0, fillType: .color(color))
-        }
-        
-        return Node(children: nodes)
-    }
-    func notePathlineTuple(from note: Note) -> (linePathlines: [Pathline],
-                                                overtonePathlines: [Pathline],
-                                                lineColors: [Color],
-                                                knobPathlines: [Pathline],
-                                                fullEditKnobPathlines: [Pathline],
-                                                lyricPaths: [Path]) {
-        let noteHeight = pitchHeight
+        let h = ScoreLayout.noteHeight
         let nx = x(atBeat: note.beatRange.start)
         let ny = self.y(fromPitch: note.pitch)
-        let nw = width(atBeatDuration: note.beatRange.length == 0 ? Sheet.fullEditBeatInterval : note.beatRange.length)
-        
-        let nt = 0.1, h = noteHeight / 2
-        let d = 1 / h
-        
-        func lyricPaths() -> [Path] {
-            note.pits.enumerated().compactMap { (pitI, pit) in
-                let p = pitPosition(atPitI: pitI, note: note)
-                if !pit.lyric.isEmpty {
-                    let lyricText = Text(string: pit.lyric, size: Font.smallSize)
-                    let typesetter = lyricText.typesetter
-                    return typesetter.path() * Transform(translationX: p.x, y: p.y - typesetter.height / 2 - 2)
-                } else {
-                    return nil
-                }
-            }
-        }
-        
-        let env = note.envelope
-        let attackW = width(atSecDuration: env.attackSec)
-        let decayW = width(atSecDuration: env.decaySec)
-        let releaseW = width(atSecDuration: env.releaseSec)
+        let nw = width(atBeatDuration: note.beatRange.length == 0 ? 
+                       Sheet.fullEditBeatInterval : note.beatRange.length)
+        let attackW = width(atSecDuration: note.envelope.attackSec)
+        let decayW = width(atSecDuration: note.envelope.decaySec)
+        let releaseW = width(atSecDuration: note.envelope.releaseSec)
         
         let overtoneH = 1.0
         let scY = 2.0
         let scH = 2.0
+        let noiseY = 1.5
         
-        let smpT = 0.5
+        var linePathlines = [Pathline]()
+        var overtonePathlines = [Pathline]()
+        var knobPathlines = [Pathline]()
+        var fullEditKnobPathlines = [Pathline]()
+        var scNodes = [Node]()
+        
+        let lyricPaths = note.pits.enumerated().compactMap { (pitI, pit) in
+            let p = pitPosition(atPitI: pitI, note: note)
+            if !pit.lyric.isEmpty {
+                let lyricText = Text(string: pit.lyric, size: Font.smallSize)
+                let typesetter = lyricText.typesetter
+                return typesetter.path() * Transform(translationX: p.x, y: p.y - typesetter.height / 2 - 2)
+            } else {
+                return nil
+            }
+        }
+        
+        
+        
+        let lineColors: [Color]
+        let smpT = 1.0
         if note.pits.count >= 2 {
             let secDur = Double(Score.sec(fromBeat: note.beatRange.length, tempo: model.tempo))
             
@@ -1413,8 +1367,7 @@ extension ScoreView {
                       pressure: smpT)
             }
             
-            let colors = note.pitbend.lineColors(secDuration: secDur,
-                                                 envelope: note.envelope)
+            lineColors = note.pitbend.lineColors(secDuration: secDur, envelope: note.envelope)
             
             let pitchSmpKnobPs: [Point] = note.pits.flatMap { pit in
                 let p = Point(pit.t * nw + nx,
@@ -1423,36 +1376,106 @@ extension ScoreView {
                     Point(p.x, p.y + $0.x.clipped(min: Double(Score.pitchRange.start), max: Double(Score.pitchRange.end), newMin: -scH / 2, newMax: scH / 2))
                 }
             }
-            
             let knobPs = 
 //            [Point(nx + attackW, ny + noteHeight),
 //                          Point(nx + attackW + decayW, ny + noteHeight),
 //                          Point(nx + nw + releaseW, ny + noteHeight)] + 
             pitchSmpKnobPs
-            let fullEditKnobPathlines = knobPs.map {
+            
+            fullEditKnobPathlines = knobPs.map {
                 Pathline(circleRadius: 0.0625, position: $0)
             }
             
-            let knobPathlines = note.pits.map {
+            knobPathlines = note.pits.map {
                 Pathline(circleRadius: 0.25,
                          position: .init($0.t * nw + nx,
                                          self.y(fromPitch: Double(note.pitch) + $0.pitch * 12)))
             }
             
-            let line1 = Line(controls: toneLine.controls.map { .init(point: .init($0.point.x, $0.point.y + overtoneH / 2 + $0.pressure * h), pressure: overtoneH / noteHeight) })
-            let line2 = Line(controls: toneLine.controls.map { .init(point: .init($0.point.x, $0.point.y - overtoneH / 2 - $0.pressure * h), pressure: overtoneH / noteHeight) })
+            struct PAndColor: Hashable {
+                var p: Point, color: Color
+                
+                init(_ p: Point, _ color: Color) {
+                    self.p = p
+                    self.color = color
+                }
+                static func ==(lhs: Self, rhs: Self) -> Bool {
+                    lhs.p.y == rhs.p.y && lhs.color == rhs.color
+                }
+            }
+            func pAndColors(x: Double, noteY: Double, pitchSmps: [Point]) -> [PAndColor] {
+                var vs = [PAndColor](capacity: pitchSmps.count)
+                
+                func appendPitchSmp(pitchSmp: Point) {
+                    let y = pitchSmp.x.clipped(min: Double(Score.pitchRange.start), max: Double(Score.pitchRange.end), newMin: -scH / 2, newMax: scH / 2) + h / 2 + overtoneH + scY + noteY
+                    let color = Color(lightness: (1 - pitchSmp.y) * 100)
+                    vs.append(.init(.init(x, y), color))
+                }
+                
+                let y = -scH / 2 + h / 2 + overtoneH + scY + noteY
+                let color = Color(lightness: (1 - (pitchSmps.first?.y ?? 0)) * 100)
+                vs.append(.init(.init(x, y), color))
+                
+                for pitchSmp in pitchSmps {
+                    appendPitchSmp(pitchSmp: pitchSmp)
+                }
+                
+                appendPitchSmp(pitchSmp: .init(Double(Score.pitchRange.end), pitchSmps.last?.y ?? 0))
+                
+                return vs
+            }
             
-            let scLine = Line(controls: toneLine.controls.map { .init(point: .init($0.point.x, $0.point.y + overtoneH + scY + $0.pressure * h), pressure: scH / noteHeight) })
+            let pitbend = Pitbend(note.pitsEqualPitchSmpCount())
+            
+            var beat = note.beatRange.start, vs = [[PAndColor]]()
+            var lastV: [PAndColor]?, isLastAppned = false
+            while beat <= note.beatRange.end {
+                let x = self.x(atBeat: beat)
+                let t = Double((beat - note.beatRange.start) / note.beatRange.length)
+                let pitchSmps = pitbend.tone(atT: t).pitchSmps
+                let noteY = y(fromPitch: Double(note.pitch) + pitbend.pitch(atT: t) * 12)
+                let v = pAndColors(x: x, noteY: noteY, pitchSmps: pitchSmps)
+                isLastAppned = vs.last != v
+                if isLastAppned {
+                    if let v = lastV {
+                        vs.append(v)
+                    }
+                    vs.append(v)
+                }
+                lastV = v
+                beat += .init(1, 48)
+            }
+            if !isLastAppned, let v = lastV {
+                vs.append(v)
+            }
+            
+            if !vs.isEmpty && vs[0].count >= 2 {
+                for yi in 1 ..< vs[0].count {
+                    var ps = [Point](capacity: 2 * vs.count)
+                    var colors = [Color](capacity: 2 * vs.count)
+                    for xi in vs.count.range {
+                        ps.append(vs[xi][yi - 1].p)
+                        ps.append(vs[xi][yi].p)
+                        colors.append(vs[xi][yi - 1].color)
+                        colors.append(vs[xi][yi].color)
+                    }
+                    let tst = TriangleStrip(points: ps)
+                    
+                    scNodes.append(.init(path: Path(tst), fillType: .colors(colors)))
+                }
+            }
+            
+            let line1 = Line(controls: toneLine.controls.map { .init(point: .init($0.point.x, $0.point.y + overtoneH / 2 + $0.pressure * h / 2), pressure: overtoneH / h) })
+            let line2 = Line(controls: toneLine.controls.map { .init(point: .init($0.point.x, $0.point.y - overtoneH / 2 - $0.pressure * h / 2), pressure: overtoneH / h) })
             
             if note.isNoise {
-                let line3 = Line(controls: toneLine.controls.map { .init(point: .init($0.point.x, $0.point.y + d * 2 + $0.pressure * h), pressure: overtoneH / noteHeight) })
-                return (line.isEmpty ? [] : [.init(line)],
-                        [.init(line1), .init(line2), .init(scLine), .init(line3)],
-                        colors, knobPathlines, fullEditKnobPathlines, lyricPaths())
+                let line3 = Line(controls: toneLine.controls.map { .init(point: .init($0.point.x, $0.point.y - overtoneH - noiseY + $0.pressure * h / 2), pressure: overtoneH / h) })
+                
+                linePathlines += line.isEmpty ? [] : [.init(line)]
+                overtonePathlines += [.init(line1), .init(line2), .init(line3)]
             } else {
-                return (line.isEmpty ? [] : [.init(line)],
-                        [.init(line1), .init(line2), .init(scLine)],
-                        colors, knobPathlines, fullEditKnobPathlines, lyricPaths())
+                linePathlines += line.isEmpty ? [] : [.init(line)]
+                overtonePathlines += [.init(line1), .init(line2)]
             }
         } else {
 //            let sustain = Volume(amp: env.sustainAmp).smp
@@ -1473,50 +1496,88 @@ extension ScoreView {
                                        .init(point: Point(nx + attackW + decayW, ny), pressure: smpT),
                                        .init(point: Point(nx + nw, ny), pressure: smpT),
                                        .init(point: Point(nx + nw, ny), pressure: smpT)])
-            
-//            let lines = (0 ... 20).map { i in
-//                let s = Double(i) / 20
-//                
-//                let l = note.tone.sourceFilter.smp(atMel: s * NoiseSourceFilter.maxMel)
-//                    .clipped(min: 0, max: 1, newMin: 75, newMax: 25)
-//                return Line(controls: line.controls.map {
-//                    .init(point: .init($0.point.x, $0.point.y - $0.pressure * h + $0.pressure * h * 2 * s),
-//                          pressure: $0.pressure / 20)
-//                }, uuColor: UU(Color(lightness: l)))
-//            }
         
             let pitchSmpKnobPs = note.firstTone.pitchSmps.map {
                 Point(nx, ny + $0.x.clipped(min: Double(Score.pitchRange.start), max: Double(Score.pitchRange.end), newMin: -scH / 2, newMax: scH / 2) + h / 2 + overtoneH + scY)
             }
-            
             let knobPs = 
 //            [Point(nx + attackW, ny + noteHeight + scY),
 //                          Point(nx + attackW + decayW, ny + noteHeight + scY),
-//                          Point(nx + nw + releaseW, ny + noteHeight + scY)] + 
+//                          Point(nx + nw + releaseW, ny + noteHeight + scY)] +
             pitchSmpKnobPs
-            let fullEditKnobPathlines = knobPs.map {
+            
+            fullEditKnobPathlines = knobPs.map {
                 Pathline(circleRadius: 0.0625, position: $0)
             }
             
             let nv = Color(lightness: (1 - note.pits[0].stereo.smp) * 100).rgba.r
             let color = Pitbend.panColor(pan: note.pits[0].stereo.pan, brightness: Double(nv))
+            lineColors = [color]
             
-            let line1 = Line(controls: toneLine.controls.map { .init(point: .init($0.point.x, $0.point.y + overtoneH / 2 + $0.pressure * h), pressure: overtoneH / noteHeight) })
-            let line2 = Line(controls: toneLine.controls.map { .init(point: .init($0.point.x, $0.point.y - overtoneH / 2 - $0.pressure * h), pressure: overtoneH / noteHeight) })
+            let line1 = Line(controls: toneLine.controls.map { .init(point: .init($0.point.x, $0.point.y + overtoneH / 2 + $0.pressure * h / 2), pressure: overtoneH / h) })
+            let line2 = Line(controls: toneLine.controls.map { .init(point: .init($0.point.x, $0.point.y - overtoneH / 2 - $0.pressure * h / 2), pressure: overtoneH / h) })
             
-            let scLine = Line(controls: toneLine.controls.map { .init(point: .init($0.point.x, $0.point.y + overtoneH + scY + $0.pressure * h), pressure: scH / noteHeight) })
+            var preY = ny - scH / 2 + h / 2 + overtoneH + scY
+            var preColor = Color(lightness: (1 - (note.firstTone.pitchSmps.first?.y ?? 0)) * 100)
+            func appendPitchSmp(pitchSmp: Point) {
+                let y = ny + pitchSmp.x.clipped(min: Double(Score.pitchRange.start), max: Double(Score.pitchRange.end), newMin: -scH / 2, newMax: scH / 2) + h / 2 + overtoneH + scY
+                let color = Color(lightness: (1 - pitchSmp.y) * 100)
+                
+                let tst = TriangleStrip(points: [.init(nx, preY), .init(nx, y),
+                                                 .init(nx + nw, preY), .init(nx + nw, y)])
+                let colors = [preColor, color, preColor, color]
+                
+                scNodes.append(.init(path: Path(tst), fillType: .colors(colors)))
+                
+                preY = y
+                preColor = color
+            }
+            for pitchSmp in note.firstTone.pitchSmps {
+                appendPitchSmp(pitchSmp: pitchSmp)
+            }
+            appendPitchSmp(pitchSmp: .init(Double(Score.pitchRange.end),
+                                           note.firstTone.pitchSmps.last?.y ?? 0))
             
             if note.isNoise {
-                let line3 = Line(controls: toneLine.controls.map { .init(point: .init($0.point.x, $0.point.y - d * 5 - $0.pressure * h), pressure: overtoneH / noteHeight) })
-                return ([.init(line)],
-                        [.init(line1), .init(line2), .init(scLine), .init(line3)],
-                        [color], [], fullEditKnobPathlines, lyricPaths())
+                let line3 = Line(controls: toneLine.controls.map {
+                    .init(point: .init($0.point.x, $0.point.y - overtoneH - noiseY - $0.pressure * h / 2),
+                          pressure: overtoneH / h)
+                })
+                linePathlines += [.init(line)]
+                overtonePathlines += [.init(line1), .init(line2), .init(line3)]
             } else {
-                return ([.init(line)],
-                        [.init(line1), .init(line2), .init(scLine)],
-                        [color], [], fullEditKnobPathlines, lyricPaths())
+                linePathlines += [.init(line)]
+                overtonePathlines += [.init(line1), .init(line2)]
             }
         }
+        
+        var nodes = [Node]()
+        nodes += linePathlines.map {
+            .init(path: Path([$0]),
+                  lineWidth: lineWidth ?? h,
+                  lineType: color != nil ? .color(color!) : (lineColors.count == 1 ? .color(lineColors[0]) : .gradient(lineColors)))
+        }
+        
+        nodes += scNodes
+        
+        var overtoneColor = Self.octaveColor(at: Int(Pitch(value: note.pitch).unison))
+        if !note.pitch.isInteger {
+            overtoneColor.chroma *= 0.1
+        }
+        nodes += overtonePathlines.map {
+            .init(path: Path([$0]),
+                  lineWidth: lineWidth ?? h,
+                  lineType: .color(color ?? overtoneColor))
+        }
+        
+        nodes += lyricPaths.map { .init(path: $0, fillType: .color(color ?? .content)) }
+        
+        nodes.append(.init(path: .init(knobPathlines), fillType: .color(.background)))
+        nodes.append(.init(name: "isFullEdit", isHidden: !isFullEdit,
+                           path: .init(fullEditKnobPathlines), fillType: .color(.background)))
+        
+        let boundingBox = nodes.reduce(into: Rect?.none) { $0 += $1.drawableBounds }
+        return Node(children: nodes, path: boundingBox != nil ? Path(boundingBox!) : .init())
     }
     
     func noteLine(from note: Note) -> Line {

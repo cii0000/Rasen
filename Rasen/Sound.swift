@@ -337,6 +337,15 @@ extension Tone {
         }
     }
     
+    static func tonesEqualPitchSmpCount(_ tones: [Tone]) -> [Tone] {
+        guard let count = tones.max(by: { $0.pitchSmps.count < $1.pitchSmps.count })?.pitchSmps.count else { return [] }
+        return tones.map {
+            var tone = $0
+            tone.pitchSmps = tone.pitchSmpsWith(count: count)
+            return tone
+        }
+    }
+    
     func pitchSmpsWith(count: Int) -> [Point] {
         let pitchSmps = pitchSmps
         guard pitchSmps.count != count else { return pitchSmps }
@@ -750,23 +759,23 @@ extension Pitbend {
     }
     func pit(atT t: Double) -> Pit {
         let interpolation = interpolation
-        let value = interpolation.valueEnabledFirstLast(withT: t)
+        let value = interpolation.monoValueEnabledFirstLast(withT: t, isLoop: false)
         let pitch = value?.pitch ?? 0
         let stereo = value?.stereo ?? .init()
         let tone = value?.tone ?? .init()
         return .init(t: t, pitch: pitch, stereo: stereo, tone: tone)
     }
     func pitch(atT t: Double) -> Double {
-        interpolation.valueEnabledFirstLast(withT: t)?.pitch ?? 0
+        interpolation.monoValueEnabledFirstLast(withT: t, isLoop: false)?.pitch ?? 0
     }
     func fqScale(atT t: Double) -> Double {
         2 ** pitch(atT: t)
     }
     func stereo(atT t: Double) -> Stereo {
-        interpolation.valueEnabledFirstLast(withT: t)?.stereo ?? .init()
+        interpolation.monoValueEnabledFirstLast(withT: t, isLoop: false)?.stereo ?? .init()
     }
     func tone(atT t: Double) -> Tone {
-        interpolation.valueEnabledFirstLast(withT: t)?.tone ?? .init()
+        interpolation.monoValueEnabledFirstLast(withT: t, isLoop: false)?.tone ?? .init()
     }
     
     func line(fromSecPerSplitCount count: Int = 24,
@@ -896,6 +905,15 @@ extension Note {
     var pits: [Pit] {
         get { pitbend.pits }
         set { pitbend.pits = newValue }
+    }
+    
+    func pitsEqualPitchSmpCount() -> [Pit] {
+        guard let count = pits.max(by: { $0.tone.pitchSmps.count < $1.tone.pitchSmps.count })?.tone.pitchSmps.count else { return [] }
+        return pits.map {
+            var pit = $0
+            pit.tone.pitchSmps = pit.tone.pitchSmpsWith(count: count)
+            return pit
+        }
     }
     
     var octavePitchString: String {
@@ -1197,7 +1215,7 @@ extension Chord: CustomStringConvertible {
 
 struct ScoreOption {
     var beatDuration = Rational(16)
-    var keyBeats = [Rational]()
+    var keyBeats: [Rational] = [4, 8, 12]
     var tempo = Music.defaultTempo
     var enabled = false
 }
@@ -1320,7 +1338,7 @@ extension Score {
             }
         }
         let length = range.length / 8
-        return pitchLengths.filter { $0.value >= length }.keys.sorted()
+        return pitchLengths.filter { $0.value > length }.keys.sorted()
     }
 }
 extension Score {
