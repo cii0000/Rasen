@@ -204,7 +204,7 @@ extension Content {
     }
     var spectrogram: Spectrogram? {
         guard let buffer = try? AVAudioPCMBuffer.from(url: url) else { return nil }
-        return Spectrogram.default(buffer)
+        return .init(buffer)
     }
     var samplePeakDb: Double? {
         guard let buffer = try? AVAudioPCMBuffer.from(url: url) else { return nil }

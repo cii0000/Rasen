@@ -110,6 +110,14 @@ extension RandomAccessCollection where Element: FloatingPoint {
     func mean() -> Element {
         reduce(.zero, +) / Element(self.count)
     }
+    func median() -> Element {
+        let v = self.sorted()
+        return if v.count % 2 == 1 {
+            v[(v.count - 1) / 2]
+        } else {
+            (v[(v.count / 2 - 1)] + v[v.count / 2]) / 2
+        }
+    }
 }
 
 struct Stack<Element> {

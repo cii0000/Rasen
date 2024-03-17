@@ -70,9 +70,9 @@ final class ContentSlider: DragEditor {
                     type = .isShownSpectrogram
                     beganIsShownSpectrogram = contentView.model.isShownSpectrogram
                 } else if let timeOption = content.timeOption {
-                    if abs(sheetP.x - sheetView.animationView.x(atBeat: timeOption.beatRange.start)) < maxMD {
+                    if Swift.abs(sheetP.x - sheetView.animationView.x(atBeat: timeOption.beatRange.start)) < maxMD {
                         type = .startBeat
-                    } else if abs(sheetP.x - sheetView.animationView.x(atBeat: timeOption.beatRange.end)) < maxMD {
+                    } else if Swift.abs(sheetP.x - sheetView.animationView.x(atBeat: timeOption.beatRange.end)) < maxMD {
                         type = .endBeat
                     } else {
                         type = .all
@@ -180,7 +180,8 @@ final class ContentView<T: BinderProtocol>: SpectrgramView {
                             lineWidth: 4, lineType: .color(.warning))
     
     let timelineNode = Node()
-    var spectrogramMaxMel: Double?
+    var spectrogramNode: Node?
+    var spectrogramFqType: Spectrogram.FqType?
     var timeNode: Node?, currentVolumeNode: Node?
     var peakVolume = Volume() {
         didSet {
@@ -195,7 +196,7 @@ final class ContentView<T: BinderProtocol>: SpectrgramView {
             .clipped(min: 0, max: Volume.maxSmp, newMin: 0, newMax: 1)
         let y = frame.height * smp
         node.path = Path([Point(), Point(0, y)])
-        if abs(peakVolume.amp) < Audio.clippingAmp {
+        if Swift.abs(peakVolume.amp) < Audio.clippingAmp {
             node.lineType = .color(.background)
         } else {
             node.lineType = .color(.warning)
@@ -529,15 +530,15 @@ extension ContentView {
     }
     
     func updateSpectrogram() {
-        node.children
-            .filter { $0.name == "spectrogram" }
-            .forEach { $0.removeFromParent() }
+        spectrogramNode?.removeFromParent()
+        spectrogramNode = nil
+        
         let content = model
         guard content.isShownSpectrogram, let sm = content.spectrogram,
               let timeOption = content.timeOption else { return }
         
         let firstX = x(atBeat: timeOption.beatRange.start + timeOption.localStartBeat)
-        let y = (contentFrame?.maxY ?? timelineFrame?.maxY ?? 0) + 0.5
+        let y = timeLineCenterY + Sheet.timelineHalfHeight + ContentLayout.spectrogramHeight
         let allBeat = content.localBeatRange?.length ?? 0
         let allW = width(atBeatDuration: allBeat)
         var nodes = [Node](), maxH = 0.0
@@ -547,7 +548,7 @@ extension ContentView {
                                         isOpaque: false,
                                         colorSpace: .sRGB) else { return nil }
             let w = allW * Double(width) / Double(sm.frames.count)
-            let h = 256 * sm.maxFq / Audio.defaultExportSampleRate
+            let h = 256.0
             maxH = max(maxH, h)
             let x = allW * Double(xi) / Double(sm.frames.count)
             return Node(name: "spectrogram",
@@ -575,9 +576,30 @@ extension ContentView {
                          attitude: .init(position: .init(firstX, y)),
                          path: Path(Rect(width: allW, height: maxH)))
         
-        self.spectrogramMaxMel = Mel.mel(fromFq: sm.maxFq)
+        self.spectrogramNode = sNode
+        self.spectrogramFqType = sm.type
         
         node.append(child: sNode)
+    }
+    func spectrogramPitch(atY y: Double) -> Double? {
+        guard let spectrogramNode, let spectrogramFqType else { return nil }
+        let y = y - 0.5 * 128.0 / 1024// - 1
+        let h = spectrogramNode.path.bounds?.height ?? 0
+        switch spectrogramFqType {
+        case .linear:
+            let fq = y.clipped(min: 0, max: h,
+                               newMin: Spectrogram.minLinearFq,
+                               newMax: Spectrogram.maxLinearFq)
+            return Pitch.pitch(fromFq: max(fq, 1))
+        case .pitch:
+            return y.clipped(min: 0, max: h,
+                             newMin: Double(Score.pitchRange.start),
+                             newMax: Double(Score.pitchRange.end))
+//            let fq = Mel.fq(fromMel: y.clipped(min: 0, max: h,
+//                             newMin: 100,
+//                             newMax: 4000))
+//            return Pitch.pitch(fromFq: max(fq, 1))
+        }
     }
     
     func updateTimeNode(atSec sec: Rational) {

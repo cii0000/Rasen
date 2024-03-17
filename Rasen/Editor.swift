@@ -904,7 +904,7 @@ final class IOEditor: Editor {
                     }
                     
                     var text = Text(string: filename, origin: nnp)
-                    text.origin.y -= (content.type.isDuration ? text.size : text.size / 2) + 4
+                    text.origin.y -= (content.type.isDuration ? Sheet.timelineHalfHeight : 0) + text.size / 2 + 4
                     sheetView.newUndoGroup()
                     sheetView.append(text)
                     sheetView.append(content)

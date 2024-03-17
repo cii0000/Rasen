@@ -2000,7 +2000,7 @@ final class SheetView: View {
         }
     }
     
-    func spectrogramNode(at p: Point) -> (node: Node, maxMel: Double)? {
+    func spectrogramNode(at p: Point) -> (node: Node, contentView: SheetContentView)? {
         for contentView in contentsView.elementViews {
             var nNode: Node?
             contentView.node.allChildren { node, stop in
@@ -2010,8 +2010,8 @@ final class SheetView: View {
                     nNode = node
                 }
             }
-            if let nNode, let maxMel = contentView.spectrogramMaxMel {
-                return (nNode, maxMel)
+            if let nNode {
+                return (nNode, contentView)
             }
         }
         return nil

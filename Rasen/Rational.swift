@@ -52,7 +52,7 @@ struct Rational: SignedNumeric, Hashable {
         var x = x
         var a = x.rounded(.down)
         var p0 = 1, q0 = 0, p1 = Int(a), q1 = 1
-        while abs(x - a) >= tolerance {
+        while Swift.abs(x - a) >= tolerance {
             x = 1 / (x - a)
             a = x.rounded(.down)
             let ia = Int(a)
@@ -88,7 +88,7 @@ extension Rational {
         var a = x.rounded(.down)
         for _ in 0 ..< maxCount {
             cfs.append(Int(a))
-            if abs(x - a) < 0.000001 { break }
+            if Swift.abs(x - a) < 0.000001 { break }
             x = 1 / (x - a)
             a = x.rounded(.down)
         }

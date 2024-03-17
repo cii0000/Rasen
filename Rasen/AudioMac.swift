@@ -867,7 +867,7 @@ final class Sequencer {
                 var peak: Float = 0.0
                 for i in 0 ..< buffer.channelCount {
                     buffer.enumerated(channelIndex: i) { _, v in
-                        let av = abs(v)
+                        let av = Swift.abs(v)
                         if av > peak {
                             peak = av
                         }
@@ -1144,308 +1144,6 @@ extension Sequencer {
     }
 }
 
-//Scalogram
-struct Spectrogram {
-    struct Frame {
-        var sec = 0.0
-        var stereos = [Stereo]()
-    }
-    enum FqType {
-        case linear, mel
-    }
-    
-    var frames = [Frame]()
-    var stereoCount = 0
-    var maxFq = 0.0
-    var secDuration = 0.0
-    var type = FqType.linear
-    
-    static func `default`(_ buffer: PCMBuffer) -> Self {
-        self.init(buffer, windowSize: 2048, windowOverlap: 0.875,
-                  type: .mel, isPan: true)
-    }
-    static func linear(_ buffer: PCMBuffer) -> Self {
-        self.init(buffer, windowSize: 1024, windowOverlap: 0.75,
-                  type: .linear, isPan: true)
-    }
-    init(_ buffer: PCMBuffer,
-         windowSize: Int,
-         windowOverlap: Double,
-         type: FqType,
-         isPan: Bool) {
-        
-        let frameCount = buffer.frameCount
-        guard buffer.channelCount >= 1,
-              frameCount >= windowSize,
-              let dft = try? VDFT(previous: nil,
-                                  count: windowSize,
-                                  direction: .forward,
-                                  transformType: .complexComplex,
-                                  ofType: Double.self) else { return }
-        
-        let overlapCount = Int(Double(windowSize) * (1 - windowOverlap))
-        let windowWave = vDSP.window(ofType: Double.self,
-                                     usingSequence: .hanningNormalized,
-                                     count: windowSize,
-                                     isHalfWindow: false)
-        
-        let sampleRate = buffer.sampleRate
-        let nd = 2 / Double(windowSize)
-        let stereoCount = windowSize / 2
-        
-        let inputIs = [Double](repeating: 0, count: windowSize)
-        
-        maxFq = sampleRate / 2
-        
-        func unionStereos(_ stereoss: [[Stereo]]) -> [Stereo] {
-            if buffer.channelCount == 2 {
-                return (0 ..< stereoCount).map {
-                    guard $0 > 0 else { return .init() }
-                    let leftStereo = stereoss[0][$0]
-                    let rightStereo = stereoss[1][$0]
-                    let smp = (leftStereo.smp + rightStereo.smp) / 2
-                    if isPan {
-                        let pan = leftStereo.smp != rightStereo.smp ?
-                        (leftStereo.smp < rightStereo.smp ?
-                         -(leftStereo.smp / (leftStereo.smp + rightStereo.smp) - 0.5) * 2 :
-                            (rightStereo.smp / (leftStereo.smp + rightStereo.smp) - 0.5) * 2) :
-                        0
-                        return .init(smp: smp, pan: pan)
-                    } else {
-                        return .init(smp: smp, pan: 0)
-                    }
-                }
-            } else {
-                return stereoss[0]
-            }
-        }
-        
-        var frames = [Frame](capacity: frameCount)
-        switch type {
-        case .linear:
-            for i in stride(from: 0, to: frameCount, by: overlapCount) {
-                let sec = Double(i) / sampleRate
-                let stereoss: [[Stereo]] = (0 ..< buffer.channelCount).map { ci in
-                    var wave = [Double](capacity: windowSize)
-                    for j in (i - overlapCount) ..< (i - overlapCount + windowSize) {
-                        wave.append(j >= 0 && j < frameCount ? Double(buffer[ci, j]) : 0)
-                    }
-                    
-                    let inputRs = vDSP.multiply(windowWave, wave)
-                    let outputs = dft.transform(real: inputRs,
-                                                imaginary: inputIs)
-                    
-                    var nAmps = (0 ..< stereoCount).map {
-                        $0 == 0 ?
-                            0 :
-                            Double.hypot(outputs.real[$0] / 2,
-                                         outputs.imaginary[$0] / 2) * nd
-                    }
-                    for x in (1 ..< stereoCount).reversed() {
-                        for y in stride(from: x * 2, to: stereoCount - 1, by: x) {
-                            nAmps[x] += nAmps[x] * nAmps[y]
-                        }
-                    }
-                    
-                    return (0 ..< stereoCount).map {
-                        let fq =  Double($0) / Double(stereoCount) * maxFq
-                        let db = Loudness.db40Phon(fromFq: fq)
-                        return $0 == 0 ?
-                            .init() :
-                            .init(smp: db * Volume(amp: nAmps[$0]).smp, pan: 0)
-                    }
-                }
-                let nStereos = unionStereos(stereoss)
-                frames.append(Frame(sec: sec, stereos: nStereos))
-            }
-        case .mel:
-            func filterBank(minFq: Double,
-                            maxFq: Double,
-                            sampleCount: Int,
-                            filterBankCount: Int) -> [Double] {
-                let minMel = Mel.mel(fromFq: minFq)
-                let maxMel = Mel.mel(fromFq: maxFq)
-                let bankWidth = (maxMel - minMel) / Double(filterBankCount - 1)
-                let filterBankFqs = stride(from: minMel, to: maxMel,
-                                           by: bankWidth).map {
-                    let fq = Mel.fq(fromMel: Double($0))
-                    return Int((fq / maxFq) * Double(sampleCount))
-                }
-                
-                var filterBank = [Double](repeating: 0,
-                                         count: sampleCount * filterBankCount)
-                var baseValue = 1.0, endValue = 0.0
-                for i in 0 ..< filterBankFqs.count {
-                    let row = i * sampleCount
-                    
-                    let startFq = filterBankFqs[max(0, i - 1)]
-                    let centerFq = filterBankFqs[i]
-                    let endFq = i + 1 < filterBankFqs.count ?
-                        filterBankFqs[i + 1] : sampleCount - 1
-                    
-                    let attackWidth = centerFq - startFq + 1
-                    if attackWidth > 0 {
-                        filterBank.withUnsafeMutableBufferPointer {
-                            vDSP_vgenD(&endValue,
-                                      &baseValue,
-                                      $0.baseAddress!.advanced(by: row + startFq),
-                                      1,
-                                      vDSP_Length(attackWidth))
-                        }
-                    }
-                    
-                    let decayWidth = endFq - centerFq + 1
-                    if decayWidth > 0 {
-                        filterBank.withUnsafeMutableBufferPointer {
-                            vDSP_vgenD(&baseValue,
-                                      &endValue,
-                                      $0.baseAddress!.advanced(by: row + centerFq),
-                                      1,
-                                      vDSP_Length(decayWidth))
-                        }
-                    }
-                }
-                
-                return filterBank
-            }
-            
-            let filterBankCount = 512
-            let filterBank = filterBank(minFq: 0,
-                                        maxFq: maxFq,
-                                        sampleCount: stereoCount,
-                                        filterBankCount: filterBankCount)
-            
-            for i in stride(from: 0, to: frameCount, by: overlapCount) {
-                let sec = Double(i) / sampleRate
-                let stereoss: [[Stereo]] = (0 ..< buffer.channelCount).map { ci in
-                    var wave = [Double](capacity: windowSize)
-                    for j in (i - overlapCount) ..< (i - overlapCount + windowSize) {
-                        wave.append(j >= 0 && j < frameCount ? Double(buffer[ci, j]) : 0)
-                    }
-                    
-                    let inputRs = vDSP.multiply(windowWave, wave)
-                    let outputs = dft.transform(real: inputRs,
-                                                imaginary: inputIs)
-                    
-                    let nAmps = (0 ..< stereoCount).map {
-                        $0 == 0 ?
-                        0 :
-                        Double.hypot(outputs.real[$0] / 2,
-                                     outputs.imaginary[$0] / 2) * nd
-                    }
-                    
-                    var nSmps = nAmps.map { $0 == 0 ? 0 : Volume(amp: $0).smp }
-                    nSmps = (0 ..< stereoCount).map {
-                        let fq =  Double($0) / Double(stereoCount) * maxFq
-                        let db = Loudness.db40PhonScale(fromFq: fq)
-                        return db * nSmps[$0]
-                    }
-                    
-                    let nf = [Double](unsafeUninitializedCapacity: filterBankCount) { buffer, initializedCount in
-                        
-                        nSmps.withUnsafeBufferPointer { nPtr in
-                            filterBank.withUnsafeBufferPointer { fPtr in
-                                cblas_dgemm(CblasRowMajor,
-                                            CblasTrans, CblasTrans,
-                                            1,
-                                            filterBankCount,
-                                            stereoCount,
-                                            1,
-                                            nPtr.baseAddress,
-                                            1,
-                                            fPtr.baseAddress,
-                                            stereoCount,
-                                            0,
-                                            buffer.baseAddress, filterBankCount)
-                            }
-                        }
-                        
-                        initializedCount = filterBankCount
-                    }
-                    
-                    let indices = vDSP.ramp(in: 0 ... Double(stereoCount),
-                                            count: nf.count)
-                    vDSP.linearInterpolate(values: nf,
-                                           atIndices: indices,
-                                           result: &nSmps)
-                    
-                    return nSmps.map { .init(smp: $0, pan: 0) }
-                }
-                
-                let nStereos = unionStereos(stereoss)
-                frames.append(Frame(sec: sec, stereos: nStereos))
-            }
-        }
-        
-        var nMaxSmp = 0.0
-        for frame in frames {
-            nMaxSmp = max(nMaxSmp, frame.stereos.max(by: { $0.smp < $1.smp })!.smp)
-        }
-        let rMaxSmp = nMaxSmp == 0 ? 0 : 1 / nMaxSmp
-        for i in 0 ..< frames.count {
-            for j in 0 ..< frames[i].stereos.count {
-                frames[i].stereos[j].smp = (frames[i].stereos[j].smp * rMaxSmp)
-                    .clipped(min: 0, max: 1)
-            }
-        }
-        
-        self.frames = frames
-        self.stereoCount = stereoCount
-        secDuration = Double(frameCount) / sampleRate
-    }
-    
-    static let (redRatio, greenRatio) = {
-        var redColor = Color(red: 0.0625, green: 0, blue: 0)
-        var greenColor = Color(red: 0, green: 0.0625, blue: 0)
-        if redColor.lightness < greenColor.lightness {
-            greenColor.lightness = redColor.lightness
-        } else {
-            redColor.lightness = greenColor.lightness
-        }
-        return (Double(redColor.rgba.r), Double(greenColor.rgba.g))
-    } ()
-    
-    static let (editRedRatio, editGreenRatio) = {
-        var redColor = Color(red: 0.5, green: 0, blue: 0)
-        var greenColor = Color(red: 0, green: 0.5, blue: 0)
-        if redColor.lightness < greenColor.lightness {
-            greenColor.lightness = redColor.lightness
-        } else {
-            redColor.lightness = greenColor.lightness
-        }
-        return (Double(redColor.rgba.r), Double(greenColor.rgba.g))
-    } ()
-    
-    func image(b: Double = 0, width: Int = 1024, at xi: Int = 0) -> Image? {
-        let h = stereoCount
-        guard let bitmap
-                = Bitmap<UInt8>(width: width, height: h,
-                                colorSpace: .sRGB) else { return nil }
-        func rgamma(_ x: Double) -> Double {
-            x <= 0.0031308 ?
-                12.92 * x :
-                1.055 * (x ** (1 / 2.4)) - 0.055
-        }
-        
-        for x in 0 ..< width {
-            for y in 0 ..< h {
-                let stereo = frames[x + xi].stereos[h - 1 - y]
-                let alpha = rgamma(stereo.smp > 0.5 ? stereo.smp.clipped(min: 0.5, max: 1, newMin: 0.95, newMax: 1) : stereo.smp * 0.95 / 0.5)
-                guard !alpha.isNaN else {
-                    print("NaN:", stereo.smp)
-                    continue
-                }
-                bitmap[x, y, 0] = stereo.pan > 0 ? UInt8(rgamma(stereo.pan * Self.redRatio) * alpha * Double(UInt8.max)) : 0
-                bitmap[x, y, 1] = stereo.pan < 0 ? UInt8(rgamma(-stereo.pan * Self.greenRatio) * alpha * Double(UInt8.max)) : 0
-                bitmap[x, y, 2] = UInt8(b * alpha * Double(UInt8.max))
-                bitmap[x, y, 3] = UInt8(alpha * Double(UInt8.max))
-            }
-        }
-        
-        return bitmap.image
-    }
-}
-
 typealias PCMBuffer = AVAudioPCMBuffer
 extension AVAudioPCMBuffer {
     struct AVAudioPCMBufferError: Error {}
@@ -1453,6 +1151,10 @@ extension AVAudioPCMBuffer {
     static var pcmFormat: AVAudioFormat? {
         AVAudioFormat(commonFormat: .pcmFormatFloat32,
                       sampleRate: Audio.defaultSampleRate, channels: 1, interleaved: true)
+    }
+    static var exportPcmFormat: AVAudioFormat? {
+        AVAudioFormat(commonFormat: .pcmFormatFloat32,
+                      sampleRate: Audio.defaultExportSampleRate, channels: 2, interleaved: true)
     }
     
     convenience init?(pcmData: Data) {
@@ -1470,8 +1172,8 @@ extension AVAudioPCMBuffer {
         }
     }
     
-    func convertDefaultFormat() throws -> AVAudioPCMBuffer {
-        guard let pcmFormat = AVAudioPCMBuffer.pcmFormat,
+    func convertDefaultFormat(isExportFormat: Bool = false) throws -> AVAudioPCMBuffer {
+        guard let pcmFormat = isExportFormat ? AVAudioPCMBuffer.exportPcmFormat : AVAudioPCMBuffer.pcmFormat,
               let converter = AVAudioConverter(from: format,
                                                to: pcmFormat) else { throw AVAudioPCMBufferError() }
         let tl = Double(frameLength) / format.sampleRate
@@ -1605,6 +1307,10 @@ extension AVAudioPCMBuffer {
         }
     }
     
+    func channelAmpsFromFloat(at ci: Int) -> [Double] {
+        frameCount.range.map { Double(self[ci, $0]) }
+    }
+    
     subscript(i: Int) -> Double {
         get { doubleChannelData![i * stride] }
         set { doubleChannelData![i * stride] = newValue }
@@ -1622,7 +1328,7 @@ extension AVAudioPCMBuffer {
     func isOver(amp: Float) -> Bool {
         for ci in 0 ..< channelCount {
             for i in 0 ..< frameCount {
-                if abs(self[ci, i]) > amp {
+                if Swift.abs(self[ci, i]) > amp {
                     return true
                 }
             }
@@ -1632,7 +1338,7 @@ extension AVAudioPCMBuffer {
     func clip(amp: Float) {
         for ci in 0 ..< channelCount {
             enumerated(channelIndex: ci) { i, v in
-                if abs(v) > amp {
+                if Swift.abs(v) > amp {
                     self[ci, i] = v < amp ? -amp : amp
                     print("clip", v)
                 }
@@ -1681,7 +1387,7 @@ extension AVAudioPCMBuffer {
         var peak = 0.0
         for ci in 0 ..< channelCount {
             enumerated(channelIndex: ci) { _, v in
-                peak = max(abs(Double(v)), peak)
+                peak = max(Swift.abs(Double(v)), peak)
             }
         }
         return Volume(amp: peak).db
@@ -1725,7 +1431,7 @@ extension AVAudioPCMBuffer {
             var maxAmp: Float = 0.0
             for ci in 0 ..< channelCount {
                 let amp = self[ci, i]
-                maxAmp = max(maxAmp, abs(amp))
+                maxAmp = max(maxAmp, Swift.abs(amp))
             }
             if maxAmp > targetAmp {
                 if minI == nil {

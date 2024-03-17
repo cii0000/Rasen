@@ -53,7 +53,7 @@ struct Triangle: Hashable, Codable {
 }
 extension Triangle {
     var area: Double {
-        abs((p0 - p2).cross(p1 - p2)) / 2
+        Swift.abs((p0 - p2).cross(p1 - p2)) / 2
     }
     var centroid: Point {
         (p0 + p1 + p2) / 3
@@ -501,7 +501,7 @@ extension Polygon {
             let p0 = points[i - 1 >= 0 ? i - 1 : points.count - 1]
             let p2 = points[i + 1 < points.count ? i + 1 : 0]
             let d = (p1.x - p0.x) * (p1.y - p2.y) - (p1.y - p0.y) * (p1.x - p2.x)
-            return abs(d) <= .ulpOfOne ? nil : p1
+            return Swift.abs(d) <= .ulpOfOne ? nil : p1
         }
         guard ps.count >= 3 else { return [] }
         
@@ -1185,7 +1185,7 @@ extension Topolygon {
                 let p2 = ops[i + 1 < ops.count ? i + 1 : 0]
                 let d = (p1.x - p0.x) * (p1.y - p2.y)
                     - (p1.y - p0.y) * (p1.x - p2.x)
-                return abs(d) <= .ulpOfOne ? nil : p1
+                return Swift.abs(d) <= .ulpOfOne ? nil : p1
             }
             return points.count >= 3 ? Polygon(points: points) : nil
         }

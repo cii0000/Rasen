@@ -453,7 +453,6 @@ final class Node {
         cachePathBuffer = nil
         cachePathBufferVertexCounts = []
         cacheTextureBuffer = nil
-        cacheTexture = nil
     }
     
     init(name: String = "",

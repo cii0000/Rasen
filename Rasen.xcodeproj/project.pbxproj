@@ -26,6 +26,7 @@
 		236855F32295106000958469 /* Sheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 236855F22295106000958469 /* Sheet.swift */; };
 		237AEFA62214285E004EE702 /* Picture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 237AEFA52214285E004EE702 /* Picture.swift */; };
 		237EC77822467E9500AA634F /* CopyEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 237EC77722467E9500AA634F /* CopyEditor.swift */; };
+		23910BA32BA1D7750064CB62 /* SpectrogramMac.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23910BA22BA1D7750064CB62 /* SpectrogramMac.swift */; };
 		239757A92513666D00BCA7E8 /* Numerics in Frameworks */ = {isa = PBXBuildFile; productRef = 239757A82513666D00BCA7E8 /* Numerics */; };
 		2399F01626E11B81005CD031 /* AnimationEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2399F01526E11B81005CD031 /* AnimationEditor.swift */; };
 		239A799B22D99A9800876D43 /* TextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 239A799A22D99A9800876D43 /* TextEditor.swift */; };
@@ -108,6 +109,7 @@
 		237AEFA52214285E004EE702 /* Picture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Picture.swift; sourceTree = "<group>"; };
 		237EC77722467E9500AA634F /* CopyEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyEditor.swift; sourceTree = "<group>"; };
 		238DA81D21F443EF00691A3A /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
+		23910BA22BA1D7750064CB62 /* SpectrogramMac.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpectrogramMac.swift; sourceTree = "<group>"; };
 		2399F01526E11B81005CD031 /* AnimationEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationEditor.swift; sourceTree = "<group>"; };
 		239A799A22D99A9800876D43 /* TextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextEditor.swift; sourceTree = "<group>"; };
 		23A72873216CF1B5000A7350 /* Rasen.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Rasen.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -246,6 +248,7 @@
 				23C4BC0928F9344500DEF37E /* Voice.swift */,
 				23E242932A63FAEC001C1A59 /* Vocoder.swift */,
 				23DFEC6429AB6F98008D8B64 /* AudioMac.swift */,
+				23910BA22BA1D7750064CB62 /* SpectrogramMac.swift */,
 				23DFEC6629AB7395008D8B64 /* ContentMac.swift */,
 				23F0B2E525ECC336003AFE2A /* EncoderMac.swift */,
 				23C8C6D425E21CCB009FEA85 /* TypelineMac.swift */,
@@ -334,6 +337,7 @@
 				TargetAttributes = {
 					23A72872216CF1B5000A7350 = {
 						CreatedOnToolsVersion = 10.0;
+						LastSwiftMigration = 1530;
 						SystemCapabilities = {
 							com.apple.Sandbox = {
 								enabled = 1;
@@ -392,6 +396,7 @@
 				23A728C0216CF269000A7350 /* Orientation.swift in Sources */,
 				237EC77822467E9500AA634F /* CopyEditor.swift in Sources */,
 				23B50CFE2997C21E002CA640 /* Loudness.swift in Sources */,
+				23910BA32BA1D7750064CB62 /* SpectrogramMac.swift in Sources */,
 				23C8C6D525E21CCB009FEA85 /* TypelineMac.swift in Sources */,
 				23C0A9C2237ED0010054ECCC /* Editor.swift in Sources */,
 				23A728BB216CF269000A7350 /* Real.swift in Sources */,
@@ -541,6 +546,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = macosx;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OBJC_INTEROP_MODE = objc;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_STRICT_CONCURRENCY = minimal;
 				SWIFT_VERSION = 5.0;
@@ -602,6 +608,7 @@
 				MTL_FAST_MATH = YES;
 				SDKROOT = macosx;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OBJC_INTEROP_MODE = objc;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_STRICT_CONCURRENCY = minimal;
 				SWIFT_VERSION = 5.0;
@@ -612,6 +619,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Rasen/Rasen.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
@@ -637,6 +645,7 @@
 				OTHER_SWIFT_FLAGS = "";
 				PRODUCT_BUNDLE_IDENTIFIER = net.cii0.Rasen;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_OBJC_BRIDGING_HEADER = "";
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_STRICT_CONCURRENCY = minimal;
 				SWIFT_VERSION = 5.0;
@@ -647,6 +656,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Rasen/Rasen.entitlements;
 				CODE_SIGN_IDENTITY = "-";
 				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
@@ -671,6 +681,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = net.cii0.Rasen;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
+				SWIFT_OBJC_BRIDGING_HEADER = "";
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_STRICT_CONCURRENCY = minimal;
 				SWIFT_VERSION = 5.0;

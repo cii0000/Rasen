@@ -740,7 +740,6 @@ final class ScoreView: TimelineView {
     let currentVolumeNode = Node(lineWidth: 3, lineType: .color(.background))
     let timeNode = Node(lineWidth: 4, lineType: .color(.content))
     
-    var spectrogramMaxMel: Double?
     var peakVolume = Volume() {
         didSet {
             guard peakVolume != oldValue else { return }

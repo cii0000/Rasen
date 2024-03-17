@@ -245,20 +245,19 @@ final class Looker: InputKeyEditor {
                         
                     }
                 } else if let sheetView = document.sheetView(at: p),
-                          let (node, hMaxMel) = sheetView.spectrogramNode(at: sheetView.convertFromWorld(p)) {
+                          let (node, contentView) = sheetView.spectrogramNode(at: sheetView.convertFromWorld(p)) {
                     let nSelection = sheetView.convertFromWorld(selection)
                     let rect = node.convertFromWorld(selection.rect)
-                    let minY = rect.minY - 0.5, maxY = rect.maxY - 0.5
-                    let h = node.path.bounds?.height ?? 0
-                    let minMel = minY.clipped(min: 0, max: h,
-                                              newMin: 0, newMax: hMaxMel)
-                    let maxMel = maxY.clipped(min: 0, max: h,
-                                              newMin: 0, newMax: hMaxMel)
-                    let minFq = Int(Mel.fq(fromMel: minMel))
-                    let maxFq = Int(Mel.fq(fromMel: maxMel))
+                    let minY = rect.minY, maxY = rect.maxY
+                    let minPitch = contentView.spectrogramPitch(atY: minY)!
+                    let minPitchRat = Rational(minPitch, intervalScale: .init(1, 12))
+                    let minFq = Pitch(value: minPitchRat).fq
+                    let maxPitch = contentView.spectrogramPitch(atY: maxY)!
+                    let maxPitchRat = Rational(maxPitch, intervalScale: .init(1, 12))
+                    let maxFq = Pitch(value: maxPitchRat).fq
                     let minSec: Rational = sheetView.animationView.sec(atX: nSelection.rect.minX)
                     let maxSec: Rational = sheetView.animationView.sec(atX: nSelection.rect.maxX)
-                    document.show("Δ\(Double(maxSec - minSec).string(digitsCount: 4)) sec, Δ\(maxFq - minFq) Hz", at: p)
+                    document.show("Δ\(Double(maxSec - minSec).string(digitsCount: 4)) sec, Δ\(Pitch(value: maxPitchRat - minPitchRat).octaveString), (Δ\((maxFq - minFq).string(digitsCount: 1)) Hz)", at: p)
                 } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
                     let scoreView = sheetView.scoreView
                     let score = scoreView.model
@@ -311,12 +310,9 @@ final class Looker: InputKeyEditor {
             let fqStr = "\(pitch.octaveString) (\(pitch.fq.string(digitsCount: 1)) Hz)".localized
             document.show(fqStr, at: p)
         } else if let sheetView = document.sheetView(at: p),
-                  let (node, maxMel) = sheetView.spectrogramNode(at: sheetView.convertFromWorld(p)) {
+                  let (node, contentView) = sheetView.spectrogramNode(at: sheetView.convertFromWorld(p)) {
             let y = node.convertFromWorld(p).y
-            let h = node.path.bounds?.height ?? 0
-            let mel = y.clipped(min: 0, max: h, newMin: 0, newMax: maxMel)
-            let fq = Mel.fq(fromMel: mel)
-            let pitch = Pitch.pitch(fromFq: fq)
+            let pitch = contentView.spectrogramPitch(atY: y)!
             let pitchRat = Rational(pitch, intervalScale: .init(1, 12))
             let nfq = Pitch(value: pitchRat).fq
             let fqStr = "\(Pitch(value: pitchRat).octaveString) (\(nfq.string(digitsCount: 1)) Hz)".localized

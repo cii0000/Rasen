@@ -524,6 +524,7 @@ extension Tone: MonoInterpolatable {
 }
 
 struct Pit: Codable, Hashable {
+    
     var t = 0.0, pitch = 0.0, stereo = Stereo(), tone = Tone(), lyric = ""
 //    var beat = Rational(0), pitch = Rational(0)
 }
@@ -1285,7 +1286,7 @@ extension Score {
     }
     var spectrogram: Spectrogram? {
         if let renderedNoneDelayPCMBuffer {
-            Spectrogram.default(renderedNoneDelayPCMBuffer)
+            .init(renderedNoneDelayPCMBuffer)
         } else {
             nil
         }

@@ -17,6 +17,12 @@
 
 import RealModule
 
+protocol PowerBinaryFloatingPoint: BinaryFloatingPoint {
+    static func ** (lhs: Self, rhs: Self) -> Self
+}
+extension Double: PowerBinaryFloatingPoint {}
+extension Float: PowerBinaryFloatingPoint {}
+
 extension BinaryFloatingPoint {
     var signValue: Self {
         self >= 0 ? 1 : -1
@@ -63,6 +69,80 @@ extension SignedNumeric {
         return a
     }
 }
+//extension Array where Element: PowerBinaryFloatingPoint {
+//    static func + (lhs: Self, rhs: Self) -> Self {
+//        zip(lhs, rhs).map { $0.0 + $0.1 }
+//    }
+//    static func + (lhs: Self, rhs: Element) -> Self {
+//        lhs.map { $0 + rhs }
+//    }
+//    static func + (lhs: Element, rhs: Self) -> Self {
+//        rhs.map { lhs + $0 }
+//    }
+//    static func += (lhs: inout Self, rhs: Self) {
+//        lhs = lhs + rhs
+//    }
+//    static func += (lhs: inout Self, rhs: Element) {
+//        lhs = lhs + rhs
+//    }
+//    static func - (lhs: Self, rhs: Self) -> Self {
+//        zip(lhs, rhs).map { $0.0 - $0.1 }
+//    }
+//    static func - (lhs: Self, rhs: Element) -> Self {
+//        lhs.map { $0 - rhs }
+//    }
+//    static func -= (lhs: inout Self, rhs: Self) {
+//        lhs = lhs - rhs
+//    }
+//    static func -= (lhs: inout Self, rhs: Element) {
+//        lhs = lhs - rhs
+//    }
+//    static func * (lhs: Self, rhs: Self) -> Self {
+//        zip(lhs, rhs).map { $0.0 * $0.1 }
+//    }
+//    static func * (lhs: Self, rhs: Element) -> Self {
+//        lhs.map { $0 * rhs }
+//    }
+//    static func * (lhs: Element, rhs: Self) -> Self {
+//        rhs.map { lhs * $0 }
+//    }
+//    static func *= (lhs: inout Self, rhs: Self) {
+//        lhs = lhs * rhs
+//    }
+//    static func *= (lhs: inout Self, rhs: Element) {
+//        lhs = lhs * rhs
+//    }
+//    static func / (lhs: Self, rhs: Self) -> Self {
+//        zip(lhs, rhs).map { $0.0 / $0.1 }
+//    }
+//    static func / (lhs: Self, rhs: Element) -> Self {
+//        lhs.map { $0 / rhs }
+//    }
+//    static func / (lhs: Element, rhs: Self) -> Self {
+//        rhs.map { lhs / $0 }
+//    }
+//    static func /= (lhs: inout Self, rhs: Self) {
+//        lhs = lhs / rhs
+//    }
+//    prefix static func - (x: Self) -> Self {
+//        x.map { -$0 }
+//    }
+//    static func % (lhs: Self, rhs: Self) -> Self {
+//        zip(lhs, rhs).map { $0.0 % $0.1 }
+//    }
+//    static func % (lhs: Self, rhs: Element) -> Self {
+//        lhs.map { $0 % rhs }
+//    }
+//    static func % (lhs: Element, rhs: Self) -> Self {
+//        rhs.map { lhs % $0 }
+//    }
+//    static func ** (lhs: Self, rhs: Element) -> Self {
+//        lhs.map { $0 ** rhs }
+//    }
+//    static func ** (lhs: Element, rhs: Self) -> Self {
+//        rhs.map { lhs ** $0 }
+//    }
+//}
 
 extension Float: Interpolatable {
     static func linear(_ f0: Float, _ f1: Float, t: Float) -> Float {
