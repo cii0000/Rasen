@@ -867,7 +867,7 @@ final class Sequencer {
                 var peak: Float = 0.0
                 for i in 0 ..< buffer.channelCount {
                     buffer.enumerated(channelIndex: i) { _, v in
-                        let av = Swift.abs(v)
+                        let av = abs(v)
                         if av > peak {
                             peak = av
                         }
@@ -1328,7 +1328,7 @@ extension AVAudioPCMBuffer {
     func isOver(amp: Float) -> Bool {
         for ci in 0 ..< channelCount {
             for i in 0 ..< frameCount {
-                if Swift.abs(self[ci, i]) > amp {
+                if abs(self[ci, i]) > amp {
                     return true
                 }
             }
@@ -1338,7 +1338,7 @@ extension AVAudioPCMBuffer {
     func clip(amp: Float) {
         for ci in 0 ..< channelCount {
             enumerated(channelIndex: ci) { i, v in
-                if Swift.abs(v) > amp {
+                if abs(v) > amp {
                     self[ci, i] = v < amp ? -amp : amp
                     print("clip", v)
                 }
@@ -1387,7 +1387,7 @@ extension AVAudioPCMBuffer {
         var peak = 0.0
         for ci in 0 ..< channelCount {
             enumerated(channelIndex: ci) { _, v in
-                peak = max(Swift.abs(Double(v)), peak)
+                peak = max(abs(Double(v)), peak)
             }
         }
         return Volume(amp: peak).db
@@ -1431,7 +1431,7 @@ extension AVAudioPCMBuffer {
             var maxAmp: Float = 0.0
             for ci in 0 ..< channelCount {
                 let amp = self[ci, i]
-                maxAmp = max(maxAmp, Swift.abs(amp))
+                maxAmp = max(maxAmp, abs(amp))
             }
             if maxAmp > targetAmp {
                 if minI == nil {

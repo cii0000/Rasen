@@ -163,7 +163,7 @@ struct Pathline {
                          angleRatio: Double = 0.33,
                          extensionRatio: Double = 0.25) -> [Pathline.Element] {
         let da = Point.differenceAngle(p0, p1, p2)
-        let phi = Swift.abs(da) / 2
+        let phi = abs(da) / 2
         let rd = r / .tan(phi)
         let p1p0Theta = p1.angle(p0), p1p2Theta = p1.angle(p2)
         let rp0 = p1.movedRoundedWith(distance: rd, angle: p1p0Theta)
@@ -484,7 +484,7 @@ extension Pathline {
             }
         }
         func appendArc(_ arc: Arc) {
-            let dAngle = Swift.abs(arc.endAngle - arc.startAngle)
+            let dAngle = abs(arc.endAngle - arc.startAngle)
             let count = max(16, Int(arc.radius * dAngle * quality))
             let rCount = 1 / Double(count)
             for i in 1 ... count {
@@ -1248,7 +1248,7 @@ extension Path {
         }
         
         func appendCenterArc(_ arc: Arc) {
-            let dAngle = Swift.abs(arc.endAngle - arc.startAngle)
+            let dAngle = abs(arc.endAngle - arc.startAngle)
             let c = dAngle.clipped(min: 0, max: .pi,
                                    newMin: 0, newMax: 8) * quality
             let count = c.isNaN ? 0 : Int(c).clipped(min: 0, max: 8)
@@ -1359,8 +1359,8 @@ extension Path {
                 }
                 
                 func appendB(_ bezier: Bezier, _ preb: BezierInterpolation) {
-                    let da = Swift.abs(Point.differenceAngle(bezier.cp - bezier.p0,
-                                                             bezier.p1 - bezier.cp))
+                    let da = abs(Point.differenceAngle(bezier.cp - bezier.p0,
+                                                       bezier.p1 - bezier.cp))
                     func isMiniCross() -> Bool {
                         if da > .pi * 0.6 {
                             let d0 = bezier.p0.distanceSquared(bezier.cp)
@@ -1422,7 +1422,7 @@ extension Path {
         }
         
         func appendArc(_ arc: Arc) {
-            let dAngle = Swift.abs(arc.endAngle - arc.startAngle)
+            let dAngle = abs(arc.endAngle - arc.startAngle)
             let c = arc.radius * dAngle * quality
             let count = c.isNaN ? 1 : max(1, Int(c))
             let rCount = 1 / Double(count)
@@ -1663,7 +1663,7 @@ extension Path {
         }
         
         func appendCenterArc(_ arc: Arc, nk: Int) {
-            let dAngle = Swift.abs(arc.endAngle - arc.startAngle)
+            let dAngle = abs(arc.endAngle - arc.startAngle)
             let c = dAngle.clipped(min: 0, max: .pi,
                                    newMin: 0, newMax: 8) * quality
             let count = c.isNaN ? 0 : Int(c).clipped(min: 0, max: 8)
@@ -1762,8 +1762,8 @@ extension Path {
                 
                 func appendB(_ bezier: Bezier, _ preb: BezierInterpolation,
                              preT: Double, nextT: Double) {
-                    let da = Swift.abs(Point.differenceAngle(bezier.cp - bezier.p0,
-                                                             bezier.p1 - bezier.cp))
+                    let da = abs(Point.differenceAngle(bezier.cp - bezier.p0,
+                                                       bezier.p1 - bezier.cp))
                     func isMiniCross() -> Bool {
                         if da > .pi * 0.6 {
                             let d0 = bezier.p0.distanceSquared(bezier.cp)
@@ -1822,7 +1822,7 @@ extension Path {
         }
         
         func appendArc(_ arc: Arc) {
-            let dAngle = Swift.abs(arc.endAngle - arc.startAngle)
+            let dAngle = abs(arc.endAngle - arc.startAngle)
             let c = arc.radius * dAngle * quality
             let count = c.isNaN ? 1 : max(1, Int(c))
             let rCount = 1 / Double(count)

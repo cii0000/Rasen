@@ -261,8 +261,4 @@ extension Double2x2 {
         }
         return -.im * .log((x + .im * y) / sqrt(x * x + y * y))
     }
-    
-    func abs() -> Double? {
-        complexPoint?.length()
-    }
 }

@@ -319,7 +319,7 @@ struct Loudness {
     }
     
     static func currentPeak(data: [[Double]]) -> Double {
-        data.map { cs in (cs.map { Swift.abs($0) }).max()! }.max()!
+        data.map { cs in (cs.map { abs($0) }).max()! }.max()!
     }
     static func normalizePeakScale(data: [[Double]],
                                    target: Double) -> Double {

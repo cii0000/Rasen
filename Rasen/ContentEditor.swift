@@ -70,9 +70,9 @@ final class ContentSlider: DragEditor {
                     type = .isShownSpectrogram
                     beganIsShownSpectrogram = contentView.model.isShownSpectrogram
                 } else if let timeOption = content.timeOption {
-                    if Swift.abs(sheetP.x - sheetView.animationView.x(atBeat: timeOption.beatRange.start)) < maxMD {
+                    if abs(sheetP.x - sheetView.animationView.x(atBeat: timeOption.beatRange.start)) < maxMD {
                         type = .startBeat
-                    } else if Swift.abs(sheetP.x - sheetView.animationView.x(atBeat: timeOption.beatRange.end)) < maxMD {
+                    } else if abs(sheetP.x - sheetView.animationView.x(atBeat: timeOption.beatRange.end)) < maxMD {
                         type = .endBeat
                     } else {
                         type = .all
@@ -196,7 +196,7 @@ final class ContentView<T: BinderProtocol>: SpectrgramView {
             .clipped(min: 0, max: Volume.maxSmp, newMin: 0, newMax: 1)
         let y = frame.height * smp
         node.path = Path([Point(), Point(0, y)])
-        if Swift.abs(peakVolume.amp) < Audio.clippingAmp {
+        if abs(peakVolume.amp) < Audio.clippingAmp {
             node.lineType = .color(.background)
         } else {
             node.lineType = .color(.warning)

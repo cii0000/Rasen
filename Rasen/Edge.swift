@@ -85,7 +85,7 @@ extension Edge {
         } else if r > 1 {
             return p1.distance(p)
         } else {
-            return Swift.abs(p1p0v.cross(pp0v)) / p0.distance(p1)
+            return abs(p1p0v.cross(pp0v)) / p0.distance(p1)
         }
     }
     func distanceSquared(from p: Point) -> Double {
@@ -110,7 +110,7 @@ extension Edge {
         Point.differenceAngle(vector, other.vector)
     }
     func minAngle(_ other: Edge) -> Double {
-        let a = Swift.abs(angle(other))
+        let a = abs(angle(other))
         return a < .pi / 2 ? a : .pi - a
     }
     func nearestT(from p: Point) -> Double {
@@ -178,8 +178,8 @@ extension Edge {
         let c = v0.cross(other.p0 - p0)
         let d = v0.cross(other.p1 - p0)
         guard a * b < 0 && c * d < 0 else { return nil }
-        let absA = Swift.abs(a)
-        let t = absA / (absA + Swift.abs(b))
+        let absA = abs(a)
+        let t = absA / (absA + abs(b))
         return p0 + vector * t
     }
     func intersectionPointAndT(_ other: Edge) -> (p: Point,
@@ -190,10 +190,10 @@ extension Edge {
         let c = v0.cross(other.p0 - p0)
         let d = v0.cross(other.p1 - p0)
         guard a * b < 0 && c * d < 0 else { return nil }
-        let absA = Swift.abs(a)
-        let t0 = absA / (absA + Swift.abs(b))
-        let absC = Swift.abs(c)
-        let t1 = absC / (absC + Swift.abs(d))
+        let absA = abs(a)
+        let t0 = absA / (absA + abs(b))
+        let absC = abs(c)
+        let t1 = absC / (absC + abs(d))
         let p: Point
         if t0 == 0 {
             p = p0
@@ -291,7 +291,7 @@ extension LinearLine {
     func distance(from p: Point) -> Double {
         p0 == p1 ?
             p0.distance(p) :
-        Swift.abs((p1 - p0).cross(p - p0)) / p0.distance(p1)
+        abs((p1 - p0).cross(p - p0)) / p0.distance(p1)
     }
     func distanceSquared(from p: Point) -> Double {
         if p0 == p1 {
@@ -340,12 +340,12 @@ extension LinearLine {
     }
     
     func intersects(_ other: LinearLine) -> Bool {
-        Swift.abs((p1 - p0).cross(other.p1 - other.p0)) >= .ulpOfOne
+        abs((p1 - p0).cross(other.p1 - other.p0)) >= .ulpOfOne
     }
     func intersection(_ other: LinearLine) -> Point? {
         let v0 = p1 - p0, v1 = other.p1 - other.p0
         let d = v1.cross(v0)
-        return Swift.abs(d) < .ulpOfOne ?
+        return abs(d) < .ulpOfOne ?
             nil :
             p0 + v0 * v1.cross(other.p0 - p0) / d
     }
@@ -354,8 +354,8 @@ extension LinearLine {
         let c = v0.cross(other.p0 - p0)
         let d = v0.cross(other.p1 - p0)
         guard c * d < 0 else { return nil }
-        let absC = Swift.abs(c)
-        let t = absC / (absC + Swift.abs(d))
+        let absC = abs(c)
+        let t = absC / (absC + abs(d))
         return other.p0 + v1 * t
     }
 }

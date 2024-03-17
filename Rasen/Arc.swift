@@ -69,7 +69,7 @@ extension Arc {
             radius: radius, startAngle: startAngle, endAngle: endAngle)
     }
     var arcLength: Double {
-        radius * Swift.abs(endAngle - startAngle)
+        radius * abs(endAngle - startAngle)
     }
     var orientation: CircularOrientation {
         startAngle > endAngle ? .clockwise : .counterClockwise

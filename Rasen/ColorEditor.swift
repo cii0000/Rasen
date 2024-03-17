@@ -876,7 +876,7 @@ final class ColorEditor: Editor {
             let wp = document.convertScreenToWorld(event.screenPoint)
             let p = lightnessNode.convertFromWorld(wp)
             if isEditableMaxLightness {
-                let r = Swift.abs(p.y - whiteLightnessHeight)
+                let r = abs(p.y - whiteLightnessHeight)
                 if r < snappableDistance {
                     if let lastTintSnapTime = lastTintSnapTime {
                         if event.time - lastTintSnapTime > 1 {

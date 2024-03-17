@@ -98,7 +98,7 @@ extension O {
         append(ceilName, OKeyInfo(buoGroup, "Ceiling function.".localized),
                F(right: 1, { .o($0[0].ceil) }))
         append(absName, OKeyInfo(buoGroup, "Absolute value function.".localized),
-               F(right: 1, { .o($0[0].abs) }))
+               F(right: 1, { .o($0[0].absV) }))
         append(sqrtName, OKeyInfo(buoGroup, "Square root (Principal value).".localized),
                F(right: 1, { .o($0[0].sqrt) }))
         append(sinName, OKeyInfo(buoGroup, "Sine.".localized),
@@ -1453,12 +1453,12 @@ extension O {
 
 extension O {
     static let absName = "abs"
-    var abs: O {
+    var absV: O {
         switch self {
         case .bool(let a): return O(a)
-        case .int(let a): return O(Swift.abs(a))
-        case .rational(let a): return O(Swift.abs(a))
-        case .real1(let a): return O(Swift.abs(a))
+        case .int(let a): return O(abs(a))
+        case .rational(let a): return O(abs(a))
+        case .real1(let a): return O(abs(a))
         case .array(let a):
             var n = O(0)
             for e in a {
@@ -1479,7 +1479,7 @@ extension O {
                 }
             }
             return n.sqrt
-        case .sheet(let a): return O(a.value).abs
+        case .sheet(let a): return O(a.value).absV
         case .error: return self
         default: return O(OError.undefined(with: "\(O.absName) \(name)"))
         }

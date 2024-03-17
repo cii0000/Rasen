@@ -263,7 +263,7 @@ final class LineEditor: Editor {
         let c1 = line.controls[line.controls.count - 3], c2 = lc
         guard c0.point != c1.point && c1.point != c2.point else { return nil }
         guard c1.point.distance(c2.point) > 3 else { return nil }
-        let dr = Swift.abs(Point.differenceAngle(c0.point, c1.point, c2.point))
+        let dr = abs(Point.differenceAngle(c0.point, c1.point, c2.point))
         if dr > angle {
             return c1
         } else if dr > lowAngle {
@@ -333,7 +333,7 @@ final class LineEditor: Editor {
                     angle += Point.differenceAngle(temps[i].control.point,
                                                   temps[i - 1].control.point,
                                                   temps[i - 2].control.point)
-                    if Swift.abs(angle) > .pi / 4 {
+                    if abs(angle) > .pi / 4 {
                         return true
                     }
                 }
@@ -683,7 +683,7 @@ final class LineEditor: Editor {
                                 || l / ll > 0.05 {
                                 break
                             }
-                            let dr = Swift.abs(Point.differenceAngle(p0, p1, p2))
+                            let dr = abs(Point.differenceAngle(p0, p1, p2))
                             if dr > .pi * 0.3 {
                                 let nCount = nLine.controls.count - i
                                 nLine.controls.removeLast(nCount)
@@ -843,10 +843,10 @@ final class LineEditor: Editor {
                 let ls = nLine.size / 2 * wtsScale
                 let maxAxisD = max(ls, 2.5), maxD = 50.0, snapSpeed = 100.0
                 let dp = lp - fp
-                if Swift.abs(dp.x) > Swift.abs(dp.y) {
-                    let dx = Swift.abs(dp.x * wtsScale).clipped(min: 0, max: maxD,
+                if abs(dp.x) > abs(dp.y) {
+                    let dx = abs(dp.x * wtsScale).clipped(min: 0, max: maxD,
                                                                 newMin: 0, newMax: maxAxisD)
-                    if Swift.abs(dp.y) * wtsScale < dx && LineEditor.speed(from: temps, at: temps.count - 1) * wtsScale < snapSpeed, time - firstChangedTime > 0.1 {
+                    if abs(dp.y) * wtsScale < dx && LineEditor.speed(from: temps, at: temps.count - 1) * wtsScale < snapSpeed, time - firstChangedTime > 0.1 {
                         llp = Point(lp.x, fp.y)
                         isSnapStraight = true
                         lastSnapStraightTime = time
@@ -857,9 +857,9 @@ final class LineEditor: Editor {
                         isSnapStraight = false
                     }
                 } else {
-                    let dy = Swift.abs(dp.y * wtsScale).clipped(min: 0, max: maxD,
+                    let dy = abs(dp.y * wtsScale).clipped(min: 0, max: maxD,
                                                                 newMin: 0, newMax: maxAxisD)
-                    if Swift.abs(dp.x) * wtsScale < dy && LineEditor.speed(from: temps, at: temps.count - 1) * wtsScale < snapSpeed, time - firstChangedTime > 0.1 {
+                    if abs(dp.x) * wtsScale < dy && LineEditor.speed(from: temps, at: temps.count - 1) * wtsScale < snapSpeed, time - firstChangedTime > 0.1 {
                         llp = Point(fp.x, lp.y)
                         isSnapStraight = true
                         lastSnapStraightTime = time
@@ -901,7 +901,7 @@ final class LineEditor: Editor {
                             break
                         }
                     }
-                    if Swift.abs(nLine.controls.first!.pressure - fpre) < 0.2 {
+                    if abs(nLine.controls.first!.pressure - fpre) < 0.2 {
                         fpre = nLine.controls.first!.pressure
                     }
                     nLine.controls[.last].pressure = fpre
@@ -923,7 +923,7 @@ final class LineEditor: Editor {
                     let fp = nLine.firstPoint, lp = nLine.lastPoint
                     let llp: Point
                     let dp = lp - fp
-                    if Swift.abs(dp.x) > Swift.abs(dp.y) {
+                    if abs(dp.x) > abs(dp.y) {
                         llp = Point(lp.x, fp.y)
                     } else {
                         llp = Point(fp.x, lp.y)

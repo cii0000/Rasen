@@ -16,10 +16,10 @@
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
 extension Comparable {
-    func clipped(min: Self, max: Self) -> Self {
-        self < min ?
-        min :
-        (self > max ? max : self)
+    func clipped(min minV: Self, max maxV: Self) -> Self {
+        self < minV ?
+        minV :
+        (self > maxV ? maxV : self)
     }
     func clipped(_ range: ClosedRange<Self>) -> Self {
         self < range.lowerBound ?
