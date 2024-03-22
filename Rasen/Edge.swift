@@ -359,3 +359,64 @@ extension LinearLine {
         return other.p0 + v1 * t
     }
 }
+
+struct Pointline: Hashable, Codable {
+    var points = [Point]()
+}
+extension Pointline {
+    var firstPoint: Point {
+        points[0]
+    }
+    var lastPoint: Point {
+        points[.last]
+    }
+    var bounds: Rect? {
+        points.bounds
+    }
+    var isEmpty: Bool {
+        points.isEmpty
+    }
+    
+    func minDistanceSquared(at p: Point) -> Double {
+        if points.count == 1 {
+            return points[0].distanceSquared(p)
+        } else {
+            var minDSquared = Double.infinity
+            for edge in edges {
+                minDSquared = min(minDSquared, edge.distanceSquared(from: p))
+            }
+            return minDSquared
+        }
+    }
+    
+    var edges: [Edge] {
+        guard points.count >= 2 else { return [] }
+        var edges = [Edge]()
+        edges.reserveCapacity(points.count)
+        var p0 = points[0]
+        for i in 1 ..< points.count {
+            let p1 = points[i]
+            edges.append(.init(p0, p1))
+            p0 = p1
+        }
+        edges.append(.init(p0, points[0]))
+        return edges
+    }
+    
+    func intersects(_ otherBezier: Bezier) -> Bool {
+        guard bounds?.intersects(otherBezier.controlBounds) ?? false else {
+            return false
+        }
+        for edge in edges {
+            if otherBezier.intersects(edge) {
+                return true
+            }
+        }
+        return false
+    }
+}
+extension Pointline: AppliableTransform {
+    static func * (lhs: Self, rhs: Transform) -> Self {
+        .init(points: lhs.points.map { $0 * rhs })
+    }
+}

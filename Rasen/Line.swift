@@ -1778,6 +1778,18 @@ extension Line {
         }
         return false
     }
+    func intersects(_ other: Pointline) -> Bool {
+        guard let otherBounds = other.bounds,
+              bounds?.intersects(otherBounds) ?? false else {
+            return false
+        }
+        for bezier in bezierSequence {
+            if other.intersects(bezier) {
+                return true
+            }
+        }
+        return false
+    }
     func intersects(_ otherRect: Rect) -> Bool {
         guard bounds?.intersects(otherRect) ?? false else {
             return false
@@ -2387,6 +2399,20 @@ extension Lasso {
             return true
         }
         for p in otherLine.mainPointSequence {
+            if contains(p) {
+                return true
+            }
+        }
+        return false
+    }
+    func intersects(_ otherPointline: Pointline) -> Bool {
+        guard bounds.intersects(otherPointline.bounds) else {
+            return false
+        }
+        if line.intersects(otherPointline) {
+            return true
+        }
+        for p in otherPointline.points {
             if contains(p) {
                 return true
             }

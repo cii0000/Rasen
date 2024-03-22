@@ -1145,7 +1145,7 @@ final class Document {
         updateGrid(with: screenToWorldTransform, in: screenBounds)
         updateEditorNode()
         updateRunnerNodesPosition()
-        updateTextViewsWithCamera()
+        updateWithIsFullEdit()
 //        updateCursorNode()
     }
     let editableMapScale = 2.0 ** -4
@@ -1162,15 +1162,15 @@ final class Document {
         v * worldToScreenTransform
     }
     
-    func updateTextViewsWithCamera() {
+    func updateWithIsFullEdit() {
         sheetViewValues.forEach {
             if let view = $0.value.view {
-                updateTextViewsWithCamera(in: view)
+                updateWithIsFullEdit(in: view)
             }
         }
     }
-    func updateTextViewsWithCamera(in sheetView: SheetView) {
-        let isFullEdit = isFullEditNoteTimeInterval
+    func updateWithIsFullEdit(in sheetView: SheetView) {
+        let isFullEdit = isFullEditNoteBeatInterval
         sheetView.textsView.elementViews.forEach { $0.isFullEdit = isFullEdit }
         sheetView.contentsView.elementViews.forEach { $0.isFullEdit = isFullEdit }
         sheetView.scoreView.isFullEdit = isFullEdit
@@ -1203,7 +1203,7 @@ final class Document {
     private(set) var selectedLinesNode: Node?,
                      selectedLineNodes = [Line: Node]()
     private(set) var selectedNotesNode: Node?,
-                     selectedNoteNodes = [Rect: Node]()
+                     selectedNoteNodes = [Pointline: Node]()
     private(set) var isOldSelectedSheet = false, isSelectedText = false
     func updateWithSelections(oldValue: [Selection]) {
         if !selections.isEmpty {
@@ -1270,7 +1270,7 @@ final class Document {
         var rectsSet = Set<Rect>()
         var rects = [Rect](), isSelectedText = false, selectedCount = 0
         var firstOrientation = Orientation.horizontal, lineNodes = [Node]()
-        var sLines = [Line]()
+        var sLines = [Line](), sPointlines = [Pointline]()
         var addedLineIndexes = Set<IntPoint>()
         var cr: Rect?, oldRect: Rect?
         for selection in selections {
@@ -1346,10 +1346,9 @@ final class Document {
                         let nis = sheetView.noteIndexes(from: selections)
                         if !nis.isEmpty {
                             for ni in nis {
-                                var nLine = scoreView.noteLine(from: score.notes[ni])
+                                var nLine = scoreView.pointline(from: score.notes[ni])
                                 nLine = sheetView.convertToWorld(nLine)
-                                nLine.uuColor.value = .selected
-                                sLines.append(nLine)
+                                sPointlines.append(nLine)
                             }
                         }
                     }
@@ -1426,24 +1425,22 @@ final class Document {
             }
         }
         
-//        let sNotesSet = Set(sNotes)
-//        for key in selectedNoteNodes.keys {
-//            if !sNotesSet.contains(key) {
-//                selectedNoteNodes[key]?.removeFromParent()
-//                selectedNoteNodes[key] = nil
-//            }
-//        }
-//        for sNote in sNotes {
-//            if selectedNoteNodes[sNote] == nil {
-//                
-//                let node = Node(path: Path(sNote),
-//                                lineWidth: worldLineWidth * 1.5,
-//                                lineType: .color(.selected),
-//                                fillType: .color(.subSelected))
-//                selectedNoteNodes[sNote] = node
-//                selectedNotesNode?.append(child: node)
-//            }
-//        }
+        let sPointlinesSet = Set(sPointlines)
+        for key in selectedNoteNodes.keys {
+            if !sPointlinesSet.contains(key) {
+                selectedNoteNodes[key]?.removeFromParent()
+                selectedNoteNodes[key] = nil
+            }
+        }
+        for sPointline in sPointlines {
+            if selectedNoteNodes[sPointline] == nil {
+                let node = Node(path: Path(sPointline.points),
+                                lineWidth: worldLineWidth * 1.5,
+                                lineType: .color(.selected))
+                selectedNoteNodes[sPointline] = node
+                selectedNotesNode?.append(child: node)
+            }
+        }
         
         selectedFrames = rects
         self.isSelectedText = isSelectedText && selectedCount == 1
@@ -1537,7 +1534,6 @@ final class Document {
                 $0.lineType = .color(selectedColor)
             }
             selectedNotesNode?.children.forEach {
-                $0.fillType = .color(subSelectedColor)
                 $0.lineType = .color(selectedColor)
             }
             selectedOrientationNode?.children.forEach {
@@ -2803,6 +2799,7 @@ final class Document {
                 sheetView.bounds = Rect(size: frame.size)
                 sheetView.node.attitude.position = frame.origin
                 sheetView.node.allChildrenAndSelf { $0.updateDatas() }
+                updateWithIsFullEdit(in: sheetView)
                 if let thumbnail = sheetRecorder.thumbnail1024Record.decodedValue {
                     do {
                         try Texture.texture(mipmapImage: thumbnail, completionHandler: { texture in
@@ -2901,6 +2898,7 @@ final class Document {
         sheetView.node.attitude.position = frame.origin
         sheetView.node.allChildrenAndSelf { $0.updateDatas() }
         sheetView.node.enableCache = true
+        updateWithIsFullEdit(in: sheetView)
         
         sheetRecord.willwriteClosure = { [weak sheetView, weak sheetHistoryRecord, weak self] (record) in
             if let sheetView = sheetView {
@@ -2919,7 +2917,7 @@ final class Document {
                 sheetsNode.append(child: sheetView.node)
             }
             thumbnailNodeValues[shp]?.node?.removeFromParent()
-            updateTextViewsWithCamera(in: sheetView)
+            updateWithIsFullEdit(in: sheetView)
         }
         
         return sheetView
@@ -3080,6 +3078,7 @@ final class Document {
         sheetView.node.attitude.position = frame.origin
         sheetView.node.allChildrenAndSelf { $0.updateDatas() }
         sheetView.node.enableCache = true
+        updateWithIsFullEdit(in: sheetView)
         
         sheetRecord.willwriteClosure = { [weak sheetView, weak sheetHistoryRecord, weak self] (record) in
             if let sheetView = sheetView {
@@ -3097,7 +3096,7 @@ final class Document {
         sheetViewValues[shp] = SheetViewValue(sheetID: sid, view: sheetView, workItem: nil)
         sheetsNode.append(child: sheetView.node)
         updateMap()
-        updateTextViewsWithCamera(in: sheetView)
+        updateWithIsFullEdit(in: sheetView)
         
         return sheetView
     }
@@ -3523,17 +3522,17 @@ final class Document {
         Sheet.knobEditDistance * screenToWorldScale
     }
     
-    var isFullEditNoteTimeInterval: Bool {
+    var isFullEditNoteBeatInterval: Bool {
         camera.logScale < -3
     }
-    var currentNoteTimeInterval: Rational {
-        isFullEditNoteTimeInterval ? Sheet.fullEditBeatInterval : Sheet.beatInterval
+    var currentNoteBeatInterval: Rational {
+        isFullEditNoteBeatInterval ? Sheet.fullEditBeatInterval : Sheet.beatInterval
     }
-    var currentKeyframeTimeInterval: Rational {
-        currentNoteTimeInterval
+    var currentKeyframeBeatInterval: Rational {
+        currentNoteBeatInterval
     }
     var currentNotePitchInterval: Rational {
-        isFullEditNoteTimeInterval ? Rational(1, 12) : 1
+        isFullEditNoteBeatInterval ? Sheet.fullEditPitchInterval : Sheet.pitchInterval
     }
     func pitch(from scoreView: ScoreView, at scoreP: Point) -> Rational {
         scoreView.pitch(atY: scoreP.y, interval: currentNotePitchInterval)

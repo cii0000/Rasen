@@ -103,12 +103,12 @@ extension Pitch {
     func lyricsUnison(isSharp: Bool) -> LyricsUnison {
         LyricsUnison(unison: Int(unison.rounded()), isSharp: isSharp)
     }
-    var octaveString: String {
+    func octaveString(hidableDecimal: Bool = true) -> String {
         let octavePitch = value / 12
         let iPart = octavePitch.rounded(.down)
         let dPart = (octavePitch - iPart) * 12
         let dPartStr = String(format: "%02d", Int(dPart))
-        if dPart.decimalPart == 0 {
+        if hidableDecimal && dPart.decimalPart == 0 {
             return "C\(iPart).\(dPartStr)"
         } else {
             let ddPart = dPart.decimalPart * 12
@@ -217,6 +217,12 @@ extension Stereo {
     var isEmpty: Bool {
         amp == 0
     }
+    
+    func with(id: UUID) -> Self {
+        var v = self
+        v.id = id
+        return v
+    }
 }
 extension Stereo: Protobuf {
     init(_ pb: PBStereo) throws {
@@ -272,7 +278,8 @@ extension Stereo: MonoInterpolatable {
 struct Tone: Hashable, Codable {
     var evenAmp = 1.0
     var oddAmp = 1.0
-    var fqAmps = [Point(1, Volume.maxAmp), Point(8000, Volume(smp: 0.1).amp)]//pitchAmps
+    var pitchAmps = [Point(.init(Score.pitchRange.start), Volume.maxAmp),
+                     Point(96, Volume(smp: 0.1).amp)]
     var id = UUID()
 }
 extension Tone: Protobuf {
@@ -280,9 +287,9 @@ extension Tone: Protobuf {
         evenAmp = ((try? pb.evenAmp.notNaN()) ?? 0).clipped(min: 0, max: 1)
         oddAmp = ((try? pb.oddAmp.notNaN()) ?? 0).clipped(min: 0, max: 1)
         
-        fqAmps = pb.fqAmps.compactMap { try? Point($0) }
-        fqAmps = fqAmps.map {
-            .init($0.x.clipped(min: 1, max: NoiseSourceFilter.maxFq),
+        pitchAmps = pb.pitchAmps.compactMap { try? Point($0) }
+        pitchAmps = pitchAmps.map {
+            .init($0.x.clipped(min: .init(Score.pitchRange.start), max: .init(Score.pitchRange.end)),
                   $0.y.clipped(min: 0, max: 1))
         }.sorted { $0.x < $1.x }
         
@@ -292,17 +299,24 @@ extension Tone: Protobuf {
         .with {
             $0.evenAmp = evenAmp
             $0.oddAmp = oddAmp
-            $0.fqAmps = fqAmps.map { $0.pb }
+            $0.pitchAmps = pitchAmps.map { $0.pb }
             $0.id = id.pb
         }
     }
 }
 extension Tone {
-    init(evenSmp: Double, oddSmp: Double, pitchSmps: [Point]) {
+    init(evenSmp: Double, oddSmp: Double, pitchSmps: [Point], id: UUID = .init()) {
         self.evenAmp = Volume(smp: evenSmp).amp.clipped(min: 0, max: Volume.maxAmp)
         self.oddAmp = Volume(smp: oddSmp).amp.clipped(min: 0, max: Volume.maxAmp)
-        self.fqAmps = Self.fqAmps(fromPitchSmps: pitchSmps)
+        self.pitchAmps = Self.pitchAmps(fromPitchSmps: pitchSmps)
             .map { .init($0.x, $0.y.clipped(min: 0, max: Volume.maxAmp)) }
+        self.id = id
+    }
+    
+    func with(id: UUID) -> Self {
+        var v = self
+        v.id = id
+        return v
     }
     
     var evenSmp: Double {
@@ -316,25 +330,19 @@ extension Tone {
     
     var pitchSmps: [Point] {
         get {
-            fqAmps.map {
-                .init(Pitch.pitch(fromFq: $0.x), Volume(amp: $0.y).smp)
-            }
+            pitchAmps.map { .init($0.x, Volume(amp: $0.y).smp) }
         }
         set {
-            fqAmps = newValue.map {
-                .init(Pitch.fq(fromPitch: $0.x), Volume(smp: $0.y).amp)
-            }
+            pitchAmps = newValue.map { .init($0.x, Volume(smp: $0.y).amp) }
         }
     }
     var fqSmps: [Point] {
-        fqAmps.map {
-            .init($0.x, Volume(amp: $0.y).smp)
+        pitchAmps.map {
+            .init(Pitch.fq(fromPitch: $0.x), Volume(amp: $0.y).smp)
         }
     }
-    static func fqAmps(fromPitchSmps pitchSmps: [Point]) -> [Point] {
-        pitchSmps.map {
-            .init(Pitch.fq(fromPitch: $0.x), Volume(smp: $0.y).amp)
-        }
+    static func pitchAmps(fromPitchSmps pitchSmps: [Point]) -> [Point] {
+        pitchSmps.map { .init($0.x, Volume(smp: $0.y).amp) }
     }
     
     static func tonesEqualPitchSmpCount(_ tones: [Tone]) -> [Tone] {
@@ -346,6 +354,10 @@ extension Tone {
         }
     }
     
+    func with(pitchSmpsCount count: Int) -> Self {
+        .init(evenSmp: evenSmp, oddSmp: oddSmp, 
+              pitchSmps: pitchSmpsWith(count: count), id: id)
+    }
     func pitchSmpsWith(count: Int) -> [Point] {
         let pitchSmps = pitchSmps
         guard pitchSmps.count != count else { return pitchSmps }
@@ -399,7 +411,7 @@ extension Tone {
     
     func noiseSourceFilter(isNoise: Bool) -> NoiseSourceFilter {
         if isNoise {
-            .init(noiseFqSmps: fqAmps)
+            .init(noiseFqSmps: fqSmps)
         } else {
             .init(fqSmps: fqSmps)
         }
@@ -452,7 +464,7 @@ extension Tone {
 }
 extension Tone: MonoInterpolatable {
     static func linear(_ f0: Self, _ f1: Self, t: Double) -> Self {
-        let count = max(f0.fqAmps.count, f1.fqAmps.count)
+        let count = max(f0.pitchAmps.count, f1.pitchAmps.count)
         let l0 = f0.pitchSmpsWith(count: count)
         let l1 = f1.pitchSmpsWith(count: count)
         return .init(evenSmp: .linear(f0.evenSmp, f1.evenSmp, t: t),
@@ -461,7 +473,7 @@ extension Tone: MonoInterpolatable {
     }
     static func firstSpline(_ f1: Self,
                             _ f2: Self, _ f3: Self, t: Double) -> Self {
-        let count = max(f1.fqAmps.count, f2.fqAmps.count, f3.fqAmps.count)
+        let count = max(f1.pitchAmps.count, f2.pitchAmps.count, f3.pitchAmps.count)
         let l1 = f1.pitchSmpsWith(count: count)
         let l2 = f2.pitchSmpsWith(count: count)
         let l3 = f3.pitchSmpsWith(count: count)
@@ -471,7 +483,7 @@ extension Tone: MonoInterpolatable {
     }
     static func spline(_ f0: Self, _ f1: Self,
                        _ f2: Self, _ f3: Self, t: Double) -> Self {
-        let count = max(f0.fqAmps.count, f1.fqAmps.count, f2.fqAmps.count, f3.fqAmps.count)
+        let count = max(f0.pitchAmps.count, f1.pitchAmps.count, f2.pitchAmps.count, f3.pitchAmps.count)
         let l0 = f0.pitchSmpsWith(count: count)
         let l1 = f1.pitchSmpsWith(count: count)
         let l2 = f2.pitchSmpsWith(count: count)
@@ -482,7 +494,7 @@ extension Tone: MonoInterpolatable {
     }
     static func lastSpline(_ f0: Self, _ f1: Self,
                            _ f2: Self, t: Double) -> Self {
-        let count = max(f0.fqAmps.count, f1.fqAmps.count, f2.fqAmps.count)
+        let count = max(f0.pitchAmps.count, f1.pitchAmps.count, f2.pitchAmps.count)
         let l0 = f0.pitchSmpsWith(count: count)
         let l1 = f1.pitchSmpsWith(count: count)
         let l2 = f2.pitchSmpsWith(count: count)
@@ -492,7 +504,7 @@ extension Tone: MonoInterpolatable {
     }
     static func firstMonospline(_ f1: Self,
                                 _ f2: Self, _ f3: Self, with ms: Monospline) -> Self {
-        let count = max(f1.fqAmps.count, f2.fqAmps.count, f3.fqAmps.count)
+        let count = max(f1.pitchAmps.count, f2.pitchAmps.count, f3.pitchAmps.count)
         let l1 = f1.pitchSmpsWith(count: count)
         let l2 = f2.pitchSmpsWith(count: count)
         let l3 = f3.pitchSmpsWith(count: count)
@@ -502,7 +514,7 @@ extension Tone: MonoInterpolatable {
     }
     static func monospline(_ f0: Self, _ f1: Self,
                            _ f2: Self, _ f3: Self, with ms: Monospline) -> Self {
-        let count = max(f0.fqAmps.count, f1.fqAmps.count, f2.fqAmps.count, f3.fqAmps.count)
+        let count = max(f0.pitchAmps.count, f1.pitchAmps.count, f2.pitchAmps.count, f3.pitchAmps.count)
         let l0 = f0.pitchSmpsWith(count: count)
         let l1 = f1.pitchSmpsWith(count: count)
         let l2 = f2.pitchSmpsWith(count: count)
@@ -513,7 +525,7 @@ extension Tone: MonoInterpolatable {
     }
     static func lastMonospline(_ f0: Self, _ f1: Self,
                                _ f2: Self, with ms: Monospline) -> Self {
-        let count = max(f0.fqAmps.count, f1.fqAmps.count, f2.fqAmps.count)
+        let count = max(f0.pitchAmps.count, f1.pitchAmps.count, f2.pitchAmps.count)
         let l0 = f0.pitchSmpsWith(count: count)
         let l1 = f1.pitchSmpsWith(count: count)
         let l2 = f2.pitchSmpsWith(count: count)
@@ -524,22 +536,20 @@ extension Tone: MonoInterpolatable {
 }
 
 struct Pit: Codable, Hashable {
-    
-    var t = 0.0, pitch = 0.0, stereo = Stereo(), tone = Tone(), lyric = ""
-//    var beat = Rational(0), pitch = Rational(0)
+    var beat = Rational(0), pitch = Rational(0), stereo = Stereo(), tone = Tone(), lyric = ""
 }
 extension Pit: Protobuf {
     init(_ pb: PBPit) throws {
-        t = (try? pb.t.notInfiniteAndNAN()) ?? 0
-        pitch = (try? pb.pitch.notInfiniteAndNAN()) ?? 0
+        beat = (try? .init(pb.beat)) ?? 0
+        pitch = (try? .init(pb.pitch)) ?? 0
         stereo = (try? .init(pb.stereo)) ?? .init()
         tone = (try? .init(pb.tone)) ?? .init()
         lyric = pb.lyric
     }
     var pb: PBPit {
         .with {
-            $0.t = t
-            $0.pitch = pitch
+            $0.beat = beat.pb
+            $0.pitch = pitch.pb
             $0.stereo = stereo.pb
             $0.tone = tone.pb
             $0.lyric = lyric
@@ -547,15 +557,19 @@ extension Pit: Protobuf {
     }
 }
 extension Pit {
-    init(t: Double, pitch: Double, amp: Double) {
-        self.t = t
+    init(beat: Rational, pitch: Rational, amp: Double) {
+        self.beat = beat
         self.pitch = pitch
         self.stereo = .init(amp: amp.clipped(min: 0, max: Volume.maxAmp))
     }
-    init(t: Double, pitch: Double, smp: Double) {
-        self.t = t
+    init(beat: Rational, pitch: Rational, smp: Double) {
+        self.beat = beat
         self.pitch = pitch
         self.stereo = .init(smp: smp.clipped(min: 0, max: Volume.maxSmp), pan: 0)
+    }
+    
+    func isEqualWithoutBeat(_ other: Self) -> Bool {
+        pitch == other.pitch && stereo == other.stereo && tone == other.tone && lyric == other.lyric
     }
 }
 enum PitIDType {
@@ -570,277 +584,16 @@ extension Pit {
     }
 }
 
-struct Pitbend: Codable, Hashable {
-    var pits = [Pit]()
-    
-    init(_ pits: [Pit] = []) {
-        self.pits = pits
-    }
-}
-extension Pitbend: Protobuf {
-    init(_ pb: PBPitbend) throws {
-        pits = pb.pits.compactMap { try? Pit($0) }
-            .sorted(by: { $0.t < $1.t })
-    }
-    var pb: PBPitbend {
-        .with {
-            $0.pits = pits.map { $0.pb }
-        }
-    }
-}
-extension Pitbend {
-    init(recoilS0 s0: Double, s1: Double, s2: Double, s3: Double,
-         y0: Double, y1: Double, y2: Double, y3: Double, ly: Double,
-         v1Amp: Double) {
-        self.init([.init(t: 0, pitch: y0, amp: 0.85),
-                   .init(t: s0, pitch: y1, amp: 1.05),
-                   .init(t: s1, pitch: y2, amp: 1.05),
-                   .init(t: s2, pitch: y3, amp: 1),
-                   .init(t: s3, pitch: 0, amp: v1Amp),
-                   .init(t: 1, pitch: ly, amp: 0.5 * v1Amp)])
-    }
-    init(recoilS0 s0: Double, s1: Double,
-         y0: Double, y1: Double, y2: Double, ly: Double) {
-        self.init([.init(t: 0, pitch: y0, amp: 0.85),
-                   .init(t: s0, pitch: y1, amp: 0.9),
-                   .init(t: s1, pitch: y2, amp: 1),
-                   .init(t: 1, pitch: ly, amp: 0.75)])
-    }
-    init(oneS0 s0: Double, s1: Double, y0: Double, y1: Double, ly: Double) {
-        self.init([.init(t: 0, pitch: y0, amp: 0.95),
-                   .init(t: s0, pitch: y1, amp: 1.05),
-                   .init(t: s1, pitch: 0, amp: 1.1),
-                   .init(t: 1, pitch: ly, amp: 0.75)])
-    }
-    init(oneS0 s0: Double, y0: Double, y1: Double, ly: Double) {
-        self.init([.init(t: 0, pitch: y0, amp: 0.95),
-                   .init(t: s0, pitch: y1, amp: 1.05),
-                   .init(t: 1, pitch: ly, amp: 0.75)])
-    }
-    init(vibratoSYs sys: [Point], vibratoStartS vs: Double,
-         s0: Double, y0: Double, ly: Double) {
-        guard sys.count % 2 == 0 else { fatalError() }
-        var pits = [Pit]()
-        pits.append(.init(t: 0, pitch: y0, amp: 0.95))
-        pits.append(.init(t: s0, pitch: 0, amp: 1.25))
-        pits.append(.init(t: vs, pitch: 0, amp: 1))
-        for v in sys {
-            pits.append(.init(t: v.x, pitch: v.y, amp: 1))
-        }
-        pits[.last].pitch = 0
-        pits.append(.init(t: 1, pitch: ly, amp: 0.5))
-        self.init(pits)
-    }
-    init(isVibrato: Bool, duration: Double,
-         fq: Double, isVowel: Bool, pitchScale psc: Double = 4,
-         previousFq: Double?, nextFq: Double?) {
-        let isStartVowel = previousFq == nil && isVowel
-        let s0 = isStartVowel ? 0.1 : 0.075
-        let maxLS = 1.0
-        let y0 = isStartVowel ? -0.015 : -0.01
-        let ly = -0.01
-        if isVibrato {
-            let vss = s0 + 0.075
-            let vibratoCount = Int((duration / (1 / 6.0)).rounded())
-            let vibratoAmp = 0.01
-            var sys = [Point]()
-            sys.reserveCapacity(vibratoCount * 2 + 2)
-            if vibratoCount * 2 + 1 > 2 {
-                for i in 2 ..< (vibratoCount * 2 + 1) {
-                    let t = Double(i + 1) / Double(vibratoCount * 2 + 2)
-                    sys.append(Point(vss + 0.95 * (1 - vss) * t * t,
-                                     ((i % 2 == 0 ? vibratoAmp : -vibratoAmp) * psc) * t))
-                }
-            } else {
-                sys.append(Point(0.5, 0))
-            }
-            sys.append(Point(0.95, 0))
-            self.init(vibratoSYs: sys,
-                      vibratoStartS: vss,
-                      s0: s0,
-                      y0: y0 * psc, ly: ly * psc)
-        } else if duration < 0.15 {
-            self.init(oneS0: 0.3,
-                      y0: -0.05 / 12 * psc, y1: 0, ly: -0.15 / 12 * psc)
-        } else if duration < 0.3, let previousFq, let nextFq,
-                  fq > previousFq && fq > nextFq {
-            self.init(oneS0: 0.3, s1: 0.7,
-                      y0: -0.05 / 12 * psc, y1: 0, ly: -0.35 / 12 * psc)
-        } else if duration < 0.3 {
-            let lastY = nextFq == nil ? ly / 2 : ly
-            self.init(recoilS0: s0, s1: isStartVowel ? 0.5 : 0.3,
-                      y0: y0 * psc, y1: 0.01 * psc, y2: -0.005 * psc,
-                      ly: lastY * psc)
-        } else {
-            let lastY = nextFq == nil ? ly / 2 : ly
-            let v1Amp = isVibrato ? 0.75 : 0.85
-            self.init(recoilS0: s0, s1: isStartVowel ? 0.5 : 0.3,
-                      s2: 0.7, s3: 1 - 0.2 * maxLS,
-                      y0: y0 * psc, y1: 0.01 * psc, y2: -0.005 * psc,
-                      y3: 0.0025 * psc, ly: lastY * psc, v1Amp: v1Amp)
-        }
-    }
-    
-    func with(scale: Double) -> Self {
-        .init(pits.map {
-            .init(t: $0.t * scale, pitch: $0.pitch, stereo: $0.stereo, tone: $0.tone)
-        })
-    }
-    
-    var withEnabledPitch: Self {
-        pits.contains(where: { $0.pitch != 0 }) ? self : Self()
-    }
-    
-    struct InterKey: Hashable, Codable, MonoInterpolatable {
-        var pitch = 0.0, stereo = Stereo(), tone = Tone()
-        
-        static func linear(_ f0: Self, _ f1: Self, t: Double) -> Self {
-            .init(pitch: .linear(f0.pitch, f1.pitch, t: t),
-                  stereo: .linear(f0.stereo, f1.stereo, t: t),
-                  tone: .linear(f0.tone, f1.tone, t: t))
-        }
-        static func firstSpline(_ f1: Self,
-                                _ f2: Self, _ f3: Self, t: Double) -> Self {
-            .init(pitch: .firstSpline(f1.pitch, f2.pitch, f3.pitch, t: t),
-                  stereo: .firstSpline(f1.stereo, f2.stereo, f3.stereo, t: t),
-                  tone: .firstSpline(f1.tone, f2.tone, f3.tone, t: t))
-        }
-        static func spline(_ f0: Self, _ f1: Self,
-                           _ f2: Self, _ f3: Self, t: Double) -> Self {
-            .init(pitch: .spline(f0.pitch, f1.pitch, f2.pitch, f3.pitch, t: t),
-                  stereo: .spline(f0.stereo, f1.stereo, f2.stereo, f3.stereo, t: t),
-                  tone: .spline(f0.tone, f1.tone, f2.tone, f3.tone, t: t))
-        }
-        static func lastSpline(_ f0: Self, _ f1: Self,
-                               _ f2: Self, t: Double) -> Self {
-            .init(pitch: .lastSpline(f0.pitch, f1.pitch, f2.pitch, t: t),
-                  stereo: .lastSpline(f0.stereo, f1.stereo, f2.stereo, t: t),
-                  tone: .lastSpline(f0.tone, f1.tone, f2.tone, t: t))
-        }
-        static func firstMonospline(_ f1: Self,
-                                    _ f2: Self, _ f3: Self, with ms: Monospline) -> Self {
-            .init(pitch: .firstMonospline(f1.pitch, f2.pitch, f3.pitch, with: ms),
-                  stereo: .firstMonospline(f1.stereo, f2.stereo, f3.stereo, with: ms),
-                  tone: .firstMonospline(f1.tone, f2.tone, f3.tone, with: ms))
-        }
-        static func monospline(_ f0: Self, _ f1: Self,
-                               _ f2: Self, _ f3: Self, with ms: Monospline) -> Self {
-            .init(pitch: .monospline(f0.pitch, f1.pitch, f2.pitch, f3.pitch, with: ms),
-                  stereo: .monospline(f0.stereo, f1.stereo, f2.stereo, f3.stereo, with: ms),
-                  tone: .monospline(f0.tone, f1.tone, f2.tone, f3.tone, with: ms))
-        }
-        static func lastMonospline(_ f0: Self, _ f1: Self,
-                                   _ f2: Self, with ms: Monospline) -> Self {
-            .init(pitch: .lastMonospline(f0.pitch, f1.pitch, f2.pitch, with: ms),
-                  stereo: .lastMonospline(f0.stereo, f1.stereo, f2.stereo, with: ms),
-                  tone: .lastMonospline(f0.tone, f1.tone, f2.tone, with: ms))
-        }
-    }
-    
-    var isEmpty: Bool {
-        pits.isEmpty
-    }
-    var isEmptyPitch: Bool {
-        !pits.contains(where: { $0.pitch != 0 })
-    }
-    var isEmptyStereo: Bool {
-        !pits.contains(where: { !$0.stereo.isEmpty })
-    }
-    var isEmptyAmp: Bool {
-        !pits.contains(where: { $0.stereo.amp != 0 })
-    }
-    var isEmptyPan: Bool {
-        !pits.contains(where: { $0.stereo.pan != 0 })
-    }
-    
-    var interpolation: Interpolation<InterKey> {
-        .init(keys: pits.map { .init(value: .init(pitch: $0.pitch, stereo: $0.stereo, tone: $0.tone),
-                                     time: $0.t, type: .spline) },
-              duration: pits.last?.t ?? 1)
-    }
-    func pit(atT t: Double) -> Pit {
-        let interpolation = interpolation
-        let value = interpolation.monoValueEnabledFirstLast(withT: t, isLoop: false)
-        let pitch = value?.pitch ?? 0
-        let stereo = value?.stereo ?? .init()
-        let tone = value?.tone ?? .init()
-        return .init(t: t, pitch: pitch, stereo: stereo, tone: tone)
-    }
-    func pitch(atT t: Double) -> Double {
-        interpolation.monoValueEnabledFirstLast(withT: t, isLoop: false)?.pitch ?? 0
-    }
-    func fqScale(atT t: Double) -> Double {
-        2 ** pitch(atT: t)
-    }
-    func stereo(atT t: Double) -> Stereo {
-        interpolation.monoValueEnabledFirstLast(withT: t, isLoop: false)?.stereo ?? .init()
-    }
-    func tone(atT t: Double) -> Tone {
-        interpolation.monoValueEnabledFirstLast(withT: t, isLoop: false)?.tone ?? .init()
-    }
-    
-    func line(fromSecPerSplitCount count: Int = 24,
-              secDuration: Double, isRelease: Bool = true,
-              envelope: Envelope) -> Line? {
-        guard !isEmpty else { return nil }
-        let dSec = 1 / Double(count)
-        let interpolation = interpolation
-        let waver = Waver(envelope: envelope, pitbend: self)
-        var sec = 0.0, cs = [Line.Control]()
-        while sec < secDuration {
-            if let v = interpolation.monoValue(withTime: sec / secDuration) {
-                cs.append(.init(point: .init(sec, v.pitch),
-                                pressure: Volume(amp: v.stereo.amp * waver.volumeAmp(atTime: sec, releaseTime: nil, startTime: 0)).smp))
-            }
-            sec += dSec
-        }
-        cs.append(.init(point: .init(secDuration,
-                                     cs.last?.point.y ?? 0),
-                        pressure: cs.last?.pressure ?? 0))
-        if isRelease {
-            cs.append(.init(point: .init(secDuration + envelope.releaseSec,
-                                         cs.last?.point.y ?? 0),
-                            pressure: 0))
-        }
-        return Line(controls: cs)
-    }
-    func lineColors(fromSecPerSplitCount count: Int = 24,
-                    secDuration: Double,
-                    envelope: Envelope) -> [Color] {
-        guard !isEmpty else { return [] }
-        let dSec = 1 / Double(count)
-        let interpolation = interpolation
-        let waver = Waver(envelope: envelope, pitbend: self)
-        var sec = 0.0, cs = [Color]()
-        while sec < secDuration {
-            if let v = interpolation.monoValue(withTime: sec / secDuration) {
-                let nv = 1 - Volume(amp: v.stereo.amp * waver.volumeAmp(atTime: sec, releaseTime: nil, startTime: 0)).smp
-                let nnv = Color(lightness: nv * 100).rgba.r
-                cs.append(Self.panColor(pan: v.stereo.pan, brightness: Double(nnv)))
-            }
-            sec += dSec
-        }
-        cs.append(cs.last ?? .init(lightness: 100))
-        
-        var c = cs.last ?? .init(lightness: 100)
-        c.lightness = 100
-        cs.append(c)
-        
-        return cs
-    }
-    static func panColor(pan: Double, brightness l: Double) -> Color {
-        pan == 0 ?
-        Color(red: l, green: l, blue: l) :
-            (pan > 0 ?
-             Color(red: pan * Spectrogram.editRedRatio * (1 - l) + l, green: l, blue: l) :
-                Color(red: l, green: -pan * Spectrogram.editGreenRatio * (1 - l) + l, blue: l))
-    }
-}
-
 struct Envelope: Hashable, Codable {
     var attackSec = 0.02, decaySec = 0.04,
         sustainAmp = Volume(smp: 0.95).amp, releaseSec = 0.06
     var id = UUID()
+}
+extension Envelope {
+    var sustatinSmp: Double {
+        get { Volume(amp: sustainAmp).smp }
+        set { sustainAmp = Volume(smp: newValue).amp }
+    }
 }
 extension Envelope: Protobuf {
     init(_ pb: PBEnvelope) throws {
@@ -864,8 +617,7 @@ extension Envelope: Protobuf {
 struct Note {
     var beatRange = 0 ..< Rational(1, 4)
     var pitch = Rational(0)
-    var pitbend = Pitbend([Pit(t: 0, pitch: 0, amp: Stereo.defaultAmp)])
-    
+    var pits = [Pit(beat: 0, pitch: 0, amp: Stereo.defaultAmp)]
     var envelope = Envelope()
     var isNoise = false
     var id = UUID()
@@ -874,14 +626,10 @@ extension Note: Protobuf {
     init(_ pb: PBNote) throws {
         beatRange = (try? RationalRange(pb.beatRange).value) ?? 0 ..< Rational(1, 4)
         pitch = (try? Rational(pb.pitch)) ?? 0
-        pitbend = (try? Pitbend(pb.pitbend)) ?? .init()
-        if pitbend.isEmpty {
-            pitbend = .init([Pit(t: 0, pitch: 0, smp: Stereo.defaultAmp)])
+        pits = pb.pits.compactMap { try? Pit($0) }.sorted(by: { $0.beat < $1.beat })
+        if pits.isEmpty {
+            pits = [Pit(beat: 0, pitch: 0, amp: Stereo.defaultAmp)]
         }
-//        pits = pb.pits.compactMap { try? Pit($0) }.sorted(by: { $0.beat < $1.beat })
-//        if pits.isEmpty {
-//            pits = [Pit(t: 0, pitch: 0, amp: Stereo.defaultAmp)]
-//        }
         envelope = (try? Envelope(pb.envelope)) ?? .init()
         isNoise = pb.isNoise
         id = (try? UUID(pb.id)) ?? UUID()
@@ -890,7 +638,7 @@ extension Note: Protobuf {
         .with {
             $0.beatRange = RationalRange(value: beatRange).pb
             $0.pitch = pitch.pb
-            $0.pitbend = pitbend.pb
+            $0.pits = pits.map { $0.pb }
             $0.envelope = envelope.pb
             $0.isNoise = isNoise
             $0.id = id.pb
@@ -899,13 +647,28 @@ extension Note: Protobuf {
 }
 extension Note: Hashable, Codable {}
 extension Note {
-    var firstTone: Tone {
-        pitbend.pits.first!.tone
+    var firstPit: Pit {
+        pits.first!
     }
-    
-    var pits: [Pit] {
-        get { pitbend.pits }
-        set { pitbend.pits = newValue }
+    var firstStereo: Stereo {
+        firstPit.stereo
+    }
+    var firstTone: Tone {
+        firstPit.tone
+    }
+    var firstPitch: Rational {
+        pitch + pits[0].pitch
+    }
+    var firstRoundedPitch: Int {
+        Int(firstPitch.rounded())
+    }
+    var firstFq: Double {
+        Pitch(value: pitch + pits[0].pitch).fq
+    }
+    var firstPitResult: PitResult {
+        .init(notePitch: pitch, pitch: .rational(firstPit.pitch), stereo: firstStereo,
+              tone: firstTone, lyric: firstPit.lyric,
+              envelope: envelope, isNoise: isNoise, id: id)
     }
     
     func pitsEqualPitchSmpCount() -> [Pit] {
@@ -917,21 +680,259 @@ extension Note {
         }
     }
     
-    var octavePitchString: String {
-        Pitch(value: pitch).octaveString
+    var pitchRange: Range<Rational> {
+        let minPitch = (pits.min(by: { $0.pitch < $1.pitch })?.pitch ?? 0) + pitch
+        let maxPitch = (pits.max(by: { $0.pitch < $1.pitch })?.pitch ?? 0) + pitch
+        return minPitch ..< maxPitch
     }
-    var roundedPitch: Int {
-        Int(pitch.rounded())
-    }
-    var fq: Double {
-        Pitch(value: pitch).fq
+    
+    func chordBeatRangeAndRoundedPitchs() -> [(beatRange: Range<Rational>, roundedPitch: Int)] {
+        if pits.count >= 2 {
+            var ns = [(beatRange: Range<Rational>, roundedPitch: Int)]()
+            var preBeat = beatRange.start, prePitch = Int((pitch + pits[0].pitch).rounded())
+            var isPreEqual = true
+            for i in 1 ..< pits.count {
+                let pit = pits[i]
+                let pitch = Int((pitch + pit.pitch).rounded())
+                if pitch != prePitch {
+                    let beat = pit.beat + beatRange.start
+                    if isPreEqual {
+                        ns.append((preBeat ..< beat, prePitch))
+                    }
+                    preBeat = beat
+                    prePitch = pitch
+                    
+                    isPreEqual = false
+                } else {
+                    isPreEqual = true
+                }
+            }
+            if preBeat < beatRange.end {
+                ns.append((preBeat ..< beatRange.end, prePitch))
+            }
+            return ns
+        } else {
+            return [(beatRange, firstRoundedPitch)]
+        }
     }
     
     func isEqualOtherThanBeatRange(_ other: Self) -> Bool {
         pitch == other.pitch
-        && pitbend == other.pitbend
+        && pits == other.pits
         && envelope == other.envelope
         && isNoise == other.isNoise
+        && id == other.id
+    }
+    
+    func pitbend(fromTempo tempo: Rational) -> Pitbend {
+        let pitchSmpCount = (pits.maxValue { $0.tone.pitchSmps.count }) ?? 0
+        var pitKeys: [Interpolation<InterPit>.Key] = pits.map {
+            .init(value: .init(pitch: .init($0.pitch) / 12,
+                               stereo: $0.stereo,
+                               tone: $0.tone.with(pitchSmpsCount: pitchSmpCount),
+                               lyric: $0.lyric),
+                  time: .init(Score.sec(fromBeat: $0.beat, tempo: tempo)), 
+                  type: .spline)
+        }
+        if pits.first?.beat != 0 {
+            pitKeys.insert(.init(value: pitKeys.first!.value, time: 0, type: .spline), at: 0)
+        }
+        let durSec = Double(Score.sec(fromBeat: beatRange.length, tempo: tempo))
+        if pits.last?.beat != beatRange.length {
+            pitKeys.append(.init(value: pitKeys.last!.value, time: durSec, type: .spline))
+        }
+        let it = Interpolation<InterPit>(keys: pitKeys, duration: durSec)
+        let firstTone = firstTone
+        let isEmptyPitch = !(pits.contains { $0.pitch != 0 })
+        let isEmptyTone = !(pits.contains { $0.tone != firstTone })
+        return .init(interpolation: it,
+                     isEmptyPitch: isEmptyPitch, isEmptyTone: isEmptyTone,
+                     isStereoOnly: isEmptyPitch && isEmptyTone)
+    }
+    
+    enum ResultPitch: Hashable {
+        case rational(Rational), real(Double)
+        
+        var doubleValue: Double {
+            switch self {
+            case .rational(let value): .init(value)
+            case .real(let value): value
+            }
+        }
+        func rationalValue(intervalScale: Rational) -> Rational {
+            switch self {
+            case .rational(let value): value.interval(scale: intervalScale)
+            case .real(let value): .init(value, intervalScale: intervalScale)
+            }
+        }
+    }
+    struct PitResult: Hashable {
+        var notePitch: Rational, pitch: ResultPitch, stereo: Stereo,
+            tone: Tone, lyric: String, envelope: Envelope, isNoise: Bool, id: UUID
+    }
+    func pitResult(atBeat beat: Double) -> PitResult {
+        if pits.count == 1 || beat <= .init(pits[0].beat) {
+            let pit = pits[0]
+            return .init(notePitch: pitch, pitch: .rational(pit.pitch), stereo: pit.stereo,
+                         tone: pit.tone, lyric: pit.lyric,
+                         envelope: envelope, isNoise: isNoise, id: id)
+        } else if let pit = pits.last, beat >= .init(pit.beat) {
+            return .init(notePitch: pitch, pitch: .rational(pit.pitch), stereo: pit.stereo,
+                         tone: pit.tone, lyric: pit.lyric,
+                         envelope: envelope, isNoise: isNoise, id: id)
+        }
+        for pitI in 0 ..< pits.count - 1 {
+            let pit = pits[pitI], nextPit = pits[pitI + 1]
+            if beat >= .init(pit.beat) && beat < .init(nextPit.beat) && pit.isEqualWithoutBeat(nextPit) {
+                return .init(notePitch: pitch, pitch: .rational(pit.pitch), stereo: pit.stereo,
+                             tone: pit.tone, lyric: pit.lyric,
+                             envelope: envelope, isNoise: isNoise, id: id)
+            }
+        }
+        
+        var pitKeys: [Interpolation<InterPit>.Key] = pits.map {
+            .init(value: .init(pitch: .init($0.pitch),
+                               stereo: $0.stereo,
+                               tone: $0.tone,
+                               lyric: $0.lyric),
+                  time: .init($0.beat),
+                  type: .spline)
+        }
+        if pits.first?.beat != 0 {
+            pitKeys.insert(.init(value: pitKeys.first!.value, time: 0, type: .spline), at: 0)
+        }
+        let durSec = Double(beatRange.length)
+        if pits.last?.beat != beatRange.length {
+            pitKeys.append(.init(value: pitKeys.last!.value, time: durSec, type: .spline))
+        }
+        let it = Interpolation<InterPit>(keys: pitKeys, duration: durSec)
+        guard let value = it.monoValueEnabledFirstLast(withT: .init(beat), isLoop: false) else {
+            let pit = firstPit
+            return .init(notePitch: pitch, pitch: .rational(pit.pitch), stereo: pit.stereo,
+                         tone: pit.tone, lyric: pit.lyric,
+                         envelope: envelope, isNoise: isNoise, id: id)
+        }
+        return .init(notePitch: pitch, pitch: .real(value.pitch), stereo: value.stereo,
+                     tone: value.tone, lyric: value.lyric,
+                     envelope: envelope, isNoise: isNoise, id: id)
+    }
+
+    var isEmpty: Bool {
+        pits.isEmpty
+    }
+    var isEmptyPitch: Bool {
+        !pits.contains(where: { $0.pitch != 0 })
+    }
+    var isEmptyStereo: Bool {
+        !pits.contains(where: { !$0.stereo.isEmpty })
+    }
+    var isEmptyAmp: Bool {
+        !pits.contains(where: { $0.stereo.amp != 0 })
+    }
+    var isEmptyPan: Bool {
+        !pits.contains(where: { $0.stereo.pan != 0 })
+    }
+}
+extension Note {
+    private static func pitsFrom(recoilBeat0 beat0: Rational, beat1: Rational,
+                                 beat2: Rational, beat3: Rational, lastBeat: Rational,
+                                 pitch0: Rational, pitch1: Rational, pitch2: Rational,
+                                 pitch3: Rational, lastPitch: Rational,
+                                 v1Smp: Double) -> [Pit] {
+        [.init(beat: 0, pitch: pitch0, smp: 0.95),
+         .init(beat: beat0, pitch: pitch1, smp: 1),
+         .init(beat: beat1, pitch: pitch2, smp: 1),
+         .init(beat: beat2, pitch: pitch3, smp: 1),
+         .init(beat: beat3, pitch: 0, smp: v1Smp),
+         .init(beat: lastBeat, pitch: lastPitch, smp: 0.9 * v1Smp)]
+    }
+    private static func pitsFrom(recoilBeat0 beat0: Rational, beat1: Rational, lastBeat: Rational,
+                                 pitch0: Rational, pitch1: Rational,
+                                 pitch2: Rational, lastPitch: Rational) -> [Pit] {
+        [.init(beat: 0, pitch: pitch0, smp: 0.95),
+         .init(beat: beat0, pitch: pitch1, smp: 0.975),
+         .init(beat: beat1, pitch: pitch2, smp: 1),
+         .init(beat: lastBeat, pitch: lastPitch, smp: 0.9)]
+    }
+    private static func pitsFrom(oneBeat0 beat0: Rational, beat1: Rational, lastBeat: Rational,
+                                 pitch0: Rational, pitch1: Rational, lastPitch: Rational) -> [Pit] {
+        [.init(beat: 0, pitch: pitch0, smp: 0.975),
+         .init(beat: beat0, pitch: pitch1, smp: 1),
+         .init(beat: beat1, pitch: 0, smp: 1),
+         .init(beat: lastBeat, pitch: lastPitch, smp: 0.9)]
+    }
+    private static func pitsFrom(oneBeat0 beat0: Rational,  lastBeat: Rational,
+                                 pitch0: Rational, pitch1: Rational, lastPitch: Rational) -> [Pit] {
+        [.init(beat: 0, pitch: pitch0, smp: 0.975),
+         .init(beat: beat0, pitch: pitch1, smp: 1),
+         .init(beat: lastBeat, pitch: lastPitch, smp: 0.9)]
+    }
+    private static func pitsFrom(vibratoBeatPitchs bps: [(beat: Rational, pitch: Rational)],
+                                 vibratoStartBeat vBeat: Rational,
+                                 beat0: Rational,  lastBeat: Rational,
+                                 pitch0: Rational, lastPitch: Rational) -> [Pit] {
+        guard bps.count % 2 == 0 else { fatalError() }
+        var pits = [Pit]()
+        pits.append(.init(beat: 0, pitch: pitch0, smp: 0.975))
+        pits.append(.init(beat: beat0, pitch: 0, smp: 1))
+        pits.append(.init(beat: vBeat, pitch: 0, smp: 1))
+        for bp in bps {
+            pits.append(.init(beat: bp.beat, pitch: bp.pitch, smp: 1))
+        }
+        pits[.last].pitch = 0
+        pits.append(.init(beat: lastBeat, pitch: lastPitch, smp: 0.8))
+        return pits
+    }
+    private static func pitsFrom(durBeat: Rational, tempo: Rational,
+                                 isVibrato: Bool, isVowel: Bool,
+                                 fq: Double, previousFq: Double?, nextFq: Double?) -> [Pit] {
+        let durSec = Double(Score.sec(fromBeat: durBeat, tempo: tempo))
+        func beat(fromT t: Double) -> Rational {
+            Score.beat(fromSec: durSec * t, tempo: tempo, beatRate: Keyframe.defaultFrameRate)
+        }
+        let isStartVowel = previousFq == nil && isVowel
+        let beat0 = beat(fromT: isStartVowel ? 0.1 : 0.075)
+        let pitch0 = isStartVowel ? -Rational(3, 4) : -Rational(1, 2)
+        let lastBeat = beat(fromT: 1)
+        let lastPitch = -Rational(1, 2)
+        if isVibrato {
+            let vst = isStartVowel ? 0.175 : 0.15
+            let vibratoCount = Int((durSec / (1 / 6.0)).rounded()) * 2 + 1
+            let vibratoPitch = Rational(1, 2)
+            var sys = [(beat: Rational, pitch: Rational)]()
+            sys.reserveCapacity(vibratoCount + 1)
+            if vibratoCount > 2 {
+                for i in 2 ..< vibratoCount {
+                    let t = Double(i + 1) / Double(vibratoCount + 1)
+                    sys.append((beat(fromT: vst + 0.95 * (1 - vst) * t * t),
+                                (i % 2 == 0 ? vibratoPitch : -vibratoPitch)
+                                * (i < vibratoCount / 2 ? Rational(1, 2) : 1)))
+                }
+            } else {
+                sys.append((beat(fromT: 0.5), 0))
+            }
+            sys.append((beat(fromT: 0.95), 0))
+            return Self.pitsFrom(vibratoBeatPitchs: sys,  vibratoStartBeat: beat(fromT: vst),
+                                 beat0: beat0, lastBeat: lastBeat,
+                                 pitch0: pitch0, lastPitch: lastPitch)
+        } else if durSec < 0.15 {
+            return Self.pitsFrom(oneBeat0: beat(fromT: 0.3), lastBeat: lastBeat,
+                      pitch0: -Rational(1, 4), pitch1: 0, lastPitch: -Rational(1, 2))
+        } else if durSec < 0.3, let previousFq, let nextFq, fq > previousFq && fq > nextFq {
+            return Self.pitsFrom(oneBeat0: beat(fromT: 0.3), beat1: beat(fromT: 0.7), lastBeat: lastBeat,
+                      pitch0: -Rational(1, 4), pitch1: 0, lastPitch: -Rational(5, 4))
+        } else if durSec < 0.3 {
+            return Self.pitsFrom(recoilBeat0: beat0, beat1: beat(fromT: isStartVowel ? 0.5 : 0.3), lastBeat: lastBeat,
+                      pitch0: pitch0, pitch1: Rational(1, 2), pitch2: -Rational(1, 4),
+                      lastPitch: nextFq == nil ? lastPitch / 2 : lastPitch)
+        } else {
+            return Self.pitsFrom(recoilBeat0: beat0, beat1: beat(fromT: isStartVowel ? 0.5 : 0.3),
+                                 beat2: beat(fromT: 0.7), beat3: beat(fromT: 0.8), lastBeat: lastBeat,
+                                 pitch0: pitch0, pitch1: Rational(1, 2),
+                                 pitch2: -Rational(1, 4), pitch3: Rational(1, 4),
+                                 lastPitch: nextFq == nil ? lastPitch / 2 : lastPitch,
+                                 v1Smp: isVibrato ? 0.9 : 0.95)
+        }
     }
 }
 
@@ -1150,30 +1151,6 @@ extension Chord {
         }
         return nRanges
     }
-    static func filterChords(_ notes: [Note]) -> [Note] {
-        let tps = notes.map { ($0.beatRange, $0.roundedPitch) }
-        let trs = splitedTimeRanges(timeRanges: tps)
-        var npis = Set<Int>()
-        for tr in trs {
-            if Chord(pitchs: tr.value.sorted()) != nil {
-                npis.formUnion(tr.value)
-            }
-        }
-        return notes.filter { npis.contains($0.roundedPitch) }
-    }
-    static func chordIndexes(_ notes: [Note]) -> [Int] {
-        let tps = notes.map { ($0.beatRange, $0.roundedPitch) }
-        let trs = splitedTimeRanges(timeRanges: tps)
-        var npis = Set<Int>()
-        for tr in trs {
-            if Chord(pitchs: tr.value.sorted()) != nil {
-                npis.formUnion(tr.value)
-            }
-        }
-        return notes.enumerated().compactMap {
-            npis.contains(tps[$0.offset].1) ? $0.offset : nil
-        }
-    }
     
     static func approximationJustIntonation5Limit(pitch: Rational) -> Rational {
         switch pitch {
@@ -1215,16 +1192,16 @@ extension Chord: CustomStringConvertible {
 }
 
 struct ScoreOption {
-    var beatDuration = Rational(16)
+    var durBeat = Rational(16)
     var keyBeats: [Rational] = [4, 8, 12]
     var tempo = Music.defaultTempo
     var enabled = false
 }
 extension ScoreOption: Protobuf {
     init(_ pb: PBScoreOption) throws {
-        beatDuration = (try? Rational(pb.beatDuration)) ?? 16
-        if beatDuration < 0 {
-            beatDuration = 0
+        durBeat = (try? Rational(pb.durBeat)) ?? 16
+        if durBeat < 0 {
+            durBeat = 0
         }
         keyBeats = pb.keyBeats.compactMap { try? Rational($0) }
         tempo = (try? Rational(pb.tempo))?.clipped(Music.tempoRange) ?? Music.defaultTempo
@@ -1232,7 +1209,7 @@ extension ScoreOption: Protobuf {
     }
     var pb: PBScoreOption {
         .with {
-            $0.beatDuration = beatDuration.pb
+            $0.durBeat = durBeat.pb
             $0.keyBeats = keyBeats.map { $0.pb }
             if tempo != Music.defaultTempo {
                 $0.tempo = tempo.pb
@@ -1248,7 +1225,7 @@ struct Score: BeatRangeType {
     
     var notes = [Note]()
     var draftNotes = [Note]()
-    var beatDuration = Rational(16)
+    var durBeat = Rational(16)
     var tempo = Music.defaultTempo
     var keyBeats: [Rational] = [4, 8, 12]
     var enabled = false
@@ -1258,9 +1235,9 @@ extension Score: Protobuf {
     init(_ pb: PBScore) throws {
         notes = pb.notes.compactMap { try? Note($0) }
         draftNotes = pb.draftNotes.compactMap { try? Note($0) }
-        beatDuration = (try? Rational(pb.beatDuration)) ?? 16
-        if beatDuration < 0 {
-            beatDuration = 0
+        durBeat = (try? Rational(pb.durBeat)) ?? 16
+        if durBeat < 0 {
+            durBeat = 0
         }
         keyBeats = pb.keyBeats.compactMap { try? Rational($0) }
         tempo = (try? Rational(pb.tempo))?.clipped(Music.tempoRange) ?? Music.defaultTempo
@@ -1271,7 +1248,7 @@ extension Score: Protobuf {
         .with {
             $0.notes = notes.map { $0.pb }
             $0.draftNotes = draftNotes.map { $0.pb }
-            $0.beatDuration = beatDuration.pb
+            $0.durBeat = durBeat.pb
             $0.keyBeats = keyBeats.map { $0.pb }
             $0.tempo = tempo.pb
             $0.enabled = enabled
@@ -1282,7 +1259,7 @@ extension Score: Protobuf {
 extension Score: Hashable, Codable {}
 extension Score {
     var beatRange: Range<Rational> {
-        0 ..< beatDuration
+        0 ..< durBeat
     }
     var spectrogram: Spectrogram? {
         if let renderedNoneDelayPCMBuffer {
@@ -1312,43 +1289,42 @@ extension Score {
         return minV ..< maxV
     }
     
-    var scaleType: MusicScaleType? {
-        .init(pitchs: notes.map { Int($0.pitch.rounded()) })
-    }
-    
-    func splitedTimeRanges(at indexes: [Int]) -> [Range<Rational>: Set<Int>] {
-        var brps = [(Range<Rational>, Int)]()
-        for (i, note) in notes.enumerated() {
-            guard indexes.contains(i),
-                  Self.pitchRange.contains(note.pitch) else { continue }
-            brps.append((note.beatRange, note.roundedPitch))
-        }
-        return Chord.splitedTimeRanges(timeRanges: brps)
-    }
-    
     func chordPitches(atBeat range: Range<Rational>) -> [Int] {
         var pitchLengths = [Int: Rational]()
         for note in notes {
-            if let iRange = note.beatRange.intersection(range) {
-                let pitch = note.roundedPitch
-                if pitchLengths[pitch] != nil {
-                    pitchLengths[pitch]! += iRange.length
-                } else {
-                    pitchLengths[pitch] = iRange.length
+            for (beatRange, roundedPitch) in note.chordBeatRangeAndRoundedPitchs() {
+                if let iRange = beatRange.intersection(range) {
+                    if pitchLengths[roundedPitch] != nil {
+                        pitchLengths[roundedPitch]! += iRange.length
+                    } else {
+                        pitchLengths[roundedPitch] = iRange.length
+                    }
                 }
             }
         }
         let length = range.length / 8
         return pitchLengths.filter { $0.value > length }.keys.sorted()
     }
+    
+    func noteIAndPits(atBeat beat: Rational,
+                      in noteIs: [Int]) -> [(noteI: Int, pitResult: Note.PitResult)] {
+        noteIs.compactMap { noteI in
+            let note = notes[noteI]
+            return if note.beatRange.contains(beat) || note.beatRange.end == beat {
+                (noteI, note.pitResult(atBeat: Double(beat - note.beatRange.start)))
+            } else {
+                nil
+            }
+        }
+    }
 }
 extension Score {
     var option: ScoreOption {
         get {
-            .init(beatDuration: beatDuration, keyBeats: keyBeats, tempo: tempo, enabled: enabled)
+            .init(durBeat: durBeat, keyBeats: keyBeats, tempo: tempo, enabled: enabled)
         }
         set {
-            beatDuration = newValue.beatDuration
+            durBeat = newValue.durBeat
             keyBeats = newValue.keyBeats
             tempo = newValue.tempo
             enabled = newValue.enabled
@@ -1360,8 +1336,8 @@ struct Music {
     static let defaultTempo: Rational = 120
     static let minTempo = Rational(1, 4), maxTempo: Rational = 10000
     static let tempoRange = minTempo ... maxTempo
-    static let defaultBeatDuration = Rational(16)
-    static let defaultBeatRange = 0 ..< defaultBeatDuration
+    static let defaultDurBeat = Rational(16)
+    static let defaultBeatRange = 0 ..< defaultDurBeat
 }
 protocol TempoType {
     var tempo: Rational { get }
@@ -1385,6 +1361,9 @@ extension TempoType {
         Int(beat * 60 / tempo * Rational(frameRate))
     }
     
+    func sec(fromBeat beat: Double) -> Double {
+        beat * 60 / Double(tempo)
+    }
     func sec(fromBeat beat: Rational) -> Rational {
         beat * 60 / tempo
     }
@@ -1450,7 +1429,7 @@ struct Audiotrack {
     var values = [Value]()
 }
 extension Audiotrack {
-    var secDuration: Rational {
+    var durSec: Rational {
         values.reduce(0) { max($0, $1.secRange.upperBound) }
     }
     static func + (lhs: Self, rhs: Self) -> Self {

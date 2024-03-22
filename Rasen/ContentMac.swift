@@ -109,7 +109,7 @@ struct Content: Hashable, Codable {
     let name: String
     let url: URL
     let type: ContentType
-    let secDuration: Double
+    let durSec: Double
     let volumeValues: [Double]
     let image: Image?
     
@@ -127,7 +127,7 @@ struct Content: Hashable, Codable {
         self.name = name
         url = URL.contents.appending(component: name)
         type = Self.type(from: url)
-        secDuration = type.isDuration ? Self.duration(from: url) : 0
+        durSec = type.isDuration ? Self.duration(from: url) : 0
         volumeValues = type.isDuration ?
         (try? Content.volumeValues(url: url)) ?? [] : []
         image = Image(url: url)
@@ -181,13 +181,21 @@ struct Content: Hashable, Codable {
 extension Content {
     var localBeatRange: Range<Rational>? {
         if let timeOption {
-            let beatDur = ContentTimeOption.beat(fromSec: secDuration,
+            let durBeat = ContentTimeOption.beat(fromSec: durSec,
                                                  tempo: timeOption.tempo,
                                                  beatRate: Keyframe.defaultFrameRate,
                                                  rounded: .up)
-            return Range(start: timeOption.localStartBeat, length: beatDur)
+            return Range(start: timeOption.localStartBeat, length: durBeat)
         } else {
             return nil
+        }
+    }
+    
+    var stereo: Stereo {
+        get { .init(smp: volume.smp, pan: pan) }
+        set {
+            volume = Volume(smp: newValue.smp)
+            pan = newValue.pan
         }
     }
     
@@ -220,7 +228,7 @@ extension Content: Protobuf {
         name = pb.name
         url = URL.contents.appending(component: name)
         type = Content.type(from: url)
-        secDuration = type.isDuration ? Content.duration(from: url) : 0
+        durSec = type.isDuration ? Content.duration(from: url) : 0
         volumeValues = type.isDuration ? ((try? Content.volumeValues(url: url)) ?? []) : []
         image = type == .image ? Image(url: url) : nil
         

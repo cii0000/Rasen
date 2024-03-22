@@ -510,7 +510,7 @@ final class AnimationView: TimelineView {
     }
     func transformedKeyframeBounds(at i: Int) -> Rect? {
         let knobW = Sheet.knobWidth, knobH = Sheet.knobHeight
-        let iKnobW = width(atBeatDuration: Rational(1, frameRate)),
+        let iKnobW = width(atDurBeat: Rational(1, frameRate)),
             iKnobH = interpolatedKnobHeight
         let centerY = 0.0
         
@@ -577,7 +577,7 @@ final class AnimationView: TimelineView {
         let lw = 1.0
         let knobW = Sheet.knobWidth, knobH = Sheet.knobHeight
         let rulerH = Sheet.rulerHeight
-        let iKnobW = width(atBeatDuration: Rational(1, frameRate)),
+        let iKnobW = width(atDurBeat: Rational(1, frameRate)),
             iKnobH = interpolatedKnobHeight
         let centerY = 0.0
         let sy = centerY - Sheet.timelineHalfHeight
@@ -604,7 +604,7 @@ final class AnimationView: TimelineView {
         var kfBeat = model.beatRange.start
         for (i, keyframe) in model.keyframes.enumerated() {
             defer {
-                kfBeat += keyframe.beatDuration
+                kfBeat += keyframe.durBeat
             }
             
             let kx = x(atBeat: kfBeat)
@@ -817,10 +817,10 @@ final class AnimationView: TimelineView {
         if enabledKeyOnly {
             var i = 0
             while i < animation.keyframes.count {
-                kfBeat += animation.keyframes[i].beatDuration
+                kfBeat += animation.keyframes[i].durBeat
                 while i + 1 < animation.keyframes.count
                         && !animation.keyframes[i + 1].isKey {
-                    kfBeat += animation.keyframes[i + 1].beatDuration
+                    kfBeat += animation.keyframes[i + 1].durBeat
                     i += 1
                 }
                 let x = x(atBeat: kfBeat)
@@ -833,7 +833,7 @@ final class AnimationView: TimelineView {
             }
         } else {
             for (i, keyframe) in animation.keyframes.enumerated() {
-                kfBeat += keyframe.beatDuration
+                kfBeat += keyframe.durBeat
                 let x = x(atBeat: kfBeat)
                 let d = abs(inP.x - x)
                 if d < minD {
@@ -856,7 +856,7 @@ final class AnimationView: TimelineView {
                 minD = d
                 minI = i
             }
-            kfBeat += keyframe.beatDuration
+            kfBeat += keyframe.durBeat
         }
         if isEnabledCount {
             let x = x(atBeat: kfBeat)
@@ -954,7 +954,7 @@ final class AnimationView: TimelineView {
         let idSet = Set(ids)
         
         let knobW = Sheet.knobWidth, knobH = Sheet.knobHeight
-        let iKnobW = width(atBeatDuration: Rational(1, frameRate)),
+        let iKnobW = width(atDurBeat: Rational(1, frameRate)),
             iKnobH = interpolatedKnobHeight
         let nb = bounds.insetBy(dx: Sheet.textPadding.width, dy: 0)
         let kfY = nb.minY + timelineY
@@ -964,7 +964,7 @@ final class AnimationView: TimelineView {
         var kfBeat = model.beatRange.start
         for keyframe in model.keyframes {
             defer {
-                kfBeat += keyframe.beatDuration
+                kfBeat += keyframe.durBeat
             }
             
             let nLines = keyframe.picture.lines.filter { idSet.contains($0.id) }
@@ -1169,14 +1169,14 @@ final class SheetView: View {
                 rightTimeSliderRect(atSec: sec))
     }
     func leftTimeSliderRect(atSec sec: Rational) -> Rect {
-        let bt = Double(sec / model.allSecDuration).clipped(min: 0, max: 1)
+        let bt = Double(sec / model.allDurSec).clipped(min: 0, max: 1)
         let knobW = 2.0, knobH = 6.0
         return Rect(x: bounds.width / 2 * bt,
                     y: 0,
                     width: knobW, height: knobH)
     }
     func rightTimeSliderRect(atSec sec: Rational) -> Rect {
-        let bt = Double(sec / model.allSecDuration).clipped(min: 0, max: 1)
+        let bt = Double(sec / model.allDurSec).clipped(min: 0, max: 1)
         let knobW = 2.0, knobH = 6.0
         return Rect(x: bounds.midX + bounds.width / 2 * bt,
                     y: 0,
@@ -1198,7 +1198,7 @@ final class SheetView: View {
     }
     
     func currentSelectiongTimeNode(indexInterval: Double) -> Node {
-        Self.selectingTimeNode(duration: currentKeyframe.beatDuration,
+        Self.selectingTimeNode(duration: currentKeyframe.durBeat,
                                time: model.animation.localBeat,
                                indexInterval: indexInterval,
                                frameRate: Rational(frameRate),
@@ -1315,7 +1315,7 @@ final class SheetView: View {
     }
     
     func timeNodes(from animationView: AnimationView) -> [Node] {
-        Self.timeNodes(duration: animationView.currentKeyframe.beatDuration,
+        Self.timeNodes(duration: animationView.currentKeyframe.durBeat,
                        time: animationView.model.localBeat,
                        frameRate: Rational(animationView.frameRate))
     }
@@ -1324,7 +1324,7 @@ final class SheetView: View {
                         frameRate: Rational(frameRate))
     }
     func currentTimeNodes() -> [Node] {
-        Self.timeNodes(duration: currentKeyframe.beatDuration,
+        Self.timeNodes(duration: currentKeyframe.durBeat,
                        time: model.animation.localBeat,
                        frameRate: Rational(frameRate))
     }
@@ -1625,7 +1625,7 @@ final class SheetView: View {
             var deltaSec: Rational = 0
             for audiotrack in firstAudiotracks {
                 audiotracks.append(audiotrack)
-                deltaSec += audiotrack.secDuration
+                deltaSec += audiotrack.durSec
             }
             
             var minFrameRate = model.mainFrameRate
@@ -1640,11 +1640,11 @@ final class SheetView: View {
                 }
                 if playingOtherTimelineIDs.isEmpty {
                     audiotrack.values
-                        .append(.score(.init(beatDuration: sheetView.model.animationBeatDuration,
+                        .append(.score(.init(durBeat: sheetView.model.animationDurBeat,
                                              tempo: sheetView.model.animation.tempo)))
                 }
                 audiotracks.append(audiotrack)
-                deltaSec += audiotrack.secDuration
+                deltaSec += audiotrack.durSec
                 previousPlayingTempo = sheetView.model.animation.tempo
                 
                 minFrameRate = min(minFrameRate,
@@ -1661,7 +1661,7 @@ final class SheetView: View {
             }
             if playingOtherTimelineIDs.isEmpty {
                 audiotrack.values
-                    .append(.score(.init(beatDuration: model.animationBeatDuration,
+                    .append(.score(.init(durBeat: model.animationDurBeat,
                                          tempo: model.animation.tempo)))
             }
             audiotracks.append(audiotrack)
@@ -1680,7 +1680,7 @@ final class SheetView: View {
                 }
                 if playingOtherTimelineIDs.isEmpty {
                     audiotrack.values
-                        .append(.score(.init(beatDuration: sheetView.model.animationBeatDuration,
+                        .append(.score(.init(durBeat: sheetView.model.animationDurBeat,
                                              tempo: sheetView.model.animation.tempo)))
                 }
                 audiotracks.append(audiotrack)
@@ -1891,7 +1891,7 @@ final class SheetView: View {
         let sheetView = playingSheetView
         let maxSec = playingSecRange != nil ?
             playingSecRange!.end :
-            sheetView.model.allSecDuration
+            sheetView.model.allDurSec
         if nSec >= maxSec {
             let oldPlayingSheetIndex = playingSheetIndex
             
@@ -3831,18 +3831,18 @@ final class SheetView: View {
         append(undo: undoItem, redo: redoItem)
         set(redoItem)
     }
-    func set(beatDuration: Rational, previousNext: PreviousNext,
+    func set(durBeat: Rational, previousNext: PreviousNext,
              at i: Int) {
-        let ko = KeyframeOption(beatDuration: beatDuration,
+        let ko = KeyframeOption(durBeat: durBeat,
                                 previousNext: previousNext)
         set([IndexValue(value: ko, index: i)])
     }
-    func set(beatDuration: Rational, at i: Int) {
+    func set(durBeat: Rational, at i: Int) {
         let oko = model.animation.keyframes[i].option
         let opo = [IndexValue(value: oko, index: i)]
         
         var nko = oko
-        nko.beatDuration = beatDuration
+        nko.durBeat = durBeat
         let npo = [IndexValue(value: nko, index: i)]
         
         let undoItem = SheetUndoItem.setKeyframeOptions(opo)
@@ -3850,14 +3850,14 @@ final class SheetView: View {
         append(undo: undoItem, redo: redoItem)
         set(redoItem)
     }
-    func capture(beatDuration: Rational,
-                 oldBeatDuration: Rational, at i: Int) {
+    func capture(durBeat: Rational,
+                 oldDurBeat: Rational, at i: Int) {
         var oko = model.animation.keyframes[i].option
-        oko.beatDuration = oldBeatDuration
+        oko.durBeat = oldDurBeat
         let opo = [IndexValue(value: oko, index: i)]
         
         var nko = model.animation.keyframes[i].option
-        nko.beatDuration = beatDuration
+        nko.durBeat = durBeat
         let npo = [IndexValue(value: nko, index: i)]
         
         let undoItem = SheetUndoItem.setKeyframeOptions(opo)
@@ -5924,20 +5924,23 @@ final class SheetView: View {
             fs.contains(where: { scoreView.intersectsNote($0, at: i) }) ? i : nil
         }
     }
-    func noteAndPitIndexes(from selections: [Selection]) -> [Int: [Int]] {
+    func noteAndPitIndexes(from selections: [Selection], enabledAll: Bool = true) -> [Int: [Int]] {
         let fs = selections
             .map { $0.rect }
             .map { scoreView.convertFromWorld($0) }
         return scoreView.model.notes.enumerated().reduce(into: [Int: [Int]]()) { (n, v) in
             let noteI = v.offset, note = v.element
             let pitIs = note.pits.enumerated().compactMap { (pitI, pit) in
-                fs.contains(where: { $0.contains(scoreView.pitPosition(atPitI: pitI, note: note)) }) ?
+                fs.contains(where: { $0.contains(scoreView.pitPosition(atPit: pitI, from: note)) }) ?
                 pitI : nil
             }
-            n[noteI] = if pitIs.isEmpty {
-                fs.contains(where: { scoreView.intersectsNote($0, at: noteI) }) ? note.pits.count.array : []
+            
+            if pitIs.isEmpty {
+                if enabledAll && fs.contains(where: { scoreView.intersectsNote($0, at: noteI) }) {
+                    n[noteI] = note.pits.count.array
+                }
             } else {
-                pitIs
+                n[noteI] = pitIs
             }
         }
     }
@@ -6566,7 +6569,7 @@ final class SheetView: View {
                 if !isNewUndGroup {
                     newUndoGroup()
                 }
-                set(beatDuration: model.animation.currentKeyframe.beatDuration,
+                set(durBeat: model.animation.currentKeyframe.durBeat,
                     previousNext: .none,
                     at: model.animation.index)
             }

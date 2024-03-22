@@ -176,13 +176,13 @@ message PBStereo {
 message PBTone {
     double evenAmp = 1;
     double oddAmp = 2;
-    repeated PBPoint fqAmps = 3;
+    repeated PBPoint pitchAmps = 3;
     PBUUID id = 4;
 }
 
 message PBPit {
-    double t = 1;
-    double pitch = 2;
+    PBRational beat = 1;
+    PBRational pitch = 2;
     PBStereo stereo = 3;
     PBTone tone = 4;
     string lyric = 5;
@@ -201,7 +201,7 @@ message PBEnvelope {
 
 message PBNote {
     PBRational pitch = 1;
-    PBPitbend pitbend = 2;
+    repeated PBPit pits = 2;
     PBRationalRange beatRange = 3;
     PBEnvelope envelope = 7;
     bool isNoise = 10;
@@ -209,7 +209,7 @@ message PBNote {
 }
 
 message PBScoreOption {
-    PBRational beatDuration = 1;
+    PBRational durBeat = 1;
     PBRational tempo = 2;
     repeated PBRational keyBeats = 4;
     bool enabled = 3;
@@ -217,7 +217,7 @@ message PBScoreOption {
 message PBScore {
     repeated PBNote notes = 1;
     repeated PBNote draftNotes = 6;
-    PBRational beatDuration = 2;
+    PBRational durBeat = 2;
     PBRational tempo = 3;
     repeated PBRational keyBeats = 7;
     bool enabled = 4;
@@ -268,7 +268,7 @@ message PBStringIntPointDic {
 message PBKeyframe {
     PBPicture picture = 1;
     PBPicture draftPicture = 2;
-    PBRational beatDuration = 3;
+    PBRational durBeat = 3;
     PBPreviousNext previousNext = 4;
 }
 
@@ -277,7 +277,7 @@ message PBKeyframeKey {
     repeated int64 planeIs = 2;
     repeated int64 draftLineIs = 3;
     repeated int64 draftPlaneIs = 4;
-    PBRational beatDuration = 5;
+    PBRational durBeat = 5;
     PBPreviousNext previousNext = 6;
 }
 message PBAnimationZipper {
@@ -306,7 +306,7 @@ message PBAnimation {
 }
 
 message PBSheetOption {
-    PBRational beatDuration = 1;
+    PBRational durBeat = 1;
 }
 
 enum PBPreviousNext {
@@ -357,7 +357,7 @@ message PBFinding {
 }
 
 message PBKeyframeOption {
-    PBRational beatDuration = 1;
+    PBRational durBeat = 1;
     PBPreviousNext previousNext = 2;
 }
 

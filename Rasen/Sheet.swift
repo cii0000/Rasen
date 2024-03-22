@@ -155,17 +155,17 @@ extension TextValue: Protobuf {
 }
 
 struct KeyframeOption {
-    var beatDuration = Rational(1)
+    var durBeat = Rational(1)
     var previousNext = PreviousNext.none
 }
 extension KeyframeOption: Protobuf {
     init(_ pb: PBKeyframeOption) throws {
-        beatDuration = (try? .init(pb.beatDuration)) ?? 0
+        durBeat = (try? .init(pb.durBeat)) ?? 0
         previousNext = (try? .init(pb.previousNext)) ?? .none
     }
     var pb: PBKeyframeOption {
         .with {
-            $0.beatDuration = beatDuration.pb
+            $0.durBeat = durBeat.pb
             $0.previousNext = previousNext.pb
         }
     }
@@ -1457,25 +1457,25 @@ struct Keyframe: Picable {
     }
     var draftPicture = Picture()
     
-    var beatDuration = Rational()
+    var durBeat = Rational()
     var previousNext = PreviousNext.none
     private(set) var isKey = true
     
     init(picture: Picture = Picture(), draftPicture: Picture = Picture(),
-         beatDuration: Rational = Keyframe.defaultBeatDuration,
+         durBeat: Rational = Keyframe.defaultDurBeat,
          previousNext: PreviousNext = .none) {
         
         self.picture = picture
         self.draftPicture = draftPicture
-        self.beatDuration = beatDuration
+        self.durBeat = durBeat
         self.previousNext = previousNext
         isKey = (picture.lines.contains { $0.interType != .interpolated }) || picture.isEmpty
     }
 }
 extension Keyframe {
     static let defaultFrameRate = 12
-    static let defaultBeatDuration = Rational(1, defaultFrameRate)
-    static let minBeatDuration = defaultBeatDuration / 2
+    static let defaultDurBeat = Rational(1, defaultFrameRate)
+    static let minDurBeat = defaultDurBeat / 2
 }
 extension Keyframe {
     var isEmpty: Bool {
@@ -1488,7 +1488,7 @@ extension Keyframe {
         picture.lines.contains { $0.interType == .interpolated }
     }
     mutating func set(_ option: KeyframeOption) {
-        beatDuration = option.beatDuration
+        durBeat = option.durBeat
         previousNext = option.previousNext
     }
     
@@ -1504,11 +1504,11 @@ extension Keyframe {
     
     var option: KeyframeOption {
         get {
-            .init(beatDuration: beatDuration,
+            .init(durBeat: durBeat,
                   previousNext: previousNext)
         }
         set {
-            self.beatDuration = newValue.beatDuration
+            self.durBeat = newValue.durBeat
             self.previousNext = newValue.previousNext
         }
     }
@@ -1518,16 +1518,16 @@ extension Keyframe: AppliableTransform {
     static func * (lhs: Self, rhs: Transform) -> Self {
         .init(picture: lhs.picture * rhs,
               draftPicture: lhs.draftPicture * rhs,
-              beatDuration: lhs.beatDuration)
+              durBeat: lhs.durBeat)
     }
 }
 extension Keyframe: Protobuf {
     init(_ pb: PBKeyframe) throws {
         picture = (try? Picture(pb.picture)) ?? Picture()
         draftPicture = (try? Picture(pb.draftPicture)) ?? Picture()
-        beatDuration = max((try? Rational(pb.beatDuration)) ?? 1, 0)
-        if beatDuration < Keyframe.minBeatDuration {
-            beatDuration = Keyframe.minBeatDuration
+        durBeat = max((try? Rational(pb.durBeat)) ?? 1, 0)
+        if durBeat < Keyframe.minDurBeat {
+            durBeat = Keyframe.minDurBeat
         }
         previousNext = (try? PreviousNext(pb.previousNext)) ?? .none
         isKey = (picture.lines.contains { $0.interType != .interpolated }) || picture.isEmpty
@@ -1536,7 +1536,7 @@ extension Keyframe: Protobuf {
         .with {
             $0.picture = picture.pb
             $0.draftPicture = draftPicture.pb
-            $0.beatDuration = beatDuration.pb
+            $0.durBeat = durBeat.pb
             $0.previousNext = previousNext.pb
         }
     }
@@ -1569,7 +1569,7 @@ extension AnimationOption: Hashable, Codable {}
 struct KeyframeKey {
     var lineIs = [Int](), planeIs = [Int]()
     var draftLineIs = [Int](), draftPlaneIs = [Int]()
-    var beatDuration: Rational = 0
+    var durBeat: Rational = 0
     var previousNext = PreviousNext.none
 }
 extension KeyframeKey: Protobuf {
@@ -1578,9 +1578,9 @@ extension KeyframeKey: Protobuf {
         planeIs = pb.planeIs.map { Int($0) }
         draftLineIs = pb.draftLineIs.map { Int($0) }
         draftPlaneIs = pb.draftPlaneIs.map { Int($0) }
-        beatDuration = max((try? Rational(pb.beatDuration)) ?? 1, 0)
-        if beatDuration < Keyframe.minBeatDuration {
-            beatDuration = Keyframe.minBeatDuration
+        durBeat = max((try? Rational(pb.durBeat)) ?? 1, 0)
+        if durBeat < Keyframe.minDurBeat {
+            durBeat = Keyframe.minDurBeat
         }
         previousNext = (try? PreviousNext(pb.previousNext)) ?? .none
     }
@@ -1590,7 +1590,7 @@ extension KeyframeKey: Protobuf {
             $0.planeIs = planeIs.map { Int64($0) }
             $0.draftLineIs = draftLineIs.map { Int64($0) }
             $0.draftPlaneIs = draftPlaneIs.map { Int64($0) }
-            $0.beatDuration = beatDuration.pb
+            $0.durBeat = durBeat.pb
             $0.previousNext = previousNext.pb
         }
     }
@@ -1620,8 +1620,8 @@ extension AnimationZipper: Protobuf {
 }
 
 struct Animation {
-    static let defaultBeatDuration = Music.defaultBeatDuration
-    static let defaultBeatRange = 0 ..< defaultBeatDuration
+    static let defaultDurBeat = Music.defaultDurBeat
+    static let defaultBeatRange = 0 ..< defaultDurBeat
     static let timelineY = 15.0
     
     var keyframes = [Keyframe]()
@@ -1684,7 +1684,7 @@ extension Animation: Protobuf {
                                             planes: planes),
                              draftPicture: .init(lines: draftLines,
                                                  planes: draftPlanes),
-                             beatDuration: $0.beatDuration,
+                             durBeat: $0.durBeat,
                              previousNext: $0.previousNext)
             }
         }
@@ -1746,7 +1746,7 @@ extension Animation: Protobuf {
                              planeIs: planeIs,
                              draftLineIs: draftLineIs,
                              draftPlaneIs: draftPlaneIs,
-                             beatDuration: keyframe.beatDuration,
+                             durBeat: keyframe.durBeat,
                              previousNext: keyframe.previousNext)
             }
             
@@ -1778,30 +1778,30 @@ extension Animation: BeatRangeType {
     }
     
     var beatRange: Range<Rational> {
-        startBeat ..< (startBeat + localBeatDuration)
+        startBeat ..< (startBeat + localDurBeat)
     }
     var mainBeat: Rational {
-        rootBeat.loop(0 ..< localBeatDuration) + startBeat
+        rootBeat.loop(0 ..< localDurBeat) + startBeat
     }
     
-    var localBeatDuration: Rational {
-        keyframes.reduce(Rational(0)) { $0 + $1.beatDuration }
+    var localDurBeat: Rational {
+        keyframes.reduce(Rational(0)) { $0 + $1.durBeat }
     }
     var localBeatRange: Range<Rational> {
-        0 ..< localBeatDuration
+        0 ..< localDurBeat
     }
     var localBeat: Rational {
-        get { rootBeat.loop(0 ..< localBeatDuration) }
+        get { rootBeat.loop(0 ..< localDurBeat) }
         set { rootBeat = newValue }
     }
     func localBeat(at i: Int) -> Rational {
-        keyframes[..<i].reduce(Rational(0)) { $0 + $1.beatDuration }
+        keyframes[..<i].reduce(Rational(0)) { $0 + $1.durBeat }
     }
     func localBeat(atRoot rootI: Int) -> Rational {
         localBeat(at: index(atRoot: rootI))
     }
     func localBeat(atRootBeat rootBeat: Rational) -> Rational {
-        rootBeat.loop(0 ..< localBeatDuration)
+        rootBeat.loop(0 ..< localDurBeat)
     }
     var localSec: Rational {
         sec(fromBeat: localBeat)
@@ -1814,11 +1814,11 @@ extension Animation: BeatRangeType {
         guard !keyframes.isEmpty && beat >= 0 else { return nil }
         var previousBeat = Rational(0)
         for keyframe in keyframes {
-            let nextBeat = previousBeat + keyframe.beatDuration
+            let nextBeat = previousBeat + keyframe.durBeat
             if beat < nextBeat {
                 return beat - previousBeat
             }
-            previousBeat += keyframe.beatDuration
+            previousBeat += keyframe.durBeat
         }
         return nil
     }
@@ -1836,11 +1836,11 @@ extension Animation: BeatRangeType {
         guard !keyframes.isEmpty && beat >= 0 else { return nil }
         var previousBeat = Rational(0)
         for (i, keyframe) in keyframes.enumerated() {
-            let nextBeat = previousBeat + keyframe.beatDuration
+            let nextBeat = previousBeat + keyframe.durBeat
             if beat < nextBeat {
                 return i
             }
-            previousBeat += keyframe.beatDuration
+            previousBeat += keyframe.durBeat
         }
         return isInCount ? keyframes.count : nil
     }
@@ -1856,7 +1856,7 @@ extension Animation: BeatRangeType {
         guard !keyframes.isEmpty && beat >= 0 else { return nil }
         var previousBeat = Rational(0)
         for (i, keyframe) in keyframes.enumerated() {
-            let nextBeat = previousBeat + keyframe.beatDuration
+            let nextBeat = previousBeat + keyframe.durBeat
             if beat < nextBeat {
                 return (i, beat - previousBeat)
             }
@@ -1868,24 +1868,24 @@ extension Animation: BeatRangeType {
     func rootBeat(atRoot rootI: Int) -> Rational {
         let ki = index(atRoot: rootI)
         let loopI = (rootI - ki) / keyframes.count
-        return Rational(loopI) * localBeatDuration + localBeat(at: ki)
+        return Rational(loopI) * localDurBeat + localBeat(at: ki)
     }
     func rootIndex(atRootBeat rootBeat: Rational) -> Int {
-        let beatDuration = localBeatDuration
-        guard beatDuration > 0 else { return 0 }
-        let beat = rootBeat.loop(0 ..< beatDuration)
-        let loopI = Int((rootBeat - beat) / beatDuration)
+        let durBeat = localDurBeat
+        guard durBeat > 0 else { return 0 }
+        let beat = rootBeat.loop(0 ..< durBeat)
+        let loopI = Int((rootBeat - beat) / durBeat)
         return loopI * keyframes.count + (index(atBeat: beat) ?? 0)
     }
     func nearestRootIndex(atRootBeat rootBeat: Rational) -> Int {
-        let beatDuration = localBeatDuration
-        guard beatDuration > 0 else { return 0 }
-        let beat = rootBeat.loop(0 ..< beatDuration)
-        let loopI = Int((rootBeat - beat) / beatDuration)
+        let durBeat = localDurBeat
+        guard durBeat > 0 else { return 0 }
+        let beat = rootBeat.loop(0 ..< durBeat)
+        let loopI = Int((rootBeat - beat) / durBeat)
         let index = index(atBeat: beat) ?? 0
         let rootI = loopI * keyframes.count + index
         let nBeat = beat - localBeat(at: index)
-        let halfBeat = keyframes[index].beatDuration / 2
+        let halfBeat = keyframes[index].durBeat / 2
         return nBeat > halfBeat ? rootI + 1 : rootI
     }
     var rootIndex: Int {
@@ -1903,7 +1903,7 @@ extension Animation: BeatRangeType {
         loopIndex(atRoot: rootIndex(atRootBeat: rootBeat))
     }
     func loopIndexBeat(atLoop loopI: Int) -> Rational {
-        localBeatDuration * Rational(loopI)
+        localDurBeat * Rational(loopI)
     }
     
     struct RootBeatIndex: Hashable, Codable {
@@ -2054,7 +2054,7 @@ extension PreviousNext: Protobuf {
 }
 
 struct Sheet {
-    var animation = Animation(keyframes: [Keyframe(beatDuration: 0)])
+    var animation = Animation(keyframes: [Keyframe(durBeat: 0)])
     var score = Score()
     var texts = [Text]()
     var contents = [Content]()
@@ -2069,7 +2069,7 @@ extension Sheet: Protobuf {
             let picture = (try? Picture(pb.picture)) ?? Picture()
             let draftPicture = (try? Picture(pb.draftPicture)) ?? Picture()
             let kf = Keyframe(picture: picture, draftPicture: draftPicture,
-                              beatDuration: 0)
+                              durBeat: 0)
             animation = Animation(keyframes: [kf])
         }
         
@@ -2106,6 +2106,8 @@ extension Sheet {
     static let beatWidth = 30.0, secPadding = 16.0
     static let timelineHalfHeight = 12.0
     static let knobWidth = 2.0, knobHeight = 12.0, rulerHeight = 4.0
+    static let fullEditPitchInterval = Rational(1, 12)
+    static let pitchInterval = Rational(1)
     static let fullEditBeatInterval = Rational(1, 48)
     static let beatInterval = Rational(1, 4)
     static let knobEditDistance = 15.0
@@ -2134,7 +2136,7 @@ extension Sheet {
     }
     
     var mainFrameRate: Int {
-        let minFrame = Int.lcd(animation.keyframes.map { $0.beatDuration.q })
+        let minFrame = Int.lcd(animation.keyframes.map { $0.durBeat.q })
         let frameRate = animation.sec(fromBeat: Rational(1, minFrame))
         for i in 1 ..< 60 {
             if (frameRate * Rational(i)).decimalPart == 0 {
@@ -2365,14 +2367,14 @@ extension Sheet {
         }
     }
     
-    var animationBeatDuration: Rational {
+    var animationDurBeat: Rational {
         animation.beatRange.upperBound
     }
-    var animationSecDuration: Rational {
+    var animationDurSec: Rational {
         animation.secRange.upperBound
     }
     
-    var musicBeatDuration: Rational {
+    var musicDurBeat: Rational {
         var v = Rational(0)
         v = max(v, score.beatRange.upperBound)
         v = contents.reduce(into: v) {
@@ -2387,7 +2389,7 @@ extension Sheet {
         }
         return v
     }
-    var musicSecDuration: Rational {
+    var musicDurSec: Rational {
         var v = Rational(0)
         v = max(v, score.secRange.upperBound)
         v = contents.reduce(into: v) {
@@ -2438,14 +2440,14 @@ extension Sheet {
         Caption.caption(atBeat: beat, in: captions)
     }
     
-    var allBeatDuration: Rational {
-        max(animationBeatDuration, musicBeatDuration)
+    var allDurBeat: Rational {
+        max(animationDurBeat, musicDurBeat)
     }
-    var allBeatRange: Range<Rational> { 0 ..< allBeatDuration }
-    var allSecDuration: Rational {
-        max(animationSecDuration, musicSecDuration)
+    var allBeatRange: Range<Rational> { 0 ..< allDurBeat }
+    var allDurSec: Rational {
+        max(animationDurSec, musicDurSec)
     }
-    var allSecTimeRange: Range<Rational> { 0 ..< allSecDuration }
+    var allSecTimeRange: Range<Rational> { 0 ..< allDurSec }
     
     var mainFrame: Rect? {
         guard enabledAnimation else { return nil }

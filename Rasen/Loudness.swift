@@ -142,21 +142,30 @@ struct IIRfilter {
 }
 
 struct Loudness {
-    private static let ps = [Point(60, 70),
-                             Point(80, 60),
-                             Point(200, 50),
-                             Point(1000, 40),
-                             Point(1400, 45),
-                             Point(1600, 45),
-                             Point(3000, 35),
-                             Point(4000, 35),
-                             Point(9000, 55),
-                             Point(12500, 55),
-                             Point(15000, 52)]
-    static func db40PhonScale(fromFq fq: Double) -> Double {
-        db40Phon(fromFq: fq) / 70
-    }
-    static func db40Phon(fromFq fq: Double) -> Double {
+    private static let ps = [Point(60, 1),
+                             Point(80, 0.9),
+                             Point(200, 0.8),
+                             Point(1000, 0.725),
+                             Point(1400, 0.775),
+                             Point(1600, 0.775),
+                             Point(3000, 0.675),
+                             Point(4000, 0.675),
+                             Point(9000, 0.85),
+                             Point(12500, 0.85),
+                             Point(15000, 0.825)]
+    private static let rps = [Point(60, 0.675),
+                              Point(80, 0.75),
+                              Point(200, 0.85),
+                              Point(1000, 0.925),
+                              Point(1400, 0.875),
+                              Point(1600, 0.875),
+                              Point(3000, 1),
+                              Point(4000, 1),
+                              Point(9000, 0.75),
+                              Point(12500, 0.75),
+                              Point(15000, 0.8)]
+    
+    static func scale40Phon(fromFq fq: Double) -> Double {
         var preFq = 0.0, preDb = ps.last!.y
         
         for p in ps {
@@ -168,6 +177,19 @@ struct Loudness {
             preDb = p.y
         }
         return ps.last!.y
+    }
+    static func reverseScale40Phon(fromFq fq: Double) -> Double {
+        var preFq = 0.0, preDb = rps.last!.y
+        
+        for p in rps {
+            if fq < p.x {
+                let t = (fq - preFq) / (p.x - preFq)
+                return Double.linear(preDb, p.y, t: t)
+            }
+            preFq = p.x
+            preDb = p.y
+        }
+        return rps.last!.y
     }
     
     enum FilterClass: String {

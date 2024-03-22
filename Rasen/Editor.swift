@@ -299,7 +299,7 @@ final class DraftEditor: Editor {
                         let kiovs: [IndexValue<KeyframeOption>] = indexes.compactMap {
                             let k = animationView.model.keyframes[$0]
                             guard k.previousNext != .previousAndNext else { return nil }
-                            let ko = KeyframeOption(beatDuration: k.beatDuration,
+                            let ko = KeyframeOption(durBeat: k.durBeat,
                                                     previousNext: .previousAndNext)
                             return IndexValue(value: ko, index: $0)
                         }
@@ -348,7 +348,7 @@ final class DraftEditor: Editor {
                                     let scoreView = sheetView.scoreView
                                     let scoreP = scoreView.convertFromWorld(p)
                                     let pitch = document.pitch(from: scoreView, at: scoreP)
-                                    let interval = document.currentNoteTimeInterval
+                                    let interval = document.currentNoteBeatInterval
                                     let beat = scoreView.beat(atX: scoreP.x, interval: interval)
                                     let notes: [Note] = nis.map {
                                         var note = scoreView.model.draftNotes[$0]
@@ -385,7 +385,7 @@ final class DraftEditor: Editor {
                             let scoreView = sheetView.scoreView
                             let scoreP = scoreView.convertFromWorld(p)
                             let pitch = document.pitch(from: scoreView, at: scoreP)
-                            let interval = document.currentNoteTimeInterval
+                            let interval = document.currentNoteBeatInterval
                             let beat = scoreView.beat(atX: scoreP.x, interval: interval)
                             let notes: [Note] = sheetView.model.score.draftNotes.map {
                                 var note = $0
@@ -411,7 +411,7 @@ final class DraftEditor: Editor {
                         = indexes.compactMap {
                             let k = animationView.model.keyframes[$0]
                             guard k.previousNext != .none else { return nil }
-                            let ko = KeyframeOption(beatDuration: k.beatDuration,
+                            let ko = KeyframeOption(durBeat: k.durBeat,
                                                     previousNext: .none)
                             return IndexValue(value: ko, index: $0)
                         }
@@ -893,13 +893,13 @@ final class IOEditor: Editor {
                     }
                     if content.type.isDuration {
                         let tempo = sheetView.nearestTempo(at: np) ?? Music.defaultTempo
-                        let interval = document.currentNoteTimeInterval
+                        let interval = document.currentNoteBeatInterval
                         let startBeat = sheetView.animationView.beat(atX: np.x, interval: interval)
-                        let beatDur = ContentTimeOption.beat(fromSec: content.secDuration,
+                        let durBeat = ContentTimeOption.beat(fromSec: content.durSec,
                                                              tempo: tempo,
                                                              beatRate: Keyframe.defaultFrameRate,
                                                              rounded: .up)
-                        let beatRange = Range(start: startBeat, length: beatDur)
+                        let beatRange = Range(start: startBeat, length: durBeat)
                         content.timeOption = .init(beatRange: beatRange, tempo: tempo)
                     }
                     
@@ -1574,8 +1574,8 @@ final class IOEditor: Editor {
                         let ot = t
                         let b = isMainFrame ? (sheet.mainFrame ?? v.bounds) : v.bounds
                         
-                        let duration = sheet.animation.sec(fromBeat: sheet.allBeatDuration)
-                        let frameCount = sheet.animation.count(fromBeat: sheet.allBeatDuration,
+                        let duration = sheet.animation.sec(fromBeat: sheet.allDurBeat)
+                        let frameCount = sheet.animation.count(fromBeat: sheet.allDurBeat,
                                                                frameRate: frameRate)
                         
                         movie.writeMovie(frameCount: frameCount,
@@ -1628,9 +1628,9 @@ final class IOEditor: Editor {
                                         fillType: .color(.background))
                         if let image = node.image(in: v.bounds, size: size,
                                                   backgroundColor: .background, colorSpace: colorSpace) {
-                            let duration = Animation.sec(fromBeat: Keyframe.defaultBeatDuration,
+                            let duration = Animation.sec(fromBeat: Keyframe.defaultDurBeat,
                                                         tempo: Music.defaultTempo)
-                            let frameCount = Animation.count(fromBeat: Keyframe.defaultBeatDuration,
+                            let frameCount = Animation.count(fromBeat: Keyframe.defaultDurBeat,
                                                          tempo: Music.defaultTempo,
                                                          frameRate: 24)
                             movie.writeMovie(frameCount: frameCount,
@@ -1831,7 +1831,7 @@ final class IOEditor: Editor {
                 for v in vs {
                     if let sid = self.document.sheetID(at: v.shp),
                        let sheet = self.document.renderableSheet(at: sid) {
-                        let tl = sheet.animation.localBeatDuration
+                        let tl = sheet.animation.localDurBeat
                         let ot = t
                         let captions = sheet.captions
                         cce.write(captions: captions, duration: tl,
@@ -1910,9 +1910,9 @@ final class IOEditor: Editor {
                         node.attitude.position = sheetBounds.origin
                         if let image = node.image(in: v.bounds, size: size,
                                                   backgroundColor: .background, colorSpace: .sRGB) {
-                            images.append((image, k.beatDuration))
+                            images.append((image, k.durBeat))
                         }
-                        time += k.beatDuration
+                        time += k.durBeat
                         let d = Double(i) / Double(sheet.animation.keyframes.count - 1)
                         t = ot + d / Double(allC)
                         progressHandler(t, &isStop)
@@ -1923,7 +1923,7 @@ final class IOEditor: Editor {
                                     fillType: .color(.background))
                     if let image = node.image(in: v.bounds, size: size,
                                               backgroundColor: .background, colorSpace: .sRGB) {
-                        images.append((image, Keyframe.defaultBeatDuration))
+                        images.append((image, Keyframe.defaultDurBeat))
                         t = ot + 1 / Double(allC)
                         progressHandler(t, &isStop)
                     }

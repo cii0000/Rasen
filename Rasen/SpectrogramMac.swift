@@ -189,7 +189,7 @@ struct Spectrogram {
     var frames = [Frame]()
     var stereoCount = 0
     var type = FqType.pitch
-    var secDuration = 0.0
+    var durSec = 0.0
     
     static let minLinearFq = 0.0, maxLinearFq = Audio.defaultExportSampleRate / 2
     static let minPitch = Double(Score.pitchRange.start), maxPitch = Double(Score.pitchRange.end)
@@ -199,6 +199,7 @@ struct Spectrogram {
     }
     init(_ buffer: PCMBuffer,
          windowSize: Int = 2048, windowOverlap: Double = 0.875,
+         isNormalized: Bool = true,
          type: FqType = .pitch) {
         
         let windowSize = Int(2 ** Double.log2(Double(windowSize)).rounded(.up))
@@ -235,7 +236,7 @@ struct Spectrogram {
         let loudnessScales = smpCount.range.map {
             let fq = Double.linear(Self.minLinearFq, Self.maxLinearFq,
                                    t: Double($0) / Double(smpCount))
-            return Loudness.db40PhonScale(fromFq: fq)
+            return Loudness.scale40Phon(fromFq: fq)
         }
         
         var ctss: [[[Double]]]
@@ -309,7 +310,7 @@ struct Spectrogram {
                 let loudnessScales2 = smpCount2.range.map {
                     let fq = Double.linear(Self.minLinearFq, Self.maxLinearFq,
                                            t: Double($0) / Double(smpCount2))
-                    return Loudness.db40PhonScale(fromFq: fq)
+                    return Loudness.scale40Phon(fromFq: fq)
                 }
                 
                 let filterBank2 = FilterBank(sampleCount: smpCount2,
@@ -372,22 +373,24 @@ struct Spectrogram {
             })
         }
         
-        var nMaxSmp = 0.0
-        for frame in frames {
-            nMaxSmp = max(nMaxSmp, frame.stereos.max(by: { $0.smp < $1.smp })!.smp)
-        }
-        let rMaxSmp = nMaxSmp == 0 ? 0 : 1 / nMaxSmp
-        for i in 0 ..< frames.count {
-            for j in 0 ..< frames[i].stereos.count {
-                frames[i].stereos[j].smp = (frames[i].stereos[j].smp * rMaxSmp)
-                    .clipped(min: 0, max: 1)
+        if isNormalized {
+            var nMaxSmp = 0.0
+            for frame in frames {
+                nMaxSmp = max(nMaxSmp, frame.stereos.max(by: { $0.smp < $1.smp })!.smp)
+            }
+            let rMaxSmp = nMaxSmp == 0 ? 0 : 1 / nMaxSmp
+            for i in 0 ..< frames.count {
+                for j in 0 ..< frames[i].stereos.count {
+                    frames[i].stereos[j].smp = (frames[i].stereos[j].smp * rMaxSmp)
+                        .clipped(min: 0, max: 1)
+                }
             }
         }
         
         self.frames = frames
         self.stereoCount = frames.isEmpty ? 0 : frames[0].stereos.count
         self.type = type
-        self.secDuration = Double(frameCount) / sampleRate
+        self.durSec = Double(frameCount) / sampleRate
     }
     
     static let (redRatio, greenRatio) = {
@@ -424,13 +427,13 @@ struct Spectrogram {
         for x in 0 ..< width {
             for y in 0 ..< h {
                 let stereo = frames[x + xi].stereos[h - 1 - y]
-                let alpha = rgamma(stereo.smp > 0.5 ? stereo.smp.clipped(min: 0.5, max: 1, newMin: 0.95, newMax: 1) : stereo.smp * 0.95 / 0.5)
+                let alpha = rgamma(stereo.smp)
                 guard !alpha.isNaN else {
                     print("NaN:", stereo.smp)
                     continue
                 }
-                bitmap[x, y, 0] = stereo.pan > 0 ? UInt8(rgamma(stereo.pan * Self.redRatio) * alpha * Double(UInt8.max)) : 0
-                bitmap[x, y, 1] = stereo.pan < 0 ? UInt8(rgamma(-stereo.pan * Self.greenRatio) * alpha * Double(UInt8.max)) : 0
+                bitmap[x, y, 0] = stereo.pan > 0 ? UInt8(rgamma(stereo.smp * stereo.pan * Self.redRatio) * Double(UInt8.max)) : 0
+                bitmap[x, y, 1] = stereo.pan < 0 ? UInt8(rgamma(stereo.smp * -stereo.pan * Self.greenRatio) * Double(UInt8.max)) : 0
                 bitmap[x, y, 2] = UInt8(b * alpha * Double(UInt8.max))
                 bitmap[x, y, 3] = UInt8(alpha * Double(UInt8.max))
             }

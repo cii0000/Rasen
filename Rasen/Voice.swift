@@ -277,10 +277,7 @@ struct FormantFilter: Hashable, Codable {
               edSmp: 0.1, edNoiseT: 0.45),
         .init(sdFq: 500, sFq: 8500, eFq: 9100, edFq: 500,
               smp: 0.4, noiseT: 0.7,
-              edSmp: 0.1, edNoiseT: 0.7),
-        .init(sdFq: 600, sFq: 11000, eFq: 11500, edFq: 600,
-              smp: 0.3, noiseT: 0.75,
-              edSmp: 0.1, edNoiseT: 0.8)
+              edSmp: 0.1, edNoiseT: 0.7)
     ]
 }
 enum FormantFilterType {
@@ -762,7 +759,7 @@ struct Mora: Hashable, Codable {
     var sourceFilter: NoiseSourceFilter
     var deltaSyllabicStartSec = 0.0
     var deltaSinStartSec = 0.0
-    var onsetSecDur: Double
+    var onsetDurSec: Double
     var isVowel = false
     var isDakuon = false
     var isOffVoice = false
@@ -784,7 +781,7 @@ struct Mora: Hashable, Codable {
         }
         
         syllabics = []
-        onsetSecDur = 0
+        onsetDurSec = 0
         isVowel = false
         switch phonemes.last {
         case .a, .i, .ɯ, .e, .o, .nn:
@@ -842,7 +839,7 @@ struct Mora: Hashable, Codable {
                                 attackSec: 0.02,
                                 releaseSec: 0.03,
                                 sourceFilter: .init(sl)))
-            onsetSecDur = tl
+            onsetDurSec = tl
             
             firstKeyFormantFilters = [.init(.empty, sec: 0)]
             firstMainFormantFilter = firstKeyFormantFilters.first!.formantFilter
@@ -920,7 +917,7 @@ struct Mora: Hashable, Codable {
                 firstKeyFormantFilters.append(.init(nsl, sec: nTl))
                 firstKeyFormantFilters.append(.init(nnsl, sec: youon != .none ? 0.01 : 0.015))
                 deltaSyllabicStartSec = -0.01
-                onsetSecDur = nTl
+                onsetDurSec = nTl
                 deltaSinStartSec -= nTl
             case .m, .mj:
                 let mTl = 0.0325
@@ -932,7 +929,7 @@ struct Mora: Hashable, Codable {
                 firstKeyFormantFilters.append(.init(msl, sec: mTl))
                 firstKeyFormantFilters.append(.init(nmsl, sec: youon != .none ? 0.01 : 0.015))
                 deltaSyllabicStartSec = -0.01
-                onsetSecDur = mTl
+                onsetDurSec = mTl
                 deltaSinStartSec -= mTl
             case .r, .rj:
                 let rTl = 0.01
@@ -944,7 +941,7 @@ struct Mora: Hashable, Codable {
                 firstKeyFormantFilters.append(.init(rsl, sec: rTl))
                 firstKeyFormantFilters.append(.init(nrsl, sec: youon != .none ? 0.01 : 0.05))
                 deltaSyllabicStartSec = 0.0
-                onsetSecDur = rTl
+                onsetDurSec = rTl
                 deltaSinStartSec -= rTl
                 
             case .k, .kj, .g, .gj:
@@ -991,7 +988,7 @@ struct Mora: Hashable, Codable {
                                     attackSec: 0.02,
                                     sourceFilter: sf))
                 deltaSyllabicStartSec = 0.01
-                onsetSecDur = isK ? (isJ ? kjTl : kTl) : (isJ ? gjTl : gTl)
+                onsetDurSec = isK ? (isJ ? kjTl : kTl) : (isJ ? gjTl : gTl)
                 isOffVoice = true
             case .t, .d:
                 let tTl = 0.05, tOTl = 0.01
@@ -1010,7 +1007,7 @@ struct Mora: Hashable, Codable {
                                     releaseSec: 0.01,
                                     sourceFilter: sf))
                 deltaSyllabicStartSec = 0.01
-                onsetSecDur = isT ? tTl : dTl
+                onsetDurSec = isT ? tTl : dTl
                 isOffVoice = true
             case .p, .pj, .b, .bj:
                 let pTl = 0.05, pOTl = 0.01
@@ -1031,7 +1028,7 @@ struct Mora: Hashable, Codable {
                                     releaseSec: 0.01,
                                     sourceFilter: sf))
                 deltaSyllabicStartSec = 0.02
-                onsetSecDur = isP ? pTl : bTl
+                onsetDurSec = isP ? pTl : bTl
                 isOffVoice = true
                 
             case .s, .ts, .dz:
@@ -1088,7 +1085,7 @@ struct Mora: Hashable, Codable {
                                         sourceFilter: sf))
                 }
                 deltaSyllabicStartSec = (oph == .ts ? 0.01 : 0) - 0.01
-                onsetSecDur = tl - olt
+                onsetDurSec = tl - olt
                 isOffVoice = true
             case .ɕ, .tɕ, .dʒ:
                 let sokuonScale: Double
@@ -1144,7 +1141,7 @@ struct Mora: Hashable, Codable {
                                         sourceFilter: sf))
                 }
                 deltaSyllabicStartSec = -0.01
-                onsetSecDur = tl - olt
+                onsetDurSec = tl - olt
                 isOffVoice = true
             case .h:
                 let sokuonScale: Double
@@ -1159,7 +1156,7 @@ struct Mora: Hashable, Codable {
                                     attackSec: 0.02,
                                     sourceFilter: .init(npsl)))
                 deltaSyllabicStartSec = -0.01
-                onsetSecDur = hTl - onsets.last!.attackSec - onsets.last!.releaseSec
+                onsetDurSec = hTl - onsets.last!.attackSec - onsets.last!.releaseSec
                 isOffVoice = true
             case .ç:
                 let sokuonScale: Double
@@ -1183,7 +1180,7 @@ struct Mora: Hashable, Codable {
                                     attackSec: 0.02,
                                     sourceFilter: sf))
                 deltaSyllabicStartSec = -0.01
-                onsetSecDur = çTl - onsets.last!.attackSec - onsets.last!.releaseSec
+                onsetDurSec = çTl - onsets.last!.attackSec - onsets.last!.releaseSec
                 isOffVoice = true
             case .ɸ:
                 let sokuonScale: Double
@@ -1207,7 +1204,7 @@ struct Mora: Hashable, Codable {
                                     attackSec: 0.02,
                                     sourceFilter: sf))
                 deltaSyllabicStartSec = -0.01
-                onsetSecDur = ɸTl - onsets.last!.attackSec - onsets.last!.releaseSec
+                onsetDurSec = ɸTl - onsets.last!.attackSec - onsets.last!.releaseSec
                 isOffVoice = true
                 
             default: onsets = []
@@ -1221,7 +1218,7 @@ struct Mora: Hashable, Codable {
                 if !onsets.isEmpty {
                     let d = onsets[.last].duration * 0.25
                     deltaSyllabicStartSec += d / 2
-                    onsetSecDur += d
+                    onsetDurSec += d
                     onsets[.last].duration += d
                 }
             } else if nextMora != nil
@@ -1229,7 +1226,7 @@ struct Mora: Hashable, Codable {
                 if !onsets.isEmpty {
                     let d = onsets[.last].duration * 0.25
                     deltaSyllabicStartSec += d / 2
-                    onsetSecDur += d
+                    onsetDurSec += d
                     onsets[.last].duration += d
                 }
             }
@@ -1272,7 +1269,7 @@ struct Mora: Hashable, Codable {
         }
         
         if firstType == .dakuon {
-            let dakuTl = onsetSecDur * 0.9
+            let dakuTl = onsetDurSec * 0.9
             let sf = NoiseSourceFilter(fqSmps: [Point(0, 1),
                                            Point(400, 1),
                                            Point(700, 0.56),

@@ -42,19 +42,26 @@ struct Biquad {
 }
 
 final class NotePlayer {
-    private var aNotes: [Note]
-    var notes: [Note] {
+    private var aNotes: [Note.PitResult]
+    var notes: [Note.PitResult] {
         get { aNotes }
         set {
             let oldValue = aNotes
             aNotes = newValue
             guard isPlaying,
                     aNotes.count == oldValue.count ?
-                        (0 ..< notes.count).contains(where: { !aNotes[$0].isEqualOtherThanBeatRange(oldValue[$0]) }) :
+                        (0 ..< notes.count).contains(where: { aNotes[$0] != oldValue[$0] }) :
                         true else { return }
             stopNote()
             playNote()
         }
+    }
+    func changeStereo(from notes: [Note.PitResult]) {
+        self.notes = notes
+//        self.aNotes = notes
+//        if notes.count == noder.rendnotes.count {
+//            noder.replaceVolumeOrPan(notes.enumerated().map { .init(value: $0.element, index: $0.offset) })
+//        }
     }
     var volume: Volume {
         get { noder.volume }
@@ -66,7 +73,8 @@ final class NotePlayer {
     
     struct NotePlayerError: Error {}
     
-    init(notes: [Note], volume: Volume = .init(smp: Volume.maxSmp), pan: Double = 0,
+    init(notes: [Note.PitResult],
+         volume: Volume = .init(smp: Volume.maxSmp), pan: Double = 0,
          reverb: Double = Audio.defaultReverb) throws {
         
         guard let sequencer = Sequencer(audiotracks: [],
@@ -106,18 +114,18 @@ final class NotePlayer {
         noder.rendnotes += notes.map { note in
             let noteID = UUID()
             noteIDs.insert(noteID)
-            let fq = note.fq
-            return .init(fq: fq,
-                         sourceFilter: note.firstTone.noiseSourceFilter(isNoise: note.isNoise),
-                         formantFilterInterpolation: nil,
+            return .init(fq: Pitch.fq(fromPitch: .init(note.notePitch) + note.pitch.doubleValue),
+                         overtone: note.tone.overtone,
+                         sourceFilter: note.tone.noiseSourceFilter(isNoise: note.isNoise),
                          fAlpha: 1,
-                         noiseSeed: Rendnote.seed(fromFq: fq, sec: .infinity),
-                         overtone: .init(),
-                         pitbend: note.pitbend,
+                         isNoise: note.isNoise,
+                         noiseSeed: Rendnote.noiseSeed(from: note.id),
+                         pitbend: .empty,
                          secRange: -.infinity ..< .infinity,
                          startDeltaSec: 0,
-                         volumeAmp: 1,
-                         waver: .init(envelope: note.envelope, pitbend: .init()),
+                         volumeSmp: note.stereo.smp,
+                         pan: note.stereo.pan,
+                         envelopeMemo: .init(note.envelope),
                          sampleRate: noder.format.sampleRate,
                          dftCount: Audio.defaultDftCount,
                          id: noteID)
@@ -380,19 +388,29 @@ final class AVAudioScoreNoder {
         }
     }
     func replaceVolumeOrPan(_ noteIVs: [IndexValue<Note>], with score: Score) {
-        let nvs = noteIVs.map { IndexValue(value: Rendnote(note: $0.value, score: score,
-                                                           startSec: startSec,
-                                                           sampleRate: format.sampleRate),
-                                           index: $0.index) }
-        nvs.forEach {
-            rendnotes[$0.index].volumeAmp = $0.value.volumeAmp
-            rendnotes[$0.index].waver = $0.value.waver
-            rendnotes[$0.index].pitbend = $0.value.pitbend
+        noteIVs.forEach {
+            rendnotes[$0.index].volumeSmp = 1
+            rendnotes[$0.index].pan = 0
+            rendnotes[$0.index].envelopeMemo = .init($0.value.envelope)
+            rendnotes[$0.index].pitbend = $0.value.pitbend(fromTempo: score.tempo)
             
             let rendnoteID = rendnotes[$0.index].id
-            memowaves[rendnoteID]?.volumeAmp = $0.value.volumeAmp
-            memowaves[rendnoteID]?.waver = $0.value.waver
-            memowaves[rendnoteID]?.pitbend = $0.value.pitbend
+            memowaves[rendnoteID]?.volumeSmp = rendnotes[$0.index].volumeSmp
+            memowaves[rendnoteID]?.pan = rendnotes[$0.index].pan
+            memowaves[rendnoteID]?.envelopeMemo = rendnotes[$0.index].envelopeMemo
+            memowaves[rendnoteID]?.pitbend = rendnotes[$0.index].pitbend
+        }
+    }
+    func replaceVolumeOrPan(_ noteIVs: [IndexValue<Note.PitResult>]) {
+        noteIVs.forEach {
+            rendnotes[$0.index].volumeSmp = $0.value.stereo.volume.smp
+            rendnotes[$0.index].pan = $0.value.stereo.pan
+            rendnotes[$0.index].envelopeMemo = .init($0.value.envelope)
+            
+            let rendnoteID = rendnotes[$0.index].id
+            memowaves[rendnoteID]?.volumeSmp = rendnotes[$0.index].volumeSmp
+            memowaves[rendnoteID]?.pan = rendnotes[$0.index].pan
+            memowaves[rendnoteID]?.envelopeMemo = rendnotes[$0.index].envelopeMemo
         }
     }
     func remove(at noteIs: [Int]) {
@@ -477,29 +495,26 @@ final class AVAudioScoreNoder {
     
     struct NotewaveID: Hashable, Codable {
         var fq: Double,
-            sourceFilter: NoiseSourceFilter,
-            formantFilterInterpolation: Interpolation<FormantFilter>?,
-            fAlpha: Double,
-            seed: UInt64,
             overtone: Overtone,
-            pitbend: Pitbend,
-            secDur: Double,
+            sourceFilter: NoiseSourceFilter,
+            fAlpha: Double,
+            noiseSeed: UInt64,
+            pitbend: Pitbend?,
+            durSec: Double,
             startDeltaSec: Double
         
         init(_ rendnote: Rendnote) {
             fq = rendnote.fq
-            sourceFilter = rendnote.sourceFilter
-            formantFilterInterpolation = rendnote.formantFilterInterpolation
-            fAlpha = rendnote.fAlpha
-            seed = rendnote.noiseSeed
             overtone = rendnote.overtone
+            sourceFilter = rendnote.sourceFilter
+            fAlpha = rendnote.fAlpha
+            noiseSeed = rendnote.noiseSeed
+            pitbend = !rendnote.pitbend.isStereoOnly ? rendnote.pitbend : nil
             
-            pitbend = rendnote.pitbend.withEnabledPitch
-            
-            let loopDuration = rendnote.pitbend.isEmpty ?
-                1 : rendnote.waver
-                .duration(fromSecLength: rendnote.secRange.length)
-            secDur = loopDuration
+            let loopDuration = rendnote.pitbend.isEmptyPitch || rendnote.pitbend.isEmptyTone ?
+                1 : rendnote.envelopeMemo
+                .duration(fromDurSec: rendnote.secRange.length)
+            durSec = loopDuration
             startDeltaSec = rendnote.startDeltaSec
         }
     }
@@ -507,7 +522,7 @@ final class AVAudioScoreNoder {
     
     struct Memowave {
         var startSec: Double, releaseSec: Double?, endSec: Double?,
-            fq: Double, volumeAmp: Double, waver: Waver, pitbend: Pitbend
+            fq: Double, volumeSmp: Double, pan: Double, envelopeMemo: EnvelopeMemo, pitbend: Pitbend
         var notewave: Notewave
         
         func contains(sec: Double) -> Bool {
@@ -524,7 +539,7 @@ final class AVAudioScoreNoder {
     let semaphore = DispatchSemaphore(value: 1)
     
     init(rendnotes: [Rendnote],
-         format: AVAudioFormat = AVAudioFormat(standardFormatWithSampleRate: Audio.defaultSampleRate, channels: 1)!,
+         format: AVAudioFormat = AVAudioFormat(standardFormatWithSampleRate: Audio.defaultSampleRate, channels: 2)!,
          startSec: Double, isAsync: Bool,
          volumeAmp: Double, pan: Double, reverb: Double = Audio.defaultReverb) {
         
@@ -596,16 +611,17 @@ final class AVAudioScoreNoder {
                                        releaseSec: nil,
                                        endSec: nil,
                                        fq: rendnote.fq,
-                                       volumeAmp: rendnote.volumeAmp,
-                                       waver: rendnote.waver,
+                                       volumeSmp: rendnote.volumeSmp,
+                                       pan: rendnote.pan,
+                                       envelopeMemo: rendnote.envelopeMemo,
                                        pitbend: rendnote.pitbend,
                                        notewave: notewave)
                         self.phases[rendnote.id] = 0
                     }
                 } else {
                     let length = rendnote.secRange.end - startSec
-                    let secDur = rendnote.waver.duration(fromSecLength: length)
-                    let frameLength = Int(secDur * sampleRate)
+                    let durSec = rendnote.envelopeMemo.duration(fromDurSec: length)
+                    let frameLength = Int(durSec * sampleRate)
                     if sec >= startSec
                         && startSec < rendnote.secRange.end
                         && secI < frameLength && secI + frameCount >= 0
@@ -624,10 +640,11 @@ final class AVAudioScoreNoder {
                         self.memowaves[rendnote.id]
                             = Memowave(startSec: startSec,
                                        releaseSec: startSec + length,
-                                       endSec: startSec + secDur,
+                                       endSec: startSec + durSec,
                                        fq: rendnote.fq,
-                                       volumeAmp: rendnote.volumeAmp,
-                                       waver: rendnote.waver,
+                                       volumeSmp: rendnote.volumeSmp,
+                                       pan: rendnote.pan,
+                                       envelopeMemo: rendnote.envelopeMemo,
                                        pitbend: rendnote.pitbend,
                                        notewave: notewave)
                         self.phases[rendnote.id] = 0
@@ -635,7 +652,7 @@ final class AVAudioScoreNoder {
                               memowave.endSec == nil {
                         
                         self.memowaves[rendnote.id]?.releaseSec = startSec + length
-                        self.memowaves[rendnote.id]?.endSec = startSec + secDur
+                        self.memowaves[rendnote.id]?.endSec = startSec + durSec
                     }
                 }
             }
@@ -654,25 +671,17 @@ final class AVAudioScoreNoder {
                 return noErr
             }
             
-//            let outputBLP
-//                = UnsafeMutableAudioBufferListPointer(outputData)
-//            for i in 0 ..< outputBLP.count {
-//                let nFrames = outputBLP[i].mData!
-//                    .assumingMemoryBound(to: Float.self)
-//                for j in 0 ..< Int(frameCount) {
-//                    nFrames[j] = 0
-//                }
-//            }
-            
-            let frames = outputBLP[0].mData!
-                .assumingMemoryBound(to: Float.self)
+            let framess = outputBLP.count.range.map {
+                outputBLP[$0].mData!.assumingMemoryBound(to: Float.self)
+            }
             
             let memowaves = self.memowaves
             var phases = self.phases
             for (id, memowave) in memowaves {
                 var phase = phases[id]!
                 let notewave = memowave.notewave
-                let waver = memowave.waver
+                let envelopeMemo = memowave.envelopeMemo
+                let pitbend = memowave.pitbend
                 guard notewave.samples.count >= 4 else { continue }
                 let count = Double(notewave.samples.count)
                 if !notewave.isLoop && phase >= count { continue }
@@ -681,34 +690,47 @@ final class AVAudioScoreNoder {
                 for i in 0 ..< Int(frameCount) {
                     let nSec = Double(i) * rSampleRate + sec
                     guard nSec >= memowave.startSec else { continue }
-                    let waverAmp = waver
-                        .volumeAmp(atTime: nSec,
-                                releaseTime: memowave.releaseSec,
-                                startTime: memowave.startSec)
-                    let pitbendAmp = waver.pitbend
-                        .stereo(atT: nSec - memowave.startSec).amp.clipped(min: 0, max: 1)
-                    let nVolumeAmp
-                        = memowave.volumeAmp * waverAmp * pitbendAmp
+                    let envelopeSmp = envelopeMemo
+                        .volumeSmp(atSec: nSec - memowave.startSec,
+                                   releaseStartSec: memowave.releaseSec != nil ? memowave.releaseSec! - memowave.startSec : nil)
+                    let loudnessScale = Loudness.reverseScale40Phon(fromFq: memowave.fq * pitbend.fqScale(atSec: nSec - memowave.startSec))
+                    let nVolumeAmp, pan: Double
+                    if pitbend.isEmpty {
+                        nVolumeAmp = Volume(smp: memowave.volumeSmp * envelopeSmp * loudnessScale).amp
+                        pan = memowave.pan
+                    } else {
+                        let stereo = pitbend.stereo(atSec: nSec - memowave.startSec)
+                        nVolumeAmp = Volume(smp: memowave.volumeSmp * envelopeSmp * stereo.smp * loudnessScale).amp
+                        pan = memowave.pan + stereo.pan
+                    }
                     
-                    frames[i] += Float(notewave
+                    let nv = notewave
                         .sample(at: i,
                                 sec: nSec - memowave.startSec,
                                 volumeAmp: nVolumeAmp,
-                                from: waver,
-                                atPhase: &phase))
+                                from: envelopeMemo,
+                                atPhase: &phase)
+                    
+                    if pan == 0 || framess.count < 2 {
+                        let fnv = Float(nv)
+                        for frames in framess {
+                            frames[i] += fnv
+                        }
+                    } else {
+                        let nPan = pan.clipped(min: -1, max: 1) * 0.75
+                        if nPan < 0 {
+                            framess[0][i] += Float(nv)
+                            framess[1][i] += Float(nv * Volume(smp: 1 + nPan).amp)
+                        } else {
+                            framess[0][i] += Float(nv * Volume(smp: 1 - nPan).amp)
+                            framess[1][i] += Float(nv)
+                        }
+                    }
                 }
                 
                 phases[id] = phase
             }
             self.phases = phases
-            
-            for i in 1 ..< outputBLP.count {
-                let nFrames = outputBLP[i].mData!
-                    .assumingMemoryBound(to: Float.self)
-                for j in 0 ..< Int(frameCount) {
-                    nFrames[j] = frames[j]
-                }
-            }
             
             return noErr
         }
@@ -763,8 +785,8 @@ final class Sequencer {
         var scoreNodes = [(node: AVAudioSourceNode, reverbNode: AVAudioUnitReverb)]()
         var scoreNoders = [UUID: AVAudioScoreNoder]()
         for audiotrack in audiotracks {
-            let secDur = audiotrack.secDuration
-            guard secDur > 0 else { continue }
+            let durSec = audiotrack.durSec
+            guard durSec > 0 else { continue }
             for value in audiotrack.values {
                 guard value.beatRange.length > 0 && value.beatRange.end > 0 else { continue }
                 switch value {
@@ -802,11 +824,11 @@ final class Sequencer {
                     let eBeat = beatRange.start + min(localBeatRange.end, beatRange.length)
                     let startSec = Double(timeOption.sec(fromBeat: sBeat)) + sSec
                     let contentStartSec = Double(timeOption.sec(fromBeat: inSBeat))
-                    let secDur = Double(timeOption.sec(fromBeat: max(eBeat - sBeat, 0)))
+                    let durSec = Double(timeOption.sec(fromBeat: max(eBeat - sBeat, 0)))
                     let noder = AVAudioPCMNoder(pcmBuffer: pcmBuffer,
                                                 startTime: startSec,
                                                 contentStartTime: contentStartSec,
-                                                duration: secDur,
+                                                duration: durSec,
                                                 volumeAmp: content.volume.amp,
                                                 pan: content.pan)
                     
@@ -824,7 +846,7 @@ final class Sequencer {
                 }
             }
             
-            sSec += Double(audiotrack.secDuration)
+            sSec += Double(audiotrack.durSec)
         }
         
         let engine = AVAudioEngine()

@@ -85,7 +85,7 @@ final class TextSlider: DragEditor {
                 switch type {
                 case .all:
                     let np = beganText.origin + sheetP - beganInP
-                    let interval = document.currentNoteTimeInterval
+                    let interval = document.currentNoteBeatInterval
                     let beat = max(min(sheetView.animationView.beat(atX: np.x, interval: interval),
                                    sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: interval)),
                                    sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval) - (text.timeOption?.beatRange.length ?? 0))
@@ -96,7 +96,7 @@ final class TextSlider: DragEditor {
                 case .startBeat:
                     if var timeOption = text.timeOption {
                         let np = beganText.origin + sheetP - beganInP
-                        let interval = document.currentNoteTimeInterval
+                        let interval = document.currentNoteBeatInterval
                         let beat = min(sheetView.animationView.beat(atX: np.x, interval: interval),
                                        sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: interval),
                                        timeOption.beatRange.end)
@@ -112,7 +112,7 @@ final class TextSlider: DragEditor {
                 case .endBeat:
                     if let beganTimeOption = beganText.timeOption {
                         let np = beganTextEndP + sheetP - beganInP
-                        let interval = document.currentNoteTimeInterval
+                        let interval = document.currentNoteBeatInterval
                         let beat = max(sheetView.animationView.beat(atX: np.x, interval: interval),
                                        sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval),
                                        beganTimeOption.beatRange.start)
@@ -257,17 +257,27 @@ final class Looker: InputKeyEditor {
                     let maxFq = Pitch(value: maxPitchRat).fq
                     let minSec: Rational = sheetView.animationView.sec(atX: nSelection.rect.minX)
                     let maxSec: Rational = sheetView.animationView.sec(atX: nSelection.rect.maxX)
-                    document.show("Δ\(Double(maxSec - minSec).string(digitsCount: 4)) sec, Δ\(Pitch(value: maxPitchRat - minPitchRat).octaveString), (Δ\((maxFq - minFq).string(digitsCount: 1)) Hz)", at: p)
+                    document.show("Δ\(Double(maxSec - minSec).string(digitsCount: 4)) sec, Δ\(Pitch(value: maxPitchRat - minPitchRat).octaveString()), (Δ\((maxFq - minFq).string(digitsCount: 1)) Hz)", at: p)
                 } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
                     let scoreView = sheetView.scoreView
                     let score = scoreView.model
                     let nis = sheetView.noteIndexes(from: document.selections)
                     if !nis.isEmpty {
                         let notes = nis.map { score.notes[$0] }
-                        let minNote = notes.min { $0.pitch < $1.pitch }!
-                        let maxNote = notes.max { $0.pitch < $1.pitch }!
+                        var fpr = notes[0].pitchRange
+                        for i in 1 ..< notes.count {
+                            let range = notes[i].pitchRange
+                            if fpr.start < range.start {
+                                fpr.start = range.start
+                            }
+                            if fpr.end > range.end {
+                                fpr.end = range.end
+                            }
+                        }
+                        let startPitch = Pitch(value: fpr.start)
+                        let endPitch = Pitch(value: fpr.end)
                         
-                        let str = "\(minNote.octavePitchString) ... \(maxNote.octavePitchString)  (\(minNote.fq.string(digitsCount: 1)) ... \(maxNote.fq.string(digitsCount: 1)) Hz)".localized
+                        let str = "\(startPitch.octaveString()) ... \(endPitch.octaveString())  (\(startPitch.fq.string(digitsCount: 1)) ... \(endPitch.fq.string(digitsCount: 1)) Hz)".localized
                         document.show(str, at: p)
                     }
                 } else {
@@ -297,7 +307,7 @@ final class Looker: InputKeyEditor {
             let y = sheetView.scoreView.noteY(atX: sheetView.scoreView.convertFromWorld(p).x, at: noteI)
             let pitch = Pitch(value: sheetView.scoreView.pitch(atY: y, interval: Rational(1, 12)))
             let fq = pitch.fq
-            let fqStr = "\("Note".localized) \(pitch.octaveString) (\(fq.string(digitsCount: 1)) Hz)".localized
+            let fqStr = "\("Note".localized) \(pitch.octaveString()) (\(fq.string(digitsCount: 1)) Hz)".localized
             document.show(fqStr, at: p)
         } else if let sheetView = document.sheetView(at: p),
                     let ci = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
@@ -307,7 +317,7 @@ final class Looker: InputKeyEditor {
         } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
             let scoreView = sheetView.scoreView
             let pitch = Pitch(value: document.pitch(from: scoreView, at: scoreView.convertFromWorld(p)))
-            let fqStr = "\(pitch.octaveString) (\(pitch.fq.string(digitsCount: 1)) Hz)".localized
+            let fqStr = "\(pitch.octaveString()) (\(pitch.fq.string(digitsCount: 1)) Hz)".localized
             document.show(fqStr, at: p)
         } else if let sheetView = document.sheetView(at: p),
                   let (node, contentView) = sheetView.spectrogramNode(at: sheetView.convertFromWorld(p)) {
@@ -315,7 +325,7 @@ final class Looker: InputKeyEditor {
             let pitch = contentView.spectrogramPitch(atY: y)!
             let pitchRat = Rational(pitch, intervalScale: .init(1, 12))
             let nfq = Pitch(value: pitchRat).fq
-            let fqStr = "\(Pitch(value: pitchRat).octaveString) (\(nfq.string(digitsCount: 1)) Hz)".localized
+            let fqStr = "\(Pitch(value: pitchRat).octaveString()) (\(nfq.string(digitsCount: 1)) Hz)".localized
             document.show(fqStr, at: p)
         } else if !document.isDefaultUUColor(at: p) {
             let colorOwners = document.readColorOwners(at: p)
@@ -761,7 +771,7 @@ final class TextEditor: Editor {
         if !event.isRepeat, let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
             let scoreView = sheetView.scoreView
             let scoreP = scoreView.convertFromWorld(p)
-            if let (noteI, pitI) = scoreView.noteAndPitI(at: scoreP, scale: document.screenToWorldScale) {
+            if let (noteI, pitI) = scoreView.noteAndPitIEnabledNote(at: scoreP, scale: document.screenToWorldScale) {
                 var note = scoreView.model.notes[noteI]
                 let key = (event.inputKeyType.name
                     .applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? "").lowercased()

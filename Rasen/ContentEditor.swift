@@ -90,7 +90,7 @@ final class ContentSlider: DragEditor {
                 switch type {
                 case .all:
                     let np = beganContent.origin + sheetP - beganInP
-                    let interval = document.currentNoteTimeInterval
+                    let interval = document.currentNoteBeatInterval
                     let beat = max(min(sheetView.animationView.beat(atX: np.x, interval: interval),
                                    sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: interval)),
                                    sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval) - (content.timeOption?.beatRange.length ?? 0))
@@ -101,7 +101,7 @@ final class ContentSlider: DragEditor {
                 case .startBeat:
                     if var timeOption = content.timeOption {
                         let np = beganContent.origin + sheetP - beganInP
-                        let interval = document.currentNoteTimeInterval
+                        let interval = document.currentNoteBeatInterval
                         let beat = min(sheetView.animationView.beat(atX: np.x, interval: interval),
                                        sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: interval),
                                        timeOption.beatRange.end)
@@ -120,7 +120,7 @@ final class ContentSlider: DragEditor {
                 case .endBeat:
                     if var timeOption = content.timeOption {
                         let np = beganContentEndP + sheetP - beganInP
-                        let interval = document.currentNoteTimeInterval
+                        let interval = document.currentNoteBeatInterval
                         let beat = max(sheetView.animationView.beat(atX: np.x, interval: interval),
                                        sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval),
                                        timeOption.beatRange.start)
@@ -311,7 +311,7 @@ extension ContentView {
             
 //            if let spctrogram {
 //                let allBeat = content.localBeatRange?.length ?? 0
-//                let allW = width(atBeatDuration: allBeat)
+//                let allW = width(atDurBeat: allBeat)
 //            }
         }
     }
@@ -423,13 +423,13 @@ extension ContentView {
             let sSec = timeOption.sec(fromBeat: max(-timeOption.localStartBeat, 0))
             let msSec = timeOption.sec(fromBeat: timeOption.localStartBeat)
             let csSec = timeOption.sec(fromBeat: timeOption.beatRange.start)
-            let beatDur = ContentTimeOption.beat(fromSec: content.secDuration,
+            let durBeat = ContentTimeOption.beat(fromSec: content.durSec,
                                                  tempo: timeOption.tempo,
                                                  beatRate: Keyframe.defaultFrameRate,
                                                  rounded: .up)
             let eSec = timeOption
                 .sec(fromBeat: min(timeOption.beatRange.end - (timeOption.localStartBeat + timeOption.beatRange.start),
-                                   beatDur))
+                                   durBeat))
             let si = Int((sSec * Content.volumeFrameRate).rounded())
                 .clipped(min: 0, max: content.volumeValues.count - 1)
             let msi = Int((msSec * Content.volumeFrameRate).rounded())
@@ -540,7 +540,7 @@ extension ContentView {
         let firstX = x(atBeat: timeOption.beatRange.start + timeOption.localStartBeat)
         let y = timeLineCenterY + Sheet.timelineHalfHeight + ContentLayout.spectrogramHeight
         let allBeat = content.localBeatRange?.length ?? 0
-        let allW = width(atBeatDuration: allBeat)
+        let allW = width(atDurBeat: allBeat)
         var nodes = [Node](), maxH = 0.0
         func spNode(width: Int, at xi: Int) -> Node? {
             guard let image = sm.image(width: width, at: xi),

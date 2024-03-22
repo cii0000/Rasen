@@ -272,7 +272,7 @@ final class RunEditor: InputKeyEditor {
                     
                     if let view, let pcmBuffer = view.pcmBuffer {
                         let allW = sheetView.bounds.width - Sheet.textPadding.width * 2
-                        let tW = view.width(atBeatDuration: view.localBeatRange?.length ?? 0)
+                        let tW = view.width(atDurBeat: view.localBeatRange?.length ?? 0)
                         let dx = text.origin.x
                         let wx = Sheet.textPadding.width - dx
                         
