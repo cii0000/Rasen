@@ -478,8 +478,8 @@ extension Rendnote {
                 ?? [Double](repeating: 0, count: dftCount)
             vDSP.multiply(1 / Double(dftCount * 2), sSamples,
                           result: &sSamples)
-            let mm = vDSP.maximumMagnitude(sSamples)
-            return (1 / mm).clipped(min: 0, max: 2)
+            let mm = vDSP.rootMeanSquare(sSamples)
+            return mm < 0.0000001 ? 0 : (1 / mm).clipped(min: 0, max: 2)
         }
         let normalizedScale = baseScale()
         
