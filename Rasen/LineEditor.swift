@@ -299,16 +299,16 @@ final class LineEditor: Editor {
     }
     
     private static func isAppendPointWith(distance: Double, deltaTime: Double,
-                           _ temps: [Temp], lastBezier lb: Bezier,
-                           scale: Double,
-                           minSpeed: Double = 300.0,
-                           maxSpeed: Double = 1500.0,
-                           exp: Double = 2.0,
-                           minTime: Double = 0.09,
-                           maxTime: Double = 0.017,
-                           minDistance: Double = 1,
-                           maxDistance: Double = 1.25,
-                           maxPressureDistance maxPrD: Double = 0.05) -> Bool {
+                                          _ temps: [Temp], lastBezier lb: Bezier,
+                                          scale: Double,
+                                          minSpeed: Double = 300.0,
+                                          maxSpeed: Double = 1000.0,
+                                          exp: Double = 2.0,
+                                          minTime: Double = 0.06,
+                                          maxTime: Double = 0.017,
+                                          minDistance: Double = 0.5,
+                                          maxDistance: Double = 0.5,
+                                          maxPressureDistance maxPrD: Double = 0.05) -> Bool {
         guard deltaTime > 0 else {
             return false
         }
