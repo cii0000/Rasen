@@ -775,14 +775,18 @@ final class TextEditor: Editor {
                 var note = scoreView.model.notes[noteI]
                 let key = (event.inputKeyType.name
                     .applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? "").lowercased()
-                if event.inputKeyType == .delete, !note.pits[pitI].lyric.isEmpty {
-                    note.pits[pitI].lyric.removeLast()
+                var lyric = note.pits[pitI].lyric
+                if event.inputKeyType == .delete, !lyric.isEmpty {
+                    lyric.removeLast()
                 } else if event.inputKeyType != .delete {
-                    note.pits[pitI].lyric += key
+                    lyric += key
                 }
-                
-                sheetView.newUndoGroup()
-                sheetView.replace(note, at: noteI)
+                if lyric != note.pits[pitI].lyric {
+                    note.replace(lyric: lyric, at: pitI, tempo: scoreView.model.tempo)
+                    
+                    sheetView.newUndoGroup()
+                    sheetView.replace(note, at: noteI)
+                }
                 return
             }
         }

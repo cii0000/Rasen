@@ -766,7 +766,13 @@ final class Player: InputKeyEditor {
                     let scoreView = cSheetView.scoreView
                     let scoreP = scoreView.convertFromWorld(p)
                     let score = scoreView.model
-                    if let ni = scoreView.noteIndex(at: scoreP,
+                    if let (noteI, pitI) = scoreView.noteAndPitI(at: scoreP, scale: document.screenToWorldScale) {
+                        let beat = score.notes[noteI].pits[pitI].beat
+                        + score.notes[noteI].beatRange.start + score.beatRange.start
+                        sec = score.sec(fromBeat: beat)
+                        secRange = score.secRange
+                        ids.insert(score.id)
+                    } else if let ni = scoreView.noteIndex(at: scoreP,
                                                     scale: document.screenToWorldScale) {
                         let beat = score.notes[ni].beatRange.start + score.beatRange.start
                         sec = score.sec(fromBeat: beat)
@@ -1790,9 +1796,7 @@ final class KeyframeInserter: InputKeyEditor {
         let p = document.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
-            document.cursor = .arrow
-            
-            print(NoiseSourceFilter(FormantFilter().with(lyric: "a")).fqSmps)
+            document.cursor = .arrow            
             
             if let sheetView = document.madeSheetView(at: p) {
                 let inP = sheetView.convertFromWorld(p)
@@ -1871,13 +1875,13 @@ final class KeyframeInserter: InputKeyEditor {
                                                                  scale: document.screenToWorldScale) {
                         let score = scoreView.model
                         let scoreP = scoreView.convertFromWorld(p)
-                        if let (pitI, _) = scoreView.pitIAndPitchSmpI(at: scoreP, at: noteI) {
-                            let pitchSmp = scoreView.pitchSmp(at: scoreP, at: noteI)
+                        if let (pitI, _) = scoreView.pitIAndSprolI(at: scoreP, at: noteI) {
+                            let sprol = scoreView.sprol(at: scoreP, at: noteI)
                             let oldTone = score.notes[noteI].pits[pitI].tone
                             var tone = oldTone
-                            let i = tone.pitchSmps.enumerated().reversed()
-                                .first(where: { pitchSmp.x > $0.element.x })?.offset ?? 0
-                            tone.pitchSmps.insert(pitchSmp, at: i + 1)
+                            let i = tone.spectlope.sprols.enumerated().reversed()
+                                .first(where: { sprol.pitch > $0.element.pitch })?.offset ?? 0
+                            tone.spectlope.sprols.insert(sprol, at: i + 1)
                             tone.id = .init()
                             
                             let nis = score.notes.count.range.filter {

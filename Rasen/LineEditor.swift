@@ -994,11 +994,7 @@ final class LineEditor: Editor {
                 let interval = document.currentNoteBeatInterval
                 let beat = scoreView.beat(atX: inP.x, interval: interval)
                 let beatRange = beat ..< beat
-                let tone = isStraight ?
-                Tone(evenSmp: 1, oddSmp: 1,
-                     pitchSmps: [.init(Double(Score.pitchRange.start), 1),
-                                 .init(Double(Score.pitchRange.end), 1)]) :
-                Tone()
+                let tone = isStraight ? Tone.noise : Tone()
                 let note = Note(beatRange: beatRange, pitch: pitch,
                                 pits: .init([.init(beat: 0, pitch: 0, tone: tone)]),
                                 envelope: isStraight ? .init(releaseSec: 1) : .init(),
@@ -1045,11 +1041,7 @@ final class LineEditor: Editor {
                 let interval = document.currentNoteBeatInterval
                 let beat = scoreView.beat(atX: sheetP.x, interval: interval)
                 let beatRange = beat > nsBeat ? nsBeat ..< beat : beat ..< nsBeat
-                let tone = isStraight ?
-                Tone(evenSmp: 1, oddSmp: 1,
-                     pitchSmps: [.init(Double(Score.pitchRange.start), 1),
-                                 .init(Double(Score.pitchRange.end), 1)]) :
-                Tone()
+                let tone = isStraight ? Tone.noise : Tone()
                 let note = Note(beatRange: beatRange, pitch: pitch,
                                 pits: [.init(beat: 0, pitch: 0, tone: tone)],
                                 envelope: isStraight ? .init(releaseSec: 1) : .init(),
@@ -1084,11 +1076,7 @@ final class LineEditor: Editor {
                 if beatRange.length == 0 {
                     scoreView.remove(at: noteI)
                 } else {
-                    let tone = isStraight ?
-                    Tone(evenSmp: 1, oddSmp: 1,
-                         pitchSmps: [.init(Double(Score.pitchRange.start), 0.5),
-                                     .init(Double(Score.pitchRange.end), 0.5)]) :
-                    Tone()
+                    let tone = isStraight ? Tone.noise : Tone()
                     let note = Note(beatRange: beatRange, pitch: pitch,
                                     pits: [.init(beat: 0, pitch: 0, tone: tone)],
                                     isNoise: isStraight)

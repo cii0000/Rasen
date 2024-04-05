@@ -910,7 +910,7 @@ final class CopyEditor: Editor {
                     Pasteboard.shared.copiedObjects = [.envelope(envelope)]
                     
                     //
-                case .pitchSmp(let pitI, _):
+                case .sprol(let pitI, _):
                     let tone = score.notes[noteI].pits[pitI].tone
                     Pasteboard.shared.copiedObjects = [.tone(tone)]
                     
@@ -1242,13 +1242,13 @@ final class CopyEditor: Editor {
                     sheetView.replace(Envelope(), at: noteI)
                     
                     sheetView.updatePlaying()
-                case .pitchSmp(let pitI, let pitchSmpI):
+                case .sprol(let pitI, let sprolI):
                     let oldTone = score.notes[noteI].pits[pitI].tone
                     var tone = oldTone
-                    if tone.pitchSmps.count <= 1 {
+                    if tone.spectlope.count <= 1 {
                         tone = .init()
                     } else {
-                        tone.pitchSmps.remove(at: pitchSmpI)
+                        tone.spectlope.sprols.remove(at: sprolI)
                     }
                     tone.id = .init()
                     
@@ -1268,7 +1268,7 @@ final class CopyEditor: Editor {
                     sheetView.replace(nivs)
                         
 //                    var tone = score.notes[noteI].pits[pitI].tone
-//                    tone.pitchSmps.remove(at: pitchSmpI)
+//                    tone.spectlope.controls.remove(at: controlI)
                     
     //                Pasteboard.shared.copiedObjects = [.formant(formant)]
 //                    sheetView.newUndoGroup()
@@ -3173,7 +3173,7 @@ final class LineColorCopier: InputKeyEditor {
                         Pasteboard.shared.copiedObjects = [.tone(tone)]
                     }
                     showPit(pitI: pitI, isTone: true)
-                case .pitchSmp(let pitI, _):
+                case .sprol(let pitI, _):
                     let tone = score.notes[noteI].pits[pitI].tone
                     if isSendPasteboard {
                         Pasteboard.shared.copiedObjects = [.tone(tone)]

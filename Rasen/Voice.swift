@@ -17,6 +17,90 @@
 
 import RealModule
 
+extension Note {
+    mutating func replace(lyric: String, at i: Int, tempo: Rational, beatRate: Int = 96) {
+        var lyric = lyric
+        let isVowelReduction: Bool
+        if lyric.last == "/" {
+            isVowelReduction = true
+            lyric.removeLast()
+        } else {
+            isVowelReduction = false
+        }
+        
+        self.pits[i].lyric = lyric
+        
+        let previousPhoneme: Phoneme?, previousFormantFilter: FormantFilter?
+        if let preI = i.range.reversed().first(where: { !pits[$0].lyric.isEmpty }) {
+            var preLyric = pits[preI].lyric
+            if preLyric.last == "/" {
+                preLyric.removeLast()
+            }
+            previousPhoneme = Phoneme.phonemes(fromHiragana: preLyric).last
+            previousFormantFilter = .init(spectlope: pits[preI].tone.spectlope)
+        } else {
+            previousPhoneme = nil
+            previousFormantFilter = nil
+        }
+        
+        if let mora = Mora(hiragana: lyric, isVowelReduction: isVowelReduction,
+                           previousPhoneme: previousPhoneme,
+                           previousFormantFilter: previousFormantFilter) {
+            if i == 0 {
+                let dBeat = Score.beat(fromSec: mora.deltaSyllabicStartSec,
+                                       tempo: tempo, beatRate: beatRate)
+                self.beatRange = beatRange.start + dBeat ..< beatRange.end
+            
+                for i in pits.count.range {
+                    pits[i].beat -= dBeat
+                }
+            }
+            
+            let beat = pits[i].beat
+            let fBeat = Score.beat(fromSec: mora.keyFormantFilters.first?.sec ?? 0,
+                                   tempo: tempo, beatRate: beatRate) + beat
+            let lBeat = Score.beat(fromSec: mora.keyFormantFilters.last?.sec ?? 0,
+                                   tempo: tempo, beatRate: beatRate) + beat
+            var minI = i, maxI = i
+            for j in i.range.reversed() {
+                if pits[j].beat < fBeat {
+                    minI = j + 1
+                    break
+                }
+            }
+            for j in i.range {
+                if pits[j].beat > lBeat {
+                    maxI = j
+                    break
+                }
+            }
+//            print(minI, maxI, i, mora.keyFormantFilters.count)
+            
+            var ivps = [IndexValue<Pit>]()
+            for (fi, ff) in mora.keyFormantFilters.enumerated() {
+                let fBeat = Score.beat(fromSec: ff.sec, tempo: tempo, beatRate: beatRate) + beat
+                let result = self.pitResult(atBeat: Double(fBeat))
+                ivps.append(.init(value: .init(beat: fBeat,
+                                               pitch: result.pitch.rationalValue(intervalScale: Sheet.fullEditBeatInterval),
+                                               stereo: result.stereo,
+                                               tone: .init(spectlope: ff.formantFilter.spectlope),
+                                               lyric: fi == mora.keyFormantFilters.count - 1 ? lyric : ""),
+                                  index: fi + minI))
+//                print(result.pitch, fi + minI, i)
+//                print(ivps.last?.value.tone.spectlope.sprols)
+            }
+            
+            pits.remove(at: Array(minI ... maxI))
+            pits.insert(ivps)
+            
+//            mora.onsets
+//            mora.onsetDurSec
+            
+//            print(pits.map { $0.beat })
+        }
+    }
+}
+
 struct Formant: Hashable, Codable {
     var sdFq = 0.0, sFq = 0.0, eFq = 0.0, edFq = 0.0,
         smp = 0.0, noiseT = 0.0, edSmp = 0.0, edNoiseT = 0.0
@@ -256,29 +340,24 @@ extension Formant {
 }
 
 struct FormantFilter: Hashable, Codable {
-    var formants: [Formant] = [
-        .init(sFq: 0, eFq: 300, edFq: 400,
-              smp: 0.8, noiseT: 0,
-              edSmp: 0.65, edNoiseT: 0.1),
-        .init(sdFq: 400, sFq: 850, eFq: 1109, edFq: 400,
-              smp: 1, noiseT: 0.3,
-              edSmp: 0.7, edNoiseT: 0.1),
-        .init(sdFq: 400, sFq: 1700, eFq: 2050, edFq: 400,
-              smp: 1, noiseT: 0.5,
-              edSmp: 0.53, edNoiseT: 0.1),
-        .init(sdFq: 400, sFq: 3700, eFq: 3900, edFq: 400,
-              smp: 0.82, noiseT: 0.6,
-              edSmp: 0.4, edNoiseT: 0.2),
-        .init(sdFq: 400, sFq: 5200, eFq: 5500, edFq: 400,
-              smp: 0.7, noiseT: 0.6,
-              edSmp: 0.1, edNoiseT: 0.3),
-        .init(sdFq: 400, sFq: 6700, eFq: 7100, edFq: 400,
-              smp: 0.3, noiseT: 0.7,
-              edSmp: 0.1, edNoiseT: 0.45),
-        .init(sdFq: 500, sFq: 8500, eFq: 9100, edFq: 500,
-              smp: 0.4, noiseT: 0.7,
-              edSmp: 0.1, edNoiseT: 0.7)
-    ]
+    var formants: [Formant] = [.init(sFq: 0, eFq: 300, edFq: 400,
+                                     smp: 0.8, noiseT: 0,
+                                     edSmp: 0.65, edNoiseT: 0.1),
+                               .init(sdFq: 400, sFq: 850, eFq: 1109, edFq: 400,
+                                     smp: 1, noiseT: 0.3,
+                                     edSmp: 0.7, edNoiseT: 0.1),
+                               .init(sdFq: 400, sFq: 1700, eFq: 2050, edFq: 400,
+                                     smp: 1, noiseT: 0.5,
+                                     edSmp: 0.53, edNoiseT: 0.1),
+                               .init(sdFq: 400, sFq: 3700, eFq: 3900, edFq: 400,
+                                     smp: 0.82, noiseT: 0.6,
+                                     edSmp: 0.4, edNoiseT: 0.2),
+                               .init(sdFq: 400, sFq: 5200, eFq: 5500, edFq: 400,
+                                     smp: 0.7, noiseT: 0.6,
+                                     edSmp: 0.1, edNoiseT: 0.3),
+                               .init(sdFq: 400, sFq: 6700, eFq: 9000, edFq: 400,
+                                     smp: 0.3, noiseT: 0.7,
+                                     edSmp: 0.1, edNoiseT: 0.45)]
 }
 enum FormantFilterType {
     case fqSmp, fqNoiseSmp, editFqNoiseSmp, dFqZero,
@@ -286,8 +365,8 @@ enum FormantFilterType {
          eeFqSmp, eeFqNoiseSmp, editEeFqNoiseSmp
 }
 extension FormantFilter {
-    static let empty = Self.init(formants: .init(repeating: .init(),
-                                                 count: 8))
+    static let empty = Self.init(formants: .init(repeating: .init(), count: 8))
+    
     subscript(i: Int, type: FormantFilterType) -> Point {
         get {
             switch type {
@@ -296,15 +375,11 @@ extension FormantFilter {
             case .editFqNoiseSmp: .init(self[i].editFqNoiseSmp)
             case .dFqZero: .init(self[i].dFq, 0)
             case .ssFqSmp: .init(self[i].ssFq, self[i - 1].edSmp)
-            case .ssFqNoiseSmp: .init(self[i].ssFq, 
-                                      self[i - 1].edNoiseSmp)
-            case .editSsFqNoiseSmp: .init(self[i].ssFq,
-                                          self[i - 1].editEdNoiseSmp)
+            case .ssFqNoiseSmp: .init(self[i].ssFq, self[i - 1].edNoiseSmp)
+            case .editSsFqNoiseSmp: .init(self[i].ssFq, self[i - 1].editEdNoiseSmp)
             case .eeFqSmp: .init(self[i].eeFq, self[i].edSmp)
-            case .eeFqNoiseSmp: .init(self[i].eeFq,
-                                      self[i].edNoiseSmp)
-            case .editEeFqNoiseSmp: .init(self[i].eeFq,
-                                          self[i].editEdNoiseSmp)
+            case .eeFqNoiseSmp: .init(self[i].eeFq, self[i].edNoiseSmp)
+            case .editEeFqNoiseSmp: .init(self[i].eeFq, self[i].editEdNoiseSmp)
             }
         }
         set {
@@ -726,6 +801,40 @@ extension FormantFilter {
         return n
     }
 }
+extension FormantFilter {
+    init(spectlope: Spectlope) {
+        spectlope.sprols
+        
+    }
+    var spectlope: Spectlope {
+        var sprols = [Sprol](capacity: count * 4)
+        for (i, f) in enumerated() {
+            sprols.append(.init(pitch: Swift.max(Pitch.pitch(fromFq: f.sFq), 0), smp: f.smp, noise: f.noiseT))
+            sprols.append(.init(pitch: Swift.max(Pitch.pitch(fromFq: f.eFq), 0), smp: f.smp, noise: f.noiseT))
+            if i + 1 < count {
+                var f = f
+                var nextF = self[i + 1]
+                if f.eeFq > nextF.ssFq {
+                    let nfq = f.eeFq.mid(nextF.ssFq)
+                    f.eeFq = nfq
+                    nextF.ssFq = nfq
+                }
+                sprols.append(.init(pitch: Pitch.pitch(fromFq: f.eeFq), smp: f.edSmp, noise: f.edNoiseT))
+                sprols.append(.init(pitch: Pitch.pitch(fromFq: nextF.ssFq), smp: f.edSmp, noise: f.edNoiseT))
+            } else {
+                sprols.append(.init(pitch: Pitch.pitch(fromFq: f.eeFq), smp: f.edSmp, noise: f.edNoiseT))
+            }
+        }
+        return .init(sprols: sprols)
+    }
+    
+    func toA(from phoneme: Phoneme) -> Self {
+//        if phoneme == .a {
+            return self
+//        }
+        
+    }
+}
 
 struct Onset: Hashable, Codable {
     var duration = 0.0
@@ -733,7 +842,7 @@ struct Onset: Hashable, Codable {
     var sec = 0.0
     var attackSec = 0.01
     var releaseSec = 0.02
-    var sourceFilter: NoiseSourceFilter
+    var spectlope: Spectlope
 }
 extension Onset {
     var volumeAmp: Double {
@@ -752,37 +861,39 @@ struct KeyFormantFilter: Hashable, Codable {
 }
 
 struct Mora: Hashable, Codable {
-    var lyric: String
-    var fq: Double
-    var onsets: [Onset]
+    var hiragana: String
     var syllabics: [Phoneme]
-    var sourceFilter: NoiseSourceFilter
-    var deltaSyllabicStartSec = 0.0
-    var deltaSinStartSec = 0.0
+    var isVowel: Bool
+    var isDakuon: Bool
+    var isOffVoice: Bool
+    var deltaSyllabicStartSec: Double
+    var keyFormantFilters: [KeyFormantFilter]
+    var onsets: [Onset]
     var onsetDurSec: Double
-    var isVowel = false
-    var isDakuon = false
-    var isOffVoice = false
-    var firstMainFormantFilter: FormantFilter
-    var firstKeyFormantFilters: [KeyFormantFilter]
-    var lastKeyFormantFilters: [KeyFormantFilter]
     
-    init?(hiragana: String, fq: Double,
-          previousMora: Mora?, nextMora: Mora?,
-          isVowelReduction: Bool,
-          from baseFormantFilter: FormantFilter) {
+    init?(hiragana: String, isVowelReduction: Bool = false,
+          previousPhoneme: Phoneme?, previousFormantFilter: FormantFilter?) {
         var phonemes = Phoneme.phonemes(fromHiragana: hiragana)
         guard !phonemes.isEmpty else { return nil }
-        lyric = hiragana
-        self.fq = fq
+        
+        let baseFormantFilter: FormantFilter = if let previousPhoneme, let previousFormantFilter {
+            previousFormantFilter.toA(from: previousPhoneme)
+        } else {
+            .init()
+        }
         
         func formantFilter(from phoneme: Phoneme) -> FormantFilter? {
             baseFormantFilter.with(phoneme: phoneme).optimized()
         }
         
+        self.hiragana = hiragana
+        
         syllabics = []
         onsetDurSec = 0
         isVowel = false
+        isDakuon = false
+        isOffVoice = false
+        
         switch phonemes.last {
         case .a, .i, .ɯ, .e, .o, .nn:
             syllabics.append(phonemes.last!)
@@ -793,95 +904,81 @@ struct Mora: Hashable, Codable {
         case .sokuon:
             syllabics.append(phonemes.last!)
             
-            let ɯSl = baseFormantFilter.with(phoneme: .ɯ)
+            let ɯFf = baseFormantFilter.with(phoneme: .ɯ)
             
-            sourceFilter = NoiseSourceFilter()
+            deltaSyllabicStartSec = 0
             onsets = []
-            firstKeyFormantFilters = [.init(ɯSl, sec: 0)]
-            firstMainFormantFilter = firstKeyFormantFilters.first!.formantFilter
-            lastKeyFormantFilters = [.init(ɯSl, sec: 0.1)]
+            keyFormantFilters = [.init(ɯFf, sec: 0)]
             return
         case .breath:
             syllabics.append(phonemes.last!)
             
-            sourceFilter = NoiseSourceFilter()
             onsets = []
             
-            let aSl = baseFormantFilter.with(phoneme: .a)
+            let aFf = baseFormantFilter.with(phoneme: .a)
             
-            let tl = 0.05
+            let durSec = 0.05
             
-            let npsl = aSl.fricative(isO: syllabics.first == .o).toNoise()
-            onsets.append(.init(duration: tl,
+            let npFf = aFf.fricative(isO: syllabics.first == .o).toNoise()
+            onsets.append(.init(duration: durSec,
                                 volume: .init(smp: 0.3),
-                                sec: tl,
+                                sec: durSec,
                                 attackSec: 0.02,
-                                sourceFilter: .init(npsl)))
+                                spectlope: npFf.spectlope))
             
-            let sf = NoiseSourceFilter(noiseFqSmps: [Point(0, 0),
-                                                Point(1000, 0),
-                                                Point(2000, 0.56),
-                                                Point(8000, 1),
-                                                Point(9000, 1),
-                                                Point(15000, 0.56),
-                                                Point(17000, 0)])
-            onsets.append(.init(duration: tl,
+            onsets.append(.init(duration: durSec,
                                 volume: .init(smp: 0.125),
-                                sec: tl,
+                                sec: durSec,
                                 attackSec: 0.02,
                                 releaseSec: 0.03,
-                                sourceFilter: sf))
+                                spectlope: .init(noisePitchSmps: [Point(70, 0),
+                                                                  Point(80, 0.5),
+                                                                  Point(100, 1),
+                                                                  Point(110, 1),
+                                                                  Point(120, 0)])))
             
-            let sl = aSl.breath()
-            onsets.append(.init(duration: tl,
+            onsets.append(.init(duration: durSec,
                                 volume: .init(smp: 0.2),
-                                sec: tl,
+                                sec: durSec,
                                 attackSec: 0.02,
                                 releaseSec: 0.03,
-                                sourceFilter: .init(sl)))
-            onsetDurSec = tl
+                                spectlope: aFf.breath().spectlope))
+            onsetDurSec = durSec
             
-            firstKeyFormantFilters = [.init(.empty, sec: 0)]
-            firstMainFormantFilter = firstKeyFormantFilters.first!.formantFilter
-            lastKeyFormantFilters = [.init(.empty, sec: 0.1)]
+            deltaSyllabicStartSec = 0
+            keyFormantFilters = [.init(.empty, sec: 0)]
             return
-        default: return nil
+        default:
+            return nil
         }
         let syllabicFormantFilter = formantFilter(from: syllabics.last!)!
-        sourceFilter = .init(syllabicFormantFilter)
-        
-        onsets = []
-        
-        var isOffVoice = false
         
         enum FirstType {
             case dakuon, haretsu, none
         }
-        let firstType: FirstType
-        if phonemes.first?.isVoicelessSound ?? false {
-            firstType = .haretsu
+        let firstType: FirstType = if phonemes.first?.isVoicelessSound ?? false {
+            .haretsu
         } else if phonemes.first?.isVoiceBar ?? false {
-            firstType = .dakuon
+            .dakuon
         } else {
-            firstType = .none
+            .none
         }
         
         enum Youon {
             case j, β, none
         }
-        let youon: Youon, youonKsls: [KeyFormantFilter]
+        let youon: Youon, youonKffs: [KeyFormantFilter]
         switch phonemes.last {
         case .j, .ja:
             youon = .j
             let phoneme = phonemes.last!
             phonemes.removeLast()
             
-            var sl = formantFilter(from: phoneme)!
-                .multiplyF2To(f2Smp: 0.7, smp: 1)
-            sl[2].sdFq *= 4
-            sl[2].edFq *= 4
-            youonKsls = [.init(sl, sec: 0.02),
-                         .init(sl, sec: 0.1)]
+            var ff = formantFilter(from: phoneme)!.multiplyF2To(f2Smp: 0.7, smp: 1)
+            ff[2].sdFq *= 4
+            ff[2].edFq *= 4
+            youonKffs = [.init(ff, sec: 0.02),
+                         .init(ff, sec: 0.1)]
             deltaSyllabicStartSec = -0.035
             syllabics.insert(phoneme, at: 0)
         case .β:
@@ -889,18 +986,19 @@ struct Mora: Hashable, Codable {
             phonemes.removeLast()
             
             let sl = formantFilter(from: .β)!.multiplyF2To()
-            youonKsls = [.init(sl, sec: 0.01),
+            youonKffs = [.init(sl, sec: 0.01),
                          .init(sl, sec: 0.075)]
             deltaSyllabicStartSec = -0.025
             syllabics.insert(.β, at: 0)
         default:
             youon = .none
             
-            youonKsls = []
+            youonKffs = []
         }
         
-        firstKeyFormantFilters = []
-        lastKeyFormantFilters = []
+        onsets = []
+        keyFormantFilters = []
+        isOffVoice = false
         
         if phonemes.count != 1 {
             onsets = []
@@ -908,438 +1006,336 @@ struct Mora: Hashable, Codable {
             let oph = phonemes[0]
             switch oph {
             case .n, .nj:
-                let nTl = 0.0325
-                let nsl = formantFilter(from: oph)!
-                let nextSl = youonKsls.first?.formantFilter ?? syllabicFormantFilter
-                var nnsl = nsl
-                nnsl[2].edSmp = .linear(nnsl[2].edSmp, nextSl[2].smp, t: 0.075)
-                nnsl[3].edSmp = .linear(nnsl[3].edSmp, nextSl[3].smp, t: 0.025)
-                firstKeyFormantFilters.append(.init(nsl, sec: nTl))
-                firstKeyFormantFilters.append(.init(nnsl, sec: youon != .none ? 0.01 : 0.015))
+                let nDurSec = 0.0325
+                let nFf = formantFilter(from: oph)!
+                let nextFf = youonKffs.first?.formantFilter ?? syllabicFormantFilter
+                var nnFf = nFf
+                nnFf[2].edSmp = .linear(nnFf[2].edSmp, nextFf[2].smp, t: 0.075)
+                nnFf[3].edSmp = .linear(nnFf[3].edSmp, nextFf[3].smp, t: 0.025)
+                keyFormantFilters.append(.init(nFf, sec: nDurSec))
+                keyFormantFilters.append(.init(nnFf, sec: youon != .none ? 0.01 : 0.015))
                 deltaSyllabicStartSec = -0.01
-                onsetDurSec = nTl
-                deltaSinStartSec -= nTl
+                onsetDurSec = nDurSec
             case .m, .mj:
-                let mTl = 0.0325
-                let msl = formantFilter(from: oph)!
-                let nextSl = youonKsls.first?.formantFilter ?? syllabicFormantFilter
-                var nmsl = msl
-                nmsl[2].edSmp = .linear(nmsl[2].edSmp, nextSl[2].smp, t: 0.075)
-                nmsl[3].edSmp = .linear(nmsl[3].edSmp, nextSl[3].smp, t: 0.025)
-                firstKeyFormantFilters.append(.init(msl, sec: mTl))
-                firstKeyFormantFilters.append(.init(nmsl, sec: youon != .none ? 0.01 : 0.015))
+                let mDurSec = 0.0325
+                let mFf = formantFilter(from: oph)!
+                let nextFf = youonKffs.first?.formantFilter ?? syllabicFormantFilter
+                var nmFf = mFf
+                nmFf[2].edSmp = .linear(nmFf[2].edSmp, nextFf[2].smp, t: 0.075)
+                nmFf[3].edSmp = .linear(nmFf[3].edSmp, nextFf[3].smp, t: 0.025)
+                keyFormantFilters.append(.init(mFf, sec: mDurSec))
+                keyFormantFilters.append(.init(nmFf, sec: youon != .none ? 0.01 : 0.015))
                 deltaSyllabicStartSec = -0.01
-                onsetDurSec = mTl
-                deltaSinStartSec -= mTl
+                onsetDurSec = mDurSec
             case .r, .rj:
-                let rTl = 0.01
-                let rsl = formantFilter(from: oph)!
-                let nextSl = youonKsls.first?.formantFilter ?? syllabicFormantFilter
-                var nrsl = rsl
-                nrsl[2].edSmp = .linear(nrsl[2].edSmp, nextSl[2].smp, t: 0.075)
-                nrsl[3].edSmp = .linear(nrsl[3].edSmp, nextSl[3].smp, t: 0.025)
-                firstKeyFormantFilters.append(.init(rsl, sec: rTl))
-                firstKeyFormantFilters.append(.init(nrsl, sec: youon != .none ? 0.01 : 0.05))
+                let rDurSec = 0.01
+                let rFf = formantFilter(from: oph)!
+                let nextFf = youonKffs.first?.formantFilter ?? syllabicFormantFilter
+                var nrFf = rFf
+                nrFf[2].edSmp = .linear(nrFf[2].edSmp, nextFf[2].smp, t: 0.075)
+                nrFf[3].edSmp = .linear(nrFf[3].edSmp, nextFf[3].smp, t: 0.025)
+                keyFormantFilters.append(.init(rFf, sec: rDurSec))
+                keyFormantFilters.append(.init(nrFf, sec: youon != .none ? 0.01 : 0.05))
                 deltaSyllabicStartSec = 0.0
-                onsetDurSec = rTl
-                deltaSinStartSec -= rTl
+                onsetDurSec = rDurSec
                 
             case .k, .kj, .g, .gj:
-                let kTl = 0.055, kjTl = 0.07, kOTl = 0.015, kjOTl = 0.02
-                let gTl = 0.045, gjTl = 0.045, gOTl = 0.015, gjOTl = 0.02
+                let kDurSec = 0.055, kjDurSec = 0.07, kODurSec = 0.015, kjODurSec = 0.02
+                let gDurSec = 0.045, gjDurSec = 0.045, gODurSec = 0.015, gjODurSec = 0.02
                 let isK = oph == .k || oph == .kj
                 let isJ = oph == .kj || oph == .gj
                 
-                let sf: NoiseSourceFilter, volume: Volume
+                let sl: Spectlope, volume: Volume
                 if isJ || syllabics.first == .e {
-                    sf = NoiseSourceFilter(fqSmps: [Point(0, 0.56),
-                                               Point(2800, 0.61),
-                                               Point(3000, 1),
-                                               Point(3400, 1),
-                                               Point(3600, 0.56),
-                                               Point(4800, 0.4),
-                                               Point(5000, 0)])
+                    sl = Spectlope(pitchSmps: [Point(0, 0.5),
+                                               Point(89, 0.6),
+                                               Point(90, 1),
+                                               Point(92, 1),
+                                               Point(93, 0.5),
+                                               Point(98, 0.4),
+                                               Point(99, 0)])
                     volume = .init(smp: 0.46)
                 } else {
                     switch syllabics.first {
                     case .o:
-                        sf = NoiseSourceFilter(fqSmps: [Point(0, 0.56),
-                                                   Point(800, 0.61),
-                                                   Point(1000, 1),
-                                                   Point(1600, 1),
-                                                   Point(1800, 0.56),
-                                                   Point(5800, 0.4),
-                                                   Point(6000, 0)])
+                        sl = Spectlope(pitchSmps: [Point(0, 0.56),
+                                                   Point(67, 0.61),
+                                                   Point(71, 1),
+                                                   Point(79, 1),
+                                                   Point(81, 0.56),
+                                                   Point(100, 0.4),
+                                                   Point(102, 0)])
                     default:
-                        sf = NoiseSourceFilter(fqSmps: [Point(0, 0.56),
-                                                   Point(1400, 0.61),
-                                                   Point(1600, 1),
-                                                   Point(2500, 1),
-                                                   Point(2700, 0.56),
-                                                   Point(4800, 0.4),
-                                                   Point(5000, 0)])
+                        sl = Spectlope(pitchSmps: [Point(0, 0.56),
+                                                   Point(77, 0.61),
+                                                   Point(80, 1),
+                                                   Point(87, 1),
+                                                   Point(88, 0.56),
+                                                   Point(98, 0.4),
+                                                   Point(99, 0)])
                     }
                     volume = .init(smp: 0.56)
                 }
                 
-                onsets.append(.init(duration: isK ? (isJ ? kjOTl : kOTl) : (isJ ? gjOTl : gOTl),
+                onsets.append(.init(duration: isK ? (isJ ? kjODurSec : kODurSec) : (isJ ? gjODurSec : gODurSec),
                                     volume: volume,
                                     sec: isK ? -0.005 : -0.01,
                                     attackSec: 0.02,
-                                    sourceFilter: sf))
+                                    spectlope: sl))
                 deltaSyllabicStartSec = 0.01
-                onsetDurSec = isK ? (isJ ? kjTl : kTl) : (isJ ? gjTl : gTl)
+                onsetDurSec = isK ? (isJ ? kjDurSec : kDurSec) : (isJ ? gjDurSec : gDurSec)
                 isOffVoice = true
             case .t, .d:
-                let tTl = 0.05, tOTl = 0.01
-                let dTl = 0.04, dOTl = 0.01
+                let tDurSec = 0.05, tODurSec = 0.01
+                let dDurSec = 0.04, dODurSec = 0.01
                 let isT = oph == .t
-                let sf = NoiseSourceFilter(noiseFqSmps: [Point(0, 0),
-                                                    Point(4300, 0),
-                                                    Point(4500, 1),
-                                                    Point(4900, 1),
-                                                    Point(5100, 0.7),
-                                                    Point(5800, 0.52),
-                                                    Point(6000, 0)])
-                onsets.append(.init(duration: isT ? tOTl : dOTl,
+                onsets.append(.init(duration: isT ? tODurSec : dODurSec,
                                     volume: .init(smp: 0.5),
                                     sec: isT ? 0 : 0.0075,
                                     releaseSec: 0.01,
-                                    sourceFilter: sf))
+                                    spectlope: .init(noisePitchSmps: [Point(96, 0),
+                                                                      Point(97, 1),
+                                                                      Point(99, 1),
+                                                                      Point(100, 0.7),
+                                                                      Point(101, 0.55),
+                                                                      Point(102, 0)])))
                 deltaSyllabicStartSec = 0.01
-                onsetDurSec = isT ? tTl : dTl
+                onsetDurSec = isT ? tDurSec : dDurSec
                 isOffVoice = true
             case .p, .pj, .b, .bj:
-                let pTl = 0.05, pOTl = 0.01
-                let bTl = 0.04, bOTl = 0.01
+                let pDurSec = 0.05, pODurSec = 0.01
+                let bDurSec = 0.04, bODurSec = 0.01
                 let isP = oph == .p || oph == .pj
-                let sf = NoiseSourceFilter(noiseFqSmps: [Point(0, 0),
-                                                    Point(600, 0),
-                                                    Point(700, 0.85),
-                                                    Point(1100, 0.9),
-                                                    Point(1200, 1),
-                                                    Point(1600, 1),
-                                                    Point(1700, 0.85),
-                                                    Point(2800, 0.75),
-                                                    Point(3000, 0)])
-                onsets.append(.init(duration: isP ? pOTl : bOTl,
+                onsets.append(.init(duration: isP ? pODurSec : bODurSec,
                                     volume: .init(smp: 0.4),
                                     sec: isP ? 0.005 : 0.0075,
                                     releaseSec: 0.01,
-                                    sourceFilter: sf))
+                                    spectlope: .init(noisePitchSmps: [Point(62, 0),
+                                                                      Point(65, 0.85),
+                                                                      Point(73, 0.9),
+                                                                      Point(74, 1),
+                                                                      Point(79, 1),
+                                                                      Point(80, 0.85),
+                                                                      Point(89, 0.75),
+                                                                      Point(90, 0)])))
                 deltaSyllabicStartSec = 0.02
-                onsetDurSec = isP ? pTl : bTl
+                onsetDurSec = isP ? pDurSec : bDurSec
                 isOffVoice = true
                 
             case .s, .ts, .dz:
-                let sokuonScale: Double
-                    = previousMora?.syllabics == [.sokuon]
-                    || isVowelReduction ? 1.5 : 1
-                let otl, tl: Double, volume: Volume
+                let sokuonScale = previousPhoneme == .sokuon || isVowelReduction ? 1.5 : 1
+                let oDurSec, durSec: Double, volume: Volume
                 switch oph {
                 case .s:
-                    otl = 0.08 * sokuonScale
-                    tl = otl
+                    oDurSec = 0.08 * sokuonScale
+                    durSec = oDurSec
                     volume = .init(smp: 0.7)
                 case .ts:
-                    otl = 0.05 * sokuonScale
-                    tl = 0.09
+                    oDurSec = 0.05 * sokuonScale
+                    durSec = 0.09
                     volume = .init(smp: 0.675)
                 case .dz:
-                    otl = 0.06 * sokuonScale
-                    tl = otl - 0.02 + 0.01
+                    oDurSec = 0.06 * sokuonScale
+                    durSec = oDurSec - 0.02 + 0.01
                     volume = .init(smp: 0.65)
                 default: fatalError()
                 }
-                let sf = NoiseSourceFilter(noiseFqSmps: [Point(0, 0),
-                                                    Point(2600, 0),
-                                                    Point(2800, 0.3),
-                                                    Point(5800, 0.46),
-                                                    Point(6000, 0.75),
-                                                    Point(8400, 0.8),
-                                                    Point(9000, 1),
-                                                    Point(11500, 1),
-                                                    Point(14000, 0.8),
-                                                    Point(16000, 0.6),
-                                                    Point(18000, 0)])
-                onsets.append(.init(duration: otl,
+                
+                onsets.append(.init(duration: oDurSec,
                                     volume: volume,
-                                    sec: (oph != .dz ? 0.01 : 0.01) + (isVowelReduction ? otl / 3 : 0),
+                                    sec: (oph != .dz ? 0.01 : 0.01) + (isVowelReduction ? oDurSec / 3 : 0),
                                     attackSec: oph != .dz ? 0.02 : 0.04,
                                     releaseSec: oph != .dz ? 0.02 : 0.02,
-                                    sourceFilter: sf))
-                let olt = onsets.last!.attackSec + onsets.last!.releaseSec
+                                    spectlope: .init(noisePitchSmps: [Point(87, 0),
+                                                                      Point(89, 0.3),
+                                                                      Point(101, 0.45),
+                                                                      Point(102, 0.75),
+                                                                      Point(108, 0.8),
+                                                                      Point(109, 1),
+                                                                      Point(113, 1),
+                                                                      Point(117, 0.8),
+                                                                      Point(119, 0.6),
+                                                                      Point(121, 0)])))
+                let oarDurSec = onsets.last!.attackSec + onsets.last!.releaseSec
                 if oph == .ts {
-                    let ootl = 0.01
-                    let sf = NoiseSourceFilter(noiseFqSmps: [Point(0, 0),
-                                                        Point(4300, 0),
-                                                        Point(4500, 1),
-                                                        Point(4900, 1),
-                                                        Point(5100, 0.7),
-                                                        Point(5800, 0.52),
-                                                        Point(6000, 0)])
-                    onsets.append(.init(duration: ootl,
+                    let ooDurSec = 0.01
+                    onsets.append(.init(duration: ooDurSec,
                                         volume: .init(smp: 0.3),
-                                        sec: -otl - ootl,
+                                        sec: -oDurSec - ooDurSec,
                                         releaseSec: 0.01,
-                                        sourceFilter: sf))
+                                        spectlope: .init(noisePitchSmps: [Point(96, 0),
+                                                                          Point(97, 1),
+                                                                          Point(99, 1),
+                                                                          Point(100, 0.7),
+                                                                          Point(101, 0.5),
+                                                                          Point(102, 0)])))
                 }
                 deltaSyllabicStartSec = (oph == .ts ? 0.01 : 0) - 0.01
-                onsetDurSec = tl - olt
+                onsetDurSec = durSec - oarDurSec
                 isOffVoice = true
             case .ɕ, .tɕ, .dʒ:
-                let sokuonScale: Double
-                    = previousMora?.syllabics == [.sokuon]
-                    || isVowelReduction ? 1.5 : 1
-                let otl, tl: Double, volume: Volume
+                let sokuonScale = previousPhoneme == .sokuon || isVowelReduction ? 1.5 : 1
+                let oDurSec, durSec: Double, volume: Volume
                 switch oph {
                 case .ɕ:
-                    otl = 0.085 * sokuonScale
-                    tl = otl
+                    oDurSec = 0.085 * sokuonScale
+                    durSec = oDurSec
                     volume = .init(smp: 0.75)
                 case .tɕ:
-                    otl = 0.04 * sokuonScale
-                    tl = 0.08
+                    oDurSec = 0.04 * sokuonScale
+                    durSec = 0.08
                     volume = .init(smp: 0.65)
                 case .dʒ:
-                    otl = 0.055 * sokuonScale
-                    tl = otl - 0.02 + 0.02
+                    oDurSec = 0.055 * sokuonScale
+                    durSec = oDurSec - 0.02 + 0.02
                     volume = .init(smp: 0.62)
                 default: fatalError()
                 }
-                let sf = NoiseSourceFilter(noiseFqSmps: [Point(0, 0),
-                                                    Point(900, 0),
-                                                    Point(1000, 0.1),
-                                                    Point(3800, 0.2),
-                                                    Point(4000, 0.6),
-                                                    Point(5200, 0.7),
-                                                    Point(6000, 1),
-                                                    Point(10500, 1),
-                                                    Point(13000, 0.8),
-                                                    Point(16000, 0.6),
-                                                    Point(18000, 0)])
-                onsets.append(.init(duration: otl,
+                onsets.append(.init(duration: oDurSec,
                                     volume: volume,
-                                    sec: (oph != .dʒ ? 0.01 : 0.02) + (isVowelReduction ? otl / 3 : 0),
+                                    sec: (oph != .dʒ ? 0.01 : 0.02) + (isVowelReduction ? oDurSec / 3 : 0),
                                     attackSec: oph == .tɕ ? 0.01 : (oph != .dz ? 0.02 : 0.04),
                                     releaseSec: oph != .dz ? 0.02 : 0.01,
-                                    sourceFilter: sf))
-                let olt = onsets.last!.attackSec + onsets.last!.releaseSec
+                                    spectlope: .init(noisePitchSmps: [Point(71, 0.1),
+                                                                      Point(94, 0.2),
+                                                                      Point(95, 0.6),
+                                                                      Point(100, 0.7),
+                                                                      Point(102, 1),
+                                                                      Point(112, 1),
+                                                                      Point(116, 0.8),
+                                                                      Point(119, 0.6),
+                                                                      Point(121, 0)])))
+                let oarDurSec = onsets.last!.attackSec + onsets.last!.releaseSec
                 if oph == .tɕ {
-                    let ootl = 0.01
-                    let sf = NoiseSourceFilter(noiseFqSmps: [Point(0, 0),
-                                                        Point(4300, 0),
-                                                        Point(4500, 1),
-                                                        Point(4900, 1),
-                                                        Point(5100, 0.7),
-                                                        Point(5800, 0.52),
-                                                        Point(6000, 0)])
-                    onsets.append(.init(duration: ootl,
+                    let ooDurSec = 0.01
+                    onsets.append(.init(duration: ooDurSec,
                                         volume: .init(smp: 0.3),
-                                        sec: -otl - ootl,
+                                        sec: -oDurSec - ooDurSec,
                                         releaseSec: 0.01,
-                                        sourceFilter: sf))
+                                        spectlope: .init(noisePitchSmps: [Point(96, 0),
+                                                                          Point(97, 1),
+                                                                          Point(99, 1),
+                                                                          Point(100, 0.7),
+                                                                          Point(101, 0.5),
+                                                                          Point(103, 0)])))
                 }
                 deltaSyllabicStartSec = -0.01
-                onsetDurSec = tl - olt
+                onsetDurSec = durSec - oarDurSec
                 isOffVoice = true
             case .h:
-                let sokuonScale: Double
-                    = previousMora?.syllabics == [.sokuon]
-                    || isVowelReduction ? 1.5 : 1
-                let hTl = 0.06 * sokuonScale
-                let psl = youonKsls.first?.formantFilter ?? syllabicFormantFilter
-                let npsl = psl.fricative(isO: syllabics.first == .o).toNoise()
-                onsets.append(.init(duration: hTl,
+                let sokuonScale = previousPhoneme == .sokuon || isVowelReduction ? 1.5 : 1
+                let hDurSec = 0.06 * sokuonScale
+                let pFf = youonKffs.first?.formantFilter ?? syllabicFormantFilter
+                let npFf = pFf.fricative(isO: syllabics.first == .o).toNoise()
+                onsets.append(.init(duration: hDurSec,
                                     volume: .init(smp: 0.37),
-                                    sec: 0.02 + (isVowelReduction ? hTl / 3 : 0),
+                                    sec: 0.02 + (isVowelReduction ? hDurSec / 3 : 0),
                                     attackSec: 0.02,
-                                    sourceFilter: .init(npsl)))
+                                    spectlope: npFf.spectlope))
                 deltaSyllabicStartSec = -0.01
-                onsetDurSec = hTl - onsets.last!.attackSec - onsets.last!.releaseSec
+                onsetDurSec = hDurSec - onsets.last!.attackSec - onsets.last!.releaseSec
                 isOffVoice = true
             case .ç:
-                let sokuonScale: Double
-                    = previousMora?.syllabics == [.sokuon]
-                    || isVowelReduction ? 1.5 : 1
-                let çTl = 0.06 * sokuonScale
-                let sf = NoiseSourceFilter(noiseFqSmps: [Point(0, 0),
-                                                    Point(3100, 0),
-                                                    Point(3300, 1),
-                                                    Point(4100, 1),
-                                                    Point(4300, 0.56),
-                                                    Point(4800, 0.7),
-                                                    Point(5000, 1),
-                                                    Point(10000, 1),
-                                                    Point(11000, 0.56),
-                                                    Point(12000, 0.3),
-                                                    Point(13000, 0)])
-                onsets.append(.init(duration: çTl,
+                let sokuonScale = previousPhoneme == .sokuon || isVowelReduction ? 1.5 : 1
+                let çDurSec = 0.06 * sokuonScale
+                onsets.append(.init(duration: çDurSec,
                                     volume: .init(smp: 0.37),
-                                    sec: 0.02 + (isVowelReduction ? çTl / 3 : 0),
+                                    sec: 0.02 + (isVowelReduction ? çDurSec / 3 : 0),
                                     attackSec: 0.02,
-                                    sourceFilter: sf))
+                                    spectlope: .init(noisePitchSmps: [Point(91, 0),
+                                                                      Point(92, 1),
+                                                                      Point(96, 1),
+                                                                      Point(97, 0.56),
+                                                                      Point(98, 0.7),
+                                                                      Point(99, 1),
+                                                                      Point(111, 1),
+                                                                      Point(113, 0.56),
+                                                                      Point(114, 0.3),
+                                                                      Point(116, 0)])))
                 deltaSyllabicStartSec = -0.01
-                onsetDurSec = çTl - onsets.last!.attackSec - onsets.last!.releaseSec
+                onsetDurSec = çDurSec - onsets.last!.attackSec - onsets.last!.releaseSec
                 isOffVoice = true
             case .ɸ:
-                let sokuonScale: Double
-                    = previousMora?.syllabics == [.sokuon]
-                    || isVowelReduction ? 1.5 : 1
-                let ɸTl = 0.06 * sokuonScale
-                let sf = NoiseSourceFilter(noiseFqSmps: [Point(0, 0),
-                                                    Point(1800, 0),
-                                                    Point(2000, 0.52),
-                                                    Point(5200, 0.7),
-                                                    Point(5400, 1),
-                                                    Point(5900, 1),
-                                                    Point(6100, 0.7),
-                                                    Point(9000, 0.66),
-                                                    Point(10000, 0.56),
-                                                    Point(17000, 0.3),
-                                                    Point(18000, 0)])
-                onsets.append(.init(duration: ɸTl,
+                let sokuonScale = previousPhoneme == .sokuon || isVowelReduction ? 1.5 : 1
+                let ɸDurSec = 0.06 * sokuonScale
+                onsets.append(.init(duration: ɸDurSec,
                                     volume: .init(smp: 0.2),
-                                    sec: 0.02 + (isVowelReduction ? ɸTl / 3 : 0),
+                                    sec: 0.02 + (isVowelReduction ? ɸDurSec / 3 : 0),
                                     attackSec: 0.02,
-                                    sourceFilter: sf))
+                                    spectlope: .init(noisePitchSmps: [Point(81, 0),
+                                                                      Point(83, 0.52),
+                                                                      Point(100, 0.7),
+                                                                      Point(101, 1),
+                                                                      Point(102, 1),
+                                                                      Point(103, 0.7),
+                                                                      Point(109, 0.66),
+                                                                      Point(111, 0.56),
+                                                                      Point(120, 0.3),
+                                                                      Point(121, 0)])))
                 deltaSyllabicStartSec = -0.01
-                onsetDurSec = ɸTl - onsets.last!.attackSec - onsets.last!.releaseSec
+                onsetDurSec = ɸDurSec - onsets.last!.attackSec - onsets.last!.releaseSec
                 isOffVoice = true
-                
-            default: onsets = []
+            default:
+                onsets = []
             }
+        }
+        
+        keyFormantFilters += youonKffs
+        keyFormantFilters.append(.init(syllabicFormantFilter, sec: 0))
+        
+        let firstFF = keyFormantFilters.first!.formantFilter
+        
+        if isOffVoice && youon == .none {
+            if phonemes.last == .g || phonemes.last == .d || phonemes.last == .b {
+                let oFf = switch phonemes.last {
+                case .g:
+                    syllabics.last! == .o || syllabics.last! == .ɯ ?
+                        firstFF.movedF2(sFq: 1200, eFq: 1400) :
+                        firstFF.movedF2(sFq: 2800, eFq: 3200)
+                case .d: firstFF.movedF2(sFq: 1600, eFq: 2000)
+                case .b: firstFF.movedF2(sFq: 600, eFq: 800)
+                default: fatalError()
+                }
+                let nFf = FormantFilter.linear(oFf, firstFF, t: 0.8).voiceless()
+                keyFormantFilters.insert(.init(nFf, sec: 0.075 * 0.25), at: 0)
+                let nnFf = FormantFilter.linear(nFf, firstFF, t: 0.25).filledSmp(from: firstFF)
+                keyFormantFilters.insert(.init(nnFf, sec: 0.075 * 0.75), at: 1)
+            } else {
+                let nFf = firstFF.voiceless()
+                keyFormantFilters.insert(.init(nFf, sec: 0.075 * 0.25), at: 0)
+                let nnFf = FormantFilter.linear(nFf, firstFF, t: 0.25).filledSmp(from: firstFF)
+                keyFormantFilters.insert(.init(nnFf, sec: 0.075 * 0.75), at: 1)
+            }
+        } else if isVowel {
+            let nFf = firstFF.offVoice()
+            keyFormantFilters.insert(.init(nFf, sec: 0.02), at: 0)
+        }
+        
+        if let ff = previousFormantFilter {
+            keyFormantFilters.insert(.init(ff, sec: 0.025), at: 0)
         }
         
         isDakuon = firstType == .dakuon
-        
-        if isOffVoice && !isDakuon && (syllabics == [.i] || syllabics == [.ɯ]) {
-            if previousMora != nil && nextMora == nil {
-                if !onsets.isEmpty {
-                    let d = onsets[.last].duration * 0.25
-                    deltaSyllabicStartSec += d / 2
-                    onsetDurSec += d
-                    onsets[.last].duration += d
-                }
-            } else if nextMora != nil
-                        && nextMora!.isOffVoice && !nextMora!.isDakuon {
-                if !onsets.isEmpty {
-                    let d = onsets[.last].duration * 0.25
-                    deltaSyllabicStartSec += d / 2
-                    onsetDurSec += d
-                    onsets[.last].duration += d
-                }
-            }
-        }
-        
-        firstKeyFormantFilters += youonKsls
-        firstKeyFormantFilters.append(.init(syllabicFormantFilter, sec: 0))
-        
-        firstMainFormantFilter = firstKeyFormantFilters.first!.formantFilter
-        
-        if isOffVoice && youon == .none {
-            let sl = firstMainFormantFilter
-            if phonemes.last == .g || phonemes.last == .d || phonemes.last == .b {
-                let osl: FormantFilter
-                switch phonemes.last {
-                case .g:
-                    osl = syllabics.last! == .o || syllabics.last! == .ɯ ?
-                        sl.movedF2(sFq: 1200, eFq: 1400) :
-                        sl.movedF2(sFq: 2800, eFq: 3200)
-                case .d: osl = sl.movedF2(sFq: 1600, eFq: 2000)
-                case .b: osl = sl.movedF2(sFq: 600, eFq: 800)
-                default: fatalError()
-                }
-                let nsl = FormantFilter.linear(osl, sl, t: 0.8).voiceless()
-                firstKeyFormantFilters.insert(.init(nsl, sec: 0.075 * 0.25), at: 0)
-                let nnsl = FormantFilter.linear(nsl, firstMainFormantFilter, t: 0.25)
-                    .filledSmp(from: firstMainFormantFilter)
-                firstKeyFormantFilters.insert(.init(nnsl, sec: 0.075 * 0.75), at: 1)
-            } else if let preSl = previousMora?.mainFormantFilter {
-                let nsl = FormantFilter.linear(preSl.offVoice(), sl, t: 0.65)
-                    .voiceless()
-                firstKeyFormantFilters.insert(.init(nsl, sec: 0.075 * 0.25), at: 0)
-                let nnsl = FormantFilter.linear(nsl, firstMainFormantFilter, t: 0.25)
-                    .filledSmp(from: firstMainFormantFilter)
-                firstKeyFormantFilters.insert(.init(nnsl, sec: 0.075 * 0.75), at: 1)
-            }
-        } else if isVowel {
-            let nsl = firstMainFormantFilter.offVoice()
-            firstKeyFormantFilters.insert(.init(nsl, sec: 0.02), at: 0)
-        }
-        
-        if firstType == .dakuon {
-            let dakuTl = onsetDurSec * 0.9
-            let sf = NoiseSourceFilter(fqSmps: [Point(0, 1),
-                                           Point(400, 1),
-                                           Point(700, 0.56),
-                                           Point(2500, 0.43),
-                                           Point(3500, 0)])
-            onsets.append(.init(duration: dakuTl, volume: .init(smp: 0.5),
-                                sourceFilter: sf))
+        if isDakuon {
+            let dakuDurSec = onsetDurSec * 0.9
+            onsets.append(.init(duration: dakuDurSec, volume: .init(smp: 0.5),
+                                spectlope: .init(pitchSmps: [Point(55, 1),
+                                                             Point(65, 0.56),
+                                                             Point(87, 0.43),
+                                                             Point(93, 0)])))
             
-            let sl = firstKeyFormantFilters[.first].formantFilter.toDakuon()
-            firstKeyFormantFilters.insert(.init(sl, sec: 0.0075), at: 0)
-            firstKeyFormantFilters.insert(.init(sl, sec: 0.01), at: 1)
-            deltaSinStartSec = -0.0075
+            let ff = keyFormantFilters[.first].formantFilter.toDakuon()
+            keyFormantFilters.insert(.init(ff, sec: 0.0075), at: 0)
+            keyFormantFilters.insert(.init(ff, sec: 0.01), at: 1)
         }
         
-        var t = 0.0
-        firstKeyFormantFilters = firstKeyFormantFilters.map {
-            let ks = KeyFormantFilter($0.formantFilter, sec: t)
-            t += $0.sec
-            return ks
+        var sec = keyFormantFilters.count >= 2 ? -keyFormantFilters[keyFormantFilters.count - 2].sec : 0
+        keyFormantFilters = keyFormantFilters.map {
+            let kff = KeyFormantFilter($0.formantFilter, sec: sec)
+            sec += $0.sec
+            return kff
         }
-        
-        let preSl = firstKeyFormantFilters.last!.formantFilter.multiplyFq(1.02)
-        lastKeyFormantFilters.append(.init(preSl, sec: 0))
-        if let nextMora {
-            let sl = nextMora.firstMainFormantFilter
-            if nextMora.isOffVoice {
-                let nsl = FormantFilter.linear(preSl, sl, t: 0.3).offVoice()
-                let nnsl = FormantFilter.linear(preSl, nsl, t: 0.25)
-                lastKeyFormantFilters.append(.init(nnsl, sec: 0.05 * 0.25))
-                lastKeyFormantFilters.append(.init(nsl, sec: 0.05))
-            } else {
-                let nsl = FormantFilter.linear(preSl, sl, t: 0.35).union()
-                let nnsl = FormantFilter.linear(preSl, nsl, t: 0.25)
-                lastKeyFormantFilters.append(.init(nnsl, sec: 0.1125 * 0.25))
-                lastKeyFormantFilters.append(.init(nsl, sec: 0.1125))
-            }
-        } else {
-            let nsl = preSl.offVoice()
-            let nnsl = FormantFilter.linear(preSl, nsl, t: 0.25)
-            lastKeyFormantFilters.append(.init(nnsl, sec: 0.075 * 0.25))
-            lastKeyFormantFilters.append(.init(nsl, sec: 0.075))
-        }
-        
-        self.isOffVoice = isOffVoice
-    }
-}
-extension Mora {
-    func formantFilterInterpolation(fromDuration dur: Double) -> Interpolation<FormantFilter> {
-        let fks = firstKeyFormantFilters.map {
-            Interpolation.Key(value: $0.formantFilter,
-                              time: $0.sec, type: .spline)
-        }
-        let lks = lastKeyFormantFilters.map {
-            Interpolation.Key(value: $0.formantFilter,
-                              time: dur - lastKeyFormantFilters.last!.sec + $0.sec, type: .spline)
-        }
-        return .init(keys: fks + lks, duration: dur)
-    }
-    var mainFormantFilter: FormantFilter {
-        firstKeyFormantFilters.last!.formantFilter
-    }
-    func formantFilter(atSec sec: Double, lastSec: Double) -> FormantFilter {
-        if sec < firstKeyFormantFilters.first!.sec {
-            return firstKeyFormantFilters.first!.formantFilter
-        } else if sec >= lastSec {
-            return lastKeyFormantFilters.last!.formantFilter
-        } else {
-            return formantFilterInterpolation(fromDuration: lastSec)
-                .value(withTime: sec) ?? lastKeyFormantFilters.last!.formantFilter
-        }
+        deltaSyllabicStartSec += sec
     }
 }
 
@@ -1545,7 +1541,7 @@ extension Phoneme {
         case "うぇ", "we", "whe": [.β, .e]
         case "うぉ", "who": [.β, .o]
         case "ん", "n", "nn": [.nn]
-        case "っ", "tt": [.sokuon]
+        case "っ", "xtu": [.sokuon]
         case "^": [.breath]
         default: []
         }

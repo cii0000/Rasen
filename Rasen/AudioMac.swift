@@ -116,9 +116,8 @@ final class NotePlayer {
             noteIDs.insert(noteID)
             return .init(fq: Pitch.fq(fromPitch: .init(note.notePitch) + note.pitch.doubleValue),
                          overtone: note.tone.overtone,
-                         sourceFilter: note.tone.noiseSourceFilter(isNoise: note.isNoise),
+                         spectlope: note.tone.spectlope.splited,
                          fAlpha: 1,
-                         isNoise: note.isNoise,
                          noiseSeed: Rendnote.noiseSeed(from: note.id),
                          pitbend: .empty,
                          secRange: -.infinity ..< .infinity,
@@ -496,7 +495,7 @@ final class AVAudioScoreNoder {
     struct NotewaveID: Hashable, Codable {
         var fq: Double,
             overtone: Overtone,
-            sourceFilter: NoiseSourceFilter,
+            spectlope: Spectlope,
             fAlpha: Double,
             noiseSeed: UInt64,
             pitbend: Pitbend?,
@@ -506,7 +505,7 @@ final class AVAudioScoreNoder {
         init(_ rendnote: Rendnote) {
             fq = rendnote.fq
             overtone = rendnote.overtone
-            sourceFilter = rendnote.sourceFilter
+            spectlope = rendnote.spectlope
             fAlpha = rendnote.fAlpha
             noiseSeed = rendnote.noiseSeed
             pitbend = !rendnote.pitbend.isStereoOnly ? rendnote.pitbend : nil
@@ -704,12 +703,7 @@ final class AVAudioScoreNoder {
                         pan = memowave.pan + stereo.pan
                     }
                     
-                    let nv = notewave
-                        .sample(at: i,
-                                sec: nSec - memowave.startSec,
-                                volumeAmp: nVolumeAmp,
-                                from: envelopeMemo,
-                                atPhase: &phase)
+                    let nv = notewave.sample(at: i, volumeAmp: nVolumeAmp, atPhase: &phase)
                     
                     if pan == 0 || framess.count < 2 {
                         let fnv = Float(nv)

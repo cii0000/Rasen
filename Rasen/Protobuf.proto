@@ -173,11 +173,24 @@ message PBStereo {
     PBUUID id = 3;
 }
 
+message PBOvertone {
+    double evenSmp = 1;
+    double oddSmp = 2;
+}
+
+message PBSprol {
+    double pitch = 1;
+    double smp = 2;
+    double noise = 3;
+}
+message PBSpectlope {
+    repeated PBSprol sprols = 1;
+}
+
 message PBTone {
-    double evenAmp = 1;
-    double oddAmp = 2;
-    repeated PBPoint pitchAmps = 3;
-    PBUUID id = 4;
+    PBOvertone overtone = 1;
+    PBSpectlope spectlope = 2;
+    PBUUID id = 3;
 }
 
 message PBPit {

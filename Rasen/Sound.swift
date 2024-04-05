@@ -80,15 +80,15 @@ extension Pitch {
         value.mod(12)
     }
     var fq: Double {
-        2 ** ((Double(value) - 57) / 12) * 440
+        .exp2((Double(value) - 57) / 12) * 440
     }
 }
 extension Pitch {
     static func pitch(fromFq fq: Double) -> Double {
-        .log(fq / 440) / .log(2) * 12 + 57
+        .log2(fq / 440) * 12 + 57
     }
     static func fq(fromPitch pitch: Double) -> Double {
-        2 ** ((pitch - 57) / 12) * 440
+        .exp2((pitch - 57) / 12) * 440
     }
     
     init(octave: Int, lyricsUnison: LyricsUnison) {
@@ -275,115 +275,262 @@ extension Stereo: MonoInterpolatable {
     }
 }
 
-struct Tone: Hashable, Codable {
-    var evenAmp = 1.0
-    var oddAmp = 1.0
-    var pitchAmps = [Point(.init(Score.pitchRange.start), Volume.maxAmp),
-                     Point(96, Volume(smp: 0.1).amp)]
-    var id = UUID()
+struct Overtone: Hashable, Codable {
+    var evenSmp = 1.0, oddSmp = 1.0
 }
-extension Tone: Protobuf {
-    init(_ pb: PBTone) throws {
-        evenAmp = ((try? pb.evenAmp.notNaN()) ?? 0).clipped(min: 0, max: 1)
-        oddAmp = ((try? pb.oddAmp.notNaN()) ?? 0).clipped(min: 0, max: 1)
-        
-        pitchAmps = pb.pitchAmps.compactMap { try? Point($0) }
-        pitchAmps = pitchAmps.map {
-            .init($0.x.clipped(min: .init(Score.pitchRange.start), max: .init(Score.pitchRange.end)),
-                  $0.y.clipped(min: 0, max: 1))
-        }.sorted { $0.x < $1.x }
-        
-        id = (try? .init(pb.id)) ?? .init()
+extension Overtone {
+    var isAll: Bool {
+        evenSmp == 1 && oddSmp == 1
     }
-    var pb: PBTone {
+    var isOne: Bool {
+        evenSmp == 0 && oddSmp == 0
+    }
+    func smp(at i: Int) -> Double {
+        i == 1 ? 1 : (i % 2 == 0 ? evenSmp : oddSmp)
+    }
+}
+extension Overtone: Protobuf {
+    init(_ pb: PBOvertone) throws {
+        evenSmp = ((try? pb.evenSmp.notNaN()) ?? 0).clipped(min: 0, max: 1)
+        oddSmp = ((try? pb.oddSmp.notNaN()) ?? 0).clipped(min: 0, max: 1)
+    }
+    var pb: PBOvertone {
         .with {
-            $0.evenAmp = evenAmp
-            $0.oddAmp = oddAmp
-            $0.pitchAmps = pitchAmps.map { $0.pb }
-            $0.id = id.pb
+            $0.evenSmp = evenSmp
+            $0.oddSmp = oddSmp
         }
     }
 }
-extension Tone {
-    init(evenSmp: Double, oddSmp: Double, pitchSmps: [Point], id: UUID = .init()) {
-        self.evenAmp = Volume(smp: evenSmp).amp.clipped(min: 0, max: Volume.maxAmp)
-        self.oddAmp = Volume(smp: oddSmp).amp.clipped(min: 0, max: Volume.maxAmp)
-        self.pitchAmps = Self.pitchAmps(fromPitchSmps: pitchSmps)
-            .map { .init($0.x, $0.y.clipped(min: 0, max: Volume.maxAmp)) }
-        self.id = id
-    }
-    
-    func with(id: UUID) -> Self {
-        var v = self
-        v.id = id
-        return v
-    }
-    
-    var evenSmp: Double {
-        get { Volume(amp: evenAmp).smp }
-        set { evenAmp = Volume(smp: newValue).amp }
-    }
-    var oddSmp: Double {
-        get { Volume(amp: oddAmp).smp }
-        set { oddAmp = Volume(smp: newValue).amp }
-    }
-    
-    var pitchSmps: [Point] {
+enum OvertoneType: Int, Hashable, Codable, CaseIterable {
+    case evenSmp, oddSmp
+}
+extension Overtone {
+    subscript(type: OvertoneType) -> Double {
         get {
-            pitchAmps.map { .init($0.x, Volume(amp: $0.y).smp) }
-        }
-        set {
-            pitchAmps = newValue.map { .init($0.x, Volume(smp: $0.y).amp) }
-        }
-    }
-    var fqSmps: [Point] {
-        pitchAmps.map {
-            .init(Pitch.fq(fromPitch: $0.x), Volume(amp: $0.y).smp)
-        }
-    }
-    static func pitchAmps(fromPitchSmps pitchSmps: [Point]) -> [Point] {
-        pitchSmps.map { .init($0.x, Volume(smp: $0.y).amp) }
-    }
-    
-    static func tonesEqualPitchSmpCount(_ tones: [Tone]) -> [Tone] {
-        guard let count = tones.max(by: { $0.pitchSmps.count < $1.pitchSmps.count })?.pitchSmps.count else { return [] }
-        return tones.map {
-            var tone = $0
-            tone.pitchSmps = tone.pitchSmpsWith(count: count)
-            return tone
-        }
-    }
-    
-    func with(pitchSmpsCount count: Int) -> Self {
-        .init(evenSmp: evenSmp, oddSmp: oddSmp, 
-              pitchSmps: pitchSmpsWith(count: count), id: id)
-    }
-    func pitchSmpsWith(count: Int) -> [Point] {
-        let pitchSmps = pitchSmps
-        guard pitchSmps.count != count else { return pitchSmps }
-        guard pitchSmps.count < count else { fatalError() }
-        guard pitchSmps.count > 1 else {
-            return .init(repeating: pitchSmps[0], count: count)
-        }
-        guard pitchSmps.count > 2 else {
-            let edge = Edge(pitchSmps[0], pitchSmps[1])
-            return (0 ..< count).map { i in
-                let t = Double(i) / Double(count - 1)
-                return edge.position(atT: t)
+            switch type {
+            case .evenSmp: evenSmp
+            case .oddSmp: oddSmp
             }
         }
-        
-        var nFqSmps = pitchSmps
-        nFqSmps.reserveCapacity(count)
-        
-        var ds: [(Double, Int)] = (0 ..< (pitchSmps.count - 1)).map {
-            (pitchSmps[$0].x.distance(pitchSmps[$0 + 1].x), $0)
+        set {
+            switch type {
+            case .evenSmp: evenSmp = newValue
+            case .oddSmp: oddSmp = newValue
+            }
         }
-        ds.sort(by: { $0.0 < $1.0 })
+    }
+}
+extension Overtone: MonoInterpolatable {
+    static func linear(_ f0: Self, _ f1: Self, t: Double) -> Self {
+        .init(evenSmp: .linear(f0.evenSmp, f1.evenSmp, t: t),
+              oddSmp: .linear(f0.oddSmp, f1.oddSmp, t: t))
+    }
+    static func firstSpline(_ f1: Self,
+                            _ f2: Self, _ f3: Self, t: Double) -> Self {
+        .init(evenSmp: .firstSpline(f1.evenSmp, f2.evenSmp, f3.evenSmp, t: t),
+              oddSmp: .firstSpline(f1.oddSmp, f2.oddSmp, f3.oddSmp, t: t))
+    }
+    static func spline(_ f0: Self, _ f1: Self,
+                       _ f2: Self, _ f3: Self, t: Double) -> Self {
+        .init(evenSmp: .spline(f0.evenSmp, f1.evenSmp, f2.evenSmp, f3.evenSmp, t: t),
+              oddSmp: .spline(f0.oddSmp, f1.oddSmp, f2.oddSmp, f3.oddSmp, t: t))
+    }
+    static func lastSpline(_ f0: Self, _ f1: Self,
+                           _ f2: Self, t: Double) -> Self {
+        .init(evenSmp: .lastSpline(f0.evenSmp, f1.evenSmp, f2.evenSmp, t: t),
+              oddSmp: .lastSpline(f0.oddSmp, f1.oddSmp, f2.oddSmp, t: t))
+    }
+    static func firstMonospline(_ f1: Self,
+                                _ f2: Self, _ f3: Self, with ms: Monospline) -> Self {
+        .init(evenSmp: .firstMonospline(f1.evenSmp, f2.evenSmp, f3.evenSmp, with: ms),
+              oddSmp: .firstMonospline(f1.oddSmp, f2.oddSmp, f3.oddSmp, with: ms))
+    }
+    static func monospline(_ f0: Self, _ f1: Self,
+                           _ f2: Self, _ f3: Self, with ms: Monospline) -> Self {
+        .init(evenSmp: .monospline(f0.evenSmp, f1.evenSmp, f2.evenSmp, f3.evenSmp, with: ms),
+              oddSmp: .monospline(f0.oddSmp, f1.oddSmp, f2.oddSmp, f3.oddSmp, with: ms))
+    }
+    static func lastMonospline(_ f0: Self, _ f1: Self,
+                               _ f2: Self, with ms: Monospline) -> Self {
+        .init(evenSmp: .lastMonospline(f0.evenSmp, f1.evenSmp, f2.evenSmp, with: ms),
+              oddSmp: .lastMonospline(f0.oddSmp, f1.oddSmp, f2.oddSmp, with: ms))
+    }
+}
+
+struct Sprol: Hashable, Codable {
+    var pitch = 0.0, smp = 0.0, noise = 0.0
+}
+extension Sprol: Protobuf {
+    init(_ pb: PBSprol) throws {
+        pitch = pb.pitch.clipped(min: .init(Score.pitchRange.start), max: .init(Score.pitchRange.end))
+        smp = pb.smp.clipped(min: 0, max: 1)
+        noise = pb.noise.clipped(min: 0, max: 1)
+    }
+    var pb: PBSprol {
+        .with {
+            $0.pitch = pitch
+            $0.smp = smp
+            $0.noise = noise
+        }
+    }
+}
+
+struct Spectlope: Hashable, Codable {
+    var sprols = [Sprol(pitch: 0, smp: 1, noise: 0),
+                    Sprol(pitch: 108, smp: 0, noise: 0)]
+}
+extension Spectlope: Protobuf {
+    init(_ pb: PBSpectlope) throws {
+        sprols = pb.sprols.compactMap { try? .init($0) }.sorted { $0.pitch < $1.pitch }
+    }
+    var pb: PBSpectlope {
+        .with {
+            $0.sprols = sprols.map { $0.pb }
+        }
+    }
+}
+extension Spectlope {
+    init(pitchSmps: [Point]) {
+        sprols = pitchSmps.map { .init(pitch: $0.x, smp: $0.y, noise: 0) }
+    }
+    init(noisePitchSmps: [Point]) {
+        sprols = noisePitchSmps.map { .init(pitch: $0.x, smp: $0.y, noise: 1) }
+    }
+}
+extension Spectlope {
+    var isEmpty: Bool {
+        sprols.isEmpty
+    }
+    var isEmptySmp: Bool {
+        !sprols.contains { $0.smp > 0 }
+    }
+    var count: Int {
+        sprols.count
+    }
+    var isFullNoise: Bool {
+        !sprols.contains { $0.noise != 1 }
+    }
+    var isNoise: Bool {
+        sprols.contains { $0.noise > 0 }
+    }
+    
+    func sprol(atPitch pitch: Double) -> Sprol {
+        guard !sprols.isEmpty else { return .init() }
+        var prePitch = sprols.first!.pitch, preSprol = sprols.first!
+        guard pitch >= prePitch else { return sprols.first! }
+        for sprol in sprols {
+            let nextPitch = sprol.pitch, nextSprol = sprol
+            guard prePitch < nextPitch else {
+                prePitch = nextPitch
+                preSprol = nextSprol
+                continue
+            }
+            if pitch < nextPitch {
+                let t = (pitch - prePitch) / (nextPitch - prePitch)
+                return .linear(preSprol, nextSprol, t: t)
+            }
+            prePitch = nextPitch
+            preSprol = nextSprol
+        }
+        return sprols.last!
+    }
+    
+    func amp(atFq fq: Double) -> Double {
+        Volume(smp: sprol(atPitch: Pitch.pitch(fromFq: fq)).smp).amp
+    }
+    
+    func noiseT(atPitch pitch: Double) -> Double {
+        sprol(atPitch: pitch).noise
+    }
+    func noiseT(atFq fq: Double) -> Double {
+        noiseT(atPitch: Pitch.pitch(fromFq: fq))
+    }
+    
+    func noiseAmp(atFq fq: Double) -> Double {
+        Volume(smp: sprol(atPitch: Pitch.pitch(fromFq: fq)).noise).amp
+    }
+    func noisedAmp(atFq fq: Double) -> Double {
+        let amp = amp(atFq: fq)
+        let noiseAmp = noiseAmp(atFq: fq)
+        return amp - noiseAmp
+    }
+    
+//    func formantPitch(at i: Int) -> Double? {
+//        
+//    }
+    
+    var splited: Self {
+        self
+    }
+}
+extension Sprol: MonoInterpolatable {
+    static func linear(_ f0: Self, _ f1: Self, t: Double) -> Self {
+        .init(pitch: .linear(f0.pitch, f1.pitch, t: t),
+              smp: .linear(f0.smp, f1.smp, t: t),
+              noise: .linear(f0.noise, f1.noise, t: t))
+    }
+    static func firstSpline(_ f1: Self,
+                            _ f2: Self, _ f3: Self, t: Double) -> Self {
+        .init(pitch: .firstSpline(f1.pitch, f2.pitch, f3.pitch, t: t),
+              smp: .firstSpline(f1.smp, f2.smp, f3.smp, t: t),
+              noise: .firstSpline(f1.noise, f2.noise, f3.noise, t: t))
+    }
+    static func spline(_ f0: Self, _ f1: Self,
+                       _ f2: Self, _ f3: Self, t: Double) -> Self {
+        .init(pitch: .spline(f0.pitch, f1.pitch, f2.pitch, f3.pitch, t: t),
+              smp: .spline(f0.smp, f1.smp, f2.smp, f3.smp, t: t),
+              noise: .spline(f0.noise, f1.noise, f2.noise, f3.noise, t: t))
+    }
+    static func lastSpline(_ f0: Self, _ f1: Self,
+                           _ f2: Self, t: Double) -> Self {
+        .init(pitch: .lastSpline(f0.pitch, f1.pitch, f2.pitch, t: t),
+              smp: .lastSpline(f0.smp, f1.smp, f2.smp, t: t),
+              noise: .lastSpline(f0.noise, f1.noise, f2.noise, t: t))
+    }
+    static func firstMonospline(_ f1: Self,
+                                _ f2: Self, _ f3: Self, with ms: Monospline) -> Self {
+        .init(pitch: .firstMonospline(f1.pitch, f2.pitch, f3.pitch, with: ms),
+              smp: .firstMonospline(f1.smp, f2.smp, f3.smp, with: ms),
+              noise: .firstMonospline(f1.noise, f2.noise, f3.noise, with: ms))
+    }
+    static func monospline(_ f0: Self, _ f1: Self,
+                           _ f2: Self, _ f3: Self, with ms: Monospline) -> Self {
+        .init(pitch: .monospline(f0.pitch, f1.pitch, f2.pitch, f3.pitch, with: ms),
+              smp: .monospline(f0.smp, f1.smp, f2.smp, f3.smp, with: ms),
+              noise: .monospline(f0.noise, f1.noise, f2.noise, f3.noise, with: ms))
+    }
+    static func lastMonospline(_ f0: Self, _ f1: Self,
+                               _ f2: Self, with ms: Monospline) -> Self {
+        .init(pitch: .lastMonospline(f0.pitch, f1.pitch, f2.pitch, with: ms),
+              smp: .lastMonospline(f0.smp, f1.smp, f2.smp, with: ms),
+              noise: .lastMonospline(f0.noise, f1.noise, f2.noise, with: ms))
+    }
+}
+extension Spectlope: MonoInterpolatable {
+    func with(count: Int) -> Self {
+        let sprols = sprols
+        guard sprols.count != count else { return self }
+        guard sprols.count < count else { fatalError() }
+        guard sprols.count > 1 else {
+            return .init(sprols: .init(repeating: sprols[0], count: count))
+        }
+        guard sprols.count > 2 else {
+            return .init(sprols: count.range.map { i in
+                let t = Double(i) / Double(count - 1)
+                return .linear(sprols[0], sprols[1], t: t)
+            })
+        }
         
-        for _ in 0 ..< (count - pitchSmps.count) {
+        var nSprols = sprols
+        nSprols.reserveCapacity(count)
+        
+        var ds: [(Double, Int)] = (0 ..< (sprols.count - 1)).map {
+            (sprols[$0].pitch.distance(sprols[$0 + 1].pitch), $0)
+        }.sorted { $0.0 < $1.0 }
+        
+        for _ in 0 ..< (count - sprols.count) {
             let ld = ds[.last]
-            nFqSmps.insert(.linear(nFqSmps[ld.1], nFqSmps[ld.1 + 1], t: 0.5), at: ld.1)
+            nSprols.insert(.linear(nSprols[ld.1], nSprols[ld.1 + 1], t: 0.5), at: ld.1)
             ds.removeLast()
             var nd = ld
             nd.0 /= 2
@@ -406,132 +553,141 @@ extension Tone {
                 }
             }
         }
-        return nFqSmps
+        return .init(sprols: nSprols)
     }
     
-    func noiseSourceFilter(isNoise: Bool) -> NoiseSourceFilter {
-        if isNoise {
-            .init(noiseFqSmps: fqSmps)
-        } else {
-            .init(fqSmps: fqSmps)
-        }
+    static func linear(_ f0: Self, _ f1: Self, t: Double) -> Self {
+        let count = max(f0.sprols.count, f1.sprols.count)
+        let l0 = f0.with(count: count)
+        let l1 = f1.with(count: count)
+        return .init(sprols: .linear(l0.sprols, l1.sprols, t: t))
     }
-    
-    func smp(atPitch pitch: Double) -> Double {
-        let pitchSmps = pitchSmps
-        guard !pitchSmps.isEmpty else { return 0 }
-        var prePitch = pitchSmps.first!.x, preSmp = pitchSmps.first!.y
-        guard pitch >= prePitch else { return pitchSmps.first!.y }
-        for scale in pitchSmps {
-            let nextPitch = scale.x, nextSmp = scale.y
-            guard prePitch < nextPitch else {
-                prePitch = nextPitch
-                preSmp = nextSmp
-                continue
-            }
-            if pitch < nextPitch {
-                let t = (pitch - prePitch) / (nextPitch - prePitch)
-                let smp = Double.linear(preSmp, nextSmp, t: t)
-                return smp
-            }
-            prePitch = nextPitch
-            preSmp = nextSmp
-        }
-        return pitchSmps.last!.y
+    static func firstSpline(_ f1: Self,
+                            _ f2: Self, _ f3: Self, t: Double) -> Self {
+        let count = max(f1.sprols.count, f2.sprols.count, f3.sprols.count)
+        let l1 = f1.with(count: count)
+        let l2 = f2.with(count: count)
+        let l3 = f3.with(count: count)
+        return .init(sprols: .firstSpline(l1.sprols, l2.sprols,
+                                            l3.sprols, t: t))
+    }
+    static func spline(_ f0: Self, _ f1: Self,
+                       _ f2: Self, _ f3: Self, t: Double) -> Self {
+        let count = max(f0.sprols.count, f1.sprols.count, f2.sprols.count, f3.sprols.count)
+        let l0 = f0.with(count: count)
+        let l1 = f1.with(count: count)
+        let l2 = f2.with(count: count)
+        let l3 = f3.with(count: count)
+        return .init(sprols: .spline(l0.sprols, l1.sprols,
+                                       l2.sprols, l3.sprols, t: t))
+    }
+    static func lastSpline(_ f0: Self, _ f1: Self,
+                           _ f2: Self, t: Double) -> Self {
+        let count = max(f0.sprols.count, f1.sprols.count, f2.sprols.count)
+        let l0 = f0.with(count: count)
+        let l1 = f1.with(count: count)
+        let l2 = f2.with(count: count)
+        return .init(sprols: .lastSpline(l0.sprols, l1.sprols,
+                                           l2.sprols, t: t))
+    }
+    static func firstMonospline(_ f1: Self,
+                                _ f2: Self, _ f3: Self, with ms: Monospline) -> Self {
+        let count = max(f1.sprols.count, f2.sprols.count, f3.sprols.count)
+        let l1 = f1.with(count: count)
+        let l2 = f2.with(count: count)
+        let l3 = f3.with(count: count)
+        return .init(sprols: .firstMonospline(l1.sprols, l2.sprols,
+                                                l3.sprols, with: ms))
+    }
+    static func monospline(_ f0: Self, _ f1: Self,
+                           _ f2: Self, _ f3: Self, with ms: Monospline) -> Self {
+        let count = max(f0.sprols.count, f1.sprols.count, f2.sprols.count, f3.sprols.count)
+        let l0 = f0.with(count: count)
+        let l1 = f1.with(count: count)
+        let l2 = f2.with(count: count)
+        let l3 = f3.with(count: count)
+        return .init(sprols: .monospline(l0.sprols, l1.sprols,
+                                           l2.sprols, l3.sprols, with: ms))
+    }
+    static func lastMonospline(_ f0: Self, _ f1: Self,
+                               _ f2: Self, with ms: Monospline) -> Self {
+        let count = max(f0.sprols.count, f1.sprols.count, f2.sprols.count)
+        let l0 = f0.with(count: count)
+        let l1 = f1.with(count: count)
+        let l2 = f2.with(count: count)
+        return .init(sprols: .lastMonospline(l0.sprols, l1.sprols,
+                                               l2.sprols, with: ms))
     }
 }
-enum OvertoneType: Int, Hashable, Codable, CaseIterable {
-    case evenSmp, oddSmp
+
+struct Tone: Hashable, Codable {
+    static let noise = Self(spectlope: .init(sprols: [.init(pitch: Double(Score.pitchRange.start),
+                                                              smp: 1, noise: 1),
+                                                        .init(pitch: Double(Score.pitchRange.end), 
+                                                              smp: 1, noise: 1)]))
+    
+    var overtone = Overtone()
+    var spectlope = Spectlope()
+    var id = UUID()
+}
+extension Tone: Protobuf {
+    init(_ pb: PBTone) throws {
+        overtone = (try? .init(pb.overtone)) ?? .init()
+        spectlope = (try? .init(pb.spectlope)) ?? .init()
+        id = (try? .init(pb.id)) ?? .init()
+    }
+    var pb: PBTone {
+        .with {
+            $0.overtone = overtone.pb
+            $0.spectlope = spectlope.pb
+            $0.id = id.pb
+        }
+    }
 }
 extension Tone {
-    var overtone: Overtone {
-        .init(evenSmp: evenSmp, oddSmp: oddSmp)
+    func with(id: UUID) -> Self {
+        var v = self
+        v.id = id
+        return v
     }
-    subscript(type: OvertoneType) -> Double {
-        get {
-            switch type {
-            case .evenSmp: evenSmp
-            case .oddSmp: oddSmp
-            }
-        }
-        set {
-            switch type {
-            case .evenSmp: evenSmp = newValue
-            case .oddSmp: oddSmp = newValue
-            }
-        }
+    func with(spectlopeCount: Int) -> Self {
+        .init(overtone: overtone, spectlope: spectlope.with(count: spectlopeCount), id: id)
     }
 }
 extension Tone: MonoInterpolatable {
     static func linear(_ f0: Self, _ f1: Self, t: Double) -> Self {
-        let count = max(f0.pitchAmps.count, f1.pitchAmps.count)
-        let l0 = f0.pitchSmpsWith(count: count)
-        let l1 = f1.pitchSmpsWith(count: count)
-        return .init(evenSmp: .linear(f0.evenSmp, f1.evenSmp, t: t),
-                     oddSmp: .linear(f0.oddSmp, f1.oddSmp, t: t),
-                     pitchSmps: .linear(l0, l1, t: t))
+        .init(overtone: .linear(f0.overtone, f1.overtone, t: t),
+              spectlope: .linear(f0.spectlope, f1.spectlope, t: t))
     }
     static func firstSpline(_ f1: Self,
                             _ f2: Self, _ f3: Self, t: Double) -> Self {
-        let count = max(f1.pitchAmps.count, f2.pitchAmps.count, f3.pitchAmps.count)
-        let l1 = f1.pitchSmpsWith(count: count)
-        let l2 = f2.pitchSmpsWith(count: count)
-        let l3 = f3.pitchSmpsWith(count: count)
-        return .init(evenSmp: .firstSpline(f1.evenSmp, f2.evenSmp, f3.evenSmp, t: t),
-                     oddSmp: .firstSpline(f1.oddSmp, f2.oddSmp, f3.oddSmp, t: t),
-                     pitchSmps: .firstSpline(l1, l2, l3, t: t))
+        .init(overtone: .firstSpline(f1.overtone, f2.overtone, f3.overtone, t: t),
+              spectlope: .firstSpline(f1.spectlope, f2.spectlope, f3.spectlope, t: t))
     }
     static func spline(_ f0: Self, _ f1: Self,
                        _ f2: Self, _ f3: Self, t: Double) -> Self {
-        let count = max(f0.pitchAmps.count, f1.pitchAmps.count, f2.pitchAmps.count, f3.pitchAmps.count)
-        let l0 = f0.pitchSmpsWith(count: count)
-        let l1 = f1.pitchSmpsWith(count: count)
-        let l2 = f2.pitchSmpsWith(count: count)
-        let l3 = f3.pitchSmpsWith(count: count)
-        return .init(evenSmp: .spline(f0.evenSmp, f1.evenSmp, f2.evenSmp, f3.evenSmp, t: t),
-                     oddSmp: .spline(f0.oddSmp, f1.oddSmp, f2.oddSmp, f3.oddSmp, t: t),
-                     pitchSmps: .spline(l0, l1, l2, l3, t: t))
+        .init(overtone: .spline(f0.overtone, f1.overtone, f2.overtone, f3.overtone, t: t),
+              spectlope: .spline(f0.spectlope, f1.spectlope, f2.spectlope, f3.spectlope, t: t))
     }
     static func lastSpline(_ f0: Self, _ f1: Self,
                            _ f2: Self, t: Double) -> Self {
-        let count = max(f0.pitchAmps.count, f1.pitchAmps.count, f2.pitchAmps.count)
-        let l0 = f0.pitchSmpsWith(count: count)
-        let l1 = f1.pitchSmpsWith(count: count)
-        let l2 = f2.pitchSmpsWith(count: count)
-        return .init(evenSmp: .lastSpline(f0.evenSmp, f1.evenSmp, f2.evenSmp, t: t),
-                     oddSmp: .lastSpline(f0.oddSmp, f1.oddSmp, f2.oddSmp, t: t),
-                     pitchSmps: .lastSpline(l0, l1, l2, t: t))
+        .init(overtone: .lastSpline(f0.overtone, f1.overtone, f2.overtone, t: t),
+              spectlope: .lastSpline(f0.spectlope, f1.spectlope, f2.spectlope, t: t))
     }
     static func firstMonospline(_ f1: Self,
                                 _ f2: Self, _ f3: Self, with ms: Monospline) -> Self {
-        let count = max(f1.pitchAmps.count, f2.pitchAmps.count, f3.pitchAmps.count)
-        let l1 = f1.pitchSmpsWith(count: count)
-        let l2 = f2.pitchSmpsWith(count: count)
-        let l3 = f3.pitchSmpsWith(count: count)
-        return .init(evenSmp: .firstMonospline(f1.evenSmp, f2.evenSmp, f3.evenSmp, with: ms),
-                     oddSmp: .firstMonospline(f1.oddSmp, f2.oddSmp, f3.oddSmp, with: ms),
-                     pitchSmps: .firstMonospline(l1, l2, l3, with: ms))
+        .init(overtone: .firstMonospline(f1.overtone, f2.overtone, f3.overtone, with: ms),
+              spectlope: .firstMonospline(f1.spectlope, f2.spectlope, f3.spectlope, with: ms))
     }
     static func monospline(_ f0: Self, _ f1: Self,
                            _ f2: Self, _ f3: Self, with ms: Monospline) -> Self {
-        let count = max(f0.pitchAmps.count, f1.pitchAmps.count, f2.pitchAmps.count, f3.pitchAmps.count)
-        let l0 = f0.pitchSmpsWith(count: count)
-        let l1 = f1.pitchSmpsWith(count: count)
-        let l2 = f2.pitchSmpsWith(count: count)
-        let l3 = f3.pitchSmpsWith(count: count)
-        return .init(evenSmp: .monospline(f0.evenSmp, f1.evenSmp, f2.evenSmp, f3.evenSmp, with: ms),
-                     oddSmp: .monospline(f0.oddSmp, f1.oddSmp, f2.oddSmp, f3.oddSmp, with: ms),
-                     pitchSmps: .monospline(l0, l1, l2, l3, with: ms))
+        .init(overtone: .monospline(f0.overtone, f1.overtone, f2.overtone, f3.overtone, with: ms),
+              spectlope: .monospline(f0.spectlope, f1.spectlope, f2.spectlope, f3.spectlope, with: ms))
     }
     static func lastMonospline(_ f0: Self, _ f1: Self,
                                _ f2: Self, with ms: Monospline) -> Self {
-        let count = max(f0.pitchAmps.count, f1.pitchAmps.count, f2.pitchAmps.count)
-        let l0 = f0.pitchSmpsWith(count: count)
-        let l1 = f1.pitchSmpsWith(count: count)
-        let l2 = f2.pitchSmpsWith(count: count)
-        return .init(evenSmp: .lastMonospline(f0.evenSmp, f1.evenSmp, f2.evenSmp, with: ms),
-                     oddSmp: .lastMonospline(f0.oddSmp, f1.oddSmp, f2.oddSmp, with: ms),
-                     pitchSmps: .lastMonospline(l0, l1, l2, with: ms))
+        .init(overtone: .lastMonospline(f0.overtone, f1.overtone, f2.overtone, with: ms),
+              spectlope: .lastMonospline(f0.spectlope, f1.spectlope, f2.spectlope, with: ms))
     }
 }
 
@@ -671,11 +827,11 @@ extension Note {
               envelope: envelope, isNoise: isNoise, id: id)
     }
     
-    func pitsEqualPitchSmpCount() -> [Pit] {
-        guard let count = pits.max(by: { $0.tone.pitchSmps.count < $1.tone.pitchSmps.count })?.tone.pitchSmps.count else { return [] }
+    func pitsEqualSpectlopeCount() -> [Pit] {
+        guard let count = pits.max(by: { $0.tone.spectlope.count < $1.tone.spectlope.count })?.tone.spectlope.count else { return [] }
         return pits.map {
             var pit = $0
-            pit.tone.pitchSmps = pit.tone.pitchSmpsWith(count: count)
+            pit.tone.spectlope = pit.tone.spectlope.with(count: count)
             return pit
         }
     }
@@ -725,11 +881,11 @@ extension Note {
     }
     
     func pitbend(fromTempo tempo: Rational) -> Pitbend {
-        let pitchSmpCount = (pits.maxValue { $0.tone.pitchSmps.count }) ?? 0
+        let spectlopeCount = (pits.maxValue { $0.tone.spectlope.sprols.count }) ?? 0
         var pitKeys: [Interpolation<InterPit>.Key] = pits.map {
             .init(value: .init(pitch: .init($0.pitch) / 12,
                                stereo: $0.stereo,
-                               tone: $0.tone.with(pitchSmpsCount: pitchSmpCount),
+                               tone: $0.tone.with(spectlopeCount: spectlopeCount),
                                lyric: $0.lyric),
                   time: .init(Score.sec(fromBeat: $0.beat, tempo: tempo)), 
                   type: .spline)
@@ -812,7 +968,9 @@ extension Note {
                          tone: pit.tone, lyric: pit.lyric,
                          envelope: envelope, isNoise: isNoise, id: id)
         }
-        return .init(notePitch: pitch, pitch: .real(value.pitch), stereo: value.stereo,
+        return .init(notePitch: pitch, pitch: .real(value.pitch.clipped(min: .init(Score.pitchRange.start),
+                                                                        max: .init(Score.pitchRange.end))),
+                     stereo: value.stereo,
                      tone: value.tone, lyric: value.lyric,
                      envelope: envelope, isNoise: isNoise, id: id)
     }

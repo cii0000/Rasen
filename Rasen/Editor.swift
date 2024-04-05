@@ -872,7 +872,7 @@ final class IOEditor: Editor {
             let xCount = max(1, Int(Double(contentURLs.count).squareRoot()))
             for url in contentURLs {
                 if let sheetView = document.madeSheetView(at: shp + dshp) {
-                    let np = contentURLs.count == 1 ? sheetView.convertFromWorld(fp) : Point(10, 10)
+                    let np = contentURLs.count == 1 ? sheetView.convertFromWorld(fp) : Point(10, 50)
                     let filename = url.lastPathComponent
                     let name = UUID().uuidString + "." + url.pathExtension
                     

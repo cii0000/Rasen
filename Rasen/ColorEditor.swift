@@ -496,15 +496,15 @@ final class ColorEditor: Editor {
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, .stereo)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
                     case .evenSmp(let pitI):
-                        beganSmp = score.notes[noteI].pits[pitI].tone.evenSmp
+                        beganSmp = score.notes[noteI].pits[pitI].tone.overtone.evenSmp
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, .tone)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
                     case .oddSmp(let pitI):
-                        beganSmp = score.notes[noteI].pits[pitI].tone.oddSmp
+                        beganSmp = score.notes[noteI].pits[pitI].tone.overtone.oddSmp
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, .tone)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
-                    case .pitchSmp(let pitI, let pitchSmpI):
-                        beganSmp = score.notes[noteI].pits[pitI].tone.pitchSmps[pitchSmpI].y
+                    case .sprol(let pitI, let sprolI):
+                        beganSmp = score.notes[noteI].pits[pitI].tone.spectlope.sprols[sprolI].smp
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, .tone)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
                     }
@@ -587,8 +587,8 @@ final class ColorEditor: Editor {
                             var note = scoreView[noteI]
                             for (pitI, beganPit) in nv.pits {
                                 guard pitI < score.notes[noteI].pits.count else { continue }
-                                let nSmp = newSmp(from: beganPit.tone[.evenSmp])
-                                note.pits[pitI].tone[.evenSmp] = nSmp
+                                let nSmp = newSmp(from: beganPit.tone.overtone[.evenSmp])
+                                note.pits[pitI].tone.overtone[.evenSmp] = nSmp
                                 note.pits[pitI].tone.id = nid
                             }
                             scoreView[noteI] = note
@@ -602,14 +602,14 @@ final class ColorEditor: Editor {
                             var note = scoreView[noteI]
                             for (pitI, beganPit) in nv.pits {
                                 guard pitI < score.notes[noteI].pits.count else { continue }
-                                let nSmp = newSmp(from: beganPit.tone[.oddSmp])
-                                note.pits[pitI].tone[.oddSmp] = nSmp
+                                let nSmp = newSmp(from: beganPit.tone.overtone[.oddSmp])
+                                note.pits[pitI].tone.overtone[.oddSmp] = nSmp
                                 note.pits[pitI].tone.id = nid
                             }
                             scoreView[noteI] = note
                         }
                     }
-                case .pitchSmp(_, let pitchSmpI):
+                case .sprol(_, let sprolI):
                     for (_, v) in beganNotePits {
                         let nid = UUID()
                         for (noteI, nv) in v {
@@ -617,9 +617,9 @@ final class ColorEditor: Editor {
                             var note = scoreView[noteI]
                             for (pitI, beganPit) in nv.pits {
                                 guard pitI < score.notes[noteI].pits.count,
-                                      pitchSmpI < note.pits[pitI].tone.pitchSmps.count else { continue }
-                                let nSmp = newSmp(from: beganPit.tone.pitchSmps[pitchSmpI].y)
-                                note.pits[pitI].tone.pitchSmps[pitchSmpI].y = nSmp
+                                      sprolI < note.pits[pitI].tone.spectlope.count else { continue }
+                                let nSmp = newSmp(from: beganPit.tone.spectlope.sprols[sprolI].smp)
+                                note.pits[pitI].tone.spectlope.sprols[sprolI].smp = nSmp
                                 note.pits[pitI].tone.id = nid
                             }
                             scoreView[noteI] = note
@@ -847,7 +847,7 @@ final class ColorEditor: Editor {
                         beganStereo = note.pits[pitI].stereo
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, .stereo)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
-                    case .evenSmp, .oddSmp, .pitchSmp: return
+                    case .evenSmp, .oddSmp, .sprol: return
                     }
                     
                     let noteIsSet = Set(beganNotePits.values.flatMap { $0.keys }).sorted()
