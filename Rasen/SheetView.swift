@@ -1245,7 +1245,7 @@ final class SheetView: View {
             if ids.isEmpty || ids.contains(scoreView.model.id) {
                 scoreView.timeNode.lineType = .color(.content)
                 scoreView.updateTimeNode(atSec: sec)
-                scoreView.peakVolume = .init()
+                scoreView.peakSmp = 0
                 scoreView.timeNode.lineWidth = isPlaying ? 4 : 1
                 scoreView.timeNode.isHidden = false
             } else {
@@ -1260,7 +1260,7 @@ final class SheetView: View {
                 }
                 contentView.timeNode?.lineType = .color(.content)
                 contentView.updateTimeNode(atSec: sec)
-                contentView.peakVolume = .init()
+                contentView.peakSmp = 0
                 contentView.timeNode?.lineWidth = isPlaying ? 3 : 1
                 contentView.timeNode?.isHidden = false
             }
@@ -1272,7 +1272,7 @@ final class SheetView: View {
                 }
                 textView.timeNode?.lineType = .color(.content)
                 textView.updateTimeNode(atSec: sec)
-                textView.peakVolume = .init()
+                textView.peakSmp = 0
                 textView.timeNode?.lineWidth = isPlaying ? 3 : 1
                 textView.timeNode?.isHidden = false
             }
@@ -1299,7 +1299,7 @@ final class SheetView: View {
     func hideOtherTimeNode() {
         if !isHiddenOtherTimeNode {
             scoreView.timeNode.path = Path()
-            scoreView.currentVolumeNode.path = Path()
+            scoreView.currentPeakSmpNode.path = Path()
             scoreView.timeNode.isHidden = true
             
             for contentView in contentsView.elementViews {
@@ -1705,21 +1705,21 @@ final class SheetView: View {
             if audiotracks.contains(where: { !$0.isEmpty }) {
                 let sequencer = Sequencer(audiotracks: audiotracks,
                                           isAsync: true,
-                                          startSec: Double(playingSec)) { [weak self] (peak) in
+                                          playStartSec: Double(playingSec)) { [weak self] (peak) in
                     DispatchQueue.main.async {
                         guard let self else { return }
                         if (self.waringDate == nil
                             || Date().timeIntervalSince(self.waringDate!) > 1 / 10.0)
                             && !self.isHiddenOtherTimeNode {
                             
-                            let peakVolume = Volume(amp: Double(peak))
+                            let peakSmp = Volume.smp(fromAmp: Double(peak))
                             for textView in self.textsView.elementViews {
-                                textView.peakVolume = peakVolume
+                                textView.peakSmp = peakSmp
                             }
                             for contentView in self.contentsView.elementViews {
-                                contentView.peakVolume = peakVolume
+                                contentView.peakSmp = peakSmp
                             }
-                            self.scoreView.peakVolume = peakVolume
+                            self.scoreView.peakSmp = peakSmp
                             self.waringDate = Date()
                         }
                     }
@@ -4798,6 +4798,7 @@ final class SheetView: View {
                 let oldNIVS = nivs.map { IndexValue(value: model.score.notes[$0.index],
                                                     index: $0.index) }
                 if oldNIVS != nivs {
+                    print(model.score.notes.count, oldNIVS, nivs)
                     history[result.version].values[result.valueIndex]
                         .saveUndoItemValue?.set(.insertNotes(oldNIVS), type: reversedType)
                 }

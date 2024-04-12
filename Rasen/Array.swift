@@ -101,13 +101,15 @@ extension Sequence where Element: AdditiveArithmetic {
 }
 extension RandomAccessCollection {
     func mean<Result>(_ nextPartialResult: (Element) throws -> Result)
-    rethrows -> Result where Result: FloatingPoint {
+    rethrows -> Result? where Result: FloatingPoint {
+        isEmpty ? nil :
         (try reduce(Result.zero) { $0 + (try nextPartialResult($1)) })
         / Result(self.count)
     }
 }
 extension RandomAccessCollection where Element: FloatingPoint {
-    func mean() -> Element {
+    func mean() -> Element? {
+        isEmpty ? nil :
         reduce(.zero, +) / Element(self.count)
     }
     func median() -> Element {

@@ -293,7 +293,7 @@ final class Movie {
                     progressHandler: (Double, inout Bool) -> ()) throws {
         if isCompress {
             guard let oBuffer = try seq.buffer(sampleRate: sampleRate,
-                                               clippingAmp: nil,
+                                               headroomAmp: nil,
                                                progressHandler: progressHandler) else { return }
             oBuffer.compress(targetDb: -Audio.headroomDb)
             guard let buffer = oBuffer.cmSampleBuffer else { return }
@@ -346,7 +346,7 @@ final class Movie {
                 switch status {
                 case .success:
                     autoreleasepool {
-                        buffer.clip(amp: Float(Audio.floatClippingAmp))
+                        buffer.clip(amp: Float(Audio.floatHeadroomAmp))
                         
                         guard let buffer = buffer.cmSampleBuffer else { return }
                         audioInput.append(buffer)

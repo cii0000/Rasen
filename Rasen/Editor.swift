@@ -1689,7 +1689,7 @@ final class IOEditor: Editor {
                     }
                     if !isStop {
                         if let sequencer = Sequencer(audiotracks: audiotracks,
-                                                     isAsync: false, startSec: 0) {
+                                                     isAsync: false, playStartSec: 0) {
                             try movie.writeAudio(from: sequencer) { t, stop in
                                 progressHandler(t * 0.2 + 0.8, &isStop)
                                 if isStop {
@@ -1766,7 +1766,7 @@ final class IOEditor: Editor {
                 }
                 if !isStop {
                     if let sequencer = Sequencer(audiotracks: audiotracks,
-                                                 isAsync: false, startSec: 0) {
+                                                 isAsync: false, playStartSec: 0) {
                         try sequencer.export(url: ioResult.url,
                                              sampleRate: Audio.defaultExportSampleRate) { (t, stop) in
                             progressHandler(t * 0.8 + 0.2, &isStop)

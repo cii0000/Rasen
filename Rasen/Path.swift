@@ -1545,7 +1545,7 @@ extension Path {
     }
     
     func fillColorsDataWith(_ colors: [Color]) -> [RGBA] {
-        colors.map { $0.rgba }
+        colors.map { $0.rgba.premultipliedAlpha }
     }
     func lineColorsDataWith(_ colors: [Color], lineWidth lw: Double,
                             quality: Double = 1) -> [RGBA] {
@@ -1554,11 +1554,11 @@ extension Path {
         
         func append(from m: Int) {
             guard m < colors.count else { return }
-            rgbas.append(colors[m].rgba)
+            rgbas.append(colors[m].rgba.premultipliedAlpha)
         }
         func append(from m: Int, t: Double) {
             guard m < colors.count else { return }
-            let rgba = Color.linear(colors[m - 1], colors[m], t: t).rgba
+            let rgba = Color.linear(colors[m - 1], colors[m], t: t).rgba.premultipliedAlpha
             rgbas.append(rgba)
         }
         
@@ -1566,12 +1566,12 @@ extension Path {
                             arcAngle: Double = .pi / 2,
                             at m: Int) {
             guard m < colors.count else { return }
-            rgbas.append(colors[m].rgba)
+            rgbas.append(colors[m].rgba.premultipliedAlpha)
             let c = r * arcAngle * 2
             let count = c.isNaN ? 4 : max(4, Int(c) * 2)
             for _ in 1 ... count {
-                rgbas.append(colors[m].rgba)
-                rgbas.append(colors[m].rgba)
+                rgbas.append(colors[m].rgba.premultipliedAlpha)
+                rgbas.append(colors[m].rgba.premultipliedAlpha)
             }
         }
         func appendFirstCap(with fb: Bezier, _ preb: BezierInterpolation,
@@ -1619,10 +1619,10 @@ extension Path {
             let c = r * arcAngle * 2
             let count = c.isNaN ? 4 : max(4, Int(c) * 2)
             for _ in (1 ... count).reversed() {
-                rgbas.append(colors[m].rgba)
-                rgbas.append(colors[m].rgba)
+                rgbas.append(colors[m].rgba.premultipliedAlpha)
+                rgbas.append(colors[m].rgba.premultipliedAlpha)
             }
-            rgbas.append(colors[m].rgba)
+            rgbas.append(colors[m].rgba.premultipliedAlpha)
         }
         func appendLastCap(with lb: Bezier, _ preb: BezierInterpolation,
                            at m: Int) {

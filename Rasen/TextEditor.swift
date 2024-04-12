@@ -776,16 +776,23 @@ final class TextEditor: Editor {
                 let key = (event.inputKeyType.name
                     .applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? "").lowercased()
                 var lyric = note.pits[pitI].lyric
+                if lyric == "%" {
+                    lyric = ""
+                }
                 if event.inputKeyType == .delete, !lyric.isEmpty {
                     lyric.removeLast()
                 } else if event.inputKeyType != .delete {
                     lyric += key
                 }
                 if lyric != note.pits[pitI].lyric {
-                    note.replace(lyric: lyric, at: pitI, tempo: scoreView.model.tempo)
+                    let notes = note.replaceAndOnsetNotes(lyric: lyric, at: pitI,
+                                                          tempo: scoreView.model.tempo)
                     
                     sheetView.newUndoGroup()
                     sheetView.replace(note, at: noteI)
+                    if !notes.isEmpty {
+                        sheetView.append(notes)
+                    }
                 }
                 return
             }
@@ -1483,21 +1490,18 @@ final class TextView<T: BinderProtocol>: TimelineView {
     let id = UUID()
     
     let timelineNode = Node()
-    var timeNode: Node?, currentVolumeNode: Node?
-    var peakVolume = Volume() {
+    var timeNode: Node?, currentPeakSmpNode: Node?
+    var peakSmp = 0.0 {
         didSet {
-            guard peakVolume != oldValue else { return }
-            updateFromPeakVolume()
+            guard peakSmp != oldValue else { return }
+            updateFromPeakSmp()
         }
     }
-    func updateFromPeakVolume() {
-        guard let node = currentVolumeNode,
-              let frame = timelineFrame else { return }
-        let smp = peakVolume.smp
-            .clipped(min: 0, max: Volume.maxSmp, newMin: 0, newMax: 1)
-        let y = frame.height * smp
+    func updateFromPeakSmp() {
+        guard let node = currentPeakSmpNode, let frame = timelineFrame else { return }
+        let y = frame.height * peakSmp
         node.path = Path([Point(), Point(0, y)])
-        if abs(peakVolume.amp) < Audio.clippingAmp {
+        if peakSmp < Audio.headroomSmp {
             node.lineType = .color(.background)
         } else {
             node.lineType = .color(.warning)
@@ -1576,15 +1580,15 @@ extension TextView {
             timelineNode.children = self.timelineNode(timeOption, from: typesetter)
             
             let timeNode = Node(lineWidth: 3, lineType: .color(.content))
-            let volumeNode = Node(lineWidth: 1, lineType: .color(.background))
-            timeNode.append(child: volumeNode)
+            let smpNode = Node(lineWidth: 1, lineType: .color(.background))
+            timeNode.append(child: smpNode)
             timelineNode.children.append(timeNode)
             self.timeNode = timeNode
-            self.currentVolumeNode = volumeNode
+            self.currentPeakSmpNode = smpNode
         } else if !timelineNode.children.isEmpty {
             timelineNode.children = []
             self.timeNode = nil
-            self.currentVolumeNode = nil
+            self.currentPeakSmpNode = nil
         }
     }
     

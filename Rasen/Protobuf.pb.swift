@@ -823,6 +823,31 @@ struct PBImage {
   init() {}
 }
 
+struct PBStereo {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var smp: Double = 0
+
+  var pan: Double = 0
+
+  var id: PBUUID {
+    get {return _id ?? PBUUID()}
+    set {_id = newValue}
+  }
+  /// Returns true if `id` has been explicitly set.
+  var hasID: Bool {return self._id != nil}
+  /// Clears the value of `id`. Subsequent reads from it will return its default value.
+  mutating func clearID() {self._id = nil}
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+
+  fileprivate var _id: PBUUID? = nil
+}
+
 struct PBContent {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -833,15 +858,14 @@ struct PBContent {
     set {_uniqueStorage()._name = newValue}
   }
 
-  var volumeAmp: Double {
-    get {return _storage._volumeAmp}
-    set {_uniqueStorage()._volumeAmp = newValue}
+  var stereo: PBStereo {
+    get {return _storage._stereo ?? PBStereo()}
+    set {_uniqueStorage()._stereo = newValue}
   }
-
-  var pan: Double {
-    get {return _storage._pan}
-    set {_uniqueStorage()._pan = newValue}
-  }
+  /// Returns true if `stereo` has been explicitly set.
+  var hasStereo: Bool {return _storage._stereo != nil}
+  /// Clears the value of `stereo`. Subsequent reads from it will return its default value.
+  mutating func clearStereo() {_uniqueStorage()._stereo = nil}
 
   var size: PBSize {
     get {return _storage._size ?? PBSize()}
@@ -911,31 +935,6 @@ struct PBContent {
   init() {}
 
   fileprivate var _storage = _StorageClass.defaultInstance
-}
-
-struct PBStereo {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  var amp: Double = 0
-
-  var pan: Double = 0
-
-  var id: PBUUID {
-    get {return _id ?? PBUUID()}
-    set {_id = newValue}
-  }
-  /// Returns true if `id` has been explicitly set.
-  var hasID: Bool {return self._id != nil}
-  /// Clears the value of `id`. Subsequent reads from it will return its default value.
-  mutating func clearID() {self._id = nil}
-
-  var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  init() {}
-
-  fileprivate var _id: PBUUID? = nil
 }
 
 struct PBOvertone {
@@ -1095,7 +1094,7 @@ struct PBEnvelope {
 
   var decaySec: Double = 0
 
-  var sustainAmp: Double = 0
+  var sustainSmp: Double = 0
 
   var releaseSec: Double = 0
 
@@ -3810,9 +3809,9 @@ extension PBPicture: @unchecked Sendable {}
 extension PBDate: @unchecked Sendable {}
 extension PBContentTimeOption: @unchecked Sendable {}
 extension PBImage: @unchecked Sendable {}
+extension PBStereo: @unchecked Sendable {}
 extension PBContent: @unchecked Sendable {}
 extension PBContent.OneOf_ContentTimeOptionOptional: @unchecked Sendable {}
-extension PBStereo: @unchecked Sendable {}
 extension PBOvertone: @unchecked Sendable {}
 extension PBSprol: @unchecked Sendable {}
 extension PBSpectlope: @unchecked Sendable {}
@@ -4951,12 +4950,59 @@ extension PBImage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
   }
 }
 
+extension PBStereo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = "PBStereo"
+  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "smp"),
+    2: .same(proto: "pan"),
+    3: .same(proto: "id"),
+  ]
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularDoubleField(value: &self.smp) }()
+      case 2: try { try decoder.decodeSingularDoubleField(value: &self.pan) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._id) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    if self.smp != 0 {
+      try visitor.visitSingularDoubleField(value: self.smp, fieldNumber: 1)
+    }
+    if self.pan != 0 {
+      try visitor.visitSingularDoubleField(value: self.pan, fieldNumber: 2)
+    }
+    try { if let v = self._id {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    } }()
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: PBStereo, rhs: PBStereo) -> Bool {
+    if lhs.smp != rhs.smp {return false}
+    if lhs.pan != rhs.pan {return false}
+    if lhs._id != rhs._id {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBContent"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "name"),
-    2: .same(proto: "volumeAmp"),
-    3: .same(proto: "pan"),
+    2: .same(proto: "stereo"),
     4: .same(proto: "size"),
     5: .same(proto: "origin"),
     6: .same(proto: "isShownSpectrogram"),
@@ -4966,8 +5012,7 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
 
   fileprivate class _StorageClass {
     var _name: String = String()
-    var _volumeAmp: Double = 0
-    var _pan: Double = 0
+    var _stereo: PBStereo? = nil
     var _size: PBSize? = nil
     var _origin: PBPoint? = nil
     var _isShownSpectrogram: Bool = false
@@ -4980,8 +5025,7 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
 
     init(copying source: _StorageClass) {
       _name = source._name
-      _volumeAmp = source._volumeAmp
-      _pan = source._pan
+      _stereo = source._stereo
       _size = source._size
       _origin = source._origin
       _isShownSpectrogram = source._isShownSpectrogram
@@ -5006,8 +5050,7 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
         // enabled. https://github.com/apple/swift-protobuf/issues/1034
         switch fieldNumber {
         case 1: try { try decoder.decodeSingularStringField(value: &_storage._name) }()
-        case 2: try { try decoder.decodeSingularDoubleField(value: &_storage._volumeAmp) }()
-        case 3: try { try decoder.decodeSingularDoubleField(value: &_storage._pan) }()
+        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._stereo) }()
         case 4: try { try decoder.decodeSingularMessageField(value: &_storage._size) }()
         case 5: try { try decoder.decodeSingularMessageField(value: &_storage._origin) }()
         case 6: try { try decoder.decodeSingularBoolField(value: &_storage._isShownSpectrogram) }()
@@ -5040,12 +5083,9 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       if !_storage._name.isEmpty {
         try visitor.visitSingularStringField(value: _storage._name, fieldNumber: 1)
       }
-      if _storage._volumeAmp != 0 {
-        try visitor.visitSingularDoubleField(value: _storage._volumeAmp, fieldNumber: 2)
-      }
-      if _storage._pan != 0 {
-        try visitor.visitSingularDoubleField(value: _storage._pan, fieldNumber: 3)
-      }
+      try { if let v = _storage._stereo {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+      } }()
       try { if let v = _storage._size {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
       } }()
@@ -5071,8 +5111,7 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
         let _storage = _args.0
         let rhs_storage = _args.1
         if _storage._name != rhs_storage._name {return false}
-        if _storage._volumeAmp != rhs_storage._volumeAmp {return false}
-        if _storage._pan != rhs_storage._pan {return false}
+        if _storage._stereo != rhs_storage._stereo {return false}
         if _storage._size != rhs_storage._size {return false}
         if _storage._origin != rhs_storage._origin {return false}
         if _storage._isShownSpectrogram != rhs_storage._isShownSpectrogram {return false}
@@ -5082,54 +5121,6 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       }
       if !storagesAreEqual {return false}
     }
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension PBStereo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = "PBStereo"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "amp"),
-    2: .same(proto: "pan"),
-    3: .same(proto: "id"),
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularDoubleField(value: &self.amp) }()
-      case 2: try { try decoder.decodeSingularDoubleField(value: &self.pan) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._id) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if self.amp != 0 {
-      try visitor.visitSingularDoubleField(value: self.amp, fieldNumber: 1)
-    }
-    if self.pan != 0 {
-      try visitor.visitSingularDoubleField(value: self.pan, fieldNumber: 2)
-    }
-    try { if let v = self._id {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-    } }()
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: PBStereo, rhs: PBStereo) -> Bool {
-    if lhs.amp != rhs.amp {return false}
-    if lhs.pan != rhs.pan {return false}
-    if lhs._id != rhs._id {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5394,7 +5385,7 @@ extension PBEnvelope: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "attackSec"),
     2: .same(proto: "decaySec"),
-    3: .same(proto: "sustainAmp"),
+    3: .same(proto: "sustainSmp"),
     4: .same(proto: "releaseSec"),
     5: .same(proto: "id"),
   ]
@@ -5407,7 +5398,7 @@ extension PBEnvelope: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularDoubleField(value: &self.attackSec) }()
       case 2: try { try decoder.decodeSingularDoubleField(value: &self.decaySec) }()
-      case 3: try { try decoder.decodeSingularDoubleField(value: &self.sustainAmp) }()
+      case 3: try { try decoder.decodeSingularDoubleField(value: &self.sustainSmp) }()
       case 4: try { try decoder.decodeSingularDoubleField(value: &self.releaseSec) }()
       case 5: try { try decoder.decodeSingularMessageField(value: &self._id) }()
       default: break
@@ -5426,8 +5417,8 @@ extension PBEnvelope: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
     if self.decaySec != 0 {
       try visitor.visitSingularDoubleField(value: self.decaySec, fieldNumber: 2)
     }
-    if self.sustainAmp != 0 {
-      try visitor.visitSingularDoubleField(value: self.sustainAmp, fieldNumber: 3)
+    if self.sustainSmp != 0 {
+      try visitor.visitSingularDoubleField(value: self.sustainSmp, fieldNumber: 3)
     }
     if self.releaseSec != 0 {
       try visitor.visitSingularDoubleField(value: self.releaseSec, fieldNumber: 4)
@@ -5441,7 +5432,7 @@ extension PBEnvelope: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
   static func ==(lhs: PBEnvelope, rhs: PBEnvelope) -> Bool {
     if lhs.attackSec != rhs.attackSec {return false}
     if lhs.decaySec != rhs.decaySec {return false}
-    if lhs.sustainAmp != rhs.sustainAmp {return false}
+    if lhs.sustainSmp != rhs.sustainSmp {return false}
     if lhs.releaseSec != rhs.releaseSec {return false}
     if lhs._id != rhs._id {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}

@@ -359,8 +359,8 @@ extension Double {
     
     static func leastSquares(xs: [Double],
                              ys: [Double]) -> (a: Double, b: Double) {
-        let meanX = xs.mean()
-        let meanY = ys.mean()
+        let meanX = xs.mean() ?? 0
+        let meanY = ys.mean() ?? 0
         let xc = xs.map { $0 - meanX }
         let yc = ys.map { $0 - meanY }
         let xx = xc.map { $0 * $0 }

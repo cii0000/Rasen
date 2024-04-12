@@ -1370,13 +1370,13 @@ final class LineSlider: DragEditor {
             document.cursor = .arrow
 
             func updatePlayer(from vs: [Note.PitResult], in sheetView: SheetView) {
-                let volume = Volume(smp: sheetView.isPlaying ? 0.1 : 1)
+                let stereo = Stereo(smp: sheetView.isPlaying ? 0.1 : 1)
                 if let notePlayer = sheetView.notePlayer {
                     self.notePlayer = notePlayer
                     notePlayer.notes = vs
-                    notePlayer.volume = volume
+                    notePlayer.stereo = stereo
                 } else {
-                    notePlayer = try? NotePlayer(notes: vs, volume: volume)
+                    notePlayer = try? NotePlayer(notes: vs, stereo: stereo)
                     sheetView.notePlayer = notePlayer
                 }
                 notePlayer?.play()
@@ -1525,9 +1525,7 @@ final class LineSlider: DragEditor {
                                 
                                 let nPressures = pressures
                                     .filter { (0.04 ..< 0.4).contains(event.time - $0.time) }
-                                let nPressure = nPressures.isEmpty ?
-                                pressures.first!.pressure :
-                                nPressures.mean { $0.pressure }
+                                let nPressure = nPressures.mean { $0.pressure } ?? pressures.first!.pressure
                                 line.controls[pointIndex].pressure = nPressure
                             }
                             
@@ -1876,7 +1874,7 @@ final class KeyframeInserter: InputKeyEditor {
                         let score = scoreView.model
                         let scoreP = scoreView.convertFromWorld(p)
                         if let (pitI, _) = scoreView.pitIAndSprolI(at: scoreP, at: noteI) {
-                            let sprol = scoreView.sprol(at: scoreP, at: noteI)
+                            let sprol = scoreView.nearestSprol(at: scoreP, at: noteI)
                             let oldTone = score.notes[noteI].pits[pitI].tone
                             var tone = oldTone
                             let i = tone.spectlope.sprols.enumerated().reversed()

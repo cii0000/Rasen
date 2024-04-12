@@ -166,28 +166,28 @@ struct Loudness {
                               Point(15000, 0.8)]
     
     static func scale40Phon(fromFq fq: Double) -> Double {
-        var preFq = 0.0, preDb = ps.last!.y
+        var preFq = 0.0, preScale = ps.last!.y
         
         for p in ps {
             if fq < p.x {
                 let t = (fq - preFq) / (p.x - preFq)
-                return Double.linear(preDb, p.y, t: t)
+                return Double.linear(preScale, p.y, t: t)
             }
             preFq = p.x
-            preDb = p.y
+            preScale = p.y
         }
         return ps.last!.y
     }
     static func reverseScale40Phon(fromFq fq: Double) -> Double {
-        var preFq = 0.0, preDb = rps.last!.y
+        var preFq = 0.0, preScale = rps.last!.y
         
         for p in rps {
             if fq < p.x {
                 let t = (fq - preFq) / (p.x - preFq)
-                return Double.linear(preDb, p.y, t: t)
+                return Double.linear(preScale, p.y, t: t)
             }
             preFq = p.x
-            preDb = p.y
+            preScale = p.y
         }
         return rps.last!.y
     }
@@ -320,7 +320,7 @@ struct Loudness {
         let J_g0 = l.enumerated().compactMap { j, l_j in l_j >= GammaA ? j : nil }
         
         // calculate the average of z[i][j] as show in eq. 5
-        let zAvgGated0 = (0 ..< numChannels).map { i in J_g0.mean { j in z[i][j] } }
+        let zAvgGated0 = (0 ..< numChannels).map { i in J_g0.mean { j in z[i][j] } ?? 0 }
         
         // calculate the relative threshold value (see eq. 6)
         let n0 = (0 ..< numChannels).sum { i in G[i] * zAvgGated0[i] }
@@ -331,7 +331,7 @@ struct Loudness {
         
         // calculate the average of z[i][j] as show in eq. 7 with blocks above both thresholds
         let zAvgGated1 = (0 ..< numChannels)
-            .map { i in J_g1.mean { j in z[i][j] } }
+            .map { i in J_g1.mean { j in z[i][j] } ?? 0 }
             .map { $0.isNaN || $0.isInfinite ? 0 : $0 }
         
         // calculate final loudness gated loudness (see eq. 7)

@@ -997,7 +997,7 @@ final class LineEditor: Editor {
                 let tone = isStraight ? Tone.noise : Tone()
                 let note = Note(beatRange: beatRange, pitch: pitch,
                                 pits: .init([.init(beat: 0, pitch: 0, tone: tone)]),
-                                envelope: isStraight ? .init(releaseSec: 1) : .init(),
+                                envelope: isStraight ? .init(releaseSec: 0.5) : .init(),
                                 isNoise: isStraight)
                 
                 noteI = count
@@ -1005,14 +1005,14 @@ final class LineEditor: Editor {
                 noteStartBeat = beat
                 beganScore = score
                 
-                let volume = Volume(smp: sheetView.isPlaying ? 0.1 : 1)
+                let stereo = Stereo(smp: sheetView.isPlaying ? 0.1 : 1)
                 if let notePlayer = sheetView.notePlayer {
                     self.notePlayer = notePlayer
                     notePlayer.notes = [note.firstPitResult]
-                    notePlayer.volume = volume
+                    notePlayer.stereo = stereo
                 } else {
                     let note = isStraight ? Note(beatRange: beatRange, pitch: pitch) : note
-                    notePlayer = try? NotePlayer(notes: [note.firstPitResult], volume: volume)
+                    notePlayer = try? NotePlayer(notes: [note.firstPitResult], stereo: stereo)
                     sheetView.notePlayer = notePlayer
                 }
                 notePlayer?.play()
@@ -1044,7 +1044,7 @@ final class LineEditor: Editor {
                 let tone = isStraight ? Tone.noise : Tone()
                 let note = Note(beatRange: beatRange, pitch: pitch,
                                 pits: [.init(beat: 0, pitch: 0, tone: tone)],
-                                envelope: isStraight ? .init(releaseSec: 1) : .init(),
+                                envelope: isStraight ? .init(releaseSec: 0.5) : .init(),
                                 isNoise: isStraight)
                 let isNote = notePitch != pitch
                 
@@ -1064,29 +1064,19 @@ final class LineEditor: Editor {
             tempLineNode = nil
             
             let p = document.convertScreenToWorld(event.screenPoint)
-            if let sheetView = noteSheetView, let nsBeat = noteStartBeat, let noteI {
+            if let sheetView = noteSheetView, let nsBeat = noteStartBeat, let noteI,
+               !sheetView.model.score.notes.isEmpty {
+                
                 let scoreView = sheetView.scoreView
                 let sheetP = sheetView.convertFromWorld(p)
-                let scoreP = scoreView.convertFromWorld(p)
-                let pitch = document.pitch(from: scoreView, at: scoreP)
-                    .clipped(min: Score.pitchRange.start, max: Score.pitchRange.end)
                 let interval = document.currentNoteBeatInterval
                 let beat = scoreView.beat(atX: sheetP.x, interval: interval)
                 let beatRange = beat > nsBeat ? nsBeat ..< beat : beat ..< nsBeat
                 if beatRange.length == 0 {
                     scoreView.remove(at: noteI)
                 } else {
-                    let tone = isStraight ? Tone.noise : Tone()
-                    let note = Note(beatRange: beatRange, pitch: pitch,
-                                    pits: [.init(beat: 0, pitch: 0, tone: tone)],
-                                    isNoise: isStraight)
-                        
-    //                   sheetView.scoresView.elementViews[si]
-    //                      .model.notes[ni] = note
-                    
                     sheetView.newUndoGroup()
-                    sheetView.captureAppend(note)
-    //                  sheetView.replaceScore(score, at: ti)
+                    sheetView.captureAppend(sheetView.model.score.notes.last!)
                 }
                 
                 sheetView.updatePlaying()

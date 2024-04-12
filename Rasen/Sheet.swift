@@ -2415,9 +2415,9 @@ extension Sheet {
         let audiotrack = audiotrack
         if !audiotrack.isEmpty,
            let sequencer = Sequencer(audiotracks: [audiotrack],
-                                     isAsync: false, startSec: 0) {
-            return try? sequencer.buffer(sampleRate: 44100,
-                                         clippingAmp: nil) { _, _ in }
+                                     isAsync: false, playStartSec: 0) {
+            return try? sequencer.buffer(sampleRate: Audio.defaultExportSampleRate,
+                                         headroomAmp: nil) { _, _ in }
         }
         return nil
     }

@@ -110,30 +110,28 @@ struct Content: Hashable, Codable {
     let url: URL
     let type: ContentType
     let durSec: Double
-    let volumeValues: [Double]
+    let smps: [Double]
     let image: Image?
     
-    var volume = Volume(smp: 1)
-    var pan = 0.0
+    var stereo = Stereo(smp: 1)
     var size = Size(width: 100, height: 100)
     var origin = Point()
     var isShownSpectrogram = false
     var timeOption: ContentTimeOption?
     var id = UUID()
     
-    init(name: String = "empty", volume: Volume = Volume(smp: 1), pan: Double = 0,
+    init(name: String = "empty", stereo: Stereo = .init(smp: 1, pan: 0),
          size: Size = Size(width: 100, height: 100), origin: Point = Point(),
          isShownSpectrogram: Bool = false, timeOption: ContentTimeOption? = nil) {
         self.name = name
         url = URL.contents.appending(component: name)
         type = Self.type(from: url)
         durSec = type.isDuration ? Self.duration(from: url) : 0
-        volumeValues = type.isDuration ?
-        (try? Content.volumeValues(url: url)) ?? [] : []
+        smps = type.isDuration ?
+        (try? Content.smps(url: url)) ?? [] : []
         image = Image(url: url)
         
-        self.volume = volume
-        self.pan = pan
+        self.stereo = stereo
         self.size = size
         self.origin = origin
         self.isShownSpectrogram = isShownSpectrogram
@@ -142,19 +140,18 @@ struct Content: Hashable, Codable {
         if type.isDuration, let lufs = integratedLoudness, lufs > -14 {
             let gain = Loudness.normalizeLoudnessScale(inputLoudness: lufs,
                                                        targetLoudness: -14)
-            self.volume.amp *= gain
+            self.stereo.smp = Volume.smp(fromAmp: Volume.amp(fromSmp: stereo.smp) * gain)
         }
     }
-    static let volumeFrameRate = Rational(Keyframe.defaultFrameRate)
-    static func volumeValues(fps: Rational = volumeFrameRate,
-                             url: URL) throws -> [Double] {
+    static let smpFrameRate = Rational(Keyframe.defaultFrameRate)
+    static func smps(fps: Rational = smpFrameRate, url: URL) throws -> [Double] {
         let buffer = try AVAudioPCMBuffer.from(url: url)
-        let volumeFrameCount = Int(buffer.sampleRate / Double(fps))
-        let count = buffer.frameCount / volumeFrameCount
-        var volumeValues = [Double]()
-        volumeValues.reserveCapacity(count)
-        let hvfc = volumeFrameCount / 2, frameCount = buffer.frameCount
-        for i in stride(from: 0, to: frameCount, by: volumeFrameCount) {
+        let smpFrameCount = Int(buffer.sampleRate / Double(fps))
+        let count = buffer.frameCount / smpFrameCount
+        var smps = [Double]()
+        smps.reserveCapacity(count)
+        let hvfc = smpFrameCount / 2, frameCount = buffer.frameCount
+        for i in stride(from: 0, to: frameCount, by: smpFrameCount) {
             var x: Float = 0.0
             for j in (i - hvfc) ..< (i + hvfc) {
                 if j >= 0 && j < frameCount {
@@ -163,10 +160,9 @@ struct Content: Hashable, Codable {
                     }
                 }
             }
-            volumeValues.append(Volume(amp: Double(x)).smp
-                .clipped(min: 0, max: 1))
+            smps.append(Volume.smp(fromAmp: Double(x)).clipped(min: 0, max: 1))
         }
-        return volumeValues
+        return smps
     }
     static func duration(from url: URL) -> Double {
         if let file = try? AVAudioFile(forReading: url,
@@ -188,14 +184,6 @@ extension Content {
             return Range(start: timeOption.localStartBeat, length: durBeat)
         } else {
             return nil
-        }
-    }
-    
-    var stereo: Stereo {
-        get { .init(smp: volume.smp, pan: pan) }
-        set {
-            volume = Volume(smp: newValue.smp)
-            pan = newValue.pan
         }
     }
     
@@ -229,12 +217,10 @@ extension Content: Protobuf {
         url = URL.contents.appending(component: name)
         type = Content.type(from: url)
         durSec = type.isDuration ? Content.duration(from: url) : 0
-        volumeValues = type.isDuration ? ((try? Content.volumeValues(url: url)) ?? []) : []
+        smps = type.isDuration ? ((try? Content.smps(url: url)) ?? []) : []
         image = type == .image ? Image(url: url) : nil
         
-        volume = .init(amp: ((try? pb.volumeAmp.notNaN()) ?? 1)
-            .clipped(min: 0, max: Volume.maxAmp))
-        pan = pb.pan.clipped(min: -1, max: 1)
+        stereo = (try? .init(pb.stereo)) ?? .init(smp: 1)
         size = (try? .init(pb.size)) ?? .init(width: 100, height: 100)
         origin = (try? .init(pb.origin)) ?? .init()
         isShownSpectrogram = pb.isShownSpectrogram
@@ -248,8 +234,7 @@ extension Content: Protobuf {
     var pb: PBContent {
         .with {
             $0.name = name
-            $0.volumeAmp = volume.amp
-            $0.pan = pan
+            $0.stereo = stereo.pb
             $0.size = size.pb
             $0.origin = origin.pb
             $0.isShownSpectrogram = isShownSpectrogram
@@ -270,8 +255,8 @@ final class ContentPlayer {
         self.content = content
         
         player = try AVAudioPlayer(contentsOf: content.url)
-        if content.volume.amp != 1 {
-            player.volume = Float(content.volume.amp)
+        if content.stereo.smp != 1 {
+            player.volume = Float(Volume.amp(fromSmp: content.stereo.smp))
         }
     }
     deinit {

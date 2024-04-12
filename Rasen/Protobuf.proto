@@ -154,10 +154,15 @@ message PBImage {
     bytes data = 1;
 }
 
+message PBStereo {
+    double smp = 1;
+    double pan = 2;
+    PBUUID id = 3;
+}
+
 message PBContent {
     string name = 1;
-    double volumeAmp = 2;
-    double pan = 3;
+    PBStereo stereo = 2;
     PBSize size = 4;
     PBPoint origin = 5;
     bool isShownSpectrogram = 6;
@@ -165,12 +170,6 @@ message PBContent {
         PBContentTimeOption timeOption = 7;
     }
     PBUUID id = 8;
-}
-
-message PBStereo {
-    double amp = 1;
-    double pan = 2;
-    PBUUID id = 3;
 }
 
 message PBOvertone {
@@ -207,7 +206,7 @@ message PBPitbend {
 message PBEnvelope {
     double attackSec = 1;
     double decaySec = 2;
-    double sustainAmp = 3;
+    double sustainSmp = 3;
     double releaseSec = 4;
     PBUUID id = 5;
 }

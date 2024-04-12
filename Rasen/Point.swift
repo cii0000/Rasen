@@ -108,13 +108,15 @@ extension Point: Protobuf {
 }
 extension RandomAccessCollection where Element == Point {
     func mean(_ nextPartialResult: (Element) throws -> Point)
-    rethrows -> Point {
+    rethrows -> Point? {
+        isEmpty ? nil :
         (try reduce(.zero) { $0 + (try nextPartialResult($1)) })
         / self.count
     }
 }
 extension RandomAccessCollection where Element == Point {
-    func mean() -> Element {
+    func mean() -> Element? {
+        isEmpty ? nil :
         reduce(.zero, +) / self.count
     }
 }

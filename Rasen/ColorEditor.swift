@@ -248,30 +248,6 @@ final class ColorEditor: Editor {
         }
     }
     
-    func volumeNodes(from volume: Volume, firstVolume: Volume, at p: Point) -> [Node] {
-        let vh = 50.0
-        let defaultVH = vh * (1 / Volume.maxSmp)
-        let vKnobW = 8.0, vKbobH = 2.0
-        let vx = 0.0, vy = 0.0
-        let y = volume.smp.clipped(min: Volume.minSmp, max: Volume.maxSmp,
-                                   newMin: 0, newMax: vh)
-        let fy = firstVolume.smp.clipped(min: Volume.minSmp, max: Volume.maxSmp,
-                                         newMin: 0, newMax: vh)
-        let path = Path([Pathline(Polygon(points: [Point(vx, vy),
-                                                   Point(vx + 1.5, vy + vh),
-                                                   Point(vx - 1.5, vy + vh)])),
-                         Pathline(Rect(x: vx - vKnobW / 2,
-                                       y: vy + y - vKbobH / 2,
-                                       width: vKnobW,
-                                       height: vKbobH)),
-                         Pathline(Rect(x: vx - 3,
-                                       y: vy + defaultVH - 1 / 2,
-                                       width: 6,
-                                       height: 1))])
-        return [Node(attitude: .init(position: p - Point(0, fy)), path: path,
-                     fillType: .color(.content))]
-    }
-    
     func smpNodes(fromSmp scale: Double, firstSmp: Double, at p: Point) -> [Node] {
         let vh = 50.0
         let vKnobW = 8.0, vKbobH = 2.0
@@ -350,7 +326,7 @@ final class ColorEditor: Editor {
 //                     fillType: .color(.content))]
 //    }
     
-    private var isChangeScore = false
+    private var isChangeSmp = false
     private var sheetView: SheetView?
     private var scoreResult: ScoreView.ColorHitResult?
     private var beganEnvelope = Envelope(), beganNotes = [Int: Note]()
@@ -359,7 +335,7 @@ final class ColorEditor: Editor {
     private var beganSP = Point(), beganSmp = 0.0
     private var notePlayer: NotePlayer?, playerBeatNoteIndexes = [Int](), beganBeat = Rational(0)
     
-    func changeScore(with event: DragEvent) {
+    func changeSmp(with event: DragEvent) {
         guard isEditingSheet else {
             document.stop(with: event)
             return
@@ -391,13 +367,13 @@ final class ColorEditor: Editor {
                 }
                 
                 func updatePlayer(from vs: [Note.PitResult], in sheetView: SheetView) {
-                    let volume = Volume(smp: sheetView.isPlaying ? 0.1 : 1)
+                    let stereo = Stereo(smp: sheetView.isPlaying ? 0.1 : 1)
                     if let notePlayer = sheetView.notePlayer {
                         self.notePlayer = notePlayer
                         notePlayer.notes = vs
-                        notePlayer.volume = volume
+                        notePlayer.stereo = stereo
                     } else {
-                        notePlayer = try? NotePlayer(notes: vs, volume: volume)
+                        notePlayer = try? NotePlayer(notes: vs, stereo: stereo)
                         sheetView.notePlayer = notePlayer
                     }
                     notePlayer?.play()
@@ -517,7 +493,7 @@ final class ColorEditor: Editor {
                 } else if let ci = sheetView.contentIndex(at: sheetP, scale: document.screenToWorldScale),
                           sheetView.model.contents[ci].type.isAudio {
                     let content = sheetView.contentsView.elementViews[ci].model
-                    beganSmp = content.volume.smp
+                    beganSmp = content.stereo.smp
                     
                     updateContentsWithSelections()
                     beganContents[ci] = content
@@ -528,7 +504,7 @@ final class ColorEditor: Editor {
                 let g = lightnessGradientWith(chroma: 0, hue: 0)
                 lightnessNode.lineType = .gradient(g)
                 lightnessNode.path = Path([Pathline(lightnessPointsWith(splitCount: Int(maxLightnessHeight)))])
-                oldEditingLightness = (1 - beganSmp) * 100
+                oldEditingLightness = beganSmp * 100
                 editingLightness = oldEditingLightness
                 firstLightnessPosition = document.convertScreenToWorld(fp)
                 isEditingLightness = true
@@ -539,13 +515,13 @@ final class ColorEditor: Editor {
             let wp = document.convertScreenToWorld(event.screenPoint)
             let p = lightnessNode.convertFromWorld(wp)
             let t = (p.y / maxLightnessHeight).clipped(min: 0, max: 1)
-            let smp = Double.linear(1, 0, t: t)
+            let smp = Double.linear(0, 1, t: t)
             let smpScale = beganSmp == 0 ? 0 : smp / beganSmp
             func newSmp(from otherSmp: Double) -> Double {
                 if beganSmp == otherSmp {
                     smp
                 } else {
-                    (otherSmp * smpScale).clipped(min: 0, max: Volume.maxSmp)
+                    (otherSmp * smpScale).clipped(Volume.smpRange)
                 }
             }
             
@@ -555,12 +531,12 @@ final class ColorEditor: Editor {
             if let scoreResult {
                 switch scoreResult {
                 case .sustain:
-                    let sustainAmp = Volume(smp: newSmp(from: beganEnvelope.sustatinSmp)).amp
+                    let sustainSmp = newSmp(from: beganEnvelope.sustainSmp)
                     
                     for ni in beganNotes.keys {
                         guard ni < score.notes.count else { continue }
                         var env = scoreView.model.notes[ni].envelope
-                        env.sustainAmp = sustainAmp
+                        env.sustainSmp = sustainSmp
                         env.id = beganEnvelope.id
                         scoreView[ni].envelope = env
                     }
@@ -632,19 +608,19 @@ final class ColorEditor: Editor {
                 })
                 
 //                sheetView.sequencer?.scoreNoders[score.id]?
-//                    .replaceVolumeOrPan([.init(value: scoreView.model.notes[ni], index: ni)],
+//                    .replaceStereo([.init(value: scoreView.model.notes[ni], index: ni)],
 //                                        with: scoreView.model)
             } else if !beganContents.isEmpty {
                 for (ci, beganContent) in beganContents {
                     guard ci < sheetView.contentsView.elementViews.count else { continue }
                     let contentView = sheetView.contentsView.elementViews[ci]
-                    let nSmp = newSmp(from: beganContent.volume.smp)
-                    contentView.model.volume = .init(smp: nSmp)
-                    sheetView.sequencer?.mixings[beganContent.id]?.volume = .init(Volume(smp: nSmp).amp)
+                    let nSmp = newSmp(from: beganContent.stereo.smp)
+                    contentView.model.stereo = .init(smp: nSmp)
+                    sheetView.sequencer?.pcmNoders[beganContent.id]?.stereo.smp = nSmp
                 }
             }
             
-            editingLightness = (1 - smp) * 100
+            editingLightness = smp * 100
         case .ended:
             notePlayer?.stop()
             
@@ -747,13 +723,13 @@ final class ColorEditor: Editor {
             document.cursor = .arrow
             
             func updatePlayer(from vs: [Note.PitResult], in sheetView: SheetView) {
-                let volume = Volume(smp: sheetView.isPlaying ? 0.1 : 1)
+                let stereo = Stereo(smp: sheetView.isPlaying ? 0.1 : 1)
                 if let notePlayer = sheetView.notePlayer {
                     self.notePlayer = notePlayer
                     notePlayer.notes = vs
-                    notePlayer.volume = volume
+                    notePlayer.stereo = stereo
                 } else {
-                    notePlayer = try? NotePlayer(notes: vs, volume: volume)
+                    notePlayer = try? NotePlayer(notes: vs, stereo: stereo)
                     sheetView.notePlayer = notePlayer
                 }
                 notePlayer?.play()
@@ -937,14 +913,14 @@ final class ColorEditor: Editor {
                 })
                 
 //                sheetView.sequencer?.scoreNoders[score.id]?
-//                    .replaceVolumeOrPan([.init(value: scoreView.model.notes[ni], index: ni)],
+//                    .replaceStereo([.init(value: scoreView.model.notes[ni], index: ni)],
 //                                        with: scoreView.model)
             } else if !beganContents.isEmpty {
                 for (ci, beganContent) in beganContents {
                     guard ci < sheetView.contentsView.elementViews.count else { continue }
                     let contentView = sheetView.contentsView.elementViews[ci]
-                    let nPan = newPan(from: beganContent.pan)
-                    contentView.model.pan = nPan
+                    let nPan = newPan(from: beganContent.stereo.pan)
+                    contentView.model.stereo.pan = nPan
                     sheetView.sequencer?.mixings[beganContent.id]?.pan = Float(nPan)
                 }
             }
@@ -1013,16 +989,24 @@ final class ColorEditor: Editor {
             document.stopPlaying(with: event)
         }
         
-        if isChangeScore {
-            changeScore(with: event)
+        if isChangeSmp {
+            changeSmp(with: event)
             return
         }
         if event.phase == .began {
             let p = document.convertScreenToWorld(event.screenPoint)
-            if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
-                isChangeScore = true
-                changeScore(with: event)
-                return
+            if let sheetView = document.sheetView(at: p) {
+                if sheetView.model.score.enabled {
+                    isChangeSmp = true
+                    changeSmp(with: event)
+                    return
+                } else if let ci = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
+                                                          scale: document.screenToWorldScale),
+                   sheetView.model.contents[ci].type.isAudio {
+                    isChangeSmp = true
+                    changeSmp(with: event)
+                    return
+                }
             }
         }
         

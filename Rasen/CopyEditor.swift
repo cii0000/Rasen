@@ -1281,7 +1281,7 @@ final class CopyEditor: Editor {
                 pits.remove(at: pitI)
                 var note = score.notes[noteI]
                 if pits.isEmpty {
-                    note.pits = [.init(beat: 0, pitch: 0, amp: Stereo.defaultAmp)]
+                    note.pits = [.init()]
                 } else {
                     note.pits = pits
                 }

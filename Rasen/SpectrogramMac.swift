@@ -81,7 +81,7 @@ struct IFFT {
 struct FilterBank {
     let type: BankType
     private let filterBank: [Double]
-    let sampleCount, filterBankCount: Int
+    let sampleCount, filterBankCount, cutMinFqI, cutMaxFqI: Int
     
     enum BankType {
         case pitch, mel
@@ -149,9 +149,19 @@ struct FilterBank {
         self.filterBank = filterBank
         self.sampleCount = sampleCount
         self.filterBankCount = filterBankCount
+        cutMinFqI = filterBankFqs.first!
+        cutMaxFqI = filterBankFqs.last!
     }
     
     func transform(_ input: [Double]) -> [Double] {
+        var input = input
+        for i in 0 ..< cutMinFqI {
+            input[i] = 0
+        }
+        for i in cutMaxFqI ..< input.count {
+            input[i] = 0
+        }
+        
         let nf = [Double](unsafeUninitializedCapacity: filterBankCount) { buffer, initializedCount in
             input.withUnsafeBufferPointer { nPtr in
                 filterBank.withUnsafeBufferPointer { fPtr in
@@ -192,7 +202,7 @@ struct Spectrogram {
     var durSec = 0.0
     
     static let minLinearFq = 0.0, maxLinearFq = Audio.defaultExportSampleRate / 2
-    static let minPitch = Double(Score.pitchRange.start), maxPitch = Double(Score.pitchRange.end)
+    static let minPitch = Score.doubleMinPitch, maxPitch = Score.doubleMaxPitch
     
     enum FqType {
         case linear, pitch
@@ -202,9 +212,9 @@ struct Spectrogram {
          isNormalized: Bool = true,
          type: FqType = .pitch) {
         
-        let windowSize = Int(2 ** Double.log2(Double(windowSize)).rounded(.up))
+        let windowSize = Int(.exp2(.log2(Double(windowSize))).rounded(.up))
         
-        guard buffer.frameCount < 44100 * 60 * 10 else {
+        guard buffer.frameCount < Int(buffer.sampleRate) * 60 * 10 else {
             print("unsupported")
             return
         }
@@ -258,7 +268,7 @@ struct Spectrogram {
                             return 0.0
                         } else {
                             let amp = outputs[$0].length * nd
-                            let smp = Volume(amp: amp).smp
+                            let smp = Volume.smp(fromAmp: amp)
                             return loudnessScales[$0] * smp
                         }
                     }
@@ -285,7 +295,7 @@ struct Spectrogram {
                             return 0.0
                         } else {
                             let amp = outputs[$0].length * nd
-                            let smp = Volume(amp: amp).smp
+                            let smp = Volume.smp(fromAmp: amp)
                             return loudnessScales[$0] * smp
                         }
                     }
@@ -293,7 +303,7 @@ struct Spectrogram {
                 }
             }
             
-            let windowSize2 = Int(2 ** Double.log2(Double(windowSize * 4)).rounded(.up))
+            let windowSize2 = Int(.exp2(.log2(Double(windowSize * 4))).rounded(.up))
             if let dft2 = try? FFT(count: windowSize2) {
                 let overlapCount2 = Int(Double(windowSize2) * (1 - windowOverlap))
                 let windowWave2 = vDSP.window(ofType: Double.self,
@@ -332,7 +342,7 @@ struct Spectrogram {
                                 return 0.0
                             } else {
                                 let amp = outputs2[$0].length * nd2
-                                let smp = Volume(amp: amp).smp
+                                let smp = Volume.smp(fromAmp: amp)
                                 return loudnessScales2[$0] * smp
                             }
                         }
@@ -342,9 +352,15 @@ struct Spectrogram {
                     
                     secs.enumerated().forEach { ti, v in
                         let ti2 = min(Int((Double(tss2.count * ti) / Double(secs.count)).rounded()), tss2.count - 1)
-                        for si in 0 ..< smpCount * 3 / 8 {
-                            ctss[ci][ti][si] = Double.linear(tss2[ti2][si], ctss[ci][ti][si],
-                                                             t: si > smpCount / 8 ? Double(si - smpCount / 8) / Double(smpCount * 3 / 8) : 0)
+                        for si in 0 ..< smpCount / 2 {
+                            let t = si < smpCount * 3 / 8 ?
+                            Double(si).clipped(min: Double(smpCount * 1 / 8),
+                                               max: Double(smpCount * 3 / 8),
+                                               newMin: 0, newMax: 0.5) :
+                            Double(si).clipped(min: Double(smpCount * 3 / 8),
+                                               max: Double(smpCount / 2),
+                                               newMin: 0.5, newMax: 1)
+                            ctss[ci][ti][si] = Double.linear(tss2[ti2][si], ctss[ci][ti][si], t: t)
                         }
                     }
                 }

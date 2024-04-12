@@ -196,6 +196,13 @@ final class Renderstate {
         let colorsD = MTLRenderPipelineDescriptor()
         colorsD.vertexFunction = library.makeFunction(name: "colorsVertex")
         colorsD.fragmentFunction = library.makeFunction(name: "basicFragment")
+        colorsD.colorAttachments[0].isBlendingEnabled = true
+        colorsD.colorAttachments[0].rgbBlendOperation = .add
+        colorsD.colorAttachments[0].alphaBlendOperation = .add
+        colorsD.colorAttachments[0].sourceRGBBlendFactor = .one
+        colorsD.colorAttachments[0].sourceAlphaBlendFactor = .one
+        colorsD.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+        colorsD.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
         colorsD.colorAttachments[0].pixelFormat = pixelFormat
         colorsD.stencilAttachmentPixelFormat = .stencil8
         colorsD.rasterSampleCount = sampleCount
@@ -1811,7 +1818,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             oldRotateAngle = nil
             oldScrollPosition = nil
             
-            oldScrollPosition = (0 ..< 4).map { ps[touchedIDs[$0]]! }.mean()
+            oldScrollPosition = (0 ..< 4).map { ps[touchedIDs[$0]]! }.mean()!
             isPreparePlay = true
         }
     }
@@ -1979,7 +1986,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         } else if ps.count == 4 {
             let vs = (0 ..< 4).compactMap { ps[touchedIDs[$0]] }
             if let oldScrollPosition, vs.count == 4 {
-                let np = vs.mean()
+                let np = vs.mean()!
                 if np.distance(oldScrollPosition) > 5 {
                     isPreparePlay = false
                 }
@@ -2491,36 +2498,6 @@ extension SubMTKView {
     }
 }
 typealias NodeOwner = SubMTKView
-
-//final class SpeechSynthesizer {
-//    private static var speechSynthesizer: AVSpeechSynthesizer?
-//    init() {}
-//    private static var previousDate: Date?
-//    static func speech(_ str: String, interval: Double = 1,
-//                       rate: Double = 1.0,
-//                       pitch: Double = 1.0,
-//                       volume: Double = 1.0) {
-//        if let previousDate = previousDate {
-//            let t = Date()
-//            if t.timeIntervalSince(previousDate) > interval {
-//                self.previousDate = t
-//            } else {
-//                return
-//            }
-//        } else {
-//            previousDate = Date()
-//        }
-//        if let speechSynthesizer = speechSynthesizer {
-//            speechSynthesizer.stopSpeaking(at: .immediate)
-//        }
-//        speechSynthesizer = AVSpeechSynthesizer()
-//        let utterance = AVSpeechUtterance(string: str)
-//        utterance.rate = Float(rate)
-//        utterance.pitchMultiplier = Float(pitch)
-//        utterance.volume = Float(volume)
-//        speechSynthesizer?.speak(utterance)
-//    }
-//}
 
 final class Context {
     fileprivate var encoder: MTLRenderCommandEncoder
