@@ -142,54 +142,54 @@ struct IIRfilter {
 }
 
 struct Loudness {
-    private static let ps = [Point(60, 1),
-                             Point(80, 0.9),
-                             Point(200, 0.8),
-                             Point(1000, 0.725),
-                             Point(1400, 0.775),
-                             Point(1600, 0.775),
-                             Point(3000, 0.675),
-                             Point(4000, 0.675),
-                             Point(9000, 0.85),
-                             Point(12500, 0.85),
-                             Point(15000, 0.825)]
-    private static let rps = [Point(60, 0.675),
-                              Point(80, 0.75),
-                              Point(200, 0.85),
-                              Point(1000, 0.925),
-                              Point(1400, 0.875),
-                              Point(1600, 0.875),
-                              Point(3000, 1),
-                              Point(4000, 1),
-                              Point(9000, 0.75),
-                              Point(12500, 0.75),
-                              Point(15000, 0.8)]
+    private static let fqVolms = [Point(60, 1.38),
+                                  Point(80, 1.24),
+                                  Point(200, 1.1),
+                                  Point(1000, 1),
+                                  Point(1400, 1.07),
+                                  Point(1600, 1.07),
+                                  Point(3000, 0.93),
+                                  Point(4000, 0.93),
+                                  Point(9000, 1.17),
+                                  Point(12500, 1.17),
+                                  Point(15000, 1.14)]
+    private static let rFqVolms = [Point(60, 0.73),
+                                   Point(80, 0.81),
+                                   Point(200, 0.92),
+                                   Point(1000, 1),
+                                   Point(1400, 0.95),
+                                   Point(1600, 0.95),
+                                   Point(3000, 1.08),
+                                   Point(4000, 1.08),
+                                   Point(9000, 0.81),
+                                   Point(12500, 0.81),
+                                   Point(15000, 0.86)]
     
-    static func scale40Phon(fromFq fq: Double) -> Double {
-        var preFq = 0.0, preScale = ps.last!.y
+    static func volm40Phon(fromFq fq: Double) -> Double {
+        var preFq = 0.0, preVolm = fqVolms.last!.y
         
-        for p in ps {
-            if fq < p.x {
-                let t = (fq - preFq) / (p.x - preFq)
-                return Double.linear(preScale, p.y, t: t)
+        for fqVolums in fqVolms {
+            if fq < fqVolums.x {
+                let t = (fq - preFq) / (fqVolums.x - preFq)
+                return Double.linear(preVolm, fqVolums.y, t: t)
             }
-            preFq = p.x
-            preScale = p.y
+            preFq = fqVolums.x
+            preVolm = fqVolums.y
         }
-        return ps.last!.y
+        return fqVolms.last!.y
     }
-    static func reverseScale40Phon(fromFq fq: Double) -> Double {
-        var preFq = 0.0, preScale = rps.last!.y
+    static func reverseVolm40Phon(fromFq fq: Double) -> Double {
+        var preFq = 0.0, preVolm = rFqVolms.last!.y
         
-        for p in rps {
-            if fq < p.x {
-                let t = (fq - preFq) / (p.x - preFq)
-                return Double.linear(preScale, p.y, t: t)
+        for fqVolm in rFqVolms {
+            if fq < fqVolm.x {
+                let t = (fq - preFq) / (fqVolm.x - preFq)
+                return Double.linear(preVolm, fqVolm.y, t: t)
             }
-            preFq = p.x
-            preScale = p.y
+            preFq = fqVolm.x
+            preVolm = fqVolm.y
         }
-        return rps.last!.y
+        return rFqVolms.last!.y
     }
     
     enum FilterClass: String {
@@ -271,7 +271,7 @@ struct Loudness {
             self.string = str
         }
     }
-    func integratedLoudness(data: [[Double]]) throws -> Double {
+    func integratedLoudnessDb(data: [[Double]]) throws -> Double {
         var inputData = data
         if inputData.count > 5 || inputData.isEmpty {
             throw ValueError("Audio must have five channels or less.")

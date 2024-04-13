@@ -3161,13 +3161,13 @@ final class LineColorCopier: InputKeyEditor {
                         Pasteboard.shared.copiedObjects = [.stereo(stereo)]
                     }
                     showPit(pitI: pitI)
-                case .evenSmp(let pitI):
+                case .evenVolm(let pitI):
                     let tone = score.notes[noteI].pits[pitI].tone
                     if isSendPasteboard {
                         Pasteboard.shared.copiedObjects = [.tone(tone)]
                     }
                     showPit(pitI: pitI, isTone: true)
-                case .oddSmp(let pitI):
+                case .oddVolm(let pitI):
                     let tone = score.notes[noteI].pits[pitI].tone
                     if isSendPasteboard {
                         Pasteboard.shared.copiedObjects = [.tone(tone)]

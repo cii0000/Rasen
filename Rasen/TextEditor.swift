@@ -1490,18 +1490,18 @@ final class TextView<T: BinderProtocol>: TimelineView {
     let id = UUID()
     
     let timelineNode = Node()
-    var timeNode: Node?, currentPeakSmpNode: Node?
-    var peakSmp = 0.0 {
+    var timeNode: Node?, currentPeakVolmNode: Node?
+    var peakVolm = 0.0 {
         didSet {
-            guard peakSmp != oldValue else { return }
-            updateFromPeakSmp()
+            guard peakVolm != oldValue else { return }
+            updateFromPeakVolm()
         }
     }
-    func updateFromPeakSmp() {
-        guard let node = currentPeakSmpNode, let frame = timelineFrame else { return }
-        let y = frame.height * peakSmp
+    func updateFromPeakVolm() {
+        guard let node = currentPeakVolmNode, let frame = timelineFrame else { return }
+        let y = frame.height * peakVolm
         node.path = Path([Point(), Point(0, y)])
-        if peakSmp < Audio.headroomSmp {
+        if peakVolm < Audio.headroomVolm {
             node.lineType = .color(.background)
         } else {
             node.lineType = .color(.warning)
@@ -1580,15 +1580,15 @@ extension TextView {
             timelineNode.children = self.timelineNode(timeOption, from: typesetter)
             
             let timeNode = Node(lineWidth: 3, lineType: .color(.content))
-            let smpNode = Node(lineWidth: 1, lineType: .color(.background))
-            timeNode.append(child: smpNode)
+            let volmNode = Node(lineWidth: 1, lineType: .color(.background))
+            timeNode.append(child: volmNode)
             timelineNode.children.append(timeNode)
             self.timeNode = timeNode
-            self.currentPeakSmpNode = smpNode
+            self.currentPeakVolmNode = volmNode
         } else if !timelineNode.children.isEmpty {
             timelineNode.children = []
             self.timeNode = nil
-            self.currentPeakSmpNode = nil
+            self.currentPeakVolmNode = nil
         }
     }
     

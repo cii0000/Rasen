@@ -1370,7 +1370,7 @@ final class LineSlider: DragEditor {
             document.cursor = .arrow
 
             func updatePlayer(from vs: [Note.PitResult], in sheetView: SheetView) {
-                let stereo = Stereo(smp: sheetView.isPlaying ? 0.1 : 1)
+                let stereo = Stereo(volm: sheetView.isPlaying ? 0.1 : 1)
                 if let notePlayer = sheetView.notePlayer {
                     self.notePlayer = notePlayer
                     notePlayer.notes = vs

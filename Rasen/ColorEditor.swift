@@ -248,12 +248,12 @@ final class ColorEditor: Editor {
         }
     }
     
-    func smpNodes(fromSmp scale: Double, firstSmp: Double, at p: Point) -> [Node] {
+    func volmNodes(fromVolm scale: Double, firstVolm: Double, at p: Point) -> [Node] {
         let vh = 50.0
         let vKnobW = 8.0, vKbobH = 2.0
         let vx = 0.0, vy = 0.0
         let y = scale.clipped(min: 0, max: 1)
-        let fy = firstSmp.clipped(min: 0, max: 1)
+        let fy = firstVolm.clipped(min: 0, max: 1)
         let path = Path([Pathline(Polygon(points: [Point(vx, vy),
                                                    Point(vx + 1.5, vy + vh),
                                                    Point(vx - 1.5, vy + vh)])),
@@ -272,10 +272,10 @@ final class ColorEditor: Editor {
             return Point(-width / 2 + width * t, 0)
         }
     }
-    private func panGradientWith(splitCount count: Int = 140, smp: Double) -> [Color] {
+    private func panGradientWith(splitCount count: Int = 140, volm: Double) -> [Color] {
         let rCount = 1 / Double(count)
         return (0 ... count).map {
-            ScoreView.color(fromPan: Double($0) * rCount * 2 - 0.5, smp: smp)
+            ScoreView.color(fromPan: Double($0) * rCount * 2 - 0.5, volm: volm)
         }
     }
     
@@ -326,16 +326,16 @@ final class ColorEditor: Editor {
 //                     fillType: .color(.content))]
 //    }
     
-    private var isChangeSmp = false
+    private var isChangeVolm = false
     private var sheetView: SheetView?
     private var scoreResult: ScoreView.ColorHitResult?
     private var beganEnvelope = Envelope(), beganNotes = [Int: Note]()
     private var beganNotePits = [UUID: [Int: (note: Note, pit: Pit, pits: [Int: Pit])]]()
     private var beganContents = [Int: Content]()
-    private var beganSP = Point(), beganSmp = 0.0
+    private var beganSP = Point(), beganVolm = 0.0
     private var notePlayer: NotePlayer?, playerBeatNoteIndexes = [Int](), beganBeat = Rational(0)
     
-    func changeSmp(with event: DragEvent) {
+    func changeVolm(with event: DragEvent) {
         guard isEditingSheet else {
             document.stop(with: event)
             return
@@ -367,7 +367,7 @@ final class ColorEditor: Editor {
                 }
                 
                 func updatePlayer(from vs: [Note.PitResult], in sheetView: SheetView) {
-                    let stereo = Stereo(smp: sheetView.isPlaying ? 0.1 : 1)
+                    let stereo = Stereo(volm: sheetView.isPlaying ? 0.1 : 1)
                     if let notePlayer = sheetView.notePlayer {
                         self.notePlayer = notePlayer
                         notePlayer.notes = vs
@@ -447,7 +447,7 @@ final class ColorEditor: Editor {
                     self.scoreResult = result
                     switch result {
                     case .note:
-                        beganSmp = scoreView.smp(atX: scoreP.x, at: noteI)
+                        beganVolm = scoreView.volm(atX: scoreP.x, at: noteI)
                         updatePitsWithSelection(noteI: noteI, pitI: nil, .stereo)
                         beganBeat = scoreView.beat(atX: scoreP.x)
                     case .sustain:
@@ -468,19 +468,19 @@ final class ColorEditor: Editor {
                         
                         beganBeat = scoreView.beat(atX: scoreP.x)
                     case .pit(let pitI):
-                        beganSmp = score.notes[noteI].pits[pitI].stereo.smp
+                        beganVolm = score.notes[noteI].pits[pitI].stereo.volm
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, .stereo)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
-                    case .evenSmp(let pitI):
-                        beganSmp = score.notes[noteI].pits[pitI].tone.overtone.evenSmp
+                    case .evenVolm(let pitI):
+                        beganVolm = score.notes[noteI].pits[pitI].tone.overtone.evenVolm
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, .tone)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
-                    case .oddSmp(let pitI):
-                        beganSmp = score.notes[noteI].pits[pitI].tone.overtone.oddSmp
+                    case .oddVolm(let pitI):
+                        beganVolm = score.notes[noteI].pits[pitI].tone.overtone.oddVolm
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, .tone)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
                     case .sprol(let pitI, let sprolI):
-                        beganSmp = score.notes[noteI].pits[pitI].tone.spectlope.sprols[sprolI].smp
+                        beganVolm = score.notes[noteI].pits[pitI].tone.spectlope.sprols[sprolI].volm
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, .tone)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
                     }
@@ -493,7 +493,7 @@ final class ColorEditor: Editor {
                 } else if let ci = sheetView.contentIndex(at: sheetP, scale: document.screenToWorldScale),
                           sheetView.model.contents[ci].type.isAudio {
                     let content = sheetView.contentsView.elementViews[ci].model
-                    beganSmp = content.stereo.smp
+                    beganVolm = content.stereo.volm
                     
                     updateContentsWithSelections()
                     beganContents[ci] = content
@@ -504,7 +504,7 @@ final class ColorEditor: Editor {
                 let g = lightnessGradientWith(chroma: 0, hue: 0)
                 lightnessNode.lineType = .gradient(g)
                 lightnessNode.path = Path([Pathline(lightnessPointsWith(splitCount: Int(maxLightnessHeight)))])
-                oldEditingLightness = beganSmp * 100
+                oldEditingLightness = beganVolm * 100
                 editingLightness = oldEditingLightness
                 firstLightnessPosition = document.convertScreenToWorld(fp)
                 isEditingLightness = true
@@ -515,13 +515,13 @@ final class ColorEditor: Editor {
             let wp = document.convertScreenToWorld(event.screenPoint)
             let p = lightnessNode.convertFromWorld(wp)
             let t = (p.y / maxLightnessHeight).clipped(min: 0, max: 1)
-            let smp = Double.linear(0, 1, t: t)
-            let smpScale = beganSmp == 0 ? 0 : smp / beganSmp
-            func newSmp(from otherSmp: Double) -> Double {
-                if beganSmp == otherSmp {
-                    smp
+            let volm = Double.linear(0, 1, t: t)
+            let volmScale = beganVolm == 0 ? 0 : volm / beganVolm
+            func newVolm(from otherVolm: Double) -> Double {
+                if beganVolm == otherVolm {
+                    volm
                 } else {
-                    (otherSmp * smpScale).clipped(Volume.smpRange)
+                    (otherVolm * volmScale).clipped(Volm.volmRange)
                 }
             }
             
@@ -531,12 +531,12 @@ final class ColorEditor: Editor {
             if let scoreResult {
                 switch scoreResult {
                 case .sustain:
-                    let sustainSmp = newSmp(from: beganEnvelope.sustainSmp)
+                    let sustainVolm = newVolm(from: beganEnvelope.sustainVolm)
                     
                     for ni in beganNotes.keys {
                         guard ni < score.notes.count else { continue }
                         var env = scoreView.model.notes[ni].envelope
-                        env.sustainSmp = sustainSmp
+                        env.sustainVolm = sustainVolm
                         env.id = beganEnvelope.id
                         scoreView[ni].envelope = env
                     }
@@ -548,14 +548,14 @@ final class ColorEditor: Editor {
                             var note = scoreView[noteI]
                             for (pitI, beganPit) in nv.pits {
                                 guard pitI < score.notes[noteI].pits.count else { continue }
-                                let nSmp = newSmp(from: beganPit.stereo.smp)
-                                note.pits[pitI].stereo.smp = nSmp
+                                let nVolm = newVolm(from: beganPit.stereo.volm)
+                                note.pits[pitI].stereo.volm = nVolm
                                 note.pits[pitI].stereo.id = nid
                             }
                             scoreView[noteI] = note
                         }
                     }
-                case .evenSmp:
+                case .evenVolm:
                     for (_, v) in beganNotePits {
                         let nid = UUID()
                         for (noteI, nv) in v {
@@ -563,14 +563,14 @@ final class ColorEditor: Editor {
                             var note = scoreView[noteI]
                             for (pitI, beganPit) in nv.pits {
                                 guard pitI < score.notes[noteI].pits.count else { continue }
-                                let nSmp = newSmp(from: beganPit.tone.overtone[.evenSmp])
-                                note.pits[pitI].tone.overtone[.evenSmp] = nSmp
+                                let nVolm = newVolm(from: beganPit.tone.overtone[.evenVolm])
+                                note.pits[pitI].tone.overtone[.evenVolm] = nVolm
                                 note.pits[pitI].tone.id = nid
                             }
                             scoreView[noteI] = note
                         }
                     }
-                case .oddSmp:
+                case .oddVolm:
                     for (_, v) in beganNotePits {
                         let nid = UUID()
                         for (noteI, nv) in v {
@@ -578,8 +578,8 @@ final class ColorEditor: Editor {
                             var note = scoreView[noteI]
                             for (pitI, beganPit) in nv.pits {
                                 guard pitI < score.notes[noteI].pits.count else { continue }
-                                let nSmp = newSmp(from: beganPit.tone.overtone[.oddSmp])
-                                note.pits[pitI].tone.overtone[.oddSmp] = nSmp
+                                let nVolm = newVolm(from: beganPit.tone.overtone[.oddVolm])
+                                note.pits[pitI].tone.overtone[.oddVolm] = nVolm
                                 note.pits[pitI].tone.id = nid
                             }
                             scoreView[noteI] = note
@@ -594,8 +594,8 @@ final class ColorEditor: Editor {
                             for (pitI, beganPit) in nv.pits {
                                 guard pitI < score.notes[noteI].pits.count,
                                       sprolI < note.pits[pitI].tone.spectlope.count else { continue }
-                                let nSmp = newSmp(from: beganPit.tone.spectlope.sprols[sprolI].smp)
-                                note.pits[pitI].tone.spectlope.sprols[sprolI].smp = nSmp
+                                let nVolm = newVolm(from: beganPit.tone.spectlope.sprols[sprolI].volm)
+                                note.pits[pitI].tone.spectlope.sprols[sprolI].volm = nVolm
                                 note.pits[pitI].tone.id = nid
                             }
                             scoreView[noteI] = note
@@ -614,13 +614,13 @@ final class ColorEditor: Editor {
                 for (ci, beganContent) in beganContents {
                     guard ci < sheetView.contentsView.elementViews.count else { continue }
                     let contentView = sheetView.contentsView.elementViews[ci]
-                    let nSmp = newSmp(from: beganContent.stereo.smp)
-                    contentView.model.stereo = .init(smp: nSmp)
-                    sheetView.sequencer?.pcmNoders[beganContent.id]?.stereo.smp = nSmp
+                    let nVolm = newVolm(from: beganContent.stereo.volm)
+                    contentView.model.stereo = .init(volm: nVolm)
+                    sheetView.sequencer?.pcmNoders[beganContent.id]?.stereo.volm = nVolm
                 }
             }
             
-            editingLightness = smp * 100
+            editingLightness = volm * 100
         case .ended:
             notePlayer?.stop()
             
@@ -723,7 +723,7 @@ final class ColorEditor: Editor {
             document.cursor = .arrow
             
             func updatePlayer(from vs: [Note.PitResult], in sheetView: SheetView) {
-                let stereo = Stereo(smp: sheetView.isPlaying ? 0.1 : 1)
+                let stereo = Stereo(volm: sheetView.isPlaying ? 0.1 : 1)
                 if let notePlayer = sheetView.notePlayer {
                     self.notePlayer = notePlayer
                     notePlayer.notes = vs
@@ -823,7 +823,7 @@ final class ColorEditor: Editor {
                         beganStereo = note.pits[pitI].stereo
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, .stereo)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
-                    case .evenSmp, .oddSmp, .sprol: return
+                    case .evenVolm, .oddVolm, .sprol: return
                     }
                     
                     let noteIsSet = Set(beganNotePits.values.flatMap { $0.keys }).sorted()
@@ -842,11 +842,11 @@ final class ColorEditor: Editor {
                 if let beganStereo {
                     beganPan = beganStereo.pan
                     
-                    let outlineColor: Color = beganStereo.smp < 0.5 ? .content : .background
+                    let outlineColor: Color = beganStereo.volm < 0.5 ? .content : .background
                     let outlineGradientNode = Node(path: .init([.init(-panWidth / 2, 0),
                                                                 .init(panWidth / 2, 0)]),
                                                    lineWidth: 5, lineType: .color(outlineColor))
-                    let gradient = panGradientWith(smp: beganStereo.smp)
+                    let gradient = panGradientWith(volm: beganStereo.volm)
                     let gradientNode = Node(path: .init([.init(panPointsWith(splitCount: .init(panWidth),
                                                                              width: panWidth))]),
                                             lineWidth: 3, lineType: .gradient(gradient))
@@ -989,22 +989,22 @@ final class ColorEditor: Editor {
             document.stopPlaying(with: event)
         }
         
-        if isChangeSmp {
-            changeSmp(with: event)
+        if isChangeVolm {
+            changeVolm(with: event)
             return
         }
         if event.phase == .began {
             let p = document.convertScreenToWorld(event.screenPoint)
             if let sheetView = document.sheetView(at: p) {
                 if sheetView.model.score.enabled {
-                    isChangeSmp = true
-                    changeSmp(with: event)
+                    isChangeVolm = true
+                    changeVolm(with: event)
                     return
                 } else if let ci = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
                                                           scale: document.screenToWorldScale),
                    sheetView.model.contents[ci].type.isAudio {
-                    isChangeSmp = true
-                    changeSmp(with: event)
+                    isChangeVolm = true
+                    changeVolm(with: event)
                     return
                 }
             }

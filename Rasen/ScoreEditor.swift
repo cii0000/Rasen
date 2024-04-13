@@ -179,7 +179,7 @@ final class ScoreSlider: DragEditor {
     private var node = Node()
     private var notePlayer: NotePlayer?
     private var sheetView: SheetView?
-    private var type: SlideType?, overtoneType = OvertoneType.evenSmp
+    private var type: SlideType?, overtoneType = OvertoneType.evenVolm
     private var beganSP = Point(), beganTime = Rational(0), beganSheetP = Point()
     private var beganLocalStartPitch = Rational(0), secI = 0, noteI: Int?, pitI: Int?, keyBeatI: Int?,
                 beganBeatRange: Range<Rational>?,
@@ -218,7 +218,7 @@ final class ScoreSlider: DragEditor {
                 beganTime = sheetView.animationView.beat(atX: inP.x)
                 
                 func updatePlayer(from vs: [Note.PitResult], in sheetView: SheetView) {
-                    let stereo = Stereo(smp: sheetView.isPlaying ? 0.1 : 1)
+                    let stereo = Stereo(volm: sheetView.isPlaying ? 0.1 : 1)
                     if let notePlayer = sheetView.notePlayer {
                         self.notePlayer = notePlayer
                         notePlayer.notes = vs
@@ -787,24 +787,24 @@ final class ScoreView: TimelineView {
         }
     }
     
-    let currentPeakSmpNode = Node(lineWidth: 3, lineType: .color(.background))
+    let currentPeakVolmNode = Node(lineWidth: 3, lineType: .color(.background))
     let timeNode = Node(lineWidth: 4, lineType: .color(.content))
     
-    var peakSmp = 0.0 {
+    var peakVolm = 0.0 {
         didSet {
-            guard peakSmp != oldValue else { return }
-            updateFromPeakSmp()
+            guard peakVolm != oldValue else { return }
+            updateFromPeakVolm()
         }
     }
-    func updateFromPeakSmp() {
+    func updateFromPeakVolm() {
         let frame = mainFrame
-        let y = frame.height// * smp
-        currentPeakSmpNode.path = Path([Point(), Point(0, y)])
-        if peakSmp < Audio.headroomSmp {
-            currentPeakSmpNode.lineType = .color(Color(lightness: (1 - peakSmp) * 100))
-//            currentPeakSmpNode.lineType = .color(.background)
+        let y = frame.height// * volm
+        currentPeakVolmNode.path = Path([Point(), Point(0, y)])
+        if peakVolm < Audio.headroomVolm {
+            currentPeakVolmNode.lineType = .color(Color(lightness: (1 - peakVolm) * 100))
+//            currentPeakVolmNode.lineType = .color(.background)
         } else {
-            currentPeakSmpNode.lineType = .color(.warning)
+            currentPeakVolmNode.lineType = .color(.warning)
         }
     }
     
@@ -834,7 +834,7 @@ final class ScoreView: TimelineView {
         self.binder = binder
         self.keyPath = keyPath
         
-        timeNode.children = [currentPeakSmpNode]
+        timeNode.children = [currentPeakVolmNode]
         
         node = Node(children: [timelineBorderNode,
                                timelineFullEditBorderNode,
@@ -1335,7 +1335,7 @@ extension ScoreView {
         
         let lineColors: [Color], evenColors: [Color], oddColors: [Color],
             knobPs: [Point], smallKnobPAndRs: [(Point, Double)]
-        let smpT = 1.0
+        let volmT = 1.0
         if note.pits.count >= 2 {
             let sprolKnobPAndRs: [(Point, Double)] = note.pits.flatMap { pit in
                 let p = Point(x(atBeat: note.beatRange.start + pit.beat),
@@ -1374,18 +1374,18 @@ extension ScoreView {
                     
                     func append(_ sprol: Sprol) {
                         let y = tonePitchY(fromPitch: sprol.pitch, noteY: noteY)
-                        let color = Self.color(fromSmp: sprol.smp, noise: sprol.noise)
+                        let color = Self.color(fromVolm: sprol.volm, noise: sprol.noise)
                         vs.append(.init(.init(x, y), color))
                     }
                     
                     append(.init(pitch: Score.doubleMinPitch,
-                                 smp: sprols.first?.smp ?? 0,
+                                 volm: sprols.first?.volm ?? 0,
                                  noise: sprols.first?.noise ?? 0))
                     for sprol in sprols {
                         append(sprol)
                     }
                     append(.init(pitch: Score.doubleMaxPitch,
-                                 smp: sprols.last?.smp ?? 0,
+                                 volm: sprols.last?.volm ?? 0,
                                  noise: sprols.last?.noise ?? 0))
                     
                     return vs
@@ -1441,8 +1441,8 @@ extension ScoreView {
             }
             
             lineColors = self.lineColors(from: note)
-            evenColors = self.overtoneColors(from: note, .evenSmp)
-            oddColors = self.overtoneColors(from: note, .oddSmp)
+            evenColors = self.overtoneColors(from: note, .evenVolm)
+            oddColors = self.overtoneColors(from: note, .oddVolm)
             
             let pointline = pointline(from: note)
             if !pointline.isEmpty {
@@ -1458,23 +1458,23 @@ extension ScoreView {
                 }
             }
         } else {
-//            let sustain = env.sustainSmp + 1 / noteHeight
+//            let sustain = env.sustainVolm + 1 / noteHeight
             let line = Line(controls: [.init(point: Point(nx, ny), pressure: 0),
-                                       .init(point: Point(nx + attackW, ny), pressure: smpT),
-                                       .init(point: Point(nx + attackW, ny), pressure: smpT),
-                                       .init(point: Point(nx + attackW + decayW, ny), pressure: smpT),
-                                       .init(point: Point(nx + attackW + decayW, ny), pressure: smpT),
-                                       .init(point: Point(nx + nw, ny), pressure: smpT),
-                                       .init(point: Point(nx + nw, ny), pressure: smpT),
+                                       .init(point: Point(nx + attackW, ny), pressure: volmT),
+                                       .init(point: Point(nx + attackW, ny), pressure: volmT),
+                                       .init(point: Point(nx + attackW + decayW, ny), pressure: volmT),
+                                       .init(point: Point(nx + attackW + decayW, ny), pressure: volmT),
+                                       .init(point: Point(nx + nw, ny), pressure: volmT),
+                                       .init(point: Point(nx + nw, ny), pressure: volmT),
                                        .init(point: Point(nx + nw + releaseW, ny), pressure: 0)])
             
-            let toneLine = Line(controls: [.init(point: Point(nx, ny), pressure: smpT),
-                                       .init(point: Point(nx + attackW, ny), pressure: smpT),
-                                       .init(point: Point(nx + attackW, ny), pressure: smpT),
-                                       .init(point: Point(nx + attackW + decayW, ny), pressure: smpT),
-                                       .init(point: Point(nx + attackW + decayW, ny), pressure: smpT),
-                                       .init(point: Point(nx + nw, ny), pressure: smpT),
-                                       .init(point: Point(nx + nw, ny), pressure: smpT)])
+            let toneLine = Line(controls: [.init(point: Point(nx, ny), pressure: volmT),
+                                       .init(point: Point(nx + attackW, ny), pressure: volmT),
+                                       .init(point: Point(nx + attackW, ny), pressure: volmT),
+                                       .init(point: Point(nx + attackW + decayW, ny), pressure: volmT),
+                                       .init(point: Point(nx + attackW + decayW, ny), pressure: volmT),
+                                       .init(point: Point(nx + nw, ny), pressure: volmT),
+                                       .init(point: Point(nx + nw, ny), pressure: volmT)])
             
             let sprolKnobPAndRs = note.firstTone.spectlope.sprols.enumerated().map {
                 (Point(nx, tonePitchY(fromPitch: $0.element.pitch, noteY: ny)),
@@ -1498,11 +1498,11 @@ extension ScoreView {
                                        newMax: scH / 2) + nh / 2 + overtoneH + scY
                 }
                 var preY = tonePitchY(fromPitch: 0)
-                var preColor = Self.color(fromSmp: note.firstTone.spectlope.sprols.first?.smp ?? 0,
+                var preColor = Self.color(fromVolm: note.firstTone.spectlope.sprols.first?.volm ?? 0,
                                           noise: note.firstTone.spectlope.sprols.first?.noise ?? 0)
                 func append(_ sprol: Sprol) {
                     let y = tonePitchY(fromPitch: sprol.pitch)
-                    let color = Self.color(fromSmp: sprol.smp, noise: sprol.noise)
+                    let color = Self.color(fromVolm: sprol.volm, noise: sprol.noise)
                     
                     let tst = TriangleStrip(points: [.init(nx, preY), .init(nx, y),
                                                      .init(nx + nw, preY), .init(nx + nw, y)])
@@ -1517,7 +1517,7 @@ extension ScoreView {
                     append(sprol)
                 }
                 append(.init(pitch: Score.doubleMaxPitch,
-                             smp: note.firstTone.spectlope.sprols.last?.smp ?? 0,
+                             volm: note.firstTone.spectlope.sprols.last?.volm ?? 0,
                              noise: note.firstTone.spectlope.sprols.last?.noise ?? 0))
                 
                 let fqY = tonePitchY(fromPitch: .init(note.firstPitch))
@@ -1531,8 +1531,8 @@ extension ScoreView {
             evenPathline = .init(line1)
             oddPathline = .init(line2)
             
-            evenColors = [Self.color(fromSmp: note.firstTone.overtone.evenSmp)]
-            oddColors = [Self.color(fromSmp: note.firstTone.overtone.oddSmp)]
+            evenColors = [Self.color(fromVolm: note.firstTone.overtone.evenVolm)]
+            oddColors = [Self.color(fromVolm: note.firstTone.overtone.oddVolm)]
             
             if note.isNoise {
                 noisePathline = .init(Line(controls: toneLine.controls.map {
@@ -1664,7 +1664,7 @@ extension ScoreView {
     }
     func overtoneColors(from note: Note, _ type: OvertoneType) -> [Color] {
         if note.pits.count == 1 {
-            let color = Self.color(fromSmp: note.pits[0].tone.overtone[type])
+            let color = Self.color(fromVolm: note.pits[0].tone.overtone[type])
             return [color, color]
         }
         
@@ -1680,10 +1680,10 @@ extension ScoreView {
 //                if let p = lastP, let overtone = lastOvertone {
 //                    ps.append(p)
 //                    
-//                    colors.append(Self.color(fromSmp: overtone))
+//                    colors.append(Self.color(fromVolm: overtone))
 //                }
 //                ps.append(p)
-                colors.append(Self.color(fromSmp: overtone))
+                colors.append(Self.color(fromVolm: overtone))
 //            }
 //            lastP = p
 //            lastOvertone = overtone
@@ -1691,7 +1691,7 @@ extension ScoreView {
         }
 //        if !isLastAppned, let p = lastP, let overtone = lastOvertone {
 //            ps.append(p)
-//            colors.append(Self.color(fromSmp: overtone))
+//            colors.append(Self.color(fromVolm: overtone))
 //        }
         
         return colors
@@ -1703,22 +1703,22 @@ extension ScoreView {
               nearestChroma: chroma,
               hue: 2 * .pi * pitch.mod(12) / 12)
     }
-    static func color(fromSmp smp: Double) -> Color {
-        Color(lightness: (1 - smp) * 100)
+    static func color(fromVolm volm: Double) -> Color {
+        Color(lightness: (1 - volm) * 100)
     }
-    static func color(fromSmp smp: Double, noise: Double) -> Color {
-        let alpha = 1 - Double(Color(lightness: (1 - smp * 0.75) * 100).rgba.r)
+    static func color(fromVolm volm: Double, noise: Double) -> Color {
+        let l = Double(Color(lightness: (1 - volm * 0.75) * 100).rgba.r)
         return if noise == 0 {
-            Color(red: 0.0, green: 0, blue: 0, opacity: alpha)
+            Color(red: l, green: l, blue: l)
         } else {
-            Color(red: 0, green: 0, blue: noise * Spectrogram.editRedRatio, opacity: alpha)
+            Color(red: l, green: l, blue: noise * Spectrogram.editRedRatio * (1 - l) + l)
         }
     }
     static func color(from stereo: Stereo) -> Color {
-        color(fromPan: stereo.pan, smp: stereo.smp)
+        color(fromPan: stereo.pan, volm: stereo.volm)
     }
-    static func color(fromPan pan: Double, smp: Double) -> Color {
-        let l = Double(Color(lightness: (1 - smp) * 100).rgba.r)
+    static func color(fromPan pan: Double, volm: Double) -> Color {
+        let l = Double(Color(lightness: (1 - volm) * 100).rgba.r)
         return if pan == 0 {
             Color(red: l, green: l, blue: l)
         } else if pan > 0 {
@@ -1742,14 +1742,14 @@ extension ScoreView {
             if x >= frame.minX && x < frame.maxX {
                 timeNode.path = Path([Point(), Point(0, frame.height)])
                 timeNode.attitude.position = Point(x, frame.minY)
-                updateFromPeakSmp()
+                updateFromPeakVolm()
             } else {
                 timeNode.path = Path()
-                currentPeakSmpNode.path = Path()
+                currentPeakVolmNode.path = Path()
             }
         } else if !timeNode.path.isEmpty {
             timeNode.path = Path()
-            currentPeakSmpNode.path = Path()
+            currentPeakVolmNode.path = Path()
         }
     }
     
@@ -1884,13 +1884,13 @@ extension ScoreView {
         case note
         case sustain
         case pit(pitI: Int)
-        case evenSmp(pitI: Int)
-        case oddSmp(pitI: Int)
+        case evenVolm(pitI: Int)
+        case oddVolm(pitI: Int)
         case sprol(pitI: Int, sprolI: Int)
         
         var isTone: Bool {
             switch self {
-            case .evenSmp, .oddSmp, .sprol: true
+            case .evenVolm, .oddVolm, .sprol: true
             default: false
             }
         }
@@ -1926,14 +1926,14 @@ extension ScoreView {
                         if evenDsd < minDS && evenDsd < maxDS {
                             minDS = evenDsd
                             minNoteI = noteI
-                            minResult = .evenSmp(pitI: pitI)
+                            minResult = .evenVolm(pitI: pitI)
                         }
                         let oddP = pitP + .init(0, -noteH / 2 - 1 / 2)
                         let oddDsd = oddP.distanceSquared(p)
                         if oddDsd < minDS && oddDsd < maxDS {
                             minDS = oddDsd
                             minNoteI = noteI
-                            minResult = .oddSmp(pitI: pitI)
+                            minResult = .oddVolm(pitI: pitI)
                         }
                         
                         if note.pits.count == 1 {
@@ -1942,13 +1942,13 @@ extension ScoreView {
                             if ds < minDS && ds < maxDS {
                                 minDS = ds
                                 minNoteI = noteI
-                                minResult = .evenSmp(pitI: 0)
+                                minResult = .evenVolm(pitI: 0)
                             }
                             ds = pointline.minDistanceSquared(at: p + Point(0, ScoreLayout.noteHeight / 2 + 1 / 2))
                             if ds < minDS && ds < maxDS {
                                 minDS = ds
                                 minNoteI = noteI
-                                minResult = .oddSmp(pitI: 0)
+                                minResult = .oddVolm(pitI: 0)
                             }
                         }
                     }
@@ -2077,8 +2077,8 @@ extension ScoreView {
         let result = note.pitResult(atBeat: .init(beat - note.beatRange.start))
         return result.stereo
     }
-    func smp(atX x: Double, at noteI: Int) -> Double {
-        stereo(atX: x, at: noteI).smp
+    func volm(atX x: Double, at noteI: Int) -> Double {
+        stereo(atX: x, at: noteI).volm
     }
     func pan(atX x: Double, at noteI: Int) -> Double {
         stereo(atX: x, at: noteI).pan

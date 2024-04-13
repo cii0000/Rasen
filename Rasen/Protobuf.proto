@@ -155,7 +155,7 @@ message PBImage {
 }
 
 message PBStereo {
-    double smp = 1;
+    double volm = 1;
     double pan = 2;
     PBUUID id = 3;
 }
@@ -173,13 +173,13 @@ message PBContent {
 }
 
 message PBOvertone {
-    double evenSmp = 1;
-    double oddSmp = 2;
+    double evenVolm = 1;
+    double oddVolm = 2;
 }
 
 message PBSprol {
     double pitch = 1;
-    double smp = 2;
+    double volm = 2;
     double noise = 3;
 }
 message PBSpectlope {
@@ -206,7 +206,7 @@ message PBPitbend {
 message PBEnvelope {
     double attackSec = 1;
     double decaySec = 2;
-    double sustainSmp = 3;
+    double sustainVolm = 3;
     double releaseSec = 4;
     PBUUID id = 5;
 }

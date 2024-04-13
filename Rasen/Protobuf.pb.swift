@@ -828,7 +828,7 @@ struct PBStereo {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var smp: Double = 0
+  var volm: Double = 0
 
   var pan: Double = 0
 
@@ -942,9 +942,9 @@ struct PBOvertone {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var evenSmp: Double = 0
+  var evenVolm: Double = 0
 
-  var oddSmp: Double = 0
+  var oddVolm: Double = 0
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -958,7 +958,7 @@ struct PBSprol {
 
   var pitch: Double = 0
 
-  var smp: Double = 0
+  var volm: Double = 0
 
   var noise: Double = 0
 
@@ -1094,7 +1094,7 @@ struct PBEnvelope {
 
   var decaySec: Double = 0
 
-  var sustainSmp: Double = 0
+  var sustainVolm: Double = 0
 
   var releaseSec: Double = 0
 
@@ -4953,7 +4953,7 @@ extension PBImage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
 extension PBStereo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBStereo"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "smp"),
+    1: .same(proto: "volm"),
     2: .same(proto: "pan"),
     3: .same(proto: "id"),
   ]
@@ -4964,7 +4964,7 @@ extension PBStereo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationB
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularDoubleField(value: &self.smp) }()
+      case 1: try { try decoder.decodeSingularDoubleField(value: &self.volm) }()
       case 2: try { try decoder.decodeSingularDoubleField(value: &self.pan) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._id) }()
       default: break
@@ -4977,8 +4977,8 @@ extension PBStereo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationB
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if self.smp != 0 {
-      try visitor.visitSingularDoubleField(value: self.smp, fieldNumber: 1)
+    if self.volm != 0 {
+      try visitor.visitSingularDoubleField(value: self.volm, fieldNumber: 1)
     }
     if self.pan != 0 {
       try visitor.visitSingularDoubleField(value: self.pan, fieldNumber: 2)
@@ -4990,7 +4990,7 @@ extension PBStereo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationB
   }
 
   static func ==(lhs: PBStereo, rhs: PBStereo) -> Bool {
-    if lhs.smp != rhs.smp {return false}
+    if lhs.volm != rhs.volm {return false}
     if lhs.pan != rhs.pan {return false}
     if lhs._id != rhs._id {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -5129,8 +5129,8 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
 extension PBOvertone: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBOvertone"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "evenSmp"),
-    2: .same(proto: "oddSmp"),
+    1: .same(proto: "evenVolm"),
+    2: .same(proto: "oddVolm"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -5139,26 +5139,26 @@ extension PBOvertone: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularDoubleField(value: &self.evenSmp) }()
-      case 2: try { try decoder.decodeSingularDoubleField(value: &self.oddSmp) }()
+      case 1: try { try decoder.decodeSingularDoubleField(value: &self.evenVolm) }()
+      case 2: try { try decoder.decodeSingularDoubleField(value: &self.oddVolm) }()
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.evenSmp != 0 {
-      try visitor.visitSingularDoubleField(value: self.evenSmp, fieldNumber: 1)
+    if self.evenVolm != 0 {
+      try visitor.visitSingularDoubleField(value: self.evenVolm, fieldNumber: 1)
     }
-    if self.oddSmp != 0 {
-      try visitor.visitSingularDoubleField(value: self.oddSmp, fieldNumber: 2)
+    if self.oddVolm != 0 {
+      try visitor.visitSingularDoubleField(value: self.oddVolm, fieldNumber: 2)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: PBOvertone, rhs: PBOvertone) -> Bool {
-    if lhs.evenSmp != rhs.evenSmp {return false}
-    if lhs.oddSmp != rhs.oddSmp {return false}
+    if lhs.evenVolm != rhs.evenVolm {return false}
+    if lhs.oddVolm != rhs.oddVolm {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5168,7 +5168,7 @@ extension PBSprol: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
   static let protoMessageName: String = "PBSprol"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "pitch"),
-    2: .same(proto: "smp"),
+    2: .same(proto: "volm"),
     3: .same(proto: "noise"),
   ]
 
@@ -5179,7 +5179,7 @@ extension PBSprol: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularDoubleField(value: &self.pitch) }()
-      case 2: try { try decoder.decodeSingularDoubleField(value: &self.smp) }()
+      case 2: try { try decoder.decodeSingularDoubleField(value: &self.volm) }()
       case 3: try { try decoder.decodeSingularDoubleField(value: &self.noise) }()
       default: break
       }
@@ -5190,8 +5190,8 @@ extension PBSprol: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
     if self.pitch != 0 {
       try visitor.visitSingularDoubleField(value: self.pitch, fieldNumber: 1)
     }
-    if self.smp != 0 {
-      try visitor.visitSingularDoubleField(value: self.smp, fieldNumber: 2)
+    if self.volm != 0 {
+      try visitor.visitSingularDoubleField(value: self.volm, fieldNumber: 2)
     }
     if self.noise != 0 {
       try visitor.visitSingularDoubleField(value: self.noise, fieldNumber: 3)
@@ -5201,7 +5201,7 @@ extension PBSprol: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
 
   static func ==(lhs: PBSprol, rhs: PBSprol) -> Bool {
     if lhs.pitch != rhs.pitch {return false}
-    if lhs.smp != rhs.smp {return false}
+    if lhs.volm != rhs.volm {return false}
     if lhs.noise != rhs.noise {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -5385,7 +5385,7 @@ extension PBEnvelope: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "attackSec"),
     2: .same(proto: "decaySec"),
-    3: .same(proto: "sustainSmp"),
+    3: .same(proto: "sustainVolm"),
     4: .same(proto: "releaseSec"),
     5: .same(proto: "id"),
   ]
@@ -5398,7 +5398,7 @@ extension PBEnvelope: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularDoubleField(value: &self.attackSec) }()
       case 2: try { try decoder.decodeSingularDoubleField(value: &self.decaySec) }()
-      case 3: try { try decoder.decodeSingularDoubleField(value: &self.sustainSmp) }()
+      case 3: try { try decoder.decodeSingularDoubleField(value: &self.sustainVolm) }()
       case 4: try { try decoder.decodeSingularDoubleField(value: &self.releaseSec) }()
       case 5: try { try decoder.decodeSingularMessageField(value: &self._id) }()
       default: break
@@ -5417,8 +5417,8 @@ extension PBEnvelope: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
     if self.decaySec != 0 {
       try visitor.visitSingularDoubleField(value: self.decaySec, fieldNumber: 2)
     }
-    if self.sustainSmp != 0 {
-      try visitor.visitSingularDoubleField(value: self.sustainSmp, fieldNumber: 3)
+    if self.sustainVolm != 0 {
+      try visitor.visitSingularDoubleField(value: self.sustainVolm, fieldNumber: 3)
     }
     if self.releaseSec != 0 {
       try visitor.visitSingularDoubleField(value: self.releaseSec, fieldNumber: 4)
@@ -5432,7 +5432,7 @@ extension PBEnvelope: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
   static func ==(lhs: PBEnvelope, rhs: PBEnvelope) -> Bool {
     if lhs.attackSec != rhs.attackSec {return false}
     if lhs.decaySec != rhs.decaySec {return false}
-    if lhs.sustainSmp != rhs.sustainSmp {return false}
+    if lhs.sustainVolm != rhs.sustainVolm {return false}
     if lhs.releaseSec != rhs.releaseSec {return false}
     if lhs._id != rhs._id {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}

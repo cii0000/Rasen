@@ -182,19 +182,19 @@ final class ContentView<T: BinderProtocol>: SpectrgramView {
     let timelineNode = Node()
     var spectrogramNode: Node?
     var spectrogramFqType: Spectrogram.FqType?
-    var timeNode: Node?, currentPeakSmpNode: Node?
-    var peakSmp = 0.0 {
+    var timeNode: Node?, currentPeakVolmNode: Node?
+    var peakVolm = 0.0 {
         didSet {
-            guard peakSmp != oldValue else { return }
-            updateFromPeakSmp()
+            guard peakVolm != oldValue else { return }
+            updateFromPeakVolm()
         }
     }
-    func updateFromPeakSmp() {
-        guard let node = currentPeakSmpNode,
+    func updateFromPeakVolm() {
+        guard let node = currentPeakVolmNode,
               let frame = timelineFrame else { return }
-        let y = frame.height * peakSmp
+        let y = frame.height * peakVolm
         node.path = Path([Point(), Point(0, y)])
-        if peakSmp < Audio.headroomSmp {
+        if peakVolm < Audio.headroomVolm {
             node.lineType = .color(.background)
         } else {
             node.lineType = .color(.warning)
@@ -259,15 +259,15 @@ extension ContentView {
             timelineNode.children = self.timelineNode(with: model)
             
             let timeNode = Node(lineWidth: 3, lineType: .color(.content))
-            let smpNode = Node(lineWidth: 1, lineType: .color(.background))
-            timeNode.append(child: smpNode)
+            let volmNode = Node(lineWidth: 1, lineType: .color(.background))
+            timeNode.append(child: volmNode)
             timelineNode.children.append(timeNode)
             self.timeNode = timeNode
-            self.currentPeakSmpNode = smpNode
+            self.currentPeakVolmNode = volmNode
         } else if !timelineNode.children.isEmpty {
             timelineNode.children = []
             self.timeNode = nil
-            self.currentPeakSmpNode = nil
+            self.currentPeakVolmNode = nil
         }
     }
     
@@ -417,7 +417,7 @@ extension ContentView {
             }
         }
         
-        if !content.smps.isEmpty {
+        if !content.volms.isEmpty {
             let sSec = timeOption.sec(fromBeat: max(-timeOption.localStartBeat, 0))
             let msSec = timeOption.sec(fromBeat: timeOption.localStartBeat)
             let csSec = timeOption.sec(fromBeat: timeOption.beatRange.start)
@@ -428,19 +428,19 @@ extension ContentView {
             let eSec = timeOption
                 .sec(fromBeat: min(timeOption.beatRange.end - (timeOption.localStartBeat + timeOption.beatRange.start),
                                    durBeat))
-            let si = Int((sSec * Content.smpFrameRate).rounded())
-                .clipped(min: 0, max: content.smps.count - 1)
-            let msi = Int((msSec * Content.smpFrameRate).rounded())
-            let ei = Int((eSec * Content.smpFrameRate).rounded())
-                .clipped(min: 0, max: content.smps.count - 1)
-            let vt = content.stereo.smp
-                .clipped(min: Volume.minSmp, max: Volume.maxSmp,
+            let si = Int((sSec * Content.volmFrameRate).rounded())
+                .clipped(min: 0, max: content.volms.count - 1)
+            let msi = Int((msSec * Content.volmFrameRate).rounded())
+            let ei = Int((eSec * Content.volmFrameRate).rounded())
+                .clipped(min: 0, max: content.volms.count - 1)
+            let vt = content.stereo.volm
+                .clipped(min: Volm.minVolm, max: Volm.maxVolm,
                          newMin: lw / noteHeight, newMax: 1)
             if si < ei {
                 let line = Line(controls: (si ... ei).map { i in
-                    let sec = Rational(i + msi) / Content.smpFrameRate + csSec
+                    let sec = Rational(i + msi) / Content.volmFrameRate + csSec
                     return .init(point: .init(x(atSec: sec), y),
-                                 pressure: content.smps[i] * vt)
+                                 pressure: content.volms[i] * vt)
                 })
                 
                 let pan = content.stereo.pan
@@ -528,7 +528,7 @@ extension ContentView {
     }
     
     static var spectrogramHeight: Double {
-        ScoreLayout.pitchHeight * 12 * 11
+        ScoreLayout.pitchHeight * (Score.doubleMaxPitch - Score.doubleMinPitch)
     }
     func updateSpectrogram() {
         spectrogramNode?.removeFromParent()
@@ -609,14 +609,14 @@ extension ContentView {
             if x >= frame.minX && x < frame.maxX {
                 timeNode.path = Path([Point(), Point(0, frame.height)])
                 timeNode.attitude.position = Point(x, frame.minY)
-                updateFromPeakSmp()
+                updateFromPeakVolm()
             } else {
                 timeNode.path = Path()
-                currentPeakSmpNode?.path = Path()
+                currentPeakVolmNode?.path = Path()
             }
         } else {
             timeNode?.path = Path()
-            currentPeakSmpNode?.path = Path()
+            currentPeakVolmNode?.path = Path()
         }
     }
     

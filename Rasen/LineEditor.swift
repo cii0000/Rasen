@@ -1005,7 +1005,7 @@ final class LineEditor: Editor {
                 noteStartBeat = beat
                 beganScore = score
                 
-                let stereo = Stereo(smp: sheetView.isPlaying ? 0.1 : 1)
+                let stereo = Stereo(volm: sheetView.isPlaying ? 0.1 : 1)
                 if let notePlayer = sheetView.notePlayer {
                     self.notePlayer = notePlayer
                     notePlayer.notes = [note.firstPitResult]

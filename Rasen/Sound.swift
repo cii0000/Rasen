@@ -197,11 +197,11 @@ struct Mel {
 }
 
 struct Stereo: Codable, Hashable {
-    var smp = 0.0, pan = 0.0, id = UUID()
+    var volm = 0.0, pan = 0.0, id = UUID()
 }
 extension Stereo {
     var isEmpty: Bool {
-        smp == 0
+        volm == 0
     }
     
     func with(id: UUID) -> Self {
@@ -212,13 +212,13 @@ extension Stereo {
 }
 extension Stereo: Protobuf {
     init(_ pb: PBStereo) throws {
-        smp = ((try? pb.smp.notNaN()) ?? 1).clipped(Volume.smpRange)
+        volm = ((try? pb.volm.notNaN()) ?? 1).clipped(Volm.volmRange)
         pan = pb.pan.clipped(min: -1, max: 1)
         id = (try? .init(pb.id)) ?? .init()
     }
     var pb: PBStereo {
         .with {
-            $0.smp = smp
+            $0.volm = volm
             $0.pan = pan
             $0.id = id.pb
         }
@@ -226,144 +226,152 @@ extension Stereo: Protobuf {
 }
 extension Stereo: MonoInterpolatable {
     static func linear(_ f0: Self, _ f1: Self, t: Double) -> Self {
-        .init(smp: .linear(f0.smp, f1.smp, t: t),
+        .init(volm: .linear(f0.volm, f1.volm, t: t),
               pan: .linear(f0.pan, f1.pan, t: t))
     }
     static func firstSpline(_ f1: Self,
                             _ f2: Self, _ f3: Self, t: Double) -> Self {
-        .init(smp: .firstSpline(f1.smp, f2.smp, f3.smp, t: t),
+        .init(volm: .firstSpline(f1.volm, f2.volm, f3.volm, t: t),
               pan: .firstSpline(f1.pan, f2.pan, f3.pan, t: t))
     }
     static func spline(_ f0: Self, _ f1: Self,
                        _ f2: Self, _ f3: Self, t: Double) -> Self {
-        .init(smp: .spline(f0.smp, f1.smp, f2.smp, f3.smp, t: t),
+        .init(volm: .spline(f0.volm, f1.volm, f2.volm, f3.volm, t: t),
               pan: .spline(f0.pan, f1.pan, f2.pan, f3.pan, t: t))
     }
     static func lastSpline(_ f0: Self, _ f1: Self,
                            _ f2: Self, t: Double) -> Self {
-        .init(smp: .lastSpline(f0.smp, f1.smp, f2.smp, t: t),
+        .init(volm: .lastSpline(f0.volm, f1.volm, f2.volm, t: t),
               pan: .lastSpline(f0.pan, f1.pan, f2.pan, t: t))
     }
     static func firstMonospline(_ f1: Self,
                             _ f2: Self, _ f3: Self, with ms: Monospline) -> Self {
-        .init(smp: .firstMonospline(f1.smp, f2.smp, f3.smp, with: ms),
+        .init(volm: .firstMonospline(f1.volm, f2.volm, f3.volm, with: ms),
               pan: .firstMonospline(f1.pan, f2.pan, f3.pan, with: ms))
     }
     static func monospline(_ f0: Self, _ f1: Self,
                        _ f2: Self, _ f3: Self, with ms: Monospline) -> Self {
-        .init(smp: .monospline(f0.smp, f1.smp, f2.smp, f3.smp, with: ms),
+        .init(volm: .monospline(f0.volm, f1.volm, f2.volm, f3.volm, with: ms),
               pan: .monospline(f0.pan, f1.pan, f2.pan, f3.pan, with: ms))
     }
     static func lastMonospline(_ f0: Self, _ f1: Self,
                            _ f2: Self, with ms: Monospline) -> Self {
-        .init(smp: .lastMonospline(f0.smp, f1.smp, f2.smp, with: ms),
+        .init(volm: .lastMonospline(f0.volm, f1.volm, f2.volm, with: ms),
               pan: .lastMonospline(f0.pan, f1.pan, f2.pan, with: ms))
     }
 }
 
 struct Overtone: Hashable, Codable {
-    var evenSmp = 1.0, oddSmp = 1.0
+    var evenVolm = 1.0, oddVolm = 1.0
 }
 extension Overtone {
     var isAll: Bool {
-        evenSmp == 1 && oddSmp == 1
+        evenVolm == 1 && oddVolm == 1
     }
     var isOne: Bool {
-        evenSmp == 0 && oddSmp == 0
+        evenVolm == 0 && oddVolm == 0
     }
-    func smp(at i: Int) -> Double {
-        i == 1 ? 1 : (i % 2 == 0 ? evenSmp : oddSmp)
+    func volm(at i: Int) -> Double {
+        i == 1 ? 1 : (i % 2 == 0 ? evenVolm : oddVolm)
     }
 }
 extension Overtone: Protobuf {
     init(_ pb: PBOvertone) throws {
-        evenSmp = ((try? pb.evenSmp.notNaN()) ?? 0).clipped(min: 0, max: 1)
-        oddSmp = ((try? pb.oddSmp.notNaN()) ?? 0).clipped(min: 0, max: 1)
+        evenVolm = ((try? pb.evenVolm.notNaN()) ?? 0).clipped(min: 0, max: 1)
+        oddVolm = ((try? pb.oddVolm.notNaN()) ?? 0).clipped(min: 0, max: 1)
     }
     var pb: PBOvertone {
         .with {
-            $0.evenSmp = evenSmp
-            $0.oddSmp = oddSmp
+            $0.evenVolm = evenVolm
+            $0.oddVolm = oddVolm
         }
     }
 }
 enum OvertoneType: Int, Hashable, Codable, CaseIterable {
-    case evenSmp, oddSmp
+    case evenVolm, oddVolm
 }
 extension Overtone {
     subscript(type: OvertoneType) -> Double {
         get {
             switch type {
-            case .evenSmp: evenSmp
-            case .oddSmp: oddSmp
+            case .evenVolm: evenVolm
+            case .oddVolm: oddVolm
             }
         }
         set {
             switch type {
-            case .evenSmp: evenSmp = newValue
-            case .oddSmp: oddSmp = newValue
+            case .evenVolm: evenVolm = newValue
+            case .oddVolm: oddVolm = newValue
             }
         }
     }
 }
 extension Overtone: MonoInterpolatable {
     static func linear(_ f0: Self, _ f1: Self, t: Double) -> Self {
-        .init(evenSmp: .linear(f0.evenSmp, f1.evenSmp, t: t),
-              oddSmp: .linear(f0.oddSmp, f1.oddSmp, t: t))
+        .init(evenVolm: .linear(f0.evenVolm, f1.evenVolm, t: t),
+              oddVolm: .linear(f0.oddVolm, f1.oddVolm, t: t))
     }
     static func firstSpline(_ f1: Self,
                             _ f2: Self, _ f3: Self, t: Double) -> Self {
-        .init(evenSmp: .firstSpline(f1.evenSmp, f2.evenSmp, f3.evenSmp, t: t),
-              oddSmp: .firstSpline(f1.oddSmp, f2.oddSmp, f3.oddSmp, t: t))
+        .init(evenVolm: .firstSpline(f1.evenVolm, f2.evenVolm, f3.evenVolm, t: t),
+              oddVolm: .firstSpline(f1.oddVolm, f2.oddVolm, f3.oddVolm, t: t))
     }
     static func spline(_ f0: Self, _ f1: Self,
                        _ f2: Self, _ f3: Self, t: Double) -> Self {
-        .init(evenSmp: .spline(f0.evenSmp, f1.evenSmp, f2.evenSmp, f3.evenSmp, t: t),
-              oddSmp: .spline(f0.oddSmp, f1.oddSmp, f2.oddSmp, f3.oddSmp, t: t))
+        .init(evenVolm: .spline(f0.evenVolm, f1.evenVolm, f2.evenVolm, f3.evenVolm, t: t),
+              oddVolm: .spline(f0.oddVolm, f1.oddVolm, f2.oddVolm, f3.oddVolm, t: t))
     }
     static func lastSpline(_ f0: Self, _ f1: Self,
                            _ f2: Self, t: Double) -> Self {
-        .init(evenSmp: .lastSpline(f0.evenSmp, f1.evenSmp, f2.evenSmp, t: t),
-              oddSmp: .lastSpline(f0.oddSmp, f1.oddSmp, f2.oddSmp, t: t))
+        .init(evenVolm: .lastSpline(f0.evenVolm, f1.evenVolm, f2.evenVolm, t: t),
+              oddVolm: .lastSpline(f0.oddVolm, f1.oddVolm, f2.oddVolm, t: t))
     }
     static func firstMonospline(_ f1: Self,
                                 _ f2: Self, _ f3: Self, with ms: Monospline) -> Self {
-        .init(evenSmp: .firstMonospline(f1.evenSmp, f2.evenSmp, f3.evenSmp, with: ms),
-              oddSmp: .firstMonospline(f1.oddSmp, f2.oddSmp, f3.oddSmp, with: ms))
+        .init(evenVolm: .firstMonospline(f1.evenVolm, f2.evenVolm, f3.evenVolm, with: ms),
+              oddVolm: .firstMonospline(f1.oddVolm, f2.oddVolm, f3.oddVolm, with: ms))
     }
     static func monospline(_ f0: Self, _ f1: Self,
                            _ f2: Self, _ f3: Self, with ms: Monospline) -> Self {
-        .init(evenSmp: .monospline(f0.evenSmp, f1.evenSmp, f2.evenSmp, f3.evenSmp, with: ms),
-              oddSmp: .monospline(f0.oddSmp, f1.oddSmp, f2.oddSmp, f3.oddSmp, with: ms))
+        .init(evenVolm: .monospline(f0.evenVolm, f1.evenVolm, f2.evenVolm, f3.evenVolm, with: ms),
+              oddVolm: .monospline(f0.oddVolm, f1.oddVolm, f2.oddVolm, f3.oddVolm, with: ms))
     }
     static func lastMonospline(_ f0: Self, _ f1: Self,
                                _ f2: Self, with ms: Monospline) -> Self {
-        .init(evenSmp: .lastMonospline(f0.evenSmp, f1.evenSmp, f2.evenSmp, with: ms),
-              oddSmp: .lastMonospline(f0.oddSmp, f1.oddSmp, f2.oddSmp, with: ms))
+        .init(evenVolm: .lastMonospline(f0.evenVolm, f1.evenVolm, f2.evenVolm, with: ms),
+              oddVolm: .lastMonospline(f0.oddVolm, f1.oddVolm, f2.oddVolm, with: ms))
     }
 }
 
 struct Sprol: Hashable, Codable {
-    var pitch = 0.0, smp = 0.0, noise = 0.0
+    var pitch = 0.0, volm = 0.0, noise = 0.0
 }
 extension Sprol: Protobuf {
     init(_ pb: PBSprol) throws {
         pitch = ((try? pb.pitch.notNaN()) ?? 0).clipped(Score.doublePitchRange)
-        smp = ((try? pb.smp.notNaN()) ?? 0).clipped(min: 0, max: 1)
+        volm = ((try? pb.volm.notNaN()) ?? 0).clipped(min: 0, max: 1)
         noise = ((try? pb.noise.notNaN()) ?? 0).clipped(min: 0, max: 1)
     }
     var pb: PBSprol {
         .with {
             $0.pitch = pitch
-            $0.smp = smp
+            $0.volm = volm
             $0.noise = noise
         }
     }
 }
+extension Sprol {
+    var noisedVolm: Double {
+        volm * (1 - noise)
+    }
+    var noiseVolm: Double {
+        volm * noise
+    }
+}
 
 struct Spectlope: Hashable, Codable {
-    var sprols = [Sprol(pitch: 0, smp: 1, noise: 0),
-                    Sprol(pitch: 108, smp: 0, noise: 0)]
+    var sprols = [Sprol(pitch: 0, volm: 1, noise: 0),
+                  Sprol(pitch: 108, volm: 0.125, noise: 0)]
 }
 extension Spectlope: Protobuf {
     init(_ pb: PBSpectlope) throws {
@@ -376,19 +384,19 @@ extension Spectlope: Protobuf {
     }
 }
 extension Spectlope {
-    init(pitchSmps: [Point]) {
-        sprols = pitchSmps.map { .init(pitch: $0.x, smp: $0.y, noise: 0) }
+    init(pitchVolms: [Point]) {
+        sprols = pitchVolms.map { .init(pitch: $0.x, volm: $0.y, noise: 0) }
     }
-    init(noisePitchSmps: [Point]) {
-        sprols = noisePitchSmps.map { .init(pitch: $0.x, smp: $0.y, noise: 1) }
+    init(noisePitchVolms: [Point]) {
+        sprols = noisePitchVolms.map { .init(pitch: $0.x, volm: $0.y, noise: 1) }
     }
 }
 extension Spectlope {
     var isEmpty: Bool {
         sprols.isEmpty
     }
-    var isEmptySmp: Bool {
-        !sprols.contains { $0.smp > 0 }
+    var isEmptyVolm: Bool {
+        !sprols.contains { $0.volm > 0 }
     }
     var count: Int {
         sprols.count
@@ -396,7 +404,7 @@ extension Spectlope {
     var isFullNoise: Bool {
         !sprols.contains { $0.noise != 1 }
     }
-    var isNoise: Bool {
+    var containsNoise: Bool {
         sprols.contains { $0.noise > 0 }
     }
     
@@ -415,7 +423,7 @@ extension Spectlope {
                 let t = (pitch - prePitch) / (nextPitch - prePitch)
                 let nSprol = Sprol.linear(preSprol, nextSprol, t: t)
                 if let nMaxSprol = maxSprol {
-                    maxSprol?.smp = max(nMaxSprol.smp, nSprol.smp)
+                    maxSprol?.volm = max(nMaxSprol.volm, nSprol.volm)
                     maxSprol?.noise = max(nMaxSprol.noise, nSprol.noise)
                 } else {
                     maxSprol = nSprol
@@ -427,24 +435,39 @@ extension Spectlope {
         return maxSprol ?? sprols.last!
     }
     
-    func amp(atFq fq: Double) -> Double {
-        Volume.amp(fromSmp: sprol(atPitch: Pitch.pitch(fromFq: fq)).smp)
+    func volm(atPitch pitch: Double) -> Double {
+        sprol(atPitch: pitch).volm
+    }
+    func volm(atFq fq: Double) -> Double {
+        volm(atPitch: Pitch.pitch(fromFq: fq))
     }
     
-    func noiseT(atPitch pitch: Double) -> Double {
+    func amp(atFq fq: Double) -> Double {
+        Volm.amp(fromVolm: sprol(atPitch: Pitch.pitch(fromFq: fq)).volm)
+    }
+    
+    func noise(atPitch pitch: Double) -> Double {
         sprol(atPitch: pitch).noise
     }
-    func noiseT(atFq fq: Double) -> Double {
-        noiseT(atPitch: Pitch.pitch(fromFq: fq))
+    func noise(atFq fq: Double) -> Double {
+        noise(atPitch: Pitch.pitch(fromFq: fq))
     }
     
     func noiseAmp(atFq fq: Double) -> Double {
-        Volume.amp(fromSmp: sprol(atPitch: Pitch.pitch(fromFq: fq)).noise)
+        Volm.amp(fromVolm: sprol(atPitch: Pitch.pitch(fromFq: fq)).noise)
     }
+    
     func noisedAmp(atFq fq: Double) -> Double {
         let amp = amp(atFq: fq)
         let noiseAmp = noiseAmp(atFq: fq)
         return amp - noiseAmp
+    }
+    
+    func noisedVolm(atPitch pitch: Double) -> Double {
+        volm(atPitch: pitch) * (1 - noise(atPitch: pitch))
+    }
+    func noisedVolm(atFq fq: Double) -> Double {
+        noisedVolm(atPitch: Pitch.pitch(fromFq: fq))
     }
     
     var formants: [Formant] {
@@ -460,43 +483,43 @@ extension Spectlope {
 extension Sprol: MonoInterpolatable {
     static func linear(_ f0: Self, _ f1: Self, t: Double) -> Self {
         .init(pitch: .linear(f0.pitch, f1.pitch, t: t),
-              smp: .linear(f0.smp, f1.smp, t: t),
+              volm: .linear(f0.volm, f1.volm, t: t),
               noise: .linear(f0.noise, f1.noise, t: t))
     }
     static func firstSpline(_ f1: Self,
                             _ f2: Self, _ f3: Self, t: Double) -> Self {
         .init(pitch: .firstSpline(f1.pitch, f2.pitch, f3.pitch, t: t),
-              smp: .firstSpline(f1.smp, f2.smp, f3.smp, t: t),
+              volm: .firstSpline(f1.volm, f2.volm, f3.volm, t: t),
               noise: .firstSpline(f1.noise, f2.noise, f3.noise, t: t))
     }
     static func spline(_ f0: Self, _ f1: Self,
                        _ f2: Self, _ f3: Self, t: Double) -> Self {
         .init(pitch: .spline(f0.pitch, f1.pitch, f2.pitch, f3.pitch, t: t),
-              smp: .spline(f0.smp, f1.smp, f2.smp, f3.smp, t: t),
+              volm: .spline(f0.volm, f1.volm, f2.volm, f3.volm, t: t),
               noise: .spline(f0.noise, f1.noise, f2.noise, f3.noise, t: t))
     }
     static func lastSpline(_ f0: Self, _ f1: Self,
                            _ f2: Self, t: Double) -> Self {
         .init(pitch: .lastSpline(f0.pitch, f1.pitch, f2.pitch, t: t),
-              smp: .lastSpline(f0.smp, f1.smp, f2.smp, t: t),
+              volm: .lastSpline(f0.volm, f1.volm, f2.volm, t: t),
               noise: .lastSpline(f0.noise, f1.noise, f2.noise, t: t))
     }
     static func firstMonospline(_ f1: Self,
                                 _ f2: Self, _ f3: Self, with ms: Monospline) -> Self {
         .init(pitch: .firstMonospline(f1.pitch, f2.pitch, f3.pitch, with: ms),
-              smp: .firstMonospline(f1.smp, f2.smp, f3.smp, with: ms),
+              volm: .firstMonospline(f1.volm, f2.volm, f3.volm, with: ms),
               noise: .firstMonospline(f1.noise, f2.noise, f3.noise, with: ms))
     }
     static func monospline(_ f0: Self, _ f1: Self,
                            _ f2: Self, _ f3: Self, with ms: Monospline) -> Self {
         .init(pitch: .monospline(f0.pitch, f1.pitch, f2.pitch, f3.pitch, with: ms),
-              smp: .monospline(f0.smp, f1.smp, f2.smp, f3.smp, with: ms),
+              volm: .monospline(f0.volm, f1.volm, f2.volm, f3.volm, with: ms),
               noise: .monospline(f0.noise, f1.noise, f2.noise, f3.noise, with: ms))
     }
     static func lastMonospline(_ f0: Self, _ f1: Self,
                                _ f2: Self, with ms: Monospline) -> Self {
         .init(pitch: .lastMonospline(f0.pitch, f1.pitch, f2.pitch, with: ms),
-              smp: .lastMonospline(f0.smp, f1.smp, f2.smp, with: ms),
+              volm: .lastMonospline(f0.volm, f1.volm, f2.volm, with: ms),
               noise: .lastMonospline(f0.noise, f1.noise, f2.noise, with: ms))
     }
 }
@@ -610,9 +633,9 @@ extension Spectlope: MonoInterpolatable {
 
 struct Tone: Hashable, Codable {
     static let noise = Self(spectlope: .init(sprols: [.init(pitch: Score.doubleMinPitch,
-                                                            smp: 1, noise: 1),
+                                                            volm: 1, noise: 1),
                                                       .init(pitch: Score.doubleMaxPitch,
-                                                            smp: 1, noise: 1)]))
+                                                            volm: 1, noise: 1)]))
     
     var overtone = Overtone()
     var spectlope = Spectlope()
@@ -680,7 +703,7 @@ extension Tone: MonoInterpolatable {
 }
 
 struct Pit: Codable, Hashable {
-    var beat = Rational(0), pitch = Rational(0), stereo = Stereo(smp: 0.5), tone = Tone(), lyric = ""
+    var beat = Rational(0), pitch = Rational(0), stereo = Stereo(volm: 0.375), tone = Tone(), lyric = ""
 }
 extension Pit: Protobuf {
     init(_ pb: PBPit) throws {
@@ -701,10 +724,10 @@ extension Pit: Protobuf {
     }
 }
 extension Pit {
-    init(beat: Rational, pitch: Rational, smp: Double) {
+    init(beat: Rational, pitch: Rational, volm: Double) {
         self.beat = beat
         self.pitch = pitch
-        self.stereo = .init(smp: smp.clipped(Volume.smpRange))
+        self.stereo = .init(volm: volm.clipped(Volm.volmRange))
     }
     
     func isEqualWithoutBeat(_ other: Self) -> Bool {
@@ -724,14 +747,14 @@ extension Pit {
 }
 
 struct Envelope: Hashable, Codable {
-    var attackSec = 0.02, decaySec = 0.04, sustainSmp = 0.95, releaseSec = 0.06
+    var attackSec = 0.02, decaySec = 0.04, sustainVolm = 0.95, releaseSec = 0.06
     var id = UUID()
 }
 extension Envelope: Protobuf {
     init(_ pb: PBEnvelope) throws {
         attackSec = try pb.attackSec.notNaN().clipped(min: 0, max: 1)
         decaySec = try pb.decaySec.notNaN().clipped(min: 0, max: 1)
-        sustainSmp = try pb.sustainSmp.notNaN().clipped(min: 0, max: 1)
+        sustainVolm = try pb.sustainVolm.notNaN().clipped(min: 0, max: 1)
         releaseSec = try pb.releaseSec.notNaN().clipped(min: 0, max: 1)
         id = (try? .init(pb.id)) ?? .init()
     }
@@ -739,7 +762,7 @@ extension Envelope: Protobuf {
         .with {
             $0.attackSec = attackSec
             $0.decaySec = decaySec
-            $0.sustainSmp = sustainSmp
+            $0.sustainVolm = sustainVolm
             $0.releaseSec = releaseSec
             $0.id = id.pb
         }
@@ -965,8 +988,8 @@ extension Note {
     var isEmptyStereo: Bool {
         !pits.contains(where: { !$0.stereo.isEmpty })
     }
-    var isEmptySmp: Bool {
-        !pits.contains(where: { $0.stereo.smp != 0 })
+    var isEmptyVolm: Bool {
+        !pits.contains(where: { $0.stereo.volm != 0 })
     }
     var isEmptyPan: Bool {
         !pits.contains(where: { $0.stereo.pan != 0 })
@@ -980,34 +1003,34 @@ extension Note {
                                  beat2: Rational, beat3: Rational, lastBeat: Rational,
                                  pitch0: Rational, pitch1: Rational, pitch2: Rational,
                                  pitch3: Rational, lastPitch: Rational,
-                                 v1Smp: Double) -> [Pit] {
-        [.init(beat: 0, pitch: pitch0, smp: 0.95),
-         .init(beat: beat0, pitch: pitch1, smp: 1),
-         .init(beat: beat1, pitch: pitch2, smp: 1),
-         .init(beat: beat2, pitch: pitch3, smp: 1),
-         .init(beat: beat3, pitch: 0, smp: v1Smp),
-         .init(beat: lastBeat, pitch: lastPitch, smp: 0.9 * v1Smp)]
+                                 v1Volm: Double) -> [Pit] {
+        [.init(beat: 0, pitch: pitch0, volm: 0.95),
+         .init(beat: beat0, pitch: pitch1, volm: 1),
+         .init(beat: beat1, pitch: pitch2, volm: 1),
+         .init(beat: beat2, pitch: pitch3, volm: 1),
+         .init(beat: beat3, pitch: 0, volm: v1Volm),
+         .init(beat: lastBeat, pitch: lastPitch, volm: 0.9 * v1Volm)]
     }
     private static func pitsFrom(recoilBeat0 beat0: Rational, beat1: Rational, lastBeat: Rational,
                                  pitch0: Rational, pitch1: Rational,
                                  pitch2: Rational, lastPitch: Rational) -> [Pit] {
-        [.init(beat: 0, pitch: pitch0, smp: 0.95),
-         .init(beat: beat0, pitch: pitch1, smp: 0.975),
-         .init(beat: beat1, pitch: pitch2, smp: 1),
-         .init(beat: lastBeat, pitch: lastPitch, smp: 0.9)]
+        [.init(beat: 0, pitch: pitch0, volm: 0.95),
+         .init(beat: beat0, pitch: pitch1, volm: 0.975),
+         .init(beat: beat1, pitch: pitch2, volm: 1),
+         .init(beat: lastBeat, pitch: lastPitch, volm: 0.9)]
     }
     private static func pitsFrom(oneBeat0 beat0: Rational, beat1: Rational, lastBeat: Rational,
                                  pitch0: Rational, pitch1: Rational, lastPitch: Rational) -> [Pit] {
-        [.init(beat: 0, pitch: pitch0, smp: 0.975),
-         .init(beat: beat0, pitch: pitch1, smp: 1),
-         .init(beat: beat1, pitch: 0, smp: 1),
-         .init(beat: lastBeat, pitch: lastPitch, smp: 0.9)]
+        [.init(beat: 0, pitch: pitch0, volm: 0.975),
+         .init(beat: beat0, pitch: pitch1, volm: 1),
+         .init(beat: beat1, pitch: 0, volm: 1),
+         .init(beat: lastBeat, pitch: lastPitch, volm: 0.9)]
     }
     private static func pitsFrom(oneBeat0 beat0: Rational,  lastBeat: Rational,
                                  pitch0: Rational, pitch1: Rational, lastPitch: Rational) -> [Pit] {
-        [.init(beat: 0, pitch: pitch0, smp: 0.975),
-         .init(beat: beat0, pitch: pitch1, smp: 1),
-         .init(beat: lastBeat, pitch: lastPitch, smp: 0.9)]
+        [.init(beat: 0, pitch: pitch0, volm: 0.975),
+         .init(beat: beat0, pitch: pitch1, volm: 1),
+         .init(beat: lastBeat, pitch: lastPitch, volm: 0.9)]
     }
     private static func pitsFrom(vibratoBeatPitchs bps: [(beat: Rational, pitch: Rational)],
                                  vibratoStartBeat vBeat: Rational,
@@ -1015,14 +1038,14 @@ extension Note {
                                  pitch0: Rational, lastPitch: Rational) -> [Pit] {
         guard bps.count % 2 == 0 else { fatalError() }
         var pits = [Pit]()
-        pits.append(.init(beat: 0, pitch: pitch0, smp: 0.975))
-        pits.append(.init(beat: beat0, pitch: 0, smp: 1))
-        pits.append(.init(beat: vBeat, pitch: 0, smp: 1))
+        pits.append(.init(beat: 0, pitch: pitch0, volm: 0.975))
+        pits.append(.init(beat: beat0, pitch: 0, volm: 1))
+        pits.append(.init(beat: vBeat, pitch: 0, volm: 1))
         for bp in bps {
-            pits.append(.init(beat: bp.beat, pitch: bp.pitch, smp: 1))
+            pits.append(.init(beat: bp.beat, pitch: bp.pitch, volm: 1))
         }
         pits[.last].pitch = 0
-        pits.append(.init(beat: lastBeat, pitch: lastPitch, smp: 0.8))
+        pits.append(.init(beat: lastBeat, pitch: lastPitch, volm: 0.8))
         return pits
     }
     private static func pitsFrom(durBeat: Rational, tempo: Rational,
@@ -1073,7 +1096,7 @@ extension Note {
                                  pitch0: pitch0, pitch1: Rational(1, 2),
                                  pitch2: -Rational(1, 4), pitch3: Rational(1, 4),
                                  lastPitch: nextFq == nil ? lastPitch / 2 : lastPitch,
-                                 v1Smp: isVibrato ? 0.9 : 0.95)
+                                 v1Volm: isVibrato ? 0.9 : 0.95)
         }
     }
 }
@@ -1588,16 +1611,16 @@ extension Audiotrack {
     }
 }
 
-struct Volume: Hashable, Codable {
-    static let minSmp = 0.0, maxSmp = 1.0, smpRange = minSmp ... maxSmp
+struct Volm: Hashable, Codable {
+    static let minVolm = 0.0, maxVolm = 1.0, volmRange = minVolm ... maxVolm
     static let minAmp = 0.0, maxAmp = 1.0, ampRange = minAmp ... maxAmp
 }
-extension Volume {
-    /// amp = (.exp(40 * smp / 8.7) - 1) / (.exp(40 / 8.7) - 1)
-    static func amp(fromSmp smp: Double) -> Double {
-        (.exp(4.5977011494 * smp) - 1) * 0.01017750808
+extension Volm {
+    /// amp = (.exp(40 * volm / 8.7) - 1) / (.exp(40 / 8.7) - 1)
+    static func amp(fromVolm volm: Double) -> Double {
+        (.exp(4.5977011494 * volm) - 1) * 0.01017750808
     }
-    static func smp(fromAmp amp: Double) -> Double {
+    static func volm(fromAmp amp: Double) -> Double {
         .log(1 + amp * 98.2558787375) * 0.2175
     }
     
@@ -1614,11 +1637,11 @@ extension Volume {
         }
     }
     
-    static func db(fromSmp smp: Double) -> Double {
-        db(fromAmp: amp(fromSmp: smp))
+    static func db(fromVolm volm: Double) -> Double {
+        db(fromAmp: amp(fromVolm: volm))
     }
-    static func smp(fromDb db: Double) -> Double {
-        smp(fromAmp: amp(fromDb: db))
+    static func volm(fromDb db: Double) -> Double {
+        volm(fromAmp: amp(fromDb: db))
     }
 }
 
@@ -1627,8 +1650,8 @@ struct Audio: Hashable, Codable {
     static let defaultSampleRate = 65536.0
     static let defaultDftCount = 65536
     static let headroomDb = 1.0
-    static let headroomSmp = Volume.smp(fromDb: -headroomDb)
-    static let headroomAmp = Volume.amp(fromSmp: headroomSmp)
+    static let headroomVolm = Volm.volm(fromDb: -headroomDb)
+    static let headroomAmp = Volm.amp(fromVolm: headroomVolm)
     static let floatHeadroomAmp = Float(headroomAmp)
     static let defaultReverb = 0.0
     static let hearingRange = 20.0 ... 20000.0

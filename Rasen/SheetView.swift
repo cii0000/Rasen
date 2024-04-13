@@ -1245,7 +1245,7 @@ final class SheetView: View {
             if ids.isEmpty || ids.contains(scoreView.model.id) {
                 scoreView.timeNode.lineType = .color(.content)
                 scoreView.updateTimeNode(atSec: sec)
-                scoreView.peakSmp = 0
+                scoreView.peakVolm = 0
                 scoreView.timeNode.lineWidth = isPlaying ? 4 : 1
                 scoreView.timeNode.isHidden = false
             } else {
@@ -1260,7 +1260,7 @@ final class SheetView: View {
                 }
                 contentView.timeNode?.lineType = .color(.content)
                 contentView.updateTimeNode(atSec: sec)
-                contentView.peakSmp = 0
+                contentView.peakVolm = 0
                 contentView.timeNode?.lineWidth = isPlaying ? 3 : 1
                 contentView.timeNode?.isHidden = false
             }
@@ -1272,7 +1272,7 @@ final class SheetView: View {
                 }
                 textView.timeNode?.lineType = .color(.content)
                 textView.updateTimeNode(atSec: sec)
-                textView.peakSmp = 0
+                textView.peakVolm = 0
                 textView.timeNode?.lineWidth = isPlaying ? 3 : 1
                 textView.timeNode?.isHidden = false
             }
@@ -1299,7 +1299,7 @@ final class SheetView: View {
     func hideOtherTimeNode() {
         if !isHiddenOtherTimeNode {
             scoreView.timeNode.path = Path()
-            scoreView.currentPeakSmpNode.path = Path()
+            scoreView.currentPeakVolmNode.path = Path()
             scoreView.timeNode.isHidden = true
             
             for contentView in contentsView.elementViews {
@@ -1712,14 +1712,14 @@ final class SheetView: View {
                             || Date().timeIntervalSince(self.waringDate!) > 1 / 10.0)
                             && !self.isHiddenOtherTimeNode {
                             
-                            let peakSmp = Volume.smp(fromAmp: Double(peak))
+                            let peakVolm = Volm.volm(fromAmp: Double(peak))
                             for textView in self.textsView.elementViews {
-                                textView.peakSmp = peakSmp
+                                textView.peakVolm = peakVolm
                             }
                             for contentView in self.contentsView.elementViews {
-                                contentView.peakSmp = peakSmp
+                                contentView.peakVolm = peakVolm
                             }
-                            self.scoreView.peakSmp = peakSmp
+                            self.scoreView.peakVolm = peakVolm
                             self.waringDate = Date()
                         }
                     }

@@ -238,15 +238,15 @@ struct Spectrogram {
         
         let sampleRate = buffer.sampleRate
         let nd = 1 / Double(windowSize)
-        let smpCount = windowSize / 2
+        let volmCount = windowSize / 2
         
         let secs: [(i: Int, sec: Double)] = stride(from: 0, to: frameCount, by: overlapCount).map { i in
             (i, Double(i) / sampleRate)
         }
-        let loudnessScales = smpCount.range.map {
+        let loudnessScales = volmCount.range.map {
             let fq = Double.linear(Self.minLinearFq, Self.maxLinearFq,
-                                   t: Double($0) / Double(smpCount))
-            return Loudness.scale40Phon(fromFq: fq)
+                                   t: Double($0) / Double(volmCount))
+            return Loudness.reverseVolm40Phon(fromFq: fq)
         }
         
         var ctss: [[[Double]]]
@@ -263,19 +263,19 @@ struct Spectrogram {
                     let inputRs = vDSP.multiply(windowWave, wave)
                     let outputs = dft.transform(inputRs)
                     
-                    return smpCount.range.map {
+                    return volmCount.range.map {
                         if $0 == 0 {
                             return 0.0
                         } else {
                             let amp = outputs[$0].length * nd
-                            let smp = Volume.smp(fromAmp: amp)
-                            return loudnessScales[$0] * smp
+                            let volm = Volm.volm(fromAmp: amp)
+                            return loudnessScales[$0] * volm
                         }
                     }
                 }
             }
         case .pitch:
-            let filterBank = FilterBank(sampleCount: smpCount,
+            let filterBank = FilterBank(sampleCount: volmCount,
                                         minPitch: Self.minPitch, maxPitch: Self.maxPitch,
                                         maxFq: Self.maxLinearFq)
 
@@ -290,16 +290,16 @@ struct Spectrogram {
                     let inputRs = vDSP.multiply(windowWave, wave)
                     let outputs = dft.transform(inputRs)
                     
-                    let smps = smpCount.range.map {
+                    let volms = volmCount.range.map {
                         if $0 == 0 {
                             return 0.0
                         } else {
                             let amp = outputs[$0].length * nd
-                            let smp = Volume.smp(fromAmp: amp)
-                            return loudnessScales[$0] * smp
+                            let volm = Volm.volm(fromAmp: amp)
+                            return loudnessScales[$0] * volm
                         }
                     }
-                    return filterBank.transform(smps)
+                    return filterBank.transform(volms)
                 }
             }
             
@@ -312,18 +312,18 @@ struct Spectrogram {
                                               isHalfWindow: false)
                 
                 let nd2 = 1 / Double(windowSize2)
-                let smpCount2 = windowSize2 / 2
+                let volmCount2 = windowSize2 / 2
                 
                 let secs2: [(i: Int, sec: Double)] = stride(from: 0, to: frameCount, by: overlapCount2).map { i in
                     (i, Double(i) / sampleRate)
                 }
-                let loudnessScales2 = smpCount2.range.map {
+                let loudnessScales2 = volmCount2.range.map {
                     let fq = Double.linear(Self.minLinearFq, Self.maxLinearFq,
-                                           t: Double($0) / Double(smpCount2))
-                    return Loudness.scale40Phon(fromFq: fq)
+                                           t: Double($0) / Double(volmCount2))
+                    return Loudness.reverseVolm40Phon(fromFq: fq)
                 }
                 
-                let filterBank2 = FilterBank(sampleCount: smpCount2,
+                let filterBank2 = FilterBank(sampleCount: volmCount2,
                                              minPitch: Self.minPitch, maxPitch: Self.maxPitch,
                                              maxFq: Self.maxLinearFq)
 
@@ -337,28 +337,28 @@ struct Spectrogram {
                         
                         let inputRs2 = vDSP.multiply(windowWave2, wave2)
                         let outputs2 = dft2.transform(inputRs2)
-                        let smps = smpCount2.range.map {
+                        let volms = volmCount2.range.map {
                             if $0 == 0 {
                                 return 0.0
                             } else {
                                 let amp = outputs2[$0].length * nd2
-                                let smp = Volume.smp(fromAmp: amp)
-                                return loudnessScales2[$0] * smp
+                                let volm = Volm.volm(fromAmp: amp)
+                                return loudnessScales2[$0] * volm
                             }
                         }
-                        let nSmps = filterBank2.transform(smps)
-                        return stride(from: 0, to: nSmps.count, by: 4).map { nSmps[$0] }
+                        let nVolms = filterBank2.transform(volms)
+                        return stride(from: 0, to: nVolms.count, by: 4).map { nVolms[$0] }
                     }
                     
                     secs.enumerated().forEach { ti, v in
                         let ti2 = min(Int((Double(tss2.count * ti) / Double(secs.count)).rounded()), tss2.count - 1)
-                        for si in 0 ..< smpCount / 2 {
-                            let t = si < smpCount * 3 / 8 ?
-                            Double(si).clipped(min: Double(smpCount * 1 / 8),
-                                               max: Double(smpCount * 3 / 8),
+                        for si in 0 ..< volmCount / 2 {
+                            let t = si < volmCount * 3 / 8 ?
+                            Double(si).clipped(min: Double(volmCount * 1 / 8),
+                                               max: Double(volmCount * 3 / 8),
                                                newMin: 0, newMax: 0.5) :
-                            Double(si).clipped(min: Double(smpCount * 3 / 8),
-                                               max: Double(smpCount / 2),
+                            Double(si).clipped(min: Double(volmCount * 3 / 8),
+                                               max: Double(volmCount / 2),
                                                newMin: 0.5, newMax: 1)
                             ctss[ci][ti][si] = Double.linear(tss2[ti2][si], ctss[ci][ti][si], t: t)
                         }
@@ -367,37 +367,37 @@ struct Spectrogram {
             }
         }
     
-        func stereo(fromSmps smps: [Double]) -> Stereo {
+        func stereo(fromVolms volms: [Double]) -> Stereo {
             if buffer.channelCount == 2 {
-                let leftSmp = smps[0]
-                let rightSmp = smps[1]
-                let smp = (leftSmp + rightSmp) / 2
-                let pan = leftSmp != rightSmp ?
-                (leftSmp < rightSmp ?
-                 -(leftSmp / (leftSmp + rightSmp) - 0.5) * 2 :
-                    (rightSmp / (leftSmp + rightSmp) - 0.5) * 2) :
+                let leftVolm = volms[0]
+                let rightVolm = volms[1]
+                let volm = (leftVolm + rightVolm) / 2
+                let pan = leftVolm != rightVolm ?
+                (leftVolm < rightVolm ?
+                 -(leftVolm / (leftVolm + rightVolm) - 0.5) * 2 :
+                    (rightVolm / (leftVolm + rightVolm) - 0.5) * 2) :
                 0
-                return .init(smp: smp, pan: pan)
+                return .init(volm: volm, pan: pan)
             } else {
-                return .init(smp: smps[0], pan: 0)
+                return .init(volm: volms[0], pan: 0)
             }
         }
         
         var frames = secs.enumerated().map { ti, v in
-            return Frame(sec: v.sec, stereos: smpCount.range.map { si in
-                stereo(fromSmps: channelCount.range.map { ci in ctss[ci][ti][si] })
+            return Frame(sec: v.sec, stereos: volmCount.range.map { si in
+                stereo(fromVolms: channelCount.range.map { ci in ctss[ci][ti][si] })
             })
         }
         
         if isNormalized {
-            var nMaxSmp = 0.0
+            var nMaxVolm = 0.0
             for frame in frames {
-                nMaxSmp = max(nMaxSmp, frame.stereos.max(by: { $0.smp < $1.smp })!.smp)
+                nMaxVolm = max(nMaxVolm, frame.stereos.max(by: { $0.volm < $1.volm })!.volm)
             }
-            let rMaxSmp = nMaxSmp == 0 ? 0 : 1 / nMaxSmp
+            let rMaxVolm = nMaxVolm == 0 ? 0 : 1 / nMaxVolm
             for i in 0 ..< frames.count {
                 for j in 0 ..< frames[i].stereos.count {
-                    frames[i].stereos[j].smp = (frames[i].stereos[j].smp * rMaxSmp)
+                    frames[i].stereos[j].volm = (frames[i].stereos[j].volm * rMaxVolm)
                         .clipped(min: 0, max: 1)
                 }
             }
@@ -443,13 +443,13 @@ struct Spectrogram {
         for x in 0 ..< width {
             for y in 0 ..< h {
                 let stereo = frames[x + xi].stereos[h - 1 - y]
-                let alpha = rgamma(stereo.smp)
+                let alpha = rgamma(stereo.volm)
                 guard !alpha.isNaN else {
-                    print("NaN:", stereo.smp)
+                    print("NaN:", stereo.volm)
                     continue
                 }
-                bitmap[x, y, 0] = stereo.pan > 0 ? UInt8(rgamma(stereo.smp * stereo.pan * Self.redRatio) * Double(UInt8.max)) : 0
-                bitmap[x, y, 1] = stereo.pan < 0 ? UInt8(rgamma(stereo.smp * -stereo.pan * Self.greenRatio) * Double(UInt8.max)) : 0
+                bitmap[x, y, 0] = stereo.pan > 0 ? UInt8(rgamma(stereo.volm * stereo.pan * Self.redRatio) * Double(UInt8.max)) : 0
+                bitmap[x, y, 1] = stereo.pan < 0 ? UInt8(rgamma(stereo.volm * -stereo.pan * Self.greenRatio) * Double(UInt8.max)) : 0
                 bitmap[x, y, 2] = UInt8(b * alpha * Double(UInt8.max))
                 bitmap[x, y, 3] = UInt8(alpha * Double(UInt8.max))
             }
