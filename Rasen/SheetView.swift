@@ -1395,7 +1395,7 @@ final class SheetView: View {
     }
     
     func containsOtherTimeline(_ p: Point, scale: Double) -> Bool {
-        if scoreView.containsNote(scoreView.convert(p, from: node), scale: scale)
+        if scoreView.containsMainFrame(scoreView.convert(p, from: node))
             || scoreView.containsTimeline(scoreView.convert(p, from: node)) {
             return true
         }
@@ -1560,8 +1560,6 @@ final class SheetView: View {
     private var willPlaySec: Rational?, playingOtherTimelineIDs = Set<UUID>()
     private var playingFrameRate: Rational = 24, firstDeltaSec: Rational = 0
     private var waringDate: Date?
-    var firstAudiotracks = [Audiotrack]()
-    var lastAudiotracks = [Audiotrack]()
     let frameRate = Keyframe.defaultFrameRate
     var isPlaying = false {
         didSet {
@@ -1621,91 +1619,82 @@ final class SheetView: View {
                 animationView.timeNode.children = timeSliders
             }
             
-            var audiotracks = [Audiotrack]()
+            var seqTracks = [Sequencer.Track]()
             var deltaSec: Rational = 0
-            for audiotrack in firstAudiotracks {
-                audiotracks.append(audiotrack)
-                deltaSec += audiotrack.durSec
-            }
             
             var minFrameRate = model.mainFrameRate
             
-            if let sheetView = previousSheetView {
-                var audiotrack = sheetView.model.audiotrack
-                if let aAudiotrack = sheetView.bottomSheetView?.model.audiotrack {
-                    audiotrack += aAudiotrack
+            if let sheetView = previousSheetView, sheetView.model.enabledTimeline {
+                var seqTrack = sheetView.sequencerTrack
+                if let aSeqTrack = sheetView.bottomSheetView?.sequencerTrack {
+                    seqTrack += aSeqTrack
                 }
-                if let aAudiotrack = sheetView.topSheetView?.model.audiotrack {
-                    audiotrack += aAudiotrack
+                if let aSeqTrack = sheetView.topSheetView?.sequencerTrack {
+                    seqTrack += aSeqTrack
                 }
                 if playingOtherTimelineIDs.isEmpty {
-                    audiotrack.values
-                        .append(.score(.init(durBeat: sheetView.model.animationDurBeat,
-                                             tempo: sheetView.model.animation.tempo)))
+                    seqTrack.scoreNoders.append(.init(rendnotes: [], startSec: 0,
+                                                      durSec: sheetView.model.animationDurSec))
                 }
-                audiotracks.append(audiotrack)
-                deltaSec += audiotrack.durSec
+                seqTracks.append(seqTrack)
+                deltaSec += seqTrack.durSec
                 previousPlayingTempo = sheetView.model.animation.tempo
                 
-                minFrameRate = min(minFrameRate,
-                                   sheetView.model.mainFrameRate)
+                minFrameRate = min(minFrameRate, sheetView.model.mainFrameRate)
             }
             firstDeltaSec = deltaSec
             
-            var audiotrack = model.audiotrack
-            if let aAudiotrack = bottomSheetView?.model.audiotrack {
-                audiotrack += aAudiotrack
+            if model.enabledTimeline {
+                var seqTrack = sequencerTrack
+                if let aSeqTrack = bottomSheetView?.sequencerTrack {
+                    seqTrack += aSeqTrack
+                }
+                if let aSeqTrack = topSheetView?.sequencerTrack {
+                    seqTrack += aSeqTrack
+                }
+                if playingOtherTimelineIDs.isEmpty {
+                    seqTrack.scoreNoders.append(.init(rendnotes: [], startSec: 0,
+                                                      durSec: model.animationDurSec))
+                }
+                seqTracks.append(seqTrack)
             }
-            if let aAudiotrack = topSheetView?.model.audiotrack {
-                audiotrack += aAudiotrack
-            }
-            if playingOtherTimelineIDs.isEmpty {
-                audiotrack.values
-                    .append(.score(.init(durBeat: model.animationDurBeat,
-                                         tempo: model.animation.tempo)))
-            }
-            audiotracks.append(audiotrack)
+            
             let mainSec = model.animation.sec(fromBeat: beat)
             deltaSec += mainSec
             playingTempo = model.animation.tempo
             willPlaySec = mainSec
             
-            if let sheetView = nextSheetView {
-                var audiotrack = sheetView.model.audiotrack
-                if let aAudiotrack = sheetView.bottomSheetView?.model.audiotrack {
-                    audiotrack += aAudiotrack
+            if let sheetView = nextSheetView, sheetView.model.enabledTimeline {
+                var seqTrack = sheetView.sequencerTrack
+                if let aSeqTrack = sheetView.bottomSheetView?.sequencerTrack {
+                    seqTrack += aSeqTrack
                 }
-                if let aAudiotrack = sheetView.topSheetView?.model.audiotrack {
-                    audiotrack += aAudiotrack
+                if let aSeqTrack = sheetView.topSheetView?.sequencerTrack {
+                    seqTrack += aSeqTrack
                 }
                 if playingOtherTimelineIDs.isEmpty {
-                    audiotrack.values
-                        .append(.score(.init(durBeat: sheetView.model.animationDurBeat,
-                                             tempo: sheetView.model.animation.tempo)))
+                    seqTrack.scoreNoders.append(.init(rendnotes: [], startSec: 0,
+                                                      durSec: sheetView.model.animationDurSec))
                 }
-                audiotracks.append(audiotrack)
+                seqTracks.append(seqTrack)
                 nextPlayingTempo = sheetView.model.animation.tempo
                 
-                minFrameRate = min(minFrameRate,
-                                   sheetView.model.mainFrameRate)
+                minFrameRate = min(minFrameRate, sheetView.model.mainFrameRate)
             }
             
             if !playingOtherTimelineIDs.isEmpty {
-                for i in 0 ..< audiotracks.count {
-                    audiotracks[i].values.removeAll {
+                for i in 0 ..< seqTracks.count {
+                    seqTracks[i].scoreNoders.removeAll {
+                        !playingOtherTimelineIDs.contains($0.id)
+                    }
+                    seqTracks[i].pcmNoders.removeAll {
                         !playingOtherTimelineIDs.contains($0.id)
                     }
                 }
             }
             
-            for audiotrack in lastAudiotracks {
-                audiotracks.append(audiotrack)
-            }
-            
-            if audiotracks.contains(where: { !$0.isEmpty }) {
-                let sequencer = Sequencer(audiotracks: audiotracks,
-                                          isAsync: true,
-                                          playStartSec: Double(playingSec)) { [weak self] (peak) in
+            if seqTracks.contains(where: { !$0.isEmpty }) {
+                let sequencer = Sequencer(tracks: seqTracks) { [weak self] (peak) in
                     DispatchQueue.main.async {
                         guard let self else { return }
                         if (self.waringDate == nil
@@ -1773,9 +1762,6 @@ final class SheetView: View {
             
             playingSecRange = nil
             firstSec = nil
-            
-            firstAudiotracks = []
-            lastAudiotracks = []
             
             hideOtherTimeNode()
             
@@ -1889,9 +1875,7 @@ final class SheetView: View {
         let nSec = willPlaySec + 1 / playingFrameRate
         
         let sheetView = playingSheetView
-        let maxSec = playingSecRange != nil ?
-            playingSecRange!.end :
-            sheetView.model.allDurSec
+        let maxSec = playingSecRange != nil ? playingSecRange!.end : sheetView.model.allDurSec
         if nSec >= maxSec {
             let oldPlayingSheetIndex = playingSheetIndex
             
@@ -1915,16 +1899,12 @@ final class SheetView: View {
                 playingOldTopKeyframeIndex = nil
             }
                 
-            let fi = previousSheetView != nil && playingSecRange == nil ?
-                -1 : 0
+            let fi = previousSheetView != nil && playingSecRange == nil ? -1 : 0
             if playingSheetIndex == fi {
-                if firstAudiotracks.isEmpty && lastAudiotracks.isEmpty {
-                    let sSec = playingSecRange?.start ?? 0
-                    sequencer?.currentPositionInSec
-                    = Double(sSec + (fi == -1 ? 0 : firstDeltaSec))
-                    self.willPlaySec = sSec
-                    playingSec = sSec
-                }
+                let sSec = playingSecRange?.start ?? 0
+                sequencer?.currentPositionInSec = Double(sSec + (fi == -1 ? 0 : firstDeltaSec))
+                self.willPlaySec = sSec
+                playingSec = sSec
             } else {
                 self.willPlaySec = nSec - maxSec
                 playingSec = nSec - maxSec
@@ -1998,6 +1978,11 @@ final class SheetView: View {
         } else {
             nil
         }
+    }
+    
+    var sequencerTrack: Sequencer.Track {
+        .init(scoreNoders: scoreView.scoreNoder != nil ? [scoreView.scoreNoder!] : [],
+              pcmNoders: contentsView.elementViews.compactMap { $0.pcmNoder })
     }
     
     func spectrogramNode(at p: Point) -> (node: Node, contentView: SheetContentView)? {
@@ -3157,9 +3142,8 @@ final class SheetView: View {
                 return (animationView.transformedPaddingTimelineBounds ?? node.bounds, [])
             }
         case .insertNotes(let nivs):
+            stop()
             insertNode(nivs)
-            scoreView.updateScore()
-            sequencer?.scoreNoders[scoreView.model.id]?.insert(nivs, with: scoreView.model)
             if isMakeRect {
                 let rect = nivs.reduce(into: Rect?.none) {
                     $0 += scoreView.noteFrame(at: $1.index)
@@ -3167,37 +3151,33 @@ final class SheetView: View {
                 return (rect, [])
             }
         case .replaceNotes(let nivs):
+            stop()
             if isMakeRect {
                 var rect: Rect?
                 for niv in nivs {
-                    binder[keyPath: keyPath].score.notes[niv.index] = niv.value
                     rect += scoreView.noteFrame(at: niv.index)
                 }
-                scoreView.updateScore()
-                sequencer?.scoreNoders[scoreView.model.id]?.replace(nivs, with: scoreView.model)
+                replaceNode(nivs)
+                for niv in nivs {
+                    rect += scoreView.noteFrame(at: niv.index)
+                }
                 return (rect, [])
             } else {
-                for niv in nivs {
-                    binder[keyPath: keyPath].score.notes[niv.index] = niv.value
-                }
-                scoreView.updateScore()
-                sequencer?.scoreNoders[scoreView.model.id]?.replace(nivs, with: scoreView.model)
+                replaceNode(nivs)
             }
         case .removeNotes(noteIndexes: let noteIndexes):
+            stop()
             if isMakeRect {
                 let rect = noteIndexes.reduce(into: Rect?.none) {
                     $0 += scoreView.noteFrame(at: $1)
                 }
                 removeNotesNode(at: noteIndexes)
-                scoreView.updateScore()
-                sequencer?.scoreNoders[scoreView.model.id]?.remove(at: noteIndexes)
                 return (rect, [])
             } else {
                 removeNotesNode(at: noteIndexes)
-                scoreView.updateScore()
-                sequencer?.scoreNoders[scoreView.model.id]?.remove(at: noteIndexes)
             }
         case .insertDraftNotes(let nivs):
+            stop()
             insertDraftNode(nivs)
             scoreView.updateDraftNotes()
             if isMakeRect {
@@ -3207,6 +3187,7 @@ final class SheetView: View {
                 return (rect, [])
             }
         case .removeDraftNotes(noteIndexes: let noteIndexes):
+            stop()
             if isMakeRect {
                 let rect = noteIndexes.reduce(into: Rect?.none) {
                     $0 += scoreView.draftNoteFrame(at: $1)
@@ -3219,6 +3200,7 @@ final class SheetView: View {
                 scoreView.updateDraftNotes()
             }
         case .insertContents(let civs):
+            stop()
             insertNode(civs)
             
             civs.forEach { contentsView.elementViews[$0.index].updateClippingNode() }
@@ -3231,6 +3213,7 @@ final class SheetView: View {
                 return (rect, [])
             }
         case .replaceContents(let civs):
+            stop()
             if isMakeRect {
                 var rect: Rect?
                 for civ in civs {
@@ -3251,6 +3234,7 @@ final class SheetView: View {
                 civs.forEach { contentsView.elementViews[$0.index].updateClippingNode() }
             }
         case .removeContents(contentIndexes: let contentIndexes):
+            stop()
             if isMakeRect {
                 let rect = contentIndexes.reduce(into: Rect?.none) {
                     let contentView = contentsView.elementViews[$1]
@@ -3262,6 +3246,7 @@ final class SheetView: View {
                 removeContentsNode(at: contentIndexes)
             }
         case .setScoreOption(let option):
+            stop()
             scoreView.option = option
             if isMakeRect {
                 return (scoreView.mainFrame, [])
@@ -3426,6 +3411,9 @@ final class SheetView: View {
     
     private func insertNode(_ nivs: [IndexValue<Note>]) {
         scoreView.insert(nivs)
+    }
+    private func replaceNode(_ nivs: [IndexValue<Note>]) {
+        scoreView.replace(nivs)
     }
     private func removeNotesNode(at noteIndexes: [Int]) {
         scoreView.remove(at: noteIndexes)

@@ -279,52 +279,19 @@ final class ColorEditor: Editor {
         }
     }
     
-//    func panNodes(fromPan pan: Double, firstPan: Double, at p: Point) -> [Node] {
-//        let panW = 50.0
-//        
-//        var contentPathlines = [Pathline]()
-//        
-//        //colors
-//        
-//        let vw = 0.0, vy = 0.0
-//        let fx = firstPan.clipped(min: -1, max: 1, newMin: 0, newMax: panW)
-//        
-//        let knobW = 2.0, knobH = 12.0
-//        let vKnobW = knobW, vKbobH = knobH, plh = 3.0, plw = 1.0
-//        contentPathlines.append(Pathline(Rect(x: vw + panW / 2 + pan * panW / 2 - vKnobW / 2,
-//                                              y: vy - vKbobH / 2,
-//                                              width: vKnobW,
-//                                              height: vKbobH)))
-//        
-//        contentPathlines.append(Pathline(Rect(x: vw + panW / 2 - plw / 2,
-//                                              y: vy - plh / 2,
-//                                              width: plw,
-//                                              height: plh)))
-//        
-//        contentPathlines.append(Pathline(Polygon(points: [
-//            Point(vw, vy - plh / 2),
-//            Point(vw + panW / 2, vy),
-//            Point(vw, vy + plh / 2)
-//        ])))
-//        contentPathlines.append(Pathline(Polygon(points: [
-//            Point(vw + panW, vy + plh / 2),
-//            Point(vw + panW / 2, vy),
-//            Point(vw + panW, vy - plh / 2)
-//        ])))
-//        
-//        if pan == 0 {
-//            contentPathlines.append(Pathline(Rect(x: vw + panW / 2 - vKnobW / 2,
-//                                                  y: vy - vKbobH / 2 - plw * 2,
-//                                                  width: vKnobW,
-//                                                  height: plw)))
-//            contentPathlines.append(Pathline(Rect(x: vw + panW / 2 - vKnobW / 2,
-//                                                  y: vy + vKbobH / 2 + plw,
-//                                                  width: vKnobW,
-//                                                  height: plw)))
-//        }
-//        return [Node(attitude: .init(position: p - Point(fx, 0)), path: Path(contentPathlines),
-//                     fillType: .color(.content))]
-//    }
+    private func noisePointsWith(splitCount count: Int = 140, width: Double) -> [Point] {
+        let rCount = 1 / Double(count)
+        return (0 ... count).map {
+            let t = Double($0) * rCount
+            return Point(width * t, 0)
+        }
+    }
+    private func noiseGradientWith(splitCount count: Int = 140, volm: Double) -> [Color] {
+        let rCount = 1 / Double(count)
+        return (0 ... count).map {
+            ScoreView.color(fromVolm: volm, noise: Double($0) * rCount)
+        }
+    }
     
     private var isChangeVolm = false
     private var sheetView: SheetView?
@@ -345,6 +312,10 @@ final class ColorEditor: Editor {
         switch event.phase {
         case .began:
             document.cursor = .arrow
+            
+            if document.isPlaying(with: event) {
+                document.stopPlaying(with: event)
+            }
             
             beganSP = sp
             let p = document.convertScreenToWorld(sp)
@@ -367,13 +338,11 @@ final class ColorEditor: Editor {
                 }
                 
                 func updatePlayer(from vs: [Note.PitResult], in sheetView: SheetView) {
-                    let stereo = Stereo(volm: sheetView.isPlaying ? 0.1 : 1)
                     if let notePlayer = sheetView.notePlayer {
                         self.notePlayer = notePlayer
                         notePlayer.notes = vs
-                        notePlayer.stereo = stereo
                     } else {
-                        notePlayer = try? NotePlayer(notes: vs, stereo: stereo)
+                        notePlayer = try? NotePlayer(notes: vs)
                         sheetView.notePlayer = notePlayer
                     }
                     notePlayer?.play()
@@ -533,14 +502,17 @@ final class ColorEditor: Editor {
                 case .sustain:
                     let sustainVolm = newVolm(from: beganEnvelope.sustainVolm)
                     
-                    for ni in beganNotes.keys {
-                        guard ni < score.notes.count else { continue }
-                        var env = scoreView.model.notes[ni].envelope
-                        env.sustainVolm = sustainVolm
-                        env.id = beganEnvelope.id
-                        scoreView[ni].envelope = env
+                    var eivs = [IndexValue<Envelope>](capacity: beganNotes.count)
+                    for noteI in beganNotes.keys {
+                        guard noteI < score.notes.count else { continue }
+                        var envelope = scoreView.model.notes[noteI].envelope
+                        envelope.sustainVolm = sustainVolm
+                        envelope.id = beganEnvelope.id
+                        eivs.append(.init(value: envelope, index: noteI))
                     }
+                    scoreView.replace(eivs)
                 case .note, .pit:
+                    var nivs = [IndexValue<Note>]()
                     for (_, v) in beganNotePits {
                         let nid = UUID()
                         for (noteI, nv) in v {
@@ -552,10 +524,12 @@ final class ColorEditor: Editor {
                                 note.pits[pitI].stereo.volm = nVolm
                                 note.pits[pitI].stereo.id = nid
                             }
-                            scoreView[noteI] = note
+                            nivs.append(.init(value: note, index: noteI))
                         }
                     }
+                    scoreView.replace(nivs)
                 case .evenVolm:
+                    var nivs = [IndexValue<Note>]()
                     for (_, v) in beganNotePits {
                         let nid = UUID()
                         for (noteI, nv) in v {
@@ -567,10 +541,12 @@ final class ColorEditor: Editor {
                                 note.pits[pitI].tone.overtone[.evenVolm] = nVolm
                                 note.pits[pitI].tone.id = nid
                             }
-                            scoreView[noteI] = note
+                            nivs.append(.init(value: note, index: noteI))
                         }
                     }
+                    scoreView.replace(nivs)
                 case .oddVolm:
+                    var nivs = [IndexValue<Note>]()
                     for (_, v) in beganNotePits {
                         let nid = UUID()
                         for (noteI, nv) in v {
@@ -582,10 +558,12 @@ final class ColorEditor: Editor {
                                 note.pits[pitI].tone.overtone[.oddVolm] = nVolm
                                 note.pits[pitI].tone.id = nid
                             }
-                            scoreView[noteI] = note
+                            nivs.append(.init(value: note, index: noteI))
                         }
                     }
+                    scoreView.replace(nivs)
                 case .sprol(_, let sprolI):
+                    var nivs = [IndexValue<Note>]()
                     for (_, v) in beganNotePits {
                         let nid = UUID()
                         for (noteI, nv) in v {
@@ -598,25 +576,28 @@ final class ColorEditor: Editor {
                                 note.pits[pitI].tone.spectlope.sprols[sprolI].volm = nVolm
                                 note.pits[pitI].tone.id = nid
                             }
-                            scoreView[noteI] = note
+                            nivs.append(.init(value: note, index: noteI))
                         }
                     }
+                    scoreView.replace(nivs)
                 }
                 
-                notePlayer?.changeStereo(from: playerBeatNoteIndexes.map {
-                    scoreView.pitResult(atBeat: beganBeat, at: $0)
-                })
-                
-//                sheetView.sequencer?.scoreNoders[score.id]?
-//                    .replaceStereo([.init(value: scoreView.model.notes[ni], index: ni)],
-//                                        with: scoreView.model)
+                switch scoreResult {
+                case .sprol:
+                    notePlayer?.notes = playerBeatNoteIndexes.map {
+                        scoreView.pitResult(atBeat: beganBeat, at: $0)
+                    }
+                default:
+                    notePlayer?.changeStereo(from: playerBeatNoteIndexes.map {
+                        scoreView.pitResult(atBeat: beganBeat, at: $0)
+                    })
+                }
             } else if !beganContents.isEmpty {
                 for (ci, beganContent) in beganContents {
                     guard ci < sheetView.contentsView.elementViews.count else { continue }
                     let contentView = sheetView.contentsView.elementViews[ci]
-                    let nVolm = newVolm(from: beganContent.stereo.volm)
-                    contentView.model.stereo = .init(volm: nVolm)
-                    sheetView.sequencer?.pcmNoders[beganContent.id]?.stereo.volm = nVolm
+                    contentView.stereo = .init(volm: newVolm(from: beganContent.stereo.volm),
+                                               pan: contentView.stereo.pan)
                 }
             }
             
@@ -643,12 +624,12 @@ final class ColorEditor: Editor {
                             $0[noteI] = v.note
                         }
                     }
-                    for (ni, beganNote) in beganNoteIAndNotes {
-                        guard ni < score.notes.count else { continue }
-                        let note = scoreView.model.notes[ni]
+                    for (noteI, beganNote) in beganNoteIAndNotes {
+                        guard noteI < score.notes.count else { continue }
+                        let note = scoreView.model.notes[noteI]
                         if beganNote != note {
-                            noteIVs.append(.init(value: note, index: ni))
-                            oldNoteIVs.append(.init(value: beganNote, index: ni))
+                            noteIVs.append(.init(value: note, index: noteI))
+                            oldNoteIVs.append(.init(value: beganNote, index: noteI))
                         }
                     }
                     if !noteIVs.isEmpty {
@@ -661,12 +642,12 @@ final class ColorEditor: Editor {
                     let scoreView = sheetView.scoreView
                     let score = scoreView.model
                     var noteIVs = [IndexValue<Note>](), oldNoteIVs = [IndexValue<Note>]()
-                    for (ni, beganNote) in beganNotes.sorted(by: { $0.key < $1.key }) {
-                        guard ni < score.notes.count else { continue }
-                        let note = score.notes[ni]
+                    for (notei, beganNote) in beganNotes.sorted(by: { $0.key < $1.key }) {
+                        guard notei < score.notes.count else { continue }
+                        let note = score.notes[notei]
                         if beganNote != note {
-                            noteIVs.append(.init(value: note, index: ni))
-                            oldNoteIVs.append(.init(value: beganNote, index: ni))
+                            noteIVs.append(.init(value: note, index: notei))
+                            oldNoteIVs.append(.init(value: beganNote, index: notei))
                         }
                     }
                     if !noteIVs.isEmpty {
@@ -707,10 +688,15 @@ final class ColorEditor: Editor {
         beganWorldP - .init(panWidth * beganPan / 2 * document.screenToWorldScale, 0)
     }
     
+    var noiseWorldPosition: Point {
+        beganWorldP - .init(panWidth * beganNoise * document.screenToWorldScale, 0)
+    }
+    
     let panWidth = 140.0
     private var beganWorldP = Point()
     private var isChangePan = false
     private var beganPan = 0.0, oldPan = 0.0, panNode = Node()//, panWorldPosition = Point()
+    private var beganNoise = 0.0, oldNoise = 0.0
     func changePan(with event: DragEvent) {
         guard isEditingSheet else {
             document.stop(with: event)
@@ -722,14 +708,16 @@ final class ColorEditor: Editor {
         case .began:
             document.cursor = .arrow
             
+            if document.isPlaying(with: event) {
+                document.stopPlaying(with: event)
+            }
+            
             func updatePlayer(from vs: [Note.PitResult], in sheetView: SheetView) {
-                let stereo = Stereo(volm: sheetView.isPlaying ? 0.1 : 1)
                 if let notePlayer = sheetView.notePlayer {
                     self.notePlayer = notePlayer
                     notePlayer.notes = vs
-                    notePlayer.stereo = stereo
                 } else {
-                    notePlayer = try? NotePlayer(notes: vs, stereo: stereo)
+                    notePlayer = try? NotePlayer(notes: vs)
                     sheetView.notePlayer = notePlayer
                 }
                 notePlayer?.play()
@@ -823,7 +811,29 @@ final class ColorEditor: Editor {
                         beganStereo = note.pits[pitI].stereo
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, .stereo)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
-                    case .evenVolm, .oddVolm, .sprol: return
+                    case .evenVolm, .oddVolm: return
+                    case .sprol(let pitI, let sprolI):
+                        let volm = score.notes[noteI].pits[pitI].tone.spectlope.sprols[sprolI].volm
+                        beganNoise = score.notes[noteI].pits[pitI].tone.spectlope.sprols[sprolI].noise
+                        updatePitsWithSelection(noteI: noteI, pitI: pitI, .tone)
+                        beganBeat = note.pits[pitI].beat + note.beatRange.start
+                        
+                        let outlineColor: Color = volm < 0.5 ? .content : .background
+                        let outlineGradientNode = Node(path: .init([.init(0, 0),
+                                                                    .init(panWidth, 0)]),
+                                                       lineWidth: 5, lineType: .color(outlineColor))
+                        let gradient = noiseGradientWith(volm: volm)
+                        let gradientNode = Node(path: .init([.init(noisePointsWith(splitCount: .init(panWidth),
+                                                                                   width: panWidth))]),
+                                                lineWidth: 3, lineType: .gradient(gradient))
+                        colorPointNode.attitude.position = .init(panWidth * beganNoise, 0)
+                        panNode.append(child: outlineGradientNode)
+                        panNode.append(child: gradientNode)
+                        panNode.append(child: colorPointNode)
+                        let attitude = Attitude(document.screenToWorldTransform)
+                        panNode.attitude = attitude.with(position: noiseWorldPosition)
+                        
+                        document.rootNode.append(child: panNode)
                     }
                     
                     let noteIsSet = Set(beganNotePits.values.flatMap { $0.keys }).sorted()
@@ -866,66 +876,102 @@ final class ColorEditor: Editor {
         case .changed:
             guard let sheetView else { return }
             
-            let oPan = beganPan + (sp.x - document.convertWorldToScreen(beganWorldP).x) / (panWidth / 2)
-            let pan: Double
-            if oldPan < 0 && oPan > 0 {
-                isSnappedPan = oPan <= 0.05
-                pan = (oPan > 0.05 ? oPan - 0.05 : 0).clipped(min: -1, max: 1)
-            } else if oldPan > 0 && oPan < 0 {
-                isSnappedPan = oPan >= -0.05
-                pan = (oPan < -0.05 ? oPan + 0.05 : 0).clipped(min: -1, max: 1)
-            } else {
-                isSnappedPan = false
-                pan = oPan.clipped(min: -1, max: 1)
-                oldPan = pan
-            }
-            let ndPan = pan - beganPan
-            
-            func newPan(from otherPan: Double) -> Double {
-                if beganPan == otherPan {
-                    pan
-                } else {
-                    (otherPan + ndPan).clipped(min: -1, max: 1)
+            if case .sprol(_, let sprolI) = scoreResult {
+                let noise = (beganNoise + (sp.x - document.convertWorldToScreen(beganWorldP).x) / panWidth).clipped(min: 0, max: 1)
+                let noiseScale = beganNoise == 0 ? 0 : noise / beganNoise
+                func newNoise(from otherNoise: Double) -> Double {
+                    if beganNoise == otherNoise {
+                        noise
+                    } else {
+                        (otherNoise * noiseScale).clipped(min: 0, max: 1)
+                    }
                 }
-            }
-            
-            if !beganNotePits.isEmpty {
+                
                 let scoreView = sheetView.scoreView
                 let score = scoreView.model
                 
+                var nivs = [IndexValue<Note>]()
                 for (_, v) in beganNotePits {
                     let nid = UUID()
                     for (noteI, nv) in v {
                         guard noteI < score.notes.count else { continue }
                         var note = scoreView[noteI]
                         for (pitI, beganPit) in nv.pits {
-                            guard pitI < score.notes[noteI].pits.count else { continue }
-                            let nPan = newPan(from: beganPit.stereo.pan)
-                            note.pits[pitI].stereo.pan = nPan
-                            note.pits[pitI].stereo.id = nid
+                            guard pitI < score.notes[noteI].pits.count,
+                                  sprolI < note.pits[pitI].tone.spectlope.count else { continue }
+                            let nNoise = newNoise(from: beganPit.tone.spectlope.sprols[sprolI].noise)
+                            note.pits[pitI].tone.spectlope.sprols[sprolI].noise = nNoise
+                            note.pits[pitI].tone.id = nid
                         }
-                        scoreView[noteI] = note
+                        nivs.append(.init(value: note, index: noteI))
+                    }
+                }
+                scoreView.replace(nivs)
+                
+                colorPointNode.attitude.position = .init(panWidth * noise, 0)
+                
+                notePlayer?.notes = playerBeatNoteIndexes.map {
+                    scoreView.pitResult(atBeat: beganBeat, at: $0)
+                }
+            } else {
+                let oPan = beganPan + (sp.x - document.convertWorldToScreen(beganWorldP).x) / (panWidth / 2)
+                let pan: Double
+                if oldPan < 0 && oPan > 0 {
+                    isSnappedPan = oPan <= 0.05
+                    pan = (oPan > 0.05 ? oPan - 0.05 : 0).clipped(min: -1, max: 1)
+                } else if oldPan > 0 && oPan < 0 {
+                    isSnappedPan = oPan >= -0.05
+                    pan = (oPan < -0.05 ? oPan + 0.05 : 0).clipped(min: -1, max: 1)
+                } else {
+                    isSnappedPan = false
+                    pan = oPan.clipped(min: -1, max: 1)
+                    oldPan = pan
+                }
+                let ndPan = pan - beganPan
+                
+                func newPan(from otherPan: Double) -> Double {
+                    if beganPan == otherPan {
+                        pan
+                    } else {
+                        (otherPan + ndPan).clipped(min: -1, max: 1)
                     }
                 }
                 
-                notePlayer?.changeStereo(from: playerBeatNoteIndexes.map {
-                    scoreView.pitResult(atBeat: beganBeat, at: $0)
-                })
-                
-//                sheetView.sequencer?.scoreNoders[score.id]?
-//                    .replaceStereo([.init(value: scoreView.model.notes[ni], index: ni)],
-//                                        with: scoreView.model)
-            } else if !beganContents.isEmpty {
-                for (ci, beganContent) in beganContents {
-                    guard ci < sheetView.contentsView.elementViews.count else { continue }
-                    let contentView = sheetView.contentsView.elementViews[ci]
-                    let nPan = newPan(from: beganContent.stereo.pan)
-                    contentView.model.stereo.pan = nPan
-                    sheetView.sequencer?.mixings[beganContent.id]?.pan = Float(nPan)
+                if !beganNotePits.isEmpty {
+                    let scoreView = sheetView.scoreView
+                    let score = scoreView.model
+                    
+                    var nivs = [IndexValue<Note>]()
+                    for (_, v) in beganNotePits {
+                        let nid = UUID()
+                        for (noteI, nv) in v {
+                            guard noteI < score.notes.count else { continue }
+                            var note = scoreView[noteI]
+                            for (pitI, beganPit) in nv.pits {
+                                guard pitI < score.notes[noteI].pits.count else { continue }
+                                let nPan = newPan(from: beganPit.stereo.pan)
+                                note.pits[pitI].stereo.pan = nPan
+                                note.pits[pitI].stereo.id = nid
+                            }
+                            nivs.append(.init(value: note, index: noteI))
+                        }
+                    }
+                    scoreView.replace(nivs)
+                    
+                    notePlayer?.changeStereo(from: playerBeatNoteIndexes.map {
+                        scoreView.pitResult(atBeat: beganBeat, at: $0)
+                    })
+                } else if !beganContents.isEmpty {
+                    for (ci, beganContent) in beganContents {
+                        guard ci < sheetView.contentsView.elementViews.count else { continue }
+                        let contentView = sheetView.contentsView.elementViews[ci]
+                        contentView.stereo = .init(volm: contentView.stereo.volm,
+                                                   pan: newPan(from: beganContent.stereo.pan))
+                    }
                 }
+                
+                colorPointNode.attitude.position = .init(panWidth * pan / 2, 0)
             }
-            
-            colorPointNode.attitude.position = .init(panWidth * pan / 2, 0)
         case .ended:
             notePlayer?.stop()
             
@@ -948,12 +994,12 @@ final class ColorEditor: Editor {
                             $0[noteI] = v.note
                         }
                     }
-                    for (ni, beganNote) in beganNoteIAndNotes {
-                        guard ni < score.notes.count else { continue }
-                        let note = scoreView.model.notes[ni]
+                    for (noteI, beganNote) in beganNoteIAndNotes {
+                        guard noteI < score.notes.count else { continue }
+                        let note = scoreView.model.notes[noteI]
                         if beganNote != note {
-                            noteIVs.append(.init(value: note, index: ni))
-                            oldNoteIVs.append(.init(value: beganNote, index: ni))
+                            noteIVs.append(.init(value: note, index: noteI))
+                            oldNoteIVs.append(.init(value: beganNote, index: noteI))
                         }
                     }
                     if !noteIVs.isEmpty {

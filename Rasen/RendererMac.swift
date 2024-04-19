@@ -136,6 +136,7 @@ final class Renderstate {
     let minColorRenderPipelineState: MTLRenderPipelineState
     let alphaColorRenderPipelineState: MTLRenderPipelineState
     let colorsRenderPipelineState: MTLRenderPipelineState
+    let maxColorsRenderPipelineState: MTLRenderPipelineState
     let opaqueTextureRenderPipelineState: MTLRenderPipelineState
     let alphaTextureRenderPipelineState: MTLRenderPipelineState
     let stencilRenderPipelineState: MTLRenderPipelineState
@@ -207,6 +208,21 @@ final class Renderstate {
         colorsD.stencilAttachmentPixelFormat = .stencil8
         colorsD.rasterSampleCount = sampleCount
         colorsRenderPipelineState = try device.makeRenderPipelineState(descriptor: colorsD)
+        
+        let maxColorsD = MTLRenderPipelineDescriptor()
+        maxColorsD.vertexFunction = library.makeFunction(name: "colorsVertex")
+        maxColorsD.fragmentFunction = library.makeFunction(name: "basicFragment")
+        maxColorsD.colorAttachments[0].isBlendingEnabled = true
+        maxColorsD.colorAttachments[0].rgbBlendOperation = .min
+        maxColorsD.colorAttachments[0].alphaBlendOperation = .min
+        maxColorsD.colorAttachments[0].sourceRGBBlendFactor = .one
+        maxColorsD.colorAttachments[0].sourceAlphaBlendFactor = .one
+        maxColorsD.colorAttachments[0].destinationRGBBlendFactor = .one
+        maxColorsD.colorAttachments[0].destinationAlphaBlendFactor = .one
+        maxColorsD.colorAttachments[0].pixelFormat = pixelFormat
+        maxColorsD.stencilAttachmentPixelFormat = .stencil8
+        maxColorsD.rasterSampleCount = sampleCount
+        maxColorsRenderPipelineState = try device.makeRenderPipelineState(descriptor: maxColorsD)
         
         let textureD = MTLRenderPipelineDescriptor()
         textureD.vertexFunction = library.makeFunction(name: "textureVertex")
@@ -2559,6 +2575,9 @@ final class Context {
     func setColorsPipeline() {
         encoder.setRenderPipelineState(rs.colorsRenderPipelineState)
     }
+    func setMaxColorsPipeline() {
+        encoder.setRenderPipelineState(rs.maxColorsRenderPipelineState)
+    }
     func setOpaqueTexturePipeline() {
         encoder.setRenderPipelineState(rs.opaqueTextureRenderPipelineState)
     }
@@ -3070,7 +3089,14 @@ extension Node {
                         ctx.drawPath(using: .fill)
                         ctx.setShouldAntialias(true)
                     }
-                case .colors(let colors):
+                case .gradient(let colors):
+                    break//
+                case .maxGradient(let colors):
+                    ctx.saveGState()
+                    ctx.setBlendMode(.darken)
+                    
+                    
+                    ctx.restoreGState()
                     break//
                 case .texture(let texture):
                     if let cgImage = texture.cgImage, let b = bounds {

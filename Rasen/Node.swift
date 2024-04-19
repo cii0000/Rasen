@@ -320,7 +320,8 @@ final class Node {
     
     enum FillType: Equatable {
         case color(Color)
-        case colors([Color])
+        case gradient([Color])
+        case maxGradient([Color])
         case texture(Texture)
     }
     var fillType: FillType? {
@@ -345,6 +346,7 @@ final class Node {
     private var fillTextureBuffer: Buffer?
     private var fillTexture: Texture?
     private var isFillOpaque = false
+    private var isMaxBlend = false
     private func updateFillColorBuffer() {
         if let fillType = fillType {
             switch fillType {
@@ -354,12 +356,21 @@ final class Node {
                 fillTextureBuffer = nil
                 fillTexture = nil
                 isFillOpaque = color.opacity == 1
-            case .colors(let colors):
+                isMaxBlend = false
+            case .gradient(let colors):
                 let colorsData = path.fillColorsDataWith(colors)
                 fillColorBuffer = nil
                 fillColorsBuffer = Renderer.shared.device.makeBuffer(colorsData)
                 fillTextureBuffer = nil
                 isFillOpaque = false
+                isMaxBlend = false
+            case .maxGradient(let colors):
+                let colorsData = path.fillColorsDataWith(colors)
+                fillColorBuffer = nil
+                fillColorsBuffer = Renderer.shared.device.makeBuffer(colorsData)
+                fillTextureBuffer = nil
+                isFillOpaque = false
+                isMaxBlend = true
             case .texture(let texture):
                 fillColorBuffer = nil
                 fillColorsBuffer = nil
@@ -375,6 +386,7 @@ final class Node {
                 
                 fillTexture = texture
                 isFillOpaque = texture.isOpaque
+                isMaxBlend = false
             }
         } else {
             fillColorBuffer = nil
@@ -382,6 +394,7 @@ final class Node {
             fillTextureBuffer = nil
             fillTexture = nil
             isFillOpaque = false
+            isMaxBlend = false
         }
     }
     
@@ -512,7 +525,7 @@ final class Node {
                  fillType: FillType?, fillColorBufferUpdateType: UpdateType,
                  fillColorBuffer: Buffer?, fillColorsBuffer: Buffer?,
                  fillTextureBuffer: Buffer?, fillTexture: Texture?,
-                 isFillOpaque: Bool) {
+                 isFillOpaque: Bool, isMaxBlend: Bool) {
         
         self.name = name
         self.backingChildren = backingChildren
@@ -548,6 +561,7 @@ final class Node {
         self.fillTextureBuffer = fillTextureBuffer
         self.fillTexture = fillTexture
         self.isFillOpaque = isFillOpaque
+        self.isMaxBlend = isMaxBlend
         
         children.forEach {
             $0.removeFromParent()
@@ -588,7 +602,7 @@ final class Node {
              fillColorBuffer: fillColorBuffer, fillColorsBuffer: fillColorsBuffer,
              fillTextureBuffer: fillTextureBuffer,
              fillTexture: fillTexture,
-             isFillOpaque: isFillOpaque)
+             isFillOpaque: isFillOpaque, isMaxBlend: isMaxBlend)
     }
 }
 extension Node {
@@ -731,7 +745,11 @@ extension Node {
                                   length: transformLength, at: 2)
                     ctx.drawTriangleStrip(with: fillPathBufferVertexCounts)
                 } else if let fillColorsBuffer {
-                    ctx.setColorsPipeline()
+                    if isMaxBlend {
+                        ctx.setMaxColorsPipeline()
+                    } else {
+                        ctx.setColorsPipeline()
+                    }
                     ctx.setVertex(fillPathBuffer, at: 0)
                     ctx.setVertex(fillColorsBuffer, at: 1)
                     ctx.setVertex(bytes: transformBytes,

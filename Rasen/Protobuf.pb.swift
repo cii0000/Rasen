@@ -1148,8 +1148,6 @@ struct PBNote {
   /// Clears the value of `envelope`. Subsequent reads from it will return its default value.
   mutating func clearEnvelope() {self._envelope = nil}
 
-  var isNoise: Bool = false
-
   var id: PBUUID {
     get {return _id ?? PBUUID()}
     set {_id = newValue}
@@ -1955,24 +1953,21 @@ struct PBNoteIndexValue {
   // methods supported on all messages.
 
   var value: PBNote {
-    get {return _storage._value ?? PBNote()}
-    set {_uniqueStorage()._value = newValue}
+    get {return _value ?? PBNote()}
+    set {_value = newValue}
   }
   /// Returns true if `value` has been explicitly set.
-  var hasValue: Bool {return _storage._value != nil}
+  var hasValue: Bool {return self._value != nil}
   /// Clears the value of `value`. Subsequent reads from it will return its default value.
-  mutating func clearValue() {_uniqueStorage()._value = nil}
+  mutating func clearValue() {self._value = nil}
 
-  var index: Int64 {
-    get {return _storage._index}
-    set {_uniqueStorage()._index = newValue}
-  }
+  var index: Int64 = 0
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
 
-  fileprivate var _storage = _StorageClass.defaultInstance
+  fileprivate var _value: PBNote? = nil
 }
 
 struct PBContentIndexValue {
@@ -5447,7 +5442,6 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
     2: .same(proto: "pits"),
     3: .same(proto: "beatRange"),
     7: .same(proto: "envelope"),
-    10: .same(proto: "isNoise"),
     9: .same(proto: "id"),
   ]
 
@@ -5462,7 +5456,6 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
       case 3: try { try decoder.decodeSingularMessageField(value: &self._beatRange) }()
       case 7: try { try decoder.decodeSingularMessageField(value: &self._envelope) }()
       case 9: try { try decoder.decodeSingularMessageField(value: &self._id) }()
-      case 10: try { try decoder.decodeSingularBoolField(value: &self.isNoise) }()
       default: break
       }
     }
@@ -5488,9 +5481,6 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
     try { if let v = self._id {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
     } }()
-    if self.isNoise != false {
-      try visitor.visitSingularBoolField(value: self.isNoise, fieldNumber: 10)
-    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5499,7 +5489,6 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
     if lhs.pits != rhs.pits {return false}
     if lhs._beatRange != rhs._beatRange {return false}
     if lhs._envelope != rhs._envelope {return false}
-    if lhs.isNoise != rhs.isNoise {return false}
     if lhs._id != rhs._id {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -6927,70 +6916,36 @@ extension PBNoteIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
     2: .same(proto: "index"),
   ]
 
-  fileprivate class _StorageClass {
-    var _value: PBNote? = nil
-    var _index: Int64 = 0
-
-    static let defaultInstance = _StorageClass()
-
-    private init() {}
-
-    init(copying source: _StorageClass) {
-      _value = source._value
-      _index = source._index
-    }
-  }
-
-  fileprivate mutating func _uniqueStorage() -> _StorageClass {
-    if !isKnownUniquelyReferenced(&_storage) {
-      _storage = _StorageClass(copying: _storage)
-    }
-    return _storage
-  }
-
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    _ = _uniqueStorage()
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      while let fieldNumber = try decoder.nextFieldNumber() {
-        // The use of inline closures is to circumvent an issue where the compiler
-        // allocates stack space for every case branch when no optimizations are
-        // enabled. https://github.com/apple/swift-protobuf/issues/1034
-        switch fieldNumber {
-        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._value) }()
-        case 2: try { try decoder.decodeSingularInt64Field(value: &_storage._index) }()
-        default: break
-        }
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._value) }()
+      case 2: try { try decoder.decodeSingularInt64Field(value: &self.index) }()
+      default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every if/case branch local when no optimizations
-      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-      // https://github.com/apple/swift-protobuf/issues/1182
-      try { if let v = _storage._value {
-        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-      } }()
-      if _storage._index != 0 {
-        try visitor.visitSingularInt64Field(value: _storage._index, fieldNumber: 2)
-      }
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
+    try { if let v = self._value {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+    } }()
+    if self.index != 0 {
+      try visitor.visitSingularInt64Field(value: self.index, fieldNumber: 2)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: PBNoteIndexValue, rhs: PBNoteIndexValue) -> Bool {
-    if lhs._storage !== rhs._storage {
-      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
-        let _storage = _args.0
-        let rhs_storage = _args.1
-        if _storage._value != rhs_storage._value {return false}
-        if _storage._index != rhs_storage._index {return false}
-        return true
-      }
-      if !storagesAreEqual {return false}
-    }
+    if lhs._value != rhs._value {return false}
+    if lhs.index != rhs.index {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

@@ -207,6 +207,10 @@ final class ScoreSlider: DragEditor {
         case .began:
             document.cursor = .arrow
             
+            if document.isPlaying(with: event) {
+                document.stopPlaying(with: event)
+            }
+            
             if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
                 let inP = sheetView.convertFromWorld(p)
                 let scoreView = sheetView.scoreView
@@ -218,13 +222,11 @@ final class ScoreSlider: DragEditor {
                 beganTime = sheetView.animationView.beat(atX: inP.x)
                 
                 func updatePlayer(from vs: [Note.PitResult], in sheetView: SheetView) {
-                    let stereo = Stereo(volm: sheetView.isPlaying ? 0.1 : 1)
                     if let notePlayer = sheetView.notePlayer {
                         self.notePlayer = notePlayer
                         notePlayer.notes = vs
-                        notePlayer.stereo = stereo
                     } else {
-                        notePlayer = try? NotePlayer(notes: vs, stereo: stereo)
+                        notePlayer = try? NotePlayer(notes: vs)
                         sheetView.notePlayer = notePlayer
                     }
                     notePlayer?.play()
@@ -448,8 +450,9 @@ final class ScoreSlider: DragEditor {
                             
                             let endBeat = sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: beatInterval)
                             
-                            for (ni, beganNote) in beganNotes {
-                                guard ni < score.notes.count else { continue }
+                            var nivs = [IndexValue<Note>](capacity: beganNotes.count)
+                            for (noteI, beganNote) in beganNotes {
+                                guard noteI < score.notes.count else { continue }
                                 
                                 var note = beganNote
                                 note.pitch = (dPitch + beganNote.pitch)
@@ -460,8 +463,9 @@ final class ScoreSlider: DragEditor {
                                 let beatRange = nsBeat < neBeat ? nsBeat ..< neBeat : neBeat ..< nsBeat
                                 note.beatRange = beatRange
                                 
-                                scoreView[ni] = note
+                                nivs.append(.init(value: note, index: noteI))
                             }
+                            scoreView.replace(nivs)
                             
                             oldBeat = nsBeat
                             
@@ -492,8 +496,10 @@ final class ScoreSlider: DragEditor {
                             let dBeat = neBeat - beganBeatRange.end
                             let dPitch = pitch - beganPitch
                             let startBeat = sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: beatInterval)
-                            for (ni, beganNote) in beganNotes {
-                                guard ni < score.notes.count else { continue }
+                            
+                            var nivs = [IndexValue<Note>](capacity: beganNotes.count)
+                            for (noteI, beganNote) in beganNotes {
+                                guard noteI < score.notes.count else { continue }
                                 
                                 var note = beganNote
                                 note.pitch = (dPitch + beganNote.pitch)
@@ -504,8 +510,9 @@ final class ScoreSlider: DragEditor {
                                 let beatRange = nsBeat < neBeat ? nsBeat ..< neBeat : neBeat ..< nsBeat
                                 note.beatRange = beatRange
                                 
-                                scoreView[ni] = note
+                                nivs.append(.init(value: note, index: noteI))
                             }
+                            scoreView.replace(nivs)
                             
                             oldBeat = neBeat
                             
@@ -539,8 +546,9 @@ final class ScoreSlider: DragEditor {
                             let startBeat = sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: beatInterval)
                             let endBeat = sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: beatInterval)
                            
-                            for (ni, beganNote) in beganNotes {
-                                guard ni < score.notes.count else { continue }
+                            var nivs = [IndexValue<Note>](capacity: beganNotes.count)
+                            for (noteI, beganNote) in beganNotes {
+                                guard noteI < score.notes.count else { continue }
                                 
                                 let nBeat = dBeat + beganNote.beatRange.start
                                 
@@ -549,8 +557,9 @@ final class ScoreSlider: DragEditor {
                                     .clipped(min: Score.pitchRange.start, max: Score.pitchRange.end)
                                 note.beatRange.start = max(min(nBeat, endBeat), startBeat - beganNote.beatRange.length)
                                 
-                                scoreView[ni] = note
+                                nivs.append(.init(value: note, index: noteI))
                             }
+                            scoreView.replace(nivs)
                             
                             oldBeat = nsBeat
                             
@@ -577,40 +586,43 @@ final class ScoreSlider: DragEditor {
                     let attackSec = (beganEnvelope.attackSec + score.sec(fromBeat: dBeat))
                         .clipped(min: 0, max: 10)
                     
-                    for ni in beganNotes.keys {
-                        guard ni < score.notes.count else { continue }
-                        var env = scoreView.model.notes[ni].envelope
-                        env.attackSec = attackSec
-                        env.id = beganEnvelope.id
-                        scoreView[ni].envelope = env
+                    var eivs = [IndexValue<Envelope>](capacity: beganNotes.count)
+                    for noteI in beganNotes.keys {
+                        guard noteI < score.notes.count else { continue }
+                        var envelope = scoreView.model.notes[noteI].envelope
+                        envelope.attackSec = attackSec
+                        envelope.id = beganEnvelope.id
+                        eivs.append(.init(value: envelope, index: noteI))
                     }
-                    sheetView.sequencer?.scoreNoders[score.id]?.replace(beganNotes.map { IndexValue(value: $0.value, index: $0.key) }, with: scoreView.model)
+                    scoreView.replace(eivs)
                 case .decay:
                     let dBeat = scoreView.durBeat(atWidth: sheetP.x - beganSheetP.x)
                     let decaySec = (beganEnvelope.decaySec + score.sec(fromBeat: dBeat))
                         .clipped(min: 0, max: 10)
                     
-                    for ni in beganNotes.keys {
-                        guard ni < score.notes.count else { continue }
-                        var env = scoreView.model.notes[ni].envelope
-                        env.decaySec = decaySec
-                        env.id = beganEnvelope.id
-                        scoreView[ni].envelope = env
+                    var eivs = [IndexValue<Envelope>](capacity: beganNotes.count)
+                    for noteI in beganNotes.keys {
+                        guard noteI < score.notes.count else { continue }
+                        var envelope = scoreView.model.notes[noteI].envelope
+                        envelope.decaySec = decaySec
+                        envelope.id = beganEnvelope.id
+                        eivs.append(.init(value: envelope, index: noteI))
                     }
-                    sheetView.sequencer?.scoreNoders[score.id]?.replace(beganNotes.map { IndexValue(value: $0.value, index: $0.key) }, with: scoreView.model)
+                    scoreView.replace(eivs)
                 case .release:
                     let dBeat = scoreView.durBeat(atWidth: sheetP.x - beganSheetP.x)
                     let releaseSec = (beganEnvelope.releaseSec + score.sec(fromBeat: dBeat))
                         .clipped(min: 0, max: 10)
                     
-                    for ni in beganNotes.keys {
-                        guard ni < score.notes.count else { continue }
-                        var env = scoreView.model.notes[ni].envelope
-                        env.releaseSec = releaseSec
-                        env.id = beganEnvelope.id
-                        scoreView[ni].envelope = env
+                    var eivs = [IndexValue<Envelope>](capacity: beganNotes.count)
+                    for noteI in beganNotes.keys {
+                        guard noteI < score.notes.count else { continue }
+                        var envelope = scoreView.model.notes[noteI].envelope
+                        envelope.releaseSec = releaseSec
+                        envelope.id = beganEnvelope.id
+                        eivs.append(.init(value: envelope, index: noteI))
                     }
-                    sheetView.sequencer?.scoreNoders[score.id]?.replace(beganNotes.map { IndexValue(value: $0.value, index: $0.key) }, with: scoreView.model)
+                    scoreView.replace(eivs)
                     
                 case .sprol:
                     if let noteI, noteI < score.notes.count,
@@ -621,11 +633,12 @@ final class ScoreSlider: DragEditor {
                         
                         var tone = beganTone
                         let opspx = tone.spectlope.sprols[sprolI].pitch + pitch - beganSprol.pitch
-                        let pspx = opspx.clipped(min: sprolI - 1 >= 0 ? tone.spectlope.sprols[sprolI - 1].pitch : Score.doubleMinPitch,
-                                                 max: sprolI + 1 < tone.spectlope.count ? tone.spectlope.sprols[sprolI + 1].pitch : Score.doubleMaxPitch)
+                        let pspx = opspx.clipped(min: sprolI - 2 >= 0 ? tone.spectlope.sprols[sprolI - 2].pitch : Score.doubleMinPitch,
+                                                 max: sprolI + 2 < tone.spectlope.count ? tone.spectlope.sprols[sprolI + 2].pitch : Score.doubleMaxPitch)
                         tone.spectlope.sprols[sprolI].pitch = pspx
                         tone.id = .init()
                         
+                        var nivs = [IndexValue<Note>]()
                         for (_, v) in beganNotePits {
                             let nid = UUID()
                             for (noteI, nv) in v {
@@ -637,9 +650,10 @@ final class ScoreSlider: DragEditor {
                                     note.pits[pitI].tone = tone
                                     note.pits[pitI].tone.id = nid
                                 }
-                                scoreView[noteI] = note
+                                nivs.append(.init(value: note, index: noteI))
                             }
                         }
+                        scoreView.replace(nivs)
                         
                         notePlayer?.notes = playerBeatNoteIndexes.map {
                             scoreView.pitResult(atBeat: beganStartBeat, at: $0)
@@ -708,12 +722,12 @@ final class ScoreSlider: DragEditor {
                     let scoreView = sheetView.scoreView
                     let score = scoreView.model
                     var noteIVs = [IndexValue<Note>](), oldNoteIVs = [IndexValue<Note>]()
-                    for (ni, beganNote) in beganNotes.sorted(by: { $0.key < $1.key }) {
-                        guard ni < score.notes.count else { continue }
-                        let note = score.notes[ni]
+                    for (noteI, beganNote) in beganNotes.sorted(by: { $0.key < $1.key }) {
+                        guard noteI < score.notes.count else { continue }
+                        let note = score.notes[noteI]
                         if beganNote != note {
-                            noteIVs.append(.init(value: note, index: ni))
-                            oldNoteIVs.append(.init(value: beganNote, index: ni))
+                            noteIVs.append(.init(value: note, index: noteI))
+                            oldNoteIVs.append(.init(value: beganNote, index: noteI))
                         }
                     }
                     if !noteIVs.isEmpty {
@@ -737,12 +751,12 @@ final class ScoreSlider: DragEditor {
                                 $0[noteI] = v.note
                             }
                         }
-                        for (ni, beganNote) in beganNoteIAndNotes {
-                            guard ni < score.notes.count else { continue }
-                            let note = scoreView.model.notes[ni]
+                        for (noteI, beganNote) in beganNoteIAndNotes {
+                            guard noteI < score.notes.count else { continue }
+                            let note = scoreView.model.notes[noteI]
                             if beganNote != note {
-                                noteIVs.append(.init(value: note, index: ni))
-                                oldNoteIVs.append(.init(value: beganNote, index: ni))
+                                noteIVs.append(.init(value: note, index: noteI))
+                                oldNoteIVs.append(.init(value: beganNote, index: noteI))
                             }
                         }
                         if !noteIVs.isEmpty {
@@ -817,7 +831,13 @@ final class ScoreView: TimelineView {
         }
     }
     var mainFrame: Rect {
-        bounds.insetBy(dx: Sheet.textPadding.width, dy: 32)
+        let score = model
+        let sBeat = max(score.beatRange.start, -10000), eBeat = min(score.beatRange.end, 10000)
+        let sx = x(atBeat: sBeat)
+        let ex = x(atBeat: eBeat)
+        let sy = y(fromPitch: Score.pitchRange.start)
+        let ey = y(fromPitch: Score.pitchRange.end)
+        return .init(x: sx, y: sy, width: ex - sx, height: ey - sy)
     }
     
     let octaveNode = Node(), draftNotesNode = Node(), notesNode = Node()
@@ -829,6 +849,8 @@ final class ScoreView: TimelineView {
     let pitsNode = Node(isHidden: true, fillType: .color(.background))
     let pitsFullEditNode = Node(isHidden: true, fillType: .color(.background))
     let clippingNode = Node(isHidden: true, lineWidth: 4, lineType: .color(.warning))
+    
+    var scoreNoder: ScoreNoder?
     
     init(binder: Binder, keyPath: BinderKeyPath) {
         self.binder = binder
@@ -847,6 +869,10 @@ final class ScoreView: TimelineView {
         updateTimeline()
         updateScore()
         updateDraftNotes()
+        
+        if model.enabled {
+            scoreNoder = .init(score: model)
+        }
     }
 }
 extension ScoreView {
@@ -928,6 +954,7 @@ extension ScoreView {
         set {
             binder[keyPath: keyPath].tempo = newValue
             updateTimeline()
+            scoreNoder?.changeTempo(with: model)
         }
     }
     
@@ -940,17 +967,20 @@ extension ScoreView {
         model.localMaxBeatRange
     }
     
+    var pitchStartY: Double {
+        32
+    }
     func pitch(atY y: Double, interval: Rational) -> Rational {
-        Rational((y - mainFrame.minY) / pitchHeight, intervalScale: interval)
+        Rational((y - pitchStartY) / pitchHeight, intervalScale: interval)
     }
     func smoothPitch(atY y: Double) -> Double? {
-        (y - mainFrame.minY) / pitchHeight
+        (y - pitchStartY) / pitchHeight
     }
     func y(fromPitch pitch: Rational) -> Double {
-        Double(pitch) * pitchHeight + mainFrame.minY
+        Double(pitch) * pitchHeight + pitchStartY
     }
     func y(fromPitch pitch: Double) -> Double {
-        pitch * pitchHeight + mainFrame.minY
+        pitch * pitchHeight + pitchStartY
     }
     
     func pitResult(atBeat beat: Rational, at noteI: Int) -> Note.PitResult {
@@ -960,9 +990,19 @@ extension ScoreView {
     var option: ScoreOption {
         get { model.option }
         set {
+            let oldValue = option
+            
             unupdateModel.option = newValue
             updateTimeline()
             updateChord()
+            
+            if oldValue.enabled != newValue.enabled {
+                scoreNoder = newValue.enabled ? .init(score: model) : nil
+            } else if oldValue.tempo != newValue.tempo {
+                scoreNoder?.changeTempo(with: model)
+            } else if oldValue.durBeat != newValue.durBeat {
+                scoreNoder?.durSec = model.secRange.end
+            }
         }
     }
     
@@ -971,35 +1011,52 @@ extension ScoreView {
         octaveNode.append(child: octaveNode(from: note))
         notesNode.append(child: noteNode(from: note))
         updateChord()
+        scoreNoder?.insert([.init(value: note, index: unupdateModel.notes.count - 1)], with: model)
     }
     func insert(_ note: Note, at noteI: Int) {
         unupdateModel.notes.insert(note, at: noteI)
         notesNode.insert(child: noteNode(from: note), at: noteI)
         updateChord()
+        scoreNoder?.insert([.init(value: note, index: noteI)], with: model)
     }
     func insert(_ nivs: [IndexValue<Note>]) {
         unupdateModel.notes.insert(nivs)
         notesNode.children.insert(nivs.map { .init(value: noteNode(from: $0.value), index: $0.index) })
         octaveNode.children.insert(nivs.map { .init(value: octaveNode(from: $0.value), index: $0.index) })
         updateChord()
+        scoreNoder?.insert(nivs, with: model)
     }
     func replace(_ nivs: [IndexValue<Note>]) {
         unupdateModel.notes.replace(nivs)
         notesNode.children.replace(nivs.map { .init(value: noteNode(from: $0.value), index: $0.index) })
         octaveNode.children.replace(nivs.map { .init(value: octaveNode(from: $0.value), index: $0.index) })
         updateChord()
+        scoreNoder?.replace(nivs, with: model)
+    }
+    func replace(_ eivs: [IndexValue<Envelope>]) {
+        let nivs = eivs.map {
+            var note = unupdateModel.notes[$0.index]
+            note.envelope = $0.value
+            return IndexValue(value: note, index: $0.index)
+        }
+        unupdateModel.notes.replace(nivs)
+        notesNode.children.replace(nivs.map { .init(value: noteNode(from: $0.value), index: $0.index) })
+        octaveNode.children.replace(nivs.map { .init(value: octaveNode(from: $0.value), index: $0.index) })
+        scoreNoder?.replace(eivs)
     }
     func remove(at noteI: Int) {
         unupdateModel.notes.remove(at: noteI)
         notesNode.remove(atChild: noteI)
         octaveNode.remove(atChild: noteI)
         updateChord()
+        scoreNoder?.remove(at: [noteI])
     }
     func remove(at noteIs: [Int]) {
         unupdateModel.notes.remove(at: noteIs)
         noteIs.reversed().forEach { notesNode.remove(atChild: $0) }
         noteIs.reversed().forEach { octaveNode.remove(atChild: $0) }
         updateChord()
+        scoreNoder?.remove(at: noteIs)
     }
     subscript(noteI: Int) -> Note {
         get {
@@ -1010,6 +1067,7 @@ extension ScoreView {
             notesNode.children[noteI] = noteNode(from: newValue)
             octaveNode.children[noteI] = octaveNode(from: newValue)
             updateChord()
+            scoreNoder?.replace([.init(value: newValue, index: noteI)], with: model)
         }
     }
     
@@ -1302,27 +1360,20 @@ extension ScoreView {
         let overtoneH = 1.0
         let scH = 2.0
         let scY = 2.0
-        let noiseY = 1.5
         
         var linePathlines = [Pathline](), lyricLinePathlines = [Pathline]()
         var evenPathline, oddPathline, fqPathline: Pathline?
-        var noisePathline: Pathline?
         var scNodes = [Node]()
         let envelopeR = 0.125, sprolR = 0.03125 / 2, sprolSubR = 0.03125 / 4
         
         let lyricPaths: [Path] = note.pits.enumerated().compactMap { (pitI, pit) in
             let p = pitPosition(atPit: pitI, from: note)
             if !pit.lyric.isEmpty {
-                if pit.lyric == "%" {
-                    lyricLinePathlines.append(.init(Rect(x: p.x - 0.25, y: p.y - nh, width: 0.5, height: nh)))
-                    return nil
-                } else {
-                    let lyricText = Text(string: pit.lyric, size: Font.smallSize)
-                    let typesetter = lyricText.typesetter
-                    let lh = typesetter.height / 2 + 2
-                    lyricLinePathlines.append(.init(Rect(x: p.x - 0.25, y: p.y - lh / 2, width: 0.5, height: lh / 2)))
-                    return typesetter.path() * Transform(translationX: p.x, y: p.y - lh)
-                }
+                let lyricText = Text(string: pit.lyric, size: Font.smallSize)
+                let typesetter = lyricText.typesetter
+                let lh = typesetter.height / 2 + 2
+                lyricLinePathlines.append(.init(Rect(x: p.x - 0.25, y: p.y - lh / 2, width: 0.5, height: lh / 2)))
+                return typesetter.path() * Transform(translationX: p.x, y: p.y - lh)
             } else {
                 return nil
             }
@@ -1342,7 +1393,7 @@ extension ScoreView {
                               self.y(fromPitch: note.pitch + pit.pitch))
                 return pit.tone.spectlope.sprols.enumerated().map {
                     (Point(p.x, tonePitchY(fromPitch: $0.element.pitch, noteY: p.y)),
-                     pit.lyric.isEmpty ? sprolR : ($0.offset % 4 == 0 || $0.offset % 4 == 3 ? sprolSubR : sprolR))
+                     $0.offset > 0 && pit.tone.spectlope.sprols[$0.offset - 1].pitch > $0.element.pitch ? sprolSubR : sprolR)
                 }
             }
             
@@ -1424,6 +1475,17 @@ extension ScoreView {
                 if !vs.isEmpty && vs[0].count >= 2 {
                     for yi in 1 ..< vs[0].count {
                         var ps = [Point](capacity: 2 * vs.count)
+                        for xi in vs.count.range {
+                            ps.append(vs[xi][yi - 1].p)
+                            ps.append(vs[xi][yi].p)
+                        }
+                        let tst = TriangleStrip(points: ps)
+                        
+                        scNodes.append(.init(path: Path(tst), fillType: .color(.background)))
+                    }
+                    
+                    for yi in 1 ..< vs[0].count {
+                        var ps = [Point](capacity: 2 * vs.count)
                         var colors = [Color](capacity: 2 * vs.count)
                         for xi in vs.count.range {
                             ps.append(vs[xi][yi - 1].p)
@@ -1433,7 +1495,7 @@ extension ScoreView {
                         }
                         let tst = TriangleStrip(points: ps)
                         
-                        scNodes.append(.init(path: Path(tst), fillType: .colors(colors)))
+                        scNodes.append(.init(path: Path(tst), fillType: .maxGradient(colors)))
                     }
                 }
                 
@@ -1452,10 +1514,6 @@ extension ScoreView {
                 let line2: [Point] = pointline.points.map { .init($0.x, $0.y - overtoneH / 2 - nh / 2) }
                 evenPathline = .init(line1)
                 oddPathline = .init(line2)
-            
-                if note.isNoise {
-                    noisePathline = .init(pointline.points.map { .init($0.x, $0.y - overtoneH - noiseY - nh / 2) })
-                }
             }
         } else {
 //            let sustain = env.sustainVolm + 1 / noteHeight
@@ -1476,9 +1534,10 @@ extension ScoreView {
                                        .init(point: Point(nx + nw, ny), pressure: volmT),
                                        .init(point: Point(nx + nw, ny), pressure: volmT)])
             
+            let fPitNx = x(atBeat: note.beatRange.start + note.firstPit.beat)
             let sprolKnobPAndRs = note.firstTone.spectlope.sprols.enumerated().map {
-                (Point(nx, tonePitchY(fromPitch: $0.element.pitch, noteY: ny)),
-                 note.firstPit.lyric.isEmpty ? sprolR : ($0.offset % 4 == 0 || $0.offset % 4 == 3 ? sprolSubR : sprolR))
+                (Point(fPitNx, tonePitchY(fromPitch: $0.element.pitch, noteY: ny)),
+                 $0.offset > 0 && note.firstTone.spectlope.sprols[$0.offset - 1].pitch > $0.element.pitch ? sprolSubR : sprolR)
             }
             
             let envelopeY = ny + nh / 2 + overtoneH + overtoneH / 2
@@ -1500,6 +1559,8 @@ extension ScoreView {
                 var preY = tonePitchY(fromPitch: 0)
                 var preColor = Self.color(fromVolm: note.firstTone.spectlope.sprols.first?.volm ?? 0,
                                           noise: note.firstTone.spectlope.sprols.first?.noise ?? 0)
+                scNodes.append(.init(path: Path(Rect(x: nx, y: preY, width: nw, height: scH)),
+                                     fillType: .color(.background)))
                 func append(_ sprol: Sprol) {
                     let y = tonePitchY(fromPitch: sprol.pitch)
                     let color = Self.color(fromVolm: sprol.volm, noise: sprol.noise)
@@ -1508,8 +1569,7 @@ extension ScoreView {
                                                      .init(nx + nw, preY), .init(nx + nw, y)])
                     let colors = [preColor, color, preColor, color]
                     
-                    scNodes.append(.init(path: Path(tst), fillType: .colors(colors)))
-                    
+                    scNodes.append(.init(path: Path(tst), fillType: .maxGradient(colors)))
                     preY = y
                     preColor = color
                 }
@@ -1533,12 +1593,6 @@ extension ScoreView {
             
             evenColors = [Self.color(fromVolm: note.firstTone.overtone.evenVolm)]
             oddColors = [Self.color(fromVolm: note.firstTone.overtone.oddVolm)]
-            
-            if note.isNoise {
-                noisePathline = .init(Line(controls: toneLine.controls.map {
-                    .init(point: .init($0.point.x, $0.point.y - overtoneH - noiseY - $0.pressure * nh / 2))
-                }))
-            }
         }
         
         var nodes = [Node]()
@@ -1546,12 +1600,6 @@ extension ScoreView {
             .init(path: Path([$0]),
                   lineWidth: lineWidth ?? nh,
                   lineType: color != nil ? .color(color!) : (lineColors.count == 1 ? .color(lineColors[0]) : .gradient(lineColors)))
-        }
-        
-        if let noisePathline {
-            nodes.append(.init(path: Path([noisePathline]),
-                               lineWidth: (lineWidth ?? nh) / 2,
-                               lineType: .color(.content)))
         }
         
         nodes += scNodes
@@ -1764,6 +1812,9 @@ extension ScoreView {
         }
     }
     
+    func containsMainFrame(_ p: Point) -> Bool {
+        mainFrame.contains(p)
+    }
     func containsTimeline(_ p : Point) -> Bool {
         model.enabled ? timelineFrame.contains(p) : false
     }

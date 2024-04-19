@@ -232,14 +232,7 @@ final class RunEditor: InputKeyEditor {
             }
             return
         }
-        if document.containsAllTimeline(with: event) {
-            let player = Player(document)
-            player.send(event)
-            var event = event
-            event.phase = .ended
-            player.send(event)
-            return
-        } else if document.isPlaying(with: event) {
+        if document.isPlaying(with: event) {
             document.stopPlaying(with: event)
             return
         }
@@ -337,7 +330,7 @@ final class RunEditor: InputKeyEditor {
                         }
                         
                         if let contentView = minContentView {
-                            if let buffer = contentView.model.pcmBuffer {
+                            if let buffer = contentView.pcmBuffer {
                                 let lufs = buffer.integratedLoudness
                                 let db = buffer.samplePeakDb
                                 document.show("Sound".localized

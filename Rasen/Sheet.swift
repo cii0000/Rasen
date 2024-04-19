@@ -2414,8 +2414,7 @@ extension Sheet {
     var pcmBuffer: PCMBuffer? {
         let audiotrack = audiotrack
         if !audiotrack.isEmpty,
-           let sequencer = Sequencer(audiotracks: [audiotrack],
-                                     isAsync: false, playStartSec: 0) {
+           let sequencer = Sequencer(audiotracks: [audiotrack]) {
             return try? sequencer.buffer(sampleRate: Audio.defaultExportSampleRate,
                                          headroomAmp: nil) { _, _ in }
         }

@@ -300,7 +300,7 @@ final class Movie {
             audioInput.append(buffer)
             
             var stop = false
-            let length = AVAudioFramePosition(seq.secoundDuration * sampleRate)
+            let length = AVAudioFramePosition(seq.durSec * sampleRate)
             
             progressHandler(Double(seq.engine.manualRenderingSampleTime) / Double(length), &stop)
             if stop { return }
@@ -332,7 +332,7 @@ final class Movie {
         }
         
         var stop = false
-        let length = AVAudioFramePosition(seq.secoundDuration * sampleRate)
+        let length = AVAudioFramePosition(seq.durSec * sampleRate)
         while seq.engine.manualRenderingSampleTime < length {
             while !audioInput.isReadyForMoreMediaData {
                 progressHandler(Double(seq.engine.manualRenderingSampleTime) / Double(length), &stop)
@@ -410,14 +410,13 @@ final class Movie {
 final class CaptionRenderer {
     struct ExportError: Error {}
     
-    let url: URL,
-        writer: AVAssetWriter,
-        captionInput: AVAssetWriterInput,
-        cAdaptor: AVAssetWriterInputCaptionAdaptor
-
-    var append = false, stop = false,
-        lastCMTime = CMTime(),
-        allDuration = Rational(), currentTime = Rational()
+    let url: URL
+    private let writer: AVAssetWriter,
+                captionInput: AVAssetWriterInput,
+                cAdaptor: AVAssetWriterInputCaptionAdaptor
+    private var append = false, stop = false,
+                lastCMTime = CMTime(),
+                allDuration = Rational(), currentTime = Rational()
 
     init(url: URL) throws {
         self.url = url
@@ -502,25 +501,25 @@ final class CaptionRenderer {
 }
 
 extension Rational {
-    func cm(timescale: CMTimeScale) -> CMTime {
+    fileprivate func cm(timescale: CMTimeScale) -> CMTime {
         CMTime(value: CMTimeValue(p * Int(timescale) / q),
                timescale: timescale)
     }
 }
 extension Double {
-    func cm(timescale: CMTimeScale) -> CMTime {
+    fileprivate func cm(timescale: CMTimeScale) -> CMTime {
         CMTime(value: CMTimeValue(self * Double(timescale)),
                timescale: timescale)
     }
 }
 extension Range where Bound == Rational {
-    func cm(timescale: CMTimeScale) -> CMTimeRange {
+    fileprivate func cm(timescale: CMTimeScale) -> CMTimeRange {
         CMTimeRange(start: start.cm(timescale: timescale),
                     duration: length.cm(timescale: timescale))
     }
 }
 extension Range where Bound == Double {
-    func cm(timescale: CMTimeScale) -> CMTimeRange {
+    fileprivate func cm(timescale: CMTimeScale) -> CMTimeRange {
         CMTimeRange(start: start.cm(timescale: timescale),
                     duration: length.cm(timescale: timescale))
     }

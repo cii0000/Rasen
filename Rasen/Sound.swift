@@ -408,19 +408,15 @@ extension Spectlope {
         sprols.contains { $0.noise > 0 }
     }
     
-    func sprol(atPitch pitch: Double) -> Sprol {
+    func sprol(atPitch pitch: Double, isClippedPitch: Bool = false) -> Sprol {
         guard !sprols.isEmpty else { return .init() }
         var prePitch = sprols.first!.pitch, preSprol = sprols.first!, maxSprol: Sprol?
-        guard pitch >= prePitch else { return sprols.first! }
+        guard pitch >= prePitch else { return isClippedPitch ? sprols.first! : .init(pitch: pitch, volm: sprols.first!.volm, noise: sprols.first!.noise) }
         for sprol in sprols {
             let nextPitch = sprol.pitch, nextSprol = sprol
-            guard prePitch < nextPitch else {
-                prePitch = nextPitch
-                preSprol = nextSprol
-                continue
-            }
-            if pitch < nextPitch, prePitch < nextPitch {
-                let t = (pitch - prePitch) / (nextPitch - prePitch)
+            let (nPrePitch, nNextPitch) = prePitch < nextPitch ? (prePitch, nextPitch) : (nextPitch, prePitch)
+            if pitch >= nPrePitch && pitch < nNextPitch {
+                let t = (pitch - nPrePitch) / (nNextPitch - nPrePitch)
                 let nSprol = Sprol.linear(preSprol, nextSprol, t: t)
                 if let nMaxSprol = maxSprol {
                     maxSprol?.volm = max(nMaxSprol.volm, nSprol.volm)
@@ -432,7 +428,7 @@ extension Spectlope {
             prePitch = nextPitch
             preSprol = nextSprol
         }
-        return maxSprol ?? sprols.last!
+        return maxSprol ?? (isClippedPitch ? sprols.last! : .init(pitch: pitch, volm: sprols.last!.volm, noise: sprols.last!.noise))
     }
     
     func volm(atPitch pitch: Double) -> Double {
@@ -703,7 +699,7 @@ extension Tone: MonoInterpolatable {
 }
 
 struct Pit: Codable, Hashable {
-    var beat = Rational(0), pitch = Rational(0), stereo = Stereo(volm: 0.375), tone = Tone(), lyric = ""
+    var beat = Rational(0), pitch = Rational(0), stereo = Stereo(volm: 0.3125), tone = Tone(), lyric = ""
 }
 extension Pit: Protobuf {
     init(_ pb: PBPit) throws {
@@ -774,7 +770,6 @@ struct Note {
     var pitch = Rational(0)
     var pits = [Pit()]
     var envelope = Envelope()
-    var isNoise = false
     var id = UUID()
 }
 extension Note: Protobuf {
@@ -786,7 +781,6 @@ extension Note: Protobuf {
             pits = [Pit()]
         }
         envelope = (try? Envelope(pb.envelope)) ?? .init()
-        isNoise = pb.isNoise
         id = (try? UUID(pb.id)) ?? UUID()
     }
     var pb: PBNote {
@@ -795,7 +789,6 @@ extension Note: Protobuf {
             $0.pitch = pitch.pb
             $0.pits = pits.map { $0.pb }
             $0.envelope = envelope.pb
-            $0.isNoise = isNoise
             $0.id = id.pb
         }
     }
@@ -823,7 +816,7 @@ extension Note {
     var firstPitResult: PitResult {
         .init(notePitch: pitch, pitch: .rational(firstPit.pitch), stereo: firstStereo,
               tone: firstTone, lyric: firstPit.lyric,
-              envelope: envelope, isNoise: isNoise, id: id)
+              envelope: envelope, id: id)
     }
     var containsNoise: Bool {
         pits.contains(where: { $0.tone.spectlope.sprols.contains(where: { $0.noise > 0 }) })
@@ -878,7 +871,6 @@ extension Note {
         pitch == other.pitch
         && pits == other.pits
         && envelope == other.envelope
-        && isNoise == other.isNoise
         && id == other.id
     }
     
@@ -886,28 +878,38 @@ extension Note {
         let spectlopeCount = (pits.maxValue { $0.tone.spectlope.sprols.count }) ?? 0
         var pitKeys: [Interpolation<InterPit>.Key] = pits.map {
             .init(value: .init(pitch: .init($0.pitch / 12),
-                               stereo: $0.stereo,
-                               tone: $0.tone.with(spectlopeCount: spectlopeCount),
+                               stereo: $0.stereo.with(id: .zero),
+                               tone: $0.tone.with(spectlopeCount: spectlopeCount).with(id: .zero),
                                lyric: $0.lyric),
                   time: .init(Score.sec(fromBeat: $0.beat, tempo: tempo)), 
                   type: .spline)
         }
-        if pits.first?.beat != 0 {
-            pitKeys.insert(.init(value: pitKeys.first!.value, time: 0, type: .spline), at: 0)
-        }
-        let durSec = Double(Score.sec(fromBeat: beatRange.length, tempo: tempo))
-        if pits.last?.beat != beatRange.length {
-            pitKeys.append(.init(value: pitKeys.last!.value, time: durSec, type: .spline))
+        
+        let firstStereo = firstStereo.with(id: .zero),
+            firstTone = firstTone.with(spectlopeCount: spectlopeCount).with(id: .zero)
+        let isEmptyPitch = !(pitKeys.contains { $0.value.pitch != 0 })
+        let isEmptyTone = !(pitKeys.contains { $0.value.tone != firstTone })
+        let isEmptyStereo = !(pitKeys.contains { $0.value.stereo != firstStereo })
+        
+        let durSec: Double
+        if !isEmptyPitch || !isEmptyTone || !isEmptyStereo {
+            if pits.first?.beat != 0 {
+                pitKeys.insert(.init(value: pitKeys.first!.value, time: 0, type: .spline), at: 0)
+            }
+            durSec = Double(Score.sec(fromBeat: beatRange.length, tempo: tempo))
+            if pits.last?.beat != beatRange.length {
+                pitKeys.append(.init(value: pitKeys.last!.value, time: durSec, type: .spline))
+            }
+        } else {
+            durSec = 0
         }
         let it = Interpolation<InterPit>(keys: pitKeys, duration: durSec)
-        let firstStereo = firstStereo, firstTone = firstTone
-        let isEmptyPitch = !(pits.contains { $0.pitch != 0 })
-        let isEmptyTone = !(pits.contains { $0.tone != firstTone })
-        let isEmptyStereo = !(pits.contains { $0.stereo != firstStereo })
+        
         return .init(interpolation: it,
                      firstPitch: .init(pits[0].pitch / 12),
                      firstStereo: firstStereo, firstTone: firstTone,
-                     isEqualAllPitch: isEmptyPitch, isEqualAllTone: isEmptyTone, isEqualAllStereo: isEmptyStereo,
+                     isEqualAllPitch: isEmptyPitch, isEqualAllTone: isEmptyTone,
+                     isEqualAllStereo: isEmptyStereo,
                      isEqualAllWithoutStereo: isEmptyPitch && isEmptyTone)
     }
     
@@ -929,25 +931,25 @@ extension Note {
     }
     struct PitResult: Hashable {
         var notePitch: Rational, pitch: ResultPitch, stereo: Stereo,
-            tone: Tone, lyric: String, envelope: Envelope, isNoise: Bool, id: UUID
+            tone: Tone, lyric: String, envelope: Envelope, id: UUID
     }
     func pitResult(atBeat beat: Double) -> PitResult {
         if pits.count == 1 || beat <= .init(pits[0].beat) {
             let pit = pits[0]
             return .init(notePitch: pitch, pitch: .rational(pit.pitch), stereo: pit.stereo,
                          tone: pit.tone, lyric: pit.lyric,
-                         envelope: envelope, isNoise: isNoise, id: id)
+                         envelope: envelope, id: id)
         } else if let pit = pits.last, beat >= .init(pit.beat) {
             return .init(notePitch: pitch, pitch: .rational(pit.pitch), stereo: pit.stereo,
                          tone: pit.tone, lyric: pit.lyric,
-                         envelope: envelope, isNoise: isNoise, id: id)
+                         envelope: envelope, id: id)
         }
         for pitI in 0 ..< pits.count - 1 {
             let pit = pits[pitI], nextPit = pits[pitI + 1]
             if beat >= .init(pit.beat) && beat < .init(nextPit.beat) && pit.isEqualWithoutBeat(nextPit) {
                 return .init(notePitch: pitch, pitch: .rational(pit.pitch), stereo: pit.stereo,
                              tone: pit.tone, lyric: pit.lyric,
-                             envelope: envelope, isNoise: isNoise, id: id)
+                             envelope: envelope, id: id)
             }
         }
         
@@ -971,12 +973,12 @@ extension Note {
             let pit = firstPit
             return .init(notePitch: pitch, pitch: .rational(pit.pitch), stereo: pit.stereo,
                          tone: pit.tone, lyric: pit.lyric,
-                         envelope: envelope, isNoise: isNoise, id: id)
+                         envelope: envelope, id: id)
         }
         return .init(notePitch: pitch, pitch: .real(value.pitch),
                      stereo: value.stereo,
                      tone: value.tone, lyric: value.lyric,
-                     envelope: envelope, isNoise: isNoise, id: id)
+                     envelope: envelope, id: id)
     }
 
     var isEmpty: Bool {
@@ -1437,8 +1439,7 @@ extension Score {
         }
     }
     var renderedPCMBuffer: PCMBuffer? {
-        let seq = Sequencer(audiotracks: [.init(values: [.score(self)])],
-                            isAsync: false, playStartSec: 0)
+        let seq = Sequencer(audiotracks: [.init(values: [.score(self)])])
         return try? seq?.buffer(sampleRate: Audio.defaultExportSampleRate,
                                 progressHandler: { _, _ in })
     }

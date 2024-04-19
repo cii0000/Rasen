@@ -107,7 +107,7 @@ final class ContentSlider: DragEditor {
                                        timeOption.beatRange.end)
                         if beat != timeOption.beatRange.start {
                             let dBeat = timeOption.beatRange.start - beat
-                            if content.type.isDuration {
+                            if content.type.hasDur {
                                 timeOption.localStartBeat += dBeat
                             }
                             timeOption.beatRange.start -= dBeat
@@ -201,6 +201,9 @@ final class ContentView<T: BinderProtocol>: SpectrgramView {
         }
     }
     
+    var pcmNoder: PCMNoder?
+    var volms = [Double]()
+    
     init(binder: Binder, keyPath: BinderKeyPath) {
         self.binder = binder
         self.keyPath = keyPath
@@ -215,6 +218,9 @@ final class ContentView<T: BinderProtocol>: SpectrgramView {
             node = Node(children: [timelineNode, clippingNode],
                         attitude: Attitude(position: binder[keyPath: keyPath].origin))
         }
+        
+        pcmNoder = .init(content: model)
+        volms = pcmNoder?.pcmBuffer.volms() ?? []
         
         updateClippingNode()
         updateTimeline()
@@ -231,6 +237,9 @@ extension ContentView {
         }
         updateClippingNode()
         updateTimeline()
+        if let timeOption = model.timeOption {
+            pcmNoder?.change(from: timeOption)
+        }
     }
     func updateClippingNode() {
         var parent: Node?
@@ -277,6 +286,9 @@ extension ContentView {
         node.attitude.position = origin
         updateTimeline()
         updateClippingNode()
+        if let timeOption = model.timeOption {
+            pcmNoder?.change(from: timeOption)
+        }
     }
     var timeOption: ContentTimeOption? {
         get { model.timeOption }
@@ -284,6 +296,9 @@ extension ContentView {
             binder[keyPath: keyPath].timeOption = newValue
             updateTimeline()
             updateClippingNode()
+            if let timeOption = model.timeOption {
+                pcmNoder?.change(from: timeOption)
+            }
         }
     }
     var origin: Point {
@@ -292,6 +307,14 @@ extension ContentView {
             binder[keyPath: keyPath].origin = newValue
             node.attitude.position = newValue
             updateClippingNode()
+        }
+    }
+    var stereo: Stereo {
+        get { model.stereo }
+        set {
+            binder[keyPath: keyPath].stereo = newValue
+            updateTimeline()
+            pcmNoder?.stereo = newValue
         }
     }
     
@@ -315,7 +338,7 @@ extension ContentView {
     }
     
     var timeLineCenterY: Double {
-        model.type.isDuration ? 0 : -Sheet.timelineHalfHeight
+        model.type.hasDur ? 0 : -Sheet.timelineHalfHeight
     }
     var beatRange: Range<Rational>? {
         model.timeOption?.beatRange
@@ -329,7 +352,7 @@ extension ContentView {
     }
     
     var pcmBuffer: PCMBuffer? {
-        model.pcmBuffer
+        pcmNoder?.pcmBuffer
     }
     
     func timelineNode(with content: Content) -> [Node] {
@@ -345,7 +368,7 @@ extension ContentView {
         let knobW = Sheet.knobWidth, knobH = Sheet.knobHeight
         let rulerH = Sheet.rulerHeight
         let timelineHalfHeight = Sheet.timelineHalfHeight
-        let y = content.type.isDuration ? 0 : -timelineHalfHeight
+        let y = content.type.hasDur ? 0 : -timelineHalfHeight
         let sy = y - timelineHalfHeight
         let ey = y + timelineHalfHeight
         
@@ -417,7 +440,7 @@ extension ContentView {
             }
         }
         
-        if !content.volms.isEmpty {
+        if !volms.isEmpty {
             let sSec = timeOption.sec(fromBeat: max(-timeOption.localStartBeat, 0))
             let msSec = timeOption.sec(fromBeat: timeOption.localStartBeat)
             let csSec = timeOption.sec(fromBeat: timeOption.beatRange.start)
@@ -428,19 +451,19 @@ extension ContentView {
             let eSec = timeOption
                 .sec(fromBeat: min(timeOption.beatRange.end - (timeOption.localStartBeat + timeOption.beatRange.start),
                                    durBeat))
-            let si = Int((sSec * Content.volmFrameRate).rounded())
-                .clipped(min: 0, max: content.volms.count - 1)
-            let msi = Int((msSec * Content.volmFrameRate).rounded())
-            let ei = Int((eSec * Content.volmFrameRate).rounded())
-                .clipped(min: 0, max: content.volms.count - 1)
+            let si = Int((sSec * PCMBuffer.volmFrameRate).rounded())
+                .clipped(min: 0, max: volms.count - 1)
+            let msi = Int((msSec * PCMBuffer.volmFrameRate).rounded())
+            let ei = Int((eSec * PCMBuffer.volmFrameRate).rounded())
+                .clipped(min: 0, max: volms.count - 1)
             let vt = content.stereo.volm
                 .clipped(min: Volm.minVolm, max: Volm.maxVolm,
                          newMin: lw / noteHeight, newMax: 1)
             if si < ei {
                 let line = Line(controls: (si ... ei).map { i in
-                    let sec = Rational(i + msi) / Content.volmFrameRate + csSec
+                    let sec = Rational(i + msi) / PCMBuffer.volmFrameRate + csSec
                     return .init(point: .init(x(atSec: sec), y),
-                                 pressure: content.volms[i] * vt)
+                                 pressure: volms[i] * vt)
                 })
                 
                 let pan = content.stereo.pan
@@ -535,7 +558,7 @@ extension ContentView {
         spectrogramNode = nil
         
         let content = model
-        guard content.isShownSpectrogram, let sm = content.spectrogram,
+        guard content.isShownSpectrogram, let sm = pcmNoder?.spectrogram,
               let timeOption = content.timeOption else { return }
         
         let firstX = x(atBeat: timeOption.beatRange.start + timeOption.localStartBeat)
@@ -665,7 +688,7 @@ extension ContentView {
         let sx = x(atBeat: timeOption.beatRange.start)
         let ex = x(atBeat: timeOption.beatRange.end)
         let thh = Sheet.timelineHalfHeight
-        return Rect(x: sx, y: model.type.isDuration ? -thh : -thh * 2,
+        return Rect(x: sx, y: model.type.hasDur ? -thh : -thh * 2,
                     width: ex - sx, height: thh * 2).outset(by: 3)
     }
     var transformedTimelineFrame: Rect? {

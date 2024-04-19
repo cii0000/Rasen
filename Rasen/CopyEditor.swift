@@ -2414,7 +2414,7 @@ final class CopyEditor: Editor {
                 content.size *= min(Sheet.width / content.size.width, Sheet.height / content.size.height)
             }
             
-            if content.type.isDuration {
+            if content.type.hasDur {
                 let tempo = sheetView.nearestTempo(at: sheetP) ?? Music.defaultTempo
                 let interval = document.currentNoteBeatInterval
                 let startBeat = sheetView.animationView.beat(atX: sheetP.x, interval: interval)
@@ -2454,7 +2454,7 @@ final class CopyEditor: Editor {
             content.size = content.size * scale
             content.origin -= Point(content.size.width / 2, content.size.height / 2)
             
-            if content.type.isDuration {
+            if content.type.hasDur {
                 let interval = document.currentNoteBeatInterval
                 let startBeat = sheetView.animationView.beat(atX: sheetP.x, interval: interval)
                 let tempo = sheetView.nearestTempo(at: sheetP) ?? Music.defaultTempo

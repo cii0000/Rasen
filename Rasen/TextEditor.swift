@@ -776,15 +776,16 @@ final class TextEditor: Editor {
                 let key = (event.inputKeyType.name
                     .applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? "").lowercased()
                 var lyric = note.pits[pitI].lyric
-                if lyric == "%" {
-                    lyric = ""
-                }
                 if event.inputKeyType == .delete, !lyric.isEmpty {
                     lyric.removeLast()
                 } else if event.inputKeyType != .delete {
                     lyric += key
                 }
                 if lyric != note.pits[pitI].lyric {
+                    if document.isPlaying(with: event) {
+                        document.stopPlaying(with: event)
+                    }
+                    
                     let notes = note.replaceAndOnsetNotes(lyric: lyric, at: pitI,
                                                           tempo: scoreView.model.tempo)
                     

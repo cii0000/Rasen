@@ -33,7 +33,7 @@ extension Note {
         self.pits[i].lyric = lyric
         
         let previousPhoneme: Phoneme?, previousFormantFilter: FormantFilter?
-        if let preI = i.range.reversed().first(where: { !pits[$0].lyric.isEmpty && pits[$0].lyric != "%" }) {
+        if let preI = i.range.reversed().first(where: { !pits[$0].lyric.isEmpty }) {
             var preLyric = pits[preI].lyric
             if preLyric.last == "/" {
                 preLyric.removeLast()
@@ -75,7 +75,7 @@ extension Note {
                                                pitch: result.pitch.rationalValue(intervalScale: Sheet.fullEditBeatInterval),
                                                stereo: result.stereo,
                                                tone: .init(spectlope: ff.formantFilter.spectlope),
-                                               lyric: fi == mora.keyFormantFilters.count - 1 ? lyric : "%"),
+                                               lyric: fi == mora.keyFormantFilters.count - 1 ? lyric : ""),
                                   index: fi + minI))
             }
             
@@ -103,8 +103,7 @@ extension Note {
                                          tone: .init(spectlope: $0.spectlope),
                                          lyric: $0.phoneme.rawValue)],
                             envelope: .init(attackSec: $0.attackSec, decaySec: 0,
-                                            sustainVolm: 1, releaseSec: $0.releaseSec),
-                            isNoise: $0.spectlope.isFullNoise)
+                                            sustainVolm: 1, releaseSec: $0.releaseSec))
             }
         }
         

@@ -84,7 +84,7 @@ struct Content: Hashable, Codable {
         var isAudio: Bool {
             self == .movie || self == .sound
         }
-        var isDuration: Bool {
+        var hasDur: Bool {
             self == .movie || self == .sound
         }
         var displayName: String {
@@ -110,7 +110,6 @@ struct Content: Hashable, Codable {
     let url: URL
     let type: ContentType
     let durSec: Double
-    let volms: [Double]
     let image: Image?
     
     var stereo = Stereo(volm: 1)
@@ -126,9 +125,7 @@ struct Content: Hashable, Codable {
         self.name = name
         url = URL.contents.appending(component: name)
         type = Self.type(from: url)
-        durSec = type.isDuration ? Self.duration(from: url) : 0
-        volms = type.isDuration ?
-        (try? Content.volms(url: url)) ?? [] : []
+        durSec = type.hasDur ? Self.durSec(from: url) : 0
         image = Image(url: url)
         
         self.stereo = stereo
@@ -137,34 +134,14 @@ struct Content: Hashable, Codable {
         self.isShownSpectrogram = isShownSpectrogram
         self.timeOption = timeOption
         
-        if type.isDuration, let lufs = integratedLoudness, lufs > -14 {
+        if type.hasDur, let lufs = integratedLoudness, lufs > -14 {
             let gain = Loudness.normalizeLoudnessScale(inputLoudness: lufs,
                                                        targetLoudness: -14)
             self.stereo.volm = Volm.volm(fromAmp: Volm.amp(fromVolm: stereo.volm) * gain)
         }
     }
-    static let volmFrameRate = Rational(Keyframe.defaultFrameRate)
-    static func volms(fps: Rational = volmFrameRate, url: URL) throws -> [Double] {
-        let buffer = try AVAudioPCMBuffer.from(url: url)
-        let volmFrameCount = Int(buffer.sampleRate / Double(fps))
-        let count = buffer.frameCount / volmFrameCount
-        var volms = [Double]()
-        volms.reserveCapacity(count)
-        let hvfc = volmFrameCount / 2, frameCount = buffer.frameCount
-        for i in stride(from: 0, to: frameCount, by: volmFrameCount) {
-            var x: Float = 0.0
-            for j in (i - hvfc) ..< (i + hvfc) {
-                if j >= 0 && j < frameCount {
-                    for ci in 0 ..< buffer.channelCount {
-                        x = max(x, abs(buffer[ci, j]))
-                    }
-                }
-            }
-            volms.append(Volm.volm(fromAmp: Double(x)).clipped(min: 0, max: 1))
-        }
-        return volms
-    }
-    static func duration(from url: URL) -> Double {
+    
+    static func durSec(from url: URL) -> Double {
         if let file = try? AVAudioFile(forReading: url,
                                        commonFormat: .pcmFormatFloat32,
                                        interleaved: false) {
@@ -198,17 +175,8 @@ extension Content {
     var pcmBuffer: PCMBuffer? {
         try? AVAudioPCMBuffer.from(url: url)
     }
-    var spectrogram: Spectrogram? {
-        guard let buffer = try? AVAudioPCMBuffer.from(url: url) else { return nil }
-        return .init(buffer)
-    }
-    var samplePeakDb: Double? {
-        guard let buffer = try? AVAudioPCMBuffer.from(url: url) else { return nil }
-        return buffer.samplePeakDb
-    }
     var integratedLoudness: Double? {
-        guard let buffer = try? AVAudioPCMBuffer.from(url: url) else { return nil }
-        return buffer.integratedLoudness
+        pcmBuffer?.integratedLoudness
     }
 }
 extension Content: Protobuf {
@@ -216,8 +184,7 @@ extension Content: Protobuf {
         name = pb.name
         url = URL.contents.appending(component: name)
         type = Content.type(from: url)
-        durSec = type.isDuration ? Content.duration(from: url) : 0
-        volms = type.isDuration ? ((try? Content.volms(url: url)) ?? []) : []
+        durSec = type.hasDur ? Content.durSec(from: url) : 0
         image = type == .image ? Image(url: url) : nil
         
         stereo = (try? .init(pb.stereo)) ?? .init(volm: 1)
@@ -245,6 +212,16 @@ extension Content: Protobuf {
             }
             $0.id = id.pb
         }
+    }
+}
+extension Content {
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.stereo == rhs.stereo
+        && lhs.size == rhs.size
+        && lhs.origin == rhs.origin
+        && lhs.isShownSpectrogram == rhs.isShownSpectrogram
+        && lhs.timeOption == rhs.timeOption
+        && lhs.id == rhs.id
     }
 }
 

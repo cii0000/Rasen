@@ -1370,13 +1370,11 @@ final class LineSlider: DragEditor {
             document.cursor = .arrow
 
             func updatePlayer(from vs: [Note.PitResult], in sheetView: SheetView) {
-                let stereo = Stereo(volm: sheetView.isPlaying ? 0.1 : 1)
                 if let notePlayer = sheetView.notePlayer {
                     self.notePlayer = notePlayer
                     notePlayer.notes = vs
-                    notePlayer.stereo = stereo
                 } else {
-                    notePlayer = try? NotePlayer(notes: vs, stereo: stereo)
+                    notePlayer = try? NotePlayer(notes: vs)
                     sheetView.notePlayer = notePlayer
                 }
                 notePlayer?.play()
@@ -1555,12 +1553,12 @@ final class LineSlider: DragEditor {
                         let beganNoteIAndNotes = beganNotePits.reduce(into: [Int: Note]()) {
                             $0[$1.key] = $1.value.note
                         }
-                        for (ni, beganNote) in beganNoteIAndNotes {
-                            guard ni < score.notes.count else { continue }
-                            let note = scoreView.model.notes[ni]
+                        for (noteI, beganNote) in beganNoteIAndNotes {
+                            guard noteI < score.notes.count else { continue }
+                            let note = scoreView.model.notes[noteI]
                             if beganNote != note {
-                                noteIVs.append(.init(value: note, index: ni))
-                                oldNoteIVs.append(.init(value: beganNote, index: ni))
+                                noteIVs.append(.init(value: note, index: noteI))
+                                oldNoteIVs.append(.init(value: beganNote, index: noteI))
                             }
                         }
                         if !noteIVs.isEmpty {
@@ -1878,7 +1876,7 @@ final class KeyframeInserter: InputKeyEditor {
                             let oldTone = score.notes[noteI].pits[pitI].tone
                             var tone = oldTone
                             let i = tone.spectlope.sprols.enumerated().reversed()
-                                .first(where: { sprol.pitch > $0.element.pitch })?.offset ?? 0
+                                .first(where: { sprol.pitch > $0.element.pitch })?.offset ?? -1
                             tone.spectlope.sprols.insert(sprol, at: i + 1)
                             tone.id = .init()
                             

@@ -982,6 +982,10 @@ final class LineEditor: Editor {
         }
         switch event.phase {
         case .began:
+            if document.isPlaying(with: event) {
+                document.stopPlaying(with: event)
+            }
+            
             let p = document.convertScreenToWorld(event.screenPoint)
             if let sheetView = noteSheetView, sheetView.model.score.enabled {
                 let scoreView = sheetView.scoreView
@@ -997,22 +1001,19 @@ final class LineEditor: Editor {
                 let tone = isStraight ? Tone.noise : Tone()
                 let note = Note(beatRange: beatRange, pitch: pitch,
                                 pits: .init([.init(beat: 0, pitch: 0, tone: tone)]),
-                                envelope: isStraight ? .init(releaseSec: 0.5) : .init(),
-                                isNoise: isStraight)
+                                envelope: isStraight ? .init(releaseSec: 0.5) : .init())
                 
                 noteI = count
                 notePitch = pitch
                 noteStartBeat = beat
                 beganScore = score
                 
-                let stereo = Stereo(volm: sheetView.isPlaying ? 0.1 : 1)
                 if let notePlayer = sheetView.notePlayer {
                     self.notePlayer = notePlayer
                     notePlayer.notes = [note.firstPitResult]
-                    notePlayer.stereo = stereo
                 } else {
                     let note = isStraight ? Note(beatRange: beatRange, pitch: pitch) : note
-                    notePlayer = try? NotePlayer(notes: [note.firstPitResult], stereo: stereo)
+                    notePlayer = try? NotePlayer(notes: [note.firstPitResult])
                     sheetView.notePlayer = notePlayer
                 }
                 notePlayer?.play()
@@ -1025,6 +1026,8 @@ final class LineEditor: Editor {
 //                    self.tempLineNode = noteNode
 //                    document.rootNode.insert(child: noteNode,
 //                                             at: document.accessoryNodeIndex)
+                
+//                stoppedSeqSec = sheetView.sequencer?.currentPositionInSec
                 
                 document.cursor = .circle(string: Pitch(value: pitch).octaveString())
             }
@@ -1044,8 +1047,7 @@ final class LineEditor: Editor {
                 let tone = isStraight ? Tone.noise : Tone()
                 let note = Note(beatRange: beatRange, pitch: pitch,
                                 pits: [.init(beat: 0, pitch: 0, tone: tone)],
-                                envelope: isStraight ? .init(releaseSec: 0.5) : .init(),
-                                isNoise: isStraight)
+                                envelope: isStraight ? .init(releaseSec: 0.5) : .init())
                 let isNote = notePitch != pitch
                 
                 if isNote {
@@ -1099,6 +1101,10 @@ final class LineEditor: Editor {
                 lasso.intersects(scoreView.pointline(from: scoreView.model.notes[i])) ? i : nil
             }
             if !nis.isEmpty {
+                if document.isPlaying(with: event) {
+                    document.stopPlaying(with: event)
+                }
+                
                 let pitch = document.pitch(from: scoreView, at: scoreP)
                 let score = scoreView.model
                 let interval = document.currentNoteBeatInterval

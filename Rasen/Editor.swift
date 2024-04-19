@@ -891,7 +891,7 @@ final class IOEditor: Editor {
                         }
                         content.size = size
                     }
-                    if content.type.isDuration {
+                    if content.type.hasDur {
                         let tempo = sheetView.nearestTempo(at: np) ?? Music.defaultTempo
                         let interval = document.currentNoteBeatInterval
                         let startBeat = sheetView.animationView.beat(atX: np.x, interval: interval)
@@ -904,7 +904,12 @@ final class IOEditor: Editor {
                     }
                     
                     var text = Text(string: filename, origin: nnp)
-                    text.origin.y -= (content.type.isDuration ? Sheet.timelineHalfHeight : 0) + text.size / 2 + 4
+                    text.origin.y -= (content.type.hasDur ? Sheet.timelineHalfHeight : 0) + text.size / 2 + 4
+                    if text.origin.y < Sheet.textPadding.height {
+                        let d = Sheet.textPadding.height - text.origin.y
+                        text.origin.y += d
+                        content.origin.y += d
+                    }
                     sheetView.newUndoGroup()
                     sheetView.append(text)
                     sheetView.append(content)
@@ -1688,8 +1693,7 @@ final class IOEditor: Editor {
                         if isStop { break }
                     }
                     if !isStop {
-                        if let sequencer = Sequencer(audiotracks: audiotracks,
-                                                     isAsync: false, playStartSec: 0) {
+                        if let sequencer = Sequencer(audiotracks: audiotracks) {
                             try movie.writeAudio(from: sequencer) { t, stop in
                                 progressHandler(t * 0.2 + 0.8, &isStop)
                                 if isStop {
@@ -1765,8 +1769,7 @@ final class IOEditor: Editor {
                     if isStop { break }
                 }
                 if !isStop {
-                    if let sequencer = Sequencer(audiotracks: audiotracks,
-                                                 isAsync: false, playStartSec: 0) {
+                    if let sequencer = Sequencer(audiotracks: audiotracks) {
                         try sequencer.export(url: ioResult.url,
                                              sampleRate: Audio.defaultExportSampleRate) { (t, stop) in
                             progressHandler(t * 0.8 + 0.2, &isStop)
