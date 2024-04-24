@@ -23,16 +23,13 @@ extension TriangleStrip {
         points.bounds
     }
     var outlinePoints: [Point] {
-        guard !points.isEmpty else { return [] }
+        guard points.count >= 3 else { return points }
         var i = 0, nPoints = [Point](capacity: points.count)
         while i < points.count {
             nPoints.append(points[i])
             i += 2
         }
-        if points.count % 2 != 0 {
-            nPoints.append(points[i - 1])
-        }
-        i -= 2
+        i -= points.count % 2 != 0 ? 4 : 2
         while i >= 0 {
             nPoints.append(points[i + 1])
             i -= 2

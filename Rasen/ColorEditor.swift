@@ -104,11 +104,11 @@ final class ColorEditor: Editor {
         }
     }
     private func lightnessGradientWith(chroma: Double, hue: Double,
-                                       splitCount count: Int = 140) -> [Color] {
+                                       splitCount count: Int = 140, isReversed: Bool = false) -> [Color] {
         let rCount = 1 / Double(count)
         return (0 ... count).map {
-            let t = Double.linear(Color.minLightness,
-                                  maxLightness,
+            let t = Double.linear(isReversed ? maxLightness : Color.minLightness,
+                                  isReversed ? Color.minLightness : maxLightness,
                                   t: Double($0) * rCount)
             return Color(lightness: t, unsafetyChroma: chroma, hue: hue,
                          document.colorSpace)
@@ -145,6 +145,7 @@ final class ColorEditor: Editor {
                   newMin: 0, newMax: 1)
     }
     let lightnessNode = Node(lineWidth: 2)
+    var isReversedLightness = false
     var isEditingLightness = false {
         didSet {
             guard isEditingLightness != oldValue else { return }
@@ -158,7 +159,8 @@ final class ColorEditor: Editor {
                 
                 let gradient = lightnessGradientWith(chroma: color.chroma,
                                                      hue: color.hue,
-                                                     splitCount: Int(maxLightnessHeight))
+                                                     splitCount: Int(maxLightnessHeight), 
+                                                     isReversed: isReversedLightness)
                 lightnessNode.lineType = .gradient(gradient)
                 document.rootNode.append(child: lightnessNode)
                 if isEditableMaxLightness {
@@ -434,7 +436,7 @@ final class ColorEditor: Editor {
                         beganNotes[noteI] = score.notes[noteI]
                         
                         beganEnvelope = score.notes[noteI].envelope
-                        
+                        beganVolm = score.notes[noteI].envelope.sustainVolm
                         beganBeat = scoreView.beat(atX: scoreP.x)
                     case .pit(let pitI):
                         beganVolm = score.notes[noteI].pits[pitI].stereo.volm
@@ -470,7 +472,8 @@ final class ColorEditor: Editor {
                 
                 updateNode()
                 fp = event.screenPoint
-                let g = lightnessGradientWith(chroma: 0, hue: 0)
+                isReversedLightness = true
+                let g = lightnessGradientWith(chroma: 0, hue: 0, isReversed: isReversedLightness)
                 lightnessNode.lineType = .gradient(g)
                 lightnessNode.path = Path([Pathline(lightnessPointsWith(splitCount: Int(maxLightnessHeight)))])
                 oldEditingLightness = beganVolm * 100
@@ -501,7 +504,6 @@ final class ColorEditor: Editor {
                 switch scoreResult {
                 case .sustain:
                     let sustainVolm = newVolm(from: beganEnvelope.sustainVolm)
-                    
                     var eivs = [IndexValue<Envelope>](capacity: beganNotes.count)
                     for noteI in beganNotes.keys {
                         guard noteI < score.notes.count else { continue }

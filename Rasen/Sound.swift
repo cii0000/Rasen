@@ -370,12 +370,13 @@ extension Sprol {
 }
 
 struct Spectlope: Hashable, Codable {
-    var sprols = [Sprol(pitch: 0, volm: 1, noise: 0),
-                  Sprol(pitch: 108, volm: 0.125, noise: 0)]
+    var sprols = [Sprol(pitch: 0, volm: 0.5, noise: 0),
+                  Sprol(pitch: 72, volm: 1, noise: 0),
+                  Sprol(pitch: 108, volm: 0.25, noise: 0)]
 }
 extension Spectlope: Protobuf {
     init(_ pb: PBSpectlope) throws {
-        sprols = pb.sprols.compactMap { try? .init($0) }.sorted { $0.pitch < $1.pitch }
+        sprols = pb.sprols.compactMap { try? .init($0) }
     }
     var pb: PBSpectlope {
         .with {
@@ -743,7 +744,7 @@ extension Pit {
 }
 
 struct Envelope: Hashable, Codable {
-    var attackSec = 0.02, decaySec = 0.04, sustainVolm = 0.95, releaseSec = 0.06
+    var attackSec = 0.03, decaySec = 0.03, sustainVolm = 0.95, releaseSec = 0.06
     var id = UUID()
 }
 extension Envelope: Protobuf {
@@ -1654,8 +1655,6 @@ struct Audio: Hashable, Codable {
     static let headroomVolm = Volm.volm(fromDb: -headroomDb)
     static let headroomAmp = Volm.amp(fromVolm: headroomVolm)
     static let floatHeadroomAmp = Float(headroomAmp)
-    static let defaultReverb = 0.0
-    static let hearingRange = 20.0 ... 20000.0
     
     var pcmData = Data()
 }

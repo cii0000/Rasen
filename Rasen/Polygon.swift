@@ -78,6 +78,10 @@ extension Triangle {
         let x2 = p2p0.cross(p0p)
         return (x0 > 0 && x1 > 0 && x2 > 0) || (x0 < 0 && x1 < 0 && x2 < 0)
     }
+    
+    func subs(form p: Point) -> [Self] {
+        [.init(p, p0, p1), .init(p, p1, p2), .init(p, p2, p0)]
+    }
 }
 
 struct Polygon: Hashable, Codable {

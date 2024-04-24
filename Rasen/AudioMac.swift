@@ -674,7 +674,6 @@ final class Sequencer {
     private(set) var scoreNoders: [UUID: ScoreNoder]
     private(set) var pcmNoders: [UUID: PCMNoder]
     private var allMainNodes: [AVAudioNode]
-    private var allReverbNodes: [AVAudioUnitReverb]
     private let mixerNode: AVAudioMixerNode
     private let limiterNode: AVAudioUnitEffect
     let engine: AVAudioEngine
@@ -744,13 +743,8 @@ final class Sequencer {
         engine.attach(mixerNode)
         self.mixerNode = mixerNode
         
-        var scoreNodes = [(node: AVAudioSourceNode, reverbNode: AVAudioUnitReverb)]()
-        var scoreNoders = [UUID: ScoreNoder]()
-        var pcmNodes = [(node: AVAudioSourceNode, reverbNode: AVAudioUnitReverb)]()
-        var pcmNoders = [UUID: PCMNoder]()
-//        var mixings = [UUID: AVAudioMixing]()
+        var scoreNoders = [UUID: ScoreNoder](), pcmNoders = [UUID: PCMNoder]()
         var allMainNodes = [AVAudioNode]()
-        var allReverbNodes = [AVAudioUnitReverb]()
         var sSec = 0.0
         for track in tracks {
             let durSec = track.durSec
@@ -759,59 +753,28 @@ final class Sequencer {
                 noder.startSec = sSec
                 noder.updateRendnotes()
                 
-                let reverbNode = AVAudioUnitReverb()
-                reverbNode.loadFactoryPreset(.mediumHall)
-                reverbNode.wetDryMix = Float(Audio.defaultReverb) * 100
-                
-                scoreNodes.append((noder.node, reverbNode))
-                
                 scoreNoders[noder.id] = noder
-//                mixings[noder.id] = noder.node
                 allMainNodes.append(noder.node)
-                allReverbNodes.append(reverbNode)
+                
+                engine.attach(noder.node)
+                engine.connect(noder.node, to: mixerNode,
+                               format: noder.node.outputFormat(forBus: 0))
             }
             for noder in track.pcmNoders {
                 noder.startSec = sSec
                 
-                let reverbNode = AVAudioUnitReverb()
-                reverbNode.loadFactoryPreset(.mediumHall)
-                reverbNode.wetDryMix = Float(Audio.defaultReverb) * 100
-                
-                pcmNodes.append((noder.node, reverbNode))
-                
                 pcmNoders[noder.id] = noder
-//                mixings[noder.id] = noder.node
                 allMainNodes.append(noder.node)
-                allReverbNodes.append(reverbNode)
+                
+                engine.attach(noder.node)
+                engine.connect(noder.node, to: mixerNode,
+                               format: noder.node.outputFormat(forBus: 0))
             }
             
             sSec += Double(durSec)
         }
-        
         durSec = sSec
-        
-        for (node, reverbNode) in scoreNodes {
-            engine.attach(node)
-            engine.attach(reverbNode)
-            engine.connect(node,
-                           to: reverbNode,
-                           format: node.outputFormat(forBus: 0))
-            engine.connect(reverbNode,
-                           to: mixerNode,
-                           format: reverbNode.outputFormat(forBus: 0))
-        }
         self.scoreNoders = scoreNoders
-        
-        for (node, reverbNode) in pcmNodes {
-            engine.attach(node)
-            engine.attach(reverbNode)
-            engine.connect(node,
-                           to: reverbNode,
-                           format: node.outputFormat(forBus: 0))
-            engine.connect(reverbNode,
-                           to: mixerNode,
-                           format: reverbNode.outputFormat(forBus: 0))
-        }
         self.pcmNoders = pcmNoders
         
         if let clipHandler {
@@ -839,18 +802,8 @@ final class Sequencer {
         engine.connect(limiterNode, to: engine.mainMixerNode,
                        format: limiterNode.outputFormat(forBus: 0))
         
-//        mixings.forEach {
-//            let v = $0.value.volume
-//            $0.value.volume = 0
-//            $0.value.volume = v
-//            let a = $0.value.pan
-//            $0.value.pan = 0
-//            $0.value.pan = a
-//        }
-        
         self.engine = engine
         self.allMainNodes = allMainNodes
-        self.allReverbNodes = allReverbNodes
         
         scoreNoders.forEach { $0.value.sequencer = self }
         pcmNoders.forEach { $0.value.sequencer = self }
@@ -858,26 +811,18 @@ final class Sequencer {
 }
 extension Sequencer {
     func append(_ noder: ScoreNoder, id: UUID) {
-        let reverbNode = AVAudioUnitReverb()
-        reverbNode.loadFactoryPreset(.mediumHall)
-        reverbNode.wetDryMix = Float(Audio.defaultReverb) * 100
-        
         scoreNoders[id] = noder
         allMainNodes.append(noder.node)
-        allReverbNodes.append(reverbNode)
-        
-        engine.attach(reverbNode)
         
         engine.attach(noder.node)
-        engine.connect(noder.node,
-                       to: reverbNode,
+        engine.connect(noder.node, to: mixerNode,
                        format: noder.node.outputFormat(forBus: 0))
         
-        engine.connect(reverbNode,
-                       to: mixerNode,
-                       format: reverbNode.outputFormat(forBus: 0))
-        
         noder.sequencer = self
+    }
+    func remove(_ noder: ScoreNoder) {
+        engine.disconnectNodeOutput(noder.node)
+        engine.detach(noder.node)
     }
     
     var currentPositionInSec: Double {
@@ -907,10 +852,6 @@ extension Sequencer {
         engine.stop()
         engine.reset()
         for node in allMainNodes {
-            engine.disconnectNodeOutput(node)
-            engine.detach(node)
-        }
-        for node in allReverbNodes {
             engine.disconnectNodeOutput(node)
             engine.detach(node)
         }

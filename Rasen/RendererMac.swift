@@ -3090,14 +3090,46 @@ extension Node {
                         ctx.setShouldAntialias(true)
                     }
                 case .gradient(let colors):
-                    break//
+                    if let ts = path.triangleStrip {
+                        let rgbas = colors.map { $0.rgba.premultipliedAlpha }
+                        let minCount = min(ts.points.count, rgbas.count)
+                        if minCount >= 3 {
+                            for i in 2 ..< minCount {
+                                if i % 2 == 0 {
+                                    ctx.drawTriangleInData(.init(ts.points[i - 2], ts.points[i],
+                                              ts.points[i - 1]),
+                                                           rgbas[i - 2], rgbas[i], rgbas[i - 1])
+                                } else {
+                                    ctx.drawTriangleInData(.init(ts.points[i - 2], ts.points[i - 1],
+                                                                 ts.points[i]),
+                                                           rgbas[i - 2], rgbas[i - 1], rgbas[i])
+                                }
+                            }
+                        }
+                    }
                 case .maxGradient(let colors):
                     ctx.saveGState()
                     ctx.setBlendMode(.darken)
                     
+                    if let ts = path.triangleStrip {
+                        let rgbas = colors.map { $0.rgba.premultipliedAlpha }
+                        let minCount = min(ts.points.count, rgbas.count)
+                        if minCount >= 3 {
+                            for i in 2 ..< minCount {
+                                if i % 2 == 0 {
+                                    ctx.drawTriangleInData(.init(ts.points[i - 2], ts.points[i],
+                                              ts.points[i - 1]),
+                                                           rgbas[i - 2], rgbas[i], rgbas[i - 1])
+                                } else {
+                                    ctx.drawTriangleInData(.init(ts.points[i - 2], ts.points[i - 1],
+                                                                 ts.points[i]),
+                                                           rgbas[i - 2], rgbas[i - 1], rgbas[i])
+                                }
+                            }
+                        }
+                    }
                     
                     ctx.restoreGState()
-                    break//
                 case .texture(let texture):
                     if let cgImage = texture.cgImage, let b = bounds {
                         ctx.draw(cgImage, in: b.cg)
@@ -3123,7 +3155,32 @@ extension Node {
                     ctx.addPath(cgPath)
                     ctx.fillPath()
                 case .gradient(let colors):
-                    break//
+                    let (pd, counts) = path.linePointsDataWith(lineWidth: lineWidth)
+                    let rgbas = path.lineColorsDataWith(colors, lineWidth: lineWidth)
+                    var i = 0
+                    for count in counts {
+                        let points = (i ..< (i + count)).map {
+                            Point(Double(pd[$0 * 4]),
+                                  Double(pd[$0 * 4 + 1]))
+                        }
+                        let ts = TriangleStrip(points: points)
+                        let minCount = min(ts.points.count, rgbas.count)
+                        if minCount >= 3 {
+                            for i in 2 ..< minCount {
+                                if i % 2 == 0 {
+                                    ctx.drawTriangleInData(.init(ts.points[i - 2], ts.points[i],
+                                              ts.points[i - 1]),
+                                                           rgbas[i - 2], rgbas[i], rgbas[i - 1])
+                                } else {
+                                    ctx.drawTriangleInData(.init(ts.points[i - 2], ts.points[i - 1],
+                                                                 ts.points[i]),
+                                                           rgbas[i - 2], rgbas[i - 1], rgbas[i])
+                                }
+                            }
+                        }
+                        
+                        i += count
+                    }
                 }
             }
         }
@@ -3131,6 +3188,45 @@ extension Node {
         if !isIdentityFromLocal {
             ctx.restoreGState()
         }
+    }
+}
+
+extension CGContext {
+    func drawTriangleInData(_ triangle: Triangle, _ rgba0: RGBA, _ rgba1: RGBA, _ rgba2: RGBA) {
+        let bounds = triangle.bounds.integral
+        let area = triangle.area
+        guard area > 0, let bitmap = Bitmap<UInt8>(width: Int(bounds.width), height: Int(bounds.height),
+                                                   colorSpace: .sRGB) else { return }
+            
+        saveGState()
+        
+        let path = CGMutablePath()
+        path.addLines(between: [triangle.p0.cg, triangle.p1.cg, triangle.p2.cg])
+        path.closeSubpath()
+        addPath(path)
+        clip()
+        
+        let rArea = Float(1 / area)
+        for y in bitmap.height.range {
+            for x in bitmap.width.range {
+                let p = Point(x, bitmap.height - y - 1) + bounds.origin
+                let areas = triangle.subs(form: p).map { Float($0.area) }
+                let r = (rgba0.r * areas[1] + rgba1.r * areas[2] + rgba2.r * areas[0]) * rArea
+                let g = (rgba0.g * areas[1] + rgba1.g * areas[2] + rgba2.g * areas[0]) * rArea
+                let b = (rgba0.b * areas[1] + rgba1.b * areas[2] + rgba2.b * areas[0]) * rArea
+                let a = (rgba0.a * areas[1] + rgba1.a * areas[2] + rgba2.a * areas[0]) * rArea
+                bitmap[x, y, 0] = UInt8(r.clipped(min: 0, max: 1) * Float(UInt8.max))
+                bitmap[x, y, 1] = UInt8(g.clipped(min: 0, max: 1) * Float(UInt8.max))
+                bitmap[x, y, 2] = UInt8(b.clipped(min: 0, max: 1) * Float(UInt8.max))
+                bitmap[x, y, 3] = UInt8(a.clipped(min: 0, max: 1) * Float(UInt8.max))
+            }
+        }
+            
+        if let cgImage = bitmap.image?.cg {
+            draw(cgImage, in: bounds.cg)
+        }
+        
+        restoreGState()
     }
 }
 

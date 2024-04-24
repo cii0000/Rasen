@@ -157,7 +157,7 @@ final class ContentSlider: DragEditor {
 }
 
 struct ContentLayout {
-    static let spectrogramX = 10.0, spectrogramHeight = 5.0
+    static let spectrogramX = 10.0, spectrogramHeight = 4.0
 }
 
 final class ContentView<T: BinderProtocol>: SpectrgramView {

@@ -929,8 +929,9 @@ extension ScoreView {
     }
     func updateNotes() {
         if model.enabled {
-            octaveNode.children = model.notes.map { octaveNode(from: $0) }
-            notesNode.children = model.notes.map { noteNode(from: $0) }
+            let nodes = model.notes.map { noteNode(from: $0) }
+            notesNode.children = nodes
+            octaveNode.children = zip(model.notes, nodes).map { octaveNode(fromPitch: $0.0.firstPitch, $0.1.children[0].clone) }
         } else {
             notesNode.children = []
         }
@@ -1008,28 +1009,33 @@ extension ScoreView {
     
     func append(_ note: Note) {
         unupdateModel.notes.append(note)
-        octaveNode.append(child: octaveNode(from: note))
-        notesNode.append(child: noteNode(from: note))
+        let noteNode = noteNode(from: note)
+        notesNode.append(child: noteNode)
+        octaveNode.append(child: octaveNode(fromPitch: note.firstPitch, noteNode.children[0].clone))
         updateChord()
         scoreNoder?.insert([.init(value: note, index: unupdateModel.notes.count - 1)], with: model)
     }
     func insert(_ note: Note, at noteI: Int) {
         unupdateModel.notes.insert(note, at: noteI)
-        notesNode.insert(child: noteNode(from: note), at: noteI)
+        let noteNode = noteNode(from: note)
+        notesNode.insert(child: noteNode, at: noteI)
+        octaveNode.append(child: octaveNode(fromPitch: note.firstPitch, noteNode.children[0].clone))
         updateChord()
         scoreNoder?.insert([.init(value: note, index: noteI)], with: model)
     }
     func insert(_ nivs: [IndexValue<Note>]) {
         unupdateModel.notes.insert(nivs)
-        notesNode.children.insert(nivs.map { .init(value: noteNode(from: $0.value), index: $0.index) })
-        octaveNode.children.insert(nivs.map { .init(value: octaveNode(from: $0.value), index: $0.index) })
+        let noivs = nivs.map { IndexValue(value: noteNode(from: $0.value), index: $0.index) }
+        notesNode.children.insert(noivs)
+        octaveNode.children.insert(noivs.enumerated().map { .init(value: octaveNode(fromPitch: nivs[$0.offset].value.firstPitch, $0.element.value.children[0].clone), index: $0.element.index) })
         updateChord()
         scoreNoder?.insert(nivs, with: model)
     }
     func replace(_ nivs: [IndexValue<Note>]) {
         unupdateModel.notes.replace(nivs)
-        notesNode.children.replace(nivs.map { .init(value: noteNode(from: $0.value), index: $0.index) })
-        octaveNode.children.replace(nivs.map { .init(value: octaveNode(from: $0.value), index: $0.index) })
+        let noivs = nivs.map { IndexValue(value: noteNode(from: $0.value), index: $0.index) }
+        notesNode.children.replace(noivs)
+        octaveNode.children.replace(noivs.enumerated().map { .init(value: octaveNode(fromPitch: nivs[$0.offset].value.firstPitch, $0.element.value.children[0].clone), index: $0.element.index) })
         updateChord()
         scoreNoder?.replace(nivs, with: model)
     }
@@ -1040,8 +1046,10 @@ extension ScoreView {
             return IndexValue(value: note, index: $0.index)
         }
         unupdateModel.notes.replace(nivs)
-        notesNode.children.replace(nivs.map { .init(value: noteNode(from: $0.value), index: $0.index) })
-        octaveNode.children.replace(nivs.map { .init(value: octaveNode(from: $0.value), index: $0.index) })
+        let noivs = nivs.map { IndexValue(value: noteNode(from: $0.value), index: $0.index) }
+        notesNode.children.replace(noivs)
+        octaveNode.children.replace(noivs.enumerated().map { .init(value: octaveNode(fromPitch: nivs[$0.offset].value.firstPitch, $0.element.value.children[0].clone), index: $0.element.index) })
+        
         scoreNoder?.replace(eivs)
     }
     func remove(at noteI: Int) {
@@ -1064,8 +1072,9 @@ extension ScoreView {
         }
         set {
             unupdateModel.notes[noteI] = newValue
-            notesNode.children[noteI] = noteNode(from: newValue)
-            octaveNode.children[noteI] = octaveNode(from: newValue)
+            let noteNode = noteNode(from: newValue)
+            notesNode.children[noteI] = noteNode
+            octaveNode.children[noteI] = octaveNode(fromPitch: newValue.firstPitch, noteNode.children[0].clone)
             updateChord()
             scoreNoder?.replace([.init(value: newValue, index: noteI)], with: model)
         }
@@ -1288,43 +1297,33 @@ extension ScoreView {
         return subBorderPathlines
     }
     
-    func octaveNode(from note: Note) -> Node {
+    func octaveNode(fromPitch pitch: Rational, _ noteNode: Node) -> Node {
         let pitchRange = Score.pitchRange
-        guard pitchRange.contains(note.pitch) else {
-            return .init()
-        }
+        guard pitchRange.contains(pitch) else { return .init() }
         
-        let nx = x(atBeat: note.beatRange.start)
-        let nw = width(atDurBeat: max(note.beatRange.length, Sheet.fullEditBeatInterval))
-        let points: [Point]
-        if note.pits.count == 1 {
-            let ny = self.y(fromPitch: note.pitch)
-            points = [Point(nx, ny), Point(nx + nw, ny)]
-        } else {
-            points = self.pointline(from: note).points
-        }
+        noteNode.fillType = .color(.subBorder)
         
-        var subBorderPathlines = [Pathline]()
-        let notePathlines = [Pathline(points)]
         let pd = 12 * pitchHeight
-        var nPitch = note.pitch, npd = 0.0
+        var nodes = [Node](), nPitch = pitch, npd = 0.0
         while true {
             nPitch -= 12
             npd -= pd
             guard pitchRange.contains(nPitch) else { break }
-            subBorderPathlines += notePathlines.map { $0 * Transform(translation: .init(0, npd)) }
+            let node = noteNode.clone
+            node.attitude.position.y = npd
+            nodes.append(node)
         }
-        nPitch = note.pitch
+        nPitch = pitch
         npd = 0.0
         while true {
             nPitch += 12
             npd += pd
             guard pitchRange.contains(nPitch) else { break }
-            subBorderPathlines += notePathlines.map { $0 * Transform(translation: .init(0, npd)) }
+            let node = noteNode.clone
+            node.attitude.position.y = npd
+            nodes.append(node)
         }
-        
-        let nh = ScoreLayout.noteHeight
-        return Node(path: Path(subBorderPathlines), lineWidth: nh, lineType: .color(.subBorder))
+        return Node(children: nodes)
     }
     
     func draftNoteNode(from note: Note) -> Node {
@@ -1344,25 +1343,26 @@ extension ScoreView {
     
     func noteNode(from note: Note, color: Color? = nil, lineWidth: Double? = nil) -> Node {
         guard note.beatRange.length > 0 else {
-            return .init(path: Path(Rect(.init(x(atBeat: note.beatRange.start),
-                                               y(fromPitch: note.pitch)),
-                                         distance: 1)),
-                         fillType: .color(color != nil ? color! : .content))
+            return .init(children: [.init(path: Path(Rect(.init(x(atBeat: note.beatRange.start),
+                                                                y(fromPitch: note.pitch)),
+                                                          distance: 1)),
+                                          fillType: .color(color != nil ? color! : .content))])
         }
         let nh = ScoreLayout.noteHeight
+        let halfNH = nh / 2
         let nx = x(atBeat: note.beatRange.start)
         let ny = y(fromPitch: note.firstPitch)
         let nw = width(atDurBeat: max(note.beatRange.length, Sheet.fullEditBeatInterval))
         let attackW = width(atDurSec: note.envelope.attackSec)
         let decayW = width(atDurSec: note.envelope.decaySec)
         let releaseW = width(atDurSec: note.envelope.releaseSec)
+        let ax = nx + attackW, dx = nx + attackW + decayW, rx = nx + nw + releaseW
         
-        let overtoneH = 1.0
-        let scH = 2.0
-        let scY = 2.0
+        let overtoneHalfH = 0.125
+        let evenY = self.evenY, oddY = self.oddY, toneH = self.toneHeight, toneY = self.toneY
         
-        var linePathlines = [Pathline](), lyricLinePathlines = [Pathline]()
-        var evenPathline, oddPathline, fqPathline: Pathline?
+        var linePath, evenLinePath, oddLinePath: Path, lyricLinePathlines = [Pathline]()
+        var spectlopePathline: Pathline?
         var scNodes = [Node]()
         let envelopeR = 0.125, sprolR = 0.03125 / 2, sprolSubR = 0.03125 / 4
         
@@ -1372,7 +1372,8 @@ extension ScoreView {
                 let lyricText = Text(string: pit.lyric, size: Font.smallSize)
                 let typesetter = lyricText.typesetter
                 let lh = typesetter.height / 2 + 2
-                lyricLinePathlines.append(.init(Rect(x: p.x - 0.25, y: p.y - lh / 2, width: 0.5, height: lh / 2)))
+                lyricLinePathlines.append(.init(Rect(x: p.x - 0.25, y: p.y - lh / 2, 
+                                                     width: 0.5, height: lh / 2)))
                 return typesetter.path() * Transform(translationX: p.x, y: p.y - lh)
             } else {
                 return nil
@@ -1381,13 +1382,115 @@ extension ScoreView {
         
         func tonePitchY(fromPitch pitch: Double, noteY: Double) -> Double {
             pitch.clipped(min: Score.doubleMinPitch, max: Score.doubleMaxPitch,
-                          newMin: -scH / 2, newMax: scH / 2) + nh / 2 + overtoneH + scY + noteY
+                          newMin: -toneH / 2, newMax: toneH / 2) + toneY + noteY
         }
         
-        let lineColors: [Color], evenColors: [Color], oddColors: [Color],
+        struct LinePoint {
+            var x, y, h: Double, color: Color
+            
+            init(_ x: Double, _ y: Double, _ h: Double, _ color: Color) {
+                self.x = x
+                self.y = y
+                self.h = h
+                self.color = color
+            }
+        }
+        func triangleStrip(_ wps: [LinePoint]) -> TriangleStrip {
+            var ps = [Point](capacity: wps.count * 2)
+            for (i, wp) in wps.enumerated() {
+                if (i == 0 || i == wps.count - 1) && wp.h == 0 {
+                    ps.append(.init(wp.x, wp.y))
+                } else {
+                    ps.append(.init(wp.x, wp.y - wp.h))
+                    ps.append(.init(wp.x, wp.y + wp.h))
+                }
+            }
+            return .init(points: ps)
+        }
+        func colors(_ wps: [LinePoint]) -> [Color] {
+            var colors = [Color](capacity: wps.count * 2)
+            for (i, wp) in wps.enumerated() {
+                if (i == 0 || i == wps.count - 1) && wp.h == 0 {
+                    colors.append(wp.color)
+                } else {
+                    colors.append(wp.color)
+                    colors.append(wp.color)
+                }
+            }
+            return colors
+        }
+
+        let lineColors, evenColors, oddColors: [Color],
             knobPs: [Point], smallKnobPAndRs: [(Point, Double)]
-        let volmT = 1.0
         if note.pits.count >= 2 {
+            var beat = note.beatRange.start
+            var ps = [LinePoint](), eps = [LinePoint](), ops = [LinePoint]()
+            ps.append(.init(nx, ny, halfNH, Self.color(from: note.firstStereo)))
+            eps.append(.init(nx, ny + evenY, overtoneHalfH,
+                             Self.color(fromVolm: note.firstTone.overtone.evenVolm)))
+            ops.append(.init(nx, ny + oddY, overtoneHalfH,
+                             Self.color(fromVolm: note.firstTone.overtone.oddVolm)))
+            beat += .init(1, 48)
+            while beat <= note.beatRange.end {
+                let noteX = x(atBeat: beat), noteY = noteY(atBeat: beat, from: note)
+                let result = note.pitResult(atBeat: .init(beat - note.beatRange.start))
+                ps.append(.init(noteX, noteY, halfNH, Self.color(from: result.stereo)))
+                eps.append(.init(noteX, noteY + evenY, overtoneHalfH,
+                                 Self.color(fromVolm: result.tone.overtone.evenVolm)))
+                ops.append(.init(noteX, noteY + oddY, overtoneHalfH,
+                                 Self.color(fromVolm: result.tone.overtone.oddVolm)))
+                beat += .init(1, 48)
+            }
+            ps.append(.init(nx + nw + releaseW, noteY(atBeat: note.beatRange.end, from: note), 0,
+                            ps.last!.color))
+            
+            var preI = 0
+            if ax - ps[0].x > 0 {
+                for i in 1 ..< ps.count {
+                    let preP = ps[i - 1], p = ps[i]
+                    if ax >= preP.x && ax < p.x {
+                        for j in i.range {
+                            ps[j].h *= (ps[j].x - ps[0].x) / (ax - ps[0].x)
+                        }
+                        let t = ax.clipped(min: preP.x, max: p.x, newMin: 0, newMax: 1)
+                        ps.insert(.init(ax, 
+                                        .linear(preP.y, p.y, t: t),
+                                        .linear(preP.h, p.h, t: t),
+                                        .rgbLinear(preP.color, p.color, t: t)), at: i)
+                        preI = i
+                        break
+                    }
+                }
+            }
+            let susVolm = note.envelope.sustainVolm
+            if dx - ps[preI].x > 0 {
+                for i in preI + 1 ..< ps.count {
+                    let preP = ps[i - 1], p = ps[i]
+                    if dx >= preP.x && dx < p.x {
+                        for j in i.range {
+                            ps[j].h *= ps[j].x.clipped(min: ps[preI].x, max: dx, newMin: 1, newMax: susVolm)
+                        }
+                        let t = dx.clipped(min: preP.x, max: p.x, newMin: 0, newMax: 1)
+                        ps.insert(.init(dx,
+                                        .linear(preP.y, p.y, t: t),
+                                        .linear(preP.h, p.h, t: t),
+                                        .rgbLinear(preP.color, p.color, t: t)), at: i)
+                        preI = i
+                        break
+                    }
+                }
+            }
+            for i in preI ..< ps.count {
+                ps[i].h *= susVolm
+            }
+            
+            linePath = .init(triangleStrip(ps))
+            lineColors = colors(ps)
+            evenLinePath = .init(triangleStrip(eps))
+            evenColors = colors(eps)
+            oddLinePath = .init(triangleStrip(ops))
+            oddColors = colors(ops)
+            
             let sprolKnobPAndRs: [(Point, Double)] = note.pits.flatMap { pit in
                 let p = Point(x(atBeat: note.beatRange.start + pit.beat),
                               self.y(fromPitch: note.pitch + pit.pitch))
@@ -1396,15 +1499,15 @@ extension ScoreView {
                      $0.offset > 0 && pit.tone.spectlope.sprols[$0.offset - 1].pitch > $0.element.pitch ? sprolSubR : sprolR)
                 }
             }
-            
-            let envelopeY = nh / 2 + overtoneH + overtoneH / 2
-            let ax = nx + attackW, dx = nx + attackW + decayW, rx = nx + nw + releaseW
-            smallKnobPAndRs = [(Point(ax, noteY(atX: ax, from: note) + envelopeY), envelopeR),
-                               (Point(dx, noteY(atX: dx, from: note) + envelopeY), envelopeR),
-                               (Point(rx, noteY(atX: rx, from: note) + envelopeY), envelopeR)] + sprolKnobPAndRs
-            
+            let envelopeY = -nh / 2
             knobPs = note.pits.map { .init(x(atBeat: note.beatRange.start + $0.beat),
                                            self.y(fromPitch: note.pitch + $0.pitch)) }
+            let toneKnobY = evenY.mid(oddY)
+            smallKnobPAndRs = [(Point(ax, noteY(atX: ax, from: note) + envelopeY), envelopeR),
+                               (Point(dx, noteY(atX: dx, from: note) + envelopeY), envelopeR),
+                               (Point(rx, noteY(atX: rx, from: note) + envelopeY), envelopeR)] 
+            + sprolKnobPAndRs
+            + knobPs.map { (Point($0.x, $0.y + toneKnobY), sprolR) }
             
             if !note.isOneOvertone {
                 struct PAndColor: Hashable {
@@ -1499,70 +1602,45 @@ extension ScoreView {
                     }
                 }
                 
-                fqPathline = .init(fqLinePs)
-            }
-            
-            lineColors = self.lineColors(from: note)
-            evenColors = self.overtoneColors(from: note, .evenVolm)
-            oddColors = self.overtoneColors(from: note, .oddVolm)
-            
-            let pointline = pointline(from: note)
-            if !pointline.isEmpty {
-                linePathlines += [.init(pointline.points)]
-                
-                let line1: [Point] = pointline.points.map { .init($0.x, $0.y + overtoneH / 2 + nh / 2) }
-                let line2: [Point] = pointline.points.map { .init($0.x, $0.y - overtoneH / 2 - nh / 2) }
-                evenPathline = .init(line1)
-                oddPathline = .init(line2)
+                spectlopePathline = .init(fqLinePs)
             }
         } else {
-//            let sustain = env.sustainVolm + 1 / noteHeight
-            let line = Line(controls: [.init(point: Point(nx, ny), pressure: 0),
-                                       .init(point: Point(nx + attackW, ny), pressure: volmT),
-                                       .init(point: Point(nx + attackW, ny), pressure: volmT),
-                                       .init(point: Point(nx + attackW + decayW, ny), pressure: volmT),
-                                       .init(point: Point(nx + attackW + decayW, ny), pressure: volmT),
-                                       .init(point: Point(nx + nw, ny), pressure: volmT),
-                                       .init(point: Point(nx + nw, ny), pressure: volmT),
-                                       .init(point: Point(nx + nw + releaseW, ny), pressure: 0)])
+            let sustainHalfH = halfNH * note.envelope.sustainVolm
+            let color = Self.color(from: note.pits[0].stereo)
+            linePath = .init(triangleStrip([.init(nx, ny, 0, color),
+                                            .init(ax, ny, halfNH, color),
+                                            .init(dx, ny, sustainHalfH, color),
+                                            .init(nx + nw, ny, sustainHalfH, color),
+                                            .init(rx, ny, 0, color)]))
+            lineColors = [color]
             
-            let toneLine = Line(controls: [.init(point: Point(nx, ny), pressure: volmT),
-                                       .init(point: Point(nx + attackW, ny), pressure: volmT),
-                                       .init(point: Point(nx + attackW, ny), pressure: volmT),
-                                       .init(point: Point(nx + attackW + decayW, ny), pressure: volmT),
-                                       .init(point: Point(nx + attackW + decayW, ny), pressure: volmT),
-                                       .init(point: Point(nx + nw, ny), pressure: volmT),
-                                       .init(point: Point(nx + nw, ny), pressure: volmT)])
+            evenLinePath = .init(Rect(x: nx, y: ny + evenY - overtoneHalfH,
+                                      width: nw, height: overtoneHalfH * 2))
+            evenColors = [Self.color(fromVolm: note.firstTone.overtone.evenVolm)]
+            
+            oddLinePath = .init(Rect(x: nx, y: ny + oddY - overtoneHalfH,
+                                     width: nw, height: overtoneHalfH * 2))
+            oddColors = [Self.color(fromVolm: note.firstTone.overtone.oddVolm)]
             
             let fPitNx = x(atBeat: note.beatRange.start + note.firstPit.beat)
             let sprolKnobPAndRs = note.firstTone.spectlope.sprols.enumerated().map {
                 (Point(fPitNx, tonePitchY(fromPitch: $0.element.pitch, noteY: ny)),
                  $0.offset > 0 && note.firstTone.spectlope.sprols[$0.offset - 1].pitch > $0.element.pitch ? sprolSubR : sprolR)
             }
-            
-            let envelopeY = ny + nh / 2 + overtoneH + overtoneH / 2
-            smallKnobPAndRs = [(Point(nx + attackW, envelopeY), envelopeR),
-                               (Point(nx + attackW + decayW, envelopeY), envelopeR),
-                               (Point(nx + nw + releaseW, envelopeY), envelopeR)] + sprolKnobPAndRs
+            let envelopeY = ny - nh / 2
+            smallKnobPAndRs = [(Point(ax, envelopeY), envelopeR),
+                               (Point(dx, envelopeY), envelopeR),
+                               (Point(rx, envelopeY), envelopeR)] + sprolKnobPAndRs
             knobPs = []
             
-            let color = Self.color(from: note.pits[0].stereo)
-            lineColors = [color]
-            
             if !note.isOneOvertone {
-                func tonePitchY(fromPitch pitch: Double) -> Double {
-                    ny + pitch.clipped(min: Double(Score.pitchRange.start),
-                                       max: Double(Score.pitchRange.end),
-                                       newMin: -scH / 2,
-                                       newMax: scH / 2) + nh / 2 + overtoneH + scY
-                }
-                var preY = tonePitchY(fromPitch: 0)
+                var preY = tonePitchY(fromPitch: 0, noteY: ny)
                 var preColor = Self.color(fromVolm: note.firstTone.spectlope.sprols.first?.volm ?? 0,
                                           noise: note.firstTone.spectlope.sprols.first?.noise ?? 0)
-                scNodes.append(.init(path: Path(Rect(x: nx, y: preY, width: nw, height: scH)),
+                scNodes.append(.init(path: Path(Rect(x: nx, y: preY, width: nw, height: toneH)),
                                      fillType: .color(.background)))
                 func append(_ sprol: Sprol) {
-                    let y = tonePitchY(fromPitch: sprol.pitch)
+                    let y = tonePitchY(fromPitch: sprol.pitch, noteY: ny)
                     let color = Self.color(fromVolm: sprol.volm, noise: sprol.noise)
                     
                     let tst = TriangleStrip(points: [.init(nx, preY), .init(nx, y),
@@ -1580,63 +1658,47 @@ extension ScoreView {
                              volm: note.firstTone.spectlope.sprols.last?.volm ?? 0,
                              noise: note.firstTone.spectlope.sprols.last?.noise ?? 0))
                 
-                let fqY = tonePitchY(fromPitch: .init(note.firstPitch))
-                fqPathline = .init([Point(nx, fqY), Point(nx + nw, fqY)])
+                let fqY = tonePitchY(fromPitch: .init(note.firstPitch), noteY: ny)
+                spectlopePathline = .init([Point(nx, fqY), Point(nx + nw, fqY)])
             }
-            
-            linePathlines += [.init(line)]
-            
-            let line1 = Line(controls: toneLine.controls.map { .init(point: .init($0.point.x, $0.point.y + overtoneH / 2 + $0.pressure * nh / 2)) })
-            let line2 = Line(controls: toneLine.controls.map { .init(point: .init($0.point.x, $0.point.y - overtoneH / 2 - $0.pressure * nh / 2)) })
-            evenPathline = .init(line1)
-            oddPathline = .init(line2)
-            
-            evenColors = [Self.color(fromVolm: note.firstTone.overtone.evenVolm)]
-            oddColors = [Self.color(fromVolm: note.firstTone.overtone.oddVolm)]
         }
         
         var nodes = [Node]()
-        nodes += linePathlines.map {
-            .init(path: Path([$0]),
-                  lineWidth: lineWidth ?? nh,
-                  lineType: color != nil ? .color(color!) : (lineColors.count == 1 ? .color(lineColors[0]) : .gradient(lineColors)))
-        }
+        let lineNode = Node(path: linePath,
+                            fillType: color != nil ? .color(color!) : (lineColors.count == 1 ? .color(lineColors[0]) : .gradient(lineColors)))
+        nodes.append(lineNode)
+        nodes.append(.init(path: .init(pointline(from: note).points),
+                           lineWidth: 0.125, lineType: .color(.content)))
         
+        nodes.append(.init(path: evenLinePath,
+                           fillType: color != nil ? .color(color!) : (evenColors.count == 1 ? .color(evenColors[0]) : .gradient(evenColors))))
+        nodes.append(.init(path: oddLinePath,
+                           fillType: color != nil ? .color(color!) : (oddColors.count == 1 ? .color(oddColors[0]) : .gradient(oddColors))))
         nodes += scNodes
-        
-        if let oddPathline {
-            nodes.append(.init(path: Path([oddPathline]),
-                               lineWidth: (lineWidth ?? nh) / 2,
-                               lineType: color != nil ? .color(color!) : (oddColors.count == 1 ? .color(oddColors[0]) : .gradient(oddColors))))
-        }
-        if let evenPathline {
-            nodes.append(.init(path: Path([evenPathline]),
-                               lineWidth: (lineWidth ?? nh) / 2,
-                               lineType: color != nil ? .color(color!) : (evenColors.count == 1 ? .color(evenColors[0]) : .gradient(evenColors))))
-        }
-        if let fqPathline {
-            nodes.append(.init(path: Path([fqPathline]),
+        if let spectlopePathline {
+            nodes.append(.init(path: Path([spectlopePathline]),
                                lineWidth: 0.03125,
                                lineType: .color(.content)))
         }
         
-        let fullEditBackKnobPathlines = smallKnobPAndRs.map {
-            Pathline(circleRadius: $0.1 * 1.5, position: $0.0)
-        }
-        let fullEditKnobPathlines = smallKnobPAndRs.map {
-            Pathline(circleRadius: $0.1, position: $0.0)
-        }
-        
-        let backKnobPathlines = knobPs.map { Pathline(circleRadius: 0.25 * 1.5, position: $0) }
-        let knobPathlines = knobPs.map { Pathline(circleRadius: 0.25, position: $0) }
-        
         nodes += lyricPaths.map { .init(path: $0, fillType: .color(color ?? .content)) }
         nodes.append(.init(path: .init(lyricLinePathlines), fillType: .color(.content)))
         
+        let backKnobPathlines = knobPs.map { Pathline(circleRadius: 0.25 * 1.5, position: $0) }
         nodes.append(.init(path: .init(backKnobPathlines), fillType: .color(.content)))
+        
+        let knobPathlines = knobPs.map { Pathline(circleRadius: 0.25, position: $0) }
         nodes.append(.init(path: .init(knobPathlines), fillType: .color(.background)))
+        
+        let fullEditBackKnobPathlines = smallKnobPAndRs.map {
+            Pathline(circleRadius: $0.1 * 1.5, position: $0.0)
+        }
         nodes.append(.init(name: "isFullEdit", isHidden: !isFullEdit,
                            path: .init(fullEditBackKnobPathlines), fillType: .color(.content)))
+        
+        let fullEditKnobPathlines = smallKnobPAndRs.map {
+            Pathline(circleRadius: $0.1, position: $0.0)
+        }
         nodes.append(.init(name: "isFullEdit", isHidden: !isFullEdit,
                            path: .init(fullEditKnobPathlines), fillType: .color(.background)))
         
@@ -1650,99 +1712,43 @@ extension ScoreView {
             let noteEX = x(atBeat: note.beatRange.end)
             let noteY = noteY(atBeat: note.beatRange.start, from: note)
             return .init(points: [.init(noteSX, noteY), .init(noteEX, noteY)])
+        } else {
+            var beat = note.beatRange.start, ps = [Point]()
+            while beat <= note.beatRange.end {
+                let noteX = x(atBeat: beat), noteY = noteY(atBeat: beat, from: note)
+                ps.append(Point(noteX, noteY))
+                beat += .init(1, 48)
+            }
+            return .init(points: ps)
         }
-        
-        var beat = note.beatRange.start, ps = [Point]()
-//        var lastP: Point?, lastStereo: Stereo?, isLastAppned = false
-        while beat <= note.beatRange.end {
-            let noteX = x(atBeat: beat)
-            let noteY = noteY(atBeat: beat, from: note)
-            let p = Point(noteX, noteY)
-//            let stereo = stereo(atBeat: beat, from: note)
-//            isLastAppned = lastP?.y != p.y || lastStereo != stereo
-//            if isLastAppned {
-//                if let p = lastP {
-//                    ps.append(p)
-//                }
-                ps.append(p)
-//            }
-//            lastP = p
-//            lastStereo = stereo
-            beat += .init(1, 48)
-        }
-//        if !isLastAppned, let p = lastP {
-//            ps.append(p)
-//        }
-       
-        return .init(points: ps)
     }
     func lineColors(from note: Note) -> [Color] {
         if note.pits.count == 1 {
             let color = Self.color(from: note.pits[0].stereo)
             return [color, color]
+        } else {
+            var beat = note.beatRange.start, colors = [Color]()
+            while beat <= note.beatRange.end {
+                let stereo = stereo(atBeat: beat, from: note)
+                colors.append(Self.color(from: stereo))
+                beat += .init(1, 48)
+            }
+            return colors
         }
-        
-        var beat = note.beatRange.start, colors = [Color]()//, ps = [Point]()
-//        var lastP: Point?, lastStereo: Stereo?, isLastAppned = false
-        while beat <= note.beatRange.end {
-//            let noteX = x(atBeat: beat)
-//            let noteY = noteY(atBeat: beat, from: note)
-//            let p = Point(noteX, noteY)
-            let stereo = stereo(atBeat: beat, from: note)
-//            isLastAppned = lastP?.y != p.y || lastStereo != stereo
-//            if isLastAppned {
-//                if let p = lastP, let stereo = lastStereo {
-//                    ps.append(p)
-//                    
-                    colors.append(Self.color(from: stereo))
-//                }
-//                ps.append(p)
-//                colors.append(Self.color(from: stereo))
-//            }
-//            lastP = p
-//            lastStereo = stereo
-            beat += .init(1, 48)
-        }
-//        if !isLastAppned, let p = lastP, let stereo = lastStereo {
-//            ps.append(p)
-//            colors.append(Self.color(from: stereo))
-//        }
-        
-        return colors
     }
     func overtoneColors(from note: Note, _ type: OvertoneType) -> [Color] {
         if note.pits.count == 1 {
             let color = Self.color(fromVolm: note.pits[0].tone.overtone[type])
             return [color, color]
-        }
-        
-        var beat = note.beatRange.start, colors = [Color]()//, ps = [Point]()
-//        var lastP: Point?, lastOvertone: Double?, isLastAppned = false
-        while beat <= note.beatRange.end {
-//            let noteX = x(atBeat: beat)
-//            let noteY = noteY(atBeat: beat, from: note)
-//            let p = Point(noteX, noteY)
-            let overtone = tone(atBeat: beat, from: note).overtone[type]
-//            isLastAppned = lastP?.y != p.y || lastOvertone != overtone
-//            if isLastAppned {
-//                if let p = lastP, let overtone = lastOvertone {
-//                    ps.append(p)
-//                    
-//                    colors.append(Self.color(fromVolm: overtone))
-//                }
-//                ps.append(p)
+        } else {
+            var beat = note.beatRange.start, colors = [Color]()
+            while beat <= note.beatRange.end {
+                let overtone = tone(atBeat: beat, from: note).overtone[type]
                 colors.append(Self.color(fromVolm: overtone))
-//            }
-//            lastP = p
-//            lastOvertone = overtone
-            beat += .init(1, 48)
+                beat += .init(1, 48)
+            }
+            return colors
         }
-//        if !isLastAppned, let p = lastP, let overtone = lastOvertone {
-//            ps.append(p)
-//            colors.append(Self.color(fromVolm: overtone))
-//        }
-        
-        return colors
     }
     
     static func octaveColor(lightness: Double = 40, chroma: Double = 50,
@@ -1778,7 +1784,7 @@ extension ScoreView {
     
     func releasePosition(from note: Note) -> Point {
         let nx = x(atBeat: note.beatRange.end)
-        let ny = noteY(atX: nx, from: note) + noteH(atX: nx, from: note) / 2 + 1 + 1 / 2
+        let ny = noteY(atX: nx, from: note) - noteH(atX: nx, from: note) / 2
         let releaseW = width(atDurSec: note.envelope.releaseSec)
         return .init(nx + releaseW, ny)
     }
@@ -1889,24 +1895,24 @@ extension ScoreView {
         
         let attackBeat = Double(note.beatRange.start) + score.beat(fromSec: note.envelope.attackSec)
         let ax = x(atBeat: attackBeat)
-        let ap = Point(ax, noteY(atX: ax, at: noteI) + noteH(atX: ax, at: noteI) / 2 + 1 + 1 / 2)
+        let ap = Point(ax, noteY(atX: ax, at: noteI) - noteH(atX: ax, at: noteI) / 2)
         let decayBeat = Double(note.beatRange.start) + score.beat(fromSec: note.envelope.attackSec + note.envelope.decaySec)
         let dx = x(atBeat: decayBeat)
-        let dp = Point(dx, noteY(atX: dx, at: noteI) + noteH(atX: dx, at: noteI) / 2 + 1 + 1 / 2)
+        let dp = Point(dx, noteY(atX: dx, at: noteI) - noteH(atX: dx, at: noteI) / 2)
         let releaseBeat = Double(note.beatRange.end) + score.beat(fromSec: note.envelope.releaseSec)
         let rx = x(atBeat: releaseBeat)
-        let rp = Point(rx, noteY(atX: rx, at: noteI) + noteH(atX: rx, at: noteI) / 2 + 1 + 1 / 2)
+        let rp = Point(rx, noteY(atX: rx, at: noteI) - noteH(atX: rx, at: noteI) / 2)
         
         var minDS = Double.infinity
         
         let dsa = ap.distanceSquared(p)
-        if dsa < minDS && dsa < maxDS {
+        if dsa < minDS && dsa < maxDS && (ax == dx ? p.x < ax : true) {
             minDS = dsa
             minResult = .attack
         }
         
         let dsd = dp.distanceSquared(p)
-        if dsd < minDS && dsd < maxDS {
+        if dsd < minDS && dsd < maxDS && (ax == dx ? p.x > ax : true) {
             minDS = dsd
             minResult = .decay
         }
@@ -1917,13 +1923,15 @@ extension ScoreView {
             minResult = .release
         }
         
-        for (pitI, pit) in note.pits.enumerated() {
-            for (sprolI, _) in pit.tone.spectlope.sprols.enumerated() {
-                let psp = sprolPosition(atSprol: sprolI, atPit: pitI, from: note)
-                let ds = psp.distanceSquared(p)
-                if ds < minDS && ds < maxDS {
-                    minDS = ds
-                    minResult = .sprol(pitI: pitI, sprolI: sprolI)
+        if !note.isOneOvertone {
+            for (pitI, pit) in note.pits.enumerated() {
+                for (sprolI, _) in pit.tone.spectlope.sprols.enumerated() {
+                    let psp = sprolPosition(atSprol: sprolI, atPit: pitI, from: note)
+                    let ds = psp.distanceSquared(p)
+                    if ds < minDS && ds < maxDS {
+                        minDS = ds
+                        minResult = .sprol(pitI: pitI, sprolI: sprolI)
+                    }
                 }
             }
         }
@@ -1956,50 +1964,54 @@ extension ScoreView {
             
             let score = model
             for (noteI, note) in score.notes.enumerated() {
-                for (pitI, pit) in note.pits.enumerated() {
-                    for (sprolI, _) in pit.tone.spectlope.sprols.enumerated() {
-                        let psp = sprolPosition(atSprol: sprolI, atPit: pitI, from: note)
-                        let dsd = psp.distanceSquared(p)
-                        if dsd < minDS && dsd < maxDS {
-                            minDS = dsd
-                            minNoteI = noteI
-                            minResult = .sprol(pitI: pitI, sprolI: sprolI)
+                if !note.isOneOvertone {
+                    for (pitI, pit) in note.pits.enumerated() {
+                        for (sprolI, _) in pit.tone.spectlope.sprols.enumerated() {
+                            let psp = sprolPosition(atSprol: sprolI, atPit: pitI, from: note)
+                            let dsd = psp.distanceSquared(p)
+                            if dsd < minDS && dsd < maxDS {
+                                minDS = dsd
+                                minNoteI = noteI
+                                minResult = .sprol(pitI: pitI, sprolI: sprolI)
+                            }
                         }
                     }
-                    
-                    let noteH = ScoreLayout.noteHeight
-                    let minODS = noteY(atX: p.x, at: noteI) - p.y
-                    if abs(minODS) > noteH / 2 {
-                        let pitP = pitPosition(atPit: pitI, from: note)
-                        
-                        let evenP = pitP + .init(0, noteH / 2 + 1 / 2)
-                        let evenDsd = evenP.distanceSquared(p)
-                        if evenDsd < minDS && evenDsd < maxDS {
-                            minDS = evenDsd
-                            minNoteI = noteI
-                            minResult = .evenVolm(pitI: pitI)
-                        }
-                        let oddP = pitP + .init(0, -noteH / 2 - 1 / 2)
-                        let oddDsd = oddP.distanceSquared(p)
-                        if oddDsd < minDS && oddDsd < maxDS {
-                            minDS = oddDsd
-                            minNoteI = noteI
-                            minResult = .oddVolm(pitI: pitI)
-                        }
-                        
-                        if note.pits.count == 1 {
-                            let pointline = pointline(from: note)
-                            var ds = pointline.minDistanceSquared(at: p - Point(0, ScoreLayout.noteHeight / 2 + 1 / 2))
-                            if ds < minDS && ds < maxDS {
-                                minDS = ds
+                }
+                
+                if note.pits.count == 1 {
+                    let pointline = pointline(from: note)
+                    var ds = pointline.minDistanceSquared(at: p - Point(0, evenY))
+                    if ds < minDS && ds < maxDS {
+                        minDS = ds
+                        minNoteI = noteI
+                        minResult = .evenVolm(pitI: 0)
+                    }
+                    ds = pointline.minDistanceSquared(at: p - Point(0, oddY))
+                    if ds < minDS && ds < maxDS {
+                        minDS = ds
+                        minNoteI = noteI
+                        minResult = .oddVolm(pitI: 0)
+                    }
+                } else {
+                    for pitI in note.pits.count.range {
+                        let noteH = ScoreLayout.noteHeight
+                        let minODS = p.y - noteY(atX: p.x, at: noteI)
+                        if minODS > noteH / 2 {
+                            let pitP = pitPosition(atPit: pitI, from: note)
+                            
+                            let evenP = pitP + .init(0, evenY)
+                            let evenDsd = evenP.distanceSquared(p)
+                            if evenDsd < minDS && evenDsd < maxDS {
+                                minDS = evenDsd
                                 minNoteI = noteI
-                                minResult = .evenVolm(pitI: 0)
+                                minResult = .evenVolm(pitI: pitI)
                             }
-                            ds = pointline.minDistanceSquared(at: p + Point(0, ScoreLayout.noteHeight / 2 + 1 / 2))
-                            if ds < minDS && ds < maxDS {
-                                minDS = ds
+                            let oddP = pitP + .init(0, oddY)
+                            let oddDsd = oddP.distanceSquared(p)
+                            if oddDsd < minDS && oddDsd < maxDS {
+                                minDS = oddDsd
                                 minNoteI = noteI
-                                minResult = .oddVolm(pitI: 0)
+                                minResult = .oddVolm(pitI: pitI)
                             }
                         }
                     }
@@ -2007,7 +2019,7 @@ extension ScoreView {
                 
                 let decayBeat = Double(note.beatRange.start) + score.beat(fromSec: note.envelope.attackSec + note.envelope.decaySec)
                 let dx = x(atBeat: decayBeat)
-                let dp = Point(dx, noteY(atX: dx, at: noteI) + noteH(atX: dx, at: noteI) / 2 + 1 + 1 / 2)
+                let dp = Point(dx, noteY(atX: dx, at: noteI) - noteH(atX: dx, at: noteI) / 2)
                 let dsd = dp.distanceSquared(p)
                 if dsd < minDS && dsd < maxDS {
                     minDS = dsd
@@ -2196,8 +2208,14 @@ extension ScoreView {
         }
         return minPitI
     }
+    var evenY: Double {
+        ScoreLayout.noteHeight / 2 + 0.5
+    }
+    var oddY: Double {
+        ScoreLayout.noteHeight / 2 + 1
+    }
     var toneY: Double {
-        ScoreLayout.noteHeight / 2 + 2 + toneHeight / 2
+        ScoreLayout.noteHeight / 2 + 1.5 + toneHeight / 2
     }
     var toneHeight: Double {
         2
