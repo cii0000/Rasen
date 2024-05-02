@@ -616,14 +616,10 @@ extension ContentView {
                                newMin: Spectrogram.minLinearFq,
                                newMax: Spectrogram.maxLinearFq)
             return Pitch.pitch(fromFq: max(fq, 1))
-        case .pitch, .wavelet:
+        case .pitch:
             return y.clipped(min: 0, max: h,
                              newMin: Spectrogram.minPitch,
                              newMax: Spectrogram.maxPitch)
-//            let fq = Mel.fq(fromMel: y.clipped(min: 0, max: h,
-//                             newMin: 100,
-//                             newMax: 4000))
-//            return Pitch.pitch(fromFq: max(fq, 1))
         }
     }
     

@@ -346,28 +346,7 @@ final class RunEditor: InputKeyEditor {
                             return
                         }
                     }
-                } else if text.string == "Test draw" {
-                    if let sheetView = document.sheetView(at: p) {
-                        let sampleRate = 44100.0, fq = 40.0, omega0 = 6.0
-                        
-                        let cp = Point(Sheet.width / 2, Sheet.height / 2)
-                        let wavelet = Wavelet.samples(fq: fq, sampleRate: sampleRate, omega0: omega0)
-                        let line0 = Line(controls: wavelet.enumerated().map {
-                            .init(point: .init(Double($0.offset) / sampleRate * Sheet.width,
-                                               $0.element.real * Sheet.height / 4) + cp) },
-                                         uuColor: .init(.init(red: 1.0, green: 0, blue: 0)))
-                        let line1 = Line(controls: wavelet.enumerated().map {
-                            .init(point: .init(Double($0.offset) / sampleRate * Sheet.width,
-                                               $0.element.imaginary * Sheet.height / 4) + cp) },
-                                         uuColor: .init(.init(red: 0.0, green: 1, blue: 0)))
-                        let l0 = Line(controls: [.init(point: .init(0, cp.y)), .init(point: .init(Sheet.width, cp.y))])
-                        let l1 = Line(controls: [.init(point: .init(cp.x, 0)), .init(point: .init(cp.x, Sheet.height))])
-                        
-                        sheetView.newUndoGroup()
-                        sheetView.append([l0, l1, line0, line1])
-                    }
                 }
-                // writeMovie loop: 10
                 
                 send(inP, from: text, ti: ti, shp, sheetView)
             }

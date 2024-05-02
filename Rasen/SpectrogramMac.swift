@@ -227,12 +227,12 @@ struct Spectrogram {
     static let minPitch = Score.doubleMinPitch, maxPitch = Score.doubleMaxPitch
     
     enum FqType {
-        case linear, pitch, wavelet
+        case linear, pitch
     }
     init(_ buffer: PCMBuffer,
          windowSize: Int = 2048, windowOverlap: Double = 0.875,
          isNormalized: Bool = true,
-         type: FqType = .wavelet) {
+         type: FqType = .pitch) {
         
         let windowSize = vDSP.nextPow2(windowSize)
         
@@ -388,28 +388,6 @@ struct Spectrogram {
                     }
                 }
             }
-        case .wavelet:
-            let secIs = secs.map { $0.i }
-            
-            chSecVolms = channelCount.range.map { chI in
-                let samples = buffer.channelAmpsFromFloat(at: chI)
-                print("samples:", samples.count, "ch:", chI)
-                
-                let volmSecs = volmCount.range.map { volmI in
-                    let pitch = Double.linear(Score.doubleMinPitch, Score.doubleMaxPitch,
-                                              t: Double(volmI) / Double(volmCount))
-                    let fq = Pitch.fq(fromPitch: pitch)
-                    let lAmp = Loudness.reverseVolm40Phon(fromFq: fq)
-                    let wavelet = Wavelet.samples(fq: fq, sampleRate: sampleRate, omega0: 6)
-                    print(volmI, "fq:", fq, "wvlt: \(wavelet.count)")
-                    return vDSP.correlate(samples, withKernel: wavelet, secIs).map {
-                        Volm.volm(fromAmp: $0.length) * lAmp
-                    }
-                }
-                return secs.enumerated().map { (secI, _) in
-                    volmCount.range.map { volmI in volmSecs[volmI][secI] }
-                }
-            }
         }
     
         func stereo(fromVolms volms: [Double]) -> Stereo {
@@ -501,66 +479,5 @@ struct Spectrogram {
         }
         
         return bitmap.image
-    }
-}
-
-extension vDSP {
-    static func correlate(_ a: [Double], withKernel b: [Complex<Double>],
-                          _ idxs: [Int]) -> [Complex<Double>] {
-        let b = b.count % 2 == 1 ? b : [0] + b
-        let hbCount = b.count / 2
-        let r0 = [Double](repeating: 0, count: hbCount)
-        let aReal = r0 + a + r0
-        let bReal = b.map { $0.real }
-        let bImag = b.map { $0.imaginary }
-        
-        let windowWave = vDSP.window(ofType: Double.self,
-                                     usingSequence: .hanningNormalized,
-                                     count: b.count,
-                                     isHalfWindow: false)
-        
-        var na = [Double](repeating: 0, count: b.count), bb = [Double](repeating: 0, count: b.count)
-        let v: [Complex<Double>] = idxs.map { ai in
-            for bi in b.count.range {
-                na[bi] = aReal[ai + bi]
-            }
-            vDSP.multiply(na, windowWave, result: &na)
-            
-            vDSP.multiply(na, bReal, result: &bb)
-            let real = vDSP.sum(bb)
-            vDSP.multiply(na, bImag, result: &bb)
-            let imag = vDSP.sum(bb)
-            return .init(real, imag)
-        }
-        
-        let rSumB = Complex(1 / (b.sum { $0.length }))
-        return v.map { $0 * rSumB }
-    }
-}
-
-struct Wavelet {
-    static func samples(fq: Double, sampleRate: Double,
-                        omega0: Double, scalingFactor sf: Double = 1) -> [Complex<Double>] {
-        let dCount = sampleRate / fq * omega0 * 2
-        let oCount = Int(dCount.rounded(.up))
-        let count = oCount % 2 == 1 ? oCount : oCount + 1
-        let halfCount = count / 2, dHalfCount = dCount / 2
-        let x = count.range.map {
-            2 * .pi * Double($0 - halfCount) / dHalfCount
-        }
-        let v0 = Complex(Double.exp(-0.5 * omega0 * omega0)), v1 = .pi ** -0.25
-        return x.map {
-            (.exp(.i * .init(omega0 * $0, 0)) - v0) * .init(Double.exp(-0.5 * $0 * $0) * v1)
-        }
-    }
-    
-    static func fqScaleV(omega0 o0: Double) -> Double {
-        (o0 + .sqrt(2 + o0 * o0)) / 4 * .pi
-    }
-    static func fq(fromScale s: Double, omega0 o0: Double) -> Double {
-        fqScaleV(omega0: o0) / s
-    }
-    static func scale(fromFq fq: Double, omega0 o0: Double) -> Double {
-        fqScaleV(omega0: o0) / fq
     }
 }
