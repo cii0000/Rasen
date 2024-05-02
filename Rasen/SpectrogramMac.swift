@@ -27,10 +27,13 @@ extension vDSP {
             initializedCount = count
         }
     }
+    static func nextPow2(_ x: Int) -> Int {
+        Int(.exp2(.log2(Double(x)).rounded(.up)))
+    }
 }
 
 typealias FFTComp = Complex<Double>
-struct FFT {
+struct VFFT {
     var vdft: VDFT<Double>
     var ims: [Double]
     
@@ -46,8 +49,20 @@ struct FFT {
         let v = vdft.transform(real: x, imaginary: ims)
         return zip(v.real, v.imaginary).map { .init($0.0, $0.1) }
     }
+    func correctTransform(_ x: [Double]) -> [FFTComp] {
+        var v = vdft.transform(real: x, imaginary: ims)
+        vDSP.multiply(0.5, v.real, result: &v.real)
+        vDSP.multiply(0.5, v.imaginary, result: &v.imaginary)
+        return zip(v.real, v.imaginary).map { .init($0.0, $0.1) }
+    }
     func transform(_ x: [FFTComp]) -> [FFTComp] {
         let v = vdft.transform(real: x.map { $0.real }, imaginary: x.map { $0.imaginary })
+        return zip(v.real, v.imaginary).map { .init($0.0, $0.1) }
+    }
+    func correctTransform(_ x: [FFTComp]) -> [FFTComp] {
+        var v = vdft.transform(real: x.map { $0.real }, imaginary: x.map { $0.imaginary })
+        vDSP.multiply(0.5, v.real, result: &v.real)
+        vDSP.multiply(0.5, v.imaginary, result: &v.imaginary)
         return zip(v.real, v.imaginary).map { .init($0.0, $0.1) }
     }
     
@@ -60,7 +75,7 @@ struct FFT {
         return results.map { Double($0) * v }
     }
 }
-struct IFFT {
+struct VIFFT {
     var vdft: VDFT<Double>
     var ims: [Double]
     
@@ -74,6 +89,13 @@ struct IFFT {
     }
     func transform(_ x: [FFTComp]) -> [FFTComp] {
         let v = vdft.transform(real: x.map { $0.real }, imaginary: x.map { $0.imaginary })
+        return zip(v.real, v.imaginary).map { .init($0.0, $0.1) }
+    }
+    func correctTransform(_ x: [FFTComp]) -> [FFTComp] {
+        var v = vdft.transform(real: x.map { $0.real }, imaginary: x.map { $0.imaginary })
+        let scale = 2 / Double(ims.count)
+        vDSP.multiply(scale, v.real, result: &v.real)
+        vDSP.multiply(scale, v.imaginary, result: &v.imaginary)
         return zip(v.real, v.imaginary).map { .init($0.0, $0.1) }
     }
 }
@@ -205,14 +227,14 @@ struct Spectrogram {
     static let minPitch = Score.doubleMinPitch, maxPitch = Score.doubleMaxPitch
     
     enum FqType {
-        case linear, pitch
+        case linear, pitch, wavelet
     }
     init(_ buffer: PCMBuffer,
          windowSize: Int = 2048, windowOverlap: Double = 0.875,
          isNormalized: Bool = true,
-         type: FqType = .pitch) {
+         type: FqType = .wavelet) {
         
-        let windowSize = Int(.exp2(.log2(Double(windowSize))).rounded(.up))
+        let windowSize = vDSP.nextPow2(windowSize)
         
         guard buffer.frameCount < Int(buffer.sampleRate) * 60 * 10 else {
             print("unsupported")
@@ -228,7 +250,7 @@ struct Spectrogram {
         let channelCount = buffer.channelCount
         let frameCount = buffer.frameCount
         guard channelCount >= 1, windowSize > 0, frameCount >= windowSize,
-              let dft = try? FFT(count: windowSize) else { return }
+              let dft = try? VFFT(count: windowSize) else { return }
         
         let overlapCount = Int(Double(windowSize) * (1 - windowOverlap))
         let windowWave = vDSP.window(ofType: Double.self,
@@ -238,7 +260,7 @@ struct Spectrogram {
         
         let sampleRate = buffer.sampleRate
         let nd = 1 / Double(windowSize)
-        let volmCount = windowSize / 2
+        var volmCount = windowSize / 2
         
         let secs: [(i: Int, sec: Double)] = stride(from: 0, to: frameCount, by: overlapCount).map { i in
             (i, Double(i) / sampleRate)
@@ -249,14 +271,14 @@ struct Spectrogram {
             return Loudness.reverseVolm40Phon(fromFq: fq)
         }
         
-        var ctss: [[[Double]]]
+        var chSecVolms: [[[Double]]]
         switch type {
         case .linear:
-            ctss = channelCount.range.map { ci in
-                let amps = buffer.channelAmpsFromFloat(at: ci)
-                return secs.map { (ti, sec) in
+            chSecVolms = channelCount.range.map { chI in
+                let amps = buffer.channelAmpsFromFloat(at: chI)
+                return secs.map { (i, sec) in
                     var wave = [Double](capacity: windowSize)
-                    for j in (ti - windowSize / 2) ..< (ti - windowSize / 2 + windowSize) {
+                    for j in (i - windowSize / 2) ..< (i - windowSize / 2 + windowSize) {
                         wave.append(j >= 0 && j < frameCount ? amps[j] : 0)
                     }
                     
@@ -279,11 +301,11 @@ struct Spectrogram {
                                         minPitch: Self.minPitch, maxPitch: Self.maxPitch,
                                         maxFq: Self.maxLinearFq)
 
-            ctss = channelCount.range.map { ci in
-                let amps = buffer.channelAmpsFromFloat(at: ci)
-                return secs.map { (ti, sec) in
+            chSecVolms = channelCount.range.map { chI in
+                let amps = buffer.channelAmpsFromFloat(at: chI)
+                return secs.map { (i, sec) in
                     var wave = [Double](capacity: windowSize)
-                    for j in (ti - windowSize / 2) ..< (ti - windowSize / 2 + windowSize) {
+                    for j in (i - windowSize / 2) ..< (i - windowSize / 2 + windowSize) {
                         wave.append(j >= 0 && j < frameCount ? amps[j] : 0)
                     }
                     
@@ -304,7 +326,7 @@ struct Spectrogram {
             }
             
             let windowSize2 = Int(.exp2(.log2(Double(windowSize * 4))).rounded(.up))
-            if let dft2 = try? FFT(count: windowSize2) {
+            if let dft2 = try? VFFT(count: windowSize2) {
                 let overlapCount2 = Int(Double(windowSize2) * (1 - windowOverlap))
                 let windowWave2 = vDSP.window(ofType: Double.self,
                                               usingSequence: .hanningNormalized,
@@ -327,11 +349,11 @@ struct Spectrogram {
                                              minPitch: Self.minPitch, maxPitch: Self.maxPitch,
                                              maxFq: Self.maxLinearFq)
 
-                channelCount.range.forEach { ci in
-                    let amps = buffer.channelAmpsFromFloat(at: ci)
-                    let tss2 = secs2.map { (ti, sec) in
+                channelCount.range.forEach { chI in
+                    let amps = buffer.channelAmpsFromFloat(at: chI)
+                    let tss2 = secs2.map { (i, sec) in
                         var wave2 = [Double](capacity: windowSize2)
-                        for j in (ti - windowSize2 / 2) ..< (ti - windowSize2 / 2 + windowSize2) {
+                        for j in (i - windowSize2 / 2) ..< (i - windowSize2 / 2 + windowSize2) {
                             wave2.append(j >= 0 && j < frameCount ? amps[j] : 0)
                         }
                         
@@ -350,19 +372,42 @@ struct Spectrogram {
                         return stride(from: 0, to: nVolms.count, by: 4).map { nVolms[$0] }
                     }
                     
-                    secs.enumerated().forEach { ti, v in
-                        let ti2 = min(Int((Double(tss2.count * ti) / Double(secs.count)).rounded()), tss2.count - 1)
-                        for si in 0 ..< volmCount / 2 {
-                            let t = si < volmCount * 3 / 8 ?
-                            Double(si).clipped(min: Double(volmCount * 1 / 8),
+                    secs.enumerated().forEach { secI, v in
+                        let ti2 = min(Int((Double(tss2.count * secI) / Double(secs.count)).rounded()), tss2.count - 1)
+                        for volmI in 0 ..< volmCount / 2 {
+                            let t = volmI < volmCount * 3 / 8 ?
+                            Double(volmI).clipped(min: Double(volmCount * 1 / 8),
                                                max: Double(volmCount * 3 / 8),
                                                newMin: 0, newMax: 0.5) :
-                            Double(si).clipped(min: Double(volmCount * 3 / 8),
+                            Double(volmI).clipped(min: Double(volmCount * 3 / 8),
                                                max: Double(volmCount / 2),
                                                newMin: 0.5, newMax: 1)
-                            ctss[ci][ti][si] = Double.linear(tss2[ti2][si], ctss[ci][ti][si], t: t)
+                            chSecVolms[chI][secI][volmI] = Double.linear(tss2[ti2][volmI],
+                                                                   chSecVolms[chI][secI][volmI], t: t)
                         }
                     }
+                }
+            }
+        case .wavelet:
+            let secIs = secs.map { $0.i }
+            
+            chSecVolms = channelCount.range.map { chI in
+                let samples = buffer.channelAmpsFromFloat(at: chI)
+                print("samples:", samples.count, "ch:", chI)
+                
+                let volmSecs = volmCount.range.map { volmI in
+                    let pitch = Double.linear(Score.doubleMinPitch, Score.doubleMaxPitch,
+                                              t: Double(volmI) / Double(volmCount))
+                    let fq = Pitch.fq(fromPitch: pitch)
+                    let lAmp = Loudness.reverseVolm40Phon(fromFq: fq)
+                    let wavelet = Wavelet.samples(fq: fq, sampleRate: sampleRate, omega0: 6)
+                    print(volmI, "fq:", fq, "wvlt: \(wavelet.count)")
+                    return vDSP.correlate(samples, withKernel: wavelet, secIs).map {
+                        Volm.volm(fromAmp: $0.length) * lAmp
+                    }
+                }
+                return secs.enumerated().map { (secI, _) in
+                    volmCount.range.map { volmI in volmSecs[volmI][secI] }
                 }
             }
         }
@@ -383,9 +428,9 @@ struct Spectrogram {
             }
         }
         
-        var frames = secs.enumerated().map { ti, v in
-            return Frame(sec: v.sec, stereos: volmCount.range.map { si in
-                stereo(fromVolms: channelCount.range.map { ci in ctss[ci][ti][si] })
+        var frames = secs.enumerated().map { secI, v in
+            return Frame(sec: v.sec, stereos: volmCount.range.map { volmI in
+                stereo(fromVolms: channelCount.range.map { chI in chSecVolms[chI][secI][volmI] })
             })
         }
         
@@ -456,5 +501,66 @@ struct Spectrogram {
         }
         
         return bitmap.image
+    }
+}
+
+extension vDSP {
+    static func correlate(_ a: [Double], withKernel b: [Complex<Double>],
+                          _ idxs: [Int]) -> [Complex<Double>] {
+        let b = b.count % 2 == 1 ? b : [0] + b
+        let hbCount = b.count / 2
+        let r0 = [Double](repeating: 0, count: hbCount)
+        let aReal = r0 + a + r0
+        let bReal = b.map { $0.real }
+        let bImag = b.map { $0.imaginary }
+        
+        let windowWave = vDSP.window(ofType: Double.self,
+                                     usingSequence: .hanningNormalized,
+                                     count: b.count,
+                                     isHalfWindow: false)
+        
+        var na = [Double](repeating: 0, count: b.count), bb = [Double](repeating: 0, count: b.count)
+        let v: [Complex<Double>] = idxs.map { ai in
+            for bi in b.count.range {
+                na[bi] = aReal[ai + bi]
+            }
+            vDSP.multiply(na, windowWave, result: &na)
+            
+            vDSP.multiply(na, bReal, result: &bb)
+            let real = vDSP.sum(bb)
+            vDSP.multiply(na, bImag, result: &bb)
+            let imag = vDSP.sum(bb)
+            return .init(real, imag)
+        }
+        
+        let rSumB = Complex(1 / (b.sum { $0.length }))
+        return v.map { $0 * rSumB }
+    }
+}
+
+struct Wavelet {
+    static func samples(fq: Double, sampleRate: Double,
+                        omega0: Double, scalingFactor sf: Double = 1) -> [Complex<Double>] {
+        let dCount = sampleRate / fq * omega0 * 2
+        let oCount = Int(dCount.rounded(.up))
+        let count = oCount % 2 == 1 ? oCount : oCount + 1
+        let halfCount = count / 2, dHalfCount = dCount / 2
+        let x = count.range.map {
+            2 * .pi * Double($0 - halfCount) / dHalfCount
+        }
+        let v0 = Complex(Double.exp(-0.5 * omega0 * omega0)), v1 = .pi ** -0.25
+        return x.map {
+            (.exp(.i * .init(omega0 * $0, 0)) - v0) * .init(Double.exp(-0.5 * $0 * $0) * v1)
+        }
+    }
+    
+    static func fqScaleV(omega0 o0: Double) -> Double {
+        (o0 + .sqrt(2 + o0 * o0)) / 4 * .pi
+    }
+    static func fq(fromScale s: Double, omega0 o0: Double) -> Double {
+        fqScaleV(omega0: o0) / s
+    }
+    static func scale(fromFq fq: Double, omega0 o0: Double) -> Double {
+        fqScaleV(omega0: o0) / fq
     }
 }

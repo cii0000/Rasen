@@ -374,6 +374,9 @@ extension Array {
         ptr.deallocate()
     }
     
+    func loop(fromLoop li: Int) -> ArraySlice<Element> {
+        loop(from: li.loop(start: 0, end: count))
+    }
     func loop(from i: Int) -> ArraySlice<Element> {
         self[i...] + self[..<i]
     }

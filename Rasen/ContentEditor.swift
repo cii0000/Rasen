@@ -224,6 +224,7 @@ final class ContentView<T: BinderProtocol>: SpectrgramView {
         
         updateClippingNode()
         updateTimeline()
+        print(keyPath)
         updateSpectrogram()
     }
 }
@@ -615,7 +616,7 @@ extension ContentView {
                                newMin: Spectrogram.minLinearFq,
                                newMax: Spectrogram.maxLinearFq)
             return Pitch.pitch(fromFq: max(fq, 1))
-        case .pitch:
+        case .pitch, .wavelet:
             return y.clipped(min: 0, max: h,
                              newMin: Spectrogram.minPitch,
                              newMax: Spectrogram.maxPitch)
