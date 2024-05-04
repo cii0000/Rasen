@@ -1551,7 +1551,7 @@ extension ScoreView {
                 var lastV: [PAndColor]?, lastFqLineP: Point?, isLastAppned = false
                 while beat <= note.beatRange.end {
                     let x = self.x(atBeat: beat)
-                    let sprols = pitbend.tone(atSec: Double(sec(fromBeat: beat - note.beatRange.start))).spectlope.sprols
+                    let sprols = pitbend.spectlope(atSec: Double(sec(fromBeat: beat - note.beatRange.start))).sprols
                     let psPitch = pitch(atBeat: beat, from: note)
                     let noteY = y(fromPitch: psPitch)
                     let v = pAndColors(x: x, pitch: psPitch, noteY: noteY, sprols: sprols)

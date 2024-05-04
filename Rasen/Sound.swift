@@ -876,42 +876,7 @@ extension Note {
     }
     
     func pitbend(fromTempo tempo: Rational) -> Pitbend {
-        let spectlopeCount = (pits.maxValue { $0.tone.spectlope.sprols.count }) ?? 0
-        var pitKeys: [Interpolation<InterPit>.Key] = pits.map {
-            .init(value: .init(pitch: .init($0.pitch / 12),
-                               stereo: $0.stereo.with(id: .zero),
-                               tone: $0.tone.with(spectlopeCount: spectlopeCount).with(id: .zero),
-                               lyric: $0.lyric),
-                  time: .init(Score.sec(fromBeat: $0.beat, tempo: tempo)), 
-                  type: .spline)
-        }
-        
-        let firstStereo = firstStereo.with(id: .zero),
-            firstTone = firstTone.with(spectlopeCount: spectlopeCount).with(id: .zero)
-        let isEmptyPitch = !(pitKeys.contains { $0.value.pitch != 0 })
-        let isEmptyTone = !(pitKeys.contains { $0.value.tone != firstTone })
-        let isEmptyStereo = !(pitKeys.contains { $0.value.stereo != firstStereo })
-        
-        let durSec: Double
-        if !isEmptyPitch || !isEmptyTone || !isEmptyStereo {
-            if pits.first?.beat != 0 {
-                pitKeys.insert(.init(value: pitKeys.first!.value, time: 0, type: .spline), at: 0)
-            }
-            durSec = Double(Score.sec(fromBeat: beatRange.length, tempo: tempo))
-            if pits.last?.beat != beatRange.length {
-                pitKeys.append(.init(value: pitKeys.last!.value, time: durSec, type: .spline))
-            }
-        } else {
-            durSec = 0
-        }
-        let it = Interpolation<InterPit>(keys: pitKeys, duration: durSec)
-        
-        return .init(interpolation: it,
-                     firstPitch: .init(pits[0].pitch / 12),
-                     firstStereo: firstStereo, firstTone: firstTone,
-                     isEqualAllPitch: isEmptyPitch, isEqualAllTone: isEmptyTone,
-                     isEqualAllStereo: isEmptyStereo,
-                     isEqualAllWithoutStereo: isEmptyPitch && isEmptyTone)
+        .init(pits: pits, beatRange: beatRange, tempo: tempo)
     }
     
     enum ResultPitch: Hashable {
@@ -1650,7 +1615,7 @@ extension Volm {
 struct Audio: Hashable, Codable {
     static let defaultExportSampleRate = 44100.0
     static let defaultSampleRate = 65536.0
-    static let defaultDftCount = 65536
+    static let defaultFftCount = 65536
     static let headroomDb = 1.0
     static let headroomVolm = Volm.volm(fromDb: -headroomDb)
     static let headroomAmp = Volm.amp(fromVolm: headroomVolm)

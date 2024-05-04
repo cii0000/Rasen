@@ -41,6 +41,8 @@ struct Biquad {
     }
 }
 
+
+
 final class NotePlayer {
     private var aNotes: [Note.PitResult]
     var notes: [Note.PitResult] {
@@ -117,12 +119,10 @@ final class NotePlayer {
             noteIDs.insert(noteID)
             return .init(fq: Pitch.fq(fromPitch: .init(note.notePitch) + note.pitch.doubleValue),
                          noiseSeed: Rendnote.noiseSeed(from: note.id),
-                         pitbend: .init(interpolation: .init(),
-                                        firstPitch: note.pitch.doubleValue,
-                                        firstStereo: note.stereo,
-                                        firstTone: note.tone,
-                                        isEqualAllPitch: true, isEqualAllTone: true,
-                                        isEqualAllStereo: true, isEqualAllWithoutStereo: false),
+                         pitbend: .init(pitch: note.pitch.doubleValue,
+                                        stereo: note.stereo,
+                                        overtone: note.tone.overtone,
+                                        spectlope: note.tone.spectlope),
                          secRange: -.infinity ..< .infinity,
                          startDeltaSec: 0,
                          envelopeMemo: .init(note.envelope),
@@ -468,13 +468,13 @@ final class ScoreNoder {
     }
     
     struct NotewaveID: Hashable, Codable {
-        var fq: Double, noiseSeed: UInt64, pitbend: Pitbend, durSec: Double, startDeltaSec: Double
+        var fq: Double, noiseSeed: UInt64, pitbend: Pitbend, rebdableDurSec: Double, startDeltaSec: Double
         
         init(_ rendnote: Rendnote) {
             fq = rendnote.fq
             noiseSeed = rendnote.noiseSeed
             pitbend = rendnote.pitbend
-            durSec = rendnote.durSec
+            rebdableDurSec = rendnote.rendableDurSec
             startDeltaSec = rendnote.startDeltaSec
         }
     }

@@ -224,7 +224,6 @@ final class ContentView<T: BinderProtocol>: SpectrgramView {
         
         updateClippingNode()
         updateTimeline()
-        print(keyPath)
         updateSpectrogram()
     }
 }
