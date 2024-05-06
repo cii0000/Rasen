@@ -254,8 +254,8 @@ extension Point {
                     || angle.isApproximatelyEqual(.pi * 3 / 2) {
             return Point(x, y - distance)
         } else if angle.isApproximatelyEqual(0)
-                    || angle.isApproximatelyEqual(.pi * 2)
-                    || angle.isApproximatelyEqual(-.pi * 2) {
+                    || angle.isApproximatelyEqual(.pi2)
+                    || angle.isApproximatelyEqual(-.pi2) {
             return Point(x + distance, y)
         } else {
             return self + distance * Point(.cos(angle), .sin(angle))
@@ -379,7 +379,7 @@ extension Sequence where Element == Point {
                        radius r: Double = 50,
                        firstAngle: Double = .pi / 2,
                        count: Int) -> [Point] {
-        var angle = firstAngle, theta = (2 * .pi) / Double(count)
+        var angle = firstAngle, theta = .pi2 / Double(count)
         return (0 ..< count).map { _ in
             let p = cp.movedWith(distance: r, angle: angle)
             angle += theta

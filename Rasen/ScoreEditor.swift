@@ -1755,7 +1755,7 @@ extension ScoreView {
                             fromPitch pitch: Double) -> Color {
         Color(lightness: lightness,
               nearestChroma: chroma,
-              hue: 2 * .pi * pitch.mod(12) / 12)
+              hue: .pi2 * pitch.mod(12) / 12)
     }
     static func color(fromVolm volm: Double) -> Color {
         Color(lightness: (1 - volm) * 100)

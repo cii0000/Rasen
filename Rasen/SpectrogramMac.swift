@@ -40,6 +40,16 @@ extension vDSP {
         (nn ..< results.count).forEach { results[$0] = -(n / 2) + $0 - nn }
         return results.map { Double($0) * v }
     }
+    
+    static func window(_ type: WindowSequence, count: Int) -> [Double] {
+        Self.window(ofType: Double.self, usingSequence: type, count: count, isHalfWindow: false)
+    }
+}
+
+struct FftFrame {
+    var dc = 0.0
+    var amps = [Double]()
+    var phases = [Double]()
 }
 
 typealias VDFT = vDSP.DiscreteFourierTransform
@@ -92,12 +102,25 @@ struct Fft {
     }
     
     func dcAndAmps(_ x: [Double]) -> (dc: Double, amps: [Double]) {
-        let vs = transform(x)
-        return (vs[0].real, vs[1 ..< x.count / 2].map { $0.length * 2 } + [vs.last!.length])
+        let vs = transform(x), ni = x.count / 2
+        return (vs[0].real, vs[1 ..< ni].map { $0.length * 2 } + [vs[ni].length])
     }
     func dcAndAmps(_ x: [FftComp]) -> (dc: Double, amps: [Double]) {
-        let vs = transform(x)
-        return (vs[0].real, vs[1 ..< x.count / 2].map { $0.length * 2 } + [vs.last!.length])
+        let vs = transform(x), ni = x.count / 2
+        return (vs[0].real, vs[1 ..< ni].map { $0.length * 2 } + [vs[ni].length])
+    }
+    
+    func frame(_ x: [Double]) -> FftFrame {
+        let vs = transform(x), ni = x.count / 2
+        return .init(dc: vs[0].real,
+                     amps: vs[1 ..< ni].map { $0.length * 2 } + [vs[ni].length],
+                     phases: vs[1 ... ni].map { $0.phase })
+    }
+    func frame(_ x: [FftComp]) -> FftFrame {
+        let vs = transform(x), ni = x.count / 2
+        return .init(dc: vs[0].real,
+                     amps: vs[1 ..< ni].map { $0.length * 2 } + [vs[ni].length],
+                     phases: vs[1 ... ni].map { $0.phase })
     }
 }
 
@@ -129,6 +152,10 @@ struct Ifft {
         }
         return resAndImsTransform(res: res, ims: ims)
     }
+    func compsTransform(_ frame: FftFrame) -> (res: [Double], ims: [Double]) {
+        let v = resAndImsTransform(dc: frame.dc, amps: frame.amps, phases: frame.phases)
+        return (v.res, v.ims)
+    }
     func resAndImsTransform(res: [Double], ims: [Double]) -> (res: [Double], ims: [Double]) {
         let v = vdft.transform(real: res, imaginary: ims)
         return (v.real, v.imaginary)
@@ -142,6 +169,10 @@ struct Ifft {
         let v = resAndImsTransform(dc: dc, amps: amps, phases: phases)
         return zip(v.res, v.ims).map { .init($0.0, $0.1) }
     }
+    func compsTransform(_ frame: FftFrame) -> [FftComp] {
+        let v = resAndImsTransform(dc: frame.dc, amps: frame.amps, phases: frame.phases)
+        return zip(v.res, v.ims).map { .init($0.0, $0.1) }
+    }
     func compsTransform(res: [Double], ims: [Double]) -> [FftComp] {
         let v = resAndImsTransform(res: res, ims: ims)
         return zip(v.res, v.ims).map { .init($0.0, $0.1) }
@@ -153,6 +184,9 @@ struct Ifft {
     
     func resTransform(dc: Double, amps: [Double], phases: [Double]) -> [Double] {
         resAndImsTransform(dc: dc, amps: amps, phases: phases).res
+    }
+    func resTransform(_ frame: FftFrame) -> [Double] {
+        resAndImsTransform(dc: frame.dc, amps: frame.amps, phases: frame.phases).res
     }
     func resTransform(res: [Double], ims: [Double]) -> [Double] {
         resAndImsTransform(res: res, ims: ims).res
@@ -285,18 +319,18 @@ struct Spectrogram {
     var type = FqType.pitch
     var durSec = 0.0
     
-    static let minLinearFq = 0.0, maxLinearFq = Audio.defaultExportSampleRate / 2
+    static let minLinearFq = 0.0, maxLinearFq = Audio.defaultSampleRate / 2
     static let minPitch = Score.doubleMinPitch, maxPitch = Score.doubleMaxPitch
     
     enum FqType {
         case linear, pitch
     }
     init(_ oBuffer: PCMBuffer,
-         windowSize: Int = 2048, windowOverlap: Double = 0.875,
+         fftCount: Int = 2048, windowOverlap: Double = 0.875,
          isNormalized: Bool = true,
          type: FqType = .pitch) {
         
-        let windowSize = vDSP.nextPow2(windowSize)
+        let fftCount = vDSP.nextPow2(fftCount)
         
         guard oBuffer.frameCount < Int(oBuffer.sampleRate) * 60 * 10 else {
             print("unsupported")
@@ -304,7 +338,7 @@ struct Spectrogram {
         }
         
         let buffer: PCMBuffer
-        if oBuffer.sampleRate != Audio.defaultExportSampleRate {
+        if oBuffer.sampleRate != Audio.defaultSampleRate {
             guard let nBuffer = try? oBuffer.convertDefaultFormat(isExportFormat: true) else { return }
             buffer = nBuffer
         } else {
@@ -313,18 +347,19 @@ struct Spectrogram {
         
         let channelCount = buffer.channelCount
         let frameCount = buffer.frameCount
-        guard channelCount >= 1, windowSize > 0, frameCount >= windowSize,
-              let fft = try? Fft(count: windowSize) else { return }
+        guard channelCount >= 1, fftCount > 0, frameCount >= fftCount,
+              let fft = try? Fft(count: fftCount) else { return }
         
-        let overlapCount = Int(Double(windowSize) * (1 - windowOverlap))
-        let windowWave = vDSP.window(ofType: Double.self,
-                                     usingSequence: .hanningNormalized,
-                                     count: windowSize,
-                                     isHalfWindow: false)
+        let overlapCount = Int(Double(fftCount) * (1 - windowOverlap))
+        var windowSamples = vDSP.window(.hanningDenormalized, count: fftCount)
+        if !isNormalized {
+            let racf = Double(fftCount) / vDSP.sum(windowSamples)
+            vDSP.multiply(racf, windowSamples, result: &windowSamples)
+        }
         
         let sampleRate = buffer.sampleRate
-        let hWindowSize = windowSize / 2
-        let volmCount = hWindowSize
+        let hFftCount = fftCount / 2
+        let volmCount = hFftCount
         
         let secs: [(i: Int, sec: Double)] = stride(from: 0, to: frameCount, by: overlapCount).map { i in
             (i, Double(i) / sampleRate)
@@ -341,11 +376,11 @@ struct Spectrogram {
             chSecVolms = channelCount.range.map { chI in
                 let amps = buffer.channelAmpsFromFloat(at: chI)
                 return secs.map { (i, sec) in
-                    let wave: [Double] = ((i - hWindowSize) ..< (i - hWindowSize + windowSize)).map { j in
+                    let wave: [Double] = ((i - hFftCount) ..< (i - hFftCount + fftCount)).map { j in
                         j >= 0 && j < frameCount ? amps[j] : 0
                     }
                     
-                    let inputRs = vDSP.multiply(windowWave, wave)
+                    let inputRs = vDSP.multiply(windowSamples, wave)
                     let (_, amps) = fft.dcAndAmps(inputRs)
                     
                     return volmCount.range.map {
@@ -361,11 +396,11 @@ struct Spectrogram {
             chSecVolms = channelCount.range.map { chI in
                 let amps = buffer.channelAmpsFromFloat(at: chI)
                 return secs.map { (i, sec) in
-                    let wave: [Double] = ((i - hWindowSize) ..< (i - hWindowSize + windowSize)).map { j in
+                    let wave: [Double] = ((i - hFftCount) ..< (i - hFftCount + fftCount)).map { j in
                         j >= 0 && j < frameCount ? amps[j] : 0
                     }
                     
-                    let inputRs = vDSP.multiply(windowWave, wave)
+                    let inputRs = vDSP.multiply(windowSamples, wave)
                     let (_, amps) = fft.dcAndAmps(inputRs)
                     
                     let volms = volmCount.range.map {
@@ -375,16 +410,16 @@ struct Spectrogram {
                 }
             }
             
-            let windowSize2 = Int(.exp2(.log2(Double(windowSize * 4))).rounded(.up))
-            let hWindowSize2 = windowSize2 / 2
-            if let fft2 = try? Fft(count: windowSize2) {
-                let overlapCount2 = Int(Double(windowSize2) * (1 - windowOverlap))
-                let windowWave2 = vDSP.window(ofType: Double.self,
-                                              usingSequence: .hanningNormalized,
-                                              count: windowSize2,
-                                              isHalfWindow: false)
-                
-                let volmCount2 = windowSize2 / 2
+            let fftCount2 = Int(.exp2(.log2(Double(fftCount * 4))).rounded(.up))
+            let hFftCount2 = fftCount2 / 2
+            if let fft2 = try? Fft(count: fftCount2) {
+                let overlapCount2 = Int(Double(fftCount2) * (1 - windowOverlap))
+                var windowSamples2 = vDSP.window(.hanningDenormalized, count: fftCount2)
+                if !isNormalized {
+                    let racf = Double(fftCount2) / vDSP.sum(windowSamples2)
+                    vDSP.multiply(racf, windowSamples2, result: &windowSamples2)
+                }
+                let volmCount2 = fftCount2 / 2
                 
                 let secs2: [(i: Int, sec: Double)] = stride(from: 0, to: frameCount, by: overlapCount2).map { i in
                     (i, Double(i) / sampleRate)
@@ -402,11 +437,11 @@ struct Spectrogram {
                 channelCount.range.forEach { chI in
                     let amps = buffer.channelAmpsFromFloat(at: chI)
                     let tss2 = secs2.map { (i, sec) in
-                        let wave2: [Double] = ((i - hWindowSize2) ..< (i - hWindowSize2 + windowSize2)).map { j in
+                        let wave2: [Double] = ((i - hFftCount2) ..< (i - hFftCount2 + fftCount2)).map { j in
                             j >= 0 && j < frameCount ? amps[j] : 0
                         }
                         
-                        let inputRs2 = vDSP.multiply(windowWave2, wave2)
+                        let inputRs2 = vDSP.multiply(windowSamples2, wave2)
                         let (_, amps2) = fft2.dcAndAmps(inputRs2)
                         let volms = volmCount2.range.map {
                             $0 == 0 ? 0 : loudnessScales2[$0] * Volm.volm(fromAmp: amps2[$0 - 1])

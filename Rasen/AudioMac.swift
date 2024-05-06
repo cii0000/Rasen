@@ -128,11 +128,9 @@ final class NotePlayer {
                          envelopeMemo: .init(note.envelope),
                          id: noteID)
         }
-        for rendnote in rendnotes {
-            noder.notewaveDic[.init(rendnote)] = rendnote.notewave()
-        }
         
         noder.rendnotes += rendnotes
+        noder.updateRendnotes()
     }
     private func stopNote() {
         let releaseStartSec = sequencer.currentPositionInSec + 0.05
@@ -428,8 +426,9 @@ final class ScoreNoder {
         
         let nwrrs = newWillRenderRendnoteDic.map { ($0.key, $0.value) }
         if nwrrs.count > 0 {
+            let sampleRate = format.sampleRate
             if nwrrs.count == 1 {
-                notewaveDic[nwrrs[0].0] = nwrrs[0].1.notewave()
+                notewaveDic[nwrrs[0].0] = nwrrs[0].1.notewave(sampleRate: sampleRate)
             } else {
                 let threadCount = 8
                 let nThreadCount = min(nwrrs.count, threadCount)
@@ -442,7 +441,7 @@ final class ScoreNoder {
                 notewaves.withUnsafeMutableBufferPointer { notewavesPtr in
                     if nThreadCount == nwrrs.count {
                         DispatchQueue.concurrentPerform(iterations: nThreadCount) { threadI in
-                            notewavesPtr[threadI] = nwrrs[threadI].1.notewave()
+                            notewavesPtr[threadI] = nwrrs[threadI].1.notewave(sampleRate: sampleRate)
                         }
                     } else {
                         DispatchQueue.concurrentPerform(iterations: nThreadCount) { threadI in
@@ -450,7 +449,7 @@ final class ScoreNoder {
                                 let j = threadI < dMod ? 
                                 (dCount + 1) * threadI + i :
                                 (dCount + 1) * dMod + dCount * (threadI - dMod) + i
-                                notewavesPtr[j] = nwrrs[j].1.notewave()
+                                notewavesPtr[j] = nwrrs[j].1.notewave(sampleRate: sampleRate)
                             }
                         }
                     }
@@ -1041,7 +1040,7 @@ extension AVAudioPCMBuffer {
     }
     static var exportPcmFormat: AVAudioFormat? {
         AVAudioFormat(commonFormat: .pcmFormatFloat32,
-                      sampleRate: Audio.defaultExportSampleRate, channels: 2, interleaved: true)
+                      sampleRate: Audio.defaultSampleRate, channels: 2, interleaved: true)
     }
     
     convenience init?(pcmData: Data) {

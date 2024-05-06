@@ -1358,6 +1358,8 @@ struct Score: BeatRangeType {
     static let pitchRange = minPitch ..< maxPitch
     static let doubleMinPitch = 0.0, doubleMaxPitch = 120.0
     static let doublePitchRange = doubleMinPitch ... doubleMaxPitch
+    static let minFq = Pitch.fq(fromPitch: doubleMinPitch), maxFq = Pitch.fq(fromPitch: doubleMaxPitch)
+    static let fqRange = minFq ... maxFq
     
     var notes = [Note]()
     var draftNotes = [Note]()
@@ -1406,7 +1408,7 @@ extension Score {
     }
     var renderedPCMBuffer: PCMBuffer? {
         let seq = Sequencer(audiotracks: [.init(values: [.score(self)])])
-        return try? seq?.buffer(sampleRate: Audio.defaultExportSampleRate,
+        return try? seq?.buffer(sampleRate: Audio.defaultSampleRate,
                                 progressHandler: { _, _ in })
     }
     
@@ -1613,9 +1615,7 @@ extension Volm {
 }
 
 struct Audio: Hashable, Codable {
-    static let defaultExportSampleRate = 44100.0
-    static let defaultSampleRate = 65536.0
-    static let defaultFftCount = 65536
+    static let defaultSampleRate = 44100.0
     static let headroomDb = 1.0
     static let headroomVolm = Volm.volm(fromDb: -headroomDb)
     static let headroomAmp = Volm.amp(fromVolm: headroomVolm)

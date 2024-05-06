@@ -61,7 +61,7 @@ struct IIRfilter {
 
     func generateCoefficients() -> [Double] {
         let A = 10 ** (self.G / 40)
-        let w0 = 2 * .pi * (self.fc / self.rate)
+        let w0 = .pi2 * (self.fc / self.rate)
         let alpha = .sin(w0) / (2 * self.Q)
 
         let a0, a1, a2, b0, b1, b2: Double

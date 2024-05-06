@@ -485,8 +485,8 @@ private extension NSImage {
         }
         
         let sp0 = spiralPathline(angle: 0, firstT: 5)
-        let sp1 = spiralPathline(angle: 2 * .pi / 3, firstT: 5)
-        let sp2 = spiralPathline(angle: 2 * .pi * 2 / 3, firstT: 5)
+        let sp1 = spiralPathline(angle: .pi2 / 3, firstT: 5)
+        let sp2 = spiralPathline(angle: .pi2 * 2 / 3, firstT: 5)
         
         var pls0 = [Pathline.Element]()
         pls0 += Pathline.squircle(p0: nb.maxXMaxYPoint,

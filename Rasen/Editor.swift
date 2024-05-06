@@ -1771,7 +1771,7 @@ final class IOEditor: Editor {
                 if !isStop {
                     if let sequencer = Sequencer(audiotracks: audiotracks) {
                         try sequencer.export(url: ioResult.url,
-                                             sampleRate: Audio.defaultExportSampleRate) { (t, stop) in
+                                             sampleRate: Audio.defaultSampleRate) { (t, stop) in
                             progressHandler(t * 0.8 + 0.2, &isStop)
                             if isStop {
                                 stop = true

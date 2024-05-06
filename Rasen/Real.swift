@@ -70,6 +70,13 @@ extension SignedNumeric {
     }
 }
 
+extension Float {
+    static let pi2 = Self.pi * 2
+}
+extension Double {
+    static let pi2 = Self.pi * 2
+}
+
 extension Float: Interpolatable {
     static func linear(_ f0: Float, _ f1: Float, t: Float) -> Float {
         f0 * (1 - t) + f1 * t
@@ -254,8 +261,8 @@ extension Double {
     
     func differenceRotation(_ other: Double) -> Double {
         var a = self - other
-        a -= (a / (2 * .pi)).rounded(.down) * 2 * .pi
-        return a > .pi ? a - 2 * .pi : a
+        a -= (a / .pi2).rounded(.down) * .pi2
+        return a > .pi ? a - .pi2 : a
     }
     
     func mod(_ other: Self) -> Self {
@@ -268,11 +275,14 @@ extension Double {
         self >= start && self < end ?
         self : (self - start).mod(end - start) + start
     }
+    func loop(end: Self) -> Self {
+        self < end ? self : mod(end)
+    }
     var loopedRotation: Double {
         if self < -.pi {
-            return (self + .pi).truncatingRemainder(dividingBy: 2 * .pi) + .pi
+            return (self + .pi).truncatingRemainder(dividingBy: .pi2) + .pi
         } else if self >= .pi {
-            return (self - .pi).truncatingRemainder(dividingBy: 2 * .pi) - .pi
+            return (self - .pi).truncatingRemainder(dividingBy: .pi2) - .pi
         } else {
             return self
         }
@@ -374,7 +384,7 @@ extension Double {
                                      mu: Self) -> Self {
         let sigmaSq = sigma * sigma
         return .exp(-(x - mu).squared / (2 * sigmaSq))
-        / .sqrt(2 * .pi * sigmaSq)
+        / .sqrt(.pi2 * sigmaSq)
     }
     static func cauchyDistribution(x: Self, gamma: Self, x0: Self) -> Self {
         gamma / (.pi * ((x - x0).squared + gamma * gamma))

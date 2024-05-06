@@ -47,7 +47,7 @@ struct Arc {
     private(set) var startPosition: Point, endPosition: Point
     
     init(centerPosition: Point = Point(), radius: Double = 0,
-         startAngle: Double = 0, endAngle: Double = 2 * .pi) {
+         startAngle: Double = 0, endAngle: Double = .pi2) {
         
         self.centerPosition = centerPosition
         self.radius = radius

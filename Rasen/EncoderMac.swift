@@ -137,7 +137,7 @@ final class Movie {
     let url: URL
     let fileType = AVFileType.mp4, codec: AVVideoCodecType
     let renderSize: Size, isHDR: Bool
-    let sampleRate = Audio.defaultExportSampleRate, audioChannelCount = 2
+    let sampleRate = Audio.defaultSampleRate, audioChannelCount = 2
     private let colorSpace: CGColorSpace, colorSpaceProfile: CFData
     private let writer: AVAssetWriter
     private let videoInput: AVAssetWriterInput

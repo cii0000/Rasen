@@ -1169,7 +1169,7 @@ final class ColorEditor: Editor {
         let rsc = 1 / Double(splitCount)
         var points = [Point](), colors = [Color]()
         for i in 0 ..< splitCount {
-            let hue = Double(i) * rsc * 2 * .pi
+            let hue = Double(i) * rsc * .pi2
             let color = Color(lightness: tintLightness,
                               unsafetyChroma: r, hue: hue,
                               document.colorSpace)
