@@ -88,7 +88,8 @@ final class NotePlayer {
         }
         self.aNotes = notes
         self.sequencer = sequencer
-        noder = .init(rendnotes: [], startSec: 0, durSec: 0, stereo: stereo)
+        noder = .init(rendnotes: [], startSec: 0, durSec: 0, sampleRate: Audio.defaultSampleRate,
+                      stereo: stereo)
         sequencer.append(noder, id: UUID())
     }
     deinit {
@@ -119,7 +120,7 @@ final class NotePlayer {
             noteIDs.insert(noteID)
             return .init(fq: Pitch.fq(fromPitch: .init(note.notePitch) + note.pitch.doubleValue),
                          noiseSeed: Rendnote.noiseSeed(from: note.id),
-                         pitbend: .init(pitch: note.pitch.doubleValue,
+                         pitbend: .init(pitch: 0,
                                         stereo: note.stereo,
                                         overtone: note.tone.overtone,
                                         spectlope: note.tone.spectlope),
@@ -351,7 +352,7 @@ final class PCMNoder {
 final class ScoreNoder {
     fileprivate weak var sequencer: Sequencer?
     fileprivate var node: AVAudioSourceNode!
-    private let format = AVAudioFormat(standardFormatWithSampleRate: Audio.defaultSampleRate, channels: 2)!
+    private let format: AVAudioFormat
     
     var stereo: Stereo {
         get {
@@ -432,16 +433,22 @@ final class ScoreNoder {
             } else {
                 let threadCount = 8
                 let nThreadCount = min(nwrrs.count, threadCount)
-                var notewaves = [Notewave](repeating: .init(fqScale: 1, isLoop: false,
-                                                            samples: [], stereos: []),
-                                           count: nwrrs.count)
                 
+                final class NotewaveBox {
+                    var notewave: Notewave
+                    
+                    init(_ notewave: Notewave = .init(fqScale: 1, isLoop: false, samples: [], stereos: [])) {
+                        self.notewave = notewave
+                    }
+                }
+                
+                var notewaveBoxs = nwrrs.count.range.map { _ in NotewaveBox() }
                 let dMod = nwrrs.count % threadCount
                 let dCount = nwrrs.count / threadCount
-                notewaves.withUnsafeMutableBufferPointer { notewavesPtr in
+                notewaveBoxs.withUnsafeMutableBufferPointer { notewavesPtr in
                     if nThreadCount == nwrrs.count {
                         DispatchQueue.concurrentPerform(iterations: nThreadCount) { threadI in
-                            notewavesPtr[threadI] = nwrrs[threadI].1.notewave(sampleRate: sampleRate)
+                            notewavesPtr[threadI] = .init(nwrrs[threadI].1.notewave(sampleRate: sampleRate))
                         }
                     } else {
                         DispatchQueue.concurrentPerform(iterations: nThreadCount) { threadI in
@@ -449,13 +456,13 @@ final class ScoreNoder {
                                 let j = threadI < dMod ? 
                                 (dCount + 1) * threadI + i :
                                 (dCount + 1) * dMod + dCount * (threadI - dMod) + i
-                                notewavesPtr[j] = nwrrs[j].1.notewave(sampleRate: sampleRate)
+                                notewavesPtr[j] = .init(nwrrs[j].1.notewave(sampleRate: sampleRate))
                             }
                         }
                     }
                 }
-                for (i, notewave) in notewaves.enumerated() {
-                    notewaveDic[nwrrs[i].0] = notewave
+                for (i, notewaveBox) in notewaveBoxs.enumerated() {
+                    notewaveDic[nwrrs[i].0] = notewaveBox.notewave
                 }
             }
         }
@@ -467,13 +474,13 @@ final class ScoreNoder {
     }
     
     struct NotewaveID: Hashable, Codable {
-        var fq: Double, noiseSeed: UInt64, pitbend: Pitbend, rebdableDurSec: Double, startDeltaSec: Double
+        var fq: Double, noiseSeed: UInt64, pitbend: Pitbend, rendableDurSec: Double, startDeltaSec: Double
         
         init(_ rendnote: Rendnote) {
             fq = rendnote.fq
             noiseSeed = rendnote.noiseSeed
             pitbend = rendnote.pitbend
-            rebdableDurSec = rendnote.rendableDurSec
+            rendableDurSec = rendnote.rendableDurSec
             startDeltaSec = rendnote.startDeltaSec
         }
     }
@@ -481,7 +488,7 @@ final class ScoreNoder {
     
     struct Memowave {
         var startSec: Double, releaseSec: Double?, endSec: Double?,
-            volm: Double, pan: Double, envelopeMemo: EnvelopeMemo, pitbend: Pitbend
+            envelopeMemo: EnvelopeMemo, pitbend: Pitbend
         var notewave: Notewave
         
         func contains(sec: Double) -> Bool {
@@ -495,18 +502,20 @@ final class ScoreNoder {
     private var memowaves = [UUID: Memowave]()
     private var phases = [UUID: Double]()
     
-    convenience init(score: Score, startSec: Double = 0, stereo: Stereo = .init(volm: 1)) {
+    convenience init(score: Score, startSec: Double = 0, sampleRate: Double,
+                     stereo: Stereo = .init(volm: 1)) {
         self.init(rendnotes: score.notes.map { Rendnote(note: $0, score: score) },
-                  startSec: startSec, durSec: score.secRange.end,
+                  startSec: startSec, durSec: score.secRange.end, sampleRate: sampleRate,
                   stereo: stereo, id: score.id)
     }
-    init(rendnotes: [Rendnote], startSec: Double, durSec: Rational,
+    init(rendnotes: [Rendnote], startSec: Double, durSec: Rational, sampleRate: Double,
          stereo: Stereo = .init(volm: 1), id: UUID = .init()) {
         
         self.rendnotes = rendnotes
         self.startSec = startSec
         self.durSec = durSec
         self.id = id
+        format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2)!
         
         let sampleRate = format.sampleRate
         let rSampleRate = 1 / sampleRate
@@ -555,8 +564,6 @@ final class ScoreNoder {
                                 = Memowave(startSec: noteStartSec,
                                            releaseSec: nil,
                                            endSec: nil,
-                                           volm: rendnote.pitbend.firstStereo.volm,
-                                           pan: rendnote.pitbend.firstStereo.pan,
                                            envelopeMemo: rendnote.envelopeMemo,
                                            pitbend: rendnote.pitbend,
                                            notewave: notewave)
@@ -578,8 +585,6 @@ final class ScoreNoder {
                                 = Memowave(startSec: noteStartSec,
                                            releaseSec: noteStartSec + length,
                                            endSec: noteStartSec + durSec,
-                                           volm: rendnote.pitbend.firstStereo.volm,
-                                           pan: rendnote.pitbend.firstStereo.pan,
                                            envelopeMemo: rendnote.envelopeMemo,
                                            pitbend: rendnote.pitbend,
                                            notewave: notewave)
@@ -629,12 +634,12 @@ final class ScoreNoder {
                     
                     let amp, pan: Double
                     if pitbend.isEqualAllStereo {
-                        amp = Volm.amp(fromVolm: memowave.volm * envelopeVolm)
-                        pan = memowave.pan + pitbend.firstStereo.pan
+                        amp = Volm.amp(fromVolm: pitbend.firstStereo.volm * envelopeVolm)
+                        pan = pitbend.firstStereo.pan
                     } else {
                         let stereo = notewave.stereo(at: i, atPhase: &phase)
-                        amp = Volm.amp(fromVolm: memowave.volm * stereo.volm * envelopeVolm)
-                        pan = memowave.pan + stereo.pan
+                        amp = Volm.amp(fromVolm: stereo.volm * envelopeVolm)
+                        pan = stereo.pan
                     }
                     
                     let sample = notewave.sample(at: i, amp: amp, atPhase: &phase)
@@ -710,7 +715,8 @@ final class Sequencer {
         }
     }
     
-    convenience init?(audiotracks: [Audiotrack], clipHandler: ((Float) -> ())? = nil) {
+    convenience init?(audiotracks: [Audiotrack], clipHandler: ((Float) -> ())? = nil,
+                      sampleRate: Double = Audio.defaultSampleRate) {
         let audiotracks = audiotracks.filter { !$0.isEmpty }
         
         var tracks = [Track]()
@@ -723,7 +729,7 @@ final class Sequencer {
                 guard value.beatRange.length > 0 && value.beatRange.end > 0 else { continue }
                 switch value {
                 case .score(let score):
-                    track.scoreNoders.append(.init(score: score))
+                    track.scoreNoders.append(.init(score: score, sampleRate: sampleRate))
                 case .sound(let content):
                     guard let noder = PCMNoder(content: content) else { continue }
                     track.pcmNoders.append(noder)
@@ -750,6 +756,7 @@ final class Sequencer {
             guard durSec > 0 else { continue }
             for noder in track.scoreNoders {
                 noder.startSec = sSec
+                noder.reset()
                 noder.updateRendnotes()
                 
                 scoreNoders[noder.id] = noder

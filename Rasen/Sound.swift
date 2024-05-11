@@ -415,7 +415,8 @@ extension Spectlope {
         guard pitch >= prePitch else { return isClippedPitch ? sprols.first! : .init(pitch: pitch, volm: sprols.first!.volm, noise: sprols.first!.noise) }
         for sprol in sprols {
             let nextPitch = sprol.pitch, nextSprol = sprol
-            let (nPrePitch, nNextPitch) = prePitch < nextPitch ? (prePitch, nextPitch) : (nextPitch, prePitch)
+            let (nPrePitch, nNextPitch) = prePitch < nextPitch ? 
+            (prePitch, nextPitch) : (nextPitch, prePitch)
             if pitch >= nPrePitch && pitch < nNextPitch {
                 let t = (pitch - nPrePitch) / (nNextPitch - nPrePitch)
                 let nSprol = Sprol.linear(preSprol, nextSprol, t: t)
@@ -431,37 +432,70 @@ extension Spectlope {
         }
         return maxSprol ?? (isClippedPitch ? sprols.last! : .init(pitch: pitch, volm: sprols.last!.volm, noise: sprols.last!.noise))
     }
+    func sprol(atFq fq: Double) -> Sprol {
+        sprol(atPitch: Pitch.pitch(fromFq: fq))
+    }
     
     func volm(atPitch pitch: Double) -> Double {
-        sprol(atPitch: pitch).volm
+        guard !sprols.isEmpty else { return 0 }
+        var prePitch = sprols.first!.pitch, preVolm = sprols.first!.volm, maxVolm: Double?
+        guard pitch >= prePitch else { return sprols.first!.volm }
+        for sprol in sprols {
+            let nextPitch = sprol.pitch, nextVolm = sprol.volm
+            let (nPrePitch, nNextPitch) = prePitch < nextPitch ? 
+            (prePitch, nextPitch) : (nextPitch, prePitch)
+            if pitch >= nPrePitch && pitch < nNextPitch {
+                let t = (pitch - nPrePitch) / (nNextPitch - nPrePitch)
+                let nVolm = Double.linear(preVolm, nextVolm, t: t)
+                maxVolm = if let nMaxVolm = maxVolm {
+                    max(nMaxVolm, nVolm)
+                } else {
+                    nVolm
+                }
+            }
+            prePitch = nextPitch
+            preVolm = nextVolm
+        }
+        return maxVolm ?? sprols.last!.volm
     }
     func volm(atFq fq: Double) -> Double {
         volm(atPitch: Pitch.pitch(fromFq: fq))
     }
-    
     func amp(atFq fq: Double) -> Double {
-        Volm.amp(fromVolm: sprol(atPitch: Pitch.pitch(fromFq: fq)).volm)
+        Volm.amp(fromVolm: volm(atPitch: Pitch.pitch(fromFq: fq)))
     }
     
     func noise(atPitch pitch: Double) -> Double {
-        sprol(atPitch: pitch).noise
+        guard !sprols.isEmpty else { return 0 }
+        var prePitch = sprols.first!.pitch, preNoise = sprols.first!.noise, maxNoise: Double?
+        guard pitch >= prePitch else { return sprols.first!.noise }
+        for sprol in sprols {
+            let nextPitch = sprol.pitch, nextNoise = sprol.noise
+            let (nPrePitch, nNextPitch) = prePitch < nextPitch ?
+            (prePitch, nextPitch) : (nextPitch, prePitch)
+            if pitch >= nPrePitch && pitch < nNextPitch {
+                let t = (pitch - nPrePitch) / (nNextPitch - nPrePitch)
+                let nNoise = Double.linear(preNoise, nextNoise, t: t)
+                maxNoise = if let nMaxNoise = maxNoise {
+                    max(nMaxNoise, nNoise)
+                } else {
+                    nNoise
+                }
+            }
+            prePitch = nextPitch
+            preNoise = nextNoise
+        }
+        return maxNoise ?? sprols.last!.noise
     }
     func noise(atFq fq: Double) -> Double {
         noise(atPitch: Pitch.pitch(fromFq: fq))
     }
-    
     func noiseAmp(atFq fq: Double) -> Double {
-        Volm.amp(fromVolm: sprol(atPitch: Pitch.pitch(fromFq: fq)).noise)
-    }
-    
-    func noisedAmp(atFq fq: Double) -> Double {
-        let amp = amp(atFq: fq)
-        let noiseAmp = noiseAmp(atFq: fq)
-        return amp - noiseAmp
+        Volm.amp(fromVolm: noise(atPitch: Pitch.pitch(fromFq: fq)))
     }
     
     func noisedVolm(atPitch pitch: Double) -> Double {
-        volm(atPitch: pitch) * (1 - noise(atPitch: pitch))
+        sprol(atPitch: pitch).noisedVolm
     }
     func noisedVolm(atFq fq: Double) -> Double {
         noisedVolm(atPitch: Pitch.pitch(fromFq: fq))
@@ -700,7 +734,7 @@ extension Tone: MonoInterpolatable {
 }
 
 struct Pit: Codable, Hashable {
-    var beat = Rational(0), pitch = Rational(0), stereo = Stereo(volm: 0.3125), tone = Tone(), lyric = ""
+    var beat = Rational(0), pitch = Rational(0), stereo = Stereo(volm: 0.25), tone = Tone(), lyric = ""
 }
 extension Pit: Protobuf {
     init(_ pb: PBPit) throws {
@@ -810,9 +844,6 @@ extension Note {
     }
     var firstRoundedPitch: Int {
         Int(firstPitch.rounded())
-    }
-    var firstFq: Double {
-        Pitch(value: pitch + pits[0].pitch).fq
     }
     var firstPitResult: PitResult {
         .init(notePitch: pitch, pitch: .rational(firstPit.pitch), stereo: firstStereo,

@@ -354,7 +354,7 @@ extension Rendnote {
         let snapSec = Double(score.sec(fromBeat: snapBeat))
         let dSec = sSec - snapSec
         
-        self.init(fq: note.firstFq,
+        self.init(fq: Pitch.fq(fromPitch: .init(note.pitch)),
                   noiseSeed: note.containsNoise ? Rendnote.noiseSeed(from: note.id) : 0,
                   pitbend: note.pitbend(fromTempo: score.tempo),
                   secRange: sSec ..< eSec,
@@ -381,12 +381,13 @@ extension Rendnote {
 }
 extension Rendnote {
     func notewave(stftCount: Int = 1024, fAlpha: Double = 1, rmsSize: Int = 2048,
-                  cutFq: Double = 16384, sampleRate: Double,
+                  cutFq: Double = 16384, cutStartFq: Double = 15800, sampleRate: Double,
                   fftCount: Int = 65536) -> Notewave {
         let date = Date()
         
         let notewave = aNotewave(stftCount: stftCount, fAlpha: fAlpha, rmsSize: rmsSize,
-                                 cutFq: cutFq, sampleRate: sampleRate, fftCount: fftCount)
+                                 cutFq: cutFq, 
+                                 cutStartFq: cutStartFq, sampleRate: sampleRate, fftCount: fftCount)
         
         print(Date().timeIntervalSince(date), fq, notewave.isLoop, notewave.samples.count)
         
@@ -397,7 +398,7 @@ extension Rendnote {
         return notewave
     }
     private func aNotewave(stftCount: Int, fAlpha: Double, rmsSize: Int,
-                           cutFq: Double, sampleRate: Double,
+                           cutFq: Double, cutStartFq: Double, sampleRate: Double,
                            fftCount: Int) -> Notewave {
         guard !pitbend.isEmpty else {
             return .init(fqScale: 1, isLoop: isLoop, samples: [0], stereos: [.init()])
@@ -478,60 +479,55 @@ extension Rendnote {
             return $0 == 0 || nfq == 0 ? 1 : 1 / (nfq / fq) ** sqfa
         }
         
-        func spline(_ samples: [Double], phase: Double) -> Double {
-            if phase.isInteger {
-                return samples[Int(phase)]
-            } else {
-                let sai = Int(phase)
-                
-                let a0 = sai - 1 >= 0 ? samples[sai - 1] : 0
-                let a1 = samples[sai]
-                let a2 = sai + 1 < samples.count ? samples[sai + 1] : 0
-                let a3 = sai + 2 < samples.count ? samples[sai + 2] : 0
-                let t = phase - Double(sai)
-                return Double.spline(a0, a1, a2, a3, t: t)
-            }
-        }
+//        func spline(_ samples: [Double], phase: Double) -> Double {// change to sinc
+//            if phase.isInteger {
+//                return samples[Int(phase)]
+//            } else {
+//                let sai = Int(phase)
+//                
+//                let a0 = sai - 1 >= 0 ? samples[sai - 1] : 0
+//                let a1 = samples[sai]
+//                let a2 = sai + 1 < samples.count ? samples[sai + 1] : 0
+//                let a3 = sai + 2 < samples.count ? samples[sai + 2] : 0
+//                let t = phase - Double(sai)
+//                return Double.spline(a0, a1, a2, a3, t: t)
+//            }
+//        }
         
-        func spectrum(from sprols: [Sprol], fq: Double, isLoudness: Bool) -> [Double] {
-            var i = 1
-            return (1 ... halfStftCount).map { fqi in
-                let nfq = Double(fqi) / Double(halfStftCount) * maxFq
-                guard nfq > 0 && nfq < cutFq else { return 0 }
-                let nPitch = Pitch.pitch(fromFq: nfq)
-                while i + 1 < sprols.count, nPitch > sprols[i].pitch { i += 1 }
-                let volm: Double
-                if let lastSprol = sprols.last, nPitch >= lastSprol.pitch {
-                    volm = lastSprol.noisedVolm
-                } else {
-                    let preSprol = sprols[i - 1], nextSprol = sprols[i]
-                    let t = preSprol.pitch == nextSprol.pitch ?
-                        0 : (nPitch - preSprol.pitch) / (nextSprol.pitch - preSprol.pitch)
-                    volm = Double.linear(preSprol.noisedVolm, nextSprol.noisedVolm, t: t)
-                }
-                let amp = Volm.amp(fromVolm: isLoudness ? volm * Loudness.volm40Phon(fromFq: nfq) : volm)
-                return amp * sqfas[fqi]
-            }
+//        func spectrum(from sprols: [Sprol], isLoudness: Bool) -> [Double] {
+//            var i = 1
+//            return (1 ... halfStftCount).map { fqi in
+//                let nfq = Double(fqi) / Double(halfStftCount) * maxFq
+//                guard nfq > 0 && nfq < cutFq else { return 0 }
+//                let nPitch = Pitch.pitch(fromFq: nfq)
+//                while i + 1 < sprols.count, nPitch > sprols[i].pitch { i += 1 }
+//                let volm: Double
+//                if let lastSprol = sprols.last, nPitch >= lastSprol.pitch {
+//                    volm = lastSprol.noisedVolm
+//                } else {
+//                    let preSprol = sprols[i - 1], nextSprol = sprols[i]
+//                    let t = preSprol.pitch == nextSprol.pitch ?
+//                        0 : (nPitch - preSprol.pitch) / (nextSprol.pitch - preSprol.pitch)
+//                    volm = Double.linear(preSprol.noisedVolm, nextSprol.noisedVolm, t: t)
+//                }
+//                let cutScale = cutStartFq < nfq ? nfq.clipped(min: cutStartFq, max: cutFq, newMin: 1, newMax: 0) : 1
+//                let amp = Volm.amp(fromVolm: (isLoudness ? volm * Loudness.volm40Phon(fromFq: nfq) : volm) * cutScale)
+//                return amp * sqfas[fqi]
+//            }
+//        }
+        func normarized(spectrum: [Double]) -> [Double] {
+            let sumV = (vDSP.sumOfSquares(spectrum) / 2).squareRoot()
+            return vDSP.multiply(sumV == 0 ? 0 : 1 / sumV, spectrum)
         }
-        func spectrum(fromNoise sprols: [Sprol], fq: Double, isLoudness: Bool) -> [Double] {
-            var i = 1
-            return (1 ... halfStftCount).map { fqi in
+        func spectrum(fromNoise spectlope: Spectlope, fq: Double, isLoudness: Bool) -> [Double] {
+            normarized(spectrum: (1 ... halfStftCount).map { fqi in
                 let nfq = Double(fqi) / Double(halfStftCount) * maxFq
                 guard nfq > 0 && nfq >= fq && nfq < cutFq else { return 0 }
-                let nPitch = Pitch.pitch(fromFq: nfq)
-                while i + 1 < sprols.count, nPitch > sprols[i].pitch { i += 1 }
-                let volm: Double
-                if let lastSprol = sprols.last, nPitch >= lastSprol.pitch {
-                    volm = lastSprol.noiseVolm
-                } else {
-                    let preSprol = sprols[i - 1], nextSprol = sprols[i]
-                    let t = preSprol.pitch == nextSprol.pitch ?
-                        0 : (nPitch - preSprol.pitch) / (nextSprol.pitch - preSprol.pitch)
-                    volm = Double.linear(preSprol.noiseVolm, nextSprol.noiseVolm, t: t)
-                }
-                let amp = Volm.amp(fromVolm: isLoudness ? volm * Loudness.volm40Phon(fromFq: nfq) : volm)
+                let noiseVolm = spectlope.sprol(atFq: nfq).noiseVolm
+                let cutScale = cutStartFq < nfq ? nfq.clipped(min: cutStartFq, max: cutFq, newMin: 1, newMax: 0) : 1
+                let amp = Volm.amp(fromVolm: (isLoudness ? noiseVolm * Loudness.volm40Phon(fromFq: nfq) : noiseVolm) * cutScale)
                 return amp * sqfas[fqi]
-            }
+            })
         }
         func clippedStft(_ samples: [Double]) -> [Double] {
             .init(samples[halfStftCount ..< samples.count - halfStftCount])
@@ -539,10 +535,10 @@ extension Rendnote {
         
         func normarizedWithRMS(from sSamples: [Double], to lSamples: [Double]) -> [Double] {
 //            guard rmsSize < sSamples.count else {
-                let maxV = vDSP.rootMeanSquare(sSamples)
-                return vDSP.multiply(maxV == 0 ? 0 : 1 / maxV, lSamples)
+//                let maxV = vDSP.rootMeanSquare(sSamples)
+//                return vDSP.multiply(maxV == 0 ? 0 : 1 / maxV, lSamples)
 //            }
-            
+            lSamples
 //            let isLast = sSamples.count % rmsSize != 0
 //            let count = sSamples.count / rmsSize + (isLast ? 1 : 0)
 //            var rmss = [Double](capacity: count), idxs = [Double](capacity: count)
@@ -573,18 +569,10 @@ extension Rendnote {
                 sSamples = .init(repeating: 0, count: sampleCount)
                 lSamples = .init(repeating: 0, count: sampleCount)
             } else {
-                func samples(isLoudness: Bool) -> [Double] {
-                    let sinCount = Int((cutFq / fq).clipped(min: 1, max: Double(Int.max)))
-                    print("SIN", fq, sinCount)
-                    let fq = fq.clipped(min: Score.minFq, max: cutFq)
-                                        
-                    let isAll = pitbend.firstOvertone.isAll
-                    let vs = (1 ... sinCount).map { n in
-                        let fq = fq * Double(n)
-                        return (n % 2 != 0 ? 1 : -1) 
-                        * Volm.amp(fromVolm: (isAll ? 1 : pitbend.firstOvertone.volm(at: n)) * (isLoudness ? Loudness.reverseVolm40Phon(fromFq: fq) : 1))
-                    }
-                    
+                let sinCount = Int((cutFq / fq).clipped(min: 1, max: Double(Int.max)))
+                print("SIN", fq, sinCount)
+                let fq = fq.clipped(min: Score.minFq, max: cutFq)
+                
 //                    let dPhase = fq * .pi2 * rSampleRate
 //                    var x = firstPhase()
 //                    var sinMX = 0.0, cosMX = 0.0
@@ -607,45 +595,70 @@ extension Rendnote {
 //                        x = x.mod(.pi2)
 //                        return v
 //                    }
-                    let dPhase = fq * .pi2 * rSampleRate
-                    var x = firstPhase()
-                    var sin1Xs = [Double](capacity: sampleCount)
-                    var cos1Xs = [Double](capacity: sampleCount)
-                    var sinMXs = [Double](capacity: sampleCount)
-                    var cosMXs = [Double](capacity: sampleCount)
-                    var ns = [Double](capacity: sampleCount)
-                    sampleCount.range.forEach { _ in
-                        let sin1X = Double.sin(x), cos1X = Double.cos(x)
-                        sin1Xs.append(sin1X)
-                        cos1Xs.append(cos1X)
-                        sinMXs.append(sin1X)
-                        cosMXs.append(cos1X)
-                        ns.append(sin1X)
-                        x += dPhase
-                        x = x.mod(.pi2)
+                let dPhase = fq * .pi2 * rSampleRate
+                var x = firstPhase()
+                var sin1Xs = [Double](capacity: sampleCount)
+                var cos1Xs = [Double](capacity: sampleCount)
+                var sinMXs = [Double](capacity: sampleCount)
+                var cosMXs = [Double](capacity: sampleCount)
+                sampleCount.range.forEach { _ in
+                    let sin1X = Double.sin(x), cos1X = Double.cos(x)
+                    sin1Xs.append(sin1X)
+                    cos1Xs.append(cos1X)
+                    sinMXs.append(sin1X)
+                    cosMXs.append(cos1X)
+                    x += dPhase
+                    x = x.mod(.pi2)
+                }
+                var sinNXss = [[Double]](capacity: sinCount)
+                sinNXss.append(sin1Xs)
+                var sinNXs = [Double](repeating: 0, count: sampleCount)
+                var sinNXs1 = [Double](repeating: 0, count: sampleCount)
+                var cosNXs = [Double](repeating: 0, count: sampleCount)
+                var cosNXs1 = [Double](repeating: 0, count: sampleCount)
+                if sinCount >= 2 {
+                    for _ in 2 ... sinCount {
+                        vDSP.multiply(sinMXs, cos1Xs, result: &sinNXs)
+                        vDSP.multiply(cosMXs, sin1Xs, result: &sinNXs1)
+                        
+                        vDSP.multiply(cosMXs, cos1Xs, result: &cosNXs)
+                        vDSP.multiply(sinMXs, sin1Xs, result: &cosNXs1)
+                        
+                        vDSP.add(sinNXs, sinNXs1, result: &sinMXs)
+                        vDSP.subtract(cosNXs, cosNXs1, result: &cosMXs)
+                        sinNXss.append(sinMXs)
                     }
-                    
-                    var sinNXs = [Double](repeating: 0, count: sampleCount)
-                    var sinNXs1 = [Double](repeating: 0, count: sampleCount)
-                    var cosNXs = [Double](repeating: 0, count: sampleCount)
-                    var cosNXs1 = [Double](repeating: 0, count: sampleCount)
-                    if sinCount >= 2 {
-                        for n in 2 ... sinCount {
-                            let m = n - 1
-                            vDSP.multiply(sinMXs, cos1Xs, result: &sinNXs)
-                            vDSP.multiply(cosMXs, sin1Xs, result: &sinNXs1)
-                            
-                            vDSP.multiply(cosMXs, cos1Xs, result: &cosNXs)
-                            vDSP.multiply(sinMXs, sin1Xs, result: &cosNXs1)
-                            
-                            vDSP.add(sinNXs, sinNXs1, result: &sinMXs)
-                            vDSP.subtract(cosNXs, cosNXs1, result: &cosMXs)
-                            
-                            vDSP.multiply(vs[m], sinMXs, result: &sinNXs)
-                            vDSP.add(sinNXs, ns, result: &ns)
-                        }
-                    }
-                    return ns
+                }
+                
+                let overtone = pitbend.firstOvertone, spectlope = pitbend.firstSpectlope
+                let isAll = overtone.isAll,
+                    oddScale = Volm.amp(fromVolm: overtone.oddVolm),
+                    evenScale = -Volm.amp(fromVolm: overtone.evenVolm)
+                func vs(isLoudness: Bool) -> [Double] {
+                    var sign = true
+                    return normarized(spectrum: (1 ... sinCount).map { n in
+                        let fq = fq * Double(n)
+                        let overtoneScale = isAll || n == 1 ? 1 : (sign ? oddScale : evenScale)
+                        let loudnessVolm = isLoudness ? Loudness.reverseVolm40Phon(fromFq: fq) : 1
+                        let spectlopeVolm = spectlope.noisedVolm(atFq: fq)
+                        let amp = Volm.amp(fromVolm: loudnessVolm * spectlopeVolm)
+                        * overtoneScale / Double(n) ** sqfa
+                        sign = !sign
+                        return amp
+                    })
+                }
+                let sVs = vs(isLoudness: false), lVs = vs(isLoudness: true)
+                
+                sSamples = [Double](repeating: 0, count: sampleCount)
+                for (n, sinNXs) in sinNXss.enumerated() {
+                    vDSP.multiply(sVs[n], sinNXs, result: &sinNXs1)
+                    vDSP.add(sinNXs1, sSamples, result: &sSamples)
+                }
+                lSamples = [Double](repeating: 0, count: sampleCount)
+                for (n, sinNXs) in sinNXss.enumerated() {
+                    vDSP.multiply(lVs[n], sinNXs, result: &sinNXs1)
+                    vDSP.add(sinNXs1, lSamples, result: &lSamples)
+                }
                     
 //                    let halfFftCount = fftCount / 2
 //                    var amps = [Double](repeating: 0, count: halfFftCount)
@@ -695,10 +708,7 @@ extension Rendnote {
 //                        sSamples = Array(sSamples.loop(fromLoop: Int(startDeltaSec * fqScale * sampleRate)))
 //                    }
 //                    return sSamples
-                }
-                
-                sSamples = samples(isLoudness: false)
-                lSamples = samples(isLoudness: true)
+//                }
             }
             
             if containsNoise {
@@ -716,9 +726,9 @@ extension Rendnote {
 //                lSamples = loopedSamples(from: lSamples)
                 
                 let noiseSamples = vDSP.gaussianNoise(count: sampleCount + stftCount, seed: noiseSeed)
-                let sSpectrum = spectrum(fromNoise: pitbend.firstSpectlope.sprols, 
+                let sSpectrum = spectrum(fromNoise: pitbend.firstSpectlope,
                                          fq: fq, isLoudness: false)
-                let lSpectrum = spectrum(fromNoise: pitbend.firstSpectlope.sprols,
+                let lSpectrum = spectrum(fromNoise: pitbend.firstSpectlope,
                                          fq: fq, isLoudness: true)
                 let sNoiseSamples = clippedStft(vDSP.apply(noiseSamples, spectrum: sSpectrum))
                 let lNoiseSamples = clippedStft(vDSP.apply(noiseSamples, spectrum: lSpectrum))
@@ -742,36 +752,140 @@ extension Rendnote {
                 sSamples = .init(repeating: 0, count: sampleCount)
                 lSamples = .init(repeating: 0, count: sampleCount)
             } else {
-                let a = .pi2 * rSampleRate
-                var phase = firstPhase()
-                let aSamples = sampleCount.range.map { i in
+                let firstOvertone = pitbend.firstOvertone
+                let isEqualAllOvertone = pitbend.isEqualAllOvertone,
+                    isAll = firstOvertone.isAll,
+                    oddScale = Volm.amp(fromVolm: firstOvertone.oddVolm),
+                    evenScale = -Volm.amp(fromVolm: firstOvertone.evenVolm)
+                var oddScales = [Double](capacity: sampleCount)
+                var evenScales = [Double](capacity: sampleCount)
+                for i in sampleCount.range {
                     let sec = Double(i) * rSampleRate
-                    let fq = fq * pitbend.fqScale(atSec: sec)
-                    let sinCount = Int((cutFq / fq).clipped(min: 1, max: Double(Int.max)))
-                    let k = Double(sinCount)
-                    let x = phase
-                    let v: Double = .sin((k + 1) * (x + .pi) / 2) * .sin((k * x + .pi * (k + 2)) / 2) / .cos(x / 2)
-                    phase += fq * a
-                    phase = phase.mod(.pi2)
-                    return v
+                    let overtone = pitbend.overtone(atSec: sec)
+                    oddScales.append(Volm.amp(fromVolm: overtone.oddVolm))
+                    evenScales.append(-Volm.amp(fromVolm: overtone.evenVolm))
                 }
                 
-                let spectrumCount = vDSP.spectramCount(sampleCount: aSamples.count, fftCount: stftCount)
-                let rDurSp = rendableDurSec / Double(spectrumCount)
-                let sSpectrogram = spectrumCount.range.map { i in
-                    let sec = Double(i) * rDurSp
-                    let spectlope = pitbend.spectlope(atSec: sec)
-                    let fq = fq * pitbend.fqScale(atSec: sec)
-                    return spectrum(from: spectlope.sprols, fq: fq, isLoudness: false)
+                struct Frame {
+                    var sec: Double, fq: Double, sinCount: Int, sin1X: Double, cos1X: Double
                 }
-                let lSpectrogram = spectrumCount.range.map { i in
-                    let sec = Double(i) * rDurSp
-                    let spectlope = pitbend.spectlope(atSec: sec)
-                    let fq = fq * pitbend.fqScale(atSec: sec)
-                    return spectrum(from: spectlope.sprols, fq: fq, isLoudness: true)
+                let pi2rs = .pi2 * rSampleRate
+                var x = firstPhase()
+                let frames: [Frame] = sampleCount.range.map { i in
+                    let sec = Double(i) * rSampleRate
+                    let fq = (fq * pitbend.fqScale(atSec: sec)).clipped(min: Score.minFq, max: cutFq)
+                    let sinCount = Int((cutFq / fq).clipped(min: 1, max: Double(Int.max)))
+                    let sin1X = Double.sin(x), cos1X = Double.cos(x)
+                    x += fq * pi2rs
+                    x = x.mod(.pi2)
+                    return Frame(sec: sec, fq: fq, sinCount: sinCount, sin1X: sin1X, cos1X: cos1X)
                 }
-                sSamples = vDSP.apply(aSamples, spectrogram: sSpectrogram)
-                lSamples = vDSP.apply(aSamples, spectrogram: lSpectrogram)
+                let maxSinCount = frames.maxValue { $0.sinCount }!
+                let sqfas = (1 ... maxSinCount).map { n in 1 / Double(n) ** sqfa }
+                let sinss: [[Double]] = frames.enumerated().map { (i, v) in
+                    let sinCount = v.sinCount, sin1X = v.sin1X, cos1X = v.cos1X
+                    var sinMX = sin1X, cosMX = cos1X
+                    var sins = [Double](capacity: sinCount)
+                    sins.append(sin1X)
+                    if sinCount >= 2 {
+                        var sign = true
+                        for n in 2 ... sinCount {
+                            let m = n - 1
+                            let sinNX = sinMX * cos1X + cosMX * sin1X
+                            let cosNX = cosMX * cos1X - sinMX * sin1X
+                            sinMX = sinNX
+                            cosMX = cosNX
+                            
+                            let overtoneScale = isEqualAllOvertone ?
+                            (isAll ? 1 : (sign ? oddScale : evenScale)) :
+                            (sign ? oddScales[i] : evenScales[i])
+                            sign = !sign
+                            
+                            let amp = overtoneScale * sqfas[m]
+                            sins.append(amp * sinNX)
+                        }
+                    }
+                    return sins
+                }
+                
+                let intCutStartFq = Int(cutStartFq.rounded(.down))
+                let cutFqVolms = (intCutStartFq ..< Int(cutFq.rounded(.down))).map {
+                    Double($0).clipped(min: cutStartFq, max: cutFq, newMin: 1, newMax: 0)
+                }
+                let spectrumCount = vDSP.spectramCount(sampleCount: sampleCount, fftCount: stftCount)
+                let ssCount = sampleCount / spectrumCount
+                func vss(isLoudness: Bool) -> [[Double]] {
+                    var spectrogram = Array(repeating: Array(repeating: 0.0, count: maxSinCount),
+                                            count: sampleCount)
+                    var preSpectrum: [Double]!
+                    func update(at i: Int) {
+                        let frame = frames[i]
+                        let sec = frame.sec
+                        let spectlope = pitbend.spectlope(atSec: sec)
+                        let fqs = (1 ... maxSinCount).map { n in frame.fq * Double(n) }
+                        let spectrum = normarized(spectrum: fqs.map { fq in
+                            Volm.amp(fromVolm: spectlope.noisedVolm(atFq: fq) * (isLoudness ? Loudness.volm40Phon(fromFq: fq) : 1) * (fq > cutStartFq ? (fq < cutFq ? cutFqVolms[Int(fq) - intCutStartFq] : 0) : 1))
+                        })
+                        maxSinCount.range.forEach { spectrogram[i][$0] = spectrum[$0] }
+                        if i > 0 {
+                            for j in i - ssCount + 1 ..< i {
+                                let t = Double(j - i + ssCount) / Double(ssCount)
+                                for k in maxSinCount.range {
+                                    spectrogram[j][k] = Double.linear(preSpectrum[k], spectrum[k], t: t)
+                                }
+                            }
+                        }
+                        preSpectrum = spectrum
+                    }
+                    for i in stride(from: 0, to: sampleCount, by: ssCount) {
+                        update(at: i)
+                    }
+                    if sampleCount % ssCount != 0 {
+                        update(at: sampleCount - 1)
+                    }
+                    
+                    for (i, v) in spectrogram.enumerated() {
+                        if v.count > frames[i].sinCount {
+                            spectrogram[i].removeLast(v.count - frames[i].sinCount)
+                        }
+                    }
+                    return spectrogram
+                }
+                
+                let sVss = vss(isLoudness: false), lVss = vss(isLoudness: true)
+                sSamples = zip(sinss, sVss).map { vDSP.sum(vDSP.multiply($0.0, $0.1)) }
+                lSamples = zip(sinss, lVss).map { vDSP.sum(vDSP.multiply($0.0, $0.1)) }
+                
+//                let a = .pi2 * rSampleRate
+//                var phase = firstPhase()
+//                let aSamples = sampleCount.range.map { i in
+//                    let sec = Double(i) * rSampleRate
+//                    let fq = fq * pitbend.fqScale(atSec: sec)
+//                    let sinCount = Int((cutFq / fq).clipped(min: 1, max: Double(Int.max)))
+//                    let k = Double(sinCount)
+//                    let x = phase
+//                    let v: Double = .sin((k + 1) * (x + .pi) / 2) * .sin((k * x + .pi * (k + 2)) / 2) / .cos(x / 2)
+//                    phase += fq * a
+//                    phase = phase.mod(.pi2)
+//                    return v
+//                }
+//                
+//                let spectrumCount = vDSP.spectramCount(sampleCount: aSamples.count, fftCount: stftCount)
+//                let rDurSp = rendableDurSec / Double(spectrumCount)
+//                let sSpectrogram = spectrumCount.range.map { i in
+//                    let sec = Double(i) * rDurSp
+//                    let spectlope = pitbend.spectlope(atSec: sec)
+//                    let fq = fq * pitbend.fqScale(atSec: sec)
+//                    return spectrum(from: spectlope, fq: fq, isLoudness: false)
+//                }
+//                let lSpectrogram = spectrumCount.range.map { i in
+//                    let sec = Double(i) * rDurSp
+//                    let spectlope = pitbend.spectlope(atSec: sec)
+//                    let fq = fq * pitbend.fqScale(atSec: sec)
+//                    return spectrum(from: spectlope, fq: fq, isLoudness: true)
+//                }
+//                sSamples = vDSP.apply(aSamples, spectrogram: sSpectrogram)
+//                lSamples = vDSP.apply(aSamples, spectrogram: lSpectrogram)
             }
             
             if containsNoise {
@@ -783,13 +897,13 @@ extension Rendnote {
                     let sec = Double(i) * rDurSp
                     let spectlope = pitbend.spectlope(atSec: sec)
                     let fq = fq * pitbend.fqScale(atSec: sec)
-                    return spectrum(fromNoise: spectlope.sprols, fq: fq, isLoudness: false)
+                    return spectrum(fromNoise: spectlope, fq: fq, isLoudness: false)
                 }
                 let lSpectrogram = spectrumCount.range.map { i in
                     let sec = Double(i) * rDurSp
                     let spectlope = pitbend.spectlope(atSec: sec)
                     let fq = fq * pitbend.fqScale(atSec: sec)
-                    return spectrum(fromNoise: spectlope.sprols, fq: fq, isLoudness: true)
+                    return spectrum(fromNoise: spectlope, fq: fq, isLoudness: true)
                 }
                 let sNoiseSamples = clippedStft(vDSP.apply(noiseSamples, spectrogram: sSpectrogram))
                 let lNoiseSamples = clippedStft(vDSP.apply(noiseSamples, spectrogram: lSpectrogram))

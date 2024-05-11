@@ -1634,7 +1634,8 @@ final class SheetView: View {
                 }
                 if playingOtherTimelineIDs.isEmpty {
                     seqTrack.scoreNoders.append(.init(rendnotes: [], startSec: 0,
-                                                      durSec: sheetView.model.animationDurSec))
+                                                      durSec: sheetView.model.animationDurSec, 
+                                                      sampleRate: Audio.defaultSampleRate))
                 }
                 seqTracks.append(seqTrack)
                 deltaSec += seqTrack.durSec
@@ -1654,7 +1655,8 @@ final class SheetView: View {
                 }
                 if playingOtherTimelineIDs.isEmpty {
                     seqTrack.scoreNoders.append(.init(rendnotes: [], startSec: 0,
-                                                      durSec: model.animationDurSec))
+                                                      durSec: model.animationDurSec,
+                                                      sampleRate: Audio.defaultSampleRate))
                 }
                 seqTracks.append(seqTrack)
             }
@@ -1674,7 +1676,8 @@ final class SheetView: View {
                 }
                 if playingOtherTimelineIDs.isEmpty {
                     seqTrack.scoreNoders.append(.init(rendnotes: [], startSec: 0,
-                                                      durSec: sheetView.model.animationDurSec))
+                                                      durSec: sheetView.model.animationDurSec,
+                                                      sampleRate: Audio.defaultSampleRate))
                 }
                 seqTracks.append(seqTrack)
                 nextPlayingTempo = sheetView.model.animation.tempo

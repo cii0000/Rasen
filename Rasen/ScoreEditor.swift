@@ -871,7 +871,7 @@ final class ScoreView: TimelineView {
         updateDraftNotes()
         
         if model.enabled {
-            scoreNoder = .init(score: model)
+            scoreNoder = .init(score: model, sampleRate: Audio.defaultSampleRate)
         }
     }
 }
@@ -998,7 +998,8 @@ extension ScoreView {
             updateChord()
             
             if oldValue.enabled != newValue.enabled {
-                scoreNoder = newValue.enabled ? .init(score: model) : nil
+                scoreNoder = newValue.enabled ? .init(score: model,
+                                                      sampleRate: Audio.defaultSampleRate) : nil
             } else if oldValue.tempo != newValue.tempo {
                 scoreNoder?.changeTempo(with: model)
             } else if oldValue.durBeat != newValue.durBeat {
