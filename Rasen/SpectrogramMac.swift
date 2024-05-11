@@ -44,6 +44,10 @@ extension vDSP {
     static func window(_ type: WindowSequence, count: Int) -> [Double] {
         Self.window(ofType: Double.self, usingSequence: type, count: count, isHalfWindow: false)
     }
+    
+    static func sinRMS<U>(_ vector: U) -> Double where U: AccelerateBuffer, U.Element == Double {
+        (vDSP.sumOfSquares(vector) / 2).squareRoot()
+    }
 }
 
 struct FftFrame {
