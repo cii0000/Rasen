@@ -502,7 +502,7 @@ extension Spectlope {
     }
     
     var formants: [Formant] {
-        stride(from: 0, to: sprols.count, by: 4).map {
+        stride(from: 0, to: (sprols.count / 4) * 4, by: 4).map {
             .init(sprol0: sprols[$0], sprol1: sprols[$0 + 1],
                   sprol2: sprols[$0 + 2], sprol3: sprols[$0 + 3])
         }

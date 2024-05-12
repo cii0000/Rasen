@@ -658,38 +658,25 @@ extension FormantFilter: Interpolatable {
     static func linear(_ f0: Self, _ f1: Self, t: Double) -> Self {
         .init(formants: .linear(f0.formants, f1.formants, t: t))
     }
-    static func firstSpline(_ f1: Self, _ f2: Self,
-                            _ f3: Self, t: Double) -> Self {
-        .init(formants: .firstSpline(f1.formants, f2.formants,
-                                     f3.formants, t: t))
+    static func firstSpline(_ f1: Self, _ f2: Self, _ f3: Self, t: Double) -> Self {
+        .init(formants: .firstSpline(f1.formants, f2.formants, f3.formants, t: t))
     }
-    static func spline(_ f0: Self, _ f1: Self,
-                       _ f2: Self, _ f3: Self, t: Double) -> Self {
-        .init(formants: .spline(f0.formants, f1.formants,
-                                f2.formants, f3.formants, t: t))
+    static func spline(_ f0: Self, _ f1: Self, _ f2: Self, _ f3: Self, t: Double) -> Self {
+        .init(formants: .spline(f0.formants, f1.formants, f2.formants, f3.formants, t: t))
     }
-    static func lastSpline(_ f0: Self, _ f1: Self,
-                           _ f2: Self, t: Double) -> Self {
-        .init(formants: .lastSpline(f0.formants, f1.formants,
-                                    f2.formants, t: t))
+    static func lastSpline(_ f0: Self, _ f1: Self, _ f2: Self, t: Double) -> Self {
+        .init(formants: .lastSpline(f0.formants, f1.formants, f2.formants, t: t))
     }
 }
 extension FormantFilter: MonoInterpolatable {
-    static func firstMonospline(_ f1: Self, _ f2: Self,
-                                _ f3: Self, with ms: Monospline) -> Self {
-        .init(formants: .firstMonospline(f1.formants, f2.formants,
-                                         f3.formants, with: ms))
+    static func firstMonospline(_ f1: Self, _ f2: Self, _ f3: Self, with ms: Monospline) -> Self {
+        .init(formants: .firstMonospline(f1.formants, f2.formants, f3.formants, with: ms))
     }
-    static func monospline(_ f0: Self, _ f1: Self,
-                           _ f2: Self, _ f3: Self,
-                           with ms: Monospline) -> Self {
-        .init(formants: .monospline(f0.formants, f1.formants,
-                                    f2.formants, f3.formants, with: ms))
+    static func monospline(_ f0: Self, _ f1: Self, _ f2: Self, _ f3: Self, with ms: Monospline) -> Self {
+        .init(formants: .monospline(f0.formants, f1.formants, f2.formants, f3.formants, with: ms))
     }
-    static func lastMonospline(_ f0: Self, _ f1: Self,
-                               _ f2: Self, with ms: Monospline) ->Self {
-        .init(formants: .lastMonospline(f0.formants, f1.formants,
-                                        f2.formants, with: ms))
+    static func lastMonospline(_ f0: Self, _ f1: Self, _ f2: Self, with ms: Monospline) ->Self {
+        .init(formants: .lastMonospline(f0.formants, f1.formants, f2.formants, with: ms))
     }
 }
 extension FormantFilter {
@@ -1137,7 +1124,7 @@ struct Mora: Hashable, Codable {
                 isOffVoice = true
             case .ɕ, .tɕ, .dʒ:
                 let sokuonScale = previousPhoneme == .sokuon || isVowelReduction ? 1.5 : 1
-                let oDurSec, durSec: Double, volm: Double
+                let oDurSec, durSec, volm: Double
                 switch oph {
                 case .ɕ:
                     oDurSec = 0.085 * sokuonScale

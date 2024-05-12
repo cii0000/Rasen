@@ -5936,6 +5936,26 @@ final class SheetView: View {
             }
         }
     }
+    func noteAndPitAndSprolIs(from selections: [Selection], enabledAll: Bool = true) -> [Int: [Int: Set<Int>]] {
+        let fs = selections
+            .map { $0.rect }
+            .map { scoreView.convertFromWorld($0) }
+        return scoreView.model.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) { (n, v) in
+            let noteI = v.offset, note = v.element
+            n[noteI] = note.pits.enumerated().reduce(into: .init()) { (v, ip) in
+                let pitI = ip.offset, pit = ip.element
+                for sprolI in pit.tone.spectlope.sprols.count.range {
+                    if fs.contains(where: { $0.contains(scoreView.sprolPosition(atSprol: sprolI, atPit: pitI, from: note)) }) {
+                        if v[pitI] != nil {
+                            v[pitI]?.insert(sprolI)
+                        } else {
+                            v[pitI] = [sprolI]
+                        }
+                    }
+                }
+            }
+        }
+    }
     func draftNoteIndexes(from selections: [Selection]) -> [Int] {
         let fs = selections
             .map { $0.rect }

@@ -192,7 +192,7 @@ final class ScoreSlider: DragEditor {
     private var sprolI: Int?, beganSprol = Sprol()
     private var beganScoreOption: ScoreOption?
     private var beganNotes = [Int: Note]()
-    private var beganNotePits = [UUID: [Int: (note: Note, pit: Pit, pits: [Int: Pit])]]()
+    private var beganNotePits = [UUID: [Int: (note: Note, pits: [Int: (pit: Pit, sprolIs: Set<Int>)])]]()
     
     func send(_ event: DragEvent) {
         guard isEditingSheet else {
@@ -305,53 +305,39 @@ final class ScoreSlider: DragEditor {
                         self.noteI = noteI
                         self.pitI = pitI
                         
-                        func updatePitsWithSelection(noteI: Int, pitI: Int?, _ type: PitIDType) {
-                            var noteAndPitIs: [Int: [Int]]
+                        func updatePitsWithSelection() {
+                            var noteAndPitIs: [Int: [Int: Set<Int>]]
                             if document.isSelect(at: p) {
-                                noteAndPitIs = sheetView.noteAndPitIndexes(from: document.selections,
-                                                                           enabledAll: false)
-                                if let pitI {
-                                    if noteAndPitIs[noteI] != nil {
-                                        if noteAndPitIs[noteI]!.contains(pitI) {
-                                            noteAndPitIs[noteI]?.append(pitI)
-                                        }
-                                    } else {
-                                        noteAndPitIs[noteI] = [pitI]
-                                    }
-                                } else {
-                                    noteAndPitIs[noteI] = score.notes[noteI].pits.count.array
-                                }
+                                noteAndPitIs = sheetView.noteAndPitAndSprolIs(from: document.selections)
                             } else {
-                                if let pitI {
-                                    let id = score.notes[noteI].pits[pitI][type]
-                                    noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int]]()) {
-                                        $0[$1.offset] = $1.element.pits.enumerated().compactMap { (pitI, pit) in
-                                            pit[type] == id ? pitI : nil
+                                let id = score.notes[noteI].pits[pitI][.tone]
+                                noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) {
+                                    $0[$1.offset] = $1.element.pits.enumerated().reduce(into: [Int: Set<Int>]()) { (v, ip) in
+                                        if ip.element[.tone] == id {
+                                            v[ip.offset] = pitI == ip.offset ? [sprolI] : []
                                         }
                                     }
-                                } else {
-                                    noteAndPitIs = [noteI: score.notes[noteI].pits.count.array]
                                 }
                             }
                             
                             beganNotePits = noteAndPitIs.reduce(into: .init()) {
-                                for pitI in $1.value {
+                                for (pitI, sprolIs) in $1.value {
                                     let pit = score.notes[$1.key].pits[pitI]
-                                    let id = pit[type]
+                                    let id = pit[.tone]
                                     if $0[id] != nil {
                                         if $0[id]![$1.key] != nil {
-                                            $0[id]![$1.key]!.pits[pitI] = pit
+                                            $0[id]![$1.key]!.pits[pitI] = (pit, sprolIs)
                                         } else {
-                                            $0[id]![$1.key] = (score.notes[$1.key], pit, [pitI: pit])
+                                            $0[id]![$1.key] = (score.notes[$1.key], [pitI: (pit, sprolIs)])
                                         }
                                     } else {
-                                        $0[id] = [$1.key: (score.notes[$1.key], pit, [pitI: pit])]
+                                        $0[id] = [$1.key: (score.notes[$1.key], [pitI: (pit, sprolIs)])]
                                     }
                                 }
                             }
                         }
                         
-                        updatePitsWithSelection(noteI: noteI, pitI: pitI, .tone)
+                        updatePitsWithSelection()
                         
                         let noteIsSet = Set(beganNotePits.values.flatMap { $0.keys }).sorted()
                         let vs = score.noteIAndPits(atBeat: note.pits[pitI].beat + note.beatRange.start,
@@ -630,36 +616,35 @@ final class ScoreSlider: DragEditor {
                        let sprolI, sprolI < score.notes[noteI].pits[pitI].tone.spectlope.count {
                        
                         let pitch = scoreView.spectlopePitch(at: scoreP, at: noteI)
+                        let dPitch = pitch - beganSprol.pitch
+                        let nPitch = (beganTone.spectlope.sprols[sprolI].pitch + dPitch)
+                            .clipped(min: Score.doubleMinPitch, max: Score.doubleMaxPitch)
                         
-                        var tone = beganTone
-                        let opspx = tone.spectlope.sprols[sprolI].pitch + pitch - beganSprol.pitch
-                        let pspx = opspx.clipped(min: sprolI - 2 >= 0 ? tone.spectlope.sprols[sprolI - 2].pitch : Score.doubleMinPitch,
-                                                 max: sprolI + 2 < tone.spectlope.count ? tone.spectlope.sprols[sprolI + 2].pitch : Score.doubleMaxPitch)
-                        tone.spectlope.sprols[sprolI].pitch = pspx
-                        tone.id = .init()
-                        
-                        var nivs = [IndexValue<Note>]()
+                        var nvs = [Int: Note]()
                         for (_, v) in beganNotePits {
                             let nid = UUID()
                             for (noteI, nv) in v {
-                                guard noteI < score.notes.count else { continue }
-                                var note = scoreView[noteI]
-                                for (pitI, _) in nv.pits {
-                                    guard pitI < score.notes[noteI].pits.count,
-                                          sprolI < note.pits[pitI].tone.spectlope.count else { continue }
-                                    note.pits[pitI].tone = tone
-                                    note.pits[pitI].tone.id = nid
+                                if nvs[noteI] == nil {
+                                    nvs[noteI] = nv.note
                                 }
-                                nivs.append(.init(value: note, index: noteI))
+                                nv.pits.forEach { (pitI, beganPit) in
+                                    for sprolI in beganPit.sprolIs {
+                                        let pitch = (beganPit.pit.tone.spectlope.sprols[sprolI].pitch + dPitch)
+                                            .clipped(min: Score.doubleMinPitch, max: Score.doubleMaxPitch)
+                                        nvs[noteI]?.pits[pitI].tone.spectlope.sprols[sprolI].pitch = pitch
+                                    }
+                                    nvs[noteI]?.pits[pitI].tone.id = nid
+                                }
                             }
                         }
+                        let nivs = nvs.map { IndexValue(value: $0.value, index: $0.key) }
                         scoreView.replace(nivs)
                         
                         notePlayer?.notes = playerBeatNoteIndexes.map {
                             scoreView.pitResult(atBeat: beganStartBeat, at: $0)
                         }
                         
-                        document.cursor = .circle(string: Pitch(value: .init(pspx, intervalScale: Sheet.fullEditPitchInterval)).octaveString(hidableDecimal: false))
+                        document.cursor = .circle(string: Pitch(value: .init(nPitch, intervalScale: Sheet.fullEditPitchInterval)).octaveString(hidableDecimal: false))
                     }
                     
                 case .keyBeats:

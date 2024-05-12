@@ -511,19 +511,23 @@ extension Rendnote {
 //                    volm = Double.linear(preSprol.noisedVolm, nextSprol.noisedVolm, t: t)
 //                }
 //                let cutScale = cutStartFq < nfq ? nfq.clipped(min: cutStartFq, max: cutFq, newMin: 1, newMax: 0) : 1
-//                let amp = Volm.amp(fromVolm: (isLoudness ? volm * Loudness.volm40Phon(fromFq: nfq) : volm) * cutScale)
+//                let amp = Volm.amp(fromVolm: (isLoudness ? volm * Loudness.reverseVolm40Phon(fromFq: nfq) : volm) * cutScale)
 //                return amp * sqfas[fqi]
 //            }
 //        }
-        func aNoiseSpectrum(fromNoise spectlope: Spectlope, fq: Double) -> [Double] {
-            (1 ... halfStftCount).map { fqi in
+        func aNoiseSpectrum(fromNoise spectlope: Spectlope, fq: Double) -> (spectrum: [Double], rms: Double) {
+            var rmsV = 0.0
+            return ((1 ... halfStftCount).map { fqi in
                 let nfq = Double(fqi) / Double(halfStftCount) * maxFq
                 guard nfq > 0 && nfq >= fq && nfq < cutFq else { return 0 }
+                let loudnessVolm = Loudness.volm40Phon(fromFq: nfq)
                 let noiseVolm = spectlope.sprol(atFq: nfq).noiseVolm
                 let cutScale = cutStartFq < nfq ? nfq.clipped(min: cutStartFq, max: cutFq, newMin: 1, newMax: 0) : 1
-                let amp = Volm.amp(fromVolm: noiseVolm * Loudness.volm40Phon(fromFq: nfq) * cutScale)
-                return amp * sqfas[fqi]
-            }
+                let a = sqfas[fqi] * cutScale
+                let amp = Volm.amp(fromVolm: loudnessVolm * noiseVolm) * a
+                rmsV += (Volm.amp(fromVolm: noiseVolm) * a).squared
+                return amp
+            }, (rmsV / 2).squareRoot())
         }
         func clippedStft(_ samples: [Double]) -> [Double] {
             .init(samples[halfStftCount ..< samples.count - halfStftCount])
@@ -532,8 +536,7 @@ extension Rendnote {
         if !isStft {
             if isFullNoise {
                 let noiseSamples = vDSP.gaussianNoise(count: sampleCount + stftCount, seed: noiseSeed)
-                let noiseSpectrum = aNoiseSpectrum(fromNoise: pitbend.firstSpectlope, fq: fq)
-                let sumSpectrum = vDSP.sinRMS(noiseSpectrum)
+                let (noiseSpectrum, sumSpectrum) = aNoiseSpectrum(fromNoise: pitbend.firstSpectlope, fq: fq)
                 let nNoiseSpectrum = vDSP.multiply(sumSpectrum == 0 ? 0 : 1 / sumSpectrum, noiseSpectrum)
                 let samples = clippedStft(vDSP.apply(noiseSamples, spectrum: nNoiseSpectrum))
                 
@@ -606,23 +609,26 @@ extension Rendnote {
                     oddScale = Volm.amp(fromVolm: overtone.oddVolm),
                     evenScale = -Volm.amp(fromVolm: overtone.evenVolm)
                 
-                var sign = true
+                var sign = true, rmsV = 0.0
                 let spectrum = (1 ... sinCount).map { n in
                     let fq = fq * Double(n)
-                    let overtoneScale = isAll || n == 1 ? 1 : (sign ? oddScale : evenScale)
-                    let loudnessVolm = Loudness.reverseVolm40Phon(fromFq: fq)
+                    let loudnessVolm = Loudness.volm40Phon(fromFq: fq)
                     let spectlopeVolm = spectlope.noisedVolm(atFq: fq)
-                    let amp = Volm.amp(fromVolm: loudnessVolm * spectlopeVolm)
-                    * overtoneScale / Double(n) ** sqfa
+                    let cutScale = fq.clipped(min: cutStartFq, max: cutFq, newMin: 1, newMax: 0)
+                    let overtoneScale = isAll || n == 1 ? (sign ? 1 : -1) : (sign ? oddScale : evenScale)
+                    let sqfa = Double(n) ** sqfa
+                    let a = overtoneScale / sqfa * cutScale
+                    let amp = Volm.amp(fromVolm: loudnessVolm * spectlopeVolm) * a
+                    rmsV += (Volm.amp(fromVolm: spectlopeVolm) * a).squared
                     sign = !sign
                     return amp
                 }
-                let sumSpectrum = vDSP.sinRMS(spectrum)
+                let sumSpectrum = (rmsV / 2).squareRoot()
                 
                 let allSumSpectrum: Double, noiseSpectrum: [Double]?
                 if containsNoise {
-                    let aNoiseSpectrum = aNoiseSpectrum(fromNoise: pitbend.firstSpectlope, fq: fq)
-                    allSumSpectrum = sumSpectrum + vDSP.sinRMS(aNoiseSpectrum)
+                    let (aNoiseSpectrum, noiseSumSpectrum) = aNoiseSpectrum(fromNoise: pitbend.firstSpectlope, fq: fq)
+                    allSumSpectrum = sumSpectrum + noiseSumSpectrum
                     noiseSpectrum = aNoiseSpectrum
                 } else {
                     noiseSpectrum = nil
@@ -724,8 +730,7 @@ extension Rendnote {
                     let sec = Double(i) * rSampleRate
                     let spectlope = pitbend.spectlope(atSec: sec)
                     let fq = fq * pitbend.fqScale(atSec: sec)
-                    let noiseSpectrum = aNoiseSpectrum(fromNoise: spectlope, fq: fq)
-                    let sumSpectrum = vDSP.sinRMS(noiseSpectrum)
+                    let (noiseSpectrum, sumSpectrum) = aNoiseSpectrum(fromNoise: spectlope, fq: fq)
                     return vDSP.multiply(sumSpectrum == 0 ? 0 : 1 / sumSpectrum, noiseSpectrum)
                 }
                 
@@ -734,20 +739,6 @@ extension Rendnote {
                 let stereos = stereos(sampleCount: samples.count)
                 return .init(fqScale: 1, isLoop: isLoop, samples: samples, stereos: stereos)
             } else {
-                let firstOvertone = pitbend.firstOvertone
-                let isEqualAllOvertone = pitbend.isEqualAllOvertone,
-                    isAll = firstOvertone.isAll,
-                    oddScale = Volm.amp(fromVolm: firstOvertone.oddVolm),
-                    evenScale = -Volm.amp(fromVolm: firstOvertone.evenVolm)
-                var oddScales = [Double](capacity: sampleCount)
-                var evenScales = [Double](capacity: sampleCount)
-                for i in sampleCount.range {
-                    let sec = Double(i) * rSampleRate
-                    let overtone = pitbend.overtone(atSec: sec)
-                    oddScales.append(Volm.amp(fromVolm: overtone.oddVolm))
-                    evenScales.append(-Volm.amp(fromVolm: overtone.evenVolm))
-                }
-                
                 struct Frame {
                     var sec: Double, fq: Double, sinCount: Int, sin1X: Double, cos1X: Double
                 }
@@ -762,38 +753,47 @@ extension Rendnote {
                     x = x.mod(.pi2)
                     return Frame(sec: sec, fq: fq, sinCount: sinCount, sin1X: sin1X, cos1X: cos1X)
                 }
-                let maxSinCount = frames.maxValue { $0.sinCount }!
-                let sqfas = [0] + (1 ... maxSinCount).map { n in 1 / Double(n) ** sqfa }
+                
                 let sinss: [[Double]] = frames.enumerated().map { (i, v) in
                     let sinCount = v.sinCount, sin1X = v.sin1X, cos1X = v.cos1X
                     var sinMX = sin1X, cosMX = cos1X
                     var sins = [Double](capacity: sinCount)
                     sins.append(sin1X)
                     if sinCount >= 2 {
-                        var sign = true
+                        var sign = false
                         for n in 2 ... sinCount {
                             let sinNX = sinMX * cos1X + cosMX * sin1X
                             let cosNX = cosMX * cos1X - sinMX * sin1X
                             sinMX = sinNX
                             cosMX = cosNX
-                            
-                            let overtoneScale = isEqualAllOvertone ?
-                            (isAll ? 1 : (sign ? oddScale : evenScale)) :
-                            (sign ? oddScales[i] : evenScales[i])
-                            sign = !sign
-                            
-                            let amp = overtoneScale * sqfas[n]
-                            sins.append(amp * sinNX)
+                            sins.append(sinNX)
                         }
                     }
                     return sins
                 }
                 
                 let intCutStartFq = Int(cutStartFq.rounded(.down))
-                let cutFqVolms = (intCutStartFq ..< Int(cutFq.rounded(.down))).map {
+                let cutScales = (intCutStartFq ..< Int(cutFq.rounded(.down))).map {
                     Double($0).clipped(min: cutStartFq, max: cutFq, newMin: 1, newMax: 0)
                 }
                 let overlapSamplesCount = vDSP.overlapSamplesCount(fftCount: stftCount)
+                
+                let firstOvertone = pitbend.firstOvertone
+                let isEqualAllOvertone = pitbend.isEqualAllOvertone,
+                    isAll = firstOvertone.isAll,
+                    oddScale = Volm.amp(fromVolm: firstOvertone.oddVolm),
+                    evenScale = -Volm.amp(fromVolm: firstOvertone.evenVolm)
+                var oddScales = [Double](capacity: sampleCount)
+                var evenScales = [Double](capacity: sampleCount)
+                for i in sampleCount.range {
+                    let sec = Double(i) * rSampleRate
+                    let overtone = pitbend.overtone(atSec: sec)
+                    oddScales.append(Volm.amp(fromVolm: overtone.oddVolm))
+                    evenScales.append(-Volm.amp(fromVolm: overtone.evenVolm))
+                }
+                
+                let maxSinCount = frames.maxValue { $0.sinCount }!
+                let rsqfas = [0] + (1 ... maxSinCount).map { n in 1 / Double(n) ** sqfa }
                 
                 var spectrogram = Array(repeating: Array(repeating: 0.0, count: maxSinCount),
                                         count: sampleCount)
@@ -803,19 +803,29 @@ extension Rendnote {
                     let frame = frames[i]
                     let sec = frame.sec
                     let spectlope = pitbend.spectlope(atSec: sec)
-                    let fqs = (1 ... maxSinCount).map { n in frame.fq * Double(n) }
-                    let spectrum = fqs.map { fq in
-                        Volm.amp(fromVolm: spectlope.noisedVolm(atFq: fq) 
-                                 * Loudness.volm40Phon(fromFq: fq)
-                                 * (fq > cutStartFq ? (fq < cutFq ? cutFqVolms[Int(fq) - intCutStartFq] : 0) : 1))
+                    var sign = true, rmsV = 0.0
+                    let spectrum = (1 ... maxSinCount).map { n in
+                        let fq = frame.fq * Double(n)
+                        let loudnessVolm = Loudness.volm40Phon(fromFq: fq)
+                        let spectlopeVolm = spectlope.noisedVolm(atFq: fq)
+                        
+                        let overtoneScale = isEqualAllOvertone ?
+                        (isAll || n == 1 ? (sign ? 1 : -1) : (sign ? oddScale : evenScale)) :
+                        (n == 1 ? 1 : (sign ? oddScales[i] : evenScales[i]))
+                        sign = !sign
+                        
+                        let a = overtoneScale * rsqfas[n]
+                        let amp = Volm.amp(fromVolm: loudnessVolm * spectlopeVolm) * a
+                        rmsV += (Volm.amp(fromVolm: spectlopeVolm) * a * (fq > cutStartFq ? (fq < cutFq ? cutScales[Int(fq) - intCutStartFq] : 0) : 1)).squared
+                        return amp
                     }
-                    let sumSpectrum = vDSP.sinRMS(spectrum)
+                    let sumSpectrum = (rmsV / 2).squareRoot()
                     
                     let allSumSpectrum: Double, spectrumScale: Double
                     if containsNoise {
                         let noiseSpectlope = pitbend.spectlope(atSec: sec)
-                        let noiseSpectrum = aNoiseSpectrum(fromNoise: noiseSpectlope, fq: frame.fq)
-                        allSumSpectrum = sumSpectrum + vDSP.sinRMS(noiseSpectrum)
+                        let (noiseSpectrum, noiseSumSpectrum) = aNoiseSpectrum(fromNoise: noiseSpectlope, fq: frame.fq)
+                        allSumSpectrum = sumSpectrum + noiseSumSpectrum
                         spectrumScale = allSumSpectrum == 0 ? 0 : 1 / allSumSpectrum
                         noiseSpectrogram.append(vDSP.multiply(spectrumScale, noiseSpectrum))
                     } else {
@@ -830,7 +840,10 @@ extension Rendnote {
                         for j in i - overlapSamplesCount + 1 ..< i {
                             let t = Double(j - i + overlapSamplesCount) / Double(overlapSamplesCount)
                             for k in maxSinCount.range {
-                                spectrogram[j][k] = Double.linear(preSpectrum[k], nSpectrum[k], t: t)
+                                let fq = frames[j].fq * Double(k)
+                                let amp = Double.linear(preSpectrum[k], nSpectrum[k], t: t)
+                                spectrogram[j][k] = fq > cutStartFq ?
+                                (fq < cutFq ? amp * cutScales[Int(fq) - intCutStartFq] : 0) : amp
                             }
                         }
                     }
@@ -871,7 +884,7 @@ extension Rendnote {
 //                    let sec = Double(i) * rDurSp
 //                    let spectlope = pitbend.spectlope(atSec: sec)
 //                    let fq = fq * pitbend.fqScale(atSec: sec)
-//                    return spectrum(from: spectlope, fq: fq, isLoudness: true)
+//                    return spectrum(from: spectlope, fq: fq)
 //                }
 //                lSamples = vDSP.apply(samples, spectrogram: spectrogram)
                 

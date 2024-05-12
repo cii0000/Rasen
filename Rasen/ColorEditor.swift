@@ -299,7 +299,7 @@ final class ColorEditor: Editor {
     private var sheetView: SheetView?
     private var scoreResult: ScoreView.ColorHitResult?
     private var beganEnvelope = Envelope(), beganNotes = [Int: Note]()
-    private var beganNotePits = [UUID: [Int: (note: Note, pit: Pit, pits: [Int: Pit])]]()
+    private var beganNotePits = [UUID: [Int: (note: Note, pits: [Int: (pit: Pit, sprolIs: Set<Int>)])]]()
     private var beganContents = [Int: Content]()
     private var beganSP = Point(), beganVolm = 0.0
     private var notePlayer: NotePlayer?, playerBeatNoteIndexes = [Int](), beganBeat = Rational(0)
@@ -350,56 +350,77 @@ final class ColorEditor: Editor {
                     notePlayer?.play()
                 }
                 
-                func updatePitsWithSelection(noteI: Int, pitI: Int?, _ type: PitIDType) {
-                    var noteAndPitIs: [Int: [Int]]
-                    if document.isSelect(at: p) {
-                        noteAndPitIs = sheetView.noteAndPitIndexes(from: document.selections)
+                func updatePitsWithSelection(noteI: Int, pitI: Int?, sprolI: Int?, _ type: PitIDType) {
+                    var noteAndPitIs: [Int: [Int: Set<Int>]]
+                    if let pitI, let sprolI {
+                        if document.isSelect(at: p) {
+                            noteAndPitIs = sheetView.noteAndPitAndSprolIs(from: document.selections)
+                        } else {
+                            let id = score.notes[noteI].pits[pitI][type]
+                            noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) {
+                                $0[$1.offset] = $1.element.pits.enumerated().reduce(into: [Int: Set<Int>]()) { (v, ip) in
+                                    if ip.element[type] == id {
+                                        v[ip.offset] = pitI == ip.offset ? [sprolI] : []
+                                    }
+                                }
+                            }
+                        }
+                    } else if document.isSelect(at: p) {
+                        let aNoteAndPitIs = sheetView.noteAndPitIndexes(from: document.selections)
+                        noteAndPitIs = [:]
+                        for (noteI, v) in aNoteAndPitIs {
+                            noteAndPitIs[noteI] = v.reduce(into: [Int: Set<Int>]()) {
+                                $0[$1] = []
+                            }
+                        }
                         if let pitI {
                             if noteAndPitIs[noteI] != nil {
-                                if noteAndPitIs[noteI]!.contains(pitI) {
-                                    noteAndPitIs[noteI]?.append(pitI)
+                                if noteAndPitIs[noteI]![pitI] != nil {
+                                    noteAndPitIs[noteI]?[pitI] = []
                                 }
                             } else {
-                                noteAndPitIs[noteI] = [pitI]
+                                noteAndPitIs[noteI] = [pitI: []]
                             }
-                        } else {
-                            noteAndPitIs[noteI] = score.notes[noteI].pits.count.array
                         }
                     } else {
                         if let pitI {
                             let id = score.notes[noteI].pits[pitI][type]
-                            noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int]]()) {
-                                $0[$1.offset] = $1.element.pits.enumerated().compactMap { (pitI, pit) in
-                                    pit[type] == id ? pitI : nil
+                            noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) {
+                                $0[$1.offset] = $1.element.pits.enumerated().reduce(into: [Int: Set<Int>]()) { (v, ip) in
+                                    if ip.element[type] == id {
+                                        v[ip.offset] = []
+                                    }
                                 }
                             }
                         } else {
                             let note = score.notes[noteI]
                             if note.pits.count == 1 {
                                 let id = note.firstPit[type]
-                                noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int]]()) {
-                                    $0[$1.offset] = $1.element.pits.enumerated().compactMap { (pitI, pit) in
-                                        pit[type] == id ? pitI : nil
+                                noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) {
+                                    $0[$1.offset] = $1.element.pits.enumerated().reduce(into: [Int: Set<Int>]()) { (v, ip) in
+                                        if ip.element[type] == id {
+                                            v[ip.offset] = []
+                                        }
                                     }
                                 }
                             } else {
-                                noteAndPitIs = [noteI: score.notes[noteI].pits.count.array]
+                                noteAndPitIs = [noteI: score.notes[noteI].pits.count.range.reduce(into: [Int: Set<Int>]()) { $0[$1] = [] }]
                             }
                         }
                     }
                     
                     beganNotePits = noteAndPitIs.reduce(into: .init()) {
-                        for pitI in $1.value {
+                        for (pitI, sprolIs) in $1.value {
                             let pit = score.notes[$1.key].pits[pitI]
                             let id = pit[type]
                             if $0[id] != nil {
                                 if $0[id]![$1.key] != nil {
-                                    $0[id]![$1.key]!.pits[pitI] = pit
+                                    $0[id]![$1.key]!.pits[pitI] = (pit, sprolIs)
                                 } else {
-                                    $0[id]![$1.key] = (score.notes[$1.key], pit, [pitI: pit])
+                                    $0[id]![$1.key] = (score.notes[$1.key], [pitI: (pit, sprolIs)])
                                 }
                             } else {
-                                $0[id] = [$1.key: (score.notes[$1.key], pit, [pitI: pit])]
+                                $0[id] = [$1.key: (score.notes[$1.key], [pitI: (pit, sprolIs)])]
                             }
                         }
                     }
@@ -419,7 +440,7 @@ final class ColorEditor: Editor {
                     switch result {
                     case .note:
                         beganVolm = scoreView.volm(atX: scoreP.x, at: noteI)
-                        updatePitsWithSelection(noteI: noteI, pitI: nil, .stereo)
+                        updatePitsWithSelection(noteI: noteI, pitI: nil, sprolI: nil, .stereo)
                         beganBeat = scoreView.beat(atX: scoreP.x)
                     case .sustain:
                         if document.isSelect(at: p) {
@@ -440,19 +461,19 @@ final class ColorEditor: Editor {
                         beganBeat = scoreView.beat(atX: scoreP.x)
                     case .pit(let pitI):
                         beganVolm = score.notes[noteI].pits[pitI].stereo.volm
-                        updatePitsWithSelection(noteI: noteI, pitI: pitI, .stereo)
+                        updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .stereo)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
                     case .evenVolm(let pitI):
                         beganVolm = score.notes[noteI].pits[pitI].tone.overtone.evenVolm
-                        updatePitsWithSelection(noteI: noteI, pitI: pitI, .tone)
+                        updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .tone)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
                     case .oddVolm(let pitI):
                         beganVolm = score.notes[noteI].pits[pitI].tone.overtone.oddVolm
-                        updatePitsWithSelection(noteI: noteI, pitI: pitI, .tone)
+                        updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .tone)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
                     case .sprol(let pitI, let sprolI):
                         beganVolm = score.notes[noteI].pits[pitI].tone.spectlope.sprols[sprolI].volm
-                        updatePitsWithSelection(noteI: noteI, pitI: pitI, .tone)
+                        updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: sprolI, .tone)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
                     }
                     
@@ -498,89 +519,87 @@ final class ColorEditor: Editor {
             }
             
             let scoreView = sheetView.scoreView
-            let score = scoreView.model
             
             if let scoreResult {
                 switch scoreResult {
                 case .sustain:
                     let sustainVolm = newVolm(from: beganEnvelope.sustainVolm)
                     var eivs = [IndexValue<Envelope>](capacity: beganNotes.count)
-                    for noteI in beganNotes.keys {
-                        guard noteI < score.notes.count else { continue }
-                        var envelope = scoreView.model.notes[noteI].envelope
+                    for (noteI, beganNote) in beganNotes {
+                        var envelope = beganNote.envelope
                         envelope.sustainVolm = sustainVolm
                         envelope.id = beganEnvelope.id
                         eivs.append(.init(value: envelope, index: noteI))
                     }
                     scoreView.replace(eivs)
                 case .note, .pit:
-                    var nivs = [IndexValue<Note>]()
+                    var nvs = [Int: Note]()
                     for (_, v) in beganNotePits {
                         let nid = UUID()
                         for (noteI, nv) in v {
-                            guard noteI < score.notes.count else { continue }
-                            var note = scoreView[noteI]
-                            for (pitI, beganPit) in nv.pits {
-                                guard pitI < score.notes[noteI].pits.count else { continue }
-                                let nVolm = newVolm(from: beganPit.stereo.volm)
-                                note.pits[pitI].stereo.volm = nVolm
-                                note.pits[pitI].stereo.id = nid
+                            if nvs[noteI] == nil {
+                                nvs[noteI] = nv.note
                             }
-                            nivs.append(.init(value: note, index: noteI))
+                            nv.pits.forEach { (pitI, beganPit) in
+                                nvs[noteI]?.pits[pitI].stereo.volm = newVolm(from: beganPit.pit.stereo.volm)
+                                nvs[noteI]?.pits[pitI].stereo.id = nid
+                            }
                         }
                     }
+                    let nivs = nvs.map { IndexValue(value: $0.value, index: $0.key) }
                     scoreView.replace(nivs)
                 case .evenVolm:
-                    var nivs = [IndexValue<Note>]()
+                    var nvs = [Int: Note]()
                     for (_, v) in beganNotePits {
                         let nid = UUID()
                         for (noteI, nv) in v {
-                            guard noteI < score.notes.count else { continue }
-                            var note = scoreView[noteI]
-                            for (pitI, beganPit) in nv.pits {
-                                guard pitI < score.notes[noteI].pits.count else { continue }
-                                let nVolm = newVolm(from: beganPit.tone.overtone[.evenVolm])
-                                note.pits[pitI].tone.overtone[.evenVolm] = nVolm
-                                note.pits[pitI].tone.id = nid
+                            if nvs[noteI] == nil {
+                                nvs[noteI] = nv.note
                             }
-                            nivs.append(.init(value: note, index: noteI))
+                            nv.pits.forEach { (pitI, beganPit) in
+                                let nVolm = newVolm(from: beganPit.pit.tone.overtone[.evenVolm])
+                                nvs[noteI]?.pits[pitI].tone.overtone[.evenVolm] = nVolm
+                                nvs[noteI]?.pits[pitI].tone.id = nid
+                            }
                         }
                     }
+                    let nivs = nvs.map { IndexValue(value: $0.value, index: $0.key) }
                     scoreView.replace(nivs)
                 case .oddVolm:
-                    var nivs = [IndexValue<Note>]()
+                    var nvs = [Int: Note]()
                     for (_, v) in beganNotePits {
                         let nid = UUID()
                         for (noteI, nv) in v {
-                            guard noteI < score.notes.count else { continue }
-                            var note = scoreView[noteI]
-                            for (pitI, beganPit) in nv.pits {
-                                guard pitI < score.notes[noteI].pits.count else { continue }
-                                let nVolm = newVolm(from: beganPit.tone.overtone[.oddVolm])
-                                note.pits[pitI].tone.overtone[.oddVolm] = nVolm
-                                note.pits[pitI].tone.id = nid
+                            if nvs[noteI] == nil {
+                                nvs[noteI] = nv.note
                             }
-                            nivs.append(.init(value: note, index: noteI))
+                            nv.pits.forEach { (pitI, beganPit) in
+                                let nVolm = newVolm(from: beganPit.pit.tone.overtone[.oddVolm])
+                                nvs[noteI]?.pits[pitI].tone.overtone[.oddVolm] = nVolm
+                                nvs[noteI]?.pits[pitI].tone.id = nid
+                            }
                         }
                     }
+                    let nivs = nvs.map { IndexValue(value: $0.value, index: $0.key) }
                     scoreView.replace(nivs)
-                case .sprol(_, let sprolI):
-                    var nivs = [IndexValue<Note>]()
+                case .sprol:
+                    var nvs = [Int: Note]()
                     for (_, v) in beganNotePits {
                         let nid = UUID()
                         for (noteI, nv) in v {
-                            guard noteI < score.notes.count else { continue }
-                            var note = scoreView[noteI]
-                            for (pitI, beganPit) in nv.pits {
-                                guard pitI < score.notes[noteI].pits.count,
-                                      sprolI < note.pits[pitI].tone.spectlope.count else { continue }
-                                let nVolm = newVolm(from: beganPit.tone.spectlope.sprols[sprolI].volm)
-                                note.pits[pitI].tone.spectlope.sprols[sprolI].volm = nVolm
-                                note.pits[pitI].tone.id = nid
+                            if nvs[noteI] == nil {
+                                nvs[noteI] = nv.note
                             }
-                            nivs.append(.init(value: note, index: noteI))
+                            nv.pits.forEach { (pitI, beganPit) in
+                                for sprolI in beganPit.sprolIs {
+                                    let nVolm = newVolm(from: beganPit.pit.tone.spectlope.sprols[sprolI].volm)
+                                    nvs[noteI]?.pits[pitI].tone.spectlope.sprols[sprolI].volm = nVolm
+                                }
+                                nvs[noteI]?.pits[pitI].tone.id = nid
+                            }
                         }
                     }
+                    let nivs = nvs.map { IndexValue(value: $0.value, index: $0.key) }
                     scoreView.replace(nivs)
                 }
                 
@@ -780,12 +799,12 @@ final class ColorEditor: Editor {
                             let id = pit[type]
                             if $0[id] != nil {
                                 if $0[id]![$1.key] != nil {
-                                    $0[id]![$1.key]!.pits[pitI] = pit
+                                    $0[id]![$1.key]!.pits[pitI] = (pit, [])
                                 } else {
-                                    $0[id]![$1.key] = (score.notes[$1.key], pit, [pitI: pit])
+                                    $0[id]![$1.key] = (score.notes[$1.key], [pitI: (pit, [])])
                                 }
                             } else {
-                                $0[id] = [$1.key: (score.notes[$1.key], pit, [pitI: pit])]
+                                $0[id] = [$1.key: (score.notes[$1.key], [pitI: (pit, [])])]
                             }
                         }
                     }
@@ -890,24 +909,22 @@ final class ColorEditor: Editor {
                 }
                 
                 let scoreView = sheetView.scoreView
-                let score = scoreView.model
                 
-                var nivs = [IndexValue<Note>]()
+                var nvs = [Int: Note]()
                 for (_, v) in beganNotePits {
                     let nid = UUID()
                     for (noteI, nv) in v {
-                        guard noteI < score.notes.count else { continue }
-                        var note = scoreView[noteI]
-                        for (pitI, beganPit) in nv.pits {
-                            guard pitI < score.notes[noteI].pits.count,
-                                  sprolI < note.pits[pitI].tone.spectlope.count else { continue }
-                            let nNoise = newNoise(from: beganPit.tone.spectlope.sprols[sprolI].noise)
-                            note.pits[pitI].tone.spectlope.sprols[sprolI].noise = nNoise
-                            note.pits[pitI].tone.id = nid
+                        if nvs[noteI] == nil {
+                            nvs[noteI] = nv.note
                         }
-                        nivs.append(.init(value: note, index: noteI))
+                        nv.pits.forEach { (pitI, beganPit) in
+                            let nNoise = newNoise(from: beganPit.pit.tone.spectlope.sprols[sprolI].noise)
+                            nvs[noteI]?.pits[pitI].tone.spectlope.sprols[sprolI].noise = nNoise
+                            nvs[noteI]?.pits[pitI].tone.id = nid
+                        }
                     }
                 }
+                let nivs = nvs.map { IndexValue(value: $0.value, index: $0.key) }
                 scoreView.replace(nivs)
                 
                 colorPointNode.attitude.position = .init(panWidth * noise, 0)
@@ -941,23 +958,22 @@ final class ColorEditor: Editor {
                 
                 if !beganNotePits.isEmpty {
                     let scoreView = sheetView.scoreView
-                    let score = scoreView.model
                     
-                    var nivs = [IndexValue<Note>]()
+                    var nvs = [Int: Note]()
                     for (_, v) in beganNotePits {
                         let nid = UUID()
                         for (noteI, nv) in v {
-                            guard noteI < score.notes.count else { continue }
-                            var note = scoreView[noteI]
-                            for (pitI, beganPit) in nv.pits {
-                                guard pitI < score.notes[noteI].pits.count else { continue }
-                                let nPan = newPan(from: beganPit.stereo.pan)
-                                note.pits[pitI].stereo.pan = nPan
-                                note.pits[pitI].stereo.id = nid
+                            if nvs[noteI] == nil {
+                                nvs[noteI] = nv.note
                             }
-                            nivs.append(.init(value: note, index: noteI))
+                            nv.pits.forEach { (pitI, beganPit) in
+                                let nPan = newPan(from: beganPit.pit.stereo.pan)
+                                nvs[noteI]?.pits[pitI].stereo.pan = nPan
+                                nvs[noteI]?.pits[pitI].stereo.id = nid
+                            }
                         }
                     }
+                    let nivs = nvs.map { IndexValue(value: $0.value, index: $0.key) }
                     scoreView.replace(nivs)
                     
                     notePlayer?.changeStereo(from: playerBeatNoteIndexes.map {
