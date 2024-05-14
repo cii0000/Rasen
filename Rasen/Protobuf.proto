@@ -279,7 +279,7 @@ message PBStringIntPointDic {
 message PBKeyframe {
     PBPicture picture = 1;
     PBPicture draftPicture = 2;
-    PBRational durBeat = 3;
+    PBRational beat = 3;
     PBPreviousNext previousNext = 4;
 }
 
@@ -288,7 +288,7 @@ message PBKeyframeKey {
     repeated int64 planeIs = 2;
     repeated int64 draftLineIs = 3;
     repeated int64 draftPlaneIs = 4;
-    PBRational durBeat = 5;
+    PBRational beat = 5;
     PBPreviousNext previousNext = 6;
 }
 message PBAnimationZipper {
@@ -300,7 +300,7 @@ message PBAnimationZipper {
 }
 
 message PBAnimationOption {
-    PBRational startBeat = 1;
+    PBRationalRange beatRange = 1;
     PBRational tempo = 2;
     double timelineY = 3;
     bool enabled = 4;
@@ -309,7 +309,7 @@ message PBAnimation {
     repeated PBKeyframe keyframes = 1;
     PBAnimationZipper zipper = 8;
     PBRational rootBeat = 2;
-    PBRational startBeat = 3;
+    PBRationalRange beatRange = 3;
     PBRational tempo = 4;
     bool isPlaying = 5;
     double timelineY = 6;
@@ -368,7 +368,7 @@ message PBFinding {
 }
 
 message PBKeyframeOption {
-    PBRational durBeat = 1;
+    PBRational beat = 1;
     PBPreviousNext previousNext = 2;
 }
 

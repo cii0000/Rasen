@@ -999,7 +999,7 @@ final class CopyEditor: Editor {
         
         if let sheetView = document.sheetView(at: p),
            sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p)),
-           let ki = sheetView.animationView.keyframeIndex(at: sheetView.convertFromWorld(p), isEnabledCount: true) {
+           let ki = sheetView.animationView.keyframeIndex(at: sheetView.convertFromWorld(p)) {
             
             let animationView = sheetView.animationView
             
@@ -1009,14 +1009,19 @@ final class CopyEditor: Editor {
             if indexes.last == animationView.model.keyframes.count {
                 indexes.removeLast()
             }
-            let kfs = indexes.map { animationView.model.keyframes[$0] }
+            let beat: Rational = animationView.beat(atX: animationView.convertFromWorld(p).x)
+            let kfs = indexes.map {
+                var keyframe = animationView.model.keyframes[$0]
+                keyframe.beat -= beat
+                return keyframe
+            }
             
             if isSelected {
                 animationView.selectedFrameIndexes = []
             }
             sheetView.newUndoGroup(enabledKeyframeIndex: false)
-            if indexes.count == animationView.model.keyframes.count {
-                let keyframe = Keyframe(durBeat: 0)
+            if indexes == animationView.model.keyframes.count.array {
+                let keyframe = Keyframe(beat: 0)
                 sheetView.insert([IndexValue(value: keyframe, index: 0)])
                 sheetView.removeKeyframes(at: indexes)
                 
@@ -1026,38 +1031,7 @@ final class CopyEditor: Editor {
                 
                 sheetView.rootKeyframeIndex = 0
             } else {
-                var setDurs = [(i: Int, dur: Rational)](), di = 0, preI: Int?
-                var fbd = Rational(0)
-                for i in indexes {
-                    let dur = animationView.model.keyframes[i].durBeat
-                    if preI == i - 1 {
-                        if setDurs.isEmpty {
-                            fbd += dur
-                        } else {
-                            setDurs[.last].dur += dur
-                        }
-                    } else if i > 0 {
-                        let ni = i - 1
-                        let nkf = animationView.model.keyframes[ni]
-                        setDurs.append((ni - di, nkf.durBeat + dur))
-                    } else {
-                        fbd = dur
-                    }
-                    di += 1
-                    preI = i
-                }
                 sheetView.removeKeyframes(at: indexes)
-                if fbd > 0 {
-                    var ao = animationView.model.option
-                    ao.startBeat += fbd
-                    sheetView.set(ao)
-                }
-                let kiovs = setDurs.map {
-                    IndexValue(value: KeyframeOption(durBeat: $0.dur,
-                                                     previousNext: animationView.model.keyframes[$0.i].previousNext),
-                               index: $0.i)
-                }
-                sheetView.set(kiovs)
             }
             document.updateSelects()
 

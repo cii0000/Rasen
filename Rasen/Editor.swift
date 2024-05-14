@@ -297,10 +297,9 @@ final class DraftEditor: Editor {
                         let indexes = isSelected ?
                             animationView.selectedFrameIndexes.sorted() : [ki]
                         let kiovs: [IndexValue<KeyframeOption>] = indexes.compactMap {
-                            let k = animationView.model.keyframes[$0]
-                            guard k.previousNext != .previousAndNext else { return nil }
-                            let ko = KeyframeOption(durBeat: k.durBeat,
-                                                    previousNext: .previousAndNext)
+                            let keyframe = animationView.model.keyframes[$0]
+                            guard keyframe.previousNext != .previousAndNext else { return nil }
+                            let ko = KeyframeOption(beat: keyframe.beat, previousNext: .previousAndNext)
                             return IndexValue(value: ko, index: $0)
                         }
                         
@@ -409,10 +408,9 @@ final class DraftEditor: Editor {
                             animationView.selectedFrameIndexes.sorted() : [ki]
                         let kiovs: [IndexValue<KeyframeOption>]
                         = indexes.compactMap {
-                            let k = animationView.model.keyframes[$0]
-                            guard k.previousNext != .none else { return nil }
-                            let ko = KeyframeOption(durBeat: k.durBeat,
-                                                    previousNext: .none)
+                            let keyframe = animationView.model.keyframes[$0]
+                            guard keyframe.previousNext != .none else { return nil }
+                            let ko = KeyframeOption(beat: keyframe.beat, previousNext: .none)
                             return IndexValue(value: ko, index: $0)
                         }
                         
@@ -1907,15 +1905,16 @@ final class IOEditor: Editor {
                     let sheetBounds = self.document.sheetFrame(with: v.shp).bounds
                     let ot = t
                     var time = Rational(0)
-                    for (i, k) in sheet.animation.keyframes.enumerated() {
-                        let node = sheet.node(isBorder: false, atRootBeat: time, 
+                    for (i, _) in sheet.animation.keyframes.enumerated() {
+                        let node = sheet.node(isBorder: false, atRootBeat: time,
                                               in: sheetBounds)
                         node.attitude.position = sheetBounds.origin
+                        let durBeat = sheet.animation.rendableKeyframeDurBeat(at: i)
                         if let image = node.image(in: v.bounds, size: size,
                                                   backgroundColor: .background, colorSpace: .sRGB) {
-                            images.append((image, k.durBeat))
+                            images.append((image, sheet.animation.sec(fromBeat: durBeat)))
                         }
-                        time += k.durBeat
+                        time += durBeat
                         let d = Double(i) / Double(sheet.animation.keyframes.count - 1)
                         t = ot + d / Double(allC)
                         progressHandler(t, &isStop)

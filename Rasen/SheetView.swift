@@ -577,8 +577,7 @@ final class AnimationView: TimelineView {
         let lw = 1.0
         let knobW = Sheet.knobWidth, knobH = Sheet.knobHeight
         let rulerH = Sheet.rulerHeight
-        let iKnobW = width(atDurBeat: Rational(1, frameRate)),
-            iKnobH = interpolatedKnobHeight
+        let iKnobW = knobW, iKnobH = interpolatedKnobHeight
         let centerY = 0.0
         let sy = centerY - Sheet.timelineHalfHeight
         let ey = centerY + Sheet.timelineHalfHeight
@@ -601,13 +600,8 @@ final class AnimationView: TimelineView {
         
         let mainBeatX = x(atBeat: model.mainBeat)
         
-        var kfBeat = model.beatRange.start
         for (i, keyframe) in model.keyframes.enumerated() {
-            defer {
-                kfBeat += keyframe.durBeat
-            }
-            
-            let kx = x(atBeat: kfBeat)
+            let kx = x(atBeat: keyframe.beat + beatRange.start)
             
             let nKnobH = keyframe.isKey ? knobH : iKnobH
             let topD: Double
@@ -813,17 +807,14 @@ final class AnimationView: TimelineView {
         guard abs(inP.y - model.timelineY) < paddingTimelineHeight * 5 / 16 else { return nil }
         let animation = model
         var minD = maxDistance, minI: Int?
-        var kfBeat = animation.beatRange.start
+        let beatRange = animation.beatRange
         if enabledKeyOnly {
             var i = 0
             while i < animation.keyframes.count {
-                kfBeat += animation.keyframes[i].durBeat
-                while i + 1 < animation.keyframes.count
-                        && !animation.keyframes[i + 1].isKey {
-                    kfBeat += animation.keyframes[i + 1].durBeat
+                while i + 1 < animation.keyframes.count && !animation.keyframes[i + 1].isKey {
                     i += 1
                 }
-                let x = x(atBeat: kfBeat)
+                let x = x(atBeat: animation.keyframes[i].beat + beatRange.start)
                 let d = abs(inP.x - x)
                 if d < minD {
                     minD = d
@@ -833,8 +824,7 @@ final class AnimationView: TimelineView {
             }
         } else {
             for (i, keyframe) in animation.keyframes.enumerated() {
-                kfBeat += keyframe.durBeat
-                let x = x(atBeat: kfBeat)
+                let x = x(atBeat: keyframe.beat + beatRange.start)
                 let d = abs(inP.x - x)
                 if d < minD {
                     minD = d
@@ -848,18 +838,17 @@ final class AnimationView: TimelineView {
         let animation = model
         let count = animation.keyframes.count
         var minD = Double.infinity, minI: Int?
-        var kfBeat = animation.beatRange.start
+        let beatRange = animation.beatRange
         for (i, keyframe) in animation.keyframes.enumerated() {
-            let x = x(atBeat: kfBeat)
+            let x = x(atBeat: keyframe.beat + beatRange.start)
             let d = abs(inP.x - x)
             if d < minD {
                 minD = d
                 minI = i
             }
-            kfBeat += keyframe.durBeat
         }
         if isEnabledCount {
-            let x = x(atBeat: kfBeat)
+            let x = x(atBeat: beatRange.end)
             let d = abs(inP.x - x)
             if d < minD {
                 minD = d
@@ -961,15 +950,11 @@ final class AnimationView: TimelineView {
         
         var selectedPathlines = [Pathline]()
         
-        var kfBeat = model.beatRange.start
+        let beatRange = model.beatRange
         for keyframe in model.keyframes {
-            defer {
-                kfBeat += keyframe.durBeat
-            }
-            
             let nLines = keyframe.picture.lines.filter { idSet.contains($0.id) }
             guard !nLines.isEmpty else { continue }
-            let kx = x(atBeat: kfBeat)
+            let kx = x(atBeat: keyframe.beat + beatRange.start)
             
             let pathline = nLines.contains(where: { $0.interType == .key }) ?
                 Pathline(Rect(x: kx - knobW / 2,
@@ -997,7 +982,12 @@ final class AnimationView: TimelineView {
     var origin: Point { .init(0, timelineY) }
     var timeLineCenterY: Double { 0 }
     var beatRange: Range<Rational>? {
-        model.beatRange
+        get { model.beatRange }
+        set {
+            guard let newValue else { return }
+            binder[keyPath: keyPath].beatRange = newValue
+            updateTimeline()
+        }
     }
     var localBeatRange: Range<Rational>? {
         model.localBeatRange
@@ -1198,7 +1188,7 @@ final class SheetView: View {
     }
     
     func currentSelectiongTimeNode(indexInterval: Double) -> Node {
-        Self.selectingTimeNode(duration: currentKeyframe.durBeat,
+        Self.selectingTimeNode(duration: model.animation.currentDurBeat,
                                time: model.animation.localBeat,
                                indexInterval: indexInterval,
                                frameRate: Rational(frameRate),
@@ -1315,7 +1305,7 @@ final class SheetView: View {
     }
     
     func timeNodes(from animationView: AnimationView) -> [Node] {
-        Self.timeNodes(duration: animationView.currentKeyframe.durBeat,
+        Self.timeNodes(duration: animationView.model.currentDurBeat,
                        time: animationView.model.localBeat,
                        frameRate: Rational(animationView.frameRate))
     }
@@ -1324,7 +1314,7 @@ final class SheetView: View {
                         frameRate: Rational(frameRate))
     }
     func currentTimeNodes() -> [Node] {
-        Self.timeNodes(duration: currentKeyframe.durBeat,
+        Self.timeNodes(duration: model.animation.currentDurBeat,
                        time: model.animation.localBeat,
                        frameRate: Rational(frameRate))
     }
@@ -3822,18 +3812,17 @@ final class SheetView: View {
         append(undo: undoItem, redo: redoItem)
         set(redoItem)
     }
-    func set(durBeat: Rational, previousNext: PreviousNext,
+    func set(beat: Rational, previousNext: PreviousNext,
              at i: Int) {
-        let ko = KeyframeOption(durBeat: durBeat,
-                                previousNext: previousNext)
+        let ko = KeyframeOption(beat: beat, previousNext: previousNext)
         set([IndexValue(value: ko, index: i)])
     }
-    func set(durBeat: Rational, at i: Int) {
+    func set(beat: Rational, at i: Int) {
         let oko = model.animation.keyframes[i].option
         let opo = [IndexValue(value: oko, index: i)]
         
         var nko = oko
-        nko.durBeat = durBeat
+        nko.beat = beat
         let npo = [IndexValue(value: nko, index: i)]
         
         let undoItem = SheetUndoItem.setKeyframeOptions(opo)
@@ -3841,18 +3830,22 @@ final class SheetView: View {
         append(undo: undoItem, redo: redoItem)
         set(redoItem)
     }
-    func capture(durBeat: Rational,
-                 oldDurBeat: Rational, at i: Int) {
+    func capture(beat: Rational, oldBeat: Rational, at i: Int) {
         var oko = model.animation.keyframes[i].option
-        oko.durBeat = oldDurBeat
+        oko.beat = oldBeat
         let opo = [IndexValue(value: oko, index: i)]
         
         var nko = model.animation.keyframes[i].option
-        nko.durBeat = durBeat
+        nko.beat = beat
         let npo = [IndexValue(value: nko, index: i)]
         
         let undoItem = SheetUndoItem.setKeyframeOptions(opo)
         let redoItem = SheetUndoItem.setKeyframeOptions(npo)
+        append(undo: undoItem, redo: redoItem)
+    }
+    func capture(_ koivs: [IndexValue<KeyframeOption>], old okoivs: [IndexValue<KeyframeOption>]) {
+        let undoItem = SheetUndoItem.setKeyframeOptions(okoivs)
+        let redoItem = SheetUndoItem.setKeyframeOptions(koivs)
         append(undo: undoItem, redo: redoItem)
     }
     
@@ -6581,7 +6574,7 @@ final class SheetView: View {
                 if !isNewUndGroup {
                     newUndoGroup()
                 }
-                set(durBeat: model.animation.currentKeyframe.durBeat,
+                set(beat: model.animation.currentKeyframe.beat,
                     previousNext: .none,
                     at: model.animation.index)
             }

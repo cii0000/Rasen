@@ -983,7 +983,7 @@ final class TempoSlider: DragEditor {
     
     private var node = Node()
     private var sheetView: SheetView?
-    private var beganSP = Point(), beganInP = Point()
+    private var beganSP = Point(), beganSheetP = Point()
     private var beganTempo: Rational = 1, oldTempo: Rational = 1
     private var beganAnimationOption: AnimationOption?, beganScoreOption: ScoreOption?,
                 beganContents = [Int: Content](),
@@ -1010,7 +1010,7 @@ final class TempoSlider: DragEditor {
                 beganSP = sp
                 self.sheetView = sheetView
                 let inP = sheetView.convertFromWorld(p)
-                beganInP = inP
+                beganSheetP = inP
                 if sheetView.containsTempo(inP, maxDistance: document.worldKnobEditDistance) {
                     beganTempo = sheetView.model.animation.tempo
                     oldTempo = beganTempo
@@ -1118,7 +1118,7 @@ final class AnimationSlider: DragEditor {
     }
     
     enum SlideType {
-        case key, startBeat, all, none
+        case key, all, startBeat, endBeat, none
     }
     
     private let indexInterval = 10.0
@@ -1126,11 +1126,10 @@ final class AnimationSlider: DragEditor {
     private var node = Node()
     private var sheetView: SheetView?, animationIndex = 0, keyframeIndex = 0
     private var type = SlideType.key
-    private var beganSP = Point(), beganInP = Point(),
-                beganTimelineX = 0.0, beganKeyframeX = 0.0,
-                beganKeyframeDurBeat = Rational(0)
+    private var beganSP = Point(), beganSheetP = Point(), beganKeyframeOptions = [Int: KeyframeOption](),
+                beganTimelineX = 0.0, beganKeyframeX = 0.0, beganBeatX = 0.0,
+                beganKeyframeBeat = Rational(0)
     private var beganAnimationOption: AnimationOption?
-    private var lastBeats = [(sec: Double, rootBeat: Rational)](capacity: 128)
     private var minLastSec = 1 / 12.0
     
     func send(_ event: DragEvent) {
@@ -1154,29 +1153,42 @@ final class AnimationSlider: DragEditor {
                 beganSP = sp
                 self.sheetView = sheetView
                 let inP = sheetView.convertFromWorld(p)
-                beganInP = inP
+                beganSheetP = inP
                 beganTimelineX = sheetView.animationView
                     .x(atBeat: sheetView.animationView.model.beatRange.start)
                 if sheetView.animationView.containsTimeline(inP) {
                     let animationView = sheetView.animationView
                     
-                    if let minI = sheetView.animationView
+                    if let minI = animationView
                         .slidableKeyframeIndex(at: inP,
                                                maxDistance: document.worldKnobEditDistance,
                                                enabledKeyOnly: true) {
-                        
                         type = .key
+                        
                         keyframeIndex = minI
                         let keyframe = animationView.model.keyframes[keyframeIndex]
-                        beganKeyframeDurBeat = keyframe.durBeat
-                        beganKeyframeX = sheetView.animationView.x(atBeat: animationView.model.localBeat(at: minI) + keyframe.durBeat)
-                        lastBeats.append((event.time, animationView.model.localBeat(at: minI) + keyframe.durBeat))
-                    } else if animationView.isStartBeat(at: inP, scale: document.screenToWorldScale) {
+                        beganKeyframeBeat = keyframe.beat
+                        beganKeyframeX = animationView.x(atBeat: animationView.model.localBeat(at: minI))
                         
+                        if !animationView.selectedFrameIndexes.isEmpty
+                            && animationView.selectedFrameIndexes.contains(keyframeIndex) {
+                            
+                            beganKeyframeOptions = animationView.selectedFrameIndexes.reduce(into: .init()) {
+                                $0[$1] = animationView.model.keyframes[$1].option
+                            }
+                        } else {
+                            beganKeyframeOptions = [keyframeIndex: keyframe.option]
+                        }
+                    } else if animationView.isStartBeat(at: inP, scale: document.screenToWorldScale) {
                         type = .all
                         
                         beganAnimationOption = sheetView.model.animation.option
-                        lastBeats.append((event.time, beganAnimationOption!.startBeat))
+                        beganBeatX = animationView.x(atBeat: sheetView.model.animation.beatRange.start)
+                    } else if animationView.isEndBeat(at: inP, scale: document.screenToWorldScale) {
+                        type = .endBeat
+                        
+                        beganAnimationOption = sheetView.model.animation.option
+                        beganBeatX = animationView.x(atBeat: sheetView.model.animation.beatRange.end)
                     } else {
                         type = .none
                     }
@@ -1190,82 +1202,79 @@ final class AnimationSlider: DragEditor {
                 switch type {
                 case .all:
                     let nh = ScoreLayout.pitchHeight
-                    let px = beganTimelineX + inP.x - beganInP.x
-                    let py = ((beganAnimationOption?.timelineY ?? 0) + inP.y - beganInP.y)
-                        .interval(scale: nh)
+                    let px = beganTimelineX + inP.x - beganSheetP.x
+                    let py = ((beganAnimationOption?.timelineY ?? 0) + inP.y - beganSheetP.y).interval(scale: nh)
                     let interval = document.currentKeyframeBeatInterval
-                    let beat = animationView.beat(atX: px,
-                                                  interval: interval) + sheetView.model.animation.startBeat
+                    let beat = animationView.beat(atX: px, interval: interval)
+                    + sheetView.model.animation.beatRange.start
                     if py != sheetView.animationView.timelineY
-                        || beat != sheetView.model.animation.startBeat {
+                        || beat != sheetView.model.animation.beatRange.start {
                         
-                        sheetView.binder[keyPath: sheetView.keyPath]
-                            .animation.startBeat = beat
-                        sheetView.binder[keyPath: sheetView.keyPath]
-                            .animation.timelineY = py
+                        sheetView.binder[keyPath: sheetView.keyPath].animation.beatRange.start = beat
+                        sheetView.binder[keyPath: sheetView.keyPath].animation.timelineY = py
                         sheetView.animationView.updateTimeline()
-                        
-                        lastBeats.append((event.time, beat))
-                        for (i, v) in lastBeats.enumerated().reversed() {
-                            if event.time - v.sec > minLastSec {
-                                if i > 0 {
-                                    lastBeats.removeFirst(i - 1)
-                                }
-                                break
-                            }
-                        }
                     }
                 case .startBeat:
                     let interval = document.currentKeyframeBeatInterval
                     let beat = animationView.beat(atX: inP.x,
-                                                  interval: interval) + sheetView.model.animation.startBeat
-                    if beat != sheetView.model.animation.startBeat {
+                                                  interval: interval) + sheetView.model.animation.beatRange.start
+                    if beat != sheetView.model.animation.beatRange.start {
                         sheetView.binder[keyPath: sheetView.keyPath]
-                            .animation.startBeat = beat
+                            .animation.beatRange.start = beat
                         
                         sheetView.animationView.updateTimeline()
-                        
-                        lastBeats.append((event.time, beat))
-                        for (i, v) in lastBeats.enumerated().reversed() {
-                            if event.time - v.sec > minLastSec {
-                                if i > 0 {
-                                    lastBeats.removeFirst(i - 1)
-                                }
-                                break
-                            }
+                    }
+                case .endBeat:
+                    if let beganAnimationOption {
+                        let interval = document.currentNoteBeatInterval
+                        let nBeat = animationView.beat(atX: beganBeatX + inP.x - beganSheetP.x,
+                                                       interval: interval)
+                        if nBeat != animationView.beatRange?.end {
+                            let dBeat = nBeat - beganAnimationOption.beatRange.end
+                            let startBeat = sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval)
+                            let nkBeat = max(beganAnimationOption.beatRange.end + dBeat, startBeat)
+                            
+                            animationView.beatRange?.end = nkBeat
                         }
                     }
                 case .key:
-//                    let dSec = animationView.durSec(atWidth: dp.x)
                     let interval = document.currentKeyframeBeatInterval
-                    let dBeat = animationView.beat(atX: beganKeyframeX + inP.x - beganInP.x,
-                                                   interval: interval)
-                    let nDur = dBeat - animationView.model.localBeat(at: keyframeIndex)
-//
-//                    let dBeat = animationView.model.beat(fromSec: dSec,
-//                                                         beatRate: animationView.frameRate)
-                    let dur = max(nDur, Keyframe.minDurBeat)
-                    let oldDur = animationView.model.keyframes[keyframeIndex].durBeat
-                    if oldDur != dur {
+                    let durBeat = animationView.model.beatRange.length
+                    let beat = animationView.beat(atX: beganKeyframeX + inP.x - beganSheetP.x, interval: interval)
+                        .clipped(min: 0, max: durBeat)
+                    let oldBeat = animationView.model.keyframes[keyframeIndex].beat
+                    if oldBeat != beat && !beganKeyframeOptions.isEmpty {
                         let rootBeatIndex = animationView.model.rootBeatIndex
                         
-                        sheetView.binder[keyPath: sheetView.keyPath]
-                            .animation.keyframes[keyframeIndex]
-                            .durBeat = dur
+                        let dBeat = beat - beganKeyframeBeat
+                        let kos = beganKeyframeOptions.sorted { $0.key < $1.key }
+                        func clippedDBeat() -> Rational {
+                            let keyframes = animationView.model.keyframes
+                            var preI = 0, minPreDBeat = Rational.max, minNextDBeat = Rational.max
+                            while preI < kos.count {
+                                var nextI = preI
+                                while nextI + 1 < kos.count {
+                                    if nextI + 1 < kos.count && kos[nextI].key + 1 != kos[nextI + 1].key { break }
+                                    nextI += 1
+                                }
+                                let preKI = kos[preI].key, nextKI = kos[nextI].key
+                                let preDBeat = kos[preI].value.beat - (preKI - 1 >= 0 ? keyframes[preKI - 1].beat : 0)
+                                let nextDBeat = (nextKI + 1 < keyframes.count ? keyframes[nextKI + 1].beat : durBeat) - kos[nextI].value.beat
+                                minPreDBeat = min(preDBeat, minPreDBeat)
+                                minNextDBeat = min(nextDBeat, minNextDBeat)
+                                
+                                preI = nextI + 1
+                            }
+                            return dBeat.clipped(min: -minPreDBeat, max: minNextDBeat)
+                        }
+                        let nDBeat = clippedDBeat()
+                        kos.forEach {
+                            sheetView.binder[keyPath: sheetView.keyPath].animation
+                                .keyframes[$0.key].beat = $0.value.beat + nDBeat
+                        }
                         
                         sheetView.rootBeatIndex = rootBeatIndex
                         sheetView.animationView.updateTimeline()
-                        
-                        let beat = dur
-                        lastBeats.append((event.time, beat))
-                        for (i, v) in lastBeats.enumerated().reversed() {
-                            if event.time - v.sec > minLastSec {
-                                if i > 0 {
-                                    lastBeats.removeFirst(i - 1)
-                                }
-                                break
-                            }
-                        }
                     }
                 case .none: break
                 }
@@ -1282,42 +1291,24 @@ final class AnimationSlider: DragEditor {
                     }
                 }
                 switch type {
-                case .all, .startBeat:
-                    for (sec, beat) in lastBeats.reversed() {
-                        if event.time - sec > minLastSec {
-                            if beat != sheetView.model.animation.startBeat {
-                                sheetView.binder[keyPath: sheetView.keyPath]
-                                    .animation.startBeat = beat
-                                
-                                sheetView.animationView.updateTimeline()
-                            }
-                            break
-                        }
-                    }
-                    
+                case .all, .startBeat, .endBeat:
                     if let beganAnimationOption, sheetView.model.animation.option != beganAnimationOption {
                         updateUndoGroup()
                         sheetView.capture(option: sheetView.model.animation.option,
                                           oldOption: beganAnimationOption)
                     }
                 case .key:
-                    let beat = sheetView.animationView.model.keyframes[keyframeIndex].durBeat
-                    for (sec, nBeat) in lastBeats.reversed() {
-                        if event.time - sec > minLastSec {
-                            if nBeat != beat {
-                                sheetView.animationView.model.keyframes[keyframeIndex].durBeat = nBeat
-                            }
-                            break
-                        }
-                    }
-                    
                     let animationView = sheetView.animationView
-                    let keyframe = animationView.model.keyframes[keyframeIndex]
-                    if keyframe.durBeat != beganKeyframeDurBeat {
+                    let okos = beganKeyframeOptions
+                        .filter { animationView.model.keyframes[$0.key].option != $0.value }
+                        .sorted { $0.key < $1.key }
+                        .map { IndexValue(value: $0.value, index: $0.key) }
+                    if !okos.isEmpty {
+                        let kos = okos.map {
+                            IndexValue(value: animationView.model.keyframes[$0.index].option, index: $0.index)
+                        }
                         updateUndoGroup()
-                        sheetView.capture(durBeat: keyframe.durBeat,
-                                          oldDurBeat: beganKeyframeDurBeat,
-                                          at: keyframeIndex)
+                        sheetView.capture(kos, old: okos)
                     }
                 case .none: break
                 }
@@ -1811,8 +1802,12 @@ final class KeyframeInserter: InputKeyEditor {
                     
                     var rootBP = animation.rootBeatPosition
                     rootBP.beat = beat
-                    if let (i, iBeat) = animation
-                        .indexAndInternalBeat(atRootBeat: beat) {
+                    if beat < animation.keyframes.first?.beat ?? 0 {
+                        let keyframe = Keyframe(beat: beat)
+                        animationView.selectedFrameIndexes = []
+                        sheetView.newUndoGroup(enabledKeyframeIndex: false)
+                        sheetView.insert([IndexValue(value: keyframe, index: 0)])
+                    } else if let (i, iBeat) = animation.indexAndInternalBeat(atRootBeat: beat) {
                         let i = iBeat != 0 ?
                         i :
                         (animationView.beat(atX: inP.x, interval: Rational(1, 60)) < beat ? i - 1 : i)
@@ -1832,21 +1827,18 @@ final class KeyframeInserter: InputKeyEditor {
                             }
                         } ()
                         if iBeat != 0 && !animation.keyframes[i].containsInterpolated {
-                            let nDurBeat = animation.keyframes[i].durBeat - iBeat
-                            let keyframe = Keyframe(durBeat: nDurBeat)
+                            let nBeat = animation.keyframes[i].beat + iBeat
+                            let keyframe = Keyframe(beat: nBeat)
                             animationView.selectedFrameIndexes = []
                             sheetView.newUndoGroup(enabledKeyframeIndex: false)
-                            sheetView.set(durBeat: iBeat, at: i)
                             sheetView.insert([IndexValue(value: keyframe, index: i + 1)])
                         } else if animation.keyframes[i].containsInterpolated {
                             let idivs: [IndexValue<InterOption>] = (0 ..< animation.keyframes[i].picture.lines.count).compactMap {
                                 
-                                let option = animation.keyframes[i]
-                                    .picture.lines[$0].interOption
+                                let option = animation.keyframes[i].picture.lines[$0].interOption
                                 if option.interType == .interpolated {
                                     let nOption = option.with(.key)
-                                    return IndexValue(value: nOption,
-                                                      index: $0)
+                                    return IndexValue(value: nOption, index: $0)
                                 } else {
                                     return nil
                                 }
@@ -1957,8 +1949,7 @@ final class KeyframeInserter: InputKeyEditor {
                     }
                 } else if !sheetView.model.enabledAnimation {
                     sheetView.newUndoGroup(enabledKeyframeIndex: false)
-                    sheetView.set(durBeat: Animation.defaultDurBeat,
-                                  at: 0)
+                    sheetView.set(beat: 0, at: 0)
                     var option = sheetView.model.animation.option
                     option.enabled = true
                     sheetView.set(option)
@@ -2121,7 +2112,7 @@ final class Interpolater: InputKeyEditor {
                     let beat = animationView.model.localBeat
                     let count = ((animationView.rootBeat - beat) / animationView.model.localDurBeat).rounded(.towardZero)
                     
-                    let oneT = Rational(1, animationView.frameRate)
+                    let oneBeat = Rational(1, animationView.frameRate)
                     
                     let ki0 = animationView.model.index(atRoot: oldRootKeyframeIndex)
                     let ki1 = animationView.model.index(atRoot: animationView.rootKeyframeIndex)
@@ -2131,18 +2122,17 @@ final class Interpolater: InputKeyEditor {
                     var nj = 0
                     for range in ranges {
                         for j in range {
-                            let k = animationView.model.keyframes[j + nj]
-                            let tl = k.durBeat
-                            if tl >= oneT {
+                            let durBeat = animationView.model.keyframeDurBeat(at: j + nj)
+                            if durBeat >= oneBeat {
                                 if !isNewUndoGroup {
                                     sheetView.newUndoGroup()
                                     isNewUndoGroup = true
                                 }
                                 
-                                sheetView.set(durBeat: oneT, at: j + nj)
-                                let count = Int(tl / oneT) - 1
+                                let nBeat = animationView.model.keyframes[j + nj].beat
+                                let count = Int(durBeat / oneBeat) - 1
                                 sheetView.insert((0 ..< count).map { k in
-                                    IndexValue(value: Keyframe(durBeat: oneT),
+                                    IndexValue(value: Keyframe(beat: oneBeat * .init(k + 1) + nBeat),
                                                index: k + j + nj + 1)
                                 })
                                 nj += count
@@ -2266,14 +2256,8 @@ extension SheetView {
         for (id, repIDs) in ids {
             let repIDSet = Set(repIDs)
             
-            var time = Rational(0)
-            let kts: [(keyframe: Keyframe, time: Rational)]
-                = model.animation.keyframes.map {
-                    let t = time
-                    time += $0.durBeat
-                    return ($0, t)
-            }
-            let duration = time
+            let kts: [(keyframe: Keyframe, time: Rational)] = model.animation.keyframes.map { ($0, $0.beat) }
+            let duration = model.animation.beatRange.length
             
             let rki = self.rootKeyframeIndex
             let lki = model.animation.index

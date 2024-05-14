@@ -1457,14 +1457,14 @@ struct PBKeyframe {
   /// Clears the value of `draftPicture`. Subsequent reads from it will return its default value.
   mutating func clearDraftPicture() {self._draftPicture = nil}
 
-  var durBeat: PBRational {
-    get {return _durBeat ?? PBRational()}
-    set {_durBeat = newValue}
+  var beat: PBRational {
+    get {return _beat ?? PBRational()}
+    set {_beat = newValue}
   }
-  /// Returns true if `durBeat` has been explicitly set.
-  var hasDurBeat: Bool {return self._durBeat != nil}
-  /// Clears the value of `durBeat`. Subsequent reads from it will return its default value.
-  mutating func clearDurBeat() {self._durBeat = nil}
+  /// Returns true if `beat` has been explicitly set.
+  var hasBeat: Bool {return self._beat != nil}
+  /// Clears the value of `beat`. Subsequent reads from it will return its default value.
+  mutating func clearBeat() {self._beat = nil}
 
   var previousNext: PBPreviousNext = .off
 
@@ -1474,7 +1474,7 @@ struct PBKeyframe {
 
   fileprivate var _picture: PBPicture? = nil
   fileprivate var _draftPicture: PBPicture? = nil
-  fileprivate var _durBeat: PBRational? = nil
+  fileprivate var _beat: PBRational? = nil
 }
 
 struct PBKeyframeKey {
@@ -1490,14 +1490,14 @@ struct PBKeyframeKey {
 
   var draftPlaneIs: [Int64] = []
 
-  var durBeat: PBRational {
-    get {return _durBeat ?? PBRational()}
-    set {_durBeat = newValue}
+  var beat: PBRational {
+    get {return _beat ?? PBRational()}
+    set {_beat = newValue}
   }
-  /// Returns true if `durBeat` has been explicitly set.
-  var hasDurBeat: Bool {return self._durBeat != nil}
-  /// Clears the value of `durBeat`. Subsequent reads from it will return its default value.
-  mutating func clearDurBeat() {self._durBeat = nil}
+  /// Returns true if `beat` has been explicitly set.
+  var hasBeat: Bool {return self._beat != nil}
+  /// Clears the value of `beat`. Subsequent reads from it will return its default value.
+  mutating func clearBeat() {self._beat = nil}
 
   var previousNext: PBPreviousNext = .off
 
@@ -1505,7 +1505,7 @@ struct PBKeyframeKey {
 
   init() {}
 
-  fileprivate var _durBeat: PBRational? = nil
+  fileprivate var _beat: PBRational? = nil
 }
 
 struct PBAnimationZipper {
@@ -1533,14 +1533,14 @@ struct PBAnimationOption {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var startBeat: PBRational {
-    get {return _startBeat ?? PBRational()}
-    set {_startBeat = newValue}
+  var beatRange: PBRationalRange {
+    get {return _beatRange ?? PBRationalRange()}
+    set {_beatRange = newValue}
   }
-  /// Returns true if `startBeat` has been explicitly set.
-  var hasStartBeat: Bool {return self._startBeat != nil}
-  /// Clears the value of `startBeat`. Subsequent reads from it will return its default value.
-  mutating func clearStartBeat() {self._startBeat = nil}
+  /// Returns true if `beatRange` has been explicitly set.
+  var hasBeatRange: Bool {return self._beatRange != nil}
+  /// Clears the value of `beatRange`. Subsequent reads from it will return its default value.
+  mutating func clearBeatRange() {self._beatRange = nil}
 
   var tempo: PBRational {
     get {return _tempo ?? PBRational()}
@@ -1559,7 +1559,7 @@ struct PBAnimationOption {
 
   init() {}
 
-  fileprivate var _startBeat: PBRational? = nil
+  fileprivate var _beatRange: PBRationalRange? = nil
   fileprivate var _tempo: PBRational? = nil
 }
 
@@ -1568,58 +1568,67 @@ struct PBAnimation {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var keyframes: [PBKeyframe] = []
+  var keyframes: [PBKeyframe] {
+    get {return _storage._keyframes}
+    set {_uniqueStorage()._keyframes = newValue}
+  }
 
   var zipper: PBAnimationZipper {
-    get {return _zipper ?? PBAnimationZipper()}
-    set {_zipper = newValue}
+    get {return _storage._zipper ?? PBAnimationZipper()}
+    set {_uniqueStorage()._zipper = newValue}
   }
   /// Returns true if `zipper` has been explicitly set.
-  var hasZipper: Bool {return self._zipper != nil}
+  var hasZipper: Bool {return _storage._zipper != nil}
   /// Clears the value of `zipper`. Subsequent reads from it will return its default value.
-  mutating func clearZipper() {self._zipper = nil}
+  mutating func clearZipper() {_uniqueStorage()._zipper = nil}
 
   var rootBeat: PBRational {
-    get {return _rootBeat ?? PBRational()}
-    set {_rootBeat = newValue}
+    get {return _storage._rootBeat ?? PBRational()}
+    set {_uniqueStorage()._rootBeat = newValue}
   }
   /// Returns true if `rootBeat` has been explicitly set.
-  var hasRootBeat: Bool {return self._rootBeat != nil}
+  var hasRootBeat: Bool {return _storage._rootBeat != nil}
   /// Clears the value of `rootBeat`. Subsequent reads from it will return its default value.
-  mutating func clearRootBeat() {self._rootBeat = nil}
+  mutating func clearRootBeat() {_uniqueStorage()._rootBeat = nil}
 
-  var startBeat: PBRational {
-    get {return _startBeat ?? PBRational()}
-    set {_startBeat = newValue}
+  var beatRange: PBRationalRange {
+    get {return _storage._beatRange ?? PBRationalRange()}
+    set {_uniqueStorage()._beatRange = newValue}
   }
-  /// Returns true if `startBeat` has been explicitly set.
-  var hasStartBeat: Bool {return self._startBeat != nil}
-  /// Clears the value of `startBeat`. Subsequent reads from it will return its default value.
-  mutating func clearStartBeat() {self._startBeat = nil}
+  /// Returns true if `beatRange` has been explicitly set.
+  var hasBeatRange: Bool {return _storage._beatRange != nil}
+  /// Clears the value of `beatRange`. Subsequent reads from it will return its default value.
+  mutating func clearBeatRange() {_uniqueStorage()._beatRange = nil}
 
   var tempo: PBRational {
-    get {return _tempo ?? PBRational()}
-    set {_tempo = newValue}
+    get {return _storage._tempo ?? PBRational()}
+    set {_uniqueStorage()._tempo = newValue}
   }
   /// Returns true if `tempo` has been explicitly set.
-  var hasTempo: Bool {return self._tempo != nil}
+  var hasTempo: Bool {return _storage._tempo != nil}
   /// Clears the value of `tempo`. Subsequent reads from it will return its default value.
-  mutating func clearTempo() {self._tempo = nil}
+  mutating func clearTempo() {_uniqueStorage()._tempo = nil}
 
-  var isPlaying: Bool = false
+  var isPlaying: Bool {
+    get {return _storage._isPlaying}
+    set {_uniqueStorage()._isPlaying = newValue}
+  }
 
-  var timelineY: Double = 0
+  var timelineY: Double {
+    get {return _storage._timelineY}
+    set {_uniqueStorage()._timelineY = newValue}
+  }
 
-  var enabled: Bool = false
+  var enabled: Bool {
+    get {return _storage._enabled}
+    set {_uniqueStorage()._enabled = newValue}
+  }
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
 
-  fileprivate var _zipper: PBAnimationZipper? = nil
-  fileprivate var _rootBeat: PBRational? = nil
-  fileprivate var _startBeat: PBRational? = nil
-  fileprivate var _tempo: PBRational? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 struct PBSheetOption {
@@ -1820,14 +1829,14 @@ struct PBKeyframeOption {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var durBeat: PBRational {
-    get {return _durBeat ?? PBRational()}
-    set {_durBeat = newValue}
+  var beat: PBRational {
+    get {return _beat ?? PBRational()}
+    set {_beat = newValue}
   }
-  /// Returns true if `durBeat` has been explicitly set.
-  var hasDurBeat: Bool {return self._durBeat != nil}
-  /// Clears the value of `durBeat`. Subsequent reads from it will return its default value.
-  mutating func clearDurBeat() {self._durBeat = nil}
+  /// Returns true if `beat` has been explicitly set.
+  var hasBeat: Bool {return self._beat != nil}
+  /// Clears the value of `beat`. Subsequent reads from it will return its default value.
+  mutating func clearBeat() {self._beat = nil}
 
   var previousNext: PBPreviousNext = .off
 
@@ -1835,7 +1844,7 @@ struct PBKeyframeOption {
 
   init() {}
 
-  fileprivate var _durBeat: PBRational? = nil
+  fileprivate var _beat: PBRational? = nil
 }
 
 struct PBIntIndexValue {
@@ -5960,7 +5969,7 @@ extension PBKeyframe: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "picture"),
     2: .same(proto: "draftPicture"),
-    3: .same(proto: "durBeat"),
+    3: .same(proto: "beat"),
     4: .same(proto: "previousNext"),
   ]
 
@@ -5972,7 +5981,7 @@ extension PBKeyframe: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularMessageField(value: &self._picture) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._draftPicture) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._durBeat) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._beat) }()
       case 4: try { try decoder.decodeSingularEnumField(value: &self.previousNext) }()
       default: break
       }
@@ -5990,7 +5999,7 @@ extension PBKeyframe: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
     try { if let v = self._draftPicture {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     } }()
-    try { if let v = self._durBeat {
+    try { if let v = self._beat {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
     } }()
     if self.previousNext != .off {
@@ -6002,7 +6011,7 @@ extension PBKeyframe: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
   static func ==(lhs: PBKeyframe, rhs: PBKeyframe) -> Bool {
     if lhs._picture != rhs._picture {return false}
     if lhs._draftPicture != rhs._draftPicture {return false}
-    if lhs._durBeat != rhs._durBeat {return false}
+    if lhs._beat != rhs._beat {return false}
     if lhs.previousNext != rhs.previousNext {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -6016,7 +6025,7 @@ extension PBKeyframeKey: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
     2: .same(proto: "planeIs"),
     3: .same(proto: "draftLineIs"),
     4: .same(proto: "draftPlaneIs"),
-    5: .same(proto: "durBeat"),
+    5: .same(proto: "beat"),
     6: .same(proto: "previousNext"),
   ]
 
@@ -6030,7 +6039,7 @@ extension PBKeyframeKey: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
       case 2: try { try decoder.decodeRepeatedInt64Field(value: &self.planeIs) }()
       case 3: try { try decoder.decodeRepeatedInt64Field(value: &self.draftLineIs) }()
       case 4: try { try decoder.decodeRepeatedInt64Field(value: &self.draftPlaneIs) }()
-      case 5: try { try decoder.decodeSingularMessageField(value: &self._durBeat) }()
+      case 5: try { try decoder.decodeSingularMessageField(value: &self._beat) }()
       case 6: try { try decoder.decodeSingularEnumField(value: &self.previousNext) }()
       default: break
       }
@@ -6054,7 +6063,7 @@ extension PBKeyframeKey: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
     if !self.draftPlaneIs.isEmpty {
       try visitor.visitPackedInt64Field(value: self.draftPlaneIs, fieldNumber: 4)
     }
-    try { if let v = self._durBeat {
+    try { if let v = self._beat {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
     } }()
     if self.previousNext != .off {
@@ -6068,7 +6077,7 @@ extension PBKeyframeKey: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
     if lhs.planeIs != rhs.planeIs {return false}
     if lhs.draftLineIs != rhs.draftLineIs {return false}
     if lhs.draftPlaneIs != rhs.draftPlaneIs {return false}
-    if lhs._durBeat != rhs._durBeat {return false}
+    if lhs._beat != rhs._beat {return false}
     if lhs.previousNext != rhs.previousNext {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -6134,7 +6143,7 @@ extension PBAnimationZipper: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
 extension PBAnimationOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBAnimationOption"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "startBeat"),
+    1: .same(proto: "beatRange"),
     2: .same(proto: "tempo"),
     3: .same(proto: "timelineY"),
     4: .same(proto: "enabled"),
@@ -6146,7 +6155,7 @@ extension PBAnimationOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._startBeat) }()
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._beatRange) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._tempo) }()
       case 3: try { try decoder.decodeSingularDoubleField(value: &self.timelineY) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self.enabled) }()
@@ -6160,7 +6169,7 @@ extension PBAnimationOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._startBeat {
+    try { if let v = self._beatRange {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
     } }()
     try { if let v = self._tempo {
@@ -6176,7 +6185,7 @@ extension PBAnimationOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 
   static func ==(lhs: PBAnimationOption, rhs: PBAnimationOption) -> Bool {
-    if lhs._startBeat != rhs._startBeat {return false}
+    if lhs._beatRange != rhs._beatRange {return false}
     if lhs._tempo != rhs._tempo {return false}
     if lhs.timelineY != rhs.timelineY {return false}
     if lhs.enabled != rhs.enabled {return false}
@@ -6191,73 +6200,119 @@ extension PBAnimation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
     1: .same(proto: "keyframes"),
     8: .same(proto: "zipper"),
     2: .same(proto: "rootBeat"),
-    3: .same(proto: "startBeat"),
+    3: .same(proto: "beatRange"),
     4: .same(proto: "tempo"),
     5: .same(proto: "isPlaying"),
     6: .same(proto: "timelineY"),
     7: .same(proto: "enabled"),
   ]
 
+  fileprivate class _StorageClass {
+    var _keyframes: [PBKeyframe] = []
+    var _zipper: PBAnimationZipper? = nil
+    var _rootBeat: PBRational? = nil
+    var _beatRange: PBRationalRange? = nil
+    var _tempo: PBRational? = nil
+    var _isPlaying: Bool = false
+    var _timelineY: Double = 0
+    var _enabled: Bool = false
+
+    static let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _keyframes = source._keyframes
+      _zipper = source._zipper
+      _rootBeat = source._rootBeat
+      _beatRange = source._beatRange
+      _tempo = source._tempo
+      _isPlaying = source._isPlaying
+      _timelineY = source._timelineY
+      _enabled = source._enabled
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.keyframes) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._rootBeat) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._startBeat) }()
-      case 4: try { try decoder.decodeSingularMessageField(value: &self._tempo) }()
-      case 5: try { try decoder.decodeSingularBoolField(value: &self.isPlaying) }()
-      case 6: try { try decoder.decodeSingularDoubleField(value: &self.timelineY) }()
-      case 7: try { try decoder.decodeSingularBoolField(value: &self.enabled) }()
-      case 8: try { try decoder.decodeSingularMessageField(value: &self._zipper) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeRepeatedMessageField(value: &_storage._keyframes) }()
+        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._rootBeat) }()
+        case 3: try { try decoder.decodeSingularMessageField(value: &_storage._beatRange) }()
+        case 4: try { try decoder.decodeSingularMessageField(value: &_storage._tempo) }()
+        case 5: try { try decoder.decodeSingularBoolField(value: &_storage._isPlaying) }()
+        case 6: try { try decoder.decodeSingularDoubleField(value: &_storage._timelineY) }()
+        case 7: try { try decoder.decodeSingularBoolField(value: &_storage._enabled) }()
+        case 8: try { try decoder.decodeSingularMessageField(value: &_storage._zipper) }()
+        default: break
+        }
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.keyframes.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.keyframes, fieldNumber: 1)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._keyframes.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._keyframes, fieldNumber: 1)
+      }
+      try { if let v = _storage._rootBeat {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+      } }()
+      try { if let v = _storage._beatRange {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+      } }()
+      try { if let v = _storage._tempo {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+      } }()
+      if _storage._isPlaying != false {
+        try visitor.visitSingularBoolField(value: _storage._isPlaying, fieldNumber: 5)
+      }
+      if _storage._timelineY != 0 {
+        try visitor.visitSingularDoubleField(value: _storage._timelineY, fieldNumber: 6)
+      }
+      if _storage._enabled != false {
+        try visitor.visitSingularBoolField(value: _storage._enabled, fieldNumber: 7)
+      }
+      try { if let v = _storage._zipper {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+      } }()
     }
-    try { if let v = self._rootBeat {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._startBeat {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._tempo {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-    } }()
-    if self.isPlaying != false {
-      try visitor.visitSingularBoolField(value: self.isPlaying, fieldNumber: 5)
-    }
-    if self.timelineY != 0 {
-      try visitor.visitSingularDoubleField(value: self.timelineY, fieldNumber: 6)
-    }
-    if self.enabled != false {
-      try visitor.visitSingularBoolField(value: self.enabled, fieldNumber: 7)
-    }
-    try { if let v = self._zipper {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
-    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: PBAnimation, rhs: PBAnimation) -> Bool {
-    if lhs.keyframes != rhs.keyframes {return false}
-    if lhs._zipper != rhs._zipper {return false}
-    if lhs._rootBeat != rhs._rootBeat {return false}
-    if lhs._startBeat != rhs._startBeat {return false}
-    if lhs._tempo != rhs._tempo {return false}
-    if lhs.isPlaying != rhs.isPlaying {return false}
-    if lhs.timelineY != rhs.timelineY {return false}
-    if lhs.enabled != rhs.enabled {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._keyframes != rhs_storage._keyframes {return false}
+        if _storage._zipper != rhs_storage._zipper {return false}
+        if _storage._rootBeat != rhs_storage._rootBeat {return false}
+        if _storage._beatRange != rhs_storage._beatRange {return false}
+        if _storage._tempo != rhs_storage._tempo {return false}
+        if _storage._isPlaying != rhs_storage._isPlaying {return false}
+        if _storage._timelineY != rhs_storage._timelineY {return false}
+        if _storage._enabled != rhs_storage._enabled {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -6630,7 +6685,7 @@ extension PBFinding: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
 extension PBKeyframeOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBKeyframeOption"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "durBeat"),
+    1: .same(proto: "beat"),
     2: .same(proto: "previousNext"),
   ]
 
@@ -6640,7 +6695,7 @@ extension PBKeyframeOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._durBeat) }()
+      case 1: try { try decoder.decodeSingularMessageField(value: &self._beat) }()
       case 2: try { try decoder.decodeSingularEnumField(value: &self.previousNext) }()
       default: break
       }
@@ -6652,7 +6707,7 @@ extension PBKeyframeOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._durBeat {
+    try { if let v = self._beat {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
     } }()
     if self.previousNext != .off {
@@ -6662,7 +6717,7 @@ extension PBKeyframeOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 
   static func ==(lhs: PBKeyframeOption, rhs: PBKeyframeOption) -> Bool {
-    if lhs._durBeat != rhs._durBeat {return false}
+    if lhs._beat != rhs._beat {return false}
     if lhs.previousNext != rhs.previousNext {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
