@@ -182,7 +182,6 @@ final class PCMNoder {
             }
             if newValue.pan != oldValue.pan {
                 node.pan = Float(newValue.pan)//
-                print("PAN", node.pan)
             }
         }
     }
@@ -353,6 +352,8 @@ final class ScoreNoder {
     fileprivate weak var sequencer: Sequencer?
     fileprivate var node: AVAudioSourceNode!
     private let format: AVAudioFormat
+    private let rendnotesSemaphore = DispatchSemaphore(value: 1)
+    private let notewaveDicSemaphore = DispatchSemaphore(value: 1)
     
     var stereo: Stereo {
         get {
@@ -371,7 +372,7 @@ final class ScoreNoder {
     
     var startSec = 0.0
     var durSec = Rational(0)
-    var id = UUID()
+    let id = UUID()
     
     var rendnotes = [Rendnote]()
     
@@ -383,17 +384,21 @@ final class ScoreNoder {
     }
     
     func insert(_ noteIVs: [IndexValue<Note>], with score: Score) {
+        rendnotesSemaphore.wait()
         rendnotes.insert(noteIVs.map {
             IndexValue(value: Rendnote(note: $0.value, score: score), index: $0.index)
         })
+        rendnotesSemaphore.signal()
     }
     func replace(_ note: Note, at i: Int, with score: Score) {
         replace([.init(value: note, index: i)], with: score)
     }
     func replace(_ noteIVs: [IndexValue<Note>], with score: Score) {
+        rendnotesSemaphore.wait()
         rendnotes.replace(noteIVs.map {
             IndexValue(value: Rendnote(note: $0.value, score: score), index: $0.index)
         })// check change stereo only
+        rendnotesSemaphore.signal()
     }
     
     func replace(_ eivs: [IndexValue<Envelope>]) {
@@ -401,12 +406,15 @@ final class ScoreNoder {
     }
     func replace(_ envelope: Envelope, at noteI: Int) {
         let envelopeMemo = EnvelopeMemo(envelope)
+        rendnotesSemaphore.wait()
         rendnotes[noteI].envelopeMemo = envelopeMemo
-        memowaves[rendnotes[noteI].id]?.envelopeMemo = envelopeMemo
+        rendnotesSemaphore.signal()
     }
     
     func remove(at noteIs: [Int]) {
+        rendnotesSemaphore.wait()
         rendnotes.remove(at: noteIs)
+        rendnotesSemaphore.signal()
     }
     
     func updateRendnotes() {
@@ -415,7 +423,9 @@ final class ScoreNoder {
         
         for nid in oldNIDs {
             guard !newNIDs.contains(nid) else { continue }
+            notewaveDicSemaphore.wait()
             notewaveDic[nid] = nil
+            notewaveDicSemaphore.signal()
         }
         
         let ors = rendnotes.reduce(into: [NotewaveID: Rendnote]()) { $0[NotewaveID($1)] = $1 }
@@ -429,7 +439,11 @@ final class ScoreNoder {
         if nwrrs.count > 0 {
             let sampleRate = format.sampleRate
             if nwrrs.count == 1 {
-                notewaveDic[nwrrs[0].0] = nwrrs[0].1.notewave(sampleRate: sampleRate)
+                let notewave = nwrrs[0].1.notewave(sampleRate: sampleRate)
+                
+                notewaveDicSemaphore.wait()
+                notewaveDic[nwrrs[0].0] = notewave
+                notewaveDicSemaphore.signal()
             } else {
                 let threadCount = 8
                 let nThreadCount = min(nwrrs.count, threadCount)
@@ -462,10 +476,13 @@ final class ScoreNoder {
                     }
                 }
                 for (i, notewaveBox) in notewaveBoxs.enumerated() {
+                    notewaveDicSemaphore.wait()
                     notewaveDic[nwrrs[i].0] = notewaveBox.notewave
+                    notewaveDicSemaphore.signal()
                 }
             }
         }
+        
     }
     
     func reset() {
@@ -506,15 +523,14 @@ final class ScoreNoder {
                      stereo: Stereo = .init(volm: 1)) {
         self.init(rendnotes: score.notes.map { Rendnote(note: $0, score: score) },
                   startSec: startSec, durSec: score.secRange.end, sampleRate: sampleRate,
-                  stereo: stereo, id: score.id)
+                  stereo: stereo)
     }
     init(rendnotes: [Rendnote], startSec: Double, durSec: Rational, sampleRate: Double,
-         stereo: Stereo = .init(volm: 1), id: UUID = .init()) {
+         stereo: Stereo = .init(volm: 1)) {
         
         self.rendnotes = rendnotes
         self.startSec = startSec
         self.durSec = durSec
-        self.id = id
         format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2)!
         
         let sampleRate = format.sampleRate
@@ -550,7 +566,9 @@ final class ScoreNoder {
                 return kAudioUnitErr_NoConnection
             }
             
+            self.rendnotesSemaphore.wait()
             let rendnotes = self.rendnotes
+            self.rendnotesSemaphore.signal()
             
             for rendnote in rendnotes {
                 let noteStartSec = rendnote.secRange.start.isInfinite ?
@@ -559,7 +577,12 @@ final class ScoreNoder {
                 if rendnote.secRange.end.isInfinite {
                     if secI + frameCount >= 0 && self.memowaves[rendnote.id] == nil {
                         let nwid = NotewaveID(rendnote)
-                        if let notewave = self.notewaveDic[nwid] {
+                        
+                        self.notewaveDicSemaphore.wait()
+                        let notewave = self.notewaveDic[nwid]
+                        self.notewaveDicSemaphore.signal()
+                        
+                        if let notewave {
                             self.memowaves[rendnote.id]
                                 = Memowave(startSec: noteStartSec,
                                            releaseSec: nil,
@@ -567,7 +590,7 @@ final class ScoreNoder {
                                            envelopeMemo: rendnote.envelopeMemo,
                                            pitbend: rendnote.pitbend,
                                            notewave: notewave)
-                            self.phases[rendnote.id] = 0
+                            self.phases[rendnote.id] = .init(secI.mod(notewave.samples.count))
                         }
                     }
                 } else {
@@ -580,7 +603,12 @@ final class ScoreNoder {
                         && self.memowaves[rendnote.id] == nil {
                         
                         let nwid = NotewaveID(rendnote)
-                        if let notewave = self.notewaveDic[nwid] {
+                        
+                        self.notewaveDicSemaphore.wait()
+                        let notewave = self.notewaveDic[nwid]
+                        self.notewaveDicSemaphore.signal()
+                        
+                        if let notewave {
                             self.memowaves[rendnote.id]
                                 = Memowave(startSec: noteStartSec,
                                            releaseSec: noteStartSec + length,
@@ -588,7 +616,7 @@ final class ScoreNoder {
                                            envelopeMemo: rendnote.envelopeMemo,
                                            pitbend: rendnote.pitbend,
                                            notewave: notewave)
-                            self.phases[rendnote.id] = 0
+                            self.phases[rendnote.id] = .init(secI.mod(notewave.samples.count))
                         }
                     } else if let memowave = self.memowaves[rendnote.id], !rendnote.secRange.end.isInfinite,
                               memowave.endSec == nil {
@@ -861,6 +889,7 @@ extension Sequencer {
             engine.disconnectNodeOutput(node)
             engine.detach(node)
         }
+        scoreNoders.forEach { $0.value.reset() }
         engine.disconnectNodeOutput(mixerNode)
         engine.detach(mixerNode)
         engine.disconnectNodeOutput(limiterNode)

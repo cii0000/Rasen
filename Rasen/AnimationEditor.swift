@@ -764,30 +764,29 @@ final class Player: InputKeyEditor {
                     var secRange: Range<Rational>?
                     var sec: Rational = cSheetView.animationView.sec(atX: sheetP.x)
                     let scoreView = cSheetView.scoreView
-                    let scoreP = scoreView.convertFromWorld(p)
-                    let score = scoreView.model
-                    if let (noteI, pitI) = scoreView.noteAndPitI(at: scoreP, scale: document.screenToWorldScale) {
-                        let beat = score.notes[noteI].pits[pitI].beat
-                        + score.notes[noteI].beatRange.start + score.beatRange.start
-                        sec = score.sec(fromBeat: beat)
-                        secRange = score.secRange
-                        ids.insert(score.id)
-                    } else if let ni = scoreView.noteIndex(at: scoreP,
-                                                    scale: document.screenToWorldScale) {
-                        let beat = score.notes[ni].beatRange.start + score.beatRange.start
-                        sec = score.sec(fromBeat: beat)
-                        secRange = score.secRange
-                        ids.insert(score.id)
-                    } else if scoreView.containsMainLine(scoreP,
-                                                         distance: 5 * document.screenToWorldScale) {
-                        ids.insert(score.id)
+                    if let scoreNoder = scoreView.scoreNoder {
+                        let scoreP = scoreView.convertFromWorld(p)
+                        let score = scoreView.model
+                        if let (noteI, pitI) = scoreView.noteAndPitI(at: scoreP, scale: document.screenToWorldScale) {
+                            let beat = score.notes[noteI].pits[pitI].beat
+                            + score.notes[noteI].beatRange.start + score.beatRange.start
+                            sec = score.sec(fromBeat: beat)
+                            secRange = score.secRange
+                            ids.insert(scoreNoder.id)
+                        } else if let noteI = scoreView.noteIndex(at: scoreP, scale: document.screenToWorldScale) {
+                            let beat = score.notes[noteI].beatRange.start + score.beatRange.start
+                            sec = score.sec(fromBeat: beat)
+                            secRange = score.secRange
+                            ids.insert(scoreNoder.id)
+                        } else if scoreView.containsMainLine(scoreP, distance: 5 * document.screenToWorldScale) {
+                            ids.insert(scoreNoder.id)
+                        }
+                        if secRange != nil {
+                            cSheetView.previousSheetView = nil
+                            cSheetView.nextSheetView = nil
+                        }
                     }
-                    if secRange != nil {
-                        cSheetView.previousSheetView = nil
-                        cSheetView.nextSheetView = nil
-                    }
-                    cSheetView.play(atSec: sec, inSec: secRange,
-                                    otherTimelineIDs: ids)
+                    cSheetView.play(atSec: sec, inSec: secRange, otherTimelineIDs: ids)
                 }
             }
         case .changed:

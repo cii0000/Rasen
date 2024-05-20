@@ -491,6 +491,11 @@ struct Monospline {
     let reciprocalH0: Double, reciprocalH1: Double, reciprocalH2: Double
     let reciprocalH0H1: Double, reciprocalH1H2: Double, reciprocalH1H1: Double
     private(set) var xx3: Double, xx2: Double, xx1: Double
+    enum XType {
+        case empty, linear, first, last, firstAndLast
+    }
+    let xType: XType
+    
     var t: Double {
         didSet {
             xx1 = h1 * t
@@ -499,6 +504,13 @@ struct Monospline {
         }
     }
     init(x1: Double, x2: Double, x3: Double, t: Double) {
+        if x1 == x2 {
+            xType = .empty
+        } else if x2 == x3 {
+            xType = .linear
+        } else {
+            xType = .last
+        }
         h0 = 0
         h1 = x2 - x1
         h2 = x3 - x2
@@ -514,6 +526,19 @@ struct Monospline {
         self.t = t
     }
     init(x0: Double, x1: Double, x2: Double, x3: Double, t: Double) {
+        if x1 == x2 {
+            xType = .empty
+        } else if x0 == x1 || x2 == x3 {
+            if x0 == x1 && x2 == x3 {
+                xType = .linear
+            } else if x0 == x1 {
+                xType = .last
+            } else {
+                xType = .first
+            }
+        } else {
+            xType = .firstAndLast
+        }
         h0 = x1 - x0
         h1 = x2 - x1
         h2 = x3 - x2
@@ -529,6 +554,13 @@ struct Monospline {
         self.t = t
     }
     init(x0: Double, x1: Double, x2: Double, t: Double) {
+        if x1 == x2 {
+            xType = .empty
+        } else if x0 == x1 {
+            xType = .linear
+        } else {
+            xType = .first
+        }
         h0 = x1 - x0
         h1 = x2 - x1
         h2 = 0
@@ -545,6 +577,12 @@ struct Monospline {
     }
     
     func firstInterpolatedValue(_ f1: Double, _ f2: Double, _ f3: Double) -> Double {
+        switch xType {
+        case .empty: return f1
+        case .linear: return .linear(f1, f2, t: t)
+        default: break
+        }
+        guard f1 != f2 else { return f1 }
         let s1 = (f2 - f1) * reciprocalH1, s2 = (f3 - f2) * reciprocalH2
         let s3 = 0.5 * abs((h2 * s1 + h1 * s2) * reciprocalH1H2)
         let signS1 = s1.signValue, signS2 = s2.signValue
@@ -553,6 +591,14 @@ struct Monospline {
         return interpolatedValue(f1: f1, s1: s1, yPrime1: yPrime1, yPrime2: yPrime2)
     }
     func interpolatedValue(_ f0: Double, _ f1: Double, _ f2: Double, _ f3: Double) -> Double {
+        switch xType {
+        case .empty: return f1
+        case .linear: return .linear(f1, f2, t: t)
+        case .first: return firstInterpolatedValue(f1, f2, f3)
+        case .last: return lastInterpolatedValue(f0, f1, f2)
+        default: break
+        }
+        guard f1 != f2 else { return f1 }
         let s0 = (f1 - f0) * reciprocalH0
         let s1 = (f2 - f1) * reciprocalH1, s2 = (f3 - f2) * reciprocalH2
         let s3 = 0.5 * abs((h1 * s0 + h0 * s1) * reciprocalH0H1)
@@ -563,6 +609,12 @@ struct Monospline {
         return interpolatedValue(f1: f1, s1: s1, yPrime1: yPrime1, yPrime2: yPrime2)
     }
     func lastInterpolatedValue(_ f0: Double, _ f1: Double, _ f2: Double) -> Double {
+        switch xType {
+        case .empty: return f1
+        case .linear: return .linear(f0, f1, t: t)
+        default: break
+        }
+        guard f1 != f2 else { return f1 }
         let s0 = (f1 - f0) * reciprocalH0, s1 = (f2 - f1) * reciprocalH1
         let s2 = 0.5 * abs((h1 * s0 + h0 * s1) * reciprocalH0H1)
         let signS0 = s0.signValue, signS1 = s1.signValue

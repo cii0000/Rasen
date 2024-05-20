@@ -314,7 +314,7 @@ final class ScoreSlider: DragEditor {
                                 noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) {
                                     $0[$1.offset] = $1.element.pits.enumerated().reduce(into: [Int: Set<Int>]()) { (v, ip) in
                                         if ip.element[.tone] == id {
-                                            v[ip.offset] = pitI == ip.offset ? [sprolI] : []
+                                            v[ip.offset] = sprolI < ip.element.tone.spectlope.count ? [sprolI] : []
                                         }
                                     }
                                 }
@@ -1350,17 +1350,18 @@ extension ScoreView {
         var linePath, evenLinePath, oddLinePath: Path, lyricLinePathlines = [Pathline]()
         var spectlopePathline: Pathline?
         var scNodes = [Node]()
-        let envelopeR = 0.125, sprolR = 0.03125 / 2, sprolSubR = 0.03125 / 4
+        let envelopeR = 0.125, toneR = 0.03125, sprolR = 0.03125 / 2, sprolSubR = 0.03125 / 4
         
         let lyricPaths: [Path] = note.pits.enumerated().compactMap { (pitI, pit) in
             let p = pitPosition(atPit: pitI, from: note)
             if !pit.lyric.isEmpty {
-                let lyricText = Text(string: pit.lyric, size: Font.smallSize)
+                let lyricText = Text(string: pit.lyric, size: 6)
                 let typesetter = lyricText.typesetter
                 let lh = typesetter.height / 2 + 2
                 lyricLinePathlines.append(.init(Rect(x: p.x - 0.25, y: p.y - lh / 2, 
                                                      width: 0.5, height: lh / 2)))
-                return typesetter.path() * Transform(translationX: p.x, y: p.y - lh)
+                return typesetter.path() * Transform(translationX: p.x - typesetter.width / 2,
+                                                     y: p.y - lh / 2 - typesetter.height / 2)
             } else {
                 return nil
             }
@@ -1493,7 +1494,7 @@ extension ScoreView {
                                (Point(dx, noteY(atX: dx, from: note) + envelopeY), envelopeR),
                                (Point(rx, noteY(atX: rx, from: note) + envelopeY), envelopeR)] 
             + sprolKnobPAndRs
-            + knobPs.map { (Point($0.x, $0.y + toneKnobY), sprolR) }
+            + knobPs.map { (Point($0.x, $0.y + toneKnobY), toneR) }
             
             if !note.isOneOvertone {
                 struct PAndColor: Hashable {
@@ -1689,7 +1690,8 @@ extension ScoreView {
                            path: .init(fullEditKnobPathlines), fillType: .color(.background)))
         
         let boundingBox = nodes.reduce(into: Rect?.none) { $0 += $1.drawableBounds }
-        return Node(children: nodes, path: boundingBox != nil ? Path(boundingBox!) : .init())
+        return Node(children: nodes, 
+                    path: boundingBox != nil ? Path(boundingBox!) : .init(Rect(origin: .init(nx, ny))))
     }
     
     func pointline(from note: Note) -> Pointline {
@@ -1758,7 +1760,7 @@ extension ScoreView {
         color(fromPan: stereo.pan, volm: stereo.volm)
     }
     static func color(fromPan pan: Double, volm: Double) -> Color {
-        let l = Double(Color(lightness: (1 - volm) * 100).rgba.r)
+        let l = Double(Color(lightness: volm.clipped(min: Volm.minVolm, max: Volm.maxVolm, newMin: 100, newMax: 0)).rgba.r)
         return if pan == 0 {
             Color(red: l, green: l, blue: l)
         } else if pan > 0 {
@@ -1936,6 +1938,12 @@ extension ScoreView {
         var isTone: Bool {
             switch self {
             case .evenVolm, .oddVolm, .sprol: true
+            default: false
+            }
+        }
+        var isEnvelpse: Bool {
+            switch self {
+            case .sustain: true
             default: false
             }
         }
@@ -2158,8 +2166,6 @@ extension ScoreView {
         let maxDS = maxD * maxD
         var minNoteI: Int?, minPitI: Int?, minDS = Double.infinity
         for (noteI, note) in score.notes.enumerated() {
-            guard note.pits.count > 1 else { continue }
-            
             for pitI in note.pits.count.range {
                 let pitP = pitPosition(atPit: pitI, from: note)
                 let ds = pitP.distanceSquared(p)
@@ -2275,6 +2281,18 @@ extension ScoreView {
                      pitch: pitch,
                      stereo: result.stereo.with(id: .init()),
                      tone: result.tone.with(id: .init()))
+    }
+    func insertablePitIndex(atBeat beat: Rational, at noteI: Int) -> Int {
+        let note = model.notes[noteI]
+        if beat < note.pits[0].beat {
+            return 0
+        }
+        for i in 1 ..< note.pits.count {
+            if note.pits[i - 1].beat <= beat && beat < note.pits[i].beat {
+                return i
+            }
+        }
+        return note.pits.count
     }
     func pitPosition(atPit pitI: Int, at noteI: Int) -> Point {
         pitPosition(atPit: pitI, from: model.notes[noteI])

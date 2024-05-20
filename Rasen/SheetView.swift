@@ -1226,13 +1226,27 @@ final class SheetView: View {
     func showOtherTimeNodeFromMainBeat() {
         showOtherTimeNode(atBeat: animationView.model.mainBeat)
     }
+    func containsScoreNoder(from ids: Set<UUID>) -> Bool {
+        if let scoreNoder = scoreView.scoreNoder {
+            ids.contains(scoreNoder.id)
+        } else {
+            false
+        }
+    }
+    func containsPCMNoder(from ids: Set<UUID>, in contentView: SheetContentView) -> Bool {
+        if let pcmNoder = contentView.pcmNoder {
+            ids.contains(pcmNoder.id)
+        } else {
+            false
+        }
+    }
     func showOtherTimeNode(atBeat beat: Rational) {
         if isHiddenOtherTimeNode {
             let ids = playingOtherTimelineIDs
             let sec = animationView.model.sec(fromBeat: beat)
             
             scoreView.timeNode.path = Path()
-            if ids.isEmpty || ids.contains(scoreView.model.id) {
+            if ids.isEmpty || containsScoreNoder(from: ids) {
                 scoreView.timeNode.lineType = .color(.content)
                 scoreView.updateTimeNode(atSec: sec)
                 scoreView.peakVolm = 0
@@ -1244,7 +1258,7 @@ final class SheetView: View {
             
             for contentView in contentsView.elementViews {
                 contentView.timeNode?.path = Path()
-                guard ids.isEmpty || ids.contains(contentView.model.id) else {
+                guard ids.isEmpty || containsPCMNoder(from: ids, in: contentView) else {
                     contentView.timeNode?.isHidden = true
                     continue
                 }
@@ -1274,11 +1288,11 @@ final class SheetView: View {
     private func updateOtherTimeNode(atBeat beat: Rational) {
         let ids = playingOtherTimelineIDs
         let sec = model.animation.sec(fromBeat: beat)
-        if ids.isEmpty || ids.contains(scoreView.model.id) {
+        if ids.isEmpty || containsScoreNoder(from: ids) {
             scoreView.updateTimeNode(atSec: sec)
         }
         for contentView in contentsView.elementViews {
-            guard ids.isEmpty || ids.contains(contentView.model.id) else { continue }
+            guard ids.isEmpty || containsPCMNoder(from: ids, in: contentView) else { continue }
             contentView.updateTimeNode(atSec: sec)
         }
         for textView in textsView.elementViews {

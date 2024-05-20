@@ -778,7 +778,7 @@ extension Pit {
 }
 
 struct Envelope: Hashable, Codable {
-    var attackSec = 0.03, decaySec = 0.03, sustainVolm = 0.95, releaseSec = 0.06
+    var attackSec = 0.025, decaySec = 0.025, sustainVolm = 1.0, releaseSec = 0.025
     var id = UUID()
 }
 extension Envelope: Protobuf {
@@ -1612,8 +1612,7 @@ extension Audiotrack {
 }
 
 struct Volm: Hashable, Codable {
-    static let minVolm = 0.0, maxVolm = 1.0, volmRange = minVolm ... maxVolm
-    static let minAmp = 0.0, maxAmp = 1.0, ampRange = minAmp ... maxAmp
+    static let minVolm = 0.0, maxVolm = 1 / 2.0.squareRoot(), volmRange = minVolm ... maxVolm
 }
 extension Volm {
     /// amp = (.exp(40 * volm / 8.7) - 1) / (.exp(40 / 8.7) - 1)

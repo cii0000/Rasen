@@ -360,7 +360,7 @@ final class ColorEditor: Editor {
                             noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) {
                                 $0[$1.offset] = $1.element.pits.enumerated().reduce(into: [Int: Set<Int>]()) { (v, ip) in
                                     if ip.element[type] == id {
-                                        v[ip.offset] = pitI == ip.offset ? [sprolI] : []
+                                        v[ip.offset] = sprolI < ip.element.tone.spectlope.count ? [sprolI] : []
                                     }
                                 }
                             }
@@ -491,13 +491,16 @@ final class ColorEditor: Editor {
                     beganContents[ci] = content
                 }
                 
+                let (minV, maxV) = scoreResult != nil && (scoreResult!.isTone || scoreResult!.isEnvelpse)
+                ? (0, 1) : (Volm.minVolm, Volm.maxVolm)
+                
                 updateNode()
                 fp = event.screenPoint
                 isReversedLightness = true
                 let g = lightnessGradientWith(chroma: 0, hue: 0, isReversed: isReversedLightness)
                 lightnessNode.lineType = .gradient(g)
                 lightnessNode.path = Path([Pathline(lightnessPointsWith(splitCount: Int(maxLightnessHeight)))])
-                oldEditingLightness = beganVolm * 100
+                oldEditingLightness = beganVolm.clipped(min: minV, max: maxV, newMin: 0, newMax: 100)
                 editingLightness = oldEditingLightness
                 firstLightnessPosition = document.convertScreenToWorld(fp)
                 isEditingLightness = true
@@ -505,10 +508,12 @@ final class ColorEditor: Editor {
         case .changed:
             guard let sheetView else { return }
             
+            let (minV, maxV) = scoreResult != nil && (scoreResult!.isTone || scoreResult!.isEnvelpse)
+            ? (0, 1) : (Volm.minVolm, Volm.maxVolm)
             let wp = document.convertScreenToWorld(event.screenPoint)
             let p = lightnessNode.convertFromWorld(wp)
             let t = (p.y / maxLightnessHeight).clipped(min: 0, max: 1)
-            let volm = Double.linear(0, 1, t: t)
+            let volm = Double.linear(minV, maxV, t: t)
             let volmScale = beganVolm == 0 ? 0 : volm / beganVolm
             func newVolm(from otherVolm: Double) -> Double {
                 if beganVolm == otherVolm {
@@ -622,7 +627,7 @@ final class ColorEditor: Editor {
                 }
             }
             
-            editingLightness = volm * 100
+            editingLightness = volm.clipped(min: minV, max: maxV, newMin: 0, newMax: 100)
         case .ended:
             notePlayer?.stop()
             
@@ -733,24 +738,13 @@ final class ColorEditor: Editor {
                 document.stopPlaying(with: event)
             }
             
-            func updatePlayer(from vs: [Note.PitResult], in sheetView: SheetView) {
-                if let notePlayer = sheetView.notePlayer {
-                    self.notePlayer = notePlayer
-                    notePlayer.notes = vs
-                } else {
-                    notePlayer = try? NotePlayer(notes: vs)
-                    sheetView.notePlayer = notePlayer
-                }
-                notePlayer?.play()
-            }
-            
             beganSP = sp
             let p = document.convertScreenToWorld(sp)
             beganWorldP = p
             if let sheetView = document.sheetView(at: p) {
                 self.sheetView = sheetView
                 
-                func updateWithSelections() {
+                func updateContentsWithSelections() {
                     let fs = document.selections
                         .map { $0.rect }
                         .map { sheetView.convertFromWorld($0) }
@@ -765,46 +759,88 @@ final class ColorEditor: Editor {
                     }
                 }
                 
-                func updatePitsWithSelection(noteI: Int, pitI: Int?, _ type: PitIDType) {
-                    var noteAndPitIs: [Int: [Int]]
-                    if document.isSelect(at: p) {
-                        noteAndPitIs = sheetView.noteAndPitIndexes(from: document.selections)
+                func updatePlayer(from vs: [Note.PitResult], in sheetView: SheetView) {
+                    if let notePlayer = sheetView.notePlayer {
+                        self.notePlayer = notePlayer
+                        notePlayer.notes = vs
+                    } else {
+                        notePlayer = try? NotePlayer(notes: vs)
+                        sheetView.notePlayer = notePlayer
+                    }
+                    notePlayer?.play()
+                }
+                
+                func updatePitsWithSelection(noteI: Int, pitI: Int?, sprolI: Int?, _ type: PitIDType) {
+                    var noteAndPitIs: [Int: [Int: Set<Int>]]
+                    if let pitI, let sprolI {
+                        if document.isSelect(at: p) {
+                            noteAndPitIs = sheetView.noteAndPitAndSprolIs(from: document.selections)
+                        } else {
+                            let id = score.notes[noteI].pits[pitI][type]
+                            noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) {
+                                $0[$1.offset] = $1.element.pits.enumerated().reduce(into: [Int: Set<Int>]()) { (v, ip) in
+                                    if ip.element[type] == id {
+                                        v[ip.offset] = sprolI < ip.element.tone.spectlope.count ? [sprolI] : []
+                                    }
+                                }
+                            }
+                        }
+                    } else if document.isSelect(at: p) {
+                        let aNoteAndPitIs = sheetView.noteAndPitIndexes(from: document.selections)
+                        noteAndPitIs = [:]
+                        for (noteI, v) in aNoteAndPitIs {
+                            noteAndPitIs[noteI] = v.reduce(into: [Int: Set<Int>]()) {
+                                $0[$1] = []
+                            }
+                        }
                         if let pitI {
                             if noteAndPitIs[noteI] != nil {
-                                if noteAndPitIs[noteI]!.contains(pitI) {
-                                    noteAndPitIs[noteI]?.append(pitI)
+                                if noteAndPitIs[noteI]![pitI] != nil {
+                                    noteAndPitIs[noteI]?[pitI] = []
                                 }
                             } else {
-                                noteAndPitIs[noteI] = [pitI]
+                                noteAndPitIs[noteI] = [pitI: []]
                             }
-                        } else {
-                            noteAndPitIs[noteI] = score.notes[noteI].pits.count.array
                         }
                     } else {
                         if let pitI {
                             let id = score.notes[noteI].pits[pitI][type]
-                            noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int]]()) {
-                                $0[$1.offset] = $1.element.pits.enumerated().compactMap { (pitI, pit) in
-                                    pit[type] == id ? pitI : nil
+                            noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) {
+                                $0[$1.offset] = $1.element.pits.enumerated().reduce(into: [Int: Set<Int>]()) { (v, ip) in
+                                    if ip.element[type] == id {
+                                        v[ip.offset] = []
+                                    }
                                 }
                             }
                         } else {
-                            noteAndPitIs = [noteI: score.notes[noteI].pits.count.array]
+                            let note = score.notes[noteI]
+                            if note.pits.count == 1 {
+                                let id = note.firstPit[type]
+                                noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) {
+                                    $0[$1.offset] = $1.element.pits.enumerated().reduce(into: [Int: Set<Int>]()) { (v, ip) in
+                                        if ip.element[type] == id {
+                                            v[ip.offset] = []
+                                        }
+                                    }
+                                }
+                            } else {
+                                noteAndPitIs = [noteI: score.notes[noteI].pits.count.range.reduce(into: [Int: Set<Int>]()) { $0[$1] = [] }]
+                            }
                         }
                     }
                     
                     beganNotePits = noteAndPitIs.reduce(into: .init()) {
-                        for pitI in $1.value {
+                        for (pitI, sprolIs) in $1.value {
                             let pit = score.notes[$1.key].pits[pitI]
                             let id = pit[type]
                             if $0[id] != nil {
                                 if $0[id]![$1.key] != nil {
-                                    $0[id]![$1.key]!.pits[pitI] = (pit, [])
+                                    $0[id]![$1.key]!.pits[pitI] = (pit, sprolIs)
                                 } else {
-                                    $0[id]![$1.key] = (score.notes[$1.key], [pitI: (pit, [])])
+                                    $0[id]![$1.key] = (score.notes[$1.key], [pitI: (pit, sprolIs)])
                                 }
                             } else {
-                                $0[id] = [$1.key: (score.notes[$1.key], [pitI: (pit, [])])]
+                                $0[id] = [$1.key: (score.notes[$1.key], [pitI: (pit, sprolIs)])]
                             }
                         }
                     }
@@ -825,18 +861,18 @@ final class ColorEditor: Editor {
                     switch result {
                     case .note:
                         beganStereo = scoreView.stereo(atX: scoreP.x, at: noteI)
-                        updatePitsWithSelection(noteI: noteI, pitI: nil, .stereo)
+                        updatePitsWithSelection(noteI: noteI, pitI: nil, sprolI: nil, .stereo)
                         beganBeat = scoreView.beat(atX: scoreP.x)
                     case .sustain: return
                     case .pit(let pitI):
                         beganStereo = note.pits[pitI].stereo
-                        updatePitsWithSelection(noteI: noteI, pitI: pitI, .stereo)
+                        updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .stereo)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
                     case .evenVolm, .oddVolm: return
                     case .sprol(let pitI, let sprolI):
                         let volm = score.notes[noteI].pits[pitI].tone.spectlope.sprols[sprolI].volm
                         beganNoise = score.notes[noteI].pits[pitI].tone.spectlope.sprols[sprolI].noise
-                        updatePitsWithSelection(noteI: noteI, pitI: pitI, .tone)
+                        updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: sprolI, .tone)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
                         
                         let outlineColor: Color = volm < 0.5 ? .content : .background
@@ -866,7 +902,7 @@ final class ColorEditor: Editor {
                     let content = sheetView.contentsView.elementViews[ci].model
                     beganStereo = content.stereo
                     
-                    updateWithSelections()
+                    updateContentsWithSelections()
                     beganContents[ci] = content
                 }
                 
@@ -897,7 +933,7 @@ final class ColorEditor: Editor {
         case .changed:
             guard let sheetView else { return }
             
-            if case .sprol(_, let sprolI) = scoreResult {
+            if case .sprol = scoreResult {
                 let noise = (beganNoise + (sp.x - document.convertWorldToScreen(beganWorldP).x) / panWidth).clipped(min: 0, max: 1)
                 let noiseScale = beganNoise == 0 ? 0 : noise / beganNoise
                 func newNoise(from otherNoise: Double) -> Double {
@@ -918,8 +954,10 @@ final class ColorEditor: Editor {
                             nvs[noteI] = nv.note
                         }
                         nv.pits.forEach { (pitI, beganPit) in
-                            let nNoise = newNoise(from: beganPit.pit.tone.spectlope.sprols[sprolI].noise)
-                            nvs[noteI]?.pits[pitI].tone.spectlope.sprols[sprolI].noise = nNoise
+                            for sprolI in beganPit.sprolIs {
+                                let nNoise = newNoise(from: beganPit.pit.tone.spectlope.sprols[sprolI].noise)
+                                nvs[noteI]?.pits[pitI].tone.spectlope.sprols[sprolI].noise = nNoise
+                            }
                             nvs[noteI]?.pits[pitI].tone.id = nid
                         }
                     }

@@ -544,7 +544,6 @@ extension Rendnote {
                 return .init(fqScale: 1, isLoop: isLoop, samples: samples, stereos: stereos)
             } else {
                 let sinCount = Int((cutFq / fq).clipped(min: 1, max: Double(Int.max)))
-                print("SIN", fq, sinCount)
                 let fq = fq.clipped(min: Score.minFq, max: cutFq)
                 
 //                    let dPhase = fq * .pi2 * rSampleRate
@@ -760,8 +759,7 @@ extension Rendnote {
                     var sins = [Double](capacity: sinCount)
                     sins.append(sin1X)
                     if sinCount >= 2 {
-                        var sign = false
-                        for n in 2 ... sinCount {
+                        for _ in 2 ... sinCount {
                             let sinNX = sinMX * cos1X + cosMX * sin1X
                             let cosNX = cosMX * cos1X - sinMX * sin1X
                             sinMX = sinNX

@@ -768,10 +768,13 @@ final class TextEditor: Editor {
         }
         
         let p = document.convertScreenToWorld(event.screenPoint)
-        if !event.isRepeat, let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+        if !event.isRepeat, let sheetView = document.sheetView(at: p),
+           sheetView.model.score.enabled,
+           sheetView.scoreView.containsMainFrame(sheetView.scoreView.convertFromWorld(p)) {
             let scoreView = sheetView.scoreView
             let scoreP = scoreView.convertFromWorld(p)
-            if let (noteI, pitI) = scoreView.noteAndPitIEnabledNote(at: scoreP, scale: document.screenToWorldScale) {
+            
+            func appendLyric(atPit pitI: Int, atNote noteI: Int, isNewUndoGroup: Bool = true) {
                 var note = scoreView.model.notes[noteI]
                 let key = (event.inputKeyType.name
                     .applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? "").lowercased()
@@ -788,15 +791,36 @@ final class TextEditor: Editor {
                     
                     let notes = note.replaceAndOnsetNotes(lyric: lyric, at: pitI,
                                                           tempo: scoreView.model.tempo)
-                    
-                    sheetView.newUndoGroup()
+                    if isNewUndoGroup {
+                        sheetView.newUndoGroup()
+                    }
                     sheetView.replace(note, at: noteI)
                     if !notes.isEmpty {
                         sheetView.append(notes)
                     }
                 }
-                return
             }
+            if let (noteI, pitI) = scoreView.noteAndPitI(at: scoreP, scale: document.screenToWorldScale) {
+                appendLyric(atPit: pitI, atNote: noteI)
+            } else if let noteI = scoreView.noteIndex(at: scoreP, scale: document.screenToWorldScale) {
+                var pit = scoreView.splittedPit(at: scoreP, at: noteI,
+                                                beatInterval: document.currentNoteBeatInterval,
+                                                pitchInterval: document.currentNotePitchInterval)
+                pit.lyric = ""
+                let pitI = scoreView.insertablePitIndex(atBeat: pit.beat, at: noteI)
+                var note = scoreView.model.notes[noteI]
+                note.pits.insert(pit, at: pitI)
+                sheetView.newUndoGroup()
+                sheetView.replace([IndexValue(value: note, index: noteI)])
+                appendLyric(atPit: pitI, atNote: noteI, isNewUndoGroup: false)
+            } else {
+                let beat = scoreView.beat(atX: scoreP.x, interval: document.currentNoteBeatInterval)
+                let pitch = scoreView.pitch(atY: scoreP.y, interval: document.currentNotePitchInterval)
+                sheetView.newUndoGroup()
+                sheetView.append(Note(beatRange: beat ..< beat + .init(1, 4), pitch: pitch, pits: [.init()]))
+                appendLyric(atPit: 0, atNote: scoreView.model.notes.count - 1, isNewUndoGroup: false)
+            }
+            return
         }
         
         if !document.finding.isEmpty,
