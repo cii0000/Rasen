@@ -48,6 +48,71 @@ extension vDSP {
     static func sinRMS<U>(_ vector: U) -> Double where U: AccelerateBuffer, U.Element == Double {
         (vDSP.sumOfSquares(vector) / 2).squareRoot()
     }
+    
+    func apply(fir impulseResponse: [Double], in data: [Double]) -> [Double] {
+        guard !impulseResponse.isEmpty else { return data }
+        let fftCount = vDSP.nextPow2(max(data.count, impulseResponse.count))
+        guard let fft = try? Fft(count: fftCount),
+              let ifft = try? Ifft(count: fftCount) else { return data }
+        let nSamples = data.count == fftCount
+        ? data : data + .init(repeating: 0, count: fftCount - data.count)
+        let nIrSamples = impulseResponse.count == fftCount
+        ? impulseResponse : impulseResponse + .init(repeating: 0, count: fftCount - impulseResponse.count)
+        var compBox: CompBox = fft.transform(nSamples)
+        let irCompBox: CompBox = fft.transform(nIrSamples)
+        compBox *= irCompBox
+        let nRes = ifft.resAndImsTransform(compBox).res
+        return Array(nRes[..<(data.count + impulseResponse.count)])
+    }
+}
+
+struct CompBox {
+    var res: [Double], ims: [Double]
+    
+    static func *=(lhs: inout Self, rhs: Self) {
+        formMultiply(&lhs, rhs, useConjugate: false)
+    }
+    static func formMultiply(_ lhs: inout Self, _ rhs: Self, useConjugate: Bool) {
+        let count = lhs.res.count
+        var lRes = lhs.res, lIms = lhs.ims, rRes = rhs.res, rIms = rhs.ims
+        lRes.withUnsafeMutableBufferPointer { lResPtr in
+            lIms.withUnsafeMutableBufferPointer { lImsPtr in
+                rRes.withUnsafeMutableBufferPointer { rResPtr in
+                    rIms.withUnsafeMutableBufferPointer { rImsPtr in
+                        var ldsc = DSPDoubleSplitComplex(realp: lResPtr.baseAddress!,
+                                                         imagp: lImsPtr.baseAddress!)
+                        let rdsc = DSPDoubleSplitComplex(realp: rResPtr.baseAddress!,
+                                                         imagp: rImsPtr.baseAddress!)
+                        vDSP.multiply(ldsc, by: rdsc, count: count, useConjugate: useConjugate, result: &ldsc)
+                    }
+                }
+            }
+        }
+        lhs.res = lRes
+        lhs.ims = lIms
+    }
+    
+    static func *(lhs: Self, rhs: Self) -> Self {
+        multiply(lhs, rhs, useConjugate: false)
+    }
+    static func multiply(_ lhs: Self, _ rhs: Self, useConjugate: Bool) -> Self {
+        let count = lhs.res.count
+        var lRes = lhs.res, lIms = lhs.ims, rRes = rhs.res, rIms = rhs.ims
+        lRes.withUnsafeMutableBufferPointer { lResPtr in
+            lIms.withUnsafeMutableBufferPointer { lImsPtr in
+                rRes.withUnsafeMutableBufferPointer { rResPtr in
+                    rIms.withUnsafeMutableBufferPointer { rImsPtr in
+                        var ldsc = DSPDoubleSplitComplex(realp: lResPtr.baseAddress!,
+                                                         imagp: lImsPtr.baseAddress!)
+                        let rdsc = DSPDoubleSplitComplex(realp: rResPtr.baseAddress!,
+                                                         imagp: rImsPtr.baseAddress!)
+                        vDSP.multiply(ldsc, by: rdsc, count: count, useConjugate: useConjugate, result: &ldsc)
+                    }
+                }
+            }
+        }
+        return .init(res: lRes, ims: lIms)
+    }
 }
 
 struct FftFrame {
@@ -72,7 +137,7 @@ struct Fft {
         self.rdCount = 1 / Double(count)
     }
     
-    func noMathTransform(_ x: [Double]) -> [FftComp] {
+    func mathTransform(_ x: [Double]) -> [FftComp] {
         let v = vdft.transform(real: x, imaginary: ims)
         return zip(v.real, v.imaginary).map { .init($0.0, $0.1) }
     }
@@ -82,8 +147,20 @@ struct Fft {
         vDSP.multiply(rdCount, v.imaginary, result: &v.imaginary)
         return zip(v.real, v.imaginary).map { .init($0.0, $0.1) }
     }
+    func transform(_ x: [Double]) -> (res: [Double], ims: [Double]) {
+        var v = vdft.transform(real: x, imaginary: ims)
+        vDSP.multiply(rdCount, v.real, result: &v.real)
+        vDSP.multiply(rdCount, v.imaginary, result: &v.imaginary)
+        return (v.real, v.imaginary)
+    }
+    func transform(_ x: [Double]) -> CompBox {
+        var v = vdft.transform(real: x, imaginary: ims)
+        vDSP.multiply(rdCount, v.real, result: &v.real)
+        vDSP.multiply(rdCount, v.imaginary, result: &v.imaginary)
+        return .init(res: v.real, ims: v.imaginary)
+    }
     
-    func noMathTransform(res: [Double], ims: [Double]) -> [FftComp] {
+    func mathTransform(res: [Double], ims: [Double]) -> [FftComp] {
         let v = vdft.transform(real: res, imaginary: ims)
         return zip(v.real, v.imaginary).map { .init($0.0, $0.1) }
     }
@@ -94,7 +171,7 @@ struct Fft {
         return zip(v.real, v.imaginary).map { .init($0.0, $0.1) }
     }
     
-    func noMathTransform(_ x: [FftComp]) -> [FftComp] {
+    func mathTransform(_ x: [FftComp]) -> [FftComp] {
         let v = vdft.transform(real: x.map { $0.real }, imaginary: x.map { $0.imaginary })
         return zip(v.real, v.imaginary).map { .init($0.0, $0.1) }
     }
@@ -106,22 +183,22 @@ struct Fft {
     }
     
     func dcAndAmps(_ x: [Double]) -> (dc: Double, amps: [Double]) {
-        let vs = transform(x), ni = x.count / 2
+        let vs: [FftComp] = transform(x), ni = x.count / 2
         return (vs[0].real, vs[1 ..< ni].map { $0.length * 2 } + [vs[ni].length])
     }
     func dcAndAmps(_ x: [FftComp]) -> (dc: Double, amps: [Double]) {
-        let vs = transform(x), ni = x.count / 2
+        let vs: [FftComp] = transform(x), ni = x.count / 2
         return (vs[0].real, vs[1 ..< ni].map { $0.length * 2 } + [vs[ni].length])
     }
     
     func frame(_ x: [Double]) -> FftFrame {
-        let vs = transform(x), ni = x.count / 2
+        let vs: [FftComp] = transform(x), ni = x.count / 2
         return .init(dc: vs[0].real,
                      amps: vs[1 ..< ni].map { $0.length * 2 } + [vs[ni].length],
                      phases: vs[1 ... ni].map { $0.phase })
     }
     func frame(_ x: [FftComp]) -> FftFrame {
-        let vs = transform(x), ni = x.count / 2
+        let vs: [FftComp] = transform(x), ni = x.count / 2
         return .init(dc: vs[0].real,
                      amps: vs[1 ..< ni].map { $0.length * 2 } + [vs[ni].length],
                      phases: vs[1 ... ni].map { $0.phase })
@@ -168,6 +245,10 @@ struct Ifft {
         let v = vdft.transform(real: x.map { $0.real }, imaginary: x.map { $0.imaginary })
         return (v.real, v.imaginary)
     }
+    func resAndImsTransform(_ x: CompBox) -> (res: [Double], ims: [Double]) {
+        let v = vdft.transform(real: x.res, imaginary: x.ims)
+        return (v.real, v.imaginary)
+    }
     
     func compsTransform(dc: Double, amps: [Double], phases: [Double]) -> [FftComp] {
         let v = resAndImsTransform(dc: dc, amps: amps, phases: phases)
@@ -209,16 +290,16 @@ struct FilterBank {
         case pitch, mel
     }
     
-    init (sampleCount: Int, filterBankCount: Int = 512,
-          minPitch: Double, maxPitch: Double, maxFq: Double) {
+    init(sampleCount: Int, filterBankCount: Int = 512,
+         minPitch: Double, maxPitch: Double, maxFq: Double) {
         self.init(sampleCount: sampleCount, minV: minPitch, maxV: maxPitch, maxFq: maxFq, .pitch)
     }
-    init (sampleCount: Int, filterBankCount: Int = 512,
-          minMel: Double, maxMel: Double, maxFq: Double) {
+    init(sampleCount: Int, filterBankCount: Int = 512,
+         minMel: Double, maxMel: Double, maxFq: Double) {
         self.init(sampleCount: sampleCount, minV: minMel, maxV: maxMel, maxFq: maxFq, .mel)
     }
-    init (sampleCount: Int, filterBankCount: Int = 512,
-          minV: Double, maxV: Double, maxFq: Double, _ type: BankType) {
+    init(sampleCount: Int, filterBankCount: Int = 512,
+         minV: Double, maxV: Double, maxFq: Double, _ type: BankType) {
         let bankWidth = (maxV - minV) / Double(filterBankCount - 1)
         let filterBankFqs = switch type {
         case .pitch:

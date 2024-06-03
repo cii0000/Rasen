@@ -153,17 +153,17 @@ struct Loudness {
                                   Point(9000, 1.17),
                                   Point(12500, 1.17),
                                   Point(15000, 1.14)]
-    private static let rFqVolms = [Point(60, 0.73),
-                                   Point(80, 0.81),
-                                   Point(200, 0.92),
+    private static let rFqVolms = [Point(60, 0.724),
+                                   Point(80, 0.806),
+                                   Point(200, 0.909),
                                    Point(1000, 1),
-                                   Point(1400, 0.95),
-                                   Point(1600, 0.95),
-                                   Point(3000, 1.08),
-                                   Point(4000, 1.08),
-                                   Point(9000, 0.81),
-                                   Point(12500, 0.81),
-                                   Point(15000, 0.86)]
+                                   Point(1400, 0.935),
+                                   Point(1600, 0.935),
+                                   Point(3000, 1.075),
+                                   Point(4000, 1.075),
+                                   Point(9000, 0.855),
+                                   Point(12500, 0.855),
+                                   Point(15000, 0.877)]
     
     static func volm40Phon(fromFq fq: Double) -> Double {
         var preFq = 0.0, preVolm = fqVolms.last!.y

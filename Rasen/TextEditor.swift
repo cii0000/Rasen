@@ -255,9 +255,9 @@ final class Looker: InputKeyEditor {
                     let maxPitch = contentView.spectrogramPitch(atY: maxY)!
                     let maxPitchRat = Rational(maxPitch, intervalScale: .init(1, 12))
                     let maxFq = Pitch(value: maxPitchRat).fq
-                    let minSec: Rational = sheetView.animationView.sec(atX: nSelection.rect.minX)
-                    let maxSec: Rational = sheetView.animationView.sec(atX: nSelection.rect.maxX)
-                    document.show("Δ\(Double(maxSec - minSec).string(digitsCount: 4)) sec, Δ\(Pitch(value: maxPitchRat - minPitchRat).octaveString()), (Δ\((maxFq - minFq).string(digitsCount: 1)) Hz)", at: p)
+                    let minSec: Double = sheetView.animationView.sec(atX: nSelection.rect.minX)
+                    let maxSec: Double = sheetView.animationView.sec(atX: nSelection.rect.maxX)
+                    document.show("Δ\((maxSec - minSec).string(digitsCount: 4)) sec, Δ\(Pitch(value: maxPitchRat - minPitchRat).octaveString()), (Δ\((maxFq - minFq).string(digitsCount: 1)) Hz)", at: p)
                 } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
                     let scoreView = sheetView.scoreView
                     let score = scoreView.model
@@ -781,7 +781,7 @@ final class TextEditor: Editor {
                 var lyric = note.pits[pitI].lyric
                 if event.inputKeyType == .delete, !lyric.isEmpty {
                     lyric.removeLast()
-                } else if event.inputKeyType != .delete {
+                } else if event.inputKeyType.isText {
                     lyric += key
                 }
                 if lyric != note.pits[pitI].lyric {
@@ -789,14 +789,31 @@ final class TextEditor: Editor {
                         document.stopPlaying(with: event)
                     }
                     
-                    let notes = note.replaceAndOnsetNotes(lyric: lyric, at: pitI,
+                    let onsetNotes = note.replaceAndOnsetNotes(lyric: lyric, at: pitI,
                                                           tempo: scoreView.model.tempo)
                     if isNewUndoGroup {
                         sheetView.newUndoGroup()
                     }
                     sheetView.replace(note, at: noteI)
-                    if !notes.isEmpty {
-                        sheetView.append(notes)
+                    if !onsetNotes.isEmpty {
+                        let beat = note.beatRange.start + note.pits[pitI].beat
+                        var idxs = Set<Int>()
+                        for onsetNote in onsetNotes {
+                            let onsetLyric = onsetNote.pits.first?.lyric
+                            for (noteI, oldOnsetNote) in scoreView.model.notes.enumerated() {
+                                if let oldOnsetLyric = oldOnsetNote.pits.first?.lyric,
+                                    onsetLyric == oldOnsetLyric,
+                                   Double(scoreView.sec(fromBeat: abs(beat - oldOnsetNote.beatRange.start))) < 0.01 {
+                                    
+                                    idxs.insert(noteI)
+                                }
+                            }
+                        }
+                        if !idxs.isEmpty {
+                            sheetView.removeNote(at: idxs.sorted())
+                        }
+                        
+                        sheetView.append(onsetNotes)
                     }
                 }
             }

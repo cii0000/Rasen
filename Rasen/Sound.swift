@@ -1615,7 +1615,7 @@ struct Volm: Hashable, Codable {
     static let minVolm = 0.0, maxVolm = 1 / 2.0.squareRoot(), volmRange = minVolm ... maxVolm
 }
 extension Volm {
-    /// amp = (.exp(40 * volm / 8.7) - 1) / (.exp(40 / 8.7) - 1)
+    /// cutDb = -40, a = -cutDb, amp = (.exp(a * volm / 8.7) - 1) / (.exp(a / 8.7) - 1)
     static func amp(fromVolm volm: Double) -> Double {
         (.exp(4.5977011494 * volm) - 1) * 0.01017750808
     }

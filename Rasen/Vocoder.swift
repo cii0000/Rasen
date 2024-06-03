@@ -18,6 +18,7 @@
 import struct Foundation.UUID
 import RealModule
 import enum Accelerate.vDSP
+import struct Accelerate.DSPDoubleSplitComplex
 import struct Foundation.Date
 
 /// xoshiro256**
@@ -515,17 +516,20 @@ extension Rendnote {
 //                return amp * sqfas[fqi]
 //            }
 //        }
-        func aNoiseSpectrum(fromNoise spectlope: Spectlope, fq: Double) -> (spectrum: [Double], rms: Double) {
-            var rmsV = 0.0
+        func aNoiseSpectrum(fromNoise spectlope: Spectlope, fq: Double,
+                            oddScale: Double, evenScale: Double) -> (spectrum: [Double], rms: Double) {
+            var rmsV = 0.0, sign = true
             return ((1 ... halfStftCount).map { fqi in
                 let nfq = Double(fqi) / Double(halfStftCount) * maxFq
                 guard nfq > 0 && nfq >= fq && nfq < cutFq else { return 0 }
                 let loudnessVolm = Loudness.volm40Phon(fromFq: nfq)
                 let noiseVolm = spectlope.sprol(atFq: nfq).noiseVolm
                 let cutScale = cutStartFq < nfq ? nfq.clipped(min: cutStartFq, max: cutFq, newMin: 1, newMax: 0) : 1
-                let a = sqfas[fqi] * cutScale
+                let overtoneScale = sign ? oddScale : evenScale
+                let a = sqfas[fqi] * cutScale * overtoneScale
                 let amp = Volm.amp(fromVolm: loudnessVolm * noiseVolm) * a
                 rmsV += (Volm.amp(fromVolm: noiseVolm) * a).squared
+                sign = !sign
                 return amp
             }, (rmsV / 2).squareRoot())
         }
@@ -534,9 +538,16 @@ extension Rendnote {
         }
         
         if !isStft {
+            let overtone = pitbend.firstOvertone
+            let isAll = overtone.isAll,
+                oddScale = Volm.amp(fromVolm: overtone.oddVolm),
+                evenScale = -Volm.amp(fromVolm: overtone.evenVolm)
             if isFullNoise {
                 let noiseSamples = vDSP.gaussianNoise(count: sampleCount + stftCount, seed: noiseSeed)
-                let (noiseSpectrum, sumSpectrum) = aNoiseSpectrum(fromNoise: pitbend.firstSpectlope, fq: fq)
+                let (noiseSpectrum, sumSpectrum) = aNoiseSpectrum(fromNoise: pitbend.firstSpectlope, 
+                                                                  fq: fq,
+                                                                  oddScale: oddScale,
+                                                                  evenScale: -evenScale)
                 let nNoiseSpectrum = vDSP.multiply(sumSpectrum == 0 ? 0 : 1 / sumSpectrum, noiseSpectrum)
                 let samples = clippedStft(vDSP.apply(noiseSamples, spectrum: nNoiseSpectrum))
                 
@@ -603,11 +614,7 @@ extension Rendnote {
                     }
                 }
                 
-                let overtone = pitbend.firstOvertone, spectlope = pitbend.firstSpectlope
-                let isAll = overtone.isAll,
-                    oddScale = Volm.amp(fromVolm: overtone.oddVolm),
-                    evenScale = -Volm.amp(fromVolm: overtone.evenVolm)
-                
+                let spectlope = pitbend.firstSpectlope
                 var sign = true, rmsV = 0.0
                 let spectrum = (1 ... sinCount).map { n in
                     let fq = fq * Double(n)
@@ -626,7 +633,10 @@ extension Rendnote {
                 
                 let allSumSpectrum: Double, noiseSpectrum: [Double]?
                 if containsNoise {
-                    let (aNoiseSpectrum, noiseSumSpectrum) = aNoiseSpectrum(fromNoise: pitbend.firstSpectlope, fq: fq)
+                    let (aNoiseSpectrum, noiseSumSpectrum) = aNoiseSpectrum(fromNoise: pitbend.firstSpectlope,
+                                                                            fq: fq,
+                                                                            oddScale: oddScale,
+                                                                            evenScale: -evenScale)
                     allSumSpectrum = sumSpectrum + noiseSumSpectrum
                     noiseSpectrum = aNoiseSpectrum
                 } else {
@@ -729,7 +739,12 @@ extension Rendnote {
                     let sec = Double(i) * rSampleRate
                     let spectlope = pitbend.spectlope(atSec: sec)
                     let fq = fq * pitbend.fqScale(atSec: sec)
-                    let (noiseSpectrum, sumSpectrum) = aNoiseSpectrum(fromNoise: spectlope, fq: fq)
+                    let overtone = pitbend.overtone(atSec: sec)
+                    let oddScale = overtone.isAll ? 1 : Volm.amp(fromVolm: overtone.oddVolm)
+                    let evenScale = overtone.isAll ? -1 : -Volm.amp(fromVolm: overtone.evenVolm)
+                    let (noiseSpectrum, sumSpectrum) = aNoiseSpectrum(fromNoise: spectlope, fq: fq,
+                                                                      oddScale: oddScale,
+                                                                      evenScale: -evenScale)
                     return vDSP.multiply(sumSpectrum == 0 ? 0 : 1 / sumSpectrum, noiseSpectrum)
                 }
                 
@@ -819,10 +834,16 @@ extension Rendnote {
                     }
                     let sumSpectrum = (rmsV / 2).squareRoot()
                     
+                    let oddScale = isEqualAllOvertone ? oddScale : oddScales[i]
+                    let evenScale = isEqualAllOvertone ? evenScale : evenScales[i]
+                    
                     let allSumSpectrum: Double, spectrumScale: Double
                     if containsNoise {
                         let noiseSpectlope = pitbend.spectlope(atSec: sec)
-                        let (noiseSpectrum, noiseSumSpectrum) = aNoiseSpectrum(fromNoise: noiseSpectlope, fq: frame.fq)
+                        let (noiseSpectrum, noiseSumSpectrum) = aNoiseSpectrum(fromNoise: noiseSpectlope,
+                                                                               fq: frame.fq,
+                                                                               oddScale: oddScale,
+                                                                               evenScale: -evenScale)
                         allSumSpectrum = sumSpectrum + noiseSumSpectrum
                         spectrumScale = allSumSpectrum == 0 ? 0 : 1 / allSumSpectrum
                         noiseSpectrogram.append(vDSP.multiply(spectrumScale, noiseSpectrum))

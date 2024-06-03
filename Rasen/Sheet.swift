@@ -2113,7 +2113,7 @@ extension Sheet {
     static let knobWidth = 2.0, knobHeight = 12.0, rulerHeight = 4.0
     static let fullEditPitchInterval = Rational(1, 12)
     static let pitchInterval = Rational(1)
-    static let fullEditBeatInterval = Rational(1, 48)
+    static let fullEditBeatInterval = Rational(1, 96 * 2)
     static let beatInterval = Rational(1, 4)
     static let knobEditDistance = 15.0
 }

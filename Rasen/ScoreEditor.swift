@@ -82,6 +82,9 @@ extension TimelineView {
     func sec(atX x: Double, interval: Rational) -> Rational {
         sec(fromBeat: beat(atX: x, interval: interval))
     }
+    func sec(atX x: Double) -> Double {
+        sec(fromBeat: beat(atX: x))
+    }
     func sec(atX x: Double) -> Rational {
         sec(atX: x, interval: Rational(1, frameRate))
     }
@@ -2101,10 +2104,10 @@ extension ScoreView {
     }
     
     func noteFrame(at noteI: Int) -> Rect {
-        notesNode.children[noteI].path.bounds!
+        notesNode.children[noteI].path.bounds ?? .init()
     }
     func draftNoteFrame(at noteI: Int) -> Rect {
-        draftNotesNode.children[noteI].path.bounds!
+        draftNotesNode.children[noteI].path.bounds ?? .init()
     }
     func noteY(atX x: Double, at noteI: Int) -> Double {
         noteY(atX: x, from: model.notes[noteI])
