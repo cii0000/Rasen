@@ -1355,7 +1355,7 @@ extension ScoreView {
         var scNodes = [Node]()
         let envelopeR = 0.125, toneR = 0.03125, sprolR = 0.03125 / 2, sprolSubR = 0.03125 / 4
         
-        let lyricPaths: [Path] = note.pits.enumerated().compactMap { (pitI, pit) in
+        let lyricNodes: [Node] = note.pits.enumerated().compactMap { (pitI, pit) in
             let p = pitPosition(atPit: pitI, from: note)
             if !pit.lyric.isEmpty {
                 let lyricText = Text(string: pit.lyric, size: 6)
@@ -1363,8 +1363,9 @@ extension ScoreView {
                 let lh = typesetter.height / 2 + 2
                 lyricLinePathlines.append(.init(Rect(x: p.x - 0.25, y: p.y - lh / 2, 
                                                      width: 0.5, height: lh / 2)))
-                return typesetter.path() * Transform(translationX: p.x - typesetter.width / 2,
-                                                     y: p.y - lh / 2 - typesetter.height / 2)
+                return .init(attitude: .init(position: .init(p.x - typesetter.width / 2,
+                                                             p.y - lh / 2 - typesetter.height / 2)),
+                             path: typesetter.path(), fillType: .color(color ?? .content))
             } else {
                 return nil
             }
@@ -1671,7 +1672,7 @@ extension ScoreView {
                                lineType: .color(.content)))
         }
         
-        nodes += lyricPaths.map { .init(path: $0, fillType: .color(color ?? .content)) }
+        nodes += lyricNodes
         nodes.append(.init(path: .init(lyricLinePathlines), fillType: .color(.content)))
         
         let backKnobPathlines = knobPs.map { Pathline(circleRadius: 0.25 * 1.5, position: $0) }
