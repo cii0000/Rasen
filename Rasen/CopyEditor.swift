@@ -3095,11 +3095,12 @@ final class LineColorCopier: InputKeyEditor {
                                                             scale: document.screenToWorldScale) {
                 
                 func showPit(pitI: Int, isTone: Bool = false) {
-                    let pitP = scoreView.pitPosition(atPit: pitI, at: noteI) + (isTone ? Point(0, scoreView.toneY) : Point())
+                    let pitP = scoreView.pitPosition(atPit: pitI, at: noteI)
+                    let nPitP = (isTone ? Point(pitP.x, scoreView.toneY(at: pitP, at: noteI)) : pitP)
                     let scale = 1 / document.worldToScreenScale
                     let lw = Line.defaultLineWidth
                     let nlw = max(lw * 1.5, lw * 2.5 * scale, 1 * scale)
-                    let noteNode = Node(path: Path(circleRadius: nlw, position: pitP),
+                    let noteNode = Node(path: Path(circleRadius: nlw, position: nPitP),
                                         fillType: .color(.selected))
                     noteNode.attitude.position = scoreView.node.convertToWorld(Point())
                     selectingLineNode.children = [noteNode]

@@ -559,6 +559,9 @@ extension Spectlope: MonoInterpolatable {
         let sprols = sprols
         guard sprols.count != count else { return self }
         guard sprols.count < count else { fatalError() }
+        guard !sprols.isEmpty else {
+            return .init(sprols: .init(repeating: .init(), count: count))
+        }
         guard sprols.count > 1 else {
             return .init(sprols: .init(repeating: sprols[0], count: count))
         }
@@ -805,6 +808,7 @@ struct Note {
     var pitch = Rational(0)
     var pits = [Pit()]
     var envelope = Envelope()
+    var toneY = 0.0
     var id = UUID()
 }
 extension Note: Protobuf {

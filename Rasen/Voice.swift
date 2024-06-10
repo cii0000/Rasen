@@ -22,6 +22,7 @@ extension Note {
     mutating func replaceAndOnsetNotes(lyric: String, at i: Int,
                                        tempo: Rational,
                                        beatRate: Int = 96 * 2, pitchRate: Int = 96) -> [Note] {
+        let oldLyric = pits[i].lyric
         self.pits[i].lyric = lyric
         
         let previousPhoneme: Phoneme?, previousFormantFilter: FormantFilter?, previousID: UUID?
@@ -39,12 +40,23 @@ extension Note {
             previousID = nil
         }
         
+        var lyric = lyric
+        for pit in pits {
+            if let fi = pit.lyric.firstIndex(where: { $0 == "+" || $0 == "-" }) {
+                let numberStr = pit.lyric[pit.lyric.index(after: fi)...]
+                if let number = Int(numberStr) {
+                    if lyric == pit.lyric {
+                        lyric = String(lyric[..<fi])
+                    }
+                    
+                }
+            }
+        }
+        
         if let mora = Mora(hiragana: lyric,
                            previousPhoneme: previousPhoneme,
                            previousFormantFilter: previousFormantFilter, previousID: previousID) {
-            var beat = pits[i].beat
-            let pitch = pits[i].pitch + pitch
-            let volm = pits[i].stereo.volm
+            let beat = pits[i].beat
             let fBeat = Score.beat(fromSec: mora.keyFormantFilters.first?.sec ?? 0,
                                    tempo: tempo, beatRate: beatRate) + beat
             let lBeat = Score.beat(fromSec: mora.keyFormantFilters.last?.sec ?? 0,
@@ -60,6 +72,17 @@ extension Note {
                 if pits[j].beat > lBeat {
                     maxI = j
                     break
+                }
+            }
+            if !oldLyric.isEmpty {
+                for j in i.range.reversed() {
+                    if !pits[j].lyric.isEmpty {
+                        break
+                    } else {
+                        if j < minI {
+                            minI = j
+                        }
+                    }
                 }
             }
             
@@ -87,23 +110,6 @@ extension Note {
                 for i in pits.count.range {
                     pits[i].beat -= dBeat
                 }
-                beat -= dBeat
-            }
-            
-            let onsetBeat = beat + beatRange.start
-            return mora.onsets.map {
-                let sBeat = Score.beat(fromSec: $0.sec, tempo: tempo, beatRate: beatRate) + onsetBeat
-                let eBeat = Score.beat(fromSec: $0.durSec - $0.releaseSec,
-                                       tempo: tempo, beatRate: beatRate) + sBeat
-                return Note(beatRange: sBeat ..< eBeat,
-                            pitch: Rational(min($0.spectlope.sprols.first?.pitch ?? 0, Double(pitch) + 6),
-                                            intervalScale: Rational(1, pitchRate)),
-                            pits: [.init(beat: 0, pitch: 0,
-                                         stereo: .init(volm: volm * $0.volm, pan: 0),
-                                         tone: .init(spectlope: $0.spectlope),
-                                         lyric: $0.phoneme.rawValue)],
-                            envelope: .init(attackSec: $0.attackSec, decaySec: 0,
-                                            sustainVolm: 1, releaseSec: $0.releaseSec))
             }
         }
         
@@ -413,27 +419,27 @@ extension Formant: MonoInterpolatable {
 
 struct FormantFilter: Hashable, Codable {
     var formants: [Formant] = [.init(sdVolm: 0.65, sdNoise: 0.1,
-                                     sdPitch: 14, sPitch: 68, ePitch: 73, edPitch: 10,
+                                     sdPitch: 14, sPitch: 70, ePitch: 75, edPitch: 10,
                                      volm: 1, noise: 0.1,
                                      edVolm: 0.5, edNoise: 0.1),
                                .init(sdVolm: 0.5, sdNoise: 0.1,
-                                     sdPitch: 6, sPitch: 80, ePitch: 84, edPitch: 4,
+                                     sdPitch: 6, sPitch: 82, ePitch: 86, edPitch: 4,
                                      volm: 1, noise: 0.25,
                                      edVolm: 0.25, edNoise: 0.1),
                                .init(sdVolm: 0.25, sdNoise: 0.1,
-                                     sdPitch: 2, sPitch: 94, ePitch: 96, edPitch: 2,
+                                     sdPitch: 2, sPitch: 96, ePitch: 98, edPitch: 2,
                                      volm: 0.82, noise: 0.3,
                                      edVolm: 0.125, edNoise: 0.1),
                                .init(sdVolm: 0.125, sdNoise: 0.1,
-                                     sdPitch: 1, sPitch: 98, ePitch: 100, edPitch: 1,
+                                     sdPitch: 1, sPitch: 100, ePitch: 102, edPitch: 1,
                                      volm: 0.5, noise: 0.4,
                                      edVolm: 0, edNoise: 0.3),
                                .init(sdVolm: 0, sdNoise: 0.3,
-                                     sdPitch: 1, sPitch: 103, ePitch: 105, edPitch: 1,
+                                     sdPitch: 1, sPitch: 105, ePitch: 107, edPitch: 1,
                                      volm: 0.25, noise: 0.5,
                                      edVolm: 0, edNoise: 0.7),
                                .init(sdVolm: 0, sdNoise: 0.3,
-                                     sdPitch: 1, sPitch: 107, ePitch: 109, edPitch: 1,
+                                     sdPitch: 1, sPitch: 109, ePitch: 111, edPitch: 1,
                                      volm: 0.25, noise: 0.5,
                                      edVolm: 0, edNoise: 0.7)]
 }
@@ -444,9 +450,6 @@ extension FormantFilter {
     var spectlope: Spectlope {
         .init(sprols: formants.flatMap { [$0.sprol0, $0.sprol1, $0.sprol2, $0.sprol3] })
     }
-}
-enum FormantFilterVolmType {
-    case esVolm, esNoise
 }
 extension FormantFilter {
     mutating func fillEsVolm(_ x: Double, at i: Int) {
@@ -461,9 +464,9 @@ extension FormantFilter {
         self[i].edVolm *= x
         self[i + 1].sdVolm *= x
     }
-    mutating func formFillEsVolm(_ x: Double, at i: Int) {
-        self[i].edVolm = x
-        self[i + 1].sdVolm = x
+    mutating func formMultiplyEsNoise(_ x: Double, at i: Int) {
+        self[i].edNoise *= x
+        self[i + 1].sdNoise *= x
     }
     mutating func formMultiplyEsVolm(to x: Double, t: Double, at i: Int) {
         self[i].edVolm = .linear(self[i].edVolm, x, t: t)
@@ -471,6 +474,18 @@ extension FormantFilter {
     }
 }
 extension FormantFilter {
+    var f0Pitch: Double {
+        get { self[0].pitch - 25 }
+        set {
+            let dPitch = newValue + 25 - self[0].pitch
+            self = .init(formants: self.map {
+                var n = $0
+                n.pitch += dPitch
+                return n
+            })
+        }
+    }
+    
     func toA(from fromPhoneme: Phoneme) -> Self {
         var n = withSelfA(to: fromPhoneme)
         func substructPitch(from v0: Sprol, to v1: Sprol) -> Double {
@@ -612,18 +627,19 @@ extension FormantFilter {
             n[1].dPitch += -1
             n[1].formMultiplyVolm(0.55)
             n.formMultiplyEsVolm(0.25, at: 1)
-            n[2].pitch += 7
+            n[2].pitch += 4
             n[2].dPitch += -1
-            n[2].formMultiplyVolm(0.75)
+            n[2].formMultiplyVolm(0.5)
             n.formMultiplyEsVolm(0, at: 2)
             n[3].pitch += -0.15
-            n[3].formMultiplyVolm(0.0625)
+            n[3].formMultiplyVolm(0.125)
             n.formMultiplyEsVolm(0, at: 3)
             n[4].formMultiplyVolm(0.0625)
             n.formMultiplyEsVolm(0, at: 4)
             n[2].formMultiplyNoise(1.25)
             n[3].formMultiplyNoise(1.5)
             n[4].formMultiplyNoise(1.75)
+            n[5].formMultiplyVolm(0.0625)
             return n
         case .nj:
             var n = withSelfA(to: .n)
@@ -643,7 +659,7 @@ extension FormantFilter {
             n[0].sdPitch += 5
             n[0].pitch += -17
             n[0].edPitch += 5
-            n[0].formMultiplyVolm(0.6)
+            n[0].formMultiplyVolm(0.75)
             n.formMultiplyEsVolm(0.25, at: 0)
             n[1].pitch += 1
             n[1].formMultiplyVolm(0.5)
@@ -662,144 +678,84 @@ extension FormantFilter {
             var n = withSelfA(to: .r)
             n[1].pitch += 1.5
             return n
-        case .s, .dz:
-            var n = movedF2(sPitch: 84, ePitch: 85)
-            if phoneme == .dz {
+        case .p, .pj, .b, .bj:
+            var n = self
+            n[0].pitch -= 20
+            n[1].pitch -= 18
+            if phoneme == .b || phoneme == .bj {
                 n = n.toDakuon()
             } else {
                 n = n.toVoiceless()
             }
             return n
-//            [Point(87, 0),
-//                                              Point(89, 0.3),
-//                                              Point(101, 0.45),
-//                                              Point(102, 0.75),
-//                                              Point(108, 0.8),
-//                                              Point(109, 1),
-//                                              Point(113, 1),
-//                                              Point(117, 0.8),
-//                                              Point(119, 0.6),
-//                                              Point(121, 0)]
-        case .ɕ, .dʒ:
-            var n = movedF2(sPitch: 84, ePitch: 85).toNoise().offVolm(to: 1)
-            if phoneme == .dʒ {
+        case .s, .ts, .dz, .ɕ, .tɕ, .dʒ:
+            var n = self
+            n[0].pitch -= 20
+            n[1].dPitch += -1
+            n[1].pitch += 3
+            n[2].pitch -= 2
+            n[5].edPitch += 10
+            if phoneme == .dz || phoneme == .dʒ {
                 n = n.toDakuon()
+            } else {
+                n = n.toVoiceless()
             }
-            n[2].sdVolm = 0
-            n[2].fillVolm(0.6)
-            n.formFillEsVolm(0.65, at: 2)
-            n[3].fillVolm(0.7)
-            n.formFillEsVolm(0.8, at: 3)
-            n[4].fillVolm(1)
-            n.formFillEsVolm(1, at: 4)
-            n[5].fillVolm(1)
-            n[5].pitch += 1
-            n[5].dPitch *= 2
-            n[5].edPitch += 7
             return n
-//            [Point(71, 0.1),
-//                                              Point(94, 0.2),
-//                                              Point(95, 0.6),//2
-//                                              Point(100, 0.7),//3
-//                                              Point(102, 1),//4
-//                                              Point(112, 1),//5
-//                                              Point(116, 0.8),
-//                                              Point(119, 0.6),
-//                                              Point(121, 0)]
-        case .ha, .he, .ho:
-            var n = withSelfA(to: phoneme == .ho ? .o : (phoneme == .he ? .e : .a))
-                .toFricative(isO: phoneme == .ho).toNoise()
-            n[0].fillNoise(0)
-            n.fillEsNoise(0.25, at: 0)
-            n[1].fillNoise(0.5)
+        case .ha:
+            let n = withSelfA(to: .a).toFricative(isO: false)
             return n
         case .ç:
-            var n = toNoise()
-            n[0].sdVolm *= 0.56
-            n[0].formMultiplyVolm(0.25)
-            n.formMultiplyEsVolm(0.125, at: 0)
-            n[0].fillNoise(0)
-            n.fillEsNoise(0.25, at: 0)
-            n[1].formMultiplyVolm(0.5)
-            n.formMultiplyEsVolm(0.5, at: 1)
-            n[1].fillNoise(0.5)
-            n[2].dPitch += 2
-            n[2].pitch += -1
-            n[2].fillVolm(1)
-            n.fillEsVolm(0.6, at: 2)
+            var n = withSelfA(to: .i).toFricative(isO: false)
+            n[1].sdPitch += 2
+            n[1].pitch += 2
+            n[2].pitch += 1
             n[3].pitch += 1
-            n[3].fillVolm(1)
-            n.fillEsVolm(1, at: 3)
-            n[4].pitch += 1
-            n[4].fillVolm(1)
-            n.fillEsVolm(1, at: 4)
-            n[5].pitch += 2
-            n[5].edPitch += 4
-            n[5].fillVolm(1)
-            n[5].edVolm = 0
             return n
-//        oisePitchVolms: [Point(91, 0),
-//                                      Point(92, 1),2
-//                                      Point(96, 1),2
-//                                      Point(97, 0.56),
-//                                      Point(98, 0.7),
-//                                      Point(99, 1),3
-//                                      Point(111, 1),4
-//                                      Point(113, 0.56),5
-//                                      Point(114, 0.3),
-//                                      Point(116, 0)]),
         case .ɸ:
-            var n = toNoise().offVolm(to: 2)
-            n[0].sdVolm *= 0.56
-            n[0].formMultiplyVolm(0.25)
-            n.formMultiplyEsVolm(0.125, at: 0)
-            n[0].fillNoise(0)
-            n.fillEsNoise(0.25, at: 0)
-            n[1].pitch += 3
-            n[1].fillVolm(0.5)
-            n.formMultiplyEsVolm(0.25, at: 1)
-            n[1].fillNoise(0.5)
-            n[2].dPitch += 2
-            n[2].pitch += -1
-            n[2].fillVolm(0.5)
-            n.fillEsVolm(0.6, at: 2)
-            n[3].pitch += -1
-            n[3].fillVolm(0.7)
-            n.fillEsVolm(1, at: 3)
-            n[4].pitch += -1
-            n[4].fillVolm(1)
-            n.fillEsVolm(0.7, at: 4)
-            n[5].pitch += 1
-            n[5].edPitch += 9
-            n[5].fillVolm(0.6)
-            n[5].edVolm = 0
+            let n = withSelfA(to: .ɯ).toFricative(isO: false)
             return n
-//        spectlope: .init(noisePitchVolms: [Point(81, 0),1
-//                                          Point(83, 0.52),
-//                                          Point(100, 0.7),3
-//                                          Point(101, 1),4
-//                                          Point(102, 1),4
-//                                          Point(103, 0.7),
-//                                          Point(109, 0.66),5
-//                                          Point(111, 0.56),5
-//                                          Point(120, 0.3),
-//                                          Point(121, 0)]),
-        case .k, .kj:
-            return movedF2(sPitch: 89, ePitch: 91)
-        case .kβ, .ko:
-            return movedF2(sPitch: 74, ePitch: 77)
-        case .g, .gj:
-            return movedF2(sPitch: 89, ePitch: 91).toDakuon()
-        case .gβ, .go:
-            return movedF2(sPitch: 74, ePitch: 77).toDakuon()
-        case .t, .ts, .tɕ:
-            return movedF2(sPitch: 79, ePitch: 83)
-        case .d, .dz, .dʒ:
-            return movedF2(sPitch: 79, ePitch: 83).toDakuon()
-        case .p, .pj:
-            return movedF2(sPitch: 62, ePitch: 67).toVoiceless()
-        case .b, .bj:
-            return movedF2(sPitch: 62, ePitch: 67).toDakuon()
+        case .he:
+            let n = withSelfA(to: .e).toFricative(isO: false)
+            return n
+        case .ho:
+            let n = withSelfA(to: .o).toFricative(isO: true)
+            return n
+        case .k, .kj, .g, .gj:
+            var n = self
+            n[0].pitch -= 20
+            n[1].dPitch -= 1
+            n[1].pitch += 10
+            n[1].formMultiplyVolm(0.5)
+            n[2].pitch -= 1
+            if phoneme == .g || phoneme == .gj {
+                n = n.toDakuon()
+            } else {
+                n = n.toVoiceless()
+            }
+            return n
+        case .kβ, .ko, .gβ, .go:
+            var n = self
+            n[0].pitch -= 20
+            n[1].dPitch -= 1
+            n[1].pitch -= 3
+            n[2].pitch += 2
+            if phoneme == .gβ || phoneme == .go {
+                n = n.toDakuon()
+            } else {
+                n = n.toVoiceless()
+            }
+            return n
+        case .t, .d:
+            var n = self
+            n[0].pitch -= 20
+            n[1].pitch += 5
+            n[2].pitch += 1
+            if phoneme == .d {
+                n = n.toDakuon()
+            } else {
+                n = n.toVoiceless()
+            }
+            return n
         case .off:
             var n = withSelfA(to: .ɴ)
             n[2].formMultiplyNoise(0.75)
@@ -809,28 +765,224 @@ extension FormantFilter {
         default: return self
         }
     }
-    func onsetWithSelfA(to phoneme: Phoneme) -> Self {
+    
+    func applyNoise(_ phoneme: Phoneme, opacity: Double) -> Self {
         switch phoneme {
-        case .a: return self
-        case .s, .dz:
-            var n = movedF2(sPitch: 84, ePitch: 85).toNoise().offVolm(to: 1)
-            if phoneme == .dz {
-                n = n.toDakuon()
+        case .k, .kβ, .ko, .g, .gβ, .go, .kj, .gj, .t, .d:
+            var n = offVolm(from: 4)
+            let scale: Double
+            switch phoneme {
+            case .k, .kj, .kβ, .ko, .t:
+                n[0].formMultiplyAllVolm(0)
+                n.formMultiplyEsVolm(0, at: 0)
+                scale = 1
+            default:
+                scale = 0.75
             }
-            n[2].sdVolm = 0
-            n[2].fillVolm(0.3)
-            n.formFillEsVolm(0.4, at: 2)
-            n[3].fillVolm(0.45)
-            n.formFillEsVolm(0.6, at: 3)
-            n[4].fillVolm(0.8)
-            n.formFillEsVolm(0.7, at: 4)
-            n[5].fillVolm(1)
-            n[5].pitch += 3
-            n[5].dPitch *= 2
-            n[5].edPitch += 7
-            return n
-        default: return self
+            n[1].formMultiplyVolm(0)
+            n.formMultiplyEsVolm(0.25, at: 1)
+            n.formMultiplyEsNoise(1, at: 1)
+            n[2].formMultiplyVolm(0.5 * scale)
+            n[2].formMultiplyNoise(1)
+            n.formMultiplyEsVolm(0.5 * scale, at: 2)
+            n.formMultiplyEsNoise(0.75, at: 2)
+            n[3].formMultiplyVolm(1 * scale)
+            n[3].formMultiplyNoise(1)
+            n.formMultiplyEsVolm(0.5 * scale, at: 3)
+            n.formMultiplyEsNoise(0.75, at: 3)
+            n[4].formMultiplyVolm(0.25 * scale)
+            n[4].formMultiplyNoise(1)
+            n.formMultiplyEsNoise(0.25, at: 4)
+            n[5].formMultiplyVolm(0.125 * scale)
+            n[5].formMultiplyNoise(1)
+            return .linear(self, n, t: opacity)
+        case .s, .ts, .dz:
+            var n = toNoise(from: 1)
+            let scale: Double
+            if phoneme == .s || phoneme == .ts {
+                n[0].formMultiplyAllVolm(0)
+                n.formMultiplyEsVolm(0, at: 0)
+                scale = 1
+            } else {
+                scale = 0.75
+            }
+            n[1].formMultiplyVolm(0)
+            n.formMultiplyEsVolm(0, at: 1)
+            n[2].formMultiplyVolm(0.3 * scale)
+            n.formMultiplyEsVolm(0.4 * scale, at: 2)
+            n[3].formMultiplyVolm(0.45 * scale)
+            n.formMultiplyEsVolm(0.6 * scale, at: 3)
+            n[4].formMultiplyVolm(0.9 * scale)
+            n.formMultiplyEsVolm(0.7 * scale, at: 4)
+            n[5].formMultiplyVolm(1 * scale)
+            return .linear(self, n, t: opacity)
+        case .ɕ, .tɕ, .dʒ:
+            var n = toNoise(from: 1)
+            let scale: Double
+            if phoneme == .ɕ || phoneme == .tɕ {
+                n[0].formMultiplyAllVolm(0)
+                n.formMultiplyEsVolm(0, at: 0)
+                scale = 1
+            } else {
+                scale = 0.75
+            }
+            n[1].formMultiplyVolm(0)
+            n.formMultiplyEsVolm(0, at: 1)
+            n[2].sdVolm *= 0
+            n[2].formMultiplyVolm(0.6 * scale)
+            n.formMultiplyEsVolm(0.65 * scale, at: 2)
+            n[3].formMultiplyVolm(0.7 * scale)
+            n.formMultiplyEsVolm(0.8 * scale, at: 3)
+            n[4].formMultiplyVolm(1 * scale)
+            n.formMultiplyEsVolm(1 * scale, at: 4)
+            n[5].formMultiplyVolm(1 * scale)
+            return .linear(self, n, t: opacity)
+        case .ha, .he, .ho:
+            var n = toNoise()
+            n[0].sdNoise *= 0
+            n[0].formMultiplyNoise(0)
+            n.formMultiplyEsNoise(0.125, at: 0)
+            n[2].formMultiplyVolm(0.25)
+            n[1].formMultiplyNoise(0.5)
+            n[2].formMultiplyNoise(1)
+            n[2].formMultiplyVolm(0.5)
+            n[3].formMultiplyNoise(1)
+            n[3].formMultiplyVolm(0.5)
+            return .linear(self, n, t: opacity)
+        case .ç:
+            var n = toNoise()
+            n[0].sdVolm *= 0.56
+            n[0].sdNoise *= 0
+            n[0].formMultiplyVolm(0.25)
+            n.formMultiplyEsVolm(0.125, at: 0)
+            n[0].formMultiplyNoise(0)
+            n.formMultiplyEsNoise(0.25, at: 0)
+            n[1].formMultiplyVolm(0.5)
+            n.formMultiplyEsVolm(0.5, at: 1)
+            n[1].formMultiplyNoise(0.5)
+            n[2].formMultiplyVolm(1)
+            n.formMultiplyEsVolm(0.6, at: 2)
+            n[3].formMultiplyVolm(0.5)
+            n.formMultiplyEsVolm(0.5, at: 3)
+            n[4].formMultiplyVolm(0.75)
+            n.formMultiplyEsVolm(0.5, at: 4)
+            n[5].formMultiplyVolm(0.5)
+            n[5].edVolm *= 0.125
+            return .linear(self, n, t: opacity)
+        case .ɸ:
+            var n = toNoise()
+            n[0].sdVolm *= 0.56
+            n[0].sdNoise *= 0
+            n[0].formMultiplyVolm(0.25)
+            n.formMultiplyEsVolm(0.125, at: 0)
+            n[0].formMultiplyNoise(0)
+            n.formMultiplyEsNoise(0.25, at: 0)
+            n[1].formMultiplyVolm(0.5)
+            n.formMultiplyEsVolm(0.25, at: 1)
+            n[1].formMultiplyNoise(0.5)
+            n[2].formMultiplyVolm(0.5)
+            n.formMultiplyEsVolm(0.6, at: 2)
+            n[3].formMultiplyVolm(0.7)
+            n.formMultiplyEsVolm(0.6, at: 3)
+            n[4].formMultiplyVolm(1)
+            n.formMultiplyEsVolm(0.7, at: 4)
+            n[5].formMultiplyVolm(0.6)
+            n[5].edVolm *= 0.125
+            return .linear(self, n, t: opacity)
+        default:
+            return self
         }
+    }
+    
+    func toFricative(isO: Bool) -> Self {
+        var n = offVolm(from: 5)
+        n[0].sdVolm *= 0.125
+        n[0].formMultiplyVolm(0)
+        n.formMultiplyEsVolm(0, at: 0)
+        n[1].formMultiplyVolm(0.75)
+        n.formMultiplyEsVolm(0.25, at: 1)
+        n[2].formMultiplyVolm(1)
+        n.formMultiplyEsVolm(0.5, at: 2)
+        n[3].formMultiplyVolm(isO ? 0.6 : 1)
+        n.formMultiplyEsVolm(0, at: 3)
+        n[4].formMultiplyVolm(isO ? 0.2 : 0.5)
+        n.formMultiplyEsVolm(0, at: 4)
+        n[5].formMultiplyVolm(isO ? 0.1 : 0.2)
+        n.formMultiplyEsVolm(0, at: 5)
+        return n
+    }
+    func toBreath() -> Self {
+        var n = offVolm(from: 4)
+        n[0].sdVolm = n[1].edVolm * 0.7
+        n[2].formMultiplyVolm(0.85)
+        n[0].fillVolm(n[2].volm * 0.7)
+        n.formMultiplyEsVolm(0.7, at: 2)
+        n[3].formMultiplyVolm(0.7)
+        return n
+    }
+    func toVoiceless() -> Self {
+        var n = offVolm(from: 3)
+        n[2].sdVolm *= n[1].edVolm * 0.75
+        n[2].sVolm *= n[1].edVolm * 0.5
+        n[2].eVolm *= n[1].edVolm * 0.25
+        n[2].edVolm *= n[1].edVolm * 0.1
+        return n
+    }
+    func toDakuon() -> Self {
+        var n = offVolm(from: 1)
+        n[0].sVolm *= 0.85
+        n[0].eVolm *= 0.6
+        n.fillEsVolm(0, at: 0)
+        return n
+    }
+    func toNoise(to i: Int) -> Self {
+        var n = self
+        for i in 0 ... i {
+            n[i].fillAllNoise(1)
+        }
+        return n
+    }
+    func toNoise(from i: Int) -> Self {
+        var n = self
+        for i in i ..< n.count {
+            n[i].fillAllNoise(1)
+        }
+        return n
+    }
+    func toNoise() -> Self {
+        var n = self
+        n.formants = n.formants.map { $0.toAllNoise() }
+        return n
+    }
+    func connectNoise() -> Self {
+        var n = self
+        n[1].fillVolm(n[1].sdVolm)
+        n[2].fillVolm(n[2].sdVolm)
+        n[3].fillVolm(n[3].sdVolm)
+        n[4].fillVolm(n[4].sdVolm)
+        n[5].fillVolm(n[5].sdVolm)
+        return n
+    }
+    func offVolm(to i: Int) -> Self {
+        var n = self
+        for i in 0 ... i {
+            n[i].fillAllVolm(0)
+        }
+        return n
+    }
+    func offVolm(from i: Int) -> Self {
+        var n = self
+        for i in i ..< n.count {
+            n[i].fillAllVolm(0)
+        }
+        return n
+    }
+    func offNoise() -> Self {
+        var n = self
+        for i in 0 ..< n.count {
+            n[i].fillAllNoise(0)
+        }
+        return n
     }
 }
 extension FormantFilter: RandomAccessCollection {
@@ -870,107 +1022,6 @@ extension FormantFilter: MonoInterpolatable {
         .init(formants: .lastMonospline(f0.formants, f1.formants, f2.formants, with: ms))
     }
 }
-extension FormantFilter {
-    func movedF2(sPitch: Double, ePitch: Double) -> Self {
-        var n = self
-        n[1].sPitch = sPitch
-        n[1].ePitch = ePitch
-        return n
-    }
-    func multiplyF2To(f2Volm: Double, volm: Double) -> Self {
-        var n = self
-        n[1].formMultiplyAllVolm(f2Volm)
-        if volm != 1 {
-            for i in 2 ..< n.count {
-                n[i].formMultiplyAllVolm(volm)
-            }
-        }
-        return n
-    }
-    
-    func offVolm(to i: Int) -> Self {
-        var n = self
-        for i in 0 ... i {
-            n[i].fillAllVolm(0)
-        }
-        return n
-    }
-    func offVolm(from i: Int) -> Self {
-        var n = self
-        for i in i ..< n.count {
-            n[i].fillAllVolm(0)
-        }
-        return n
-    }
-    func offNoise() -> Self {
-        var n = self
-        for i in 0 ..< n.count {
-            n[i].fillAllNoise(0)
-        }
-        return n
-    }
-    
-    func toFricative(isO: Bool) -> Self {
-        var n = offVolm(from: 5)
-        n[0].sdVolm *= 0.56
-        n[0].formMultiplyVolm(0.7)
-        n.formMultiplyEsVolm(0.56, at: 0)
-        n[1].fillVolm(1)
-        n.formMultiplyEsVolm(0.56, at: 1)
-        n[2].fillVolm(1)
-        n.formMultiplyEsVolm(0.56, at: 2)
-        n[3].fillVolm(isO ? 0.6 : 1)
-        n.fillEsVolm(0, at: 3)
-        n[4].fillVolm(isO ? 0.2 : 0.5)
-        n.fillEsVolm(0, at: 4)
-        n[5].fillVolm(isO ? 0.1 : 0.2)
-        n.fillEsVolm(0, at: 5)
-        return n
-    }
-    func toBreath() -> Self {
-        var n = offVolm(from: 4)
-        n[0].sdVolm = n[1].edVolm * 0.7
-        n[0].fillVolm(n[2].volm * 0.7)
-        n[2].formMultiplyVolm(0.85)
-        n.formMultiplyEsVolm(0.7, at: 2)
-        n[3].formMultiplyVolm(0.7)
-        return n
-    }
-    
-    func toVoiceless() -> Self {
-        var n = offVolm(from: 3)
-        n[2].sdVolm *= n[1].edVolm * 0.75
-        n[2].sVolm *= n[1].edVolm * 0.5
-        n[2].eVolm *= n[1].edVolm * 0.25
-        n[2].edVolm *= n[1].edVolm * 0.1
-        return n
-    }
-    
-    func toDakuon() -> Self {
-        var n = offVolm(from: 1)
-        n[0].pitchRange = 55 ... 60
-        n[0].sVolm *= 0.85
-        n[0].eVolm *= 0.6
-        n.fillEsVolm(0, at: 0)
-        return n
-    }
-    
-    func toNoise() -> Self {
-        var n = self
-        n.formants = n.formants.map { $0.toAllNoise() }
-        return n
-    }
-}
-
-struct Onset: Hashable, Codable {
-    var durSec: Double
-    var volm: Double
-    var sec: Double
-    var attackSec: Double
-    var releaseSec: Double
-    var spectlope: Spectlope
-    var phoneme: Phoneme
-}
 
 struct KeyFormantFilter: Hashable, Codable {
     var formantFilter: FormantFilter
@@ -991,7 +1042,6 @@ struct KeyFormantFilter: Hashable, Codable {
 
 struct Mora: Hashable, Codable {
     var keyFormantFilters: [KeyFormantFilter]
-    var onsets: [Onset]
     
     init?(hiragana: String,
           previousPhoneme: Phoneme?, previousFormantFilter: FormantFilter?, previousID: UUID?) {
@@ -1024,7 +1074,6 @@ struct Mora: Hashable, Codable {
             } else {
                 [.init(ff, sec: 0, volm: 0.25)]
             }
-            onsets = []
             return
         case .breath:
             let aFf = baseFf.withSelfA(to: .a)
@@ -1034,7 +1083,6 @@ struct Mora: Hashable, Codable {
             } else {
                 [.init(ff, sec: 0, volm: 0.25)]
             }
-            onsets = []
             return
         default:
             return nil
@@ -1062,10 +1110,10 @@ struct Mora: Hashable, Codable {
         default:
             youonKffs = []
         }
-        let onsetStartSec = -(youonKffs.last?.sec ?? 0) - 0.02
         var paddingSec = 0.05
+        var previousSec = paddingSec
         
-        var kffs = [KeyFormantFilter](), onsets = [Onset]()
+        var kffs = [KeyFormantFilter]()
         
         let nextFf = youonKffs.first?.formantFilter ?? vowelFf
         let onsetDurSec: Double
@@ -1074,8 +1122,8 @@ struct Mora: Hashable, Codable {
         } else {
             let onsetScale = previousPhoneme == .sokuon ? 1.5 : (isVowelReduction ? 1.15 : 1)
             let volm: Double, pitch: Rational
-            var centerPitch: Rational?
             let oph = phonemes[0]
+            var onsetVolm = 0.0, offSec = 0.0
             switch oph {
             case .n, .nj:
                 onsetDurSec = 0.06
@@ -1092,142 +1140,67 @@ struct Mora: Hashable, Codable {
                 volm = 0.75
                 pitch = 0
                 paddingSec = 0.03
-                
-            case .k, .kj, .kβ, .ko, .g, .gj, .gβ, .go:
-                let sl: Spectlope, onsetVolm: Double
-                if oph == .kj || oph == .gj {
-                    sl = Spectlope(noisePitchVolms: [Point(80, 0),
-                                                     Point(89, 0.6),
-                                                     Point(90, 1),
-                                                     Point(92, 1),
-                                                     Point(93, 0.5),
-                                                     Point(98, 0.4),
-                                                     Point(99, 0)])
-                    onsetVolm = 0.25
-                } else {
-                    sl = switch vowel {
-                    case .o: Spectlope(noisePitchVolms: [Point(55, 0),
-                                                         Point(67, 0.61),
-                                                         Point(71, 1),
-                                                         Point(79, 1),
-                                                         Point(81, 0.56),
-                                                         Point(100, 0.4),
-                                                         Point(102, 0)])
-                    default: Spectlope(noisePitchVolms: [Point(55, 0),
-                                                         Point(77, 0.61),
-                                                         Point(80, 1),
-                                                         Point(87, 1),
-                                                         Point(88, 0.56),
-                                                         Point(98, 0.4),
-                                                         Point(99, 0)])
-                    }
-                    onsetVolm = 0.1
-                }
-                
-                let oDurSec = 0.035
-                onsets.append(.init(durSec: oDurSec,
-                                    volm: onsetVolm,
-                                    sec: -oDurSec + onsetStartSec,
-                                    attackSec: 0.01, releaseSec: 0.01,
-                                    spectlope: sl,
-                                    phoneme: oph))
-                
-                onsetDurSec = (oph == .k || oph == .kj ? 0.065 : 0.05) - 0.02 * 2
-                volm = oph == .k || oph == .kj ? 0 : 0.75
+            case .p, .pj:
+                onsetDurSec = 0.03
+                volm = 0
                 pitch = -3
-                
-            case .t, .d:
-                let oDurSec = 0.035
-                onsets.append(.init(durSec: oDurSec,
-                                    volm: 0.5,
-                                    sec: -oDurSec + onsetStartSec,
-                                    attackSec: 0.01, releaseSec: 0.01,
-                                    spectlope: .init(noisePitchVolms: [Point(96, 0),
-                                                                      Point(97, 1),
-                                                                      Point(99, 1),
-                                                                      Point(100, 0.7),
-                                                                      Point(101, 0.55),
-                                                                      Point(102, 0)]),
-                                    phoneme: oph))
-                onsetDurSec = (oph == .t ? 0.085 : 0.065) - 0.02 * 2
-                volm = oph == .t ? 0 : 0.75
+            case .b, .bj:
+                onsetDurSec = 0.01
+                volm = 0.75
                 pitch = -3
-            case .p, .pj, .b, .bj:
-                onsetDurSec = (oph == .p || oph == .pj ? 0.07 : 0.05) - 0.02 * 2
-                volm = oph == .p || oph == .pj ? 0 : 0.75
+            case .s, .ɕ:
+                onsetDurSec = 0.06 * onsetScale
+                volm = 0.5
                 pitch = -3
-            case .s, .ts, .dz:
-                let oDurSec, onsetVolm: Double
-                switch oph {
-                case .s:
-                    oDurSec = 0.1 * onsetScale
-                    onsetDurSec = oDurSec - 0.02 * 2
-                    onsetVolm = 0.7
-                    volm = 0.75
-                    pitch = -3
-                case .ts:
-                    oDurSec = 0.05 * onsetScale
-                    onsetDurSec = oDurSec + 0.04 - 0.02 * 2
-                    onsetVolm = 0.675
-                    volm = 0.75
-                    pitch = -3
-                case .dz:
-                    oDurSec = 0.06 * onsetScale
-                    onsetDurSec = oDurSec + 0.03 - 0.02 * 2
-                    onsetVolm = 0.65
-                    volm = 0.75
-                    pitch = -3
-                default: fatalError()
-                }
-//                onsets.append(.init(durSec: oDurSec,
-//                                    volm: onsetVolm,
-//                                    sec: -oDurSec + onsetStartSec,
-//                                    attackSec: 0.02, releaseSec: 0.02,
-//                                    spectlope: baseFf.withSelfA(to: oph).spectlope,
-//                                    phoneme: oph))
-            case .ɕ, .tɕ, .dʒ:
-                let oDurSec, onsetVolm: Double
-                switch oph {
-                case .ɕ:
-                    oDurSec = 0.085 * onsetScale
-                    onsetDurSec = oDurSec - 0.02 * 2
-                    onsetVolm = 0.75
-                    volm = 0.75
-                    pitch = -3
-                case .tɕ:
-                    oDurSec = 0.04 * onsetScale
-                    onsetDurSec = oDurSec + 0.04 - 0.02 * 2
-                    onsetVolm = 0.65
-                    volm = 0.75
-                    pitch = -3
-                case .dʒ:
-                    oDurSec = 0.055 * onsetScale
-                    onsetDurSec = oDurSec + 0.03 - 0.02 * 2
-                    onsetVolm = 0.62
-                    volm = 0.75
-                    pitch = -3
-                default: fatalError()
-                }
-//                onsets.append(.init(durSec: oDurSec,
-//                                    volm: onsetVolm,
-//                                    sec: -oDurSec + onsetStartSec,
-//                                    attackSec: 0.02, releaseSec: 0.02,
-//                                    spectlope: baseFf.withSelfA(to: oph).spectlope,
-//                                    phoneme: oph))
+            case .dz, .dʒ:
+                onsetDurSec = 0.03 * onsetScale
+                volm = 0.5
+                pitch = -3
+                paddingSec = 0.03
+            case .tɕ:
+                offSec = 0.02
+                onsetDurSec = 0.05 * onsetScale
+                volm = 0
+                onsetVolm = 0.5
+                pitch = -3
+            case .ts:
+                offSec = 0.02
+                onsetDurSec = 0.03 * onsetScale
+                volm = 0
+                onsetVolm = 0.5
+                pitch = -3
             case .ha, .he, .ho:
-                onsetDurSec = 0.06 * onsetScale - 0.02 * 2
-                centerPitch = 1
-                volm = 0.125
+                onsetDurSec = 0.02 * onsetScale
+                volm = 0.35
                 pitch = -3
             case .ç:
-                onsetDurSec = 0.08 * onsetScale - 0.02 * 2
-                centerPitch = 1
-                volm = 0.125
+                onsetDurSec = 0.04 * onsetScale
+                volm = 0.25
                 pitch = -3
             case .ɸ:
-                onsetDurSec = 0.06 * onsetScale - 0.02 * 2
-                centerPitch = 1
+                onsetDurSec = 0.02 * onsetScale
                 volm = 0.125
+                pitch = -3
+            case .k, .kj, .kβ, .ko:
+                offSec = 0.04
+                onsetDurSec = 0.01
+                volm = 0
+                onsetVolm = 0.0625
+                pitch = -3
+                paddingSec = 0.03
+            case .g, .gj, .gβ, .go:
+                onsetDurSec = 0.0075
+                volm = 0.75
+                pitch = -3
+            case .t:
+                offSec = 0.01
+                onsetDurSec = 0.015
+                volm = 0
+                onsetVolm = 0.0625
+                pitch = -3
+            case .d:
+                onsetDurSec = 0.0075
+                volm = 0.75
                 pitch = -3
             default:
                 onsetDurSec = 0
@@ -1236,26 +1209,45 @@ struct Mora: Hashable, Codable {
             }
             
             let nFf = baseFf.withSelfA(to: oph)
-            if let centerPitch {
-                kffs.append(.init(nFf, sec: onsetDurSec / 2, volm: volm, pitch: pitch))
-                kffs.append(.init(nFf, sec: onsetDurSec / 2, volm: volm, pitch: centerPitch))
-            } else {
-                switch oph {
-                case .s, .ts, .dz:
-                    let onsetFf = baseFf.onsetWithSelfA(to: oph)
-                    kffs.append(.init(nFf, sec: paddingSec * 0.5, volm: volm, pitch: pitch))
-                    kffs.append(.init(onsetFf, sec: onsetDurSec, volm: volm, pitch: pitch))
-                    kffs.append(.init(onsetFf, sec: paddingSec * 0.5, volm: volm, pitch: pitch))
-                default:
-                    kffs.append(.init(nFf, sec: onsetDurSec, volm: volm, pitch: pitch))
+            switch oph {
+            case .dz, .dʒ:
+                previousSec = paddingSec
+                let onsetFf = nFf.applyNoise(oph, opacity: 1)
+                kffs.append(.init(onsetFf, sec: onsetDurSec, volm: volm, pitch: pitch))
+                kffs.append(.init(onsetFf, sec: paddingSec, volm: volm, pitch: pitch))
+            case .s, .ɕ, .ha, .ç, .ɸ, .he, .ho:
+                previousSec = paddingSec * 0.5
+                if let preFf = previousFormantFilter {
+                    let preFf1 = FormantFilter.linear(nFf, preFf, t: 0.5).connectNoise()
+                    kffs.append(.init(preFf1, sec: paddingSec * 0.5, volm: .linear(volm, 1, t: 0.75),
+                                      pitch: pitch * .init(1, 4)))
                 }
-                
+                let onsetFf = nFf.applyNoise(oph, opacity: 1)
+                let nNextFf = FormantFilter.linear(nFf, nextFf, t: 0.25).connectNoise()
+                kffs.append(.init(onsetFf, sec: previousFormantFilter == nil ? paddingSec * 0.5 + onsetDurSec : onsetDurSec, volm: volm, pitch: pitch))
+                kffs.append(.init(onsetFf, sec: paddingSec * 0.5, volm: volm, pitch: pitch))
+                kffs.append(.init(nNextFf, sec: paddingSec * 0.5, volm: .linear(volm, 1, t: 0.75),
+                                  pitch: pitch * .init(1, 4)))
+            case .k, .kj, .kβ, .ko, .t, .tɕ, .ts:
+                previousSec = paddingSec
+                let onsetFf = nFf.applyNoise(oph, opacity: 1)
+                if let preFf = previousFormantFilter {
+                    let nnFf = FormantFilter.linear(preFf, nFf, t: 0.75)
+                    kffs.append(.init(nnFf, sec: offSec, volm: volm, pitch: pitch))
+                } else {
+                    kffs.append(.init(onsetFf, sec: offSec + paddingSec, volm: volm, pitch: pitch))
+                }
+                kffs.append(.init(onsetFf, sec: onsetDurSec, volm: volm, pitch: pitch))
+                kffs.append(.init(onsetFf, sec: paddingSec, volm: onsetVolm, pitch: pitch))
+            default:
+                previousSec = paddingSec
+                kffs.append(.init(nFf, sec: onsetDurSec, volm: volm, pitch: pitch))
+                kffs.append(.init(nFf, sec: paddingSec, volm: volm, pitch: pitch))
             }
-            kffs.append(.init(nFf, sec: paddingSec, volm: volm, pitch: pitch))
         }
         
         if let ff = previousFormantFilter, let id = previousID {
-            kffs.insert(.init(ff, sec: paddingSec, id: id), at: 0)
+            kffs.insert(.init(ff, sec: previousSec, id: id), at: 0)
         }
         kffs += youonKffs
         if !isVowelReduction {
@@ -1266,14 +1258,12 @@ struct Mora: Hashable, Codable {
         
         let durSec = kffs.sum { $0.sec }
         var sec = -durSec
-        kffs = kffs.map {
+        self.keyFormantFilters = kffs.map {
             var kff = $0
             kff.sec = sec
             sec += $0.sec
             return kff
         }
-        self.keyFormantFilters = kffs
-        self.onsets = onsets
     }
 }
 
@@ -1315,6 +1305,19 @@ extension Phoneme {
     var isYouon: Bool {
         switch self{
         case .j, .ja, .β: true
+        default: false
+        }
+    }
+    
+    var isK: Bool {
+        switch self {
+        case .k, .kj, .kβ, .ko: true
+        default: false
+        }
+    }
+    var isG: Bool {
+        switch self {
+        case .g, .gj, .gβ, .go: true
         default: false
         }
     }
