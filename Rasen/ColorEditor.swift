@@ -508,12 +508,10 @@ final class ColorEditor: Editor {
         case .changed:
             guard let sheetView else { return }
             
-            let (minV, maxV) = scoreResult != nil && (scoreResult!.isTone || scoreResult!.isEnvelpse)
-            ? (0, 1) : (Volm.minVolm, Volm.maxVolm)
             let wp = document.convertScreenToWorld(event.screenPoint)
             let p = lightnessNode.convertFromWorld(wp)
             let t = (p.y / maxLightnessHeight).clipped(min: 0, max: 1)
-            let volm = Double.linear(minV, maxV, t: t)
+            let volm = Double.linear(Volm.minVolm, Volm.maxVolm, t: t)
             let volmScale = beganVolm == 0 ? 0 : volm / beganVolm
             func newVolm(from otherVolm: Double) -> Double {
                 if beganVolm == otherVolm {
@@ -627,7 +625,7 @@ final class ColorEditor: Editor {
                 }
             }
             
-            editingLightness = volm.clipped(min: minV, max: maxV, newMin: 0, newMax: 100)
+            editingLightness = volm.clipped(min: Volm.minVolm, max: Volm.maxVolm, newMin: 0, newMax: 100)
         case .ended:
             notePlayer?.stop()
             

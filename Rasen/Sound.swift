@@ -204,9 +204,24 @@ extension Stereo {
         volm == 0
     }
     
+    func with(volm: Double) -> Self {
+        var v = self
+        v.volm = volm
+        return v
+    }
+    func with(pan: Double) -> Self {
+        var v = self
+        v.pan = pan
+        return v
+    }
     func with(id: UUID) -> Self {
         var v = self
         v.id = id
+        return v
+    }
+    func multiply(volm: Double) -> Self {
+        var v = self
+        v.volm *= volm
         return v
     }
 }
@@ -873,17 +888,20 @@ extension Note {
         return minPitch ..< maxPitch
     }
     
-    func chordBeatRangeAndRoundedPitchs() -> [(beatRange: Range<Rational>, roundedPitch: Int)] {
+    func chordBeatRangeAndRoundedPitchs(minBeatLength: Rational = .init(1, 8)) -> [(beatRange: Range<Rational>, roundedPitch: Int)] {
         if pits.count >= 2 {
             var ns = [(beatRange: Range<Rational>, roundedPitch: Int)]()
             var preBeat = beatRange.start, prePitch = Int((pitch + pits[0].pitch).rounded())
-            var isPreEqual = true
+            if preBeat < pits[0].beat + beatRange.start {
+                ns.append((preBeat ..< pits[0].beat + beatRange.start, prePitch))
+            }
+            var isPreEqual = false
             for i in 1 ..< pits.count {
                 let pit = pits[i]
                 let pitch = Int((pitch + pit.pitch).rounded())
                 if pitch != prePitch {
                     let beat = pit.beat + beatRange.start
-                    if isPreEqual {
+                    if isPreEqual && preBeat < beat {
                         ns.append((preBeat ..< beat, prePitch))
                     }
                     preBeat = beat
@@ -897,9 +915,9 @@ extension Note {
             if preBeat < beatRange.end {
                 ns.append((preBeat ..< beatRange.end, prePitch))
             }
-            return ns
+            return ns.filter { $0.beatRange.length >= minBeatLength }
         } else {
-            return [(beatRange, firstRoundedPitch)]
+            return beatRange.length >= minBeatLength ? [(beatRange, firstRoundedPitch)] : []
         }
     }
     
@@ -1616,7 +1634,7 @@ extension Audiotrack {
 }
 
 struct Volm: Hashable, Codable {
-    static let minVolm = 0.0, maxVolm = 1 / 2.0.squareRoot(), volmRange = minVolm ... maxVolm
+    static let minVolm = 0.0, maxVolm = 1.0, volmRange = minVolm ... maxVolm
 }
 extension Volm {
     /// cutDb = -40, a = -cutDb, amp = (.exp(a * volm / 8.7) - 1) / (.exp(a / 8.7) - 1)

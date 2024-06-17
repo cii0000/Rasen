@@ -390,7 +390,7 @@ extension Rendnote {
                                  cutFq: cutFq, 
                                  cutStartFq: cutStartFq, sampleRate: sampleRate, fftCount: fftCount)
         
-        print(Date().timeIntervalSince(date), fq, notewave.isLoop, notewave.samples.count)
+//        print(Date().timeIntervalSince(date), fq, notewave.isLoop, notewave.samples.count)
         
         if notewave.samples.contains(where: { $0.isNaN || $0.isInfinite }) {
             print(notewave.samples.contains(where: { $0.isInfinite }) ? "inf" : "nan")
@@ -415,10 +415,11 @@ extension Rendnote {
             return .init(fqScale: 1, isLoop: isLoop, samples: [0], stereos: [.init()])
         }
         
+        let stereoScale = Volm.volm(fromAmp: 1 / 2.0.squareRoot())
         func stereos(sampleCount: Int) -> [Stereo] {
             pitbend.isEqualAllStereo ?
-            [pitbend.firstStereo] :
-            sampleCount.range.map { pitbend.stereo(atSec: Double($0) * rSampleRate) }
+            [pitbend.firstStereo.multiply(volm: stereoScale)] :
+            sampleCount.range.map { pitbend.stereo(atSec: Double($0) * rSampleRate).multiply(volm: stereoScale) }
         }
         
         let fq = fq.clipped(min: Score.minFq, max: cutFq)
@@ -617,10 +618,13 @@ extension Rendnote {
                 let spectlope = pitbend.firstSpectlope
                 var sign = true, rmsV = 0.0
                 let spectrum = (1 ... sinCount).map { n in
-                    let fq = fq * Double(n)
-                    let loudnessVolm = Loudness.volm40Phon(fromFq: fq)
-                    let spectlopeVolm = spectlope.noisedVolm(atFq: fq)
-                    let cutScale = fq.clipped(min: cutStartFq, max: cutFq, newMin: 1, newMax: 0)
+                    let nFq = fq * Double(n)
+                    let loudnessVolm = Loudness.volm40Phon(fromFq: nFq)
+                    
+                    let spectlopeVolm = spectlope.noisedVolm(atFq: nFq)
+                    nFq - fq / 2 ... nFq + fq / 2
+                    
+                    let cutScale = nFq.clipped(min: cutStartFq, max: cutFq, newMin: 1, newMax: 0)
                     let overtoneScale = isAll || n == 1 ? (sign ? 1 : -1) : (sign ? oddScale : evenScale)
                     let sqfa = Double(n) ** sqfa
                     let a = overtoneScale / sqfa * cutScale
@@ -633,7 +637,7 @@ extension Rendnote {
                 
                 let allSumSpectrum: Double, noiseSpectrum: [Double]?
                 if containsNoise {
-                    let (aNoiseSpectrum, noiseSumSpectrum) = aNoiseSpectrum(fromNoise: pitbend.firstSpectlope,
+                    let (aNoiseSpectrum, noiseSumSpectrum) = aNoiseSpectrum(fromNoise: spectlope,
                                                                             fq: fq,
                                                                             oddScale: oddScale,
                                                                             evenScale: -evenScale)
@@ -820,7 +824,9 @@ extension Rendnote {
                     let spectrum = (1 ... maxSinCount).map { n in
                         let fq = frame.fq * Double(n)
                         let loudnessVolm = Loudness.volm40Phon(fromFq: fq)
+                        
                         let spectlopeVolm = spectlope.noisedVolm(atFq: fq)
+                        fq - frame.fq / 2 ... fq + frame.fq / 2
                         
                         let overtoneScale = isEqualAllOvertone ?
                         (isAll || n == 1 ? (sign ? 1 : -1) : (sign ? oddScale : evenScale)) :

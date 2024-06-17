@@ -782,6 +782,9 @@ final class TextEditor: Editor {
                 if event.inputKeyType == .delete, !lyric.isEmpty {
                     lyric.removeLast()
                 } else if event.inputKeyType.isText {
+                    if lyric == "[" {
+                        lyric = ""
+                    }
                     lyric += key
                 }
                 if lyric != note.pits[pitI].lyric {
@@ -789,32 +792,11 @@ final class TextEditor: Editor {
                         document.stopPlaying(with: event)
                     }
                     
-                    let onsetNotes = note.replaceAndOnsetNotes(lyric: lyric, at: pitI,
-                                                          tempo: scoreView.model.tempo)
+                    note.replace(lyric: lyric, at: pitI, tempo: scoreView.model.tempo)
                     if isNewUndoGroup {
                         sheetView.newUndoGroup()
                     }
                     sheetView.replace(note, at: noteI)
-                    if !onsetNotes.isEmpty {
-                        let beat = note.beatRange.start + note.pits[pitI].beat
-                        var idxs = Set<Int>()
-                        for onsetNote in onsetNotes {
-                            let onsetLyric = onsetNote.pits.first?.lyric
-                            for (noteI, oldOnsetNote) in scoreView.model.notes.enumerated() {
-                                if let oldOnsetLyric = oldOnsetNote.pits.first?.lyric,
-                                    onsetLyric == oldOnsetLyric,
-                                   Double(scoreView.sec(fromBeat: abs(beat - oldOnsetNote.beatRange.start))) < 0.01 {
-                                    
-                                    idxs.insert(noteI)
-                                }
-                            }
-                        }
-                        if !idxs.isEmpty {
-                            sheetView.removeNote(at: idxs.sorted())
-                        }
-                        
-                        sheetView.append(onsetNotes)
-                    }
                 }
             }
             if let (noteI, pitI) = scoreView.noteAndPitI(at: scoreP, scale: document.screenToWorldScale) {

@@ -913,7 +913,7 @@ final class CopyEditor: Editor {
                 case .sprol(let pitI, _):
                     let tone = score.notes[noteI].pits[pitI].tone
                     Pasteboard.shared.copiedObjects = [.tone(tone)]
-                    
+                    print(FormantFilter(spectlope: tone.spectlope).defaultFormantsString)
                     //
                 }
             } else {

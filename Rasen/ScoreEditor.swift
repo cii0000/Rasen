@@ -1360,14 +1360,20 @@ extension ScoreView {
         let lyricNodes: [Node] = note.pits.enumerated().compactMap { (pitI, pit) in
             let p = pitPosition(atPit: pitI, from: note)
             if !pit.lyric.isEmpty {
-                let lyricText = Text(string: pit.lyric, size: 6)
-                let typesetter = lyricText.typesetter
-                let lh = typesetter.height / 2 + 16
-                lyricLinePathlines.append(.init(Rect(x: p.x - 0.25, y: p.y - lh / 2,
-                                                     width: 0.5, height: lh / 2)))
-                return .init(attitude: .init(position: .init(p.x - typesetter.width / 2,
-                                                             p.y - lh / 2 - typesetter.height / 2)),
-                             path: typesetter.path(), fillType: .color(color ?? .content))
+                if pit.lyric == "[" {
+                    lyricLinePathlines.append(.init(Rect(x: p.x - 0.25, y: p.y - 3,
+                                                         width: 0.5, height: 3)))
+                    return nil
+                } else {
+                    let lyricText = Text(string: pit.lyric, size: 6)
+                    let typesetter = lyricText.typesetter
+                    let lh = typesetter.height / 2 + 16
+                    lyricLinePathlines.append(.init(Rect(x: p.x - 0.25, y: p.y - lh / 2,
+                                                         width: 0.5, height: lh / 2)))
+                    return .init(attitude: .init(position: .init(p.x - typesetter.width / 2,
+                                                                 p.y - lh / 2 - typesetter.height / 2)),
+                                 path: typesetter.path(), fillType: .color(color ?? .content))
+                }
             } else {
                 return nil
             }
