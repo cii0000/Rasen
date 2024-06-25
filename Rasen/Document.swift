@@ -2506,7 +2506,7 @@ final class Document {
         return .texture(texture)
     }
     
-    func containsAllTimeline(with event: Event) -> Bool {
+    func containsAllTimelines(with event: Event) -> Bool {
         let sp = lastEditedSheetScreenCenterPositionNoneCursor ?? event.screenPoint
         let p = convertScreenToWorld(sp)
         guard let sheetView = sheetView(at: p) else { return false }
@@ -4027,6 +4027,7 @@ final class Document {
         case .interpolate: Interpolater(self)
         case .crossErase: CrossEraser(self)
         case .addScore: ScoreAdder(self)
+        case .showTone: ToneShower(self)
         default: nil
         }
     }

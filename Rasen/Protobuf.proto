@@ -217,6 +217,7 @@ message PBNote {
     PBRationalRange beatRange = 3;
     PBEnvelope envelope = 7;
     PBUUID id = 9;
+    bool isShownTone = 10;
 }
 
 message PBScoreOption {

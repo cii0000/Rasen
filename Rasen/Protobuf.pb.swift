@@ -628,8 +628,8 @@ struct PBLine {
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch (lhs, rhs) {
       case (.uuColor, .uuColor): return {
-        guard case .uuColor(let l) = lhs, case .uuColor(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .uuColor(let l) = lhs, case .uuColor(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       }
     }
@@ -924,8 +924,8 @@ struct PBContent {
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch (lhs, rhs) {
       case (.timeOption, .timeOption): return {
-        guard case .timeOption(let l) = lhs, case .timeOption(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .timeOption(let l) = lhs, case .timeOption(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       }
     }
@@ -1157,6 +1157,8 @@ struct PBNote {
   /// Clears the value of `id`. Subsequent reads from it will return its default value.
   mutating func clearID() {self._id = nil}
 
+  var isShownTone: Bool = false
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -1359,8 +1361,8 @@ struct PBText {
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch (lhs, rhs) {
       case (.timeOption, .timeOption): return {
-        guard case .timeOption(let l) = lhs, case .timeOption(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .timeOption(let l) = lhs, case .timeOption(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       }
     }
@@ -1962,21 +1964,24 @@ struct PBNoteIndexValue {
   // methods supported on all messages.
 
   var value: PBNote {
-    get {return _value ?? PBNote()}
-    set {_value = newValue}
+    get {return _storage._value ?? PBNote()}
+    set {_uniqueStorage()._value = newValue}
   }
   /// Returns true if `value` has been explicitly set.
-  var hasValue: Bool {return self._value != nil}
+  var hasValue: Bool {return _storage._value != nil}
   /// Clears the value of `value`. Subsequent reads from it will return its default value.
-  mutating func clearValue() {self._value = nil}
+  mutating func clearValue() {_uniqueStorage()._value = nil}
 
-  var index: Int64 = 0
+  var index: Int64 {
+    get {return _storage._index}
+    set {_uniqueStorage()._index = newValue}
+  }
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
 
-  fileprivate var _value: PBNote? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 struct PBContentIndexValue {
@@ -2204,8 +2209,8 @@ struct PBTextValue {
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch (lhs, rhs) {
       case (.origin, .origin): return {
-        guard case .origin(let l) = lhs, case .origin(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .origin(let l) = lhs, case .origin(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       }
     }
@@ -2222,8 +2227,8 @@ struct PBTextValue {
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch (lhs, rhs) {
       case (.size, .size): return {
-        guard case .size(let l) = lhs, case .size(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .size(let l) = lhs, case .size(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       }
     }
@@ -2240,8 +2245,8 @@ struct PBTextValue {
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch (lhs, rhs) {
       case (.widthCount, .widthCount): return {
-        guard case .widthCount(let l) = lhs, case .widthCount(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .widthCount(let l) = lhs, case .widthCount(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       }
     }
@@ -3050,196 +3055,196 @@ struct PBSheetUndoItem {
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch (lhs, rhs) {
       case (.appendLine, .appendLine): return {
-        guard case .appendLine(let l) = lhs, case .appendLine(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .appendLine(let l) = lhs, case .appendLine(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.appendLines, .appendLines): return {
-        guard case .appendLines(let l) = lhs, case .appendLines(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .appendLines(let l) = lhs, case .appendLines(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.appendPlanes, .appendPlanes): return {
-        guard case .appendPlanes(let l) = lhs, case .appendPlanes(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .appendPlanes(let l) = lhs, case .appendPlanes(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.removeLastLines, .removeLastLines): return {
-        guard case .removeLastLines(let l) = lhs, case .removeLastLines(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .removeLastLines(let l) = lhs, case .removeLastLines(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.removeLastPlanes, .removeLastPlanes): return {
-        guard case .removeLastPlanes(let l) = lhs, case .removeLastPlanes(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .removeLastPlanes(let l) = lhs, case .removeLastPlanes(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.insertLines, .insertLines): return {
-        guard case .insertLines(let l) = lhs, case .insertLines(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .insertLines(let l) = lhs, case .insertLines(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.insertPlanes, .insertPlanes): return {
-        guard case .insertPlanes(let l) = lhs, case .insertPlanes(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .insertPlanes(let l) = lhs, case .insertPlanes(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.removeLines, .removeLines): return {
-        guard case .removeLines(let l) = lhs, case .removeLines(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .removeLines(let l) = lhs, case .removeLines(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.removePlanes, .removePlanes): return {
-        guard case .removePlanes(let l) = lhs, case .removePlanes(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .removePlanes(let l) = lhs, case .removePlanes(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.setPlaneValue, .setPlaneValue): return {
-        guard case .setPlaneValue(let l) = lhs, case .setPlaneValue(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .setPlaneValue(let l) = lhs, case .setPlaneValue(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.changeToDraft, .changeToDraft): return {
-        guard case .changeToDraft(let l) = lhs, case .changeToDraft(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .changeToDraft(let l) = lhs, case .changeToDraft(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.setPicture, .setPicture): return {
-        guard case .setPicture(let l) = lhs, case .setPicture(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .setPicture(let l) = lhs, case .setPicture(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.insertDraftLines, .insertDraftLines): return {
-        guard case .insertDraftLines(let l) = lhs, case .insertDraftLines(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .insertDraftLines(let l) = lhs, case .insertDraftLines(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.insertDraftPlanes, .insertDraftPlanes): return {
-        guard case .insertDraftPlanes(let l) = lhs, case .insertDraftPlanes(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .insertDraftPlanes(let l) = lhs, case .insertDraftPlanes(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.removeDraftLines, .removeDraftLines): return {
-        guard case .removeDraftLines(let l) = lhs, case .removeDraftLines(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .removeDraftLines(let l) = lhs, case .removeDraftLines(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.removeDraftPlanes, .removeDraftPlanes): return {
-        guard case .removeDraftPlanes(let l) = lhs, case .removeDraftPlanes(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .removeDraftPlanes(let l) = lhs, case .removeDraftPlanes(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.setDraftPicture, .setDraftPicture): return {
-        guard case .setDraftPicture(let l) = lhs, case .setDraftPicture(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .setDraftPicture(let l) = lhs, case .setDraftPicture(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.insertTexts, .insertTexts): return {
-        guard case .insertTexts(let l) = lhs, case .insertTexts(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .insertTexts(let l) = lhs, case .insertTexts(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.removeTexts, .removeTexts): return {
-        guard case .removeTexts(let l) = lhs, case .removeTexts(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .removeTexts(let l) = lhs, case .removeTexts(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.replaceString, .replaceString): return {
-        guard case .replaceString(let l) = lhs, case .replaceString(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .replaceString(let l) = lhs, case .replaceString(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.changedColors, .changedColors): return {
-        guard case .changedColors(let l) = lhs, case .changedColors(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .changedColors(let l) = lhs, case .changedColors(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.insertBorders, .insertBorders): return {
-        guard case .insertBorders(let l) = lhs, case .insertBorders(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .insertBorders(let l) = lhs, case .insertBorders(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.removeBorders, .removeBorders): return {
-        guard case .removeBorders(let l) = lhs, case .removeBorders(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .removeBorders(let l) = lhs, case .removeBorders(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.setRootKeyframeIndex, .setRootKeyframeIndex): return {
-        guard case .setRootKeyframeIndex(let l) = lhs, case .setRootKeyframeIndex(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .setRootKeyframeIndex(let l) = lhs, case .setRootKeyframeIndex(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.insertKeyframes, .insertKeyframes): return {
-        guard case .insertKeyframes(let l) = lhs, case .insertKeyframes(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .insertKeyframes(let l) = lhs, case .insertKeyframes(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.removeKeyframes, .removeKeyframes): return {
-        guard case .removeKeyframes(let l) = lhs, case .removeKeyframes(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .removeKeyframes(let l) = lhs, case .removeKeyframes(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.setKeyframeOptions, .setKeyframeOptions): return {
-        guard case .setKeyframeOptions(let l) = lhs, case .setKeyframeOptions(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .setKeyframeOptions(let l) = lhs, case .setKeyframeOptions(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.insertKeyLines, .insertKeyLines): return {
-        guard case .insertKeyLines(let l) = lhs, case .insertKeyLines(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .insertKeyLines(let l) = lhs, case .insertKeyLines(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.replaceKeyLines, .replaceKeyLines): return {
-        guard case .replaceKeyLines(let l) = lhs, case .replaceKeyLines(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .replaceKeyLines(let l) = lhs, case .replaceKeyLines(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.removeKeyLines, .removeKeyLines): return {
-        guard case .removeKeyLines(let l) = lhs, case .removeKeyLines(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .removeKeyLines(let l) = lhs, case .removeKeyLines(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.insertKeyPlanes, .insertKeyPlanes): return {
-        guard case .insertKeyPlanes(let l) = lhs, case .insertKeyPlanes(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .insertKeyPlanes(let l) = lhs, case .insertKeyPlanes(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.replaceKeyPlanes, .replaceKeyPlanes): return {
-        guard case .replaceKeyPlanes(let l) = lhs, case .replaceKeyPlanes(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .replaceKeyPlanes(let l) = lhs, case .replaceKeyPlanes(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.removeKeyPlanes, .removeKeyPlanes): return {
-        guard case .removeKeyPlanes(let l) = lhs, case .removeKeyPlanes(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .removeKeyPlanes(let l) = lhs, case .removeKeyPlanes(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.insertDraftKeyLines, .insertDraftKeyLines): return {
-        guard case .insertDraftKeyLines(let l) = lhs, case .insertDraftKeyLines(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .insertDraftKeyLines(let l) = lhs, case .insertDraftKeyLines(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.removeDraftKeyLines, .removeDraftKeyLines): return {
-        guard case .removeDraftKeyLines(let l) = lhs, case .removeDraftKeyLines(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .removeDraftKeyLines(let l) = lhs, case .removeDraftKeyLines(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.insertDraftKeyPlanes, .insertDraftKeyPlanes): return {
-        guard case .insertDraftKeyPlanes(let l) = lhs, case .insertDraftKeyPlanes(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .insertDraftKeyPlanes(let l) = lhs, case .insertDraftKeyPlanes(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.removeDraftKeyPlanes, .removeDraftKeyPlanes): return {
-        guard case .removeDraftKeyPlanes(let l) = lhs, case .removeDraftKeyPlanes(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .removeDraftKeyPlanes(let l) = lhs, case .removeDraftKeyPlanes(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.setLineIds, .setLineIds): return {
-        guard case .setLineIds(let l) = lhs, case .setLineIds(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .setLineIds(let l) = lhs, case .setLineIds(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.setAnimationOption, .setAnimationOption): return {
-        guard case .setAnimationOption(let l) = lhs, case .setAnimationOption(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .setAnimationOption(let l) = lhs, case .setAnimationOption(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.insertNotes, .insertNotes): return {
-        guard case .insertNotes(let l) = lhs, case .insertNotes(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .insertNotes(let l) = lhs, case .insertNotes(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.replaceNotes, .replaceNotes): return {
-        guard case .replaceNotes(let l) = lhs, case .replaceNotes(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .replaceNotes(let l) = lhs, case .replaceNotes(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.removeNotes, .removeNotes): return {
-        guard case .removeNotes(let l) = lhs, case .removeNotes(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .removeNotes(let l) = lhs, case .removeNotes(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.insertContents, .insertContents): return {
-        guard case .insertContents(let l) = lhs, case .insertContents(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .insertContents(let l) = lhs, case .insertContents(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.replaceContents, .replaceContents): return {
-        guard case .replaceContents(let l) = lhs, case .replaceContents(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .replaceContents(let l) = lhs, case .replaceContents(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.removeContents, .removeContents): return {
-        guard case .removeContents(let l) = lhs, case .removeContents(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .removeContents(let l) = lhs, case .removeContents(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.setScoreOption, .setScoreOption): return {
-        guard case .setScoreOption(let l) = lhs, case .setScoreOption(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .setScoreOption(let l) = lhs, case .setScoreOption(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.insertDraftNotes, .insertDraftNotes): return {
-        guard case .insertDraftNotes(let l) = lhs, case .insertDraftNotes(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .insertDraftNotes(let l) = lhs, case .insertDraftNotes(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.removeDraftNotes, .removeDraftNotes): return {
-        guard case .removeDraftNotes(let l) = lhs, case .removeDraftNotes(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .removeDraftNotes(let l) = lhs, case .removeDraftNotes(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       default: return false
       }
@@ -3286,12 +3291,12 @@ struct PBWorldUndoItem {
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch (lhs, rhs) {
       case (.insertSheets, .insertSheets): return {
-        guard case .insertSheets(let l) = lhs, case .insertSheets(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .insertSheets(let l) = lhs, case .insertSheets(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.removeSheets, .removeSheets): return {
-        guard case .removeSheets(let l) = lhs, case .removeSheets(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .removeSheets(let l) = lhs, case .removeSheets(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       default: return false
       }
@@ -3372,8 +3377,8 @@ struct PBBranch {
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch (lhs, rhs) {
       case (.selectedChildIndex, .selectedChildIndex): return {
-        guard case .selectedChildIndex(let l) = lhs, case .selectedChildIndex(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .selectedChildIndex(let l) = lhs, case .selectedChildIndex(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       }
     }
@@ -3696,84 +3701,84 @@ struct PBPastableObject {
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch (lhs, rhs) {
       case (.copiedSheetsValue, .copiedSheetsValue): return {
-        guard case .copiedSheetsValue(let l) = lhs, case .copiedSheetsValue(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .copiedSheetsValue(let l) = lhs, case .copiedSheetsValue(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.sheetValue, .sheetValue): return {
-        guard case .sheetValue(let l) = lhs, case .sheetValue(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .sheetValue(let l) = lhs, case .sheetValue(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.border, .border): return {
-        guard case .border(let l) = lhs, case .border(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .border(let l) = lhs, case .border(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.text, .text): return {
-        guard case .text(let l) = lhs, case .text(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .text(let l) = lhs, case .text(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.string, .string): return {
-        guard case .string(let l) = lhs, case .string(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .string(let l) = lhs, case .string(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.picture, .picture): return {
-        guard case .picture(let l) = lhs, case .picture(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .picture(let l) = lhs, case .picture(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.planesValue, .planesValue): return {
-        guard case .planesValue(let l) = lhs, case .planesValue(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .planesValue(let l) = lhs, case .planesValue(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.uuColor, .uuColor): return {
-        guard case .uuColor(let l) = lhs, case .uuColor(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .uuColor(let l) = lhs, case .uuColor(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.animation, .animation): return {
-        guard case .animation(let l) = lhs, case .animation(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .animation(let l) = lhs, case .animation(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.ids, .ids): return {
-        guard case .ids(let l) = lhs, case .ids(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .ids(let l) = lhs, case .ids(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.score, .score): return {
-        guard case .score(let l) = lhs, case .score(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .score(let l) = lhs, case .score(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.content, .content): return {
-        guard case .content(let l) = lhs, case .content(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .content(let l) = lhs, case .content(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.image, .image): return {
-        guard case .image(let l) = lhs, case .image(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .image(let l) = lhs, case .image(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.beatRange, .beatRange): return {
-        guard case .beatRange(let l) = lhs, case .beatRange(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .beatRange(let l) = lhs, case .beatRange(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.normalizationValue, .normalizationValue): return {
-        guard case .normalizationValue(let l) = lhs, case .normalizationValue(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .normalizationValue(let l) = lhs, case .normalizationValue(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.normalizationRationalValue, .normalizationRationalValue): return {
-        guard case .normalizationRationalValue(let l) = lhs, case .normalizationRationalValue(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .normalizationRationalValue(let l) = lhs, case .normalizationRationalValue(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.notesValue, .notesValue): return {
-        guard case .notesValue(let l) = lhs, case .notesValue(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .notesValue(let l) = lhs, case .notesValue(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.stereo, .stereo): return {
-        guard case .stereo(let l) = lhs, case .stereo(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .stereo(let l) = lhs, case .stereo(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.tone, .tone): return {
-        guard case .tone(let l) = lhs, case .tone(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .tone(let l) = lhs, case .tone(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       case (.envelope, .envelope): return {
-        guard case .envelope(let l) = lhs, case .envelope(let ɾ) = rhs else { preconditionFailure() }
-        return l == ɾ
+        guard case .envelope(let l) = lhs, case .envelope(let r) = rhs else { preconditionFailure() }
+        return l == r
       }()
       default: return false
       }
@@ -5452,6 +5457,7 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
     3: .same(proto: "beatRange"),
     7: .same(proto: "envelope"),
     9: .same(proto: "id"),
+    10: .same(proto: "isShownTone"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -5465,6 +5471,7 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
       case 3: try { try decoder.decodeSingularMessageField(value: &self._beatRange) }()
       case 7: try { try decoder.decodeSingularMessageField(value: &self._envelope) }()
       case 9: try { try decoder.decodeSingularMessageField(value: &self._id) }()
+      case 10: try { try decoder.decodeSingularBoolField(value: &self.isShownTone) }()
       default: break
       }
     }
@@ -5490,6 +5497,9 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
     try { if let v = self._id {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
     } }()
+    if self.isShownTone != false {
+      try visitor.visitSingularBoolField(value: self.isShownTone, fieldNumber: 10)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5499,6 +5509,7 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
     if lhs._beatRange != rhs._beatRange {return false}
     if lhs._envelope != rhs._envelope {return false}
     if lhs._id != rhs._id {return false}
+    if lhs.isShownTone != rhs.isShownTone {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -6971,36 +6982,70 @@ extension PBNoteIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
     2: .same(proto: "index"),
   ]
 
+  fileprivate class _StorageClass {
+    var _value: PBNote? = nil
+    var _index: Int64 = 0
+
+    static let defaultInstance = _StorageClass()
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _value = source._value
+      _index = source._index
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._value) }()
-      case 2: try { try decoder.decodeSingularInt64Field(value: &self.index) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._value) }()
+        case 2: try { try decoder.decodeSingularInt64Field(value: &_storage._index) }()
+        default: break
+        }
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._value {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    if self.index != 0 {
-      try visitor.visitSingularInt64Field(value: self.index, fieldNumber: 2)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      try { if let v = _storage._value {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+      } }()
+      if _storage._index != 0 {
+        try visitor.visitSingularInt64Field(value: _storage._index, fieldNumber: 2)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: PBNoteIndexValue, rhs: PBNoteIndexValue) -> Bool {
-    if lhs._value != rhs._value {return false}
-    if lhs.index != rhs.index {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._value != rhs_storage._value {return false}
+        if _storage._index != rhs_storage._index {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

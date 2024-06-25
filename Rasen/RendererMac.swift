@@ -1603,6 +1603,14 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
+        
+        menu.addItem(SubNSMenuItem(title: "test".localized, closure: { [weak self] in
+            guard let self else { return }
+            self.isEnabledPinch = !self.isEnabledPinch
+            self.isEnabledScroll = !self.isEnabledScroll
+            self.isEnabledRotate = !self.isEnabledRotate
+        }))
+        
         if System.isVersion3 {
             menu.addItem(NSMenuItem.separator())
             menu.addItem(SubNSMenuItem(title: "Show About Run".localized, closure: { [weak self] in
@@ -1762,11 +1770,10 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     var isEnabledScroll = true
     var isEnabledPinch = true
     var isEnabledRotate = true
-    var isEnabledSwipe = false
-    var isEnabledPlay = false
+    var isEnabledSwipe = true
+    var isEnabledPlay = true
     
-    var isBeganScroll = false, oldScrollPosition: Point?,
-        allScrollPosition = Point()
+    var isBeganScroll = false, oldScrollPosition: Point?, allScrollPosition = Point()
     var isBeganPinch = false, oldPinchDistance: Double?
     var isBeganRotate = false, oldRotateAngle: Double?
     var isPreparePlay = false
@@ -1880,6 +1887,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                                          magnification: magnification.mid(lastMagnification),
                                          phase: .changed))
                     pinchVs.append((magnification, event.timestamp))
+//                    print("A", magnification)
                     self.oldPinchDistance = nPinchDistance
                     lastMagnification = magnification
                 } else if isEnabledScroll && !(isSubDrag && isSubTouth)
@@ -2248,11 +2256,15 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         guard !isEnabledPinch else { return }
         if nsEvent.phase.contains(.began) {
             blockGesture = .pinch
+            pinchVs = []
             document.pinch(pinchEventWith(nsEvent, .began))
         } else if nsEvent.phase.contains(.ended) {
             blockGesture = .none
             document.pinch(pinchEventWith(nsEvent, .ended))
+            pinchVs = []
         } else if nsEvent.phase.contains(.changed) {
+            pinchVs.append((Double(nsEvent.magnification), nsEvent.timestamp))
+//            print("B", Double(nsEvent.magnification))
             document.pinch(pinchEventWith(nsEvent, .changed))
         }
     }

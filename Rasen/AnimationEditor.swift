@@ -301,19 +301,23 @@ final class KeyframeSwiper: SwipeEditor {
                 let iit = ii - ii.rounded(.down)
                 let si = nRootI
                 let ei = animationView.model.rootIndex(atRootInter: ni + 1)
-                let nni = Int.linear(si, ei, t: iit)
-                if nni != interpolatedRootIndex {
-                    interpolatedRootIndex = nni
-                    let nnni = animationView.model.index(atRoot: nni)
-                    if !animationView.model.keyframes[nnni].isEmptyNotKey {
-                        let node = animationView.elementViews[nnni].linesView.node.clone
-                        node.children.forEach { $0.lineType = .color(.subInterpolated) }
-                        interpolatedNode.children = [node]
-                        if interpolatedNode.parent == nil {
-                            sheetView.node.append(child: interpolatedNode)
+                if abs(ei - si) <= 1 {
+                    interpolatedNode.children = []
+                } else {
+                    let nni = Int.linear(si, ei, t: iit)
+                    if nni != interpolatedRootIndex {
+                        interpolatedRootIndex = nni
+                        let nnni = animationView.model.index(atRoot: nni)
+                        if !animationView.model.keyframes[nnni].isKeyWhereAllLines {
+                            let node = animationView.elementViews[nnni].linesView.node.clone
+                            node.children.forEach { $0.lineType = .color(.subInterpolated) }
+                            interpolatedNode.children = [node]
+                            if interpolatedNode.parent == nil {
+                                sheetView.node.append(child: interpolatedNode)
+                            }
+                        } else {
+                            interpolatedNode.children = []
                         }
-                    } else {
-                        interpolatedNode.children = []
                     }
                 }
                 
@@ -444,19 +448,23 @@ final class KeyframeSlider: DragEditor {
                 let iit = ii - ii.rounded(.down)
                 let si = nRootI
                 let ei = animationView.model.rootIndex(atRootInter: ni + 1)
-                let nni = Int.linear(si, ei, t: iit)
-                if nni != interpolatedRootIndex {
-                    interpolatedRootIndex = nni
-                    let nnni = animationView.model.index(atRoot: nni)
-                    if !animationView.model.keyframes[nnni].isEmptyNotKey {
-                        let node = animationView.elementViews[nnni].linesView.node.clone
-                        node.children.forEach { $0.lineType = .color(.subInterpolated) }
-                        interpolatedNode.children = [node]
-                        if interpolatedNode.parent == nil {
-                            sheetView.node.append(child: interpolatedNode)
+                if abs(ei - si) <= 1 {
+                    interpolatedNode.children = []
+                } else {
+                    let nni = Int.linear(si, ei, t: iit)
+                    if nni != interpolatedRootIndex {
+                        interpolatedRootIndex = nni
+                        let nnni = animationView.model.index(atRoot: nni)
+                        if !animationView.model.keyframes[nnni].isKeyWhereAllLines {
+                            let node = animationView.elementViews[nnni].linesView.node.clone
+                            node.children.forEach { $0.lineType = .color(.subInterpolated) }
+                            interpolatedNode.children = [node]
+                            if interpolatedNode.parent == nil {
+                                sheetView.node.append(child: interpolatedNode)
+                            }
+                        } else {
+                            interpolatedNode.children = []
                         }
-                    } else {
-                        interpolatedNode.children = []
                     }
                 }
                 
@@ -756,7 +764,9 @@ final class Player: InputKeyEditor {
                     cSheetView.topSheetView = aSheetView
                 }
                 
-                if !document.containsAllTimeline(with: event) {
+                if !(document.containsAllTimelines(with: event)
+                    || (!cSheetView.model.enabledAnimation && cSheetView.model.enabledMusic)) {
+                    
                     cSheetView.play()
                 } else {
                     let sheetP = cSheetView.convertFromWorld(p)
@@ -764,7 +774,7 @@ final class Player: InputKeyEditor {
                     var secRange: Range<Rational>?
                     var sec: Rational = cSheetView.animationView.sec(atX: sheetP.x)
                     let scoreView = cSheetView.scoreView
-                    if let scoreNoder = scoreView.scoreNoder {
+                    if scoreView.model.enabled, let scoreNoder = scoreView.scoreNoder {
                         let scoreP = scoreView.convertFromWorld(p)
                         let score = scoreView.model
                         if let (noteI, pitI) = scoreView.noteAndPitI(at: scoreP, scale: document.screenToWorldScale) {
@@ -1508,7 +1518,7 @@ final class LineSlider: DragEditor {
                             
                             line.controls[pointIndex].point = np
                             
-                            if isPressure || (!isPressure && (event.time - (pressures.first?.time ?? 0) > 1 && !pressures.contains(where: { $0.pressure > 0.5 }))) {
+                            if isPressure || (!isPressure && (event.time - (pressures.first?.time ?? 0) > 1 && (pressures.allSatisfy { $0.pressure <= 0.5 }))) {
                                 isPressure = true
                                 
                                 let nPressures = pressures
@@ -1899,7 +1909,7 @@ final class KeyframeInserter: InputKeyEditor {
                             let pit = scoreView.splittedPit(at: scoreP, at: noteI,
                                                             beatInterval: document.currentNoteBeatInterval,
                                                             pitchInterval: document.currentNotePitchInterval)
-                            if !pits.contains(where: { $0.beat == pit.beat }) {
+                            if pits.allSatisfy({ $0.beat != pit.beat }) {
                                 pits.append(pit)
                                 pits.sort { $0.beat < $1.beat }
                                 var note = score.notes[noteI]

@@ -41,6 +41,11 @@ extension Range {
         let maxV = Swift.min(upperBound, other.upperBound)
         return minV < maxV ? minV ..< maxV : nil
     }
+    func formUnion(_ other: Self) -> Self {
+        let minV = Swift.min(lowerBound, other.lowerBound)
+        let maxV = Swift.max(upperBound, other.upperBound)
+        return minV ..< maxV
+    }
 }
 extension Range where Bound: SignedNumeric {
     init(start: Bound, length: Bound) {

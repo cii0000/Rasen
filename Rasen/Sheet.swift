@@ -1481,8 +1481,8 @@ extension Keyframe {
     var isEmpty: Bool {
         picture.isEmpty && draftPicture.isEmpty
     }
-    var isEmptyNotKey: Bool {
-        !(picture.lines.contains { $0.interType != .key })
+    var isKeyWhereAllLines: Bool {
+        picture.lines.allSatisfy { $0.interType == .key }
     }
     var containsInterpolated: Bool {
         picture.lines.contains { $0.interType == .interpolated }
@@ -2386,7 +2386,9 @@ extension Sheet {
     
     var musicDurBeat: Rational {
         var v = Rational(0)
-        v = max(v, score.beatRange.upperBound)
+        if score.enabled {
+            v = max(v, score.beatRange.upperBound)
+        }
         v = contents.reduce(into: v) {
             if let timeOption = $1.timeOption {
                 $0 = max($0, timeOption.beatRange.upperBound)
@@ -2401,7 +2403,9 @@ extension Sheet {
     }
     var musicDurSec: Rational {
         var v = Rational(0)
-        v = max(v, score.secRange.upperBound)
+        if score.enabled {
+            v = max(v, score.secRange.upperBound)
+        }
         v = contents.reduce(into: v) {
             if let timeOption = $1.timeOption {
                 $0 = max($0, timeOption.secRange.upperBound)

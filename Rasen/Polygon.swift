@@ -1092,7 +1092,7 @@ extension Topolygon {
     }
     
     var isEmpty: Bool {
-        polygon.isEmpty && (holePolygons.isEmpty || !(holePolygons.contains { !$0.isEmpty }))
+        polygon.isEmpty && (holePolygons.isEmpty || holePolygons.allSatisfy { $0.isEmpty })
     }
     var bounds: Rect? {
         polygon.bounds

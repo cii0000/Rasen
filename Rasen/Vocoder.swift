@@ -243,22 +243,22 @@ struct Pitbend: Codable, Hashable {
         let firstPitch = pitchs.first!
         self.firstPitch = firstPitch
         firstFqScale = .exp2(firstPitch)
-        isEqualAllPitch = !(pitchs.contains { $0 != firstPitch })
+        isEqualAllPitch = pitchs.allSatisfy { $0 == firstPitch }
         pitchInterpolation = interpolation(isAll: isEqualAllPitch, pitchs)
         
         let firstStereo = stereos.first!
         self.firstStereo = firstStereo
-        isEqualAllStereo = !(stereos.contains { $0 != firstStereo })
+        isEqualAllStereo = stereos.allSatisfy { $0 == firstStereo }
         stereoInterpolation = interpolation(isAll: isEqualAllStereo, stereos)
         
         let firstOvertone = overtones.first!
         self.firstOvertone = firstOvertone
-        isEqualAllOvertone = !(overtones.contains { $0 != firstOvertone })
+        isEqualAllOvertone = overtones.allSatisfy { $0 == firstOvertone }
         overtoneInterpolation = interpolation(isAll: isEqualAllOvertone, overtones)
         
         let firstSpectlope = spectlopes.first!
         self.firstSpectlope = firstSpectlope
-        isEqualAllSpectlope = !(spectlopes.contains { $0 != firstSpectlope })
+        isEqualAllSpectlope = spectlopes.allSatisfy { $0 == firstSpectlope }
         spectlopeInterpolation = interpolation(isAll: isEqualAllSpectlope, spectlopes)
     }
     init(pitch: Double, stereo: Stereo, overtone: Overtone, spectlope: Spectlope) {
@@ -320,11 +320,11 @@ extension Pitbend {
     var isFullNoise: Bool {
         isEqualAllSpectlope ?
         firstSpectlope.isFullNoise :
-        !spectlopeInterpolation.keys.contains { !$0.value.isFullNoise }
+        spectlopeInterpolation.keys.allSatisfy { $0.value.isFullNoise }
     }
     var isOne: Bool {
         isEqualAllOvertone ?
-        firstOvertone.isOne : !overtoneInterpolation.keys.contains { !$0.value.isOne }
+        firstOvertone.isOne : overtoneInterpolation.keys.allSatisfy { $0.value.isOne }
     }
     var isEqualAllWithoutStereo: Bool {
         isEqualAllPitch && isEqualAllOvertone && isEqualAllSpectlope
@@ -384,7 +384,7 @@ extension Rendnote {
     func notewave(stftCount: Int = 1024, fAlpha: Double = 1, rmsSize: Int = 2048,
                   cutFq: Double = 16384, cutStartFq: Double = 15800, sampleRate: Double,
                   fftCount: Int = 65536) -> Notewave {
-        let date = Date()
+//        let date = Date()
         
         let notewave = aNotewave(stftCount: stftCount, fAlpha: fAlpha, rmsSize: rmsSize,
                                  cutFq: cutFq, 
@@ -622,8 +622,6 @@ extension Rendnote {
                     let loudnessVolm = Loudness.volm40Phon(fromFq: nFq)
                     
                     let spectlopeVolm = spectlope.noisedVolm(atFq: nFq)
-                    nFq - fq / 2 ... nFq + fq / 2
-                    
                     let cutScale = nFq.clipped(min: cutStartFq, max: cutFq, newMin: 1, newMax: 0)
                     let overtoneScale = isAll || n == 1 ? (sign ? 1 : -1) : (sign ? oddScale : evenScale)
                     let sqfa = Double(n) ** sqfa
@@ -826,8 +824,6 @@ extension Rendnote {
                         let loudnessVolm = Loudness.volm40Phon(fromFq: fq)
                         
                         let spectlopeVolm = spectlope.noisedVolm(atFq: fq)
-                        fq - frame.fq / 2 ... fq + frame.fq / 2
-                        
                         let overtoneScale = isEqualAllOvertone ?
                         (isAll || n == 1 ? (sign ? 1 : -1) : (sign ? oddScale : evenScale)) :
                         (n == 1 ? 1 : (sign ? oddScales[i] : evenScales[i]))

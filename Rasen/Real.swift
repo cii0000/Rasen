@@ -238,7 +238,9 @@ extension Double {
     var isInteger: Bool {
         Int(exactly: self) != nil
     }
-    func string(digitsCount: Int) -> String {
+    func string(digitsCount: Int, enabledZeroInteger: Bool = true) -> String {
+        !enabledZeroInteger && self.isInteger ?
+        "\(Int(self))" :
         String(format: "%.\(digitsCount)f", self)
     }
     

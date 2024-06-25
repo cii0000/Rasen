@@ -160,6 +160,47 @@ final class ScoreAdder: InputKeyEditor {
     }
 }
 
+final class ToneShower: InputKeyEditor {
+    let document: Document
+    let isEditingSheet: Bool
+    
+    init(_ document: Document) {
+        self.document = document
+        isEditingSheet = document.isEditingSheet
+    }
+    
+    func send(_ event: InputKeyEvent) {
+        guard isEditingSheet else {
+            document.stop(with: event)
+            return
+        }
+        if document.isPlaying(with: event) {
+            document.stopPlaying(with: event)
+        }
+        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+            ?? event.screenPoint
+        let p = document.convertScreenToWorld(sp)
+        switch event.phase {
+        case .began:
+            document.cursor = .arrow
+            
+            if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+                let inP = sheetView.convertFromWorld(p)
+                if let i = sheetView.scoreView.noteIndex(at: p, scale: document.screenToWorldScale) {
+                    sheetView.scoreView.toneIndexes = [i]
+                } else {
+                    sheetView.scoreView.toneIndexes = []
+                }
+            }
+        case .changed:
+            break
+        case .ended:
+            
+            document.cursor = Document.defaultCursor
+        }
+    }
+}
+
 final class ScoreSlider: DragEditor {
     let document: Document
     let isEditingSheet: Bool
@@ -793,9 +834,15 @@ final class ScoreView: TimelineView {
     let currentPeakVolmNode = Node(lineWidth: 3, lineType: .color(.background))
     let timeNode = Node(lineWidth: 4, lineType: .color(.content))
     
+    var toneIndexes = Set<Int>() {
+        didSet {
+            
+        }
+    }
+    
     var peakVolm = 0.0 {
         didSet {
-            guard peakVolm != oldValue else { return }
+            guard option.enabled, peakVolm != oldValue else { return }
             updateFromPeakVolm()
         }
     }
@@ -836,6 +883,7 @@ final class ScoreView: TimelineView {
     let timelineFullEditBorderNode = Node(isHidden: true, fillType: .color(.border))
     let chordNode = Node(fillType: .color(.subBorder))
     let pitsNode = Node(isHidden: true, fillType: .color(.background))
+    var toneNode = Node(isHidden: true)
     let pitsFullEditNode = Node(isHidden: true, fillType: .color(.background))
     let clippingNode = Node(isHidden: true, lineWidth: 4, lineType: .color(.warning))
     
@@ -852,7 +900,7 @@ final class ScoreView: TimelineView {
                                timelineSubBorderNode, chordNode, octaveNode,
                                timelineContentNode,
                                draftNotesNode, notesNode,
-                               pitsFullEditNode, pitsNode,
+                               pitsFullEditNode, pitsNode, toneNode,
                                timeNode, clippingNode])
         updateClippingNode()
         updateTimeline()
@@ -1452,7 +1500,7 @@ extension ScoreView {
                             ps[j].h *= (ps[j].x - ps[0].x) / (ax - ps[0].x)
                         }
                         let t = ax.clipped(min: preP.x, max: p.x, newMin: 0, newMax: 1)
-                        ps.insert(.init(ax, 
+                        ps.insert(.init(ax,
                                         .linear(preP.y, p.y, t: t),
                                         .linear(preP.h, p.h, t: t),
                                         .rgbLinear(preP.color, p.color, t: t)), at: i)
@@ -1483,32 +1531,36 @@ extension ScoreView {
                 ps[i].h *= susVolm
             }
             
-            linePath = .init(triangleStrip(ps))
-            lineColors = colors(ps)
-            evenLinePath = .init(triangleStrip(eps))
-            evenColors = colors(eps)
-            oddLinePath = .init(triangleStrip(ops))
-            oddColors = colors(ops)
-            
-            let sprolKnobPAndRs: [(Point, Double)] = note.pits.flatMap { pit in
-                let p = Point(x(atBeat: note.beatRange.start + pit.beat),
-                              self.y(fromPitch: note.pitch + pit.pitch))
-                return pit.tone.spectlope.sprols.enumerated().map {
-                    (Point(p.x, tonePitchY(fromPitch: $0.element.pitch, noteY: p.y)),
-                     $0.offset > 0 && pit.tone.spectlope.sprols[$0.offset - 1].pitch > $0.element.pitch ? sprolSubR : sprolR)
-                }
-            }
             let envelopeY = -nh / 2
             knobPs = note.pits.map { .init(x(atBeat: note.beatRange.start + $0.beat),
-                                           self.y(fromPitch: note.pitch + $0.pitch)) }
+                                           y(fromPitch: note.pitch + $0.pitch)) }
 //            let toneKnobY = evenY.mid(oddY)
-            smallKnobPAndRs = [(Point(ax, noteY(atX: ax, from: note) + envelopeY), envelopeR),
-                               (Point(dx, noteY(atX: dx, from: note) + envelopeY), envelopeR),
-                               (Point(rx, noteY(atX: rx, from: note) + envelopeY), envelopeR)] 
-            + sprolKnobPAndRs
-            + knobPs.map { (Point($0.x, self.toneY(at: $0, from: note) - toneH / 2 + evenY.mid(oddY)), toneR) }
+            let smallEnvelopeKnobPAndRs = [(Point(ax, noteY(atX: ax, from: note) + envelopeY), envelopeR),
+                                           (Point(dx, noteY(atX: dx, from: note) + envelopeY), envelopeR),
+                                           (Point(rx, noteY(atX: rx, from: note) + envelopeY), envelopeR)]
+            
+            linePath = .init(triangleStrip(ps))
+            lineColors = colors(ps)
             
             if !note.isOneOvertone {
+                evenLinePath = .init(triangleStrip(eps))
+                evenColors = colors(eps)
+                oddLinePath = .init(triangleStrip(ops))
+                oddColors = colors(ops)
+                
+                let sprolKnobPAndRs: [(Point, Double)] = note.pits.flatMap { pit in
+                    let p = Point(x(atBeat: note.beatRange.start + pit.beat),
+                                  y(fromPitch: note.pitch + pit.pitch))
+                    return pit.tone.spectlope.sprols.enumerated().map {
+                        (Point(p.x, tonePitchY(fromPitch: $0.element.pitch, noteY: p.y)),
+                         $0.offset > 0 && pit.tone.spectlope.sprols[$0.offset - 1].pitch > $0.element.pitch ? sprolSubR : sprolR)
+                    }
+                }
+                
+                smallKnobPAndRs = smallEnvelopeKnobPAndRs
+                + sprolKnobPAndRs
+                + knobPs.map { (Point($0.x, self.toneY(at: $0, from: note) - toneH / 2 + evenY.mid(oddY)), toneR) }
+                
                 struct PAndColor: Hashable {
                     var p: Point, color: Color
                     
@@ -1602,6 +1654,12 @@ extension ScoreView {
                 }
                 
                 spectlopePathline = .init(fqLinePs)
+            } else {
+                evenLinePath = .init()
+                evenColors = []
+                oddLinePath = .init()
+                oddColors = []
+                smallKnobPAndRs = smallEnvelopeKnobPAndRs
             }
         } else {
             let sustainHalfH = halfNH * note.envelope.sustainVolm
@@ -1613,26 +1671,28 @@ extension ScoreView {
                                             .init(rx, ny, 0, color)]))
             lineColors = [color]
             
-            evenLinePath = .init(Rect(x: nx, y: toneY - toneH / 2 + evenY - overtoneHalfH,
-                                      width: nw, height: overtoneHalfH * 2))
-            evenColors = [Self.color(fromVolm: note.firstTone.overtone.evenVolm)]
-            
-            oddLinePath = .init(Rect(x: nx, y: toneY - toneH / 2 + oddY - overtoneHalfH,
-                                     width: nw, height: overtoneHalfH * 2))
-            oddColors = [Self.color(fromVolm: note.firstTone.overtone.oddVolm)]
-            
-            let fPitNx = x(atBeat: note.beatRange.start + note.firstPit.beat)
-            let sprolKnobPAndRs = note.firstTone.spectlope.sprols.enumerated().map {
-                (Point(fPitNx, tonePitchY(fromPitch: $0.element.pitch, noteY: ny)),
-                 $0.offset > 0 && note.firstTone.spectlope.sprols[$0.offset - 1].pitch > $0.element.pitch ? sprolSubR : sprolR)
-            }
             let envelopeY = ny - nh / 2
-            smallKnobPAndRs = [(Point(ax, envelopeY), envelopeR),
-                               (Point(dx, envelopeY), envelopeR),
-                               (Point(rx, envelopeY), envelopeR)] + sprolKnobPAndRs
+            let smallEnvelopeKnobPAndRs = [(Point(ax, envelopeY), envelopeR),
+                                           (Point(dx, envelopeY), envelopeR),
+                                           (Point(rx, envelopeY), envelopeR)]
             knobPs = []
             
             if !note.isOneOvertone {
+                evenLinePath = .init(Rect(x: nx, y: toneY - toneH / 2 + evenY - overtoneHalfH,
+                                          width: nw, height: overtoneHalfH * 2))
+                evenColors = [Self.color(fromVolm: note.firstTone.overtone.evenVolm)]
+                
+                oddLinePath = .init(Rect(x: nx, y: toneY - toneH / 2 + oddY - overtoneHalfH,
+                                         width: nw, height: overtoneHalfH * 2))
+                oddColors = [Self.color(fromVolm: note.firstTone.overtone.oddVolm)]
+                
+                let fPitNx = x(atBeat: note.beatRange.start + note.firstPit.beat)
+                let sprolKnobPAndRs = note.firstTone.spectlope.sprols.enumerated().map {
+                    (Point(fPitNx, tonePitchY(fromPitch: $0.element.pitch, noteY: ny)),
+                     $0.offset > 0 && note.firstTone.spectlope.sprols[$0.offset - 1].pitch > $0.element.pitch ? sprolSubR : sprolR)
+                }
+                
+                smallKnobPAndRs = smallEnvelopeKnobPAndRs + sprolKnobPAndRs
                 var preY = tonePitchY(fromPitch: 0, noteY: ny)
                 var preColor = Self.color(fromVolm: note.firstTone.spectlope.sprols.first?.volm ?? 0,
                                           noise: note.firstTone.spectlope.sprols.first?.noise ?? 0)
@@ -1659,6 +1719,12 @@ extension ScoreView {
                 
                 let fqY = tonePitchY(fromPitch: .init(note.firstPitch), noteY: ny)
                 spectlopePathline = .init([Point(nx, fqY), Point(nx + nw, fqY)])
+            } else {
+                evenLinePath = .init()
+                evenColors = []
+                oddLinePath = .init()
+                oddColors = []
+                smallKnobPAndRs = smallEnvelopeKnobPAndRs
             }
         }
         
@@ -1666,8 +1732,15 @@ extension ScoreView {
         let lineNode = Node(path: linePath,
                             fillType: color != nil ? .color(color!) : (lineColors.count == 1 ? .color(lineColors[0]) : .gradient(lineColors)))
         nodes.append(lineNode)
-        nodes.append(.init(path: .init(pointline(from: note).points),
-                           lineWidth: 0.125, lineType: .color(.content)))
+        let mainLinePoints = pointline(from: note).points
+        let lmly = mainLinePoints.last?.y ?? ny
+        let mainLineColor = note.isOneOvertone ?
+        Color(lightness: 50, nearestChroma: 1000, hue: .pi / 2) :
+        Self.color(fromVolm: 1, noise: note.noiseRatio)
+        nodes.append(.init(path: .init([Point(nx + nw, lmly), Point(rx, lmly)]),
+                           lineWidth: 0.125, lineType: .color(mainLineColor)))
+        nodes.append(.init(path: .init(mainLinePoints + [Point(nx + nw, lmly)]),
+                           lineWidth: 0.5, lineType: .color(mainLineColor)))
         
         nodes.append(.init(path: evenLinePath,
                            fillType: color != nil ? .color(color!) : (evenColors.count == 1 ? .color(evenColors[0]) : .gradient(evenColors))))
@@ -1702,7 +1775,7 @@ extension ScoreView {
                            path: .init(fullEditKnobPathlines), fillType: .color(.background)))
         
         let boundingBox = nodes.reduce(into: Rect?.none) { $0 += $1.drawableBounds }
-        return Node(children: nodes, 
+        return Node(children: nodes,
                     path: boundingBox != nil ? Path(boundingBox!) : .init(Rect(origin: .init(nx, ny))))
     }
     
@@ -1819,7 +1892,7 @@ extension ScoreView {
     }
     
     func containsMainFrame(_ p: Point) -> Bool {
-        mainFrame.contains(p)
+        model.enabled ? mainFrame.contains(p) : false
     }
     func containsTimeline(_ p : Point) -> Bool {
         model.enabled ? timelineFrame.contains(p) : false
@@ -1886,6 +1959,10 @@ extension ScoreView {
         }
         return minI
     }
+    
+//    func containsTone(at p: Point, at i: Int) -> Bool {
+//        
+//    }
     
     enum FullEditHitResult {
         case attack

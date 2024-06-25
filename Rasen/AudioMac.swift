@@ -368,6 +368,10 @@ final class ScoreNoder {
     
     var rendnotes = [Rendnote]()
     
+    var isEmpty: Bool {
+        rendnotes.isEmpty || durSec == 0
+    }
+    
     func changeTempo(with score: Score) {
         replace(score.notes.enumerated().map { .init(value: $0.element, index: $0.offset) },
                 with: score)
@@ -731,7 +735,7 @@ final class Sequencer {
             }
         }
         var isEmpty: Bool {
-            durSec == 0
+            durSec == 0 || (scoreNoders.allSatisfy { $0.isEmpty } && pcmNoders.isEmpty)
         }
     }
     

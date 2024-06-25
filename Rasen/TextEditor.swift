@@ -266,13 +266,7 @@ final class Looker: InputKeyEditor {
                         let notes = nis.map { score.notes[$0] }
                         var fpr = notes[0].pitchRange
                         for i in 1 ..< notes.count {
-                            let range = notes[i].pitchRange
-                            if fpr.start < range.start {
-                                fpr.start = range.start
-                            }
-                            if fpr.end > range.end {
-                                fpr.end = range.end
-                            }
+                            fpr = fpr.formUnion(notes[i].pitchRange)
                         }
                         let startPitch = Pitch(value: fpr.start)
                         let endPitch = Pitch(value: fpr.end)

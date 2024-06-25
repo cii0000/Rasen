@@ -595,11 +595,11 @@ final class CopyEditor: Editor {
             switch orientation {
             case .horizontal:
                  [202,
+                  242,
                   sb.height - 202,
+                  sb.height - 242,
                   (sb.height / 4).rounded(),
-                  (sb.height / 3).rounded(),
                   (sb.height / 2).rounded(),
-                  (2 * sb.height / 3).rounded(),
                   (3 * sb.height / 4).rounded()].sorted()
             case .vertical:
                  [43,
@@ -1588,14 +1588,11 @@ final class CopyEditor: Editor {
                textView.textOrientation == oldBorder.orientation.reversed(),
                let frame = textView.model.frame {
                 let f = frame + sb.origin
-                let edge: Edge
-                switch textView.model.orientation {
+                let edge = switch textView.model.orientation {
                 case .horizontal:
-                    edge = Edge(Point(f.minX + x, f.minY),
-                                Point(f.minX + x, f.maxY))
+                    Edge(Point(f.minX + x, f.minY), Point(f.minX + x, f.maxY))
                 case .vertical:
-                    edge = Edge(Point(f.minX, f.maxY - x),
-                                Point(f.maxX, f.maxY - x))
+                    Edge(Point(f.minX, f.maxY - x), Point(f.maxX, f.maxY - x))
                 }
                 snapLineNode.children = []
                 selectingLineNode.path = Path([Pathline(edge)])
@@ -1639,13 +1636,53 @@ final class CopyEditor: Editor {
                                          oldBorder: oldBorder)
             isSnapped = bnp.isSnapped
             let np = bnp.point + sb.origin
+            var nBorder = oldBorder
             switch oldBorder.orientation {
             case .horizontal:
                 selectingLineNode.path = Path([Pathline([Point(sb.minX, np.y),
                                                          Point(sb.maxX, np.y)])])
+                nBorder.location = np.y - sb.minY
             case .vertical:
                 selectingLineNode.path = Path([Pathline([Point(np.x, sb.minY),
                                                          Point(np.x, sb.maxY)])])
+                nBorder.location = np.x - sb.minX
+            }
+            if let sheetView {
+                let borders = sheetView.model.borders + [nBorder]
+                if borders.count == 4 && borders.reduce(0, { $0 + ($1.orientation == .horizontal ? 1 : 0) }) == 2 {
+                    var xs = [Double](), ys = [Double]()
+                    func append(border: Border) {
+                        if border.orientation == .horizontal {
+                            ys.append(border.location)
+                        } else {
+                            xs.append(border.location)
+                        }
+                    }
+                    borders.forEach { append(border: $0) }
+                    let nxs = xs.sorted(), nys = ys.sorted()
+                    let width = nxs[1] - nxs[0], height = nys[1] - nys[0]
+                    let widthStr = width.string(digitsCount: 1, enabledZeroInteger: false)
+                    let heightStr = height.string(digitsCount: 1, enabledZeroInteger: false)
+                    document.cursor = if width == 426 && height == 320 {
+                        document.cursor(from: "\(widthStr) x \(heightStr) (4:3)")
+                    } else if (width == 426 && height == 240) || (width == 800 && height == 450) {
+                        document.cursor(from: "\(widthStr) x \(heightStr) (16:9)")
+                    } else {
+                        document.cursor(from: "\(widthStr) x \(heightStr)")
+                    }
+                } else {
+                    let nString = nBorder.location.string(digitsCount: 1, enabledZeroInteger: false)
+                    document.cursor = switch nBorder.orientation {
+                    case .horizontal: document.cursor(from: nString)
+                    case .vertical: document.cursor(from: nString)
+                    }
+                }
+            } else {
+                let nString = nBorder.location.string(digitsCount: 1, enabledZeroInteger: false)
+                document.cursor = switch nBorder.orientation {
+                case .horizontal: document.cursor(from: nString)
+                case .vertical: document.cursor(from: nString)
+                }
             }
         }
         func updateIDs(_ ids: [InterOption]) {

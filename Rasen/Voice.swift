@@ -1195,7 +1195,6 @@ struct Mora: Hashable, Codable {
         
         var kffs = [KeyFormantFilter]()
         
-        let nextFf = youonKffs.first?.formantFilter ?? vowelFf
         let onsetDurSec: Double
         if phonemes.count != 1 {
             onsetDurSec = 0

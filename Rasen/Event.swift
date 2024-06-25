@@ -329,6 +329,7 @@ extension Quasimode {
     static let playDrag = Quasimode(.otherDrag)
     static let play = Quasimode(modifier: [.control], .click)
     static let addScore = Quasimode(modifier: [.command], .no3)
+    static let showTone = Quasimode(modifier: [.command], .click)
     
     static let selectVersion = Quasimode(modifier: [.control, .shift], .drag)
     

@@ -412,13 +412,13 @@ extension Spectlope {
         sprols.isEmpty
     }
     var isEmptyVolm: Bool {
-        !sprols.contains { $0.volm > 0 }
+        sprols.allSatisfy { $0.volm == 0 }
     }
     var count: Int {
         sprols.count
     }
     var isFullNoise: Bool {
-        !sprols.contains { $0.noise != 1 }
+        sprols.allSatisfy { $0.noise == 1 }
     }
     var containsNoise: Bool {
         sprols.contains { $0.noise > 0 }
@@ -514,6 +514,19 @@ extension Spectlope {
     }
     func noisedVolm(atFq fq: Double) -> Double {
         noisedVolm(atPitch: Pitch.pitch(fromFq: fq))
+    }
+    
+    var sumVolm: Double {
+        (1 ..< sprols.count).sum {
+            let dPitch = sprols[$0].pitch - sprols[$0 - 1].pitch
+            return (sprols[$0].volm + sprols[$0 - 1].volm) * dPitch / 2
+        }
+    }
+    var sumNoiseVolm: Double {
+        (1 ..< sprols.count).sum {
+            let dPitch = sprols[$0].pitch - sprols[$0 - 1].pitch
+            return (sprols[$0].volm * sprols[$0].noise + sprols[$0 - 1].volm * sprols[$0 - 1].noise) * dPitch / 2
+        }
     }
     
     var formants: [Formant] {
@@ -752,7 +765,7 @@ extension Tone: MonoInterpolatable {
 }
 
 struct Pit: Codable, Hashable {
-    var beat = Rational(0), pitch = Rational(0), stereo = Stereo(volm: 0.25), tone = Tone(), lyric = ""
+    var beat = Rational(0), pitch = Rational(0), stereo = Stereo(volm: 0.25), odd = 0.0, tone = Tone(), lyric = ""
 }
 extension Pit: Protobuf {
     init(_ pb: PBPit) throws {
@@ -823,8 +836,9 @@ struct Note {
     var pitch = Rational(0)
     var pits = [Pit()]
     var envelope = Envelope()
-    var toneY = 0.0
+//    var isOneOvertone = false
     var id = UUID()
+    var isShownTone = false
 }
 extension Note: Protobuf {
     init(_ pb: PBNote) throws {
@@ -836,6 +850,7 @@ extension Note: Protobuf {
         }
         envelope = (try? Envelope(pb.envelope)) ?? .init()
         id = (try? UUID(pb.id)) ?? UUID()
+        isShownTone = pb.isShownTone
     }
     var pb: PBNote {
         .with {
@@ -844,6 +859,7 @@ extension Note: Protobuf {
             $0.pits = pits.map { $0.pb }
             $0.envelope = envelope.pb
             $0.id = id.pb
+            $0.isShownTone = isShownTone
         }
     }
 }
@@ -871,6 +887,16 @@ extension Note {
     }
     var containsNoise: Bool {
         pits.contains(where: { $0.tone.spectlope.sprols.contains(where: { $0.noise > 0 }) })
+    }
+    
+    var noiseRatio: Double {
+        if pits.count == 1 {
+            let sumVolm = firstTone.spectlope.sumVolm
+            return sumVolm == 0 ? 0 : firstTone.spectlope.sumNoiseVolm / sumVolm
+        } else {
+            let sumVolm = pits.sum { $0.tone.spectlope.sumVolm }
+            return sumVolm == 0 ? 0 : pits.sum { $0.tone.spectlope.sumNoiseVolm } / sumVolm
+        }
     }
     
     func pitsEqualSpectlopeCount() -> [Pit] {
@@ -1004,19 +1030,19 @@ extension Note {
         pits.isEmpty
     }
     var isEmptyPitch: Bool {
-        !pits.contains(where: { $0.pitch != 0 })
+        pits.allSatisfy { $0.pitch == 0 }
     }
     var isEmptyStereo: Bool {
-        !pits.contains(where: { !$0.stereo.isEmpty })
+        pits.allSatisfy { $0.stereo.isEmpty }
     }
     var isEmptyVolm: Bool {
-        !pits.contains(where: { $0.stereo.volm != 0 })
+        pits.allSatisfy { $0.stereo.volm == 0 }
     }
     var isEmptyPan: Bool {
-        !pits.contains(where: { $0.stereo.pan != 0 })
+        pits.allSatisfy { $0.stereo.pan == 0 }
     }
     var isOneOvertone: Bool {
-        !pits.contains(where: { !$0.tone.overtone.isOne })
+        pits.allSatisfy { $0.tone.overtone.isOne }
     }
 }
 extension Note {
