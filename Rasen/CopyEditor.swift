@@ -903,7 +903,7 @@ final class CopyEditor: Editor {
             selectingLineNode.lineType = .color(.selected)
             selectingLineNode.lineWidth = document.worldLineWidth
             
-            if let result = scoreView.hitTestFullEdit(scoreP, scale: document.screenToWorldScale, at: noteI) {
+            if let result = scoreView.hitTestControl(scoreP, scale: document.screenToWorldScale, at: noteI) {
                 switch result {
                 case .attack, .decay, .release:
                     let envelope = score.notes[noteI].envelope
@@ -913,7 +913,6 @@ final class CopyEditor: Editor {
                 case .sprol(let pitI, _):
                     let tone = score.notes[noteI].pits[pitI].tone
                     Pasteboard.shared.copiedObjects = [.tone(tone)]
-                    print(FormantFilter(spectlope: tone.spectlope).defaultFormantsString)
                     //
                 }
             } else {
@@ -1206,7 +1205,7 @@ final class CopyEditor: Editor {
             let scoreView = sheetView.scoreView
             let score = scoreView.model
             let scoreP = scoreView.convertFromWorld(p)
-            if let result = scoreView.hitTestFullEdit(scoreP, scale: document.screenToWorldScale, at: noteI) {
+            if let result = scoreView.hitTestControl(scoreP, scale: document.screenToWorldScale, at: noteI) {
                 switch result {
                 case .attack, .decay, .release:
                     let envelope = score.notes[noteI].envelope
@@ -1776,7 +1775,7 @@ final class CopyEditor: Editor {
             }
             
             selectingLineNode.children = notes.map {
-                let node = scoreView.noteNode(from: $0)
+                let node = scoreView.noteNode(from: $0).node
                 node.attitude = Attitude(position: sheetView.convertToWorld(Point()))
                 return node
             }
@@ -3161,7 +3160,7 @@ final class LineColorCopier: InputKeyEditor {
                         let scale = 1 / document.worldToScreenScale
                         let lw = Line.defaultLineWidth
                         let nlw = max(lw * 1.5, lw * 2.5 * scale, 1 * scale)
-                        let noteNode = scoreView.noteNode(from: score.notes[noteI], color: .selected, lineWidth: nlw)
+                        let noteNode = scoreView.noteNode(from: score.notes[noteI], color: .selected, lineWidth: nlw).node
                         noteNode.attitude.position = scoreView.node.convertToWorld(Point())
                         selectingLineNode.children = [noteNode]
                     }

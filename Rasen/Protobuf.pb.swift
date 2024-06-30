@@ -1849,6 +1849,20 @@ struct PBKeyframeOption {
   fileprivate var _beat: PBRational? = nil
 }
 
+struct PBBoolIndexValue {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var value: Bool = false
+
+  var index: Int64 = 0
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 struct PBIntIndexValue {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -2521,6 +2535,18 @@ struct PBInterOptionIndexValueArrayIndexValueArray {
   init() {}
 }
 
+struct PBBoolIndexValueArray {
+  // SwiftProtobuf.Message conformance is added in an extension below. See the
+  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
+  // methods supported on all messages.
+
+  var value: [PBBoolIndexValue] = []
+
+  var unknownFields = SwiftProtobuf.UnknownStorage()
+
+  init() {}
+}
+
 struct PBPlaneIndexValueArray {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -2996,6 +3022,14 @@ struct PBSheetUndoItem {
     set {value = .removeDraftNotes(newValue)}
   }
 
+  var setIsShownTones: PBBoolIndexValueArray {
+    get {
+      if case .setIsShownTones(let v)? = value {return v}
+      return PBBoolIndexValueArray()
+    }
+    set {value = .setIsShownTones(newValue)}
+  }
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   enum OneOf_Value: Equatable {
@@ -3047,6 +3081,7 @@ struct PBSheetUndoItem {
     case setScoreOption(PBScoreOption)
     case insertDraftNotes(PBNoteIndexValueArray)
     case removeDraftNotes(PBInt64Array)
+    case setIsShownTones(PBBoolIndexValueArray)
 
   #if !swift(>=4.1)
     static func ==(lhs: PBSheetUndoItem.OneOf_Value, rhs: PBSheetUndoItem.OneOf_Value) -> Bool {
@@ -3244,6 +3279,10 @@ struct PBSheetUndoItem {
       }()
       case (.removeDraftNotes, .removeDraftNotes): return {
         guard case .removeDraftNotes(let l) = lhs, case .removeDraftNotes(let r) = rhs else { preconditionFailure() }
+        return l == r
+      }()
+      case (.setIsShownTones, .setIsShownTones): return {
+        guard case .setIsShownTones(let l) = lhs, case .setIsShownTones(let r) = rhs else { preconditionFailure() }
         return l == r
       }()
       default: return false
@@ -3853,6 +3892,7 @@ extension PBCornerRectValue: @unchecked Sendable {}
 extension PBCornerRectValueArray: @unchecked Sendable {}
 extension PBFinding: @unchecked Sendable {}
 extension PBKeyframeOption: @unchecked Sendable {}
+extension PBBoolIndexValue: @unchecked Sendable {}
 extension PBIntIndexValue: @unchecked Sendable {}
 extension PBLineIndexValue: @unchecked Sendable {}
 extension PBInterOptionIndexValue: @unchecked Sendable {}
@@ -3886,6 +3926,7 @@ extension PBPlaneIndexValueArrayIndexValueArray: @unchecked Sendable {}
 extension PBInterOptionIndexValueArray: @unchecked Sendable {}
 extension PBInterOptionIndexValueArrayIndexValue: @unchecked Sendable {}
 extension PBInterOptionIndexValueArrayIndexValueArray: @unchecked Sendable {}
+extension PBBoolIndexValueArray: @unchecked Sendable {}
 extension PBPlaneIndexValueArray: @unchecked Sendable {}
 extension PBNoteIndexValueArray: @unchecked Sendable {}
 extension PBTextIndexValueArray: @unchecked Sendable {}
@@ -6735,6 +6776,44 @@ extension PBKeyframeOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
+extension PBBoolIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = "PBBoolIndexValue"
+  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "value"),
+    2: .same(proto: "index"),
+  ]
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeSingularBoolField(value: &self.value) }()
+      case 2: try { try decoder.decodeSingularInt64Field(value: &self.index) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if self.value != false {
+      try visitor.visitSingularBoolField(value: self.value, fieldNumber: 1)
+    }
+    if self.index != 0 {
+      try visitor.visitSingularInt64Field(value: self.index, fieldNumber: 2)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: PBBoolIndexValue, rhs: PBBoolIndexValue) -> Bool {
+    if lhs.value != rhs.value {return false}
+    if lhs.index != rhs.index {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 extension PBIntIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBIntIndexValue"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
@@ -8093,6 +8172,38 @@ extension PBInterOptionIndexValueArrayIndexValueArray: SwiftProtobuf.Message, Sw
   }
 }
 
+extension PBBoolIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+  static let protoMessageName: String = "PBBoolIndexValueArray"
+  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    1: .same(proto: "value"),
+  ]
+
+  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
+    while let fieldNumber = try decoder.nextFieldNumber() {
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every case branch when no optimizations are
+      // enabled. https://github.com/apple/swift-protobuf/issues/1034
+      switch fieldNumber {
+      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.value) }()
+      default: break
+      }
+    }
+  }
+
+  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    if !self.value.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.value, fieldNumber: 1)
+    }
+    try unknownFields.traverse(visitor: &visitor)
+  }
+
+  static func ==(lhs: PBBoolIndexValueArray, rhs: PBBoolIndexValueArray) -> Bool {
+    if lhs.value != rhs.value {return false}
+    if lhs.unknownFields != rhs.unknownFields {return false}
+    return true
+  }
+}
+
 extension PBPlaneIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBPlaneIndexValueArray"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
@@ -8368,6 +8479,7 @@ extension PBSheetUndoItem: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
     49: .same(proto: "setScoreOption"),
     50: .same(proto: "insertDraftNotes"),
     51: .same(proto: "removeDraftNotes"),
+    52: .same(proto: "setIsShownTones"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -8980,6 +9092,19 @@ extension PBSheetUndoItem: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
           self.value = .removeDraftNotes(v)
         }
       }()
+      case 52: try {
+        var v: PBBoolIndexValueArray?
+        var hadOneofValue = false
+        if let current = self.value {
+          hadOneofValue = true
+          if case .setIsShownTones(let m) = current {v = m}
+        }
+        try decoder.decodeSingularMessageField(value: &v)
+        if let v = v {
+          if hadOneofValue {try decoder.handleConflictingOneOf()}
+          self.value = .setIsShownTones(v)
+        }
+      }()
       default: break
       }
     }
@@ -9182,6 +9307,10 @@ extension PBSheetUndoItem: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
     case .removeDraftNotes?: try {
       guard case .removeDraftNotes(let v)? = self.value else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 51)
+    }()
+    case .setIsShownTones?: try {
+      guard case .setIsShownTones(let v)? = self.value else { preconditionFailure() }
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 52)
     }()
     case nil: break
     }

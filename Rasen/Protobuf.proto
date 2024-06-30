@@ -373,6 +373,10 @@ message PBKeyframeOption {
     PBPreviousNext previousNext = 2;
 }
 
+message PBBoolIndexValue {
+    bool value = 1;
+    int64 index = 2;
+}
 message PBIntIndexValue {
     int64 value = 1;
     int64 index = 2;
@@ -505,6 +509,9 @@ message PBInterOptionIndexValueArrayIndexValue {
 message PBInterOptionIndexValueArrayIndexValueArray {
     repeated PBInterOptionIndexValueArrayIndexValue value = 1;
 }
+message PBBoolIndexValueArray {
+    repeated PBBoolIndexValue value = 1;
+}
 message PBPlaneIndexValueArray {
     repeated PBPlaneIndexValue value = 1;
 }
@@ -577,6 +584,7 @@ message PBSheetUndoItem {
         PBScoreOption setScoreOption = 49;
         PBNoteIndexValueArray insertDraftNotes = 50;
         PBInt64Array removeDraftNotes = 51;
+        PBBoolIndexValueArray setIsShownTones = 52;
     }
 }
 message PBWorldUndoItem {

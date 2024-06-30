@@ -972,7 +972,7 @@ final class LineEditor: Editor {
     }
     
     private var isDrawNote = false
-    private var noteSheetView: SheetView?, notePitch: Rational?,
+    private var noteSheetView: SheetView?, notePitch: Rational?, firstTone = Tone(),
                 beganScore: Score?,
                 noteI: Int?, noteStartBeat: Rational?, notePlayer: NotePlayer?
     func drawNote(with event: DragEvent, isStraight: Bool = false) {
@@ -998,10 +998,10 @@ final class LineEditor: Editor {
                 let interval = document.currentNoteBeatInterval
                 let beat = scoreView.beat(atX: inP.x, interval: interval)
                 let beatRange = beat ..< beat
-                let tone = isStraight ? Tone.noise : Tone()
+                firstTone = isStraight ? Tone.empty : Tone.default(pitch: pitch)
                 let note = Note(beatRange: beatRange, pitch: pitch,
-                                pits: .init([.init(beat: 0, pitch: 0, tone: tone)]),
-                                envelope: isStraight ? .init(releaseSec: 0.5) : .init())
+                                pits: .init([.init(beat: 0, pitch: 0, tone: firstTone)]),
+                                envelope: !isStraight && firstTone.spectlope.isFullNoise ? .init(releaseSec: 0.5) : .init())
                 
                 noteI = count
                 notePitch = pitch
@@ -1044,10 +1044,9 @@ final class LineEditor: Editor {
                 let interval = document.currentNoteBeatInterval
                 let beat = scoreView.beat(atX: sheetP.x, interval: interval)
                 let beatRange = beat > nsBeat ? nsBeat ..< beat : beat ..< nsBeat
-                let tone = isStraight ? Tone.noise : Tone()
                 let note = Note(beatRange: beatRange, pitch: pitch,
-                                pits: [.init(beat: 0, pitch: 0, tone: tone)],
-                                envelope: isStraight ? .init(releaseSec: 0.5) : .init())
+                                pits: [.init(beat: 0, pitch: 0, tone: firstTone)],
+                                envelope: !isStraight && firstTone.spectlope.isFullNoise ? .init(releaseSec: 0.5) : .init())
                 let isNote = notePitch != pitch
                 
                 if isNote {

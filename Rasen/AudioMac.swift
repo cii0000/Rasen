@@ -551,16 +551,18 @@ final class ScoreNoder {
                 }
             }
             
-            let sec: Double
+            let frameStartSec: Double
             if timestamp.pointee.mFlags.contains(.hostTimeValid) {
                 let dHostTime = timestamp.pointee.mHostTime > seq.startHostTime ?
                     timestamp.pointee.mHostTime - seq.startHostTime : 0
-                sec = AVAudioTime.seconds(forHostTime: dHostTime) + seq.startSec
+                frameStartSec = AVAudioTime.seconds(forHostTime: dHostTime) + seq.startSec
             } else if timestamp.pointee.mFlags.contains(.sampleTimeValid) {
-                sec = timestamp.pointee.mSampleTime * rSampleRate
+                frameStartSec = timestamp.pointee.mSampleTime * rSampleRate
             } else {
                 return kAudioUnitErr_NoConnection
             }
+            
+            let frameEndSec = Double(frameCount - 1) * rSampleRate + frameStartSec
             
             self.rendnotesSemaphore.wait()
             let rendnotes = self.rendnotes
@@ -568,10 +570,10 @@ final class ScoreNoder {
             
             for rendnote in rendnotes {
                 let noteStartSec = rendnote.secRange.start.isInfinite ?
-                sec : rendnote.secRange.start + startSec
-                let secI = Int((sec - noteStartSec) * sampleRate)
+                frameStartSec : rendnote.secRange.start + startSec
+                let dNoteStartSecI = Int((frameStartSec - noteStartSec) * sampleRate)
                 if rendnote.secRange.end.isInfinite {
-                    if secI + frameCount >= 0 && self.memowaves[rendnote.id] == nil {
+                    if dNoteStartSecI + frameCount >= 0 && self.memowaves[rendnote.id] == nil {
                         let nwid = NotewaveID(rendnote)
                         
                         self.notewaveDicSemaphore.wait()
@@ -579,23 +581,20 @@ final class ScoreNoder {
                         self.notewaveDicSemaphore.signal()
                         
                         if let notewave {
-                            self.memowaves[rendnote.id]
-                                = Memowave(startSec: noteStartSec,
-                                           releaseSec: nil,
-                                           endSec: nil,
-                                           envelopeMemo: rendnote.envelopeMemo,
-                                           pitbend: rendnote.pitbend,
-                                           notewave: notewave)
-                            self.phases[rendnote.id] = .init(secI.mod(notewave.samples.count))
+                            self.memowaves[rendnote.id] = .init(startSec: noteStartSec,
+                                                                releaseSec: nil,
+                                                                endSec: nil,
+                                                                envelopeMemo: rendnote.envelopeMemo,
+                                                                pitbend: rendnote.pitbend,
+                                                                notewave: notewave)
+                            self.phases[rendnote.id] = 0
                         }
                     }
                 } else {
-                    let length = rendnote.secRange.end + startSec - noteStartSec
-                    let durSec = rendnote.envelopeMemo.duration(fromDurSec: length)
-                    let frameLength = Int(durSec * sampleRate)
-                    if sec >= noteStartSec
-                        && noteStartSec < rendnote.secRange.end + startSec
-                        && secI < frameLength && secI + frameCount >= 0
+                    let dDurSec = rendnote.secRange.end + startSec - noteStartSec
+                    let noteDurSec = rendnote.envelopeMemo.duration(fromDurSec: dDurSec)
+                    if !rendnote.secRange.start.isInfinite,
+                       (frameStartSec ..< frameEndSec).intersects(noteStartSec ..< noteStartSec + noteDurSec)
                         && self.memowaves[rendnote.id] == nil {
                         
                         let nwid = NotewaveID(rendnote)
@@ -605,26 +604,25 @@ final class ScoreNoder {
                         self.notewaveDicSemaphore.signal()
                         
                         if let notewave {
-                            self.memowaves[rendnote.id]
-                                = Memowave(startSec: noteStartSec,
-                                           releaseSec: noteStartSec + length,
-                                           endSec: noteStartSec + durSec,
-                                           envelopeMemo: rendnote.envelopeMemo,
-                                           pitbend: rendnote.pitbend,
-                                           notewave: notewave)
-                            self.phases[rendnote.id] = .init(secI.mod(notewave.samples.count))
+                            self.memowaves[rendnote.id] = .init(startSec: noteStartSec,
+                                                                releaseSec: noteStartSec + dDurSec,
+                                                                endSec: noteStartSec + noteDurSec,
+                                                                envelopeMemo: rendnote.envelopeMemo,
+                                                                pitbend: rendnote.pitbend,
+                                                                notewave: notewave)
+                            self.phases[rendnote.id] = 0
                         }
                     } else if let memowave = self.memowaves[rendnote.id], !rendnote.secRange.end.isInfinite,
                               memowave.endSec == nil {
                         
-                        self.memowaves[rendnote.id]?.releaseSec = noteStartSec + length
-                        self.memowaves[rendnote.id]?.endSec = noteStartSec + durSec
+                        self.memowaves[rendnote.id]?.releaseSec = noteStartSec + dDurSec
+                        self.memowaves[rendnote.id]?.endSec = noteStartSec + noteDurSec
                     }
                 }
             }
             
             for (id, memowave) in self.memowaves {
-                if let endSec = memowave.endSec, sec < memowave.startSec || sec >= endSec {
+                if let endSec = memowave.endSec, frameStartSec < memowave.startSec || frameStartSec >= endSec {
                     self.memowaves[id] = nil
                     self.phases[id] = nil
                 }
@@ -650,7 +648,7 @@ final class ScoreNoder {
                 phase = phase.loop(0 ..< count)
                 
                 for i in 0 ..< Int(frameCount) {
-                    let nSec = Double(i) * rSampleRate + sec
+                    let nSec = Double(i) * rSampleRate + frameStartSec
                     guard nSec >= memowave.startSec else { continue }
                     let envelopeVolm = memowave.envelopeMemo
                         .volm(atSec: nSec - memowave.startSec,
@@ -661,12 +659,12 @@ final class ScoreNoder {
                         amp = Volm.amp(fromVolm: pitbend.firstStereo.volm * envelopeVolm)
                         pan = pitbend.firstStereo.pan
                     } else {
-                        let stereo = notewave.stereo(at: i, atPhase: &phase)
+                        let stereo = notewave.stereo(atPhase: &phase)
                         amp = Volm.amp(fromVolm: stereo.volm * envelopeVolm)
                         pan = stereo.pan
                     }
                     
-                    let sample = notewave.sample(at: i, amp: amp, atPhase: &phase)
+                    let sample = notewave.sample(amp: amp, atPhase: &phase)
                     
                     if pan == 0 || framess.count < 2 {
                         let fSample = Float(sample)

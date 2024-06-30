@@ -322,7 +322,7 @@ extension Pitbend {
         firstSpectlope.isFullNoise :
         spectlopeInterpolation.keys.allSatisfy { $0.value.isFullNoise }
     }
-    var isOne: Bool {
+    var isOneOvertone: Bool {
         isEqualAllOvertone ?
         firstOvertone.isOne : overtoneInterpolation.keys.allSatisfy { $0.value.isOne }
     }
@@ -369,7 +369,7 @@ extension Rendnote {
     var isLoop: Bool {
         if secRange.length.isInfinite {
             true
-        } else if pitbend.isOne {
+        } else if pitbend.isOneOvertone {
             false
         } else {
             false
@@ -444,7 +444,7 @@ extension Rendnote {
             }
         }
         
-        let isOneSin = pitbend.isOne
+        let isOneSin = pitbend.isOneOvertone
         if isOneSin {
             if pitbend.isEqualAllPitch {
                 let a = (isLoop ? intFq : fq) * .pi2 * rSampleRate, firstPhase = firstPhase()
@@ -989,7 +989,7 @@ struct Notewave {
     let stereos: [Stereo]
 }
 extension Notewave {
-    func sample(at i: Int, amp: Double, atPhase phase: inout Double) -> Double {
+    func sample(amp: Double, atPhase phase: inout Double) -> Double {
         let count = Double(samples.count)
         if !isLoop && phase >= count { return 0 }
         phase = phase.loop(start: 0, end: count)
@@ -1016,7 +1016,7 @@ extension Notewave {
         return n
     }
     
-    func stereo(at i: Int, atPhase phase: inout Double) -> Stereo {
+    func stereo(atPhase phase: inout Double) -> Stereo {
         let count = Double(stereos.count)
         if !isLoop && phase >= count { return .init() }
         

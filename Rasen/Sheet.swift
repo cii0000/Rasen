@@ -287,6 +287,18 @@ extension Array where Element == Plane {
         .with { $0.value = map { $0.pb } }
     }
 }
+extension IndexValue where Value == Bool {
+    init(_ pb: PBBoolIndexValue) throws {
+        value = pb.value
+        index = max(Int(pb.index), 0)
+    }
+    var pb: PBBoolIndexValue {
+        .with {
+            $0.value = value
+            $0.index = Int64(index)
+        }
+    }
+}
 extension IndexValue where Value == Int {
     init(_ pb: PBIntIndexValue) throws {
         value = Int(pb.value)
@@ -483,6 +495,14 @@ extension IndexValue where Value == KeyframeOption {
         }
     }
 }
+extension Array where Element == IndexValue<Bool> {
+    init(_ pb: PBBoolIndexValueArray) throws {
+        self = try pb.value.map { try IndexValue<Bool>($0) }
+    }
+    var pb: PBBoolIndexValueArray {
+        .with { $0.value = map { $0.pb } }
+    }
+}
 extension Array where Element == IndexValue<Line> {
     init(_ pb: PBLineIndexValueArray) throws {
         self = try pb.value.map { try IndexValue<Line>($0) }
@@ -629,6 +649,7 @@ enum SheetUndoItem {
     case replaceContents(_ contentIndexValue: [IndexValue<Content>])
     case removeContents(contentIndexes: [Int])
     case setScoreOption(_ option: ScoreOption)
+    case setIsShownTones(_ isShownToneIndexValue: [IndexValue<Bool>])
 }
 extension SheetUndoItem: UndoItem {
     var type: UndoItemType {
@@ -681,6 +702,7 @@ extension SheetUndoItem: UndoItem {
         case .replaceContents: .lazyReversible
         case .removeContents: .unreversible
         case .setScoreOption: .lazyReversible
+        case .setIsShownTones: .lazyReversible
         }
     }
     func reversed() -> SheetUndoItem? {
@@ -789,6 +811,9 @@ extension SheetUndoItem: UndoItem {
             
         case .setScoreOption:
              self
+            
+        case .setIsShownTones:
+             self
         }
     }
 }
@@ -894,6 +919,8 @@ extension SheetUndoItem: Protobuf {
             self = .removeContents(contentIndexes: try [Int](contentIndexes))
         case .setScoreOption(let option):
             self = .setScoreOption(try ScoreOption(option))
+        case .setIsShownTones(let isivs):
+            self = .setIsShownTones(try [IndexValue<Bool>](isivs))
         }
     }
     var pb: PBSheetUndoItem {
@@ -995,6 +1022,8 @@ extension SheetUndoItem: Protobuf {
                 $0.value = .removeContents(cis.pb)
             case .setScoreOption(let option):
                 $0.value = .setScoreOption(option.pb)
+            case .setIsShownTones(let isivs):
+                $0.value = .setIsShownTones(isivs.pb)
             }
         }
     }
@@ -1049,6 +1078,7 @@ extension SheetUndoItem: Codable {
         case replaceContents = "46"
         case removeContents = "47"
         case setScoreOption = "48"
+        case setIsShownTones = "51"
     }
     init(from decoder: Decoder) throws {
         var container = try decoder.unkeyedContainer()
@@ -1150,6 +1180,8 @@ extension SheetUndoItem: Codable {
             self = .removeContents(contentIndexes: try container.decode([Int].self))
         case .setScoreOption:
             self = .setScoreOption(try container.decode(ScoreOption.self))
+        case .setIsShownTones:
+            self = .setIsShownTones(try container.decode([IndexValue<Bool>].self))
         }
     }
     func encode(to encoder: Encoder) throws {
@@ -1299,6 +1331,9 @@ extension SheetUndoItem: Codable {
         case .setScoreOption(let option):
             try container.encode(CodingTypeKey.setScoreOption)
             try container.encode(option)
+        case .setIsShownTones(let vs):
+            try container.encode(CodingTypeKey.setIsShownTones)
+            try container.encode(vs)
         }
     }
 }
@@ -1353,6 +1388,7 @@ extension SheetUndoItem: CustomStringConvertible {
         case .replaceContents: "replaceContents"
         case .removeContents: "removeContents"
         case .setScoreOption: "setScoreOption"
+        case .setIsShownTones: "setIsShownTones"
         }
     }
 }

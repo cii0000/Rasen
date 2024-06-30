@@ -3427,7 +3427,7 @@ final class Document {
         }
     }
     func madeColorOwner(at p: Point,
-                        removingUUColor: UUColor? = nil) -> [SheetColorOwner] {
+                        removingUUColor: UUColor? = Line.defaultUUColor) -> [SheetColorOwner] {
         guard let sheetView = madeSheetView(at: p) else {
             return []
         }

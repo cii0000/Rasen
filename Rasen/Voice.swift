@@ -477,7 +477,9 @@ sdPitch: \($1.sdPitch.string(digitsCount: 1)), sPitch: \($1.sPitch.string(digits
 volm: \($1.volm.string(digitsCount: 2)), noise: \($1.noise.string(digitsCount: 2)),
 edVolm: \($1.edVolm.string(digitsCount: 2)), edNoise: \($1.edNoise.string(digitsCount: 2))),
 """ + "\n" }
-        n.removeLast(2)
+        if n.count >= 2 {
+            n.removeLast(2)
+        }
         return n + "]"
     }
     var defaultFqFormantsString: String {
@@ -487,7 +489,9 @@ sdPitch: \($1.sdPitch.string(digitsCount: 1)), sFq: \(Pitch.fq(fromPitch: $1.sPi
 volm: \($1.volm.string(digitsCount: 2)), noise: \($1.noise.string(digitsCount: 2)),
 edVolm: \($1.edVolm.string(digitsCount: 2)), edNoise: \($1.edNoise.string(digitsCount: 2))),
 """ + "\n" }
-        n.removeLast(2)
+        if n.count >= 2 {
+            n.removeLast(2)
+        }
         return n + "]"
     }
 }

@@ -385,9 +385,30 @@ extension Sprol {
 }
 
 struct Spectlope: Hashable, Codable {
-    var sprols = [Sprol(pitch: 0, volm: 0.5, noise: 0),
-                  Sprol(pitch: 72, volm: 1, noise: 0),
-                  Sprol(pitch: 108, volm: 0.25, noise: 0)]
+    static func defaultSprols(pitch: Rational) -> [Sprol] {
+        if pitch < 12 * 1 {
+            [Sprol(pitch: 0, volm: 0.5, noise: 0),
+             Sprol(pitch: 12, volm: 1, noise: 0),
+             Sprol(pitch: 72, volm: 0.25, noise: 0)]
+        } else if pitch > 12 * 8 + 6 {
+            [Sprol(pitch: 60, volm: 0.5, noise: 1),
+             Sprol(pitch: 108, volm: 1, noise: 1),
+             Sprol(pitch: 120, volm: 0.25, noise: 1)]
+        } else if pitch > 12 * 7 {
+            [Sprol(pitch: 60, volm: 0.5, noise: 0),
+             Sprol(pitch: 84, volm: 1, noise: 0),
+             Sprol(pitch: 108, volm: 0.25, noise: 0)]
+        } else {
+            [Sprol(pitch: 0, volm: 0.5, noise: 0),
+             Sprol(pitch: 72, volm: 1, noise: 0),
+             Sprol(pitch: 108, volm: 0.25, noise: 0)]
+        }
+    }
+    static func `default`(pitch: Rational) -> Self {
+        .init(sprols: defaultSprols(pitch: pitch))
+    }
+    
+    var sprols = Self.defaultSprols(pitch: 4)
 }
 extension Spectlope: Protobuf {
     init(_ pb: PBSpectlope) throws {
@@ -517,13 +538,13 @@ extension Spectlope {
     }
     
     var sumVolm: Double {
-        (1 ..< sprols.count).sum {
+        sprols.isEmpty ? 0 : (1 ..< sprols.count).sum {
             let dPitch = sprols[$0].pitch - sprols[$0 - 1].pitch
             return (sprols[$0].volm + sprols[$0 - 1].volm) * dPitch / 2
         }
     }
     var sumNoiseVolm: Double {
-        (1 ..< sprols.count).sum {
+        sprols.isEmpty ? 0 : (1 ..< sprols.count).sum {
             let dPitch = sprols[$0].pitch - sprols[$0 - 1].pitch
             return (sprols[$0].volm * sprols[$0].noise + sprols[$0 - 1].volm * sprols[$0 - 1].noise) * dPitch / 2
         }
@@ -694,11 +715,6 @@ extension Spectlope: MonoInterpolatable {
 }
 
 struct Tone: Hashable, Codable {
-    static let noise = Self(spectlope: .init(sprols: [.init(pitch: Score.doubleMinPitch,
-                                                            volm: 1, noise: 1),
-                                                      .init(pitch: Score.doubleMaxPitch,
-                                                            volm: 1, noise: 1)]))
-    
     var overtone = Overtone()
     var spectlope = Spectlope()
     var id = UUID()
@@ -718,6 +734,12 @@ extension Tone: Protobuf {
     }
 }
 extension Tone {
+    static let empty = Self.init(overtone: .init(evenVolm: 0, oddVolm: 0),
+                                 spectlope: .init(sprols: [.init(pitch: 0, volm: 1, noise: 0)]))
+    static func `default`(pitch: Rational) -> Self {
+        .init(spectlope: .default(pitch: pitch))
+    }
+    
     func with(id: UUID) -> Self {
         var v = self
         v.id = id
@@ -836,7 +858,6 @@ struct Note {
     var pitch = Rational(0)
     var pits = [Pit()]
     var envelope = Envelope()
-//    var isOneOvertone = false
     var id = UUID()
     var isShownTone = false
 }
@@ -884,9 +905,6 @@ extension Note {
         .init(notePitch: pitch, pitch: .rational(firstPit.pitch), stereo: firstStereo,
               tone: firstTone, lyric: firstPit.lyric,
               envelope: envelope, id: id)
-    }
-    var containsNoise: Bool {
-        pits.contains(where: { $0.tone.spectlope.sprols.contains(where: { $0.noise > 0 }) })
     }
     
     var noiseRatio: Double {
@@ -1043,6 +1061,9 @@ extension Note {
     }
     var isOneOvertone: Bool {
         pits.allSatisfy { $0.tone.overtone.isOne }
+    }
+    var containsNoise: Bool {
+        pits.contains(where: { $0.tone.spectlope.sprols.contains(where: { $0.noise > 0 }) })
     }
 }
 extension Note {
