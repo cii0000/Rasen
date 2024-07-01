@@ -7,7 +7,7 @@
 // For information on using the generated types, please see the documentation:
 //   https://github.com/apple/swift-protobuf/
 
-// Copyright 2023 Cii
+// Copyright 2024 Cii
 //
 // This file is part of Rasen.
 //
