@@ -90,7 +90,7 @@ final class ContentSlider: DragEditor {
                 switch type {
                 case .all:
                     let np = beganContent.origin + sheetP - beganInP
-                    let interval = document.currentNoteBeatInterval
+                    let interval = document.currentBeatInterval
                     let beat = max(min(sheetView.animationView.beat(atX: np.x, interval: interval),
                                    sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: interval)),
                                    sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval) - (content.timeOption?.beatRange.length ?? 0))
@@ -101,7 +101,7 @@ final class ContentSlider: DragEditor {
                 case .startBeat:
                     if var timeOption = content.timeOption {
                         let np = beganContent.origin + sheetP - beganInP
-                        let interval = document.currentNoteBeatInterval
+                        let interval = document.currentBeatInterval
                         let beat = min(sheetView.animationView.beat(atX: np.x, interval: interval),
                                        sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: interval),
                                        timeOption.beatRange.end)
@@ -120,7 +120,7 @@ final class ContentSlider: DragEditor {
                 case .endBeat:
                     if var timeOption = content.timeOption {
                         let np = beganContentEndP + sheetP - beganInP
-                        let interval = document.currentNoteBeatInterval
+                        let interval = document.currentBeatInterval
                         let beat = max(sheetView.animationView.beat(atX: np.x, interval: interval),
                                        sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval),
                                        timeOption.beatRange.start)

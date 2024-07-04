@@ -85,7 +85,7 @@ final class TextSlider: DragEditor {
                 switch type {
                 case .all:
                     let np = beganText.origin + sheetP - beganInP
-                    let interval = document.currentNoteBeatInterval
+                    let interval = document.currentBeatInterval
                     let beat = max(min(sheetView.animationView.beat(atX: np.x, interval: interval),
                                    sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: interval)),
                                    sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval) - (text.timeOption?.beatRange.length ?? 0))
@@ -96,7 +96,7 @@ final class TextSlider: DragEditor {
                 case .startBeat:
                     if var timeOption = text.timeOption {
                         let np = beganText.origin + sheetP - beganInP
-                        let interval = document.currentNoteBeatInterval
+                        let interval = document.currentBeatInterval
                         let beat = min(sheetView.animationView.beat(atX: np.x, interval: interval),
                                        sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: interval),
                                        timeOption.beatRange.end)
@@ -112,7 +112,7 @@ final class TextSlider: DragEditor {
                 case .endBeat:
                     if let beganTimeOption = beganText.timeOption {
                         let np = beganTextEndP + sheetP - beganInP
-                        let interval = document.currentNoteBeatInterval
+                        let interval = document.currentBeatInterval
                         let beat = max(sheetView.animationView.beat(atX: np.x, interval: interval),
                                        sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval),
                                        beganTimeOption.beatRange.start)
@@ -310,7 +310,8 @@ final class Looker: InputKeyEditor {
             document.show(content.type.displayName, at: p)
         } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
             let scoreView = sheetView.scoreView
-            let pitch = Pitch(value: document.pitch(from: scoreView, at: scoreView.convertFromWorld(p)))
+            let pitchInterval = document.currentPitchInterval
+            let pitch = Pitch(value: scoreView.pitch(atY: scoreView.convertFromWorld(p).y, interval: pitchInterval))
             let fqStr = "\(pitch.octaveString()) (\(pitch.fq.string(digitsCount: 1)) Hz)".localized
             document.show(fqStr, at: p)
         } else if let sheetView = document.sheetView(at: p),
@@ -797,8 +798,8 @@ final class TextEditor: Editor {
                 appendLyric(atPit: pitI, atNote: noteI)
             } else if let noteI = scoreView.noteIndex(at: scoreP, scale: document.screenToWorldScale) {
                 var pit = scoreView.splittedPit(at: scoreP, at: noteI,
-                                                beatInterval: document.currentNoteBeatInterval,
-                                                pitchInterval: document.currentNotePitchInterval)
+                                                beatInterval: document.currentBeatInterval,
+                                                pitchInterval: document.currentPitchInterval)
                 pit.lyric = ""
                 let pitI = scoreView.insertablePitIndex(atBeat: pit.beat, at: noteI)
                 var note = scoreView.model.notes[noteI]
@@ -807,8 +808,8 @@ final class TextEditor: Editor {
                 sheetView.replace([IndexValue(value: note, index: noteI)])
                 appendLyric(atPit: pitI, atNote: noteI, isNewUndoGroup: false)
             } else {
-                let beat = scoreView.beat(atX: scoreP.x, interval: document.currentNoteBeatInterval)
-                let pitch = scoreView.pitch(atY: scoreP.y, interval: document.currentNotePitchInterval)
+                let beat = scoreView.beat(atX: scoreP.x, interval: document.currentBeatInterval)
+                let pitch = scoreView.pitch(atY: scoreP.y, interval: document.currentPitchInterval)
                 sheetView.newUndoGroup()
                 sheetView.append(Note(beatRange: beat ..< beat + .init(1, 4), pitch: pitch, pits: [.init()]))
                 appendLyric(atPit: 0, atNote: scoreView.model.notes.count - 1, isNewUndoGroup: false)

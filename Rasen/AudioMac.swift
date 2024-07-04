@@ -562,7 +562,7 @@ final class ScoreNoder {
                 return kAudioUnitErr_NoConnection
             }
             
-            let frameEndSec = Double(frameCount - 1) * rSampleRate + frameStartSec
+            let frameEndSec = Double(frameCount) * rSampleRate + frameStartSec
             
             self.rendnotesSemaphore.wait()
             let rendnotes = self.rendnotes
@@ -622,7 +622,8 @@ final class ScoreNoder {
             }
             
             for (id, memowave) in self.memowaves {
-                if let endSec = memowave.endSec, frameStartSec < memowave.startSec || frameStartSec >= endSec {
+                if let endSec = memowave.endSec,
+                   !(frameStartSec ..< frameEndSec).intersects(memowave.startSec ..< endSec) {
                     self.memowaves[id] = nil
                     self.phases[id] = nil
                 }
@@ -649,7 +650,8 @@ final class ScoreNoder {
                 
                 for i in 0 ..< Int(frameCount) {
                     let nSec = Double(i) * rSampleRate + frameStartSec
-                    guard nSec >= memowave.startSec else { continue }
+                    guard nSec >= memowave.startSec
+                            && (memowave.endSec != nil ? nSec < memowave.endSec! : true) else { continue }
                     let envelopeVolm = memowave.envelopeMemo
                         .volm(atSec: nSec - memowave.startSec,
                               releaseStartSec: memowave.releaseSec != nil ? memowave.releaseSec! - memowave.startSec : nil)

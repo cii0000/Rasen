@@ -1170,7 +1170,7 @@ final class Document {
         }
     }
     func updateWithIsFullEdit(in sheetView: SheetView) {
-        let isFullEdit = isFullEditNoteBeatInterval
+        let isFullEdit = isFullEditNote
         sheetView.textsView.elementViews.forEach { $0.isFullEdit = isFullEdit }
         sheetView.contentsView.elementViews.forEach { $0.isFullEdit = isFullEdit }
         sheetView.scoreView.isFullEdit = isFullEdit
@@ -3522,20 +3522,17 @@ final class Document {
         Sheet.knobEditDistance * screenToWorldScale
     }
     
-    var isFullEditNoteBeatInterval: Bool {
-        camera.logScale < -3
+    var isFullEditNote: Bool {
+        camera.logScale < -4
     }
-    var currentNoteBeatInterval: Rational {
-        isFullEditNoteBeatInterval ? Sheet.fullEditBeatInterval : Sheet.beatInterval
+    var currentBeatInterval: Rational {
+        isFullEditNote ? Sheet.fullEditBeatInterval : Sheet.beatInterval
     }
     var currentKeyframeBeatInterval: Rational {
-        currentNoteBeatInterval
+        currentBeatInterval
     }
-    var currentNotePitchInterval: Rational {
-        isFullEditNoteBeatInterval ? Sheet.fullEditPitchInterval : Sheet.pitchInterval
-    }
-    func pitch(from scoreView: ScoreView, at scoreP: Point) -> Rational {
-        scoreView.pitch(atY: scoreP.y, interval: currentNotePitchInterval)
+    var currentPitchInterval: Rational {
+        isFullEditNote ? Sheet.fullEditPitchInterval : Sheet.pitchInterval
     }
     func smoothPitch(from scoreView: ScoreView, at scoreP: Point) -> Double? {
         scoreView.smoothPitch(atY: scoreP.y)

@@ -1235,7 +1235,7 @@ final class AnimationSlider: DragEditor {
                     }
                 case .endBeat:
                     if let beganAnimationOption {
-                        let interval = document.currentNoteBeatInterval
+                        let interval = document.currentBeatInterval
                         let nBeat = animationView.beat(atX: beganBeatX + inP.x - beganSheetP.x,
                                                        interval: interval)
                         if nBeat != animationView.beatRange?.end {
@@ -1465,9 +1465,10 @@ final class LineSlider: DragEditor {
                         let note = score.notes[noteI]
                         let preBeat = (pitI > 0 ? note.pits[pitI - 1].beat : 0) + note.beatRange.start
                         let nextBeat = (pitI + 1 < note.pits.count ? note.pits[pitI + 1].beat : note.beatRange.length) + note.beatRange.start
-                        let beatInterval = Sheet.fullEditBeatInterval
+                        let beatInterval = document.currentBeatInterval
+                        let pitchInterval = document.currentPitchInterval
                         let pitch = scoreView.pitch(atY: beganPitchY + sheetP.y - beganSheetP.y,
-                                                    interval: Sheet.fullEditPitchInterval)
+                                                    interval: pitchInterval)
                         let nsBeat = scoreView.beat(atX: beganBeatX + sheetP.x - beganSheetP.x,
                                                     interval: beatInterval)
                             .clipped(min: preBeat, max: nextBeat)
@@ -1803,7 +1804,7 @@ final class KeyframeInserter: InputKeyEditor {
                     let animationView = sheetView.animationView
                     let animation = animationView.model
                     
-                    let interval = document.currentNoteBeatInterval
+                    let interval = document.currentBeatInterval
                     let oBeat = animationView.beat(atX: inP.x, interval: interval)
                     let beat = (oBeat - animation.beatRange.start)
                         .clipped(min: 0, max: animation.beatRange.length)
@@ -1907,8 +1908,8 @@ final class KeyframeInserter: InputKeyEditor {
                         } else {
                             var pits = score.notes[noteI].pits
                             let pit = scoreView.splittedPit(at: scoreP, at: noteI,
-                                                            beatInterval: document.currentNoteBeatInterval,
-                                                            pitchInterval: document.currentNotePitchInterval)
+                                                            beatInterval: document.currentBeatInterval,
+                                                            pitchInterval: document.currentPitchInterval)
                             if pits.allSatisfy({ $0.beat != pit.beat }) {
                                 pits.append(pit)
                                 pits.sort { $0.beat < $1.beat }
@@ -1922,7 +1923,7 @@ final class KeyframeInserter: InputKeyEditor {
                             }
                         }
                     } else if scoreView.containsTimeline(scoreP) {
-                        let interval = document.currentNoteBeatInterval
+                        let interval = document.currentBeatInterval
                         let beat = scoreView.beat(atX: inP.x, interval: interval)
                         var option = scoreView.model.option
                         option.keyBeats.append(beat)

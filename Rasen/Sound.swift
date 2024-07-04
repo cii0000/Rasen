@@ -385,30 +385,9 @@ extension Sprol {
 }
 
 struct Spectlope: Hashable, Codable {
-    static func defaultSprols(pitch: Rational) -> [Sprol] {
-        if pitch < 12 * 1 {
-            [Sprol(pitch: 0, volm: 0.5, noise: 0),
-             Sprol(pitch: 12, volm: 1, noise: 0),
-             Sprol(pitch: 72, volm: 0.25, noise: 0)]
-        } else if pitch > 12 * 8 + 6 {
-            [Sprol(pitch: 60, volm: 0.5, noise: 1),
-             Sprol(pitch: 108, volm: 1, noise: 1),
-             Sprol(pitch: 120, volm: 0.25, noise: 1)]
-        } else if pitch > 12 * 7 {
-            [Sprol(pitch: 60, volm: 0.5, noise: 0),
-             Sprol(pitch: 84, volm: 1, noise: 0),
-             Sprol(pitch: 108, volm: 0.25, noise: 0)]
-        } else {
-            [Sprol(pitch: 0, volm: 0.5, noise: 0),
-             Sprol(pitch: 72, volm: 1, noise: 0),
-             Sprol(pitch: 108, volm: 0.25, noise: 0)]
-        }
-    }
-    static func `default`(pitch: Rational) -> Self {
-        .init(sprols: defaultSprols(pitch: pitch))
-    }
-    
-    var sprols = Self.defaultSprols(pitch: 4)
+    var sprols = [Sprol(pitch: 12 * 2, volm: 1, noise: 0),
+                  Sprol(pitch: 12 * 7, volm: 0.125, noise: 0),
+                  Sprol(pitch: 12 * 10, volm: 0, noise: 0)]
 }
 extension Spectlope: Protobuf {
     init(_ pb: PBSpectlope) throws {
@@ -736,9 +715,6 @@ extension Tone: Protobuf {
 extension Tone {
     static let empty = Self.init(overtone: .init(evenVolm: 0, oddVolm: 0),
                                  spectlope: .init(sprols: [.init(pitch: 0, volm: 1, noise: 0)]))
-    static func `default`(pitch: Rational) -> Self {
-        .init(spectlope: .default(pitch: pitch))
-    }
     
     func with(id: UUID) -> Self {
         var v = self
@@ -787,7 +763,7 @@ extension Tone: MonoInterpolatable {
 }
 
 struct Pit: Codable, Hashable {
-    var beat = Rational(0), pitch = Rational(0), stereo = Stereo(volm: 0.25), odd = 0.0, tone = Tone(), lyric = ""
+    var beat = Rational(0), pitch = Rational(0), stereo = Stereo(volm: 0.3125), odd = 0.0, tone = Tone(), lyric = ""
 }
 extension Pit: Protobuf {
     init(_ pb: PBPit) throws {
@@ -831,7 +807,7 @@ extension Pit {
 }
 
 struct Envelope: Hashable, Codable {
-    var attackSec = 0.025, decaySec = 0.025, sustainVolm = 1.0, releaseSec = 0.025
+    var attackSec = 0.02, decaySec = 0.01, sustainVolm = 1.0, releaseSec = 0.02
     var id = UUID()
 }
 extension Envelope: Protobuf {
@@ -1045,7 +1021,7 @@ extension Note {
     }
 
     var isEmpty: Bool {
-        pits.isEmpty
+        pits.count == 1 && pits[0].beat == 0 && pits[0].pitch == 0
     }
     var isEmptyPitch: Bool {
         pits.allSatisfy { $0.pitch == 0 }

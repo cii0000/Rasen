@@ -694,14 +694,15 @@ final class CopyEditor: Editor {
                 let nis = sheetView.noteIndexes(from: document.selections)
                 if !nis.isEmpty {
                     let scoreP = scoreView.convertFromWorld(p)
-                    let pitch = document.pitch(from: scoreView, at: scoreP)
+                    let pitchInterval = document.currentPitchInterval
+                    let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
                     let score = scoreView.model
-                    let interval = document.currentNoteBeatInterval
-                    let t = scoreView.beat(atX: scoreP.x, interval: interval)
+                    let beatInterval = document.currentBeatInterval
+                    let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
                     let notes: [Note] = nis.map {
                         var note = score.notes[$0]
                         note.pitch -= pitch
-                        note.beatRange.start -= t
+                        note.beatRange.start -= beat
                         return note
                     }
                     if isSendPasteboard {
@@ -916,15 +917,15 @@ final class CopyEditor: Editor {
                     //
                 }
             } else {
-                let pitch = document.pitch(from: scoreView, at: scoreP)
-                let interval = document.currentNoteBeatInterval
-                let beat = scoreView.beat(atX: scoreP.x, interval: interval)
+                let pitchInterval = document.currentPitchInterval
+                let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
+                let beatInterval = document.currentBeatInterval
+                let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
                 var note = score.notes[noteI]
                 note.pitch -= pitch
                 note.beatRange.start -= beat
                 if isSendPasteboard {
-                    Pasteboard.shared.copiedObjects
-                    = [.notesValue(NotesValue(notes: [note]))]
+                    Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [note]))]
                 }
                 let lines = [scoreView.pointline(from: score.notes[noteI])]
                     .map { scoreView.convertToWorld($0) }
@@ -1046,11 +1047,12 @@ final class CopyEditor: Editor {
                     
                     let scoreView = sheetView.scoreView
                     let scoreP = scoreView.convertFromWorld(p)
-                    let pitch = document.pitch(from: scoreView, at: scoreP)
+                    let pitchInterval = document.currentPitchInterval
+                    let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
                     let nis = sheetView.noteIndexes(from: document.selections)
                     if !nis.isEmpty {
-                        let interval = document.currentNoteBeatInterval
-                        let beat = scoreView.beat(atX: scoreP.x, interval: interval)
+                        let beatInterval = document.currentBeatInterval
+                        let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
                         let score = scoreView.model
                         let notes: [Note] = nis.map {
                             var note = score.notes[$0]
@@ -1249,11 +1251,12 @@ final class CopyEditor: Editor {
                     return true
                 }
             } else if let (noteI, pitI) = scoreView.noteAndPitI(at: scoreP,
-                                                                 scale: document.screenToWorldScale) {
+                                                                 scale: document.screenToWorldScale),
+                      !scoreView.model.notes[noteI].isEmpty {
                 var pits = score.notes[noteI].pits
                 pits.remove(at: pitI)
                 var note = score.notes[noteI]
-                if pits.isEmpty {
+                if pits.isEmpty || (pits.count == 1 && (pits[0].beat != 0 || pits[0].pitch != 0)) {
                     note.pits = [.init()]
                 } else {
                     note.pits = pits
@@ -1265,9 +1268,10 @@ final class CopyEditor: Editor {
                 sheetView.updatePlaying()
                 return true
             } else {
-                let pitch = document.pitch(from: scoreView, at: scoreP)
-                let interval = document.currentNoteBeatInterval
-                let beat = scoreView.beat(atX: scoreP.x, interval: interval)
+                let pitchInterval = document.currentPitchInterval
+                let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
+                let beatInterval = document.currentBeatInterval
+                let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
                 var note = score.notes[noteI]
                 note.pitch -= pitch
                 note.beatRange.start -= beat
@@ -1764,9 +1768,10 @@ final class CopyEditor: Editor {
                   sheetView.model.score.enabled else { return }
             let scoreView = sheetView.scoreView
             let scoreP = scoreView.convertFromWorld(p)
-            let pitch = document.pitch(from: scoreView, at: scoreP)
-            let interval = document.currentNoteBeatInterval
-            let beat = scoreView.beat(atX: scoreP.x, interval: interval)
+            let pitchInterval = document.currentPitchInterval
+            let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
+            let beatInterval = document.currentBeatInterval
+            let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
             
             var notes = notes
             for j in 0 ..< notes.count {
@@ -2426,7 +2431,7 @@ final class CopyEditor: Editor {
             
             if content.type.hasDur {
                 let tempo = sheetView.nearestTempo(at: sheetP) ?? Music.defaultTempo
-                let interval = document.currentNoteBeatInterval
+                let interval = document.currentBeatInterval
                 let startBeat = sheetView.animationView.beat(atX: sheetP.x, interval: interval)
                 let durBeat = ContentTimeOption.beat(fromSec: content.durSec,
                                                      tempo: tempo,
@@ -2465,7 +2470,7 @@ final class CopyEditor: Editor {
             content.origin -= Point(content.size.width / 2, content.size.height / 2)
             
             if content.type.hasDur {
-                let interval = document.currentNoteBeatInterval
+                let interval = document.currentBeatInterval
                 let startBeat = sheetView.animationView.beat(atX: sheetP.x, interval: interval)
                 let tempo = sheetView.nearestTempo(at: sheetP) ?? Music.defaultTempo
                 let durBeat = if let nbr = content.timeOption?.beatRange {
@@ -2519,19 +2524,22 @@ final class CopyEditor: Editor {
                     sheetView.model.score.enabled else { return }
             let scoreView = sheetView.scoreView
             let scoreP = scoreView.convertFromWorld(p)
-            let pitch = document.pitch(from: scoreView, at: scoreP)
-            let interval = document.currentNoteBeatInterval
-            let t = scoreView.beat(atX: scoreP.x, interval: interval)
+            let pitchInterval = document.currentPitchInterval
+            let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
+            let beatInterval = document.currentBeatInterval
+            let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
             var notes = notesValue.notes
-            let startBeat = sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval)
-            let endBeat = sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: interval)
+            let startBeat = sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: beatInterval)
+            let endBeat = sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: beatInterval)
             for j in 0 ..< notes.count {
                 notes[j].pitch += pitch
-                notes[j].beatRange.start += t
+                notes[j].beatRange.start += beat
                 
                 notes[j].pitch = notes[j].pitch
                     .clipped(min: Score.pitchRange.start, max: Score.pitchRange.end)
                 notes[j].beatRange.start = max(min(notes[j].beatRange.start, endBeat), startBeat - notes[j].beatRange.length)
+                
+                notes[j].id = .init()
             }
             sheetView.newUndoGroup()
             sheetView.append(notes)

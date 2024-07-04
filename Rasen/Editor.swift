@@ -346,9 +346,10 @@ final class DraftEditor: Editor {
                                 if !nis.isEmpty {
                                     let scoreView = sheetView.scoreView
                                     let scoreP = scoreView.convertFromWorld(p)
-                                    let pitch = document.pitch(from: scoreView, at: scoreP)
-                                    let interval = document.currentNoteBeatInterval
-                                    let beat = scoreView.beat(atX: scoreP.x, interval: interval)
+                                    let pitchInterval = document.currentPitchInterval
+                                    let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
+                                    let beatInterval = document.currentBeatInterval
+                                    let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
                                     let notes: [Note] = nis.map {
                                         var note = scoreView.model.draftNotes[$0]
                                         note.pitch -= pitch
@@ -383,9 +384,10 @@ final class DraftEditor: Editor {
                         if !nis.isEmpty {
                             let scoreView = sheetView.scoreView
                             let scoreP = scoreView.convertFromWorld(p)
-                            let pitch = document.pitch(from: scoreView, at: scoreP)
-                            let interval = document.currentNoteBeatInterval
-                            let beat = scoreView.beat(atX: scoreP.x, interval: interval)
+                            let pitchInterval = document.currentPitchInterval
+                            let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
+                            let beatInterval = document.currentBeatInterval
+                            let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
                             let notes: [Note] = sheetView.model.score.draftNotes.map {
                                 var note = $0
                                 note.pitch -= pitch
@@ -891,7 +893,7 @@ final class IOEditor: Editor {
                     }
                     if content.type.hasDur {
                         let tempo = sheetView.nearestTempo(at: np) ?? Music.defaultTempo
-                        let interval = document.currentNoteBeatInterval
+                        let interval = document.currentBeatInterval
                         let startBeat = sheetView.animationView.beat(atX: np.x, interval: interval)
                         let durBeat = ContentTimeOption.beat(fromSec: content.durSec,
                                                              tempo: tempo,

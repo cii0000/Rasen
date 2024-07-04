@@ -255,9 +255,9 @@ final class LineEditor: Editor {
     }
     
     private static func joinControlWith(_ line: Line,
-                         lastControl lc: Line.Control,
-                         lowAngle: Double = 0.8 * (.pi / 2),
-                         angle: Double = 1.0 * (.pi / 2)) -> Line.Control? {
+                                        lastControl lc: Line.Control,
+                                        lowAngle: Double = 0.8 * (.pi / 2),
+                                        angle: Double = 1.0 * (.pi / 2)) -> Line.Control? {
         guard line.controls.count >= 4 else { return nil }
         let c0 = line.controls[line.controls.count - 4]
         let c1 = line.controls[line.controls.count - 3], c2 = lc
@@ -276,8 +276,7 @@ final class LineEditor: Editor {
         }
     }
     
-    private static func speed(from temps: [Temp], at i: Int,
-                      delta: Int = 2) -> Double {
+    private static func speed(from temps: [Temp], at i: Int, delta: Int = 2) -> Double {
         var allSpeed = 0.0, count = 0
         for temp in temps[max(0, i - delta) ..< i] {
             allSpeed += temp.speed
@@ -359,8 +358,8 @@ final class LineEditor: Editor {
     }
     
     private static func revision(pressure: Double,
-                  minPressure: Double = 0.3,
-                  revisonMinPressure: Double = 0.125) -> Double {
+                                 minPressure: Double = 0.3,
+                                 revisonMinPressure: Double = 0.125) -> Double {
         if pressure < minPressure {
             return revisonMinPressure
         } else {
@@ -382,10 +381,10 @@ final class LineEditor: Editor {
     }
     
     private static func snap(_ fol: FirstOrLast, _ line: Line,
-                     isSnapSelf: Bool = true,
-                     worldToScreenScale: Double,
-                     screenToWorldScale: Double,
-                     from lines: [Line]) -> Line.Control? {
+                             isSnapSelf: Bool = true,
+                             worldToScreenScale: Double,
+                             screenToWorldScale: Double,
+                             from lines: [Line]) -> Line.Control? {
         snap(line.controls[fol],
              isSnapSelf ? line.controls[fol.reversed] : nil,
              size: line.size * line.controls[fol].pressure,
@@ -393,10 +392,10 @@ final class LineEditor: Editor {
              screenToWorldScale: screenToWorldScale, from: lines)?.control
     }
     private static func snap(_ c: Line.Control, _ nc: Line.Control?,
-                     size: Double,
-                     worldToScreenScale: Double,
-                     screenToWorldScale: Double,
-                     from lines: [Line]) -> (size: Double, control: Line.Control)? {
+                             size: Double,
+                             worldToScreenScale: Double,
+                             screenToWorldScale: Double,
+                             from lines: [Line]) -> (size: Double, control: Line.Control)? {
         let dq = screenToWorldScale.clipped(min: 0.06, max: 2,
                                             newMin: 0.5, newMax: 2)
         let dd = size / 2
@@ -991,14 +990,15 @@ final class LineEditor: Editor {
                 let scoreView = sheetView.scoreView
                 let inP = sheetView.convertFromWorld(p)
                 let scoreP = scoreView.convertFromWorld(p)
-                let pitch = document.pitch(from: scoreView, at: scoreP)
+                let pitchInterval = document.currentPitchInterval
+                let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
                     .clipped(min: Score.pitchRange.start, max: Score.pitchRange.end)
                 let score = scoreView.model
                 let count = score.notes.count
-                let interval = document.currentNoteBeatInterval
-                let beat = scoreView.beat(atX: inP.x, interval: interval)
+                let beatInterval = document.currentBeatInterval
+                let beat = scoreView.beat(atX: inP.x, interval: beatInterval)
                 let beatRange = beat ..< beat
-                firstTone = isStraight ? Tone.empty : Tone.default(pitch: pitch)
+                firstTone = isStraight ? Tone.empty : Tone()
                 let note = Note(beatRange: beatRange, pitch: pitch,
                                 pits: .init([.init(beat: 0, pitch: 0, tone: firstTone)]),
                                 envelope: !isStraight && firstTone.spectlope.isFullNoise ? .init(releaseSec: 0.5) : .init())
@@ -1036,13 +1036,14 @@ final class LineEditor: Editor {
             if let sheetView = noteSheetView, let notePitch,
                 let nsBeat = noteStartBeat, let noteI {
                 
+                let pitchInterval = document.currentPitchInterval
+                let beatInterval = document.currentBeatInterval
                 let scoreView = sheetView.scoreView
                 let sheetP = sheetView.convertFromWorld(p)
                 let scoreP = scoreView.convertFromWorld(p)
-                let pitch = document.pitch(from: scoreView, at: scoreP)
+                let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
                     .clipped(min: Score.pitchRange.start, max: Score.pitchRange.end)
-                let interval = document.currentNoteBeatInterval
-                let beat = scoreView.beat(atX: sheetP.x, interval: interval)
+                let beat = scoreView.beat(atX: sheetP.x, interval: beatInterval)
                 let beatRange = beat > nsBeat ? nsBeat ..< beat : beat ..< nsBeat
                 let note = Note(beatRange: beatRange, pitch: pitch,
                                 pits: [.init(beat: 0, pitch: 0, tone: firstTone)],
@@ -1070,7 +1071,7 @@ final class LineEditor: Editor {
                 
                 let scoreView = sheetView.scoreView
                 let sheetP = sheetView.convertFromWorld(p)
-                let interval = document.currentNoteBeatInterval
+                let interval = document.currentBeatInterval
                 let beat = scoreView.beat(atX: sheetP.x, interval: interval)
                 let beatRange = beat > nsBeat ? nsBeat ..< beat : beat ..< nsBeat
                 if beatRange.length == 0 {
@@ -1104,14 +1105,14 @@ final class LineEditor: Editor {
                     document.stopPlaying(with: event)
                 }
                 
-                let pitch = document.pitch(from: scoreView, at: scoreP)
+                let pitch = scoreView.pitch(atY: scoreP.y, interval: document.currentPitchInterval)
                 let score = scoreView.model
-                let interval = document.currentNoteBeatInterval
-                let t = scoreView.beat(atX: scoreP.x, interval: interval)
+                let interval = document.currentBeatInterval
+                let beat = scoreView.beat(atX: scoreP.x, interval: interval)
                 let notes: [Note] = nis.map {
                     var note = score.notes[$0]
                     note.pitch -= pitch
-                    note.beatRange.start -= t
+                    note.beatRange.start -= beat
                     return note
                 }
                 

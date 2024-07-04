@@ -522,7 +522,7 @@ extension Rendnote {
             var rmsV = 0.0, sign = true
             return ((1 ... halfStftCount).map { fqi in
                 let nfq = Double(fqi) / Double(halfStftCount) * maxFq
-                guard nfq > 0 && nfq >= fq && nfq < cutFq else { return 0 }
+                guard nfq > 0 && nfq < cutFq else { return 0 }
                 let loudnessVolm = Loudness.volm40Phon(fromFq: nfq)
                 let noiseVolm = spectlope.sprol(atFq: nfq).noiseVolm
                 let cutScale = cutStartFq < nfq ? nfq.clipped(min: cutStartFq, max: cutFq, newMin: 1, newMax: 0) : 1

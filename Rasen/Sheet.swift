@@ -2147,10 +2147,10 @@ extension Sheet {
     static let beatWidth = 30.0, secPadding = 16.0
     static let timelineHalfHeight = 12.0
     static let knobWidth = 2.0, knobHeight = 12.0, rulerHeight = 4.0
-    static let fullEditPitchInterval = Rational(1, 12)
+    static let fullEditPitchInterval = Rational(1, 6)
     static let pitchInterval = Rational(1)
-    static let fullEditBeatInterval = Rational(1, 96 * 2)
-    static let beatInterval = Rational(1, 4)
+    static let fullEditBeatInterval = Rational(1, 72)
+    static let beatInterval = Rational(1, 12)
     static let knobEditDistance = 15.0
 }
 extension Sheet {

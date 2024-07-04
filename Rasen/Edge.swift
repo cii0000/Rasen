@@ -399,7 +399,6 @@ extension Pointline {
             edges.append(.init(p0, p1))
             p0 = p1
         }
-        edges.append(.init(p0, points[0]))
         return edges
     }
     
