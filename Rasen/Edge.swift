@@ -361,25 +361,33 @@ extension LinearLine {
 }
 
 struct Pointline: Hashable, Codable {
-    var points = [Point]()
+    struct Control: Hashable, Codable {
+        var point = Point(), pressure = 1.0
+    }
+    var controls = [Control]()
 }
 extension Pointline {
     var firstPoint: Point {
-        points[0]
+        controls[0].point
     }
     var lastPoint: Point {
-        points[.last]
+        controls[.last].point
     }
     var bounds: Rect? {
-        points.bounds
+        guard let fp = controls.first?.point else { return nil }
+        var aabb = AABB(fp)
+        for c in controls {
+            aabb += c.point
+        }
+        return aabb.rect
     }
     var isEmpty: Bool {
-        points.isEmpty
+        controls.isEmpty
     }
     
     func minDistanceSquared(at p: Point) -> Double {
-        if points.count == 1 {
-            return points[0].distanceSquared(p)
+        if controls.count == 1 {
+            return controls[0].point.distanceSquared(p)
         } else {
             var minDSquared = Double.infinity
             for edge in edges {
@@ -390,12 +398,12 @@ extension Pointline {
     }
     
     var edges: [Edge] {
-        guard points.count >= 2 else { return [] }
+        guard controls.count >= 2 else { return [] }
         var edges = [Edge]()
-        edges.reserveCapacity(points.count)
-        var p0 = points[0]
-        for i in 1 ..< points.count {
-            let p1 = points[i]
+        edges.reserveCapacity(controls.count)
+        var p0 = controls[0].point
+        for i in 1 ..< controls.count {
+            let p1 = controls[i].point
             edges.append(.init(p0, p1))
             p0 = p1
         }
@@ -414,8 +422,13 @@ extension Pointline {
         return false
     }
 }
+extension Pointline.Control: AppliableTransform {
+    static func * (lhs: Self, rhs: Transform) -> Self {
+        .init(point: lhs.point * rhs, pressure: lhs.pressure)
+    }
+}
 extension Pointline: AppliableTransform {
     static func * (lhs: Self, rhs: Transform) -> Self {
-        .init(points: lhs.points.map { $0 * rhs })
+        .init(controls: lhs.controls.map { $0 * rhs })
     }
 }

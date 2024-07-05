@@ -142,54 +142,34 @@ struct IIRfilter {
 }
 
 struct Loudness {
-    private static let fqVolms = [Point(60, 1.38),
-                                  Point(80, 1.24),
-                                  Point(200, 1.1),
-                                  Point(1000, 1),
-                                  Point(1400, 1.07),
-                                  Point(1600, 1.07),
-                                  Point(3000, 0.93),
-                                  Point(4000, 0.93),
-                                  Point(9000, 1.17),
-                                  Point(12500, 1.17),
-                                  Point(15000, 1.14)]
-    private static let rFqVolms = [Point(60, 0.724),
-                                   Point(80, 0.806),
-                                   Point(200, 0.909),
-                                   Point(1000, 1),
-                                   Point(1400, 0.935),
-                                   Point(1600, 0.935),
-                                   Point(3000, 1.075),
-                                   Point(4000, 1.075),
-                                   Point(9000, 0.855),
-                                   Point(12500, 0.855),
-                                   Point(15000, 0.877)]
-    
-    static func volm40Phon(fromFq fq: Double) -> Double {
-        var preFq = 0.0, preVolm = fqVolms.last!.y
-        
-        for fqVolums in fqVolms {
-            if fq < fqVolums.x {
-                let t = (fq - preFq) / (fqVolums.x - preFq)
-                return Double.linear(preVolm, fqVolums.y, t: t)
-            }
-            preFq = fqVolums.x
-            preVolm = fqVolums.y
+    private static let pitchVolms = [Point(22.5, 1.45),
+                                     Point(27.5, 1.3),
+                                     Point(43.3, 1.1),
+                                     Point(71.2, 1),
+                                     Point(75.0, 1.05),
+                                     Point(77.0, 0.975),
+                                     Point(91.0, 0.85),
+                                     Point(95.0, 0.75),
+                                     Point(109.0, 0.85),
+                                     Point(115.0, 0.9),
+                                     Point(118.0, 0.85)]
+    static func volm40Phon(fromPitch pitch: Double) -> Double {
+        var prePitchVolm = pitchVolms.first!
+        if pitch < prePitchVolm.x {
+            return prePitchVolm.y
         }
-        return fqVolms.last!.y
+        for i in 1 ..< pitchVolms.count {
+            let pitchVolum = pitchVolms[i]
+            if pitch < pitchVolum.x {
+                let t = (pitch - prePitchVolm.x) / (pitchVolum.x - prePitchVolm.x)
+                return Double.linear(prePitchVolm.y, pitchVolum.y, t: t)
+            }
+            prePitchVolm = pitchVolum
+        }
+        return prePitchVolm.y
     }
-    static func reverseVolm40Phon(fromFq fq: Double) -> Double {
-        var preFq = 0.0, preVolm = rFqVolms.last!.y
-        
-        for fqVolm in rFqVolms {
-            if fq < fqVolm.x {
-                let t = (fq - preFq) / (fqVolm.x - preFq)
-                return Double.linear(preVolm, fqVolm.y, t: t)
-            }
-            preFq = fqVolm.x
-            preVolm = fqVolm.y
-        }
-        return rFqVolms.last!.y
+    static func reverseVolm40Phon(fromPitch pitch: Double) -> Double {
+        1 / volm40Phon(fromPitch: pitch)
     }
     
     enum FilterClass: String {

@@ -930,7 +930,8 @@ final class CopyEditor: Editor {
                 let lines = [scoreView.pointline(from: score.notes[noteI])]
                     .map { scoreView.convertToWorld($0) }
                 selectingLineNode.children = lines.map {
-                    Node(path: Path($0.points), lineWidth: document.worldLineWidth * 1.5,
+                    Node(path: Path($0.controls.map { $0.point }),
+                         lineWidth: document.worldLineWidth * 1.5,
                          lineType: .color(.selected))
                 }
             }
@@ -1367,7 +1368,7 @@ final class CopyEditor: Editor {
     }
     
     private var oldScale: Double?, firstRotation = 0.0,
-                oldSnapP: Point?, oldFillSnapP: Point?,
+                oldSnapP: Point?, oldFillSnapP: Point?, beganPitch = Rational(0),
                 textNode: Node?, imageNode: Node?, textFrame: Rect?, textScale = 1.0
     var snapDistance = 1.0
     
@@ -1773,6 +1774,10 @@ final class CopyEditor: Editor {
             let beatInterval = document.currentBeatInterval
             let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
             
+            if phase == .began {
+                beganPitch = pitch
+            }
+            
             var notes = notes
             for j in 0 ..< notes.count {
                 notes[j].pitch += pitch - Score.pitchRange.start
@@ -1784,6 +1789,9 @@ final class CopyEditor: Editor {
                 node.attitude = Attitude(position: sheetView.convertToWorld(Point()))
                 return node
             }
+            
+            document.cursor = .circle(string: Pitch(value: pitch)
+                .octaveString(deltaPitch: pitch - beganPitch))
         }
         
         switch pasteObject {

@@ -2412,8 +2412,8 @@ extension Lasso {
         if line.intersects(otherPointline) {
             return true
         }
-        for p in otherPointline.points {
-            if contains(p) {
+        for c in otherPointline.controls {
+            if contains(c.point) {
                 return true
             }
         }

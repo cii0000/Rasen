@@ -117,7 +117,6 @@ final class NotePlayer {
                                         overtone: note.tone.overtone,
                                         spectlope: note.tone.spectlope),
                          secRange: -.infinity ..< .infinity,
-                         startDeltaSec: 0,
                          envelopeMemo: .init(note.envelope),
                          id: noteID)
         }
@@ -487,14 +486,13 @@ final class ScoreNoder {
     }
     
     struct NotewaveID: Hashable, Codable {
-        var fq: Double, noiseSeed: UInt64, pitbend: Pitbend, rendableDurSec: Double, startDeltaSec: Double
+        var fq: Double, noiseSeed: UInt64, pitbend: Pitbend, rendableDurSec: Double
         
         init(_ rendnote: Rendnote) {
             fq = rendnote.fq
             noiseSeed = rendnote.noiseSeed
             pitbend = rendnote.pitbend
             rendableDurSec = rendnote.rendableDurSec
-            startDeltaSec = rendnote.startDeltaSec
         }
     }
     fileprivate(set) var notewaveDic = [NotewaveID: Notewave]()
@@ -572,6 +570,8 @@ final class ScoreNoder {
                 let noteStartSec = rendnote.secRange.start.isInfinite ?
                 frameStartSec : rendnote.secRange.start + startSec
                 let dNoteStartSecI = Int((frameStartSec - noteStartSec) * sampleRate)
+                let secI = frameStartSec - noteStartSec < 0 ? 
+                0 : Int((frameStartSec - noteStartSec) * sampleRate)
                 if rendnote.secRange.end.isInfinite {
                     if dNoteStartSecI + frameCount >= 0 && self.memowaves[rendnote.id] == nil {
                         let nwid = NotewaveID(rendnote)
@@ -587,7 +587,7 @@ final class ScoreNoder {
                                                                 envelopeMemo: rendnote.envelopeMemo,
                                                                 pitbend: rendnote.pitbend,
                                                                 notewave: notewave)
-                            self.phases[rendnote.id] = 0
+                            self.phases[rendnote.id] = .init(secI.mod(notewave.samples.count))
                         }
                     }
                 } else {
@@ -610,7 +610,7 @@ final class ScoreNoder {
                                                                 envelopeMemo: rendnote.envelopeMemo,
                                                                 pitbend: rendnote.pitbend,
                                                                 notewave: notewave)
-                            self.phases[rendnote.id] = 0
+                            self.phases[rendnote.id] = .init(secI.mod(notewave.samples.count))
                         }
                     } else if let memowave = self.memowaves[rendnote.id], !rendnote.secRange.end.isInfinite,
                               memowave.endSec == nil {

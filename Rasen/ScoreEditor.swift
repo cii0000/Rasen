@@ -536,7 +536,7 @@ final class ScoreSlider: DragEditor {
                                     let note = scoreView[noteI]
                                     let result = note.pitResult(atBeat: Double(nsBeat - note.beatRange.start))
                                     let cPitch = result.notePitch + result.pitch.rationalValue(intervalScale: Sheet.fullEditBeatInterval)
-                                    document.cursor = .circle(string: Pitch(value: cPitch).octaveString())
+                                    document.cursor = .circle(string: Pitch(value: cPitch).octaveString(deltaPitch: dPitch))
                                 }
                             }
                             document.updateSelects()
@@ -583,7 +583,7 @@ final class ScoreSlider: DragEditor {
                                     let note = scoreView[noteI]
                                     let result = note.pitResult(atBeat: Double(neBeat - note.beatRange.start))
                                     let cPitch = result.notePitch + result.pitch.rationalValue(intervalScale: Sheet.fullEditBeatInterval)
-                                    document.cursor = .circle(string: Pitch(value: cPitch).octaveString())
+                                    document.cursor = .circle(string: Pitch(value: cPitch).octaveString(deltaPitch: dPitch))
                                 }
                             }
                             document.updateSelects()
@@ -631,7 +631,7 @@ final class ScoreSlider: DragEditor {
                                     let note = scoreView[noteI]
                                     let result = note.pitResult(atBeat: Double(beat - note.beatRange.start))
                                     let cPitch = result.notePitch + result.pitch.rationalValue(intervalScale: Sheet.fullEditBeatInterval)
-                                    document.cursor = .circle(string: Pitch(value: cPitch).octaveString())
+                                    document.cursor = .circle(string: Pitch(value: cPitch).octaveString(deltaPitch: dPitch))
                                 }
                             }
                             document.updateSelects()
@@ -847,8 +847,6 @@ final class ScoreView: TimelineView {
         didSet {
             guard isFullEdit != oldValue else { return }
             timelineFullEditBorderNode.isHidden = !isFullEdit
-            pitsFullEditNode.isHidden = !isFullEdit
-            pitsNode.isHidden = isFullEdit
             
             notesNode.children.forEach {
                 $0.children.forEach {
@@ -905,9 +903,8 @@ final class ScoreView: TimelineView {
     let timelineBorderNode = Node(fillType: .color(.border))
     let timelineFullEditBorderNode = Node(isHidden: true, fillType: .color(.border))
     let chordNode = Node(fillType: .color(.subBorder))
-    let pitsNode = Node(isHidden: true, fillType: .color(.background))
+    let pitsNode = Node(fillType: .color(.background))
     var tonesNode = Node()
-    let pitsFullEditNode = Node(isHidden: true, fillType: .color(.background))
     let clippingNode = Node(isHidden: true, lineWidth: 4, lineType: .color(.warning))
     
     var scoreNoder: ScoreNoder?
@@ -922,8 +919,7 @@ final class ScoreView: TimelineView {
                                timelineFullEditBorderNode,
                                timelineSubBorderNode, octaveNode, chordNode,
                                timelineContentNode,
-                               draftNotesNode, notesNode,
-                               pitsFullEditNode, pitsNode, tonesNode,
+                               draftNotesNode, notesNode, pitsNode, tonesNode,
                                timeNode, clippingNode])
         updateClippingNode()
         updateTimeline()
@@ -1265,13 +1261,13 @@ extension ScoreView {
         let sBeat = max(score.beatRange.start, -10000), eBeat = min(score.beatRange.end, 10000)
         let sx = self.x(atBeat: sBeat)
         let ex = self.x(atBeat: eBeat)
-        let lw = 1.0
         
         var subBorderPathlines = [Pathline]()
         
+        let notes = score.notes + score.draftNotes
         if let range = Range<Int>(pitchRange) {
             let plw = 0.5
-            let unisonsSet = Set(score.notes.flatMap { $0.chordBeatRangeAndRoundedPitchs().map { $0.roundedPitch.mod(12) } })
+            let unisonsSet = Set(notes.flatMap { $0.chordBeatRangeAndRoundedPitchs().map { $0.roundedPitch.mod(12) } })
             for pitch in range {
                 guard unisonsSet.contains(pitch.mod(12)) else { continue }
                 let py = self.y(fromPitch: Rational(pitch))
@@ -1293,8 +1289,9 @@ extension ScoreView {
         chordRanges.append(preBeat ..< score.beatRange.end)
         
         let sy = self.y(fromPitch: pitchRange.start), ey = self.y(fromPitch: pitchRange.end)
+        let plw = 0.5
         subBorderPathlines += chordBeats.map {
-            Pathline(Rect(x: x(atBeat: $0) - lw / 2, y: sy, width: lw, height: ey - sy))
+            Pathline(Rect(x: x(atBeat: $0) - plw / 2, y: sy, width: plw, height: ey - sy))
         }
         
         let trs = chordRanges.map { ($0, score.chordPitches(atBeat: $0)) }
@@ -1337,7 +1334,7 @@ extension ScoreView {
                                 subBorderPathlines.append(.init(Rect(x: fx - allLw / 2, y: py + d,
                                                                      width: allLw, height: tlw)))
                                 if isInversion {
-                                    let ilw = 1.0
+                                    let ilw = 0.75
                                     subBorderPathlines.append(.init(Rect(x: fx - allLw / 2 - ilw, y: py - d - ilw,
                                                                          width: allLw + 2 * ilw, height: ilw)))
                                     subBorderPathlines.append(.init(Rect(x: fx - allLw / 2 - ilw, y: py + d,
@@ -1471,25 +1468,60 @@ extension ScoreView {
                 self.h = h
                 self.color = color
             }
+            
+            var point: Point {
+                .init(x, y)
+            }
         }
         func triangleStrip(_ wps: [LinePoint]) -> TriangleStrip {
-            var ps = [Point](capacity: wps.count * 2)
+            var ps = [Point](capacity: wps.count * 4)
+            guard wps.count >= 2 else {
+                return .init(points: wps.isEmpty ? [] : [wps[0].point])
+            }
             for (i, wp) in wps.enumerated() {
-                if (i == 0 || i == wps.count - 1) && wp.h == 0 {
-                    ps.append(.init(wp.x, wp.y))
+                if i == 0 || i == wps.count - 1 {
+                    if wp.h == 0 {
+                        ps.append(.init(wp.x, wp.y))
+                    } else if i == 0 {
+                        let angle = Edge(wps[0].point, wps[1].point).angle()
+                        let p = PolarPoint(wp.h, angle + .pi / 2).rectangular
+                        ps.append(wp.point + p)
+                        ps.append(wp.point - p)
+                    } else {
+                        let angle = Edge(wps[i - 1].point, wps[i].point).angle()
+                        let p = PolarPoint(wp.h, angle + .pi / 2).rectangular
+                        ps.append(wp.point + p)
+                        ps.append(wp.point - p)
+                    }
                 } else {
-                    ps.append(.init(wp.x, wp.y - wp.h))
-                    ps.append(.init(wp.x, wp.y + wp.h))
+                    let angle0 = Edge(wps[i - 1].point, wps[i].point).angle()
+                    let angle1 = Edge(wps[i].point, wps[i + 1].point).angle()
+                    let p0 = PolarPoint(wp.h, angle0 + .pi / 2).rectangular
+                    ps.append(wp.point + p0)
+                    ps.append(wp.point - p0)
+                    let p1 = PolarPoint(wp.h, angle1 + .pi / 2).rectangular
+                    ps.append(wp.point + p1)
+                    ps.append(wp.point - p1)
                 }
             }
             return .init(points: ps)
         }
         func colors(_ wps: [LinePoint]) -> [Color] {
-            var colors = [Color](capacity: wps.count * 2)
+            var colors = [Color](capacity: wps.count * 4)
+            guard wps.count >= 2 else {
+                return wps.isEmpty ? [] : [wps[0].color]
+            }
             for (i, wp) in wps.enumerated() {
-                if (i == 0 || i == wps.count - 1) && wp.h == 0 {
-                    colors.append(wp.color)
+                if i == 0 || i == wps.count - 1 {
+                    if wp.h == 0 {
+                        colors.append(wp.color)
+                    } else {
+                        colors.append(wp.color)
+                        colors.append(wp.color)
+                    }
                 } else {
+                    colors.append(wp.color)
+                    colors.append(wp.color)
                     colors.append(wp.color)
                     colors.append(wp.color)
                 }
@@ -1743,14 +1775,16 @@ extension ScoreView {
         }
         
         var nodes = [Node](), toneNodes = [Node]()
+        
         let lineNode = Node(path: linePath,
                             fillType: color != nil ? .color(color!) : (lineColors.count == 1 ? .color(lineColors[0]) : .gradient(lineColors)))
         nodes.append(lineNode)
-        let mainLinePoints = pointline(from: note).points
+        
+        let mainLinePoints = pointline(from: note).controls.map { $0.point }
         let lmly = mainLinePoints.last?.y ?? ny
         let mainLineColor = note.isOneOvertone ?
         Color(lightness: 50, nearestChroma: 1000, hue: .pi / 2) :
-        Self.color(fromVolm: 1, noise: note.noiseRatio)
+        Self.color(fromVolm: 0.75, noise: note.noiseRatio)
         nodes.append(.init(path: .init([Point(nx + nw, lmly), Point(rx, lmly)]),
                            lineWidth: 0.125, lineType: .color(mainLineColor)))
         nodes.append(.init(path: .init(mainLinePoints + [Point(nx + nw, lmly)]),
@@ -1799,7 +1833,8 @@ extension ScoreView {
             let noteSX = x(atBeat: note.beatRange.start)
             let noteEX = x(atBeat: note.beatRange.end)
             let noteY = noteY(atBeat: note.beatRange.start, from: note)
-            return .init(points: [.init(noteSX, noteY), .init(noteEX, noteY)])
+            return .init(controls: [.init(point: .init(noteSX, noteY)),
+                                    .init(point: .init(noteEX, noteY))])
         } else {
             var beat = note.beatRange.start, ps = [Point]()
             while beat <= note.beatRange.end {
@@ -1807,7 +1842,7 @@ extension ScoreView {
                 ps.append(Point(noteX, noteY))
                 beat += .init(1, 48)
             }
-            return .init(points: ps)
+            return .init(controls: ps.map { .init(point: $0) })
         }
     }
     func lineColors(from note: Note) -> [Color] {
@@ -1985,7 +2020,6 @@ extension ScoreView {
         case sprol(pitI: Int, sprolI: Int)
     }
     func hitTestControl(_ p: Point, scale: Double, at noteI: Int) -> ControlHitResult? {
-        guard isFullEdit else { return nil }
         var minResult: ControlHitResult?
         
         let maxD = Sheet.knobEditDistance * scale

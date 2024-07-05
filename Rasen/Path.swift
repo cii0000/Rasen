@@ -604,7 +604,7 @@ struct Path {
     }
     init(_ triangleStrip: TriangleStrip) {
         self.triangleStrip = triangleStrip
-        self.pathlines = [.init(triangleStrip.outlinePoints)]
+        self.pathlines = [.init(triangleStrip.outlinePoints, isClosed: true)]
         isCap = false
         updateBounds()
     }

@@ -1434,7 +1434,7 @@ final class Document {
         }
         for sPointline in sPointlines {
             if selectedNoteNodes[sPointline] == nil {
-                let node = Node(path: Path(sPointline.points),
+                let node = Node(path: Path(sPointline.controls.map { $0.point }),
                                 lineWidth: worldLineWidth * 1.5,
                                 lineType: .color(.selected))
                 selectedNoteNodes[sPointline] = node

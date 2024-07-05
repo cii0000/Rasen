@@ -452,7 +452,8 @@ struct Spectrogram {
         let loudnessScales = volmCount.range.map {
             let fq = Double.linear(Self.minLinearFq, Self.maxLinearFq,
                                    t: Double($0) / Double(volmCount))
-            return Loudness.reverseVolm40Phon(fromFq: fq)
+            let pitch = Pitch.pitch(fromFq: fq)
+            return Loudness.reverseVolm40Phon(fromPitch: pitch)
         }
         
         var chSecVolms: [[[Double]]]
@@ -512,7 +513,8 @@ struct Spectrogram {
                 let loudnessScales2 = volmCount2.range.map {
                     let fq = Double.linear(Self.minLinearFq, Self.maxLinearFq,
                                            t: Double($0) / Double(volmCount2))
-                    return Loudness.reverseVolm40Phon(fromFq: fq)
+                    let pitch = Pitch.pitch(fromFq: fq)
+                    return Loudness.reverseVolm40Phon(fromPitch: pitch)
                 }
                 
                 let filterBank2 = FilterBank(sampleCount: volmCount2,

@@ -1594,7 +1594,7 @@ final class LineZSlider: DragEditor {
 
     private var sheetView: SheetView?, lineNode = Node(),
     crossIndexes = [Int](), crossLineIndex = 0,
-    lineIndex = 0, lineView: SheetLineView?, oldSP = Point()
+    lineIndex = 0, lineView: SheetLineView?, oldSP = Point(), isNote = false
     
     func send(_ event: DragEvent) {
         guard isEditingSheet else {

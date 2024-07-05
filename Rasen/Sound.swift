@@ -103,17 +103,38 @@ extension Pitch {
     func lyricsUnison(isSharp: Bool) -> LyricsUnison {
         LyricsUnison(unison: Int(unison.rounded()), isSharp: isSharp)
     }
-    func octaveString(hidableDecimal: Bool = true) -> String {
+    func octaveString(hidableDecimal: Bool = true, deltaPitch: Rational = 0) -> String {
         let octavePitch = value / 12
         let iPart = octavePitch.rounded(.down)
         let dPart = (octavePitch - iPart) * 12
         let dPartStr = String(format: "%02d", Int(dPart))
+        
+        let deltaDPartStr: String
+        if abs(deltaPitch) >= 12 {
+            let deltaOctavePitch = abs(deltaPitch) / 12
+            let deltaIPart = (deltaOctavePitch).rounded(.down)
+            let deltaDPart = (deltaOctavePitch - deltaIPart) * 12
+            deltaDPartStr = String(format: deltaPitch > 0 ? "+%d.%02d" : "-%d.%02d", Int(deltaIPart), Int(deltaDPart))
+        } else {
+            deltaDPartStr = String(format: deltaPitch > 0 ? "+%d" : "-%d", Int(abs(deltaPitch)))
+        }
+        let deltaStr: String
+        if deltaPitch == 0 {
+            deltaStr = ""
+        } else if hidableDecimal && deltaPitch.decimalPart == 0 {
+            deltaStr = " (\(deltaDPartStr))"
+        } else {
+            let ddPart = deltaPitch.decimalPart * 12
+            let ddPartStr = ddPart.decimalPart == 0 ? String(format: "%02d", Int(abs(ddPart))) : "\(abs(ddPart.decimalPart))"
+            deltaStr = " (\(deltaDPartStr).\(ddPartStr))"
+        }
+        
         if hidableDecimal && dPart.decimalPart == 0 {
-            return "C\(iPart).\(dPartStr)"
+            return "C\(iPart).\(dPartStr)" + deltaStr
         } else {
             let ddPart = dPart.decimalPart * 12
             let ddPartStr = ddPart.decimalPart == 0 ? String(format: "%02d", Int(ddPart)) : "\(ddPart.decimalPart)"
-            return "C\(iPart).\(dPartStr).\(ddPartStr)"
+            return "C\(iPart).\(dPartStr).\(ddPartStr)" + deltaStr
         }
     }
 }
@@ -385,9 +406,10 @@ extension Sprol {
 }
 
 struct Spectlope: Hashable, Codable {
-    var sprols = [Sprol(pitch: 12 * 2, volm: 1, noise: 0),
-                  Sprol(pitch: 12 * 7, volm: 0.125, noise: 0),
-                  Sprol(pitch: 12 * 10, volm: 0, noise: 0)]
+    var sprols = [Sprol(pitch: 12 * 1, volm: 0.75, noise: 0),
+                  Sprol(pitch: 12 * 2 + 5, volm: 1, noise: 0),
+                  Sprol(pitch: 12 * 7 + 5, volm: 0.5, noise: 0),
+                  Sprol(pitch: 12 * 10, volm: 0.1875, noise: 0)]
 }
 extension Spectlope: Protobuf {
     init(_ pb: PBSpectlope) throws {
@@ -713,8 +735,10 @@ extension Tone: Protobuf {
     }
 }
 extension Tone {
-    static let empty = Self.init(overtone: .init(evenVolm: 0, oddVolm: 0),
-                                 spectlope: .init(sprols: [.init(pitch: 0, volm: 1, noise: 0)]))
+    static func empty() -> Self {
+        Self.init(overtone: .init(evenVolm: 0, oddVolm: 0),
+                  spectlope: .init(sprols: [.init(pitch: 0, volm: 1, noise: 0)]))
+    }
     
     func with(id: UUID) -> Self {
         var v = self
@@ -763,7 +787,7 @@ extension Tone: MonoInterpolatable {
 }
 
 struct Pit: Codable, Hashable {
-    var beat = Rational(0), pitch = Rational(0), stereo = Stereo(volm: 0.3125), odd = 0.0, tone = Tone(), lyric = ""
+    var beat = Rational(0), pitch = Rational(0), stereo = Stereo(volm: 0.28125), odd = 0.0, tone = Tone(), lyric = ""
 }
 extension Pit: Protobuf {
     init(_ pb: PBPit) throws {
@@ -807,7 +831,7 @@ extension Pit {
 }
 
 struct Envelope: Hashable, Codable {
-    var attackSec = 0.02, decaySec = 0.01, sustainVolm = 1.0, releaseSec = 0.02
+    var attackSec = 0.01, decaySec = 0.01, sustainVolm = 1.0, releaseSec = 0.01
     var id = UUID()
 }
 extension Envelope: Protobuf {
@@ -1497,7 +1521,7 @@ extension Score {
     
     func chordPitches(atBeat range: Range<Rational>) -> [Int] {
         var pitchLengths = [Int: Rational]()
-        for note in notes {
+        for note in notes + draftNotes {
             for (beatRange, roundedPitch) in note.chordBeatRangeAndRoundedPitchs() {
                 if let iRange = beatRange.intersection(range) {
                     if pitchLengths[roundedPitch] != nil {

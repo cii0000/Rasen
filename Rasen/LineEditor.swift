@@ -972,7 +972,7 @@ final class LineEditor: Editor {
     
     private var isDrawNote = false
     private var noteSheetView: SheetView?, notePitch: Rational?, firstTone = Tone(),
-                beganScore: Score?,
+                beganScore: Score?, beganPitch = Rational(),
                 noteI: Int?, noteStartBeat: Rational?, notePlayer: NotePlayer?
     func drawNote(with event: DragEvent, isStraight: Bool = false) {
         guard isEditingSheet else {
@@ -998,13 +998,14 @@ final class LineEditor: Editor {
                 let beatInterval = document.currentBeatInterval
                 let beat = scoreView.beat(atX: inP.x, interval: beatInterval)
                 let beatRange = beat ..< beat
-                firstTone = isStraight ? Tone.empty : Tone()
+                firstTone = isStraight ? Tone.empty() : Tone()
                 let note = Note(beatRange: beatRange, pitch: pitch,
                                 pits: .init([.init(beat: 0, pitch: 0, tone: firstTone)]),
                                 envelope: !isStraight && firstTone.spectlope.isFullNoise ? .init(releaseSec: 0.5) : .init())
                 
                 noteI = count
                 notePitch = pitch
+                beganPitch = pitch
                 noteStartBeat = beat
                 beganScore = score
                 
@@ -1059,7 +1060,8 @@ final class LineEditor: Editor {
 //                    tempLineNode?.children
 //                        = scoreView.noteNode(from: note).children
                 
-                document.cursor = .circle(string: Pitch(value: pitch).octaveString())
+                document.cursor = .circle(string: Pitch(value: pitch)
+                    .octaveString(deltaPitch: pitch - beganPitch))
             }
         case .ended:
             tempLineNode?.removeFromParent()
