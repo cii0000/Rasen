@@ -241,9 +241,11 @@ extension TimelineView {
                 let rect = Rect(x: beatX - lw / 2, y: sy,
                                 width: lw, height: ey - sy)
                 if lw == 0.125 {
-                    fullEditBorderPathlines.append(Pathline(rect))
+                    fullEditBorderPathlines.append(.init(rect))
+                } else if lw == 0.5 {
+                    subBorderPathlines.append(.init(rect))
                 } else {
-                    borderPathlines.append(Pathline(rect))
+                    borderPathlines.append(.init(rect))
                 }
             }
             cBeat += deltaBeat

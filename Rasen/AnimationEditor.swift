@@ -1594,7 +1594,8 @@ final class LineZSlider: DragEditor {
 
     private var sheetView: SheetView?, lineNode = Node(),
     crossIndexes = [Int](), crossLineIndex = 0,
-    lineIndex = 0, lineView: SheetLineView?, oldSP = Point(), isNote = false
+    lineIndex = 0, lineView: SheetLineView?, oldSP = Point(),
+                isNote = false, noteNode: Node?
     
     func send(_ event: DragEvent) {
         guard isEditingSheet else {
@@ -1612,7 +1613,7 @@ final class LineZSlider: DragEditor {
         switch event.phase {
         case .began:
             document.cursor = .arrow
-
+            
             if let sheetView = document.sheetView(at: p) {
                 let inP = sheetView.convertFromWorld(p)
                 if let (lineView, li) = sheetView.lineTuple(at: inP,
@@ -1649,6 +1650,41 @@ final class LineZSlider: DragEditor {
                     lineNode.lineType = lineView.node.lineType
                     lineNode.lineWidth = lineView.node.lineWidth
                     sheetView.linesView.node.children.insert(lineNode, at: li)
+                } else if sheetView.scoreView.model.enabled,
+                          let li = sheetView.scoreView.noteIndex(at: inP,
+                                                                 scale: document.screenToWorldScale) {
+                    self.sheetView = sheetView
+                    lineIndex = li
+                    let noteNode = sheetView.scoreView.notesNode.children[li]
+                    self.noteNode = noteNode
+                    noteNode.isHidden = true
+                    
+                    let line = sheetView.scoreView.pointline(from: sheetView.scoreView.model.notes[li])
+                    let noteH = sheetView.scoreView.noteH(from: sheetView.scoreView.model.notes[li])
+                    if let lb = noteNode.path.bounds?.outset(by: noteH / 2) {
+                        crossIndexes = sheetView.scoreView.model.notes.enumerated().compactMap {
+                            let nNoteH = sheetView.scoreView.noteH(from: sheetView.scoreView.model.notes[$0.offset])
+                            let nLine = sheetView.scoreView.pointline(from: $0.element)
+                            return if $0.offset == li {
+                                li
+                            } else if let nb = sheetView.scoreView.notesNode.children[$0.offset].path.bounds,
+                                      nb.outset(by: noteH / 2).intersects(lb) {
+                                nLine.minDistanceSquared(line) < (noteH / 2 + nNoteH / 2).squared ?
+                                $0.offset : nil
+                            } else {
+                                nil
+                            }
+                        }
+                        if let lastI = crossIndexes.last {
+                            crossIndexes.append(lastI + 1)
+                        }
+                        crossLineIndex = crossIndexes.firstIndex(of: li)!
+                    }
+                    
+                    oldSP = sp
+                    lineNode = noteNode.clone
+                    lineNode.isHidden = false
+                    sheetView.scoreView.notesNode.children.insert(lineNode, at: li)
                 }
             }
         case .changed:
@@ -1660,14 +1696,25 @@ final class LineZSlider: DragEditor {
                 let cli = (Int((sp.y - oldSP.y) / 10) + crossLineIndex)
                     .clipped(min: 0, max: crossIndexes.count - 1)
                 let li = crossIndexes[cli]
-                    .clipped(min: 0,
-                             max: sheetView.linesView.elementViews.count)
+                    .clipped(min: 0, max: sheetView.linesView.elementViews.count)
                 lineNode.removeFromParent()
                 sheetView.linesView.node.children.insert(lineNode, at: li)
+            } else if let sheetView = sheetView, sheetView.scoreView.model.enabled,
+                      lineIndex < sheetView.scoreView.model.notes.count {
+                
+                guard !crossIndexes.isEmpty else { return }
+                
+                let cli = (Int((sp.y - oldSP.y) / 10) + crossLineIndex)
+                    .clipped(min: 0, max: crossIndexes.count - 1)
+                let li = crossIndexes[cli]
+                    .clipped(min: 0, max: sheetView.scoreView.model.notes.count)
+                lineNode.removeFromParent()
+                sheetView.scoreView.notesNode.children.insert(lineNode, at: li)
             }
         case .ended:
             lineNode.removeFromParent()
             lineView?.node.isHidden = false
+            noteNode?.isHidden = false
             
             if let sheetView = sheetView,
                lineIndex < sheetView.linesView.elementViews.count {
@@ -1677,12 +1724,26 @@ final class LineZSlider: DragEditor {
                 let cli = (Int((sp.y - oldSP.y) / 10) + crossLineIndex)
                     .clipped(min: 0, max: crossIndexes.count - 1)
                 let li = crossIndexes[cli]
-                    .clipped(min: 0,
-                             max: sheetView.linesView.elementViews.count)
+                    .clipped(min: 0, max: sheetView.linesView.elementViews.count)
                 let line = sheetView.linesView.elementViews[lineIndex].model
                 if lineIndex != li {
                     sheetView.newUndoGroup()
                     sheetView.removeLines(at: [lineIndex])
+                    sheetView.insert([.init(value: line, index: li > lineIndex ? li - 1 : li)])
+                }
+            } else if let sheetView = sheetView, sheetView.scoreView.model.enabled,
+                      lineIndex < sheetView.scoreView.model.notes.count {
+                
+                guard !crossIndexes.isEmpty else { return }
+                
+                let cli = (Int((sp.y - oldSP.y) / 10) + crossLineIndex)
+                    .clipped(min: 0, max: crossIndexes.count - 1)
+                let li = crossIndexes[cli]
+                    .clipped(min: 0, max: sheetView.scoreView.model.notes.count)
+                let line = sheetView.scoreView.model.notes[lineIndex]
+                if lineIndex != li {
+                    sheetView.newUndoGroup()
+                    sheetView.removeNote(at: lineIndex)
                     sheetView.insert([.init(value: line, index: li > lineIndex ? li - 1 : li)])
                 }
             }

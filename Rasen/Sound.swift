@@ -1065,6 +1065,9 @@ extension Note {
     var containsNoise: Bool {
         pits.contains(where: { $0.tone.spectlope.sprols.contains(where: { $0.noise > 0 }) })
     }
+    var isFullNoise: Bool {
+        pits.allSatisfy { $0.tone.spectlope.isFullNoise }
+    }
 }
 extension Note {
     private static func pitsFrom(recoilBeat0 beat0: Rational, beat1: Rational,

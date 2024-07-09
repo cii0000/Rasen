@@ -256,7 +256,7 @@ final class ScoreSlider: DragEditor {
                 beganBeatRange: Range<Rational>?,
                 playerBeatNoteIndexes = [Int](),
                 beganDeltaNoteBeat = Rational(),
-                oldNotePitch: Rational?, oldBeat: Rational?,
+                oldPitch: Rational?, oldBeat: Rational?, octaveNode: Node?,
                 minScorePitch = Rational(0), maxScorePitch = Rational(0)
     private var beganStartBeat = Rational(0), beganPitch: Rational?,  beganBeatX = 0.0, beganPitchY = 0.0
     private var beganTone = Tone(), beganOvertone = Overtone(), beganEnvelope = Envelope()
@@ -440,7 +440,7 @@ final class ScoreSlider: DragEditor {
                         let dBeat = note.beatRange.start - note.beatRange.start.interval(scale: interval)
                         beganDeltaNoteBeat = -dBeat
                         beganBeatRange = note.beatRange
-                        oldNotePitch = note.pitch
+                        oldPitch = note.pitch
                         
                         if type == .startNoteBeat || type == .note {
                             beganBeatX = scoreView.x(atBeat: note.beatRange.start)
@@ -465,6 +465,15 @@ final class ScoreSlider: DragEditor {
                         playerBeatNoteIndexes = vs.map { $0.noteI }
                         
                         updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
+                        
+                        let octaveNode = scoreView.octaveNode(fromPitch: note.pitch,
+                                                              noteIs: beganNotes.keys.sorted(),
+                                                              .octave)
+                        octaveNode.attitude.position = sheetView.node.attitude.position
+                        self.octaveNode = octaveNode
+                        document.rootNode.append(child: octaveNode)
+                        
+                        document.cursor = .circle(string: Pitch(value: note.pitch).octaveString())
                     }
                     
                     if type == .startNoteBeat || type == .endNoteBeat || type == .note {
@@ -501,7 +510,7 @@ final class ScoreSlider: DragEditor {
                                                     interval: document.currentPitchInterval)
                         let nsBeat = scoreView.beat(atX: beganBeatX + sheetP.x - beganSheetP.x,
                                                     interval: beatInterval)
-                        if pitch != oldNotePitch || nsBeat != oldBeat {
+                        if pitch != oldPitch || nsBeat != oldBeat {
                             let dBeat = nsBeat - beganBeatRange.start
                             let dPitch = pitch - beganPitch
                             
@@ -526,11 +535,15 @@ final class ScoreSlider: DragEditor {
                             
                             oldBeat = nsBeat
                             
-                            if pitch != oldNotePitch {
+                            octaveNode?.children = scoreView.octaveNode(fromPitch: pitch,
+                                                                        noteIs: beganNotes.keys.sorted(),
+                                                                        .octave).children
+                            
+                            if pitch != oldPitch {
                                 notePlayer?.notes = playerBeatNoteIndexes.map {
                                     scoreView.pitResult(atBeat: nsBeat, at: $0)
                                 }
-                                oldNotePitch = pitch
+                                oldPitch = pitch
                                 
                                 if let noteI, noteI < scoreView.model.notes.count {
                                     let note = scoreView[noteI]
@@ -549,7 +562,7 @@ final class ScoreSlider: DragEditor {
                                                     interval: document.currentPitchInterval)
                         let neBeat = scoreView.beat(atX: beganBeatX + sheetP.x - beganSheetP.x,
                                                     interval: beatInterval)
-                        if pitch != oldNotePitch || neBeat != oldBeat {
+                        if pitch != oldPitch || neBeat != oldBeat {
                             let dBeat = neBeat - beganBeatRange.end
                             let dPitch = pitch - beganPitch
                             let startBeat = sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: beatInterval)
@@ -573,11 +586,15 @@ final class ScoreSlider: DragEditor {
                             
                             oldBeat = neBeat
                             
-                            if pitch != oldNotePitch {
+                            octaveNode?.children = scoreView.octaveNode(fromPitch: pitch,
+                                                                        noteIs: beganNotes.keys.sorted(),
+                                                                        .octave).children
+                            
+                            if pitch != oldPitch {
                                 notePlayer?.notes = playerBeatNoteIndexes.map {
                                     scoreView.pitResult(atBeat: neBeat, at: $0)
                                 }
-                                oldNotePitch = pitch
+                                oldPitch = pitch
                                 
                                 if let noteI, noteI < scoreView.model.notes.count {
                                     let note = scoreView[noteI]
@@ -596,7 +613,7 @@ final class ScoreSlider: DragEditor {
                                                     interval: document.currentPitchInterval)
                         let nsBeat = scoreView.beat(atX: beganBeatX + sheetP.x - beganSheetP.x,
                                                     interval: beatInterval)
-                        if pitch != oldNotePitch || nsBeat != oldBeat {
+                        if pitch != oldPitch || nsBeat != oldBeat {
                             let dBeat = nsBeat - beganBeatRange.start
                             let dPitch = pitch - beganPitch
                             
@@ -620,12 +637,16 @@ final class ScoreSlider: DragEditor {
                             
                             oldBeat = nsBeat
                             
-                            if pitch != oldNotePitch {
+                            octaveNode?.children = scoreView.octaveNode(fromPitch: pitch,
+                                                                        noteIs: beganNotes.keys.sorted(),
+                                                                        .octave).children
+                            
+                            if pitch != oldPitch {
                                 let beat: Rational = scoreView.beat(atX: scoreP.x)
                                 notePlayer?.notes = playerBeatNoteIndexes.map {
                                     scoreView.pitResult(atBeat: beat, at: $0)
                                 }
-                                oldNotePitch = pitch
+                                oldPitch = pitch
                                 
                                 if let noteI, noteI < scoreView.model.notes.count {
                                     let note = scoreView[noteI]
@@ -760,6 +781,8 @@ final class ScoreSlider: DragEditor {
         case .ended:
             notePlayer?.stop()
             node.removeFromParent()
+            octaveNode?.removeFromParent()
+            octaveNode = nil
             
             if let sheetView {
                 if type == .keyBeats || type == .endBeat {
@@ -1217,7 +1240,7 @@ extension ScoreView {
         while cPitch <= pitchRange.end {
             if cPitch >= pitchRange.start {
                 let plw: Double = if cPitch % pitchR1 == 0 {
-                    0.5
+                    0.25
                 } else {
                     0.125
                 }
@@ -1234,14 +1257,16 @@ extension ScoreView {
         
         for keyBeat in score.keyBeats {
             let nx = x(atBeat: keyBeat)
-            contentPathlines.append(.init(Rect(x: nx - 1, y: y - knobH / 2,
+            let lw = 1.0
+            subBorderPathlines.append(.init(Rect(x: nx - lw / 2, y: sy,
+                                                 width: lw, height: ey - sy)))
+            contentPathlines.append(.init(Rect(x: nx - knobW / 2, y: y - knobH / 2,
                                                width: knobW, height: knobH)))
         }
-        
-        contentPathlines.append(.init(Rect(x: ex - 1, y: y - knobH / 2,
+        contentPathlines.append(.init(Rect(x: ex - knobW / 2, y: y - knobH / 2,
                                            width: knobW, height: knobH)))
-        contentPathlines.append(.init(Rect(x: sx + 1, y: y - lw / 2,
-                                           width: ex - sx - 2, height: lw)))
+        contentPathlines.append(.init(Rect(x: sx, y: y - lw / 2,
+                                           width: ex - sx, height: lw)))
         
         let secRange = score.secRange
         for sec in Int(secRange.start.rounded(.up)) ..< Int(secRange.end.rounded(.up)) {
@@ -1289,7 +1314,7 @@ extension ScoreView {
         chordRanges.append(preBeat ..< score.beatRange.end)
         
         let sy = self.y(fromPitch: pitchRange.start), ey = self.y(fromPitch: pitchRange.end)
-        let plw = 0.5
+        let plw = 1.0
         subBorderPathlines += chordBeats.map {
             Pathline(Rect(x: x(atBeat: $0) - plw / 2, y: sy, width: plw, height: ey - sy))
         }
@@ -1361,11 +1386,16 @@ extension ScoreView {
         return subBorderPathlines
     }
     
-    func octaveNode(fromPitch pitch: Rational, _ noteNode: Node) -> Node {
+    func octaveNode(fromPitch pitch: Rational, noteIs: [Int], _ color: Color = .border) -> Node {
+        let node = Node(children: noteIs.map { notesNode.children[$0].children[0].clone })
+        node.children.forEach { $0.fillType = .color(color) }
+        return octaveNode(fromPitch: pitch, node, color)
+    }
+    func octaveNode(fromPitch pitch: Rational, _ noteNode: Node, _ color: Color = .border) -> Node {
         let pitchRange = Score.pitchRange
         guard pitchRange.contains(pitch) else { return .init() }
         
-        noteNode.fillType = .color(.border)
+        noteNode.fillType = .color(color)
         
         let pd = 12 * pitchHeight
         var nodes = [Node](), nPitch = pitch, npd = 0.0
@@ -1413,7 +1443,7 @@ extension ScoreView {
                                            fillType: .color(color != nil ? color! : .content))]),
                     .init())
         }
-        let nh = ScoreLayout.noteHeight
+        let nh = noteH(from: note)
         let halfNH = nh / 2
         let nx = x(atBeat: note.beatRange.start)
         let ny = y(fromPitch: note.firstPitch)
@@ -1782,13 +1812,10 @@ extension ScoreView {
         
         let mainLinePoints = pointline(from: note).controls.map { $0.point }
         let lmly = mainLinePoints.last?.y ?? ny
-        let mainLineColor = note.isOneOvertone ?
-        Color(lightness: 50, nearestChroma: 1000, hue: .pi / 2) :
-        Self.color(fromVolm: 0.75, noise: note.noiseRatio)
         nodes.append(.init(path: .init([Point(nx + nw, lmly), Point(rx, lmly)]),
-                           lineWidth: 0.125, lineType: .color(mainLineColor)))
+                           lineWidth: 0.125, lineType: .color(.content)))
         nodes.append(.init(path: .init(mainLinePoints + [Point(nx + nw, lmly)]),
-                           lineWidth: 0.5, lineType: .color(mainLineColor)))
+                           lineWidth: noteMainH(from: note), lineType: .color(.content)))
         
         toneNodes.append(.init(path: evenLinePath,
                                fillType: color != nil ? .color(color!) : (evenColors.count == 1 ? .color(evenColors[0]) : .gradient(evenColors))))
@@ -1810,7 +1837,7 @@ extension ScoreView {
         nodes.append(.init(path: .init(knobPathlines), fillType: .color(.background)))
         
         toneNodes.append(.init(path: .init([Point(rx, lmly - halfNH), Point(rx, lmly + halfNH)]),
-                               lineWidth: 0.125, lineType: .color(mainLineColor)))
+                               lineWidth: 0.125, lineType: .color(.content)))
         let toneBackKnobPathlines = toneKnobPAndRs.map {
             Pathline(circleRadius: $0.1 * 1.5, position: $0.0)
         }
@@ -1859,27 +1886,7 @@ extension ScoreView {
             return colors
         }
     }
-    func overtoneColors(from note: Note, _ type: OvertoneType) -> [Color] {
-        if note.pits.count == 1 {
-            let color = Self.color(fromVolm: note.pits[0].tone.overtone[type])
-            return [color, color]
-        } else {
-            var beat = note.beatRange.start, colors = [Color]()
-            while beat <= note.beatRange.end {
-                let overtone = tone(atBeat: beat, from: note).overtone[type]
-                colors.append(Self.color(fromVolm: overtone))
-                beat += .init(1, 48)
-            }
-            return colors
-        }
-    }
     
-    static func octaveColor(lightness: Double = 40, chroma: Double = 50,
-                            fromPitch pitch: Double) -> Color {
-        Color(lightness: lightness,
-              nearestChroma: chroma,
-              hue: .pi2 * pitch.mod(12) / 12)
-    }
     static func color(fromVolm volm: Double) -> Color {
         Color(lightness: (1 - volm) * 100)
     }
@@ -1976,11 +1983,11 @@ extension ScoreView {
         noteIndex(at: p, scale: scale) != nil
     }
     func noteIndex(at p: Point, scale: Double, enabledRelease: Bool = false) -> Int? {
-        let noteH = ScoreLayout.noteHeight
-        let maxD = Sheet.knobEditDistance * scale + noteH / 2
-        let maxDS = maxD * maxD, hnh = pitchHeight / 2
+        let hnh = pitchHeight / 2
         var minDS = Double.infinity, minI: Int?
         for (noteI, note) in model.notes.enumerated() {
+            let maxD = Sheet.knobEditDistance * scale + noteH(from: note) / 2
+            let maxDS = maxD * maxD
             let nf = noteFrame(at: noteI).outset(by: hnh)
             let ods = nf.distanceSquared(p)
             if ods < maxDS {
@@ -2130,8 +2137,8 @@ extension ScoreView {
                     minResult = .oddVolm(pitI: 0)
                 }
             } else {
+                let noteH = noteH(from: note)
                 for pitI in note.pits.count.range {
-                    let noteH = ScoreLayout.noteHeight
                     let minODS = p.y - noteY(atX: p.x, at: noteI)
                     if minODS > noteH / 2 {
                         let pitP = pitPosition(atPit: pitI, from: note)
@@ -2308,6 +2315,12 @@ extension ScoreView {
     func noteH(atX x: Double, from note: Note) -> Double {
         ScoreLayout.noteHeight
     }
+    func noteMainH(from note: Note) -> Double {
+        note.isOneOvertone ? 0.25 : (note.isFullNoise ? 1 : 0.5)
+    }
+    func noteH(from note: Note) -> Double {
+        ScoreLayout.noteHeight - 0.5 + noteMainH(from: note)
+    }
     
     func noteAndPitIEnabledNote(at p: Point, scale: Double) -> (noteI: Int, pitI: Int)? {
         if let v = noteAndPitI(at: p, scale: scale) {
@@ -2375,9 +2388,6 @@ extension ScoreView {
     }
     var toneHeight: Double {
         16
-    }
-    var curveToneY: Double {
-        ScoreLayout.noteHeight / 2 + 1.5 + toneHeight / 2
     }
     func toneFrame(at noteI: Int) -> Rect {
         toneFrame(from: model.notes[noteI])

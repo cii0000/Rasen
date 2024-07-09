@@ -971,8 +971,8 @@ final class LineEditor: Editor {
     }
     
     private var isDrawNote = false
-    private var noteSheetView: SheetView?, notePitch: Rational?, firstTone = Tone(),
-                beganScore: Score?, beganPitch = Rational(),
+    private var noteSheetView: SheetView?, oldPitch = Rational(0), firstTone = Tone(),
+                beganScore: Score?, beganPitch = Rational(), octaveNode: Node?, oldBeat = Rational(0),
                 noteI: Int?, noteStartBeat: Rational?, notePlayer: NotePlayer?
     func drawNote(with event: DragEvent, isStraight: Bool = false) {
         guard isEditingSheet else {
@@ -1004,7 +1004,8 @@ final class LineEditor: Editor {
                                 envelope: !isStraight && firstTone.spectlope.isFullNoise ? .init(releaseSec: 0.5) : .init())
                 
                 noteI = count
-                notePitch = pitch
+                oldPitch = pitch
+                oldBeat = beat
                 beganPitch = pitch
                 noteStartBeat = beat
                 beganScore = score
@@ -1030,11 +1031,17 @@ final class LineEditor: Editor {
                 
 //                stoppedSeqSec = sheetView.sequencer?.currentPositionInSec
                 
+                let octaveNode = scoreView.octaveNode(fromPitch: pitch, scoreView.notesNode.children.last!.children[0].clone,
+                                                  .subInterpolated)
+                octaveNode.attitude.position = sheetView.node.attitude.position
+                self.octaveNode = octaveNode
+                document.rootNode.append(child: octaveNode)
+                
                 document.cursor = .circle(string: Pitch(value: pitch).octaveString())
             }
         case .changed:
             let p = document.convertScreenToWorld(event.screenPoint)
-            if let sheetView = noteSheetView, let notePitch,
+            if let sheetView = noteSheetView,
                 let nsBeat = noteStartBeat, let noteI {
                 
                 let pitchInterval = document.currentPitchInterval
@@ -1049,16 +1056,23 @@ final class LineEditor: Editor {
                 let note = Note(beatRange: beatRange, pitch: pitch,
                                 pits: [.init(beat: 0, pitch: 0, tone: firstTone)],
                                 envelope: !isStraight && firstTone.spectlope.isFullNoise ? .init(releaseSec: 0.5) : .init())
-                let isNote = notePitch != pitch
+                let isNote = oldPitch != pitch
                 
                 if isNote {
                     notePlayer?.notes = [note.firstPitResult]
-                    self.notePitch = pitch
+                    self.oldPitch = pitch
                 }
                 
                 scoreView[noteI] = note
 //                    tempLineNode?.children
 //                        = scoreView.noteNode(from: note).children
+                
+                if isNote || beat != oldBeat {
+                    octaveNode?.children = scoreView.octaveNode(fromPitch: pitch,
+                                                                scoreView.notesNode.children.last!.children[0].clone,
+                                                                .octave).children
+                    oldBeat = beat
+                }
                 
                 document.cursor = .circle(string: Pitch(value: pitch)
                     .octaveString(deltaPitch: pitch - beganPitch))
@@ -1066,6 +1080,8 @@ final class LineEditor: Editor {
         case .ended:
             tempLineNode?.removeFromParent()
             tempLineNode = nil
+            octaveNode?.removeFromParent()
+            octaveNode = nil
             
             let p = document.convertScreenToWorld(event.screenPoint)
             if let sheetView = noteSheetView, let nsBeat = noteStartBeat, let noteI,

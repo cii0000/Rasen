@@ -396,6 +396,26 @@ extension Pointline {
             return minDSquared
         }
     }
+    func minDistanceSquared(_ other: Pointline) -> Double {
+        var minDSquared = Double.infinity
+        var p0 = firstPoint
+        for edge0 in edges {
+            for edge1 in other.edges {
+                if edge0.intersects(edge1) {
+                    return 0
+                } else {
+                    let dSquared = min(edge1.distanceSquared(from: edge0.p0),
+                                       edge1.distanceSquared(from: edge0.p1),
+                                       edge0.distanceSquared(from: edge1.p0),
+                                       edge0.distanceSquared(from: edge1.p1))
+                    if dSquared < minDSquared {
+                        minDSquared = dSquared
+                    }
+                }
+            }
+        }
+        return minDSquared
+    }
     
     var edges: [Edge] {
         guard controls.count >= 2 else { return [] }
