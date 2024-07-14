@@ -491,7 +491,7 @@ final class AnimationView: TimelineView {
     func updateWithKeyframeIndex() {
         updatePreviousNext()
         
-        node.children = [keyframeView.node, timelineNode]
+        node.children = [keyframeView.node]
     }
     
     func containsTimeline(_ p: Point) -> Bool {
@@ -541,6 +541,8 @@ final class AnimationView: TimelineView {
     func updateTimeline() {
         if model.enabled {
             timelineNode.children = timelineNodes() + [clippingNode]
+            timelineNode.path = .init(paddingTimelineBounds ?? .init())
+            timelineNode.fillType = .color(.background)
             timelineNode.attitude.position.y = model.timelineY
             
             let btsx = x(atBeat: model.beatRange.lowerBound) - paddingWidth
@@ -552,6 +554,8 @@ final class AnimationView: TimelineView {
             updateClippingNode()
         } else {
             timelineNode.children = []
+            timelineNode.path = .init()
+            timelineNode.fillType = nil
             paddingTimelineBounds = nil
             updateClippingNode()
         }
@@ -1062,11 +1066,12 @@ final class SheetView: View {
         
         node = Node(children: [animationView.previousNextNode,
                                animationView.node,
-                               animationView.timeNode,
                                scoreView.node,
                                contentsView.node,
                                textsView.node,
-                               bordersView.node])
+                               bordersView.node,
+                               animationView.timelineNode,
+                               animationView.timeNode])
         
         updateBackground()
         updateWithKeyframeIndex()
@@ -1094,7 +1099,7 @@ final class SheetView: View {
     }
     func updateWithKeyframeIndex() {
         updatePreviousNext()
-        animationView.node.children = [keyframeView.node, animationView.timelineNode]
+        animationView.node.children = [keyframeView.node]
     }
     func updatePreviousNext() {
         animationView.updatePreviousNext()
@@ -1816,7 +1821,6 @@ final class SheetView: View {
                 children.append(topNode)
             }
             
-            children.append(animationView.timelineNode)
             if !children.isEmpty {
                 animationView.node.children = children
             }

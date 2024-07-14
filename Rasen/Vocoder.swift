@@ -105,7 +105,6 @@ extension vDSP {
 
 struct EnvelopeMemo {
     let attackSec, decaySec, sustainVolm, releaseSec: Double
-    let attackAndDecaySec: Double
     let rAttackSec, rDecaySec, rReleaseSec: Double
     
     init(_ envelope: Envelope) {
@@ -113,41 +112,36 @@ struct EnvelopeMemo {
         decaySec = max(envelope.decaySec, 0)
         sustainVolm = envelope.sustainVolm
         releaseSec = max(envelope.releaseSec, 0)
-        attackAndDecaySec = attackSec + decaySec
         rAttackSec = 1 / attackSec
         rDecaySec = 1 / decaySec
         rReleaseSec = 1 / releaseSec
     }
 }
 extension EnvelopeMemo {
-    func duration(fromDurSec durSec: Double) -> Double {
-        durSec < attackAndDecaySec ? attackAndDecaySec + releaseSec : durSec + releaseSec
-    }
-    
-    func volm(atSec sec: Double, releaseStartSec relaseStartSec: Double?) -> Double {
+    func volm(atSec sec: Double, releaseStartSec: Double?) -> Double {
         if sec < 0 {
             return 0
-        } else if attackSec > 0 && sec < attackSec {
-            return sec * rAttackSec
+        }
+        let adVolm: Double
+        if attackSec > 0 && sec < attackSec {
+            adVolm = sec * rAttackSec
         } else {
             let nSec = sec - attackSec
-            if decaySec > 0 && nSec < decaySec {
-                return .linear(1, sustainVolm, t: nSec * rDecaySec)
-            } else if let relaseStartSec {
-                let rsSec = relaseStartSec < attackAndDecaySec ? attackAndDecaySec : relaseStartSec
-                if sec < rsSec {
-                    return sustainVolm
-                } else {
-                    let nnSec = sec - rsSec
-                    if releaseSec > 0 && nnSec < releaseSec {
-                        return .linear(sustainVolm, 0, t: nnSec * rReleaseSec)
-                    } else {
-                        return 0
-                    }
-                }
+            adVolm = if decaySec > 0 && nSec < decaySec {
+                .linear(1, sustainVolm, t: nSec * rDecaySec)
             } else {
-                return sustainVolm
+                sustainVolm
             }
+        }
+        if let releaseStartSec, sec >= releaseStartSec {
+            let nSec = sec - releaseStartSec
+            return if releaseSec > 0 && nSec < releaseSec {
+                .linear(adVolm, 0, t: nSec * rReleaseSec)
+            } else {
+                0
+            }
+        } else {
+            return adVolm
         }
     }
 }
@@ -333,24 +327,21 @@ extension Pitbend {
 
 struct Rendnote {
     var fq: Double
-    var noiseSeed: UInt64
+    var noiseSeed0: UInt64
+    var noiseSeed1: UInt64
     var pitbend: Pitbend
     var secRange: Range<Double>
     var envelopeMemo: EnvelopeMemo
     var id = UUID()
 }
 extension Rendnote {
-    static func noiseSeed(from id: UUID) -> UInt64 {
-        var hasher = Hasher()
-        hasher.combine(id)
-        return UInt64(abs(hasher.finalize()))
-    }
     init(note: Note, score: Score, snapBeatScale: Rational = .init(1, 4)) {
         let sSec = Double(score.sec(fromBeat: note.beatRange.start))
         let eSec = Double(score.sec(fromBeat: note.beatRange.end))
         
+        let (seed0, seed1) = note.containsNoise ? note.id.uInt64Values : (0, 0)
         self.init(fq: Pitch.fq(fromPitch: .init(note.pitch)),
-                  noiseSeed: note.containsNoise ? Rendnote.noiseSeed(from: note.id) : 0,
+                  noiseSeed0: seed0, noiseSeed1: seed1,
                   pitbend: note.pitbend(fromTempo: score.tempo),
                   secRange: sSec ..< eSec,
                   envelopeMemo: .init(note.envelope))
@@ -363,7 +354,7 @@ extension Rendnote {
         secRange.length.isInfinite
     }
     var rendableDurSec: Double {
-        isLoop ? 1 : envelopeMemo.duration(fromDurSec: min(secRange.length, 100000))
+        isLoop ? 1 : min(secRange.length + envelopeMemo.releaseSec, 100000)
     }
 }
 extension Rendnote {
@@ -390,7 +381,6 @@ extension Rendnote {
         guard !pitbend.isEmpty else {
             return .init(fqScale: 1, isLoop: isLoop, samples: [0], stereos: [.init()])
         }
-        
         let isLoop = isLoop
         let isStft = isStft
         let isFullNoise = pitbend.isFullNoise
@@ -486,7 +476,8 @@ extension Rendnote {
                                                                         fq: fq,
                                                                         oddScale: oddScale,
                                                                         evenScale: -evenScale)
-                let noiseSamples = vDSP.gaussianNoise(count: sampleCount + stftCount, seed: noiseSeed)
+                let noiseSamples = vDSP.gaussianNoise(count: sampleCount + stftCount,
+                                                      seed0: noiseSeed0, seed1: noiseSeed1)
                 var samples = clippedStft(vDSP.apply(noiseSamples, spectrum: noiseSpectrum))
                 let mainSamples = clippedStft(vDSP.apply(noiseSamples, spectrum: mainNoiseSpectrum))
                 
@@ -569,7 +560,8 @@ extension Rendnote {
                                                                             fq: fq,
                                                                             oddScale: oddScale,
                                                                             evenScale: -evenScale)
-                    let noiseSamples = vDSP.gaussianNoise(count: sampleCount + stftCount, seed: noiseSeed)
+                    let noiseSamples = vDSP.gaussianNoise(count: sampleCount + stftCount,
+                                                          seed0: noiseSeed0, seed1: noiseSeed1)
                     let nNoiseSamples = clippedStft(vDSP.apply(noiseSamples, spectrum: noiseSpectrum))
                     let nMainNoiseSamples = clippedStft(vDSP.apply(noiseSamples, spectrum: mainNoiseSpectrum))
                     
@@ -623,7 +615,8 @@ extension Rendnote {
             }
             
             if isFullNoise {
-                let noiseSamples = vDSP.gaussianNoise(count: sampleCount + stftCount, seed: noiseSeed)
+                let noiseSamples = vDSP.gaussianNoise(count: sampleCount + stftCount,
+                                                      seed0: noiseSeed0, seed1: noiseSeed1)
                 
                 let overlapSamplesCount = vDSP.overlapSamplesCount(fftCount: stftCount)
                 var mainNoiseSpectrogram = [[Double]](capacity: overlapSamplesCount / sampleCount)
@@ -767,7 +760,7 @@ extension Rendnote {
                 for i in stride(from: 0, to: sampleCount, by: overlapSamplesCount) {
                     update(at: i)
                 }
-                if sampleCount % overlapSamplesCount != 0 {
+                if sampleCount % overlapSamplesCount != 1 {
                     update(at: sampleCount - 1)
                 }
                 
@@ -786,7 +779,8 @@ extension Rendnote {
                 var mainSamples = zip(sinss, mainSpectrogram).map { vDSP.sum(vDSP.multiply($0.0, $0.1)) }
                 
                 if containsNoise {
-                    let noiseSamples = vDSP.gaussianNoise(count: sampleCount + stftCount, seed: noiseSeed)
+                    let noiseSamples = vDSP.gaussianNoise(count: sampleCount + stftCount,
+                                                          seed0: noiseSeed0, seed1: noiseSeed1)
                     let nNoiseSamples = clippedStft(vDSP.apply(noiseSamples, spectrogram: noiseSpectrogram))
                     let nMainNoiseSamples = clippedStft(vDSP.apply(noiseSamples, spectrogram: mainNoiseSpectrogram))
                     vDSP.add(samples, nNoiseSamples, result: &samples)
@@ -829,10 +823,10 @@ extension vDSP {
         var frames = [FftFrame](capacity: sampleCount / overlapSamplesCount)
         for i in stride(from: halfFftCount, to: sampleCount + halfFftCount, by: overlapSamplesCount) {
             let ni = i - halfFftCount
-            let samples = (ni ..< ni + fftCount).map {
-                $0 >= 0 && $0 < sampleCount ? samples[$0] : 0
+            let frameSamples = (ni ..< ni + fftCount).map {
+                $0 >= 0 && $0 < samples.count ? samples[$0] : 0
             }
-            let inputRes = vDSP.multiply(windowSamples, samples)
+            let inputRes = vDSP.multiply(windowSamples, frameSamples)
             frames.append(fft.frame(inputRes))
         }
         
@@ -844,12 +838,12 @@ extension vDSP {
         var nSamples = [Double](repeating: 0, count: samples.count)
         for (j, i) in stride(from: halfFftCount, to: sampleCount + halfFftCount, by: overlapSamplesCount).enumerated() {
             let frame = frames[j]
-            var samples = ifft.resTransform(frame)
-            samples = vDSP.multiply(windowSamples, samples)
+            var frameSamples = ifft.resTransform(frame)
+            frameSamples = vDSP.multiply(windowSamples, frameSamples)
             let ni = i - halfFftCount
             for k in ni ..< ni + fftCount {
-                if k >= 0 && k < sampleCount {
-                    nSamples[k] += samples[k - ni]
+                if k >= 0 && k < samples.count {
+                    nSamples[k] += frameSamples[k - ni]
                 }
             }
         }
@@ -897,12 +891,12 @@ extension Notewave {
     
     func stereo(atPhase phase: inout Double) -> Stereo {
         let count = Double(stereos.count)
-        if !isLoop && phase >= count { return .init() }
+        if !isLoop && phase >= count { return stereos.last ?? .init() }
         
         if phase.isInteger {
             return stereos[Int(phase)]
         } else {
-            guard stereos.count >= 2 else { return .init() }
+            guard stereos.count >= 2 else { return stereos.last ?? .init() }
             let sai = Int(phase)
             
             let s0 = stereos[sai]

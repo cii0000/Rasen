@@ -1604,12 +1604,12 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         
-        menu.addItem(SubNSMenuItem(title: "test".localized, closure: { [weak self] in
-            guard let self else { return }
-            self.isEnabledPinch = !self.isEnabledPinch
-            self.isEnabledScroll = !self.isEnabledScroll
-            self.isEnabledRotate = !self.isEnabledRotate
-        }))
+//        menu.addItem(SubNSMenuItem(title: "test".localized, closure: { [weak self] in
+//            guard let self else { return }
+//            self.isEnabledPinch = !self.isEnabledPinch
+//            self.isEnabledScroll = !self.isEnabledScroll
+//            self.isEnabledRotate = !self.isEnabledRotate
+//        }))
         
         if System.isVersion3 {
             menu.addItem(NSMenuItem.separator())

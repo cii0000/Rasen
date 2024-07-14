@@ -67,6 +67,17 @@ extension UUID {
     }
 }
 
+extension UUID {
+    var uInt64Values: (value0: UInt64, value1: UInt64) {
+        let uuid = uuid
+        var data0 = Data([uuid.0, uuid.1, uuid.2, uuid.3, uuid.4, uuid.5, uuid.6, uuid.7])
+        let value0 = withUnsafeBytes(of: &data0) { $0.load(as: UInt64.self) }
+        var data1 = Data([uuid.8, uuid.9, uuid.10, uuid.11, uuid.12, uuid.13, uuid.14, uuid.15])
+        let value1 = withUnsafeBytes(of: &data1) { $0.load(as: UInt64.self) }
+        return (value0, value1)
+    }
+}
+
 struct UU<Value: Codable>: Codable {
     var value: Value {
         didSet {

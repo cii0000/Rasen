@@ -938,9 +938,9 @@ final class ScoreView: TimelineView {
         
         timeNode.children = [currentPeakVolmNode]
         
-        node = Node(children: [timelineBorderNode,
-                               timelineFullEditBorderNode,
-                               timelineSubBorderNode, octaveNode, chordNode,
+        node = Node(children: [timelineBorderNode, timelineFullEditBorderNode,
+                               octaveNode,
+                               timelineSubBorderNode, chordNode,
                                timelineContentNode,
                                draftNotesNode, notesNode, pitsNode, tonesNode,
                                timeNode, clippingNode])
@@ -1643,6 +1643,7 @@ extension ScoreView {
                               y(fromPitch: note.pitch + pit.pitch))
                 return pit.tone.spectlope.sprols.enumerated().map {
                     (Point(p.x, tonePitchY(fromPitch: $0.element.pitch, noteY: p.y)),
+                     $0.element.volm == 0 ? sprolSubR / 2 :
                      $0.offset > 0 && pit.tone.spectlope.sprols[$0.offset - 1].pitch > $0.element.pitch ? sprolSubR : sprolR)
                 }
             }
@@ -1772,6 +1773,7 @@ extension ScoreView {
             let fPitNx = x(atBeat: note.beatRange.start + note.firstPit.beat)
             let sprolKnobPAndRs = note.firstTone.spectlope.sprols.enumerated().map {
                 (Point(fPitNx, tonePitchY(fromPitch: $0.element.pitch, noteY: ny)),
+                 $0.element.volm == 0 ? sprolSubR / 2 :
                  $0.offset > 0 && note.firstTone.spectlope.sprols[$0.offset - 1].pitch > $0.element.pitch ? sprolSubR : sprolR)
             }
             
@@ -1812,10 +1814,12 @@ extension ScoreView {
         
         let mainLinePoints = pointline(from: note).controls.map { $0.point }
         let lmly = mainLinePoints.last?.y ?? ny
+        let defaultTone = Tone()
+        let mainColor: Color = note.pits.contains { $0.tone.overtone != defaultTone.overtone || $0.tone.spectlope != defaultTone.spectlope } ? Color(white: 0.25) : .content
         nodes.append(.init(path: .init([Point(nx + nw, lmly), Point(rx, lmly)]),
-                           lineWidth: 0.125, lineType: .color(.content)))
+                           lineWidth: 0.125, lineType: .color(mainColor)))
         nodes.append(.init(path: .init(mainLinePoints + [Point(nx + nw, lmly)]),
-                           lineWidth: noteMainH(from: note), lineType: .color(.content)))
+                           lineWidth: noteMainH(from: note), lineType: .color(mainColor)))
         
         toneNodes.append(.init(path: evenLinePath,
                                fillType: color != nil ? .color(color!) : (evenColors.count == 1 ? .color(evenColors[0]) : .gradient(evenColors))))

@@ -1523,20 +1523,20 @@ extension Score {
     }
     
     func chordPitches(atBeat range: Range<Rational>) -> [Int] {
-        var pitchLengths = [Int: Rational]()
+        var pitchLengths = [Int: [Range<Rational>]]()
         for note in notes + draftNotes {
             for (beatRange, roundedPitch) in note.chordBeatRangeAndRoundedPitchs() {
                 if let iRange = beatRange.intersection(range) {
                     if pitchLengths[roundedPitch] != nil {
-                        pitchLengths[roundedPitch]! += iRange.length
+                        Range.union(iRange, in: &pitchLengths[roundedPitch]!)
                     } else {
-                        pitchLengths[roundedPitch] = iRange.length
+                        pitchLengths[roundedPitch] = [iRange]
                     }
                 }
             }
         }
-        let length = range.length / 8
-        return pitchLengths.filter { $0.value > length }.keys.sorted()
+        let length = range.length / 4
+        return pitchLengths.filter { $0.value.sum { $0.length } >= length }.keys.sorted()
     }
     
     func noteIAndPits(atBeat beat: Rational,

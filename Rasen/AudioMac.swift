@@ -110,8 +110,9 @@ final class NotePlayer {
         let rendnotes: [Rendnote] = notes.map { note in
             let noteID = UUID()
             noteIDs.insert(noteID)
+            let (seed0, seed1) = note.id.uInt64Values
             return .init(fq: Pitch.fq(fromPitch: .init(note.notePitch) + note.pitch.doubleValue),
-                         noiseSeed: Rendnote.noiseSeed(from: note.id),
+                         noiseSeed0: seed0, noiseSeed1: seed1,
                          pitbend: .init(pitch: 0,
                                         stereo: note.stereo,
                                         overtone: note.tone.overtone,
@@ -362,7 +363,12 @@ final class ScoreNoder {
     }
     
     var startSec = 0.0
-    var durSec = Rational(0)
+    var durSec = Rational(0) {
+        didSet {
+            dDurSec = .init(durSec)
+        }
+    }
+    private var dDurSec = 0.0
     let id = UUID()
     
     var rendnotes = [Rendnote]()
@@ -486,11 +492,12 @@ final class ScoreNoder {
     }
     
     struct NotewaveID: Hashable, Codable {
-        var fq: Double, noiseSeed: UInt64, pitbend: Pitbend, rendableDurSec: Double
+        var fq: Double, noiseSeed0: UInt64, noiseSeed1: UInt64, pitbend: Pitbend, rendableDurSec: Double
         
         init(_ rendnote: Rendnote) {
             fq = rendnote.fq
-            noiseSeed = rendnote.noiseSeed
+            noiseSeed0 = rendnote.noiseSeed0
+            noiseSeed1 = rendnote.noiseSeed1
             pitbend = rendnote.pitbend
             rendableDurSec = rendnote.rendableDurSec
         }
@@ -525,6 +532,7 @@ final class ScoreNoder {
         self.rendnotes = rendnotes
         self.startSec = startSec
         self.durSec = durSec
+        self.dDurSec = .init(durSec)
         format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2)!
         
         let sampleRate = format.sampleRate
@@ -592,7 +600,7 @@ final class ScoreNoder {
                     }
                 } else {
                     let dDurSec = rendnote.secRange.end + startSec - noteStartSec
-                    let noteDurSec = rendnote.envelopeMemo.duration(fromDurSec: dDurSec)
+                    let noteDurSec = dDurSec + rendnote.envelopeMemo.releaseSec
                     if !rendnote.secRange.start.isInfinite,
                        (frameStartSec ..< frameEndSec).intersects(noteStartSec ..< noteStartSec + noteDurSec)
                         && self.memowaves[rendnote.id] == nil {
@@ -855,11 +863,12 @@ extension Sequencer {
         engine.detach(noder.node)
     }
     
+    var engineSec: Double {
+        AVAudioTime.seconds(forHostTime: AudioGetCurrentHostTime() - startHostTime)
+    }
     var currentPositionInSec: Double {
         get {
-            isPlaying ?
-                AVAudioTime.seconds(forHostTime: AudioGetCurrentHostTime() - startHostTime) + startSec :
-                startSec
+            isPlaying ? engineSec + startSec : startSec
         }
         set {
             startHostTime = AudioGetCurrentHostTime()

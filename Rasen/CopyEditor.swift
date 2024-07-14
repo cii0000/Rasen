@@ -1257,7 +1257,7 @@ final class CopyEditor: Editor {
                 var pits = score.notes[noteI].pits
                 pits.remove(at: pitI)
                 var note = score.notes[noteI]
-                if pits.isEmpty || (pits.count == 1 && (pits[0].beat != 0 || pits[0].pitch != 0)) {
+                if pits.isEmpty {
                     note.pits = [.init()]
                 } else {
                     note.pits = pits
@@ -2548,7 +2548,7 @@ final class CopyEditor: Editor {
             break
         case .normalizationRationalValue:
             break
-        case .notesValue(let notesValue):
+        case .notesValue(_):
             octaveNode?.removeFromParent()
             octaveNode = nil
             
@@ -2567,32 +2567,6 @@ final class CopyEditor: Editor {
             if !noteIVs.isEmpty {
                 sheetView.capture(noteIVs, old: oldNoteIVs)
             }
-            
-//            guard let sheetView = document.sheetView(at: shp),
-//                    sheetView.model.score.enabled else { return }
-//            let scoreView = sheetView.scoreView
-//            let scoreP = scoreView.convertFromWorld(p)
-//            let pitchInterval = document.currentPitchInterval
-//            let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
-//            let beatInterval = document.currentBeatInterval
-//            let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
-//            var notes = notesValue.notes
-//            let startBeat = sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: beatInterval)
-//            let endBeat = sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: beatInterval)
-//            for j in 0 ..< notes.count {
-//                notes[j].pitch += pitch
-//                notes[j].beatRange.start += beat
-//                
-//                notes[j].pitch = notes[j].pitch
-//                    .clipped(min: Score.pitchRange.start, max: Score.pitchRange.end)
-//                notes[j].beatRange.start = max(min(notes[j].beatRange.start, endBeat), startBeat - notes[j].beatRange.length)
-//                
-//                notes[j].id = .init()
-//            }
-//            sheetView.newUndoGroup()
-//            sheetView.append(notes)
-            
-//            sheetView.updatePlaying()
         case .stereo(let stereo):
             guard let sheetView = document.sheetView(at: shp) else { return }
             if sheetView.model.score.enabled {

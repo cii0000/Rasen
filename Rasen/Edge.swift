@@ -398,7 +398,6 @@ extension Pointline {
     }
     func minDistanceSquared(_ other: Pointline) -> Double {
         var minDSquared = Double.infinity
-        var p0 = firstPoint
         for edge0 in edges {
             for edge1 in other.edges {
                 if edge0.intersects(edge1) {
