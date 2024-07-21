@@ -1928,8 +1928,40 @@ extension Animation: BeatRangeType {
         return nBeat > halfBeat ? rootI + 1 : rootI
     }
     var rootIndex: Int {
-        get { rootIndex(atRootBeat: rootBeat) }
-        set { rootBeat = self.rootBeat(atRoot: newValue) }
+        get { loopIndex(atRootBeat: rootBeat) * keyframes.count + index }
+        set {
+            rootBeat = self.rootBeat(atRoot: newValue)
+            let index = index(atRoot: newValue)
+            if index != self.index {
+                self.index = index
+            }
+        }
+    }
+    mutating func moveNextInterKeyframe() {
+        let fki = index, ks = keyframes
+        var rki = rootIndex.addingReportingOverflow(1).partialValue
+        while true {
+            let ki = index(atRoot: rki)
+            if ki == fki { break }
+            if ks[ki].isKey {
+                self.rootIndex = rki
+                return
+            }
+            rki = rki.addingReportingOverflow(1).partialValue
+        }
+    }
+    mutating func movePreviousInterKeyframe() {
+        let fki = index, ks = keyframes
+        var rki = rootIndex.subtractingReportingOverflow(1).partialValue
+        while true {
+            let ki = index(atRoot: rki)
+            if ki == fki { break }
+            if ks[ki].isKey {
+                self.rootIndex = rki
+                return
+            }
+            rki = rki.subtractingReportingOverflow(1).partialValue
+        }
     }
     
     var loopIndex: Int {
@@ -2105,6 +2137,8 @@ struct Sheet {
 }
 extension Sheet: Protobuf {
     init(_ pb: PBSheet) throws {
+        
+        
         if let animation = try? Animation(pb.animation), !animation.isEmpty {
             self.animation = animation
         } else {

@@ -1196,6 +1196,8 @@ struct PBScoreOption {
 
   var enabled: Bool = false
 
+  var isShownSpectrogram: Bool = false
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -1234,6 +1236,8 @@ struct PBScore {
   var keyBeats: [PBRational] = []
 
   var enabled: Bool = false
+
+  var isShownSpectrogram: Bool = false
 
   var id: PBUUID {
     get {return _id ?? PBUUID()}
@@ -5563,6 +5567,7 @@ extension PBScoreOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
     2: .same(proto: "tempo"),
     4: .same(proto: "keyBeats"),
     3: .same(proto: "enabled"),
+    5: .same(proto: "isShownSpectrogram"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -5575,6 +5580,7 @@ extension PBScoreOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
       case 2: try { try decoder.decodeSingularMessageField(value: &self._tempo) }()
       case 3: try { try decoder.decodeSingularBoolField(value: &self.enabled) }()
       case 4: try { try decoder.decodeRepeatedMessageField(value: &self.keyBeats) }()
+      case 5: try { try decoder.decodeSingularBoolField(value: &self.isShownSpectrogram) }()
       default: break
       }
     }
@@ -5597,6 +5603,9 @@ extension PBScoreOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
     if !self.keyBeats.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.keyBeats, fieldNumber: 4)
     }
+    if self.isShownSpectrogram != false {
+      try visitor.visitSingularBoolField(value: self.isShownSpectrogram, fieldNumber: 5)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5605,6 +5614,7 @@ extension PBScoreOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
     if lhs._tempo != rhs._tempo {return false}
     if lhs.keyBeats != rhs.keyBeats {return false}
     if lhs.enabled != rhs.enabled {return false}
+    if lhs.isShownSpectrogram != rhs.isShownSpectrogram {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5619,6 +5629,7 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
     3: .same(proto: "tempo"),
     7: .same(proto: "keyBeats"),
     4: .same(proto: "enabled"),
+    8: .same(proto: "isShownSpectrogram"),
     5: .same(proto: "id"),
   ]
 
@@ -5635,6 +5646,7 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
       case 5: try { try decoder.decodeSingularMessageField(value: &self._id) }()
       case 6: try { try decoder.decodeRepeatedMessageField(value: &self.draftNotes) }()
       case 7: try { try decoder.decodeRepeatedMessageField(value: &self.keyBeats) }()
+      case 8: try { try decoder.decodeSingularBoolField(value: &self.isShownSpectrogram) }()
       default: break
       }
     }
@@ -5666,6 +5678,9 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
     if !self.keyBeats.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.keyBeats, fieldNumber: 7)
     }
+    if self.isShownSpectrogram != false {
+      try visitor.visitSingularBoolField(value: self.isShownSpectrogram, fieldNumber: 8)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5676,6 +5691,7 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
     if lhs._tempo != rhs._tempo {return false}
     if lhs.keyBeats != rhs.keyBeats {return false}
     if lhs.enabled != rhs.enabled {return false}
+    if lhs.isShownSpectrogram != rhs.isShownSpectrogram {return false}
     if lhs._id != rhs._id {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

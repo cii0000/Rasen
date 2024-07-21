@@ -225,6 +225,7 @@ message PBScoreOption {
     PBRational tempo = 2;
     repeated PBRational keyBeats = 4;
     bool enabled = 3;
+    bool isShownSpectrogram = 5;
 }
 message PBScore {
     repeated PBNote notes = 1;
@@ -233,6 +234,7 @@ message PBScore {
     PBRational tempo = 3;
     repeated PBRational keyBeats = 7;
     bool enabled = 4;
+    bool isShownSpectrogram = 8;
     PBUUID id = 5;
 }
 

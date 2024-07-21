@@ -589,7 +589,7 @@ final class ScoreNoder {
                         self.notewaveDicSemaphore.signal()
                         
                         if let notewave {
-                            self.memowaves[rendnote.id] = .init(startSec: noteStartSec,
+                            self.memowaves[rendnote.id] = .init(startSec: seq.startSec >= noteStartSec ? frameStartSec : noteStartSec,
                                                                 releaseSec: nil,
                                                                 endSec: nil,
                                                                 envelopeMemo: rendnote.envelopeMemo,
@@ -612,7 +612,7 @@ final class ScoreNoder {
                         self.notewaveDicSemaphore.signal()
                         
                         if let notewave {
-                            self.memowaves[rendnote.id] = .init(startSec: noteStartSec,
+                            self.memowaves[rendnote.id] = .init(startSec: seq.startSec >= noteStartSec && seq.startSec < noteStartSec + noteDurSec ? frameStartSec : noteStartSec,
                                                                 releaseSec: noteStartSec + dDurSec,
                                                                 endSec: noteStartSec + noteDurSec,
                                                                 envelopeMemo: rendnote.envelopeMemo,
@@ -632,8 +632,16 @@ final class ScoreNoder {
             for (id, memowave) in self.memowaves {
                 if let endSec = memowave.endSec,
                    !(frameStartSec ..< frameEndSec).intersects(memowave.startSec ..< endSec) {
-                    self.memowaves[id] = nil
-                    self.phases[id] = nil
+                    if frameStartSec < memowave.startSec {
+                        self.memowaves[id]?.startSec -= dDurSec
+                        if let releaseSec = self.memowaves[id]?.releaseSec {
+                            self.memowaves[id]?.releaseSec = releaseSec - dDurSec
+                        }
+                        self.memowaves[id]?.endSec = endSec - dDurSec
+                    } else {
+                        self.memowaves[id] = nil
+                        self.phases[id] = nil
+                    }
                 }
             }
             

@@ -1168,7 +1168,12 @@ final class AnimationSlider: DragEditor {
                 if sheetView.animationView.containsTimeline(inP) {
                     let animationView = sheetView.animationView
                     
-                    if let minI = animationView
+                    if animationView.isEndBeat(at: inP, scale: document.screenToWorldScale) {
+                        type = .endBeat
+                        
+                        beganAnimationOption = sheetView.model.animation.option
+                        beganBeatX = animationView.x(atBeat: sheetView.model.animation.beatRange.end)
+                    } else if let minI = animationView
                         .slidableKeyframeIndex(at: inP,
                                                maxDistance: document.worldKnobEditDistance,
                                                enabledKeyOnly: true) {
@@ -1188,34 +1193,26 @@ final class AnimationSlider: DragEditor {
                         } else {
                             beganKeyframeOptions = [keyframeIndex: keyframe.option]
                         }
-                    } else if animationView.isStartBeat(at: inP, scale: document.screenToWorldScale) {
-                        type = .all
-                        
-                        beganAnimationOption = sheetView.model.animation.option
-                        beganBeatX = animationView.x(atBeat: sheetView.model.animation.beatRange.start)
-                    } else if animationView.isEndBeat(at: inP, scale: document.screenToWorldScale) {
-                        type = .endBeat
-                        
-                        beganAnimationOption = sheetView.model.animation.option
-                        beganBeatX = animationView.x(atBeat: sheetView.model.animation.beatRange.end)
                     } else {
-                        type = .none
+                        beganAnimationOption = sheetView.model.animation.option
+                        type = .all
                     }
                 }
             }
         case .changed:
             if let sheetView = sheetView {
                 let animationView = sheetView.animationView
-                let inP = sheetView.convertFromWorld(p)
+                let sheetP = sheetView.convertFromWorld(p)
                 
                 switch type {
                 case .all:
                     let nh = ScoreLayout.pitchHeight
-                    let px = beganTimelineX + inP.x - beganSheetP.x
-                    let py = ((beganAnimationOption?.timelineY ?? 0) + inP.y - beganSheetP.y).interval(scale: nh)
-                    let interval = document.currentKeyframeBeatInterval
-                    let beat = animationView.beat(atX: px, interval: interval)
-                    + sheetView.model.animation.beatRange.start
+                    let np = beganTimelineX + sheetP - beganSheetP
+                    let py = ((beganAnimationOption?.timelineY ?? 0) + sheetP.y - beganSheetP.y).interval(scale: nh)
+                    let interval = document.currentBeatInterval
+                    let beat = max(min(sheetView.animationView.beat(atX: np.x, interval: interval),
+                                   sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: interval)),
+                                   sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval) - sheetView.animationView.model.beatRange.length)
                     if py != sheetView.animationView.timelineY
                         || beat != sheetView.model.animation.beatRange.start {
                         
@@ -1225,7 +1222,7 @@ final class AnimationSlider: DragEditor {
                     }
                 case .startBeat:
                     let interval = document.currentKeyframeBeatInterval
-                    let beat = animationView.beat(atX: inP.x,
+                    let beat = animationView.beat(atX: sheetP.x,
                                                   interval: interval) + sheetView.model.animation.beatRange.start
                     if beat != sheetView.model.animation.beatRange.start {
                         sheetView.binder[keyPath: sheetView.keyPath]
@@ -1236,7 +1233,7 @@ final class AnimationSlider: DragEditor {
                 case .endBeat:
                     if let beganAnimationOption {
                         let interval = document.currentBeatInterval
-                        let nBeat = animationView.beat(atX: beganBeatX + inP.x - beganSheetP.x,
+                        let nBeat = animationView.beat(atX: beganBeatX + sheetP.x - beganSheetP.x,
                                                        interval: interval)
                         if nBeat != animationView.beatRange?.end {
                             let dBeat = nBeat - beganAnimationOption.beatRange.end
@@ -1249,7 +1246,7 @@ final class AnimationSlider: DragEditor {
                 case .key:
                     let interval = document.currentKeyframeBeatInterval
                     let durBeat = animationView.model.beatRange.length
-                    let beat = animationView.beat(atX: beganKeyframeX + inP.x - beganSheetP.x, interval: interval)
+                    let beat = animationView.beat(atX: beganKeyframeX + sheetP.x - beganSheetP.x, interval: interval)
                         .clipped(min: 0, max: durBeat)
                     let oldBeat = animationView.model.keyframes[keyframeIndex].beat
                     if oldBeat != beat && !beganKeyframeOptions.isEmpty {

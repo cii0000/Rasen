@@ -480,6 +480,17 @@ final class AnimationView: TimelineView {
             updateTimeline()
         }
     }
+    func moveNextInterKeyframe() {
+        binder[keyPath: keyPath].moveNextInterKeyframe()
+        updateWithKeyframeIndex()
+        updateTimeline()
+    }
+    func movePreviousInterKeyframe() {
+        binder[keyPath: keyPath].movePreviousInterKeyframe()
+        updateWithKeyframeIndex()
+        updateTimeline()
+    }
+    
     var currentKeyframe: Keyframe {
         get { binder[keyPath: keyPath].currentKeyframe }
         set {
@@ -647,8 +658,8 @@ final class AnimationView: TimelineView {
         }
         let kx = ex
         contentPathlines.append(.init(Rect(x: kx - knobW / 2,
-                                           y: centerY - knobH / 2,
-                                           width: knobW, height: knobH)))
+                                           y: centerY - knobH / 2 - 1,
+                                           width: knobW, height: knobH + 2)))
         
         if isSelected {
             let d = if let (i, iBeat) = model.indexAndInternalBeat(atRootBeat: model.localBeat) {
@@ -829,6 +840,17 @@ final class AnimationView: TimelineView {
                     minI = i
                 }
             }
+        }
+        
+        if let minI, minI + 2 < animation.keyframes.count,
+           animation.keyframes[minI].beat == animation.keyframes[minI + 1].beat {
+            
+            for i in minI + 1 ..< animation.keyframes.count - 1 {
+                if animation.keyframes[i + 1].beat - animation.keyframes[i].beat > 0 {
+                    return i
+                }
+            }
+            return animation.keyframes.count - 1
         }
         return minI
     }
@@ -1457,11 +1479,7 @@ final class SheetView: View {
     
     var rootKeyframeIndex: Int {
         get { animationView.rootKeyframeIndex }
-        set {
-            animationView.rootKeyframeIndex = newValue
-            let rootBeat = model.animation.rootBeat
-            animationView.rootBeat = rootBeat
-        }
+        set { animationView.rootKeyframeIndex = newValue }
     }
     var rootBeatIndex: Animation.RootBeatIndex {
         get { animationView.rootBeatIndex }
@@ -1502,33 +1520,13 @@ final class SheetView: View {
         if isPlaying {
             stop()
         }
-        let fki = model.animation.index, ks = model.animation.keyframes
-        var rki = rootKeyframeIndex.addingReportingOverflow(1).partialValue
-        while true {
-            let ki = model.animation.index(atRoot: rki)
-            if ki == fki { break }
-            if ks[ki].isKey {
-                self.rootKeyframeIndex = rki
-                return
-            }
-            rki = rki.addingReportingOverflow(1).partialValue
-        }
+        animationView.moveNextInterKeyframe()
     }
     func movePreviousInterKeyframe() {
         if isPlaying {
             stop()
         }
-        let fki = model.animation.index, ks = model.animation.keyframes
-        var rki = rootKeyframeIndex.subtractingReportingOverflow(1).partialValue
-        while true {
-            let ki = model.animation.index(atRoot: rki)
-            if ki == fki { break }
-            if ks[ki].isKey {
-                self.rootKeyframeIndex = rki
-                return
-            }
-            rki = rki.subtractingReportingOverflow(1).partialValue
-        }
+        animationView.movePreviousInterKeyframe()
     }
     func moveNextTime() {
         if isPlaying {

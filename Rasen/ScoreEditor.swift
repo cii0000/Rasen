@@ -241,7 +241,7 @@ final class ScoreSlider: DragEditor {
         case startNoteBeat, endNoteBeat, note,
              attack, decay, release,
              sprol,
-             keyBeats, endBeat
+             keyBeats, endBeat, isShownSpectrogram
     }
     
     private let editableInterval = 5.0
@@ -304,7 +304,10 @@ final class ScoreSlider: DragEditor {
                 }
                 
                 let scoreP = scoreView.convert(inP, from: sheetView.node)
-                if let noteI = scoreView.noteIndex(at: scoreP, scale: document.screenToWorldScale,
+                if scoreView.containsIsShownSpectrogram(scoreP, scale: document.screenToWorldScale) {
+                    type = .isShownSpectrogram
+                    beganScoreOption = scoreView.model.option
+                } else if let noteI = scoreView.noteIndex(at: scoreP, scale: document.screenToWorldScale,
                                                    enabledRelease: true) {
                     let note = score.notes[noteI]
                     
@@ -776,6 +779,10 @@ final class ScoreSlider: DragEditor {
                             document.updateSelects()
                         }
                     }
+                case .isShownSpectrogram:
+                    let scoreP = scoreView.convertFromWorld(p)
+                    let isShownSpectrogram = scoreView.isShownSpectrogram(at: scoreP)
+                    scoreView.isShownSpectrogram = isShownSpectrogram
                 }
             }
         case .ended:
@@ -785,7 +792,7 @@ final class ScoreSlider: DragEditor {
             octaveNode = nil
             
             if let sheetView {
-                if type == .keyBeats || type == .endBeat {
+                if type == .keyBeats || type == .endBeat || type == .isShownSpectrogram {
                     sheetView.updatePlaying()
                     if let beganScoreOption, sheetView.model.score.option != beganScoreOption {
                         sheetView.newUndoGroup()
@@ -930,6 +937,9 @@ final class ScoreView: TimelineView {
     var tonesNode = Node()
     let clippingNode = Node(isHidden: true, lineWidth: 4, lineType: .color(.warning))
     
+    var spectrogramNode: Node?
+    var spectrogramFqType: Spectrogram.FqType?
+    
     var scoreNoder: ScoreNoder?
     
     init(binder: Binder, keyPath: BinderKeyPath) {
@@ -946,6 +956,7 @@ final class ScoreView: TimelineView {
                                timeNode, clippingNode])
         updateClippingNode()
         updateTimeline()
+        updateSpectrogram()
         updateScore()
         updateDraftNotes()
         
@@ -1077,6 +1088,7 @@ extension ScoreView {
             unupdateModel.option = newValue
             updateTimeline()
             updateChord()
+            updateSpectrogram()
             
             if oldValue.enabled != newValue.enabled {
                 scoreNoder = newValue.enabled ? .init(score: model,
@@ -1277,6 +1289,25 @@ extension ScoreView {
                                                width: lw, height: rulerH)))
         }
         
+        let sprH = ContentLayout.spectrogramHeight
+        let sprKnobW = knobH, sprKbobH = knobW
+        let np = Point(ContentLayout.spectrogramX + sx, ey)
+        contentPathlines.append(Pathline(Rect(x: np.x - 1 / 2,
+                                              y: np.y,
+                                              width: 1,
+                                              height: sprH)))
+        if score.isShownSpectrogram {
+            contentPathlines.append(Pathline(Rect(x: np.x - sprKnobW / 2,
+                                                  y: np.y + sprH - sprKbobH / 2,
+                                                  width: sprKnobW,
+                                                  height: sprKbobH)))
+        } else {
+            contentPathlines.append(Pathline(Rect(x: np.x - sprKnobW / 2,
+                                                  y: np.y - sprKbobH / 2,
+                                                  width: sprKnobW,
+                                                  height: sprKbobH)))
+        }
+        
         return (contentPathlines, subBorderPathlines, borderPathlines, fullEditBorderPathlines)
     }
     
@@ -1460,7 +1491,7 @@ extension ScoreView {
         var linePath, evenLinePath, oddLinePath: Path, lyricLinePathlines = [Pathline]()
         var spectlopePathline: Pathline?
         var scNodes = [Node]()
-        let envelopeR = 0.125, toneR = 0.125, sprolR = 0.03125, sprolSubR = 0.03125 / 2
+        let envelopeR = 0.125, toneR = 0.125, sprolR = 0.0625, sprolSubR = 0.03125
         
         let lyricNodes: [Node] = note.pits.enumerated().compactMap { (pitI, pit) in
             let p = pitPosition(atPit: pitI, from: note)
@@ -1560,7 +1591,7 @@ extension ScoreView {
         }
 
         let lineColors, evenColors, oddColors: [Color],
-            knobPs: [Point], toneKnobPAndRs: [(Point, Double)]
+            knobPs: [Point], toneKnobPRCs: [(p: Point, r: Double, color: Color)]
         if note.pits.count >= 2 {
             var beat = note.beatRange.start
             var ps = [LinePoint](), eps = [LinePoint](), ops = [LinePoint]()
@@ -1626,9 +1657,9 @@ extension ScoreView {
             let envelopeY = nh / 2
             knobPs = note.pits.map { .init(x(atBeat: note.beatRange.start + $0.beat),
                                            y(fromPitch: note.pitch + $0.pitch)) }
-            let envelopeKnobPAndRs = [(Point(ax, noteY(atX: ax, from: note) + envelopeY), envelopeR),
-                                      (Point(dx, noteY(atX: dx, from: note) + envelopeY), envelopeR),
-                                      (Point(rx, noteY(atX: rx, from: note) + envelopeY), envelopeR)]
+            let envelopeKnobPAndRs = [(Point(ax, noteY(atX: ax, from: note) + envelopeY), envelopeR, Color.background),
+                                      (Point(dx, noteY(atX: dx, from: note) + envelopeY), envelopeR, Color.background),
+                                      (Point(rx, noteY(atX: rx, from: note) + envelopeY), envelopeR, Color.background)]
             
             linePath = .init(triangleStrip(ps))
             lineColors = colors(ps)
@@ -1638,19 +1669,19 @@ extension ScoreView {
             oddLinePath = .init(triangleStrip(ops))
             oddColors = colors(ops)
             
-            let sprolKnobPAndRs: [(Point, Double)] = note.pits.flatMap { pit in
+            let sprolKnobPAndRs: [(Point, Double, Color)] = note.pits.flatMap { pit in
                 let p = Point(x(atBeat: note.beatRange.start + pit.beat),
                               y(fromPitch: note.pitch + pit.pitch))
                 return pit.tone.spectlope.sprols.enumerated().map {
                     (Point(p.x, tonePitchY(fromPitch: $0.element.pitch, noteY: p.y)),
-                     $0.element.volm == 0 ? sprolSubR / 2 :
-                     $0.offset > 0 && pit.tone.spectlope.sprols[$0.offset - 1].pitch > $0.element.pitch ? sprolSubR : sprolR)
+                     $0.offset > 0 && pit.tone.spectlope.sprols[$0.offset - 1].pitch > $0.element.pitch ? sprolSubR : sprolR,
+                     $0.element.volm == 0 ? Color.subBorder : Color.background)
                 }
             }
             
-            toneKnobPAndRs = envelopeKnobPAndRs + sprolKnobPAndRs
-            + knobPs.map { (Point($0.x, self.toneY(at: $0, from: note) - toneH / 2 + evenY), toneR) }
-            + knobPs.map { (Point($0.x, self.toneY(at: $0, from: note) - toneH / 2 + oddY), toneR) }
+            toneKnobPRCs = envelopeKnobPAndRs + sprolKnobPAndRs
+            + knobPs.map { (Point($0.x, self.toneY(at: $0, from: note) - toneH / 2 + evenY), toneR, .background) }
+            + knobPs.map { (Point($0.x, self.toneY(at: $0, from: note) - toneH / 2 + oddY), toneR, .background) }
             
             struct PAndColor: Hashable {
                 var p: Point, color: Color
@@ -1756,9 +1787,9 @@ extension ScoreView {
             lineColors = [color]
             
             let envelopeY = ny + nh / 2
-            let envelopeKnobPAndRs = [(Point(ax, envelopeY), envelopeR),
-                                      (Point(dx, envelopeY), envelopeR),
-                                      (Point(rx, envelopeY), envelopeR)]
+            let envelopeKnobPAndRs = [(Point(ax, envelopeY), envelopeR, Color.background),
+                                      (Point(dx, envelopeY), envelopeR, Color.background),
+                                      (Point(rx, envelopeY), envelopeR, Color.background)]
             knobPs = note.pits.map { .init(x(atBeat: note.beatRange.start + $0.beat),
                                            y(fromPitch: note.pitch + $0.pitch)) }
             
@@ -1773,11 +1804,11 @@ extension ScoreView {
             let fPitNx = x(atBeat: note.beatRange.start + note.firstPit.beat)
             let sprolKnobPAndRs = note.firstTone.spectlope.sprols.enumerated().map {
                 (Point(fPitNx, tonePitchY(fromPitch: $0.element.pitch, noteY: ny)),
-                 $0.element.volm == 0 ? sprolSubR / 2 :
-                 $0.offset > 0 && note.firstTone.spectlope.sprols[$0.offset - 1].pitch > $0.element.pitch ? sprolSubR : sprolR)
+                 $0.offset > 0 && note.firstTone.spectlope.sprols[$0.offset - 1].pitch > $0.element.pitch ? sprolSubR : sprolR,
+                 $0.element.volm == 0 ? Color.subBorder : Color.background)
             }
             
-            toneKnobPAndRs = envelopeKnobPAndRs + sprolKnobPAndRs
+            toneKnobPRCs = envelopeKnobPAndRs + sprolKnobPAndRs
             var preY = tonePitchY(fromPitch: 0, noteY: ny)
             var preColor = Self.color(fromVolm: note.firstTone.spectlope.sprols.first?.volm ?? 0,
                                       noise: note.firstTone.spectlope.sprols.first?.noise ?? 0)
@@ -1815,7 +1846,9 @@ extension ScoreView {
         let mainLinePoints = pointline(from: note).controls.map { $0.point }
         let lmly = mainLinePoints.last?.y ?? ny
         let defaultTone = Tone()
-        let mainColor: Color = note.pits.contains { $0.tone.overtone != defaultTone.overtone || $0.tone.spectlope != defaultTone.spectlope } ? Color(white: 0.25) : .content
+        let mainColor: Color = note.pits.contains { $0.tone.overtone != defaultTone.overtone || $0.tone.spectlope != defaultTone.spectlope } ?
+        Self.color(fromLightness: 25, noise: note.noiseRatio) :
+        Self.color(fromLightness: Color.content.lightness, noise: note.noiseRatio)
         nodes.append(.init(path: .init([Point(nx + nw, lmly), Point(rx, lmly)]),
                            lineWidth: 0.125, lineType: .color(mainColor)))
         nodes.append(.init(path: .init(mainLinePoints + [Point(nx + nw, lmly)]),
@@ -1842,14 +1875,25 @@ extension ScoreView {
         
         toneNodes.append(.init(path: .init([Point(rx, lmly - halfNH), Point(rx, lmly + halfNH)]),
                                lineWidth: 0.125, lineType: .color(.content)))
-        let toneBackKnobPathlines = toneKnobPAndRs.map {
-            Pathline(circleRadius: $0.1 * 1.5, position: $0.0)
+        
+        let toneBackKnobPathlines = toneKnobPRCs.map {
+            Pathline(circleRadius: $0.r * 1.5, position: $0.p)
         }
         toneNodes.append(.init(path: .init(toneBackKnobPathlines), fillType: .color(.content)))
-        let toneKnobPathlines = toneKnobPAndRs.map {
-            Pathline(circleRadius: $0.1, position: $0.0)
+        
+        let prsDic = toneKnobPRCs.reduce(into: [Color: [(p: Point, r: Double)]]()) {
+            if $0[$1.color] == nil {
+                $0[$1.color] = [($1.p, $1.r)]
+            } else {
+                $0[$1.color]?.append(($1.p, $1.r))
+            }
         }
-        toneNodes.append(.init(path: .init(toneKnobPathlines), fillType: .color(.background)))
+        for (color, prs) in prsDic {
+            let toneKnobPathlines = prs.map {
+                Pathline(circleRadius: $0.r, position: $0.p)
+            }
+            toneNodes.append(.init(path: .init(toneKnobPathlines), fillType: .color(color)))
+        }
         
         let boundingBox = nodes.reduce(into: Rect?.none) { $0 += $1.drawableBounds }
         let toneBoundingBox = toneNodes.reduce(into: Rect?.none) { $0 += $1.drawableBounds }
@@ -1895,18 +1939,22 @@ extension ScoreView {
         Color(lightness: (1 - volm) * 100)
     }
     static func color(fromVolm volm: Double, noise: Double) -> Color {
-        let l = Double(Color(lightness: (1 - volm * 0.75) * 100).rgba.r)
+        color(fromLightness: (1 - volm * 0.75) * 100, noise: noise)
+    }
+    static func color(fromLightness l: Double, noise: Double) -> Color {
+        let br = Double(Color(lightness: l).rgba.r)
         return if noise == 0 {
-            Color(red: l, green: l, blue: l)
+            Color(red: br, green: br, blue: br)
         } else {
-            Color(red: l, green: l, blue: noise * Spectrogram.editRedRatio * (1 - l) + l)
+            Color(red: br, green: br, blue: noise * Spectrogram.editRedRatio * (1 - br) + br)
         }
     }
     static func color(from stereo: Stereo) -> Color {
         color(fromPan: stereo.pan, volm: stereo.volm)
     }
     static func color(fromPan pan: Double, volm: Double) -> Color {
-        let l = Double(Color(lightness: volm.clipped(min: Volm.minVolm, max: Volm.maxVolm, newMin: 100, newMax: 0)).rgba.r)
+        let volm = Spectrogram.mainVolm(fromVolum: volm, splitVolm: 0.5, midVolm: 0.9)
+        let l = Double(Color(lightness: volm.clipped(min: Volm.minVolm, max: Volm.maxVolm, newMin: 100, newMax: Color.content.lightness)).rgba.r)
         return if pan == 0 {
             Color(red: l, green: l, blue: l)
         } else if pan > 0 {
@@ -2489,5 +2537,102 @@ extension ScoreView {
     func pitPosition(atPit pitI: Int, from note: Note) -> Point {
         .init(x(atBeat: note.beatRange.start + note.pits[pitI].beat),
               y(fromPitch: note.pitch + note.pits[pitI].pitch))
+    }
+    
+    static var spectrogramHeight: Double {
+        ScoreLayout.pitchHeight * (Score.doubleMaxPitch - Score.doubleMinPitch)
+    }
+    func updateSpectrogram() {
+        spectrogramNode?.removeFromParent()
+        spectrogramNode = nil
+        
+        let score = model
+        guard score.isShownSpectrogram, let sm = score.spectrogram else { return }
+        
+        let firstX = x(atBeat: score.beatRange.start)
+        let y = timeLineCenterY + Sheet.timelineHalfHeight + ContentLayout.spectrogramHeight + Sheet.knobWidth / 2
+        let allBeat = score.beatRange.length
+        let allW = width(atDurBeat: allBeat)
+        var nodes = [Node](), maxH = 0.0
+        func spNode(width: Int, at xi: Int) -> Node? {
+            guard let image = sm.image(width: width, at: xi),
+                  let texture = Texture(image: image,
+                                        isOpaque: false,
+                                        colorSpace: .sRGB) else { return nil }
+            let w = allW * Double(width) / Double(sm.frames.count)
+            let h = Self.spectrogramHeight
+            maxH = max(maxH, h)
+            let x = allW * Double(xi) / Double(sm.frames.count)
+            return Node(name: "spectrogram",
+                        attitude: .init(position: .init(x, 0)),
+                        path: Path(Rect(width: w, height: h)),
+                        fillType: .texture(texture))
+        }
+        (0 ..< (sm.frames.count / 1024)).forEach { xi in
+            if let node = spNode(width: 1024,
+                                 at: xi * 1024) {
+                nodes.append(node)
+            }
+        }
+        let lastCount = sm.frames.count % 1024
+        if lastCount > 0 {
+            let xi = sm.frames.count / 1024
+            if let node = spNode(width: lastCount,
+                                 at: xi * 1024) {
+                nodes.append(node)
+            }
+        }
+        
+        let sNode = Node(name: "spectrogram",
+                         children: nodes,
+                         attitude: .init(position: .init(firstX, y)),
+                         path: Path(Rect(width: allW, height: maxH)))
+        
+        self.spectrogramNode = sNode
+        self.spectrogramFqType = sm.type
+        
+        node.insert(child: sNode, at: 5)
+    }
+    func spectrogramPitch(atY y: Double) -> Double? {
+        guard let spectrogramNode, let spectrogramFqType else { return nil }
+        let y = y - 0.5 * Self.spectrogramHeight / 1024
+        let h = spectrogramNode.path.bounds?.height ?? 0
+        switch spectrogramFqType {
+        case .linear:
+            let fq = y.clipped(min: 0, max: h,
+                               newMin: Spectrogram.minLinearFq,
+                               newMax: Spectrogram.maxLinearFq)
+            return Pitch.pitch(fromFq: max(fq, 1))
+        case .pitch:
+            return y.clipped(min: 0, max: h,
+                             newMin: Spectrogram.minPitch,
+                             newMax: Spectrogram.maxPitch)
+        }
+    }
+    
+    func containsIsShownSpectrogram(_ p: Point, scale: Double) -> Bool {
+        Rect(x: timelineFrame.minX + ContentLayout.spectrogramX - Sheet.knobHeight / 2,
+                 y: timeLineCenterY + Sheet.timelineHalfHeight - Sheet.knobWidth / 2,
+                 width: Sheet.knobHeight,
+                 height: ContentLayout.spectrogramHeight + Sheet.knobWidth)
+            .outset(by: scale * 3)
+            .contains(p)
+    }
+    
+    func isShownSpectrogram(at p :Point) -> Bool {
+        p.y > timeLineCenterY + Sheet.timelineHalfHeight + ContentLayout.spectrogramHeight / 2
+    }
+    var isShownSpectrogram: Bool {
+        get {
+            model.isShownSpectrogram
+        }
+        set {
+            let oldValue = model.isShownSpectrogram
+            if newValue != oldValue {
+                binder[keyPath: keyPath].isShownSpectrogram = newValue
+                updateTimeline()
+                updateSpectrogram()
+            }
+        }
     }
 }

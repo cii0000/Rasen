@@ -1432,6 +1432,7 @@ struct ScoreOption {
     var keyBeats: [Rational] = [4, 8, 12]
     var tempo = Music.defaultTempo
     var enabled = false
+    var isShownSpectrogram = false
 }
 extension ScoreOption: Protobuf {
     init(_ pb: PBScoreOption) throws {
@@ -1442,6 +1443,7 @@ extension ScoreOption: Protobuf {
         keyBeats = pb.keyBeats.compactMap { try? Rational($0) }
         tempo = (try? Rational(pb.tempo))?.clipped(Music.tempoRange) ?? Music.defaultTempo
         enabled = pb.enabled
+        isShownSpectrogram = pb.isShownSpectrogram
     }
     var pb: PBScoreOption {
         .with {
@@ -1451,6 +1453,7 @@ extension ScoreOption: Protobuf {
                 $0.tempo = tempo.pb
             }
             $0.enabled = enabled
+            $0.isShownSpectrogram = isShownSpectrogram
         }
     }
 }
@@ -1470,6 +1473,7 @@ struct Score: BeatRangeType {
     var tempo = Music.defaultTempo
     var keyBeats: [Rational] = [4, 8, 12]
     var enabled = false
+    var isShownSpectrogram = false
     var id = UUID()
 }
 extension Score: Protobuf {
@@ -1483,6 +1487,7 @@ extension Score: Protobuf {
         keyBeats = pb.keyBeats.compactMap { try? Rational($0) }
         tempo = (try? Rational(pb.tempo))?.clipped(Music.tempoRange) ?? Music.defaultTempo
         enabled = pb.enabled
+        isShownSpectrogram = pb.isShownSpectrogram
         id = (try? .init(pb.id)) ?? .init()
     }
     var pb: PBScore {
@@ -1493,6 +1498,7 @@ extension Score: Protobuf {
             $0.keyBeats = keyBeats.map { $0.pb }
             $0.tempo = tempo.pb
             $0.enabled = enabled
+            $0.isShownSpectrogram = isShownSpectrogram
             $0.id = id.pb
         }
     }
@@ -1554,13 +1560,15 @@ extension Score {
 extension Score {
     var option: ScoreOption {
         get {
-            .init(durBeat: durBeat, keyBeats: keyBeats, tempo: tempo, enabled: enabled)
+            .init(durBeat: durBeat, keyBeats: keyBeats, tempo: tempo, enabled: enabled,
+                  isShownSpectrogram: isShownSpectrogram)
         }
         set {
             durBeat = newValue.durBeat
             keyBeats = newValue.keyBeats
             tempo = newValue.tempo
             enabled = newValue.enabled
+            isShownSpectrogram = newValue.isShownSpectrogram
         }
     }
 }

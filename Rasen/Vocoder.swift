@@ -491,41 +491,6 @@ extension Rendnote {
                 let sinCount = Int((cutFq / fq).clipped(min: 1, max: Double(Int.max)))
                 let fq = fq.clipped(min: Score.minFq, max: cutFq)
                 
-                let dPhase = fq * .pi2 * rSampleRate
-                var x = 0.0
-                var sin1Xs = [Double](capacity: sampleCount)
-                var cos1Xs = [Double](capacity: sampleCount)
-                var sinMXs = [Double](capacity: sampleCount)
-                var cosMXs = [Double](capacity: sampleCount)
-                sampleCount.range.forEach { _ in
-                    let sin1X = Double.sin(x), cos1X = Double.cos(x)
-                    sin1Xs.append(sin1X)
-                    cos1Xs.append(cos1X)
-                    sinMXs.append(sin1X)
-                    cosMXs.append(cos1X)
-                    x += dPhase
-                    x = x.mod(.pi2)
-                }
-                var sinNXss = [[Double]](capacity: sinCount)
-                sinNXss.append(sin1Xs)
-                var sinNXs = [Double](repeating: 0, count: sampleCount)
-                var sinNXs1 = [Double](repeating: 0, count: sampleCount)
-                var cosNXs = [Double](repeating: 0, count: sampleCount)
-                var cosNXs1 = [Double](repeating: 0, count: sampleCount)
-                if sinCount >= 2 {
-                    for _ in 2 ... sinCount {
-                        vDSP.multiply(sinMXs, cos1Xs, result: &sinNXs)
-                        vDSP.multiply(cosMXs, sin1Xs, result: &sinNXs1)
-                        
-                        vDSP.multiply(cosMXs, cos1Xs, result: &cosNXs)
-                        vDSP.multiply(sinMXs, sin1Xs, result: &cosNXs1)
-                        
-                        vDSP.add(sinNXs, sinNXs1, result: &sinMXs)
-                        vDSP.subtract(cosNXs, cosNXs1, result: &cosMXs)
-                        sinNXss.append(sinMXs)
-                    }
-                }
-                
                 let spectlope = pitbend.firstSpectlope
                 var sign = true, mainSpectrum = [Double](capacity: sinCount)
                 let spectrum = (1 ... sinCount).map { n in
@@ -543,16 +508,50 @@ extension Rendnote {
                     return amp
                 }
                 
-                var mainSamples = [Double](repeating: 0, count: sampleCount)
-                for (n, sinNXs) in sinNXss.enumerated() {
-                    vDSP.multiply(mainSpectrum[n], sinNXs, result: &sinNXs1)
-                    vDSP.add(sinNXs1, mainSamples, result: &mainSamples)
+                let dPhase = fq * .pi2 * rSampleRate
+                var x = 0.0
+                var sin1Xs = [Double](capacity: sampleCount)
+                var cos1Xs = [Double](capacity: sampleCount)
+                var sinMXs = [Double](capacity: sampleCount)
+                var cosMXs = [Double](capacity: sampleCount)
+                sampleCount.range.forEach { _ in
+                    let sin1X = Double.sin(x), cos1X = Double.cos(x)
+                    sin1Xs.append(sin1X)
+                    cos1Xs.append(cos1X)
+                    sinMXs.append(sin1X)
+                    cosMXs.append(cos1X)
+                    x += dPhase
+                    x = x.mod(.pi2)
                 }
                 
+                var mainSamples = [Double](repeating: 0, count: sampleCount)
                 var samples = [Double](repeating: 0, count: sampleCount)
-                for (n, sinNXs) in sinNXss.enumerated() {
-                    vDSP.multiply(spectrum[n], sinNXs, result: &sinNXs1)
-                    vDSP.add(sinNXs1, samples, result: &samples)
+                var sinKXs = [Double](repeating: 0, count: sampleCount)
+                func append(_ sinNXs: [Double], at n: Int) {
+                    vDSP.multiply(mainSpectrum[n], sinNXs, result: &sinKXs)
+                    vDSP.add(sinKXs, mainSamples, result: &mainSamples)
+                    vDSP.multiply(spectrum[n], sinNXs, result: &sinKXs)
+                    vDSP.add(sinKXs, samples, result: &samples)
+                }
+                
+                var sinNXs = [Double](repeating: 0, count: sampleCount)
+                var sinNXs1 = [Double](repeating: 0, count: sampleCount)
+                var cosNXs = [Double](repeating: 0, count: sampleCount)
+                var cosNXs1 = [Double](repeating: 0, count: sampleCount)
+                append(sin1Xs, at: 0)
+                if sinCount >= 2 {
+                    for n in 1 ..< sinCount {
+                        vDSP.multiply(sinMXs, cos1Xs, result: &sinNXs)
+                        vDSP.multiply(cosMXs, sin1Xs, result: &sinNXs1)
+                        
+                        vDSP.multiply(cosMXs, cos1Xs, result: &cosNXs)
+                        vDSP.multiply(sinMXs, sin1Xs, result: &cosNXs1)
+                        
+                        vDSP.add(sinNXs, sinNXs1, result: &sinMXs)
+                        vDSP.subtract(cosNXs, cosNXs1, result: &cosMXs)
+                        
+                        append(sinMXs, at: n)
+                    }
                 }
                 
                 if containsNoise {
@@ -656,23 +655,6 @@ extension Rendnote {
                     return Frame(sec: sec, fq: fq, sinCount: sinCount, sin1X: sin1X, cos1X: cos1X)
                 }
                 
-                let sinss: [[Double]] = frames.enumerated().map { (i, v) in
-                    let sinCount = v.sinCount, sin1X = v.sin1X, cos1X = v.cos1X
-                    var sinMX = sin1X, cosMX = cos1X
-                    var sins = [Double](capacity: sinCount)
-                    sins.append(sin1X)
-                    if sinCount >= 2 {
-                        for _ in 2 ... sinCount {
-                            let sinNX = sinMX * cos1X + cosMX * sin1X
-                            let cosNX = cosMX * cos1X - sinMX * sin1X
-                            sinMX = sinNX
-                            cosMX = cosNX
-                            sins.append(sinNX)
-                        }
-                    }
-                    return sins
-                }
-                
                 let intCutStartFq = Int(cutStartFq.rounded(.down))
                 let cutScales = (intCutStartFq ..< Int(cutFq.rounded(.down))).map {
                     Double($0).clipped(min: cutStartFq, max: cutFq, newMin: 1, newMax: 0)
@@ -696,13 +678,30 @@ extension Rendnote {
                 let maxSinCount = frames.maxValue { $0.sinCount }!
                 let rsqfas = [0] + (1 ... maxSinCount).map { n in 1 / Double(n) ** sqfa }
                 
-                var spectrogram = Array(repeating: Array(repeating: 0.0, count: maxSinCount), 
-                                        count: sampleCount)
-                var mainSpectrogram = Array(repeating: Array(repeating: 0.0, count: maxSinCount), 
-                                            count: sampleCount)
                 var noiseSpectrogram = [[Double]](capacity: sampleCount / overlapSamplesCount)
                 var mainNoiseSpectrogram = [[Double]](capacity: sampleCount / overlapSamplesCount)
                 var preSpectrum: [Double]!, preMainSpectrum: [Double]!
+                
+                var mainSamples = [Double](repeating: 0, count: sampleCount)
+                var samples = [Double](repeating: 0, count: sampleCount)
+                func append(at i: Int, spectrum: [Double], mainSpectrum: [Double]) {
+                    let v = frames[i]
+                    let sinCount = v.sinCount, sin1X = v.sin1X, cos1X = v.cos1X
+                    var sinMX = sin1X, cosMX = cos1X
+                    var sins = [Double](capacity: sinCount)
+                    sins.append(sin1X)
+                    if sinCount >= 2 {
+                        for _ in 2 ... sinCount {
+                            let sinNX = sinMX * cos1X + cosMX * sin1X
+                            let cosNX = cosMX * cos1X - sinMX * sin1X
+                            sinMX = sinNX
+                            cosMX = cosNX
+                            sins.append(sinNX)
+                        }
+                    }
+                    mainSamples[i] = vDSP.sum(vDSP.multiply(sins, mainSpectrum[..<sinCount]))
+                    samples[i] = vDSP.sum(vDSP.multiply(sins, spectrum[..<sinCount]))
+                }
                 func update(at i: Int) {
                     let frame = frames[i]
                     let sec = frame.sec
@@ -725,6 +724,27 @@ extension Rendnote {
                         return amp
                     }
                     
+                    if i > 0 {
+                        for j in i - overlapSamplesCount + 1 ..< i {
+                            let t = Double(j - i + overlapSamplesCount) / Double(overlapSamplesCount)
+                            
+                            var nSpectrum = [Double](capacity: maxSinCount)
+                            var nMainSpectrum = [Double](capacity: maxSinCount)
+                            for k in maxSinCount.range {
+                                let fq = frames[j].fq * Double(k)
+                                let amp = Double.linear(preSpectrum[k], spectrum[k], t: t)
+                                nSpectrum.append(fq > cutStartFq ?
+                                (fq < cutFq ? amp * cutScales[Int(fq) - intCutStartFq] : 0) : amp)
+                                
+                                let mainAmp = Double.linear(preMainSpectrum[k], mainSpectrum[k], t: t)
+                                nMainSpectrum.append(fq > cutStartFq ?
+                                (fq < cutFq ? mainAmp * cutScales[Int(fq) - intCutStartFq] : 0) : mainAmp)
+                            }
+                            append(at: j, spectrum: nSpectrum, mainSpectrum: nMainSpectrum)
+                        }
+                    }
+                    append(at: i, spectrum: spectrum, mainSpectrum: mainSpectrum)
+                    
                     let oddScale = isEqualAllOvertone ? oddScale : oddScales[i]
                     let evenScale = isEqualAllOvertone ? evenScale : evenScales[i]
                     if containsNoise {
@@ -737,23 +757,6 @@ extension Rendnote {
                         mainNoiseSpectrogram.append(mainNoiseSpectrum)
                     }
                     
-                    maxSinCount.range.forEach { spectrogram[i][$0] = spectrum[$0] }
-                    maxSinCount.range.forEach { mainSpectrogram[i][$0] = mainSpectrum[$0] }
-                    if i > 0 {
-                        for j in i - overlapSamplesCount + 1 ..< i {
-                            let t = Double(j - i + overlapSamplesCount) / Double(overlapSamplesCount)
-                            for k in maxSinCount.range {
-                                let fq = frames[j].fq * Double(k)
-                                let amp = Double.linear(preSpectrum[k], spectrum[k], t: t)
-                                spectrogram[j][k] = fq > cutStartFq ?
-                                (fq < cutFq ? amp * cutScales[Int(fq) - intCutStartFq] : 0) : amp
-                                
-                                let mainAmp = Double.linear(preMainSpectrum[k], mainSpectrum[k], t: t)
-                                mainSpectrogram[j][k] = fq > cutStartFq ?
-                                (fq < cutFq ? mainAmp * cutScales[Int(fq) - intCutStartFq] : 0) : mainAmp
-                            }
-                        }
-                    }
                     preSpectrum = spectrum
                     preMainSpectrum = mainSpectrum
                 }
@@ -763,20 +766,6 @@ extension Rendnote {
                 if sampleCount % overlapSamplesCount != 1 {
                     update(at: sampleCount - 1)
                 }
-                
-                for (i, v) in spectrogram.enumerated() {
-                    if v.count > frames[i].sinCount {
-                        spectrogram[i].removeLast(v.count - frames[i].sinCount)
-                    }
-                }
-                for (i, v) in mainSpectrogram.enumerated() {
-                    if v.count > frames[i].sinCount {
-                        mainSpectrogram[i].removeLast(v.count - frames[i].sinCount)
-                    }
-                }
-                
-                var samples = zip(sinss, spectrogram).map { vDSP.sum(vDSP.multiply($0.0, $0.1)) }
-                var mainSamples = zip(sinss, mainSpectrogram).map { vDSP.sum(vDSP.multiply($0.0, $0.1)) }
                 
                 if containsNoise {
                     let noiseSamples = vDSP.gaussianNoise(count: sampleCount + stftCount,

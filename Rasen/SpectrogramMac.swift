@@ -412,7 +412,7 @@ struct Spectrogram {
     }
     init(_ oBuffer: PCMBuffer,
          fftCount: Int = 2048, windowOverlap: Double = 0.875,
-         isNormalized: Bool = true,
+         isNormalized: Bool = false,
          type: FqType = .pitch) {
         
         let fftCount = vDSP.nextPow2(fftCount)
@@ -619,6 +619,12 @@ struct Spectrogram {
         return (Double(redColor.rgba.r), Double(greenColor.rgba.g))
     } ()
     
+    static func mainVolm(fromVolum volm: Double, splitVolm: Double = 0.7, midVolm: Double = 0.9) -> Double {
+        volm < splitVolm ?
+        volm.clipped(min: 0, max: splitVolm, newMin: 0, newMax: midVolm) :
+        volm.clipped(min: splitVolm, max: 1, newMin: midVolm, newMax: 1)
+    }
+    
     func image(b: Double = 0, width: Int = 1024, at xi: Int = 0) -> Image? {
         let h = stereoCount
         guard let bitmap = Bitmap<UInt8>(width: width, height: h, colorSpace: .sRGB) else { return nil }
@@ -631,7 +637,7 @@ struct Spectrogram {
         for x in 0 ..< width {
             for y in 0 ..< h {
                 let stereo = frames[x + xi].stereos[h - 1 - y]
-                let alpha = rgamma(stereo.volm)
+                let alpha = rgamma(Self.mainVolm(fromVolum: stereo.volm))
                 guard !alpha.isNaN else {
                     print("NaN:", stereo.volm)
                     continue
