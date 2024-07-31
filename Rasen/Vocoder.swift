@@ -212,6 +212,8 @@ struct Pitbend: Codable, Hashable {
     let spectlopeInterpolation: Interpolation<Spectlope>
     let firstSpectlope: Spectlope, isEqualAllSpectlope: Bool
  
+    let secs: [Double]
+    
     init(pits: [Pit], beatRange: Range<Rational>, tempo: Rational) {
         let pitchs = pits.map { Double($0.pitch / 12) }
         let stereos = pits.map { $0.stereo.with(id: .zero) }
@@ -254,6 +256,8 @@ struct Pitbend: Codable, Hashable {
         self.firstSpectlope = firstSpectlope
         isEqualAllSpectlope = spectlopes.allSatisfy { $0 == firstSpectlope }
         spectlopeInterpolation = interpolation(isAll: isEqualAllSpectlope, spectlopes)
+        
+        self.secs = secs
     }
     init(pitch: Double, stereo: Stereo, overtone: Overtone, spectlope: Spectlope) {
         pitchInterpolation = .init()
@@ -272,6 +276,8 @@ struct Pitbend: Codable, Hashable {
         spectlopeInterpolation = .init()
         firstSpectlope = spectlope
         isEqualAllSpectlope = true
+        
+        secs = []
     }
 }
 extension Pitbend {
@@ -481,7 +487,7 @@ extension Rendnote {
                 var samples = clippedStft(vDSP.apply(noiseSamples, spectrum: noiseSpectrum))
                 let mainSamples = clippedStft(vDSP.apply(noiseSamples, spectrum: mainNoiseSpectrum))
                 
-                let maxV = vDSP.maximumMagnitude(mainSamples)
+                let maxV = vDSP.rootMeanSquare(mainSamples[..<min(mainSamples.count, rmsSize)])
                 let spectrumScale = maxV == 0 ? 0 : 1 / maxV
                 vDSP.multiply(spectrumScale, samples, result: &samples)
                 
@@ -583,27 +589,42 @@ extension Rendnote {
                 }
             }
         } else {
-            func normarizedWithRMS(from sSamples: [Double], to lSamples: [Double]) -> [Double] {
-                guard rmsSize < sSamples.count else {
+            func normarizedWithRMS(from sSamples: [Double], to lSamples: [Double],
+                                   pitRmsSize: Int = 512) -> [Double] {
+                let isLast = sSamples.count % pitRmsSize != 0
+                let count = sSamples.count / pitRmsSize * 2 + (isLast ? 1 : 0)
+                var rmss = [Double](capacity: count), idxs = [Double](capacity: count)
+                
+                for secI in 0 ..< pitbend.secs.count {
+                    let i = Int(pitbend.secs[secI] * sampleRate).clipped(min: 0, max: sSamples.count - 1)
+                    if i > 0 && i < sSamples.count {
+                        let rms0 = vDSP.rootMeanSquare(pitRmsSize.range.map { i - pitRmsSize + $0 >= 0 ? sSamples[i - pitRmsSize + $0] : 0 })
+                        rmss.append(rms0 == 0 ? 0 : 1 / rms0)
+                        idxs.append(.init(i))
+                    }
+                    let nextI = secI + 1 >= pitbend.secs.count ? sSamples.count - 1 : Int(pitbend.secs[secI + 1] * sampleRate).clipped(min: 0, max: sSamples.count - 1)
+                    if i + pitRmsSize < nextI {
+                        let rms1 = vDSP.rootMeanSquare(pitRmsSize.range.map { i + pitRmsSize + $0 < sSamples.count ? sSamples[i + pitRmsSize + $0] : 0 })
+                        rmss.append(rms1 == 0 ? 0 : 1 / rms1)
+                        idxs.append(.init(i + pitRmsSize))
+                    }
+                    
+                    for i in stride(from: i + rmsSize, to: nextI - pitRmsSize, by: rmsSize) {
+                        let rms = vDSP.rootMeanSquare(sSamples[(i - rmsSize) ..< i])
+                        rmss.append(rms == 0 ? 0 : 1 / rms)
+                        idxs.append(.init(i))
+                    }
+                }
+                
+                guard !rmss.isEmpty else {
                     let maxV = vDSP.rootMeanSquare(sSamples)
                     return vDSP.multiply(maxV == 0 ? 0 : 1 / maxV, lSamples)
                 }
                 
-                let isLast = sSamples.count % rmsSize != 0
-                let count = sSamples.count / rmsSize + (isLast ? 1 : 0)
-                var rmss = [Double](capacity: count), idxs = [Double](capacity: count)
-                for i in stride(from: rmsSize, to: sSamples.count, by: rmsSize) {
-                    let rms = vDSP.rootMeanSquare(sSamples[(i - rmsSize) ..< i])
-                    rmss.append(rms == 0 ? 0 : 1 / rms)
-                    idxs.append(.init(i))
-                }
-                if isLast {
+                if idxs.last != .init(sSamples.count - 1) {
                     rmss.append(rmss.last!)
-                } else {
-                    let rms = vDSP.rootMeanSquare(sSamples[(sSamples.count - rmsSize) ..< sSamples.count])
-                    rmss.append(rms == 0 ? 0 : 1 / rms)
+                    idxs.append(.init(sSamples.count - 1))
                 }
-                idxs.append(.init(sSamples.count - 1))
     
                 let nCount = Int(idxs.last!) + 1
                 let result = [Double](unsafeUninitializedCapacity: nCount) { buffer, initializedCount in
@@ -776,6 +797,9 @@ extension Rendnote {
                     vDSP.add(mainSamples, nMainNoiseSamples, result: &mainSamples)
                 }
                 samples = normarizedWithRMS(from: mainSamples, to: samples)
+//                let v = vDSP.maximumMagnitude(samples)
+//                vDSP.multiply(v == 0 ? 0 : 1 / v, samples, result: &samples)
+//                print("SSS", v)
                 
                 let stereos = stereos(sampleCount: samples.count)
                 return .init(fqScale: 1, isLoop: isLoop, samples: samples, stereos: stereos)

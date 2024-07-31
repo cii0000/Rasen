@@ -675,7 +675,15 @@ final class CopyEditor: Editor {
             let isSelected = animationView.selectedFrameIndexes.contains(ki)
             let indexes = isSelected ?
                 animationView.selectedFrameIndexes.sorted() : [ki]
-            let kfs = indexes.map { animationView.model.keyframes[$0] }
+            var beat: Rational = 0
+            let kfs = indexes.map {
+                var kf = animationView.model.keyframes[$0]
+                let nextBeat = $0 + 1 < animationView.model.keyframes.count ? animationView.model.keyframes[$0 + 1].beat : animationView.model.beatRange.upperBound
+                let dBeat = nextBeat - kf.beat
+                kf.beat = beat
+                beat += dBeat
+                return kf
+            }
             
             Pasteboard.shared.copiedObjects = [.animation(Animation(keyframes: kfs))]
             
@@ -1010,11 +1018,15 @@ final class CopyEditor: Editor {
             if indexes.last == animationView.model.keyframes.count {
                 indexes.removeLast()
             }
-            let beat: Rational = animationView.beat(atX: animationView.convertFromWorld(p).x)
+            
+            var beat: Rational = 0
             let kfs = indexes.map {
-                var keyframe = animationView.model.keyframes[$0]
-                keyframe.beat -= beat
-                return keyframe
+                var kf = animationView.model.keyframes[$0]
+                let nextBeat = $0 + 1 < animationView.model.keyframes.count ? animationView.model.keyframes[$0 + 1].beat : animationView.model.beatRange.upperBound
+                let dBeat = nextBeat - kf.beat
+                kf.beat = beat
+                beat += dBeat
+                return kf
             }
             
             if isSelected {
@@ -2383,21 +2395,34 @@ final class CopyEditor: Editor {
             document.updateSelects()
         case .animation(let animation):
             guard !animation.keyframes.isEmpty,
-                  let sheetView = document.sheetView(at: shp),
-                  let ni = sheetView.keyframeIndex(at: sheetView.convertFromWorld(p),
-                                                   isEnabledCount: true) else { return }
+                  let sheetView = document.sheetView(at: shp) else { return }
+            let beat: Rational = sheetView.animationView.beat(atX: sheetView.convertFromWorld(p).x)
+            var ni = 0
+            for (i, kf) in sheetView.model.animation.keyframes.enumerated().reversed() {
+                if kf.beat <= beat {
+                    ni = i + 1
+                    break
+                }
+            }
             
             let currentIndex = sheetView.model.animation.index(atRoot: sheetView.rootKeyframeIndex)
             let count = (sheetView.rootKeyframeIndex - currentIndex) / sheetView.model.animation.keyframes.count
+            let nextBeat = ni < sheetView.model.animation.keyframes.count ? sheetView.model.animation.keyframes[ni].beat : sheetView.model.animation.beatRange.upperBound
             var ki = ni
-            let kivs: [IndexValue<Keyframe>] = animation.keyframes.map {
-                let v = IndexValue(value: $0, index: ki)
+            let kivs: [IndexValue<Keyframe>] = animation.keyframes.compactMap {
+                var keyframe = $0
+                keyframe.beat += beat
+                if keyframe.beat >= nextBeat {
+                    return nil
+                }
+                let v = IndexValue(value: keyframe, index: ki)
                 ki += 1
                 return v
             }
+            
             sheetView.newUndoGroup()
             sheetView.insert(kivs)
-            sheetView.rootKeyframeIndex = sheetView.model.animation.keyframes.count * count + currentIndex + 1
+            sheetView.rootKeyframeIndex = sheetView.model.animation.keyframes.count * count + ni
             document.updateEditorNode()
             document.updateSelects()
         case .ids(let idv):

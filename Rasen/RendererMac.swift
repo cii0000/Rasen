@@ -1377,8 +1377,22 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                        ns: nsEvent, inputContext: inputContext)
     }
     
+    private var isOneFlag = false
     override func flagsChanged(with nsEvent: NSEvent) {
+        let oldModifierKeys = document.modifierKeys
+        
         document.modifierKeys = nsEvent.modifierKeys
+        
+        if oldModifierKeys.isEmpty && document.modifierKeys.isOne {
+            isOneFlag = true
+        } else if let oneKey = oldModifierKeys.oneInputKeyTYpe,
+                  document.modifierKeys.isEmpty && isOneFlag {
+            document.inputKey(inputKeyEventWith(nsEvent, oneKey, .began))
+            document.inputKey(inputKeyEventWith(nsEvent, oneKey, .ended))
+            isOneFlag = false
+        } else {
+            isOneFlag = false
+        }
     }
     
     override func mouseMoved(with nsEvent: NSEvent) {
@@ -1392,6 +1406,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     
     override func keyDown(with nsEvent: NSEvent) {
+        isOneFlag = false
         guard let key = nsEvent.key else { return }
         let phase: Phase = nsEvent.isARepeat ? .changed : .began
         if key.isTextEdit
@@ -1422,6 +1437,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 oldPressureStage = 0, isDrag = false, isStrongDrag = false,
                 firstTime = 0.0, firstP = Point(), isMovedDrag = false
     override func mouseDown(with nsEvent: NSEvent) {
+        isOneFlag = false
         isDrag = false
         isStrongDrag = false
         let beganDragEvent = dragEventWith(nsEvent, .began)
@@ -1486,6 +1502,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     private var beganSubDragEvent: DragEvent?, isSubDrag = false, isSubTouth = false
     override func rightMouseDown(with nsEvent: NSEvent) {
+        isOneFlag = false
         isSubTouth = nsEvent.subtype == .touch
         isSubDrag = false
         let beganDragEvent = dragEventWith(nsEvent, .began)
@@ -1630,6 +1647,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     private var beganMiddleDragEvent: DragEvent?, isMiddleDrag = false
     override func otherMouseDown(with nsEvent: NSEvent) {
+        isOneFlag = false
         isMiddleDrag = false
         let beganDragEvent = dragEventWith(nsEvent, .began)
         self.beganMiddleDragEvent = beganDragEvent

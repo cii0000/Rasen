@@ -928,9 +928,10 @@ final class AnimationView: TimelineView {
         guard !ids.isEmpty else { return [] }
         let idSet = Set(ids)
         let ki = model.index, lw = Line.defaultLineWidth
-        let nlw = lw * 2.5 * scale / 10, blw = lw * 4
+        
+        let nlw = max(lw * 0.5, lw * scale), blw = lw * 4
         let color: Color = removeLineIndex != nil ?
-            .removing : .selected
+            .removing : .subSelected
         var nodes = [Node]()
         var lineNodeDic = [[Line.Control]: Node]()
         for (i, kf) in model.keyframes.enumerated() {

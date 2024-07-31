@@ -4014,7 +4014,7 @@ final class Document {
         case .cutDraft: DraftCutter(self)
         case .makeFaces: FacesMaker(self)
         case .cutFaces: FacesCutter(self)
-        case .play: Player(self)
+        case .controlPlay, .play: Player(self)
         case .movePreviousKeyframe: KeyframePreviousMover(self)
         case .moveNextKeyframe: KeyframeNextMover(self)
         case .movePreviousTime: TimePreviousMover(self)

@@ -163,7 +163,7 @@ extension Color {
     static let content = Color(lightness: 10)
     
     static let interpolated = Color(white: 0.5)
-    static let subInterpolated = Color(white: 0, opacity: 0.25)
+    static let subInterpolated = Color(white: 0.5, opacity: 0.25)
     static let warning = Color(red: 1, green: 0.5, blue: 0)
     
     static let octave = Color(white: 0, opacity: 0.125)

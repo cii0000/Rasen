@@ -307,7 +307,9 @@ final class Looker: InputKeyEditor {
                     let ci = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
                                                     scale: document.screenToWorldScale) {
             let content = sheetView.contentsView.elementViews[ci].model
-            document.show(content.type.displayName, at: p)
+            let fileSize = content.url.fileSize ?? 0
+            let string = IOResult.fileSizeNameFrom(fileSize: fileSize)
+            document.show(content.type.displayName + "\n\t\(content.url.lastPathComponent)\n\t\("File Size".localized): \(string)", at: p)
         } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
             let scoreView = sheetView.scoreView
             let pitchInterval = document.currentPitchInterval

@@ -873,7 +873,7 @@ final class IOEditor: Editor {
             for url in contentURLs {
                 if let sheetView = document.madeSheetView(at: shp + dshp) {
                     let np = contentURLs.count == 1 ? sheetView.convertFromWorld(fp) : Point(10, 50)
-                    let filename = url.lastPathComponent
+                    let filename = url.deletingPathExtension().lastPathComponent
                     let name = UUID().uuidString + "." + url.pathExtension
                     
                     try? document.contentsDirectory.copy(name: name, from: url)

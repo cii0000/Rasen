@@ -277,6 +277,19 @@ extension ModifierKeys {
         }
         return str
     }
+    var isOne: Bool {
+        self == .shift || self == .control || self == .option || self == .command || self == .function
+    }
+    var oneInputKeyTYpe: InputKeyType? {
+        switch self {
+        case .shift: .shift
+        case .control: .control
+        case .option: .option
+        case .command: .command
+        case .function: .function
+        default: nil
+        }
+    }
 }
 struct Quasimode {
     var modifierKeys: ModifierKeys
@@ -328,6 +341,7 @@ extension Quasimode {
     static let selectMultiFrame = Quasimode(modifier: [.control, .shift, .command], .drag)
     static let playDrag = Quasimode(.otherDrag)
     static let play = Quasimode(modifier: [.control], .click)
+    static let controlPlay = Quasimode(.control)
     static let addScore = Quasimode(modifier: [.command], .no3)
     static let showTone = Quasimode(modifier: [.command], .click)
     

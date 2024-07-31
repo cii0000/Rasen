@@ -2176,41 +2176,41 @@ final class Interpolater: InputKeyEditor {
                 
                 let animationView = sheetView.animationView
                 var isNewUndoGroup = false
-                if oldRootKeyframeIndex != animationView.rootKeyframeIndex {
-                    let beat = animationView.model.localBeat
-                    let count = ((animationView.rootBeat - beat) / animationView.model.localDurBeat).rounded(.towardZero)
-                    
-                    let oneBeat = Rational(1, animationView.frameRate)
-                    
-                    let ki0 = animationView.model.index(atRoot: oldRootKeyframeIndex)
-                    let ki1 = animationView.model.index(atRoot: animationView.rootKeyframeIndex)
-                    let nki0 = min(ki0, ki1), nki1 = max(ki0, ki1)
-                    let ranges = (oldRootKeyframeIndex < animationView.rootKeyframeIndex ? ki0 < ki1 : ki1 < ki0) ? [nki0 ..< nki1] : [0 ..< nki0, nki1 ..< animationView.model.keyframes.count]
-                    
-                    var nj = 0
-                    for range in ranges {
-                        for j in range {
-                            let durBeat = animationView.model.keyframeDurBeat(at: j + nj)
-                            if durBeat >= oneBeat {
-                                if !isNewUndoGroup {
-                                    sheetView.newUndoGroup()
-                                    isNewUndoGroup = true
-                                }
-                                
-                                let nBeat = animationView.model.keyframes[j + nj].beat
-                                let count = Int(durBeat / oneBeat) - 1
-                                sheetView.insert((0 ..< count).map { k in
-                                    IndexValue(value: Keyframe(beat: oneBeat * .init(k + 1) + nBeat),
-                                               index: k + j + nj + 1)
-                                })
-                                nj += count
-                            }
-                        }
-                    }
-                    sheetView.rootBeat = animationView.model.localDurBeat * count + beat
-                    document.updateEditorNode()
-                    document.updateSelects()
-                }
+//                if oldRootKeyframeIndex != animationView.rootKeyframeIndex {
+//                    let beat = animationView.model.localBeat
+//                    let count = ((animationView.rootBeat - beat) / animationView.model.localDurBeat).rounded(.towardZero)
+//                    
+//                    let oneBeat = Rational(1, animationView.frameRate)
+//                    
+//                    let ki0 = animationView.model.index(atRoot: oldRootKeyframeIndex)
+//                    let ki1 = animationView.model.index(atRoot: animationView.rootKeyframeIndex)
+//                    let nki0 = min(ki0, ki1), nki1 = max(ki0, ki1)
+//                    let ranges = (oldRootKeyframeIndex < animationView.rootKeyframeIndex ? ki0 < ki1 : ki1 < ki0) ? [nki0 ..< nki1] : [0 ..< nki0, nki1 ..< animationView.model.keyframes.count]
+//                    
+//                    var nj = 0
+//                    for range in ranges {
+//                        for j in range {
+//                            let durBeat = animationView.model.keyframeDurBeat(at: j + nj)
+//                            if durBeat >= oneBeat {
+//                                if !isNewUndoGroup {
+//                                    sheetView.newUndoGroup()
+//                                    isNewUndoGroup = true
+//                                }
+//                                
+//                                let nBeat = animationView.model.keyframes[j + nj].beat
+//                                let count = Int(durBeat / oneBeat) - 1
+//                                sheetView.insert((0 ..< count).map { k in
+//                                    IndexValue(value: Keyframe(beat: oneBeat * .init(k + 1) + nBeat),
+//                                               index: k + j + nj + 1)
+//                                })
+//                                nj += count
+//                            }
+//                        }
+//                    }
+//                    sheetView.rootBeat = animationView.model.localDurBeat * count + beat
+//                    document.updateEditorNode()
+//                    document.updateSelects()
+//                }
                 
                 let lis: [Int]
                 if document.isSelectNoneCursor(at: p), !document.isSelectedText {
@@ -2294,8 +2294,15 @@ final class Interpolater: InputKeyEditor {
                                             isNewUndoGroup: false)
                     
                     let scale = 1 / document.worldToScreenScale
+                    let lw = Line.defaultLineWidth
+                    let nodes = lis.map {
+                        Node(path: sheetView.linesView.elementViews[$0].node.path * sheetView.node.localTransform,
+                             lineWidth: max(lw * 1.5, lw * 2.5 * scale, 1 * scale),
+                             lineType: .color(.selected))
+                    }
+                    
                     let iNodes = animationView.interpolationNodes(from: nids, scale: scale)
-                    linesNode.children = iNodes + noNodes
+                    linesNode.children = iNodes + noNodes + nodes
                     
                     sheetView.setRootKeyframeIndex(rootKeyframeIndex: animationView.rootKeyframeIndex)
                     
