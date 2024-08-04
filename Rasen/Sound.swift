@@ -718,18 +718,24 @@ extension Spectlope: MonoInterpolatable {
 struct Tone: Hashable, Codable {
     var overtone = Overtone()
     var spectlope = Spectlope()
+    var color = Color.background
     var id = UUID()
 }
 extension Tone: Protobuf {
     init(_ pb: PBTone) throws {
         overtone = (try? .init(pb.overtone)) ?? .init()
         spectlope = (try? .init(pb.spectlope)) ?? .init()
+        color = (try? .init(pb.color)) ?? .content
+        if color.opacity != 1 {
+            color = .background
+        }
         id = (try? .init(pb.id)) ?? .init()
     }
     var pb: PBTone {
         .with {
             $0.overtone = overtone.pb
             $0.spectlope = spectlope.pb
+            $0.color = color.pb
             $0.id = id.pb
         }
     }
@@ -747,6 +753,9 @@ extension Tone {
     }
     func with(spectlopeCount: Int) -> Self {
         .init(overtone: overtone, spectlope: spectlope.with(count: spectlopeCount), id: id)
+    }
+    var isDefault: Bool {
+        overtone == .init() && spectlope == .init()
     }
 }
 extension Tone: MonoInterpolatable {
@@ -831,7 +840,7 @@ extension Pit {
 }
 
 struct Envelope: Hashable, Codable {
-    var attackSec = 0.01, decaySec = 0.01, sustainVolm = 1.0, releaseSec = 0.01
+    var attackSec = 0.0, decaySec = 0.0, sustainVolm = 1.0, releaseSec = 0.01
     var id = UUID()
 }
 extension Envelope: Protobuf {
@@ -1043,7 +1052,7 @@ extension Note {
                      tone: value.tone, lyric: value.lyric,
                      envelope: envelope, id: id)
     }
-
+    
     var isEmpty: Bool {
         pits.count == 1 && pits[0].beat == 0 && pits[0].pitch == 0
     }
@@ -1059,11 +1068,17 @@ extension Note {
     var isEmptyPan: Bool {
         pits.allSatisfy { $0.stereo.pan == 0 }
     }
+    var isDefaultTone: Bool {
+        pits.allSatisfy { $0.tone.isDefault }
+    }
     var isOneOvertone: Bool {
         pits.allSatisfy { $0.tone.overtone.isOne }
     }
     var containsNoise: Bool {
         pits.contains(where: { $0.tone.spectlope.sprols.contains(where: { $0.noise > 0 }) })
+    }
+    var containsNoOneEven: Bool {
+        pits.contains(where: { $0.tone.overtone.evenVolm != 1 })
     }
     var isFullNoise: Bool {
         pits.allSatisfy { $0.tone.spectlope.isFullNoise }
@@ -1531,6 +1546,7 @@ extension Score {
     func chordPitches(atBeat range: Range<Rational>) -> [Int] {
         var pitchLengths = [Int: [Range<Rational>]]()
         for note in notes + draftNotes {
+            guard !note.isOneOvertone && !note.isFullNoise else { continue }
             for (beatRange, roundedPitch) in note.chordBeatRangeAndRoundedPitchs() {
                 if let iRange = beatRange.intersection(range) {
                     if pitchLengths[roundedPitch] != nil {

@@ -37,7 +37,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
   typealias Version = _2
 }
 
-enum PBRGBColorSpace: SwiftProtobuf.Enum {
+enum PBRGBColorSpace: SwiftProtobuf.Enum, Swift.CaseIterable {
   typealias RawValue = Int
   case sRgb // = 0
   case sRgblinear // = 4
@@ -81,13 +81,8 @@ enum PBRGBColorSpace: SwiftProtobuf.Enum {
     }
   }
 
-}
-
-#if swift(>=4.2)
-
-extension PBRGBColorSpace: CaseIterable {
   // The compiler won't synthesize support with the UNRECOGNIZED case.
-  static var allCases: [PBRGBColorSpace] = [
+  static let allCases: [PBRGBColorSpace] = [
     .sRgb,
     .sRgblinear,
     .sRgbhdr,
@@ -97,11 +92,10 @@ extension PBRGBColorSpace: CaseIterable {
     .p3Hdr,
     .p3Hdrlinear,
   ]
+
 }
 
-#endif  // swift(>=4.2)
-
-enum PBInterType: SwiftProtobuf.Enum {
+enum PBInterType: SwiftProtobuf.Enum, Swift.CaseIterable {
   typealias RawValue = Int
   case none // = 0
   case key // = 1
@@ -130,22 +124,16 @@ enum PBInterType: SwiftProtobuf.Enum {
     }
   }
 
-}
-
-#if swift(>=4.2)
-
-extension PBInterType: CaseIterable {
   // The compiler won't synthesize support with the UNRECOGNIZED case.
-  static var allCases: [PBInterType] = [
+  static let allCases: [PBInterType] = [
     .none,
     .key,
     .interpolated,
   ]
+
 }
 
-#endif  // swift(>=4.2)
-
-enum PBOrientation: SwiftProtobuf.Enum {
+enum PBOrientation: SwiftProtobuf.Enum, Swift.CaseIterable {
   typealias RawValue = Int
   case horizontal // = 0
   case vertical // = 1
@@ -171,21 +159,15 @@ enum PBOrientation: SwiftProtobuf.Enum {
     }
   }
 
-}
-
-#if swift(>=4.2)
-
-extension PBOrientation: CaseIterable {
   // The compiler won't synthesize support with the UNRECOGNIZED case.
-  static var allCases: [PBOrientation] = [
+  static let allCases: [PBOrientation] = [
     .horizontal,
     .vertical,
   ]
+
 }
 
-#endif  // swift(>=4.2)
-
-enum PBPreviousNext: SwiftProtobuf.Enum {
+enum PBPreviousNext: SwiftProtobuf.Enum, Swift.CaseIterable {
   typealias RawValue = Int
   case off // = 0
   case previous // = 1
@@ -217,23 +199,17 @@ enum PBPreviousNext: SwiftProtobuf.Enum {
     }
   }
 
-}
-
-#if swift(>=4.2)
-
-extension PBPreviousNext: CaseIterable {
   // The compiler won't synthesize support with the UNRECOGNIZED case.
-  static var allCases: [PBPreviousNext] = [
+  static let allCases: [PBPreviousNext] = [
     .off,
     .previous,
     .next,
     .previousAndNext,
   ]
+
 }
 
-#endif  // swift(>=4.2)
-
-enum PBRectCorner: SwiftProtobuf.Enum {
+enum PBRectCorner: SwiftProtobuf.Enum, Swift.CaseIterable {
   typealias RawValue = Int
   case minXminY // = 0
   case minXmaxY // = 1
@@ -265,23 +241,17 @@ enum PBRectCorner: SwiftProtobuf.Enum {
     }
   }
 
-}
-
-#if swift(>=4.2)
-
-extension PBRectCorner: CaseIterable {
   // The compiler won't synthesize support with the UNRECOGNIZED case.
-  static var allCases: [PBRectCorner] = [
+  static let allCases: [PBRectCorner] = [
     .minXminY,
     .minXmaxY,
     .maxXminY,
     .maxXmaxY,
   ]
+
 }
 
-#endif  // swift(>=4.2)
-
-struct PBRational {
+struct PBRational: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -295,7 +265,7 @@ struct PBRational {
   init() {}
 }
 
-struct PBIntRange {
+struct PBIntRange: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -309,7 +279,7 @@ struct PBIntRange {
   init() {}
 }
 
-struct PBRationalRange {
+struct PBRationalRange: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -340,7 +310,7 @@ struct PBRationalRange {
   fileprivate var _upperBound: PBRational? = nil
 }
 
-struct PBPoint {
+struct PBPoint: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -354,7 +324,7 @@ struct PBPoint {
   init() {}
 }
 
-struct PBSize {
+struct PBSize: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -368,7 +338,7 @@ struct PBSize {
   init() {}
 }
 
-struct PBRect {
+struct PBRect: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -399,7 +369,7 @@ struct PBRect {
   fileprivate var _size: PBSize? = nil
 }
 
-struct PBAttitude {
+struct PBAttitude: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -432,7 +402,7 @@ struct PBAttitude {
   fileprivate var _scale: PBSize? = nil
 }
 
-struct PBLCHA {
+struct PBLCHA: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -450,7 +420,7 @@ struct PBLCHA {
   init() {}
 }
 
-struct PBRGBA {
+struct PBRGBA: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -468,7 +438,7 @@ struct PBRGBA {
   init() {}
 }
 
-struct PBColor {
+struct PBColor: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -501,7 +471,7 @@ struct PBColor {
   fileprivate var _rgba: PBRGBA? = nil
 }
 
-struct PBUUID {
+struct PBUUID: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -515,7 +485,7 @@ struct PBUUID {
   init() {}
 }
 
-struct PBUUColor {
+struct PBUUColor: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -546,7 +516,7 @@ struct PBUUColor {
   fileprivate var _id: PBUUID? = nil
 }
 
-struct PBInterOption {
+struct PBInterOption: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -569,7 +539,7 @@ struct PBInterOption {
   fileprivate var _id: PBUUID? = nil
 }
 
-struct PBLine {
+struct PBLine: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -618,25 +588,12 @@ struct PBLine {
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  enum OneOf_UuColorOptional: Equatable {
+  enum OneOf_UuColorOptional: Equatable, Sendable {
     case uuColor(PBUUColor)
 
-  #if !swift(>=4.1)
-    static func ==(lhs: PBLine.OneOf_UuColorOptional, rhs: PBLine.OneOf_UuColorOptional) -> Bool {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch (lhs, rhs) {
-      case (.uuColor, .uuColor): return {
-        guard case .uuColor(let l) = lhs, case .uuColor(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      }
-    }
-  #endif
   }
 
-  struct PBControl {
+  struct PBControl: Sendable {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
@@ -666,7 +623,7 @@ struct PBLine {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-struct PBPolygon {
+struct PBPolygon: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -680,7 +637,7 @@ struct PBPolygon {
   init() {}
 }
 
-struct PBTopolygon {
+struct PBTopolygon: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -703,7 +660,7 @@ struct PBTopolygon {
   fileprivate var _polygon: PBPolygon? = nil
 }
 
-struct PBPlane {
+struct PBPlane: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -744,7 +701,7 @@ struct PBPlane {
   fileprivate var _uuColor: PBUUColor? = nil
 }
 
-struct PBPicture {
+struct PBPicture: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -758,7 +715,7 @@ struct PBPicture {
   init() {}
 }
 
-struct PBDate {
+struct PBDate: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -770,7 +727,7 @@ struct PBDate {
   init() {}
 }
 
-struct PBContentTimeOption {
+struct PBContentTimeOption: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -811,7 +768,7 @@ struct PBContentTimeOption {
   fileprivate var _tempo: PBRational? = nil
 }
 
-struct PBImage {
+struct PBImage: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -823,7 +780,7 @@ struct PBImage {
   init() {}
 }
 
-struct PBStereo {
+struct PBStereo: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -848,7 +805,7 @@ struct PBStereo {
   fileprivate var _id: PBUUID? = nil
 }
 
-struct PBContent {
+struct PBContent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -914,22 +871,9 @@ struct PBContent {
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  enum OneOf_ContentTimeOptionOptional: Equatable {
+  enum OneOf_ContentTimeOptionOptional: Equatable, Sendable {
     case timeOption(PBContentTimeOption)
 
-  #if !swift(>=4.1)
-    static func ==(lhs: PBContent.OneOf_ContentTimeOptionOptional, rhs: PBContent.OneOf_ContentTimeOptionOptional) -> Bool {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch (lhs, rhs) {
-      case (.timeOption, .timeOption): return {
-        guard case .timeOption(let l) = lhs, case .timeOption(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      }
-    }
-  #endif
   }
 
   init() {}
@@ -937,7 +881,7 @@ struct PBContent {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-struct PBOvertone {
+struct PBOvertone: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -951,7 +895,7 @@ struct PBOvertone {
   init() {}
 }
 
-struct PBSprol {
+struct PBSprol: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -967,7 +911,7 @@ struct PBSprol {
   init() {}
 }
 
-struct PBSpectlope {
+struct PBSpectlope: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -979,7 +923,7 @@ struct PBSpectlope {
   init() {}
 }
 
-struct PBTone {
+struct PBTone: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1002,6 +946,15 @@ struct PBTone {
   /// Clears the value of `spectlope`. Subsequent reads from it will return its default value.
   mutating func clearSpectlope() {self._spectlope = nil}
 
+  var color: PBColor {
+    get {return _color ?? PBColor()}
+    set {_color = newValue}
+  }
+  /// Returns true if `color` has been explicitly set.
+  var hasColor: Bool {return self._color != nil}
+  /// Clears the value of `color`. Subsequent reads from it will return its default value.
+  mutating func clearColor() {self._color = nil}
+
   var id: PBUUID {
     get {return _id ?? PBUUID()}
     set {_id = newValue}
@@ -1017,63 +970,64 @@ struct PBTone {
 
   fileprivate var _overtone: PBOvertone? = nil
   fileprivate var _spectlope: PBSpectlope? = nil
+  fileprivate var _color: PBColor? = nil
   fileprivate var _id: PBUUID? = nil
 }
 
-struct PBPit {
+struct PBPit: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
   var beat: PBRational {
-    get {return _beat ?? PBRational()}
-    set {_beat = newValue}
+    get {return _storage._beat ?? PBRational()}
+    set {_uniqueStorage()._beat = newValue}
   }
   /// Returns true if `beat` has been explicitly set.
-  var hasBeat: Bool {return self._beat != nil}
+  var hasBeat: Bool {return _storage._beat != nil}
   /// Clears the value of `beat`. Subsequent reads from it will return its default value.
-  mutating func clearBeat() {self._beat = nil}
+  mutating func clearBeat() {_uniqueStorage()._beat = nil}
 
   var pitch: PBRational {
-    get {return _pitch ?? PBRational()}
-    set {_pitch = newValue}
+    get {return _storage._pitch ?? PBRational()}
+    set {_uniqueStorage()._pitch = newValue}
   }
   /// Returns true if `pitch` has been explicitly set.
-  var hasPitch: Bool {return self._pitch != nil}
+  var hasPitch: Bool {return _storage._pitch != nil}
   /// Clears the value of `pitch`. Subsequent reads from it will return its default value.
-  mutating func clearPitch() {self._pitch = nil}
+  mutating func clearPitch() {_uniqueStorage()._pitch = nil}
 
   var stereo: PBStereo {
-    get {return _stereo ?? PBStereo()}
-    set {_stereo = newValue}
+    get {return _storage._stereo ?? PBStereo()}
+    set {_uniqueStorage()._stereo = newValue}
   }
   /// Returns true if `stereo` has been explicitly set.
-  var hasStereo: Bool {return self._stereo != nil}
+  var hasStereo: Bool {return _storage._stereo != nil}
   /// Clears the value of `stereo`. Subsequent reads from it will return its default value.
-  mutating func clearStereo() {self._stereo = nil}
+  mutating func clearStereo() {_uniqueStorage()._stereo = nil}
 
   var tone: PBTone {
-    get {return _tone ?? PBTone()}
-    set {_tone = newValue}
+    get {return _storage._tone ?? PBTone()}
+    set {_uniqueStorage()._tone = newValue}
   }
   /// Returns true if `tone` has been explicitly set.
-  var hasTone: Bool {return self._tone != nil}
+  var hasTone: Bool {return _storage._tone != nil}
   /// Clears the value of `tone`. Subsequent reads from it will return its default value.
-  mutating func clearTone() {self._tone = nil}
+  mutating func clearTone() {_uniqueStorage()._tone = nil}
 
-  var lyric: String = String()
+  var lyric: String {
+    get {return _storage._lyric}
+    set {_uniqueStorage()._lyric = newValue}
+  }
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
 
-  fileprivate var _beat: PBRational? = nil
-  fileprivate var _pitch: PBRational? = nil
-  fileprivate var _stereo: PBStereo? = nil
-  fileprivate var _tone: PBTone? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-struct PBPitbend {
+struct PBPitbend: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1085,7 +1039,7 @@ struct PBPitbend {
   init() {}
 }
 
-struct PBEnvelope {
+struct PBEnvelope: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1114,7 +1068,7 @@ struct PBEnvelope {
   fileprivate var _id: PBUUID? = nil
 }
 
-struct PBNote {
+struct PBNote: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1169,7 +1123,7 @@ struct PBNote {
   fileprivate var _id: PBUUID? = nil
 }
 
-struct PBScoreOption {
+struct PBScoreOption: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1206,7 +1160,7 @@ struct PBScoreOption {
   fileprivate var _tempo: PBRational? = nil
 }
 
-struct PBScore {
+struct PBScore: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1257,7 +1211,7 @@ struct PBScore {
   fileprivate var _id: PBUUID? = nil
 }
 
-struct PBAudio {
+struct PBAudio: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1269,7 +1223,7 @@ struct PBAudio {
   init() {}
 }
 
-struct PBLocale {
+struct PBLocale: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1281,7 +1235,7 @@ struct PBLocale {
   init() {}
 }
 
-struct PBTextTimeOption {
+struct PBTextTimeOption: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1312,7 +1266,7 @@ struct PBTextTimeOption {
   fileprivate var _tempo: PBRational? = nil
 }
 
-struct PBText {
+struct PBText: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1355,22 +1309,9 @@ struct PBText {
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  enum OneOf_TimeOptionOptional: Equatable {
+  enum OneOf_TimeOptionOptional: Equatable, Sendable {
     case timeOption(PBTextTimeOption)
 
-  #if !swift(>=4.1)
-    static func ==(lhs: PBText.OneOf_TimeOptionOptional, rhs: PBText.OneOf_TimeOptionOptional) -> Bool {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch (lhs, rhs) {
-      case (.timeOption, .timeOption): return {
-        guard case .timeOption(let l) = lhs, case .timeOption(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      }
-    }
-  #endif
   }
 
   init() {}
@@ -1379,7 +1320,7 @@ struct PBText {
   fileprivate var _locale: PBLocale? = nil
 }
 
-struct PBBorder {
+struct PBBorder: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1393,7 +1334,7 @@ struct PBBorder {
   init() {}
 }
 
-struct PBSheetposStringDic {
+struct PBSheetposStringDic: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1405,7 +1346,7 @@ struct PBSheetposStringDic {
   init() {}
 }
 
-struct PBStringIntPointDicElement {
+struct PBStringIntPointDicElement: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1428,7 +1369,7 @@ struct PBStringIntPointDicElement {
   fileprivate var _key: PBSheetpos? = nil
 }
 
-struct PBStringIntPointDic {
+struct PBStringIntPointDic: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1440,7 +1381,7 @@ struct PBStringIntPointDic {
   init() {}
 }
 
-struct PBKeyframe {
+struct PBKeyframe: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1483,7 +1424,7 @@ struct PBKeyframe {
   fileprivate var _beat: PBRational? = nil
 }
 
-struct PBKeyframeKey {
+struct PBKeyframeKey: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1514,7 +1455,7 @@ struct PBKeyframeKey {
   fileprivate var _beat: PBRational? = nil
 }
 
-struct PBAnimationZipper {
+struct PBAnimationZipper: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1534,7 +1475,7 @@ struct PBAnimationZipper {
   init() {}
 }
 
-struct PBAnimationOption {
+struct PBAnimationOption: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1569,7 +1510,7 @@ struct PBAnimationOption {
   fileprivate var _tempo: PBRational? = nil
 }
 
-struct PBAnimation {
+struct PBAnimation: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1637,7 +1578,7 @@ struct PBAnimation {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-struct PBSheetOption {
+struct PBSheetOption: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1658,7 +1599,7 @@ struct PBSheetOption {
   fileprivate var _durBeat: PBRational? = nil
 }
 
-struct PBSheet {
+struct PBSheet: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1735,7 +1676,7 @@ struct PBSheet {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-struct PBSheetpos {
+struct PBSheetpos: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1751,7 +1692,7 @@ struct PBSheetpos {
   init() {}
 }
 
-struct PBWorld {
+struct PBWorld: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1772,7 +1713,7 @@ struct PBWorld {
   fileprivate var _sheetPositions: PBSheetposStringDic? = nil
 }
 
-struct PBCornerRectValue {
+struct PBCornerRectValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1795,7 +1736,7 @@ struct PBCornerRectValue {
   fileprivate var _rect: PBRect? = nil
 }
 
-struct PBCornerRectValueArray {
+struct PBCornerRectValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1807,7 +1748,7 @@ struct PBCornerRectValueArray {
   init() {}
 }
 
-struct PBFinding {
+struct PBFinding: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1830,7 +1771,7 @@ struct PBFinding {
   fileprivate var _worldPosition: PBPoint? = nil
 }
 
-struct PBKeyframeOption {
+struct PBKeyframeOption: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1853,7 +1794,7 @@ struct PBKeyframeOption {
   fileprivate var _beat: PBRational? = nil
 }
 
-struct PBBoolIndexValue {
+struct PBBoolIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1867,7 +1808,7 @@ struct PBBoolIndexValue {
   init() {}
 }
 
-struct PBIntIndexValue {
+struct PBIntIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1881,7 +1822,7 @@ struct PBIntIndexValue {
   init() {}
 }
 
-struct PBLineIndexValue {
+struct PBLineIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1904,7 +1845,7 @@ struct PBLineIndexValue {
   fileprivate var _value: PBLine? = nil
 }
 
-struct PBInterOptionIndexValue {
+struct PBInterOptionIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1927,7 +1868,7 @@ struct PBInterOptionIndexValue {
   fileprivate var _value: PBInterOption? = nil
 }
 
-struct PBPlaneIndexValue {
+struct PBPlaneIndexValue: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1953,7 +1894,7 @@ struct PBPlaneIndexValue {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-struct PBTextIndexValue {
+struct PBTextIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1976,7 +1917,7 @@ struct PBTextIndexValue {
   fileprivate var _value: PBText? = nil
 }
 
-struct PBNoteIndexValue {
+struct PBNoteIndexValue: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2002,7 +1943,7 @@ struct PBNoteIndexValue {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-struct PBContentIndexValue {
+struct PBContentIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2025,7 +1966,7 @@ struct PBContentIndexValue {
   fileprivate var _value: PBContent? = nil
 }
 
-struct PBBorderIndexValue {
+struct PBBorderIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2048,7 +1989,7 @@ struct PBBorderIndexValue {
   fileprivate var _value: PBBorder? = nil
 }
 
-struct PBKeyframeIndexValue {
+struct PBKeyframeIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2071,7 +2012,7 @@ struct PBKeyframeIndexValue {
   fileprivate var _value: PBKeyframe? = nil
 }
 
-struct PBKeyframeOptionIndexValue {
+struct PBKeyframeOptionIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2094,7 +2035,7 @@ struct PBKeyframeOptionIndexValue {
   fileprivate var _value: PBKeyframeOption? = nil
 }
 
-struct PBColorValue {
+struct PBColorValue: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2153,7 +2094,7 @@ struct PBColorValue {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-struct PBPlaneValue {
+struct PBPlaneValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2169,7 +2110,7 @@ struct PBPlaneValue {
   init() {}
 }
 
-struct PBTextValue {
+struct PBTextValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2217,58 +2158,19 @@ struct PBTextValue {
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  enum OneOf_OriginOptional: Equatable {
+  enum OneOf_OriginOptional: Equatable, Sendable {
     case origin(PBPoint)
 
-  #if !swift(>=4.1)
-    static func ==(lhs: PBTextValue.OneOf_OriginOptional, rhs: PBTextValue.OneOf_OriginOptional) -> Bool {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch (lhs, rhs) {
-      case (.origin, .origin): return {
-        guard case .origin(let l) = lhs, case .origin(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      }
-    }
-  #endif
   }
 
-  enum OneOf_SizeOptional: Equatable {
+  enum OneOf_SizeOptional: Equatable, Sendable {
     case size(Double)
 
-  #if !swift(>=4.1)
-    static func ==(lhs: PBTextValue.OneOf_SizeOptional, rhs: PBTextValue.OneOf_SizeOptional) -> Bool {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch (lhs, rhs) {
-      case (.size, .size): return {
-        guard case .size(let l) = lhs, case .size(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      }
-    }
-  #endif
   }
 
-  enum OneOf_WidthCountOptional: Equatable {
+  enum OneOf_WidthCountOptional: Equatable, Sendable {
     case widthCount(Double)
 
-  #if !swift(>=4.1)
-    static func ==(lhs: PBTextValue.OneOf_WidthCountOptional, rhs: PBTextValue.OneOf_WidthCountOptional) -> Bool {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch (lhs, rhs) {
-      case (.widthCount, .widthCount): return {
-        guard case .widthCount(let l) = lhs, case .widthCount(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      }
-    }
-  #endif
   }
 
   init() {}
@@ -2276,7 +2178,7 @@ struct PBTextValue {
   fileprivate var _replacedRange: PBIntRange? = nil
 }
 
-struct PBTextValueIndexValue {
+struct PBTextValueIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2299,7 +2201,7 @@ struct PBTextValueIndexValue {
   fileprivate var _value: PBTextValue? = nil
 }
 
-struct PBSheetValue {
+struct PBSheetValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2342,7 +2244,7 @@ struct PBSheetValue {
   fileprivate var _id: PBUUID? = nil
 }
 
-struct PBInt64Array {
+struct PBInt64Array: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2354,7 +2256,7 @@ struct PBInt64Array {
   init() {}
 }
 
-struct PBIntArrayIndexValue {
+struct PBIntArrayIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2377,7 +2279,7 @@ struct PBIntArrayIndexValue {
   fileprivate var _value: PBInt64Array? = nil
 }
 
-struct PBIntArrayIndexValueArray {
+struct PBIntArrayIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2389,7 +2291,7 @@ struct PBIntArrayIndexValueArray {
   init() {}
 }
 
-struct PBLineArray {
+struct PBLineArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2401,7 +2303,7 @@ struct PBLineArray {
   init() {}
 }
 
-struct PBPlaneArray {
+struct PBPlaneArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2413,7 +2315,7 @@ struct PBPlaneArray {
   init() {}
 }
 
-struct PBSheetposArray {
+struct PBSheetposArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2425,7 +2327,7 @@ struct PBSheetposArray {
   init() {}
 }
 
-struct PBIntIndexValueArray {
+struct PBIntIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2437,7 +2339,7 @@ struct PBIntIndexValueArray {
   init() {}
 }
 
-struct PBLineIndexValueArray {
+struct PBLineIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2449,7 +2351,7 @@ struct PBLineIndexValueArray {
   init() {}
 }
 
-struct PBLineIndexValueArrayIndexValue {
+struct PBLineIndexValueArrayIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2463,7 +2365,7 @@ struct PBLineIndexValueArrayIndexValue {
   init() {}
 }
 
-struct PBLineIndexValueArrayIndexValueArray {
+struct PBLineIndexValueArrayIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2475,7 +2377,7 @@ struct PBLineIndexValueArrayIndexValueArray {
   init() {}
 }
 
-struct PBPlaneIndexValueArrayIndexValue {
+struct PBPlaneIndexValueArrayIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2489,7 +2391,7 @@ struct PBPlaneIndexValueArrayIndexValue {
   init() {}
 }
 
-struct PBPlaneIndexValueArrayIndexValueArray {
+struct PBPlaneIndexValueArrayIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2501,7 +2403,7 @@ struct PBPlaneIndexValueArrayIndexValueArray {
   init() {}
 }
 
-struct PBInterOptionIndexValueArray {
+struct PBInterOptionIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2513,7 +2415,7 @@ struct PBInterOptionIndexValueArray {
   init() {}
 }
 
-struct PBInterOptionIndexValueArrayIndexValue {
+struct PBInterOptionIndexValueArrayIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2527,7 +2429,7 @@ struct PBInterOptionIndexValueArrayIndexValue {
   init() {}
 }
 
-struct PBInterOptionIndexValueArrayIndexValueArray {
+struct PBInterOptionIndexValueArrayIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2539,7 +2441,7 @@ struct PBInterOptionIndexValueArrayIndexValueArray {
   init() {}
 }
 
-struct PBBoolIndexValueArray {
+struct PBBoolIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2551,7 +2453,7 @@ struct PBBoolIndexValueArray {
   init() {}
 }
 
-struct PBPlaneIndexValueArray {
+struct PBPlaneIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2563,7 +2465,7 @@ struct PBPlaneIndexValueArray {
   init() {}
 }
 
-struct PBNoteIndexValueArray {
+struct PBNoteIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2575,7 +2477,7 @@ struct PBNoteIndexValueArray {
   init() {}
 }
 
-struct PBTextIndexValueArray {
+struct PBTextIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2587,7 +2489,7 @@ struct PBTextIndexValueArray {
   init() {}
 }
 
-struct PBContentIndexValueArray {
+struct PBContentIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2599,7 +2501,7 @@ struct PBContentIndexValueArray {
   init() {}
 }
 
-struct PBBorderIndexValueArray {
+struct PBBorderIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2611,7 +2513,7 @@ struct PBBorderIndexValueArray {
   init() {}
 }
 
-struct PBKeyframeIndexValueArray {
+struct PBKeyframeIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2623,7 +2525,7 @@ struct PBKeyframeIndexValueArray {
   init() {}
 }
 
-struct PBKeyframeOptionIndexValueArray {
+struct PBKeyframeOptionIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2635,7 +2537,7 @@ struct PBKeyframeOptionIndexValueArray {
   init() {}
 }
 
-struct PBSheetUndoItem {
+struct PBSheetUndoItem: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3036,7 +2938,7 @@ struct PBSheetUndoItem {
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  enum OneOf_Value: Equatable {
+  enum OneOf_Value: Equatable, Sendable {
     case appendLine(PBLine)
     case appendLines(PBLineArray)
     case appendPlanes(PBPlaneArray)
@@ -3087,218 +2989,12 @@ struct PBSheetUndoItem {
     case removeDraftNotes(PBInt64Array)
     case setIsShownTones(PBBoolIndexValueArray)
 
-  #if !swift(>=4.1)
-    static func ==(lhs: PBSheetUndoItem.OneOf_Value, rhs: PBSheetUndoItem.OneOf_Value) -> Bool {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch (lhs, rhs) {
-      case (.appendLine, .appendLine): return {
-        guard case .appendLine(let l) = lhs, case .appendLine(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.appendLines, .appendLines): return {
-        guard case .appendLines(let l) = lhs, case .appendLines(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.appendPlanes, .appendPlanes): return {
-        guard case .appendPlanes(let l) = lhs, case .appendPlanes(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.removeLastLines, .removeLastLines): return {
-        guard case .removeLastLines(let l) = lhs, case .removeLastLines(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.removeLastPlanes, .removeLastPlanes): return {
-        guard case .removeLastPlanes(let l) = lhs, case .removeLastPlanes(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.insertLines, .insertLines): return {
-        guard case .insertLines(let l) = lhs, case .insertLines(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.insertPlanes, .insertPlanes): return {
-        guard case .insertPlanes(let l) = lhs, case .insertPlanes(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.removeLines, .removeLines): return {
-        guard case .removeLines(let l) = lhs, case .removeLines(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.removePlanes, .removePlanes): return {
-        guard case .removePlanes(let l) = lhs, case .removePlanes(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.setPlaneValue, .setPlaneValue): return {
-        guard case .setPlaneValue(let l) = lhs, case .setPlaneValue(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.changeToDraft, .changeToDraft): return {
-        guard case .changeToDraft(let l) = lhs, case .changeToDraft(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.setPicture, .setPicture): return {
-        guard case .setPicture(let l) = lhs, case .setPicture(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.insertDraftLines, .insertDraftLines): return {
-        guard case .insertDraftLines(let l) = lhs, case .insertDraftLines(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.insertDraftPlanes, .insertDraftPlanes): return {
-        guard case .insertDraftPlanes(let l) = lhs, case .insertDraftPlanes(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.removeDraftLines, .removeDraftLines): return {
-        guard case .removeDraftLines(let l) = lhs, case .removeDraftLines(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.removeDraftPlanes, .removeDraftPlanes): return {
-        guard case .removeDraftPlanes(let l) = lhs, case .removeDraftPlanes(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.setDraftPicture, .setDraftPicture): return {
-        guard case .setDraftPicture(let l) = lhs, case .setDraftPicture(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.insertTexts, .insertTexts): return {
-        guard case .insertTexts(let l) = lhs, case .insertTexts(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.removeTexts, .removeTexts): return {
-        guard case .removeTexts(let l) = lhs, case .removeTexts(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.replaceString, .replaceString): return {
-        guard case .replaceString(let l) = lhs, case .replaceString(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.changedColors, .changedColors): return {
-        guard case .changedColors(let l) = lhs, case .changedColors(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.insertBorders, .insertBorders): return {
-        guard case .insertBorders(let l) = lhs, case .insertBorders(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.removeBorders, .removeBorders): return {
-        guard case .removeBorders(let l) = lhs, case .removeBorders(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.setRootKeyframeIndex, .setRootKeyframeIndex): return {
-        guard case .setRootKeyframeIndex(let l) = lhs, case .setRootKeyframeIndex(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.insertKeyframes, .insertKeyframes): return {
-        guard case .insertKeyframes(let l) = lhs, case .insertKeyframes(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.removeKeyframes, .removeKeyframes): return {
-        guard case .removeKeyframes(let l) = lhs, case .removeKeyframes(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.setKeyframeOptions, .setKeyframeOptions): return {
-        guard case .setKeyframeOptions(let l) = lhs, case .setKeyframeOptions(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.insertKeyLines, .insertKeyLines): return {
-        guard case .insertKeyLines(let l) = lhs, case .insertKeyLines(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.replaceKeyLines, .replaceKeyLines): return {
-        guard case .replaceKeyLines(let l) = lhs, case .replaceKeyLines(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.removeKeyLines, .removeKeyLines): return {
-        guard case .removeKeyLines(let l) = lhs, case .removeKeyLines(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.insertKeyPlanes, .insertKeyPlanes): return {
-        guard case .insertKeyPlanes(let l) = lhs, case .insertKeyPlanes(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.replaceKeyPlanes, .replaceKeyPlanes): return {
-        guard case .replaceKeyPlanes(let l) = lhs, case .replaceKeyPlanes(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.removeKeyPlanes, .removeKeyPlanes): return {
-        guard case .removeKeyPlanes(let l) = lhs, case .removeKeyPlanes(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.insertDraftKeyLines, .insertDraftKeyLines): return {
-        guard case .insertDraftKeyLines(let l) = lhs, case .insertDraftKeyLines(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.removeDraftKeyLines, .removeDraftKeyLines): return {
-        guard case .removeDraftKeyLines(let l) = lhs, case .removeDraftKeyLines(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.insertDraftKeyPlanes, .insertDraftKeyPlanes): return {
-        guard case .insertDraftKeyPlanes(let l) = lhs, case .insertDraftKeyPlanes(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.removeDraftKeyPlanes, .removeDraftKeyPlanes): return {
-        guard case .removeDraftKeyPlanes(let l) = lhs, case .removeDraftKeyPlanes(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.setLineIds, .setLineIds): return {
-        guard case .setLineIds(let l) = lhs, case .setLineIds(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.setAnimationOption, .setAnimationOption): return {
-        guard case .setAnimationOption(let l) = lhs, case .setAnimationOption(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.insertNotes, .insertNotes): return {
-        guard case .insertNotes(let l) = lhs, case .insertNotes(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.replaceNotes, .replaceNotes): return {
-        guard case .replaceNotes(let l) = lhs, case .replaceNotes(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.removeNotes, .removeNotes): return {
-        guard case .removeNotes(let l) = lhs, case .removeNotes(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.insertContents, .insertContents): return {
-        guard case .insertContents(let l) = lhs, case .insertContents(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.replaceContents, .replaceContents): return {
-        guard case .replaceContents(let l) = lhs, case .replaceContents(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.removeContents, .removeContents): return {
-        guard case .removeContents(let l) = lhs, case .removeContents(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.setScoreOption, .setScoreOption): return {
-        guard case .setScoreOption(let l) = lhs, case .setScoreOption(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.insertDraftNotes, .insertDraftNotes): return {
-        guard case .insertDraftNotes(let l) = lhs, case .insertDraftNotes(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.removeDraftNotes, .removeDraftNotes): return {
-        guard case .removeDraftNotes(let l) = lhs, case .removeDraftNotes(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.setIsShownTones, .setIsShownTones): return {
-        guard case .setIsShownTones(let l) = lhs, case .setIsShownTones(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      default: return false
-      }
-    }
-  #endif
   }
 
   init() {}
 }
 
-struct PBWorldUndoItem {
+struct PBWorldUndoItem: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3323,34 +3019,16 @@ struct PBWorldUndoItem {
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  enum OneOf_Value: Equatable {
+  enum OneOf_Value: Equatable, Sendable {
     case insertSheets(PBStringIntPointDic)
     case removeSheets(PBSheetposArray)
 
-  #if !swift(>=4.1)
-    static func ==(lhs: PBWorldUndoItem.OneOf_Value, rhs: PBWorldUndoItem.OneOf_Value) -> Bool {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch (lhs, rhs) {
-      case (.insertSheets, .insertSheets): return {
-        guard case .insertSheets(let l) = lhs, case .insertSheets(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.removeSheets, .removeSheets): return {
-        guard case .removeSheets(let l) = lhs, case .removeSheets(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      default: return false
-      }
-    }
-  #endif
   }
 
   init() {}
 }
 
-struct PBUndoDataValue {
+struct PBUndoDataValue: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3364,7 +3042,7 @@ struct PBUndoDataValue {
   init() {}
 }
 
-struct PBUndoGroup {
+struct PBUndoGroup: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3389,7 +3067,7 @@ struct PBUndoGroup {
   fileprivate var _date: PBDate? = nil
 }
 
-struct PBBranch {
+struct PBBranch: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3410,28 +3088,15 @@ struct PBBranch {
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  enum OneOf_SelectedChildIndexOptional: Equatable {
+  enum OneOf_SelectedChildIndexOptional: Equatable, Sendable {
     case selectedChildIndex(Int64)
 
-  #if !swift(>=4.1)
-    static func ==(lhs: PBBranch.OneOf_SelectedChildIndexOptional, rhs: PBBranch.OneOf_SelectedChildIndexOptional) -> Bool {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch (lhs, rhs) {
-      case (.selectedChildIndex, .selectedChildIndex): return {
-        guard case .selectedChildIndex(let l) = lhs, case .selectedChildIndex(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      }
-    }
-  #endif
   }
 
   init() {}
 }
 
-struct PBBranchCoder {
+struct PBBranchCoder: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3443,7 +3108,7 @@ struct PBBranchCoder {
   init() {}
 }
 
-struct PBHistory {
+struct PBHistory: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3466,7 +3131,7 @@ struct PBHistory {
   fileprivate var _branchCoder: PBBranchCoder? = nil
 }
 
-struct PBCopiedSheetsValue {
+struct PBCopiedSheetsValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3497,7 +3162,7 @@ struct PBCopiedSheetsValue {
   fileprivate var _sheetIds: PBStringIntPointDic? = nil
 }
 
-struct PBPlanesValue {
+struct PBPlanesValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3509,7 +3174,7 @@ struct PBPlanesValue {
   init() {}
 }
 
-struct PBNotesValue {
+struct PBNotesValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3521,7 +3186,7 @@ struct PBNotesValue {
   init() {}
 }
 
-struct PBInterOptionsValue {
+struct PBInterOptionsValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3546,7 +3211,7 @@ struct PBInterOptionsValue {
   fileprivate var _sheetID: PBUUID? = nil
 }
 
-struct PBPastableObject {
+struct PBPastableObject: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3715,7 +3380,7 @@ struct PBPastableObject {
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  enum OneOf_Value: Equatable {
+  enum OneOf_Value: Equatable, Sendable {
     case copiedSheetsValue(PBCopiedSheetsValue)
     case sheetValue(PBSheetValue)
     case border(PBBorder)
@@ -3737,224 +3402,10 @@ struct PBPastableObject {
     case tone(PBTone)
     case envelope(PBEnvelope)
 
-  #if !swift(>=4.1)
-    static func ==(lhs: PBPastableObject.OneOf_Value, rhs: PBPastableObject.OneOf_Value) -> Bool {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch (lhs, rhs) {
-      case (.copiedSheetsValue, .copiedSheetsValue): return {
-        guard case .copiedSheetsValue(let l) = lhs, case .copiedSheetsValue(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.sheetValue, .sheetValue): return {
-        guard case .sheetValue(let l) = lhs, case .sheetValue(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.border, .border): return {
-        guard case .border(let l) = lhs, case .border(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.text, .text): return {
-        guard case .text(let l) = lhs, case .text(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.string, .string): return {
-        guard case .string(let l) = lhs, case .string(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.picture, .picture): return {
-        guard case .picture(let l) = lhs, case .picture(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.planesValue, .planesValue): return {
-        guard case .planesValue(let l) = lhs, case .planesValue(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.uuColor, .uuColor): return {
-        guard case .uuColor(let l) = lhs, case .uuColor(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.animation, .animation): return {
-        guard case .animation(let l) = lhs, case .animation(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.ids, .ids): return {
-        guard case .ids(let l) = lhs, case .ids(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.score, .score): return {
-        guard case .score(let l) = lhs, case .score(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.content, .content): return {
-        guard case .content(let l) = lhs, case .content(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.image, .image): return {
-        guard case .image(let l) = lhs, case .image(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.beatRange, .beatRange): return {
-        guard case .beatRange(let l) = lhs, case .beatRange(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.normalizationValue, .normalizationValue): return {
-        guard case .normalizationValue(let l) = lhs, case .normalizationValue(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.normalizationRationalValue, .normalizationRationalValue): return {
-        guard case .normalizationRationalValue(let l) = lhs, case .normalizationRationalValue(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.notesValue, .notesValue): return {
-        guard case .notesValue(let l) = lhs, case .notesValue(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.stereo, .stereo): return {
-        guard case .stereo(let l) = lhs, case .stereo(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.tone, .tone): return {
-        guard case .tone(let l) = lhs, case .tone(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      case (.envelope, .envelope): return {
-        guard case .envelope(let l) = lhs, case .envelope(let r) = rhs else { preconditionFailure() }
-        return l == r
-      }()
-      default: return false
-      }
-    }
-  #endif
   }
 
   init() {}
 }
-
-#if swift(>=5.5) && canImport(_Concurrency)
-extension PBRGBColorSpace: @unchecked Sendable {}
-extension PBInterType: @unchecked Sendable {}
-extension PBOrientation: @unchecked Sendable {}
-extension PBPreviousNext: @unchecked Sendable {}
-extension PBRectCorner: @unchecked Sendable {}
-extension PBRational: @unchecked Sendable {}
-extension PBIntRange: @unchecked Sendable {}
-extension PBRationalRange: @unchecked Sendable {}
-extension PBPoint: @unchecked Sendable {}
-extension PBSize: @unchecked Sendable {}
-extension PBRect: @unchecked Sendable {}
-extension PBAttitude: @unchecked Sendable {}
-extension PBLCHA: @unchecked Sendable {}
-extension PBRGBA: @unchecked Sendable {}
-extension PBColor: @unchecked Sendable {}
-extension PBUUID: @unchecked Sendable {}
-extension PBUUColor: @unchecked Sendable {}
-extension PBInterOption: @unchecked Sendable {}
-extension PBLine: @unchecked Sendable {}
-extension PBLine.OneOf_UuColorOptional: @unchecked Sendable {}
-extension PBLine.PBControl: @unchecked Sendable {}
-extension PBPolygon: @unchecked Sendable {}
-extension PBTopolygon: @unchecked Sendable {}
-extension PBPlane: @unchecked Sendable {}
-extension PBPicture: @unchecked Sendable {}
-extension PBDate: @unchecked Sendable {}
-extension PBContentTimeOption: @unchecked Sendable {}
-extension PBImage: @unchecked Sendable {}
-extension PBStereo: @unchecked Sendable {}
-extension PBContent: @unchecked Sendable {}
-extension PBContent.OneOf_ContentTimeOptionOptional: @unchecked Sendable {}
-extension PBOvertone: @unchecked Sendable {}
-extension PBSprol: @unchecked Sendable {}
-extension PBSpectlope: @unchecked Sendable {}
-extension PBTone: @unchecked Sendable {}
-extension PBPit: @unchecked Sendable {}
-extension PBPitbend: @unchecked Sendable {}
-extension PBEnvelope: @unchecked Sendable {}
-extension PBNote: @unchecked Sendable {}
-extension PBScoreOption: @unchecked Sendable {}
-extension PBScore: @unchecked Sendable {}
-extension PBAudio: @unchecked Sendable {}
-extension PBLocale: @unchecked Sendable {}
-extension PBTextTimeOption: @unchecked Sendable {}
-extension PBText: @unchecked Sendable {}
-extension PBText.OneOf_TimeOptionOptional: @unchecked Sendable {}
-extension PBBorder: @unchecked Sendable {}
-extension PBSheetposStringDic: @unchecked Sendable {}
-extension PBStringIntPointDicElement: @unchecked Sendable {}
-extension PBStringIntPointDic: @unchecked Sendable {}
-extension PBKeyframe: @unchecked Sendable {}
-extension PBKeyframeKey: @unchecked Sendable {}
-extension PBAnimationZipper: @unchecked Sendable {}
-extension PBAnimationOption: @unchecked Sendable {}
-extension PBAnimation: @unchecked Sendable {}
-extension PBSheetOption: @unchecked Sendable {}
-extension PBSheet: @unchecked Sendable {}
-extension PBSheetpos: @unchecked Sendable {}
-extension PBWorld: @unchecked Sendable {}
-extension PBCornerRectValue: @unchecked Sendable {}
-extension PBCornerRectValueArray: @unchecked Sendable {}
-extension PBFinding: @unchecked Sendable {}
-extension PBKeyframeOption: @unchecked Sendable {}
-extension PBBoolIndexValue: @unchecked Sendable {}
-extension PBIntIndexValue: @unchecked Sendable {}
-extension PBLineIndexValue: @unchecked Sendable {}
-extension PBInterOptionIndexValue: @unchecked Sendable {}
-extension PBPlaneIndexValue: @unchecked Sendable {}
-extension PBTextIndexValue: @unchecked Sendable {}
-extension PBNoteIndexValue: @unchecked Sendable {}
-extension PBContentIndexValue: @unchecked Sendable {}
-extension PBBorderIndexValue: @unchecked Sendable {}
-extension PBKeyframeIndexValue: @unchecked Sendable {}
-extension PBKeyframeOptionIndexValue: @unchecked Sendable {}
-extension PBColorValue: @unchecked Sendable {}
-extension PBPlaneValue: @unchecked Sendable {}
-extension PBTextValue: @unchecked Sendable {}
-extension PBTextValue.OneOf_OriginOptional: @unchecked Sendable {}
-extension PBTextValue.OneOf_SizeOptional: @unchecked Sendable {}
-extension PBTextValue.OneOf_WidthCountOptional: @unchecked Sendable {}
-extension PBTextValueIndexValue: @unchecked Sendable {}
-extension PBSheetValue: @unchecked Sendable {}
-extension PBInt64Array: @unchecked Sendable {}
-extension PBIntArrayIndexValue: @unchecked Sendable {}
-extension PBIntArrayIndexValueArray: @unchecked Sendable {}
-extension PBLineArray: @unchecked Sendable {}
-extension PBPlaneArray: @unchecked Sendable {}
-extension PBSheetposArray: @unchecked Sendable {}
-extension PBIntIndexValueArray: @unchecked Sendable {}
-extension PBLineIndexValueArray: @unchecked Sendable {}
-extension PBLineIndexValueArrayIndexValue: @unchecked Sendable {}
-extension PBLineIndexValueArrayIndexValueArray: @unchecked Sendable {}
-extension PBPlaneIndexValueArrayIndexValue: @unchecked Sendable {}
-extension PBPlaneIndexValueArrayIndexValueArray: @unchecked Sendable {}
-extension PBInterOptionIndexValueArray: @unchecked Sendable {}
-extension PBInterOptionIndexValueArrayIndexValue: @unchecked Sendable {}
-extension PBInterOptionIndexValueArrayIndexValueArray: @unchecked Sendable {}
-extension PBBoolIndexValueArray: @unchecked Sendable {}
-extension PBPlaneIndexValueArray: @unchecked Sendable {}
-extension PBNoteIndexValueArray: @unchecked Sendable {}
-extension PBTextIndexValueArray: @unchecked Sendable {}
-extension PBContentIndexValueArray: @unchecked Sendable {}
-extension PBBorderIndexValueArray: @unchecked Sendable {}
-extension PBKeyframeIndexValueArray: @unchecked Sendable {}
-extension PBKeyframeOptionIndexValueArray: @unchecked Sendable {}
-extension PBSheetUndoItem: @unchecked Sendable {}
-extension PBSheetUndoItem.OneOf_Value: @unchecked Sendable {}
-extension PBWorldUndoItem: @unchecked Sendable {}
-extension PBWorldUndoItem.OneOf_Value: @unchecked Sendable {}
-extension PBUndoDataValue: @unchecked Sendable {}
-extension PBUndoGroup: @unchecked Sendable {}
-extension PBBranch: @unchecked Sendable {}
-extension PBBranch.OneOf_SelectedChildIndexOptional: @unchecked Sendable {}
-extension PBBranchCoder: @unchecked Sendable {}
-extension PBHistory: @unchecked Sendable {}
-extension PBCopiedSheetsValue: @unchecked Sendable {}
-extension PBPlanesValue: @unchecked Sendable {}
-extension PBNotesValue: @unchecked Sendable {}
-extension PBInterOptionsValue: @unchecked Sendable {}
-extension PBPastableObject: @unchecked Sendable {}
-extension PBPastableObject.OneOf_Value: @unchecked Sendable {}
-#endif  // swift(>=5.5) && canImport(_Concurrency)
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
@@ -4143,10 +3594,10 @@ extension PBPoint: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.x != 0 {
+    if self.x.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.x, fieldNumber: 1)
     }
-    if self.y != 0 {
+    if self.y.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.y, fieldNumber: 2)
     }
     try unknownFields.traverse(visitor: &visitor)
@@ -4181,10 +3632,10 @@ extension PBSize: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.width != 0 {
+    if self.width.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.width, fieldNumber: 1)
     }
-    if self.height != 0 {
+    if self.height.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.height, fieldNumber: 2)
     }
     try unknownFields.traverse(visitor: &visitor)
@@ -4273,7 +3724,7 @@ extension PBAttitude: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
     try { if let v = self._scale {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     } }()
-    if self.rotation != 0 {
+    if self.rotation.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.rotation, fieldNumber: 3)
     }
     try unknownFields.traverse(visitor: &visitor)
@@ -4313,16 +3764,16 @@ extension PBLCHA: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.l != 0 {
+    if self.l.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.l, fieldNumber: 1)
     }
-    if self.c != 0 {
+    if self.c.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.c, fieldNumber: 2)
     }
-    if self.h != 0 {
+    if self.h.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.h, fieldNumber: 3)
     }
-    if self.a != 0 {
+    if self.a.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.a, fieldNumber: 4)
     }
     try unknownFields.traverse(visitor: &visitor)
@@ -4363,16 +3814,16 @@ extension PBRGBA: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.r != 0 {
+    if self.r.bitPattern != 0 {
       try visitor.visitSingularFloatField(value: self.r, fieldNumber: 1)
     }
-    if self.g != 0 {
+    if self.g.bitPattern != 0 {
       try visitor.visitSingularFloatField(value: self.g, fieldNumber: 2)
     }
-    if self.b != 0 {
+    if self.b.bitPattern != 0 {
       try visitor.visitSingularFloatField(value: self.b, fieldNumber: 3)
     }
-    if self.a != 0 {
+    if self.a.bitPattern != 0 {
       try visitor.visitSingularFloatField(value: self.a, fieldNumber: 4)
     }
     try unknownFields.traverse(visitor: &visitor)
@@ -4577,7 +4028,15 @@ extension PBLine: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
     var _controlsData: Data = Data()
     var _uuColorOptional: PBLine.OneOf_UuColorOptional?
 
-    static let defaultInstance = _StorageClass()
+    #if swift(>=5.10)
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+    #else
+      static let defaultInstance = _StorageClass()
+    #endif
 
     private init() {}
 
@@ -4639,7 +4098,7 @@ extension PBLine: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
       if !_storage._controls.isEmpty {
         try visitor.visitRepeatedMessageField(value: _storage._controls, fieldNumber: 1)
       }
-      if _storage._size != 0 {
+      if _storage._size.bitPattern != 0 {
         try visitor.visitSingularDoubleField(value: _storage._size, fieldNumber: 2)
       }
       try { if let v = _storage._id {
@@ -4708,10 +4167,10 @@ extension PBLine.PBControl: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
     try { if let v = self._point {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
     } }()
-    if self.weight != 0 {
+    if self.weight.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.weight, fieldNumber: 2)
     }
-    if self.pressure != 0 {
+    if self.pressure.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.pressure, fieldNumber: 3)
     }
     try unknownFields.traverse(visitor: &visitor)
@@ -4911,7 +4370,7 @@ extension PBDate: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.timestamp != 0 {
+    if self.timestamp.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.timestamp, fieldNumber: 1)
     }
     try unknownFields.traverse(visitor: &visitor)
@@ -5031,10 +4490,10 @@ extension PBStereo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationB
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if self.volm != 0 {
+    if self.volm.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.volm, fieldNumber: 1)
     }
-    if self.pan != 0 {
+    if self.pan.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.pan, fieldNumber: 2)
     }
     try { if let v = self._id {
@@ -5073,7 +4532,15 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     var _contentTimeOptionOptional: PBContent.OneOf_ContentTimeOptionOptional?
     var _id: PBUUID? = nil
 
-    static let defaultInstance = _StorageClass()
+    #if swift(>=5.10)
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+    #else
+      static let defaultInstance = _StorageClass()
+    #endif
 
     private init() {}
 
@@ -5201,10 +4668,10 @@ extension PBOvertone: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.evenVolm != 0 {
+    if self.evenVolm.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.evenVolm, fieldNumber: 1)
     }
-    if self.oddVolm != 0 {
+    if self.oddVolm.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.oddVolm, fieldNumber: 2)
     }
     try unknownFields.traverse(visitor: &visitor)
@@ -5241,13 +4708,13 @@ extension PBSprol: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.pitch != 0 {
+    if self.pitch.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.pitch, fieldNumber: 1)
     }
-    if self.volm != 0 {
+    if self.volm.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.volm, fieldNumber: 2)
     }
-    if self.noise != 0 {
+    if self.noise.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.noise, fieldNumber: 3)
     }
     try unknownFields.traverse(visitor: &visitor)
@@ -5299,6 +4766,7 @@ extension PBTone: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "overtone"),
     2: .same(proto: "spectlope"),
+    4: .same(proto: "color"),
     3: .same(proto: "id"),
   ]
 
@@ -5311,6 +4779,7 @@ extension PBTone: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
       case 1: try { try decoder.decodeSingularMessageField(value: &self._overtone) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._spectlope) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._id) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._color) }()
       default: break
       }
     }
@@ -5330,12 +4799,16 @@ extension PBTone: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
     try { if let v = self._id {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
     } }()
+    try { if let v = self._color {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: PBTone, rhs: PBTone) -> Bool {
     if lhs._overtone != rhs._overtone {return false}
     if lhs._spectlope != rhs._spectlope {return false}
+    if lhs._color != rhs._color {return false}
     if lhs._id != rhs._id {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -5352,51 +4825,99 @@ extension PBPit: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase
     5: .same(proto: "lyric"),
   ]
 
+  fileprivate class _StorageClass {
+    var _beat: PBRational? = nil
+    var _pitch: PBRational? = nil
+    var _stereo: PBStereo? = nil
+    var _tone: PBTone? = nil
+    var _lyric: String = String()
+
+    #if swift(>=5.10)
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+    #else
+      static let defaultInstance = _StorageClass()
+    #endif
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _beat = source._beat
+      _pitch = source._pitch
+      _stereo = source._stereo
+      _tone = source._tone
+      _lyric = source._lyric
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._beat) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._pitch) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._stereo) }()
-      case 4: try { try decoder.decodeSingularMessageField(value: &self._tone) }()
-      case 5: try { try decoder.decodeSingularStringField(value: &self.lyric) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeSingularMessageField(value: &_storage._beat) }()
+        case 2: try { try decoder.decodeSingularMessageField(value: &_storage._pitch) }()
+        case 3: try { try decoder.decodeSingularMessageField(value: &_storage._stereo) }()
+        case 4: try { try decoder.decodeSingularMessageField(value: &_storage._tone) }()
+        case 5: try { try decoder.decodeSingularStringField(value: &_storage._lyric) }()
+        default: break
+        }
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._beat {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
-    try { if let v = self._pitch {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
-    try { if let v = self._stereo {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-    } }()
-    try { if let v = self._tone {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
-    } }()
-    if !self.lyric.isEmpty {
-      try visitor.visitSingularStringField(value: self.lyric, fieldNumber: 5)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      try { if let v = _storage._beat {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
+      } }()
+      try { if let v = _storage._pitch {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+      } }()
+      try { if let v = _storage._stereo {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+      } }()
+      try { if let v = _storage._tone {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+      } }()
+      if !_storage._lyric.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._lyric, fieldNumber: 5)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: PBPit, rhs: PBPit) -> Bool {
-    if lhs._beat != rhs._beat {return false}
-    if lhs._pitch != rhs._pitch {return false}
-    if lhs._stereo != rhs._stereo {return false}
-    if lhs._tone != rhs._tone {return false}
-    if lhs.lyric != rhs.lyric {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._beat != rhs_storage._beat {return false}
+        if _storage._pitch != rhs_storage._pitch {return false}
+        if _storage._stereo != rhs_storage._stereo {return false}
+        if _storage._tone != rhs_storage._tone {return false}
+        if _storage._lyric != rhs_storage._lyric {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5465,16 +4986,16 @@ extension PBEnvelope: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    if self.attackSec != 0 {
+    if self.attackSec.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.attackSec, fieldNumber: 1)
     }
-    if self.decaySec != 0 {
+    if self.decaySec.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.decaySec, fieldNumber: 2)
     }
-    if self.sustainVolm != 0 {
+    if self.sustainVolm.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.sustainVolm, fieldNumber: 3)
     }
-    if self.releaseSec != 0 {
+    if self.releaseSec.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.releaseSec, fieldNumber: 4)
     }
     try { if let v = self._id {
@@ -5857,10 +5378,10 @@ extension PBText: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
     if self.orientation != .horizontal {
       try visitor.visitSingularEnumField(value: self.orientation, fieldNumber: 2)
     }
-    if self.size != 0 {
+    if self.size.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.size, fieldNumber: 3)
     }
-    if self.widthCount != 0 {
+    if self.widthCount.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.widthCount, fieldNumber: 4)
     }
     try { if let v = self._origin {
@@ -5909,7 +5430,7 @@ extension PBBorder: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationB
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.location != 0 {
+    if self.location.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.location, fieldNumber: 1)
     }
     if self.orientation != .horizontal {
@@ -6243,7 +5764,7 @@ extension PBAnimationOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     try { if let v = self._tempo {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     } }()
-    if self.timelineY != 0 {
+    if self.timelineY.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.timelineY, fieldNumber: 3)
     }
     if self.enabled != false {
@@ -6285,7 +5806,15 @@ extension PBAnimation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
     var _timelineY: Double = 0
     var _enabled: Bool = false
 
-    static let defaultInstance = _StorageClass()
+    #if swift(>=5.10)
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+    #else
+      static let defaultInstance = _StorageClass()
+    #endif
 
     private init() {}
 
@@ -6351,7 +5880,7 @@ extension PBAnimation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
       if _storage._isPlaying != false {
         try visitor.visitSingularBoolField(value: _storage._isPlaying, fieldNumber: 5)
       }
-      if _storage._timelineY != 0 {
+      if _storage._timelineY.bitPattern != 0 {
         try visitor.visitSingularDoubleField(value: _storage._timelineY, fieldNumber: 6)
       }
       if _storage._enabled != false {
@@ -6447,7 +5976,15 @@ extension PBSheet: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
     var _rects: [PBRect] = []
     var _backgroundUucolor: PBUUColor? = nil
 
-    static let defaultInstance = _StorageClass()
+    #if swift(>=5.10)
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+    #else
+      static let defaultInstance = _StorageClass()
+    #endif
 
     private init() {}
 
@@ -6963,7 +6500,15 @@ extension PBPlaneIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     var _value: PBPlane? = nil
     var _index: Int64 = 0
 
-    static let defaultInstance = _StorageClass()
+    #if swift(>=5.10)
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+    #else
+      static let defaultInstance = _StorageClass()
+    #endif
 
     private init() {}
 
@@ -7081,7 +6626,15 @@ extension PBNoteIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
     var _value: PBNote? = nil
     var _index: Int64 = 0
 
-    static let defaultInstance = _StorageClass()
+    #if swift(>=5.10)
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+    #else
+      static let defaultInstance = _StorageClass()
+    #endif
 
     private init() {}
 
@@ -7335,7 +6888,15 @@ extension PBColorValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
     var _animationColors: [PBColor] = []
     var _isBackground: Bool = false
 
-    static let defaultInstance = _StorageClass()
+    #if swift(>=5.10)
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+    #else
+      static let defaultInstance = _StorageClass()
+    #endif
 
     private init() {}
 

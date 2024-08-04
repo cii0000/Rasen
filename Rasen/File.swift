@@ -43,7 +43,7 @@ protocol Protobuf: Serializable {
 }
 extension Protobuf where PB: SwiftProtobuf.Message {
     init(serializedData: Data) throws {
-        self = try Self(try PB(serializedData: serializedData))
+        self = try Self(try PB(serializedBytes: serializedData))
     }
     func serializedData() throws -> Data {
         try pb.serializedData()

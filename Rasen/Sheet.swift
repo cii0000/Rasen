@@ -2448,10 +2448,10 @@ extension Sheet {
     }
     
     var animationDurBeat: Rational {
-        animation.beatRange.upperBound
+        animation.enabled ? animation.beatRange.upperBound : 0
     }
     var animationDurSec: Rational {
-        animation.secRange.upperBound
+        animation.enabled ? animation.secRange.upperBound : 0
     }
     
     var musicDurBeat: Rational {

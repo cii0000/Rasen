@@ -1460,8 +1460,8 @@ final class LineSlider: DragEditor {
                         let sheetP = sheetView.convertFromWorld(p)
                         
                         let note = score.notes[noteI]
-                        let preBeat = (pitI > 0 ? note.pits[pitI - 1].beat : 0) + note.beatRange.start
-                        let nextBeat = (pitI + 1 < note.pits.count ? note.pits[pitI + 1].beat : note.beatRange.length) + note.beatRange.start
+                        let preBeat = pitI > 0 ? note.pits[pitI - 1].beat + note.beatRange.start : .min
+                        let nextBeat = pitI + 1 < note.pits.count ? note.pits[pitI + 1].beat + note.beatRange.start : .max
                         let beatInterval = document.currentBeatInterval
                         let pitchInterval = document.currentPitchInterval
                         let pitch = scoreView.pitch(atY: beganPitchY + sheetP.y - beganSheetP.y,
@@ -1475,12 +1475,27 @@ final class LineSlider: DragEditor {
                             
                             for (noteI, nv) in beganNotePits {
                                 guard noteI < score.notes.count else { continue }
-                                var note = scoreView[noteI]
+                                var note = nv.note
                                 for (pitI, beganPit) in nv.pits {
                                     guard pitI < score.notes[noteI].pits.count else { continue }
                                     note.pits[pitI].beat = dBeat + beganPit.beat
                                     note.pits[pitI].pitch = dPitch + beganPit.pitch
                                 }
+                                if note.pits.first!.beat < 0 {
+                                    let dBeat = note.pits.first!.beat
+                                    note.beatRange.start = nv.note.beatRange.start + dBeat
+                                    note.beatRange.length = nv.note.beatRange.length - dBeat
+                                    for i in note.pits.count.range {
+                                        note.pits[i].beat -= dBeat
+                                    }
+                                } else {
+                                    if note.pits.last!.beat > note.beatRange.length {
+                                        note.beatRange.length = note.pits.last!.beat
+                                    } else {
+                                        note.beatRange.length = nv.note.beatRange.length
+                                    }
+                                }
+                                
                                 scoreView[noteI] = note
                             }
                             
@@ -1856,9 +1871,46 @@ final class KeyframeInserter: InputKeyEditor {
             if let sheetView = document.madeSheetView(at: p) {
                 let inP = sheetView.convertFromWorld(p)
                 
-                sheetView.selectedFrameIndexes = []
-                
-                if sheetView.animationView.containsTimeline(inP) {
+                let animationView = sheetView.animationView
+                if animationView.containsTimeline(inP),
+                   let i = animationView
+                       .slidableKeyframeIndex(at: inP,
+                                              maxDistance: document.worldKnobEditDistance,
+                                              enabledKeyOnly: true),
+                   sheetView.selectedFrameIndexes.contains(i) {
+                    
+                    let kis = sheetView.selectedFrameIndexes
+                    sheetView.selectedFrameIndexes = []
+                    
+                    let beat = animationView.model.localBeat
+                    let count = ((animationView.rootBeat - beat) / animationView.model.localDurBeat).rounded(.towardZero)
+                    
+                    let oneBeat = Rational(1, animationView.frameRate)
+                    
+                    var nj = 0, isNewUndoGroup = false
+                    for j in kis {
+                        let durBeat = animationView.model.keyframeDurBeat(at: j + nj)
+                        if durBeat >= oneBeat {
+                            if !isNewUndoGroup {
+                                sheetView.newUndoGroup()
+                                isNewUndoGroup = true
+                            }
+                            
+                            let nBeat = animationView.model.keyframes[j + nj].beat
+                            let count = Int(durBeat / oneBeat) - 1
+                            sheetView.insert((0 ..< count).map { k in
+                                IndexValue(value: Keyframe(beat: oneBeat * .init(k + 1) + nBeat),
+                                           index: k + j + nj + 1)
+                            })
+                            nj += count
+                        }
+                    }
+                    sheetView.rootBeat = animationView.model.localDurBeat * count + beat
+                    document.updateEditorNode()
+                    document.updateSelects()
+                } else if sheetView.animationView.containsTimeline(inP) {
+                    sheetView.selectedFrameIndexes = []
+                    
                     let animationView = sheetView.animationView
                     let animation = animationView.model
                     
@@ -2094,6 +2146,45 @@ final class Interpolater: InputKeyEditor {
         switch event.phase {
         case .began:
             document.cursor = .arrow
+            
+            if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+                if document.isSelectNoneCursor(at: p), !document.isSelectedText {
+                    let nis = sheetView.noteIndexes(from: document.selections)
+                    if !nis.isEmpty {
+                        let noteIAndNotes = nis
+                            .map { ($0, sheetView.scoreView.model.notes[$0]) }
+                            .sorted { $0.1.beatRange.start < $1.1.beatRange.start }
+                        var preBeat = noteIAndNotes.first!.1.beatRange.end, isAppend = false
+                        var nNote = noteIAndNotes.first!.1
+                        var preLastPit = nNote.pits.last!
+                        preLastPit.beat = nNote.beatRange.length
+                        for i in 1 ..< noteIAndNotes.count {
+                            let (_, note) = noteIAndNotes[i]
+                            if preBeat <= note.beatRange.start {
+                                nNote.pits.append(preLastPit)
+                                nNote.pits += note.pits.map {
+                                    var pit = $0
+                                    pit.beat += note.beatRange.start - nNote.beatRange.start
+                                    pit.pitch += note.pitch - nNote.pitch
+                                    return pit
+                                }
+                                preBeat = note.beatRange.end
+                                preLastPit = note.pits.last!
+                                preLastPit.beat = note.beatRange.end - nNote.beatRange.start
+                                preLastPit.pitch += note.pitch - nNote.pitch
+                                nNote.beatRange.length = preLastPit.beat
+                                isAppend = true
+                            }
+                        }
+                        if isAppend {
+                            sheetView.newUndoGroup()
+                            sheetView.removeNote(at: noteIAndNotes.map { $0.0 }.sorted())
+                            sheetView.append(nNote)
+                        }
+                    }
+                }
+                return
+            }
             
             let cos = Pasteboard.shared.copiedObjects
             for co in cos {

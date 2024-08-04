@@ -483,6 +483,48 @@ final class FaceEditor: Editor {
         case .began:
             document.cursor = .arrow
             
+            if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+                let score = sheetView.scoreView.model
+                let nis = document.isSelectNoneCursor(at: p) && !document.isSelectedText ?
+                sheetView.noteIndexes(from: document.selections) :
+                Array(score.notes.count.range)
+                let nnis = nis.filter { score.notes[$0].isDefaultTone }.sorted()
+                if !nnis.isEmpty {
+                    var tones = [UUID: Tone]()
+                    var nivs = [IndexValue<Note>]()
+                    for ni in nnis {
+                        var note = score.notes[ni]
+                        for (pi, pit) in note.pits.enumerated() {
+                            if let tone = tones[pit.tone.id] {
+                                note.pits[pi].tone = tone
+                            } else if pit.tone.isDefault {
+                                let spectlope = Spectlope(sprols: [
+                                    .init(pitch: 12, volm: .random(in: 0 ..< 1), noise: 0),
+                                    .init(pitch: 24, volm: .random(in: 0 ..< 1), noise: 0),
+                                    .init(pitch: 36, volm: .random(in: 0 ..< 1), noise: 0),
+                                    .init(pitch: 48, volm: .random(in: 0 ..< 1), noise: 0),
+                                    .init(pitch: 60, volm: .random(in: 0 ..< 1), noise: 0),
+                                    .init(pitch: 72, volm: .random(in: 0 ..< 1), noise: 0),
+                                    .init(pitch: 84, volm: .random(in: 0 ..< 1), noise: 0),
+                                    .init(pitch: 96, volm: .random(in: 0 ..< 0.125), noise: 0)
+                                ])
+                                let tone = Tone(overtone: .init(),
+                                                spectlope: spectlope,
+                                                color: .randomLightnessAndHue(60 ... 90),
+                                                id: .init())
+                                tones[pit.tone.id] = tone
+                                note.pits[pi].tone = tone
+                            }
+                        }
+                        nivs.append(.init(value: note, index: ni))
+                    }
+                    
+                    sheetView.newUndoGroup()
+                    sheetView.replace(nivs)
+                }
+                return
+            }
+            
             if document.isSelectNoneCursor(at: p), !document.isSelectedText {
                 for (shp, _) in document.sheetViewValues {
                     let ssFrame = document.sheetFrame(with: shp)
@@ -526,6 +568,32 @@ final class FaceEditor: Editor {
         switch event.phase {
         case .began:
             document.cursor = .arrow
+            
+            if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+                let score = sheetView.scoreView.model
+                let nis = document.isSelectNoneCursor(at: p) && !document.isSelectedText ?
+                sheetView.noteIndexes(from: document.selections) :
+                Array(score.notes.count.range)
+                let nnis = nis
+                    .filter { !score.notes[$0].isOneOvertone && !score.notes[$0].isFullNoise }
+                    .sorted()
+                if !nnis.isEmpty {
+                    var nivs = [IndexValue<Note>]()
+                    for ni in nnis {
+                        var note = score.notes[ni]
+                        for (pi, pit) in note.pits.enumerated() {
+                            if !pit.tone.overtone.isOne && !pit.tone.spectlope.isFullNoise {
+                                note.pits[pi].tone = .init()
+                            }
+                        }
+                        nivs.append(.init(value: note, index: ni))
+                    }
+                    
+                    sheetView.newUndoGroup()
+                    sheetView.replace(nivs)
+                }
+                return
+            }
             
             if document.isSelectNoneCursor(at: p), !document.isSelectedText {
                 var value = SheetValue()

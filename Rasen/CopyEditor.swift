@@ -1245,9 +1245,13 @@ final class CopyEditor: Editor {
                     let nivs = nis.map {
                         var note = score.notes[$0]
                         note.pits = note.pits.map {
-                            var pit = $0
-                            pit.tone = tone
-                            return pit
+                            if $0.tone.id == oldTone.id {
+                                var pit = $0
+                                pit.tone = tone
+                                return pit
+                            } else {
+                                return $0
+                            }
                         }
                         return IndexValue(value: note, index: $0)
                     }
@@ -1298,14 +1302,6 @@ final class CopyEditor: Editor {
                 return true
             }
         } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
-                  sheetView.scoreView.model.notes.isEmpty {
-            var option = sheetView.model.score.option
-            option.enabled = false
-            
-            sheetView.newUndoGroup()
-            sheetView.set(option)
-            return true
-        } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
                     let keyBeatI = sheetView.scoreView.keyBeatIndex(at: sheetView.scoreView.convertFromWorld(p),
                                                                     scale: document.screenToWorldScale) {
             let keyBeat = sheetView.model.score.keyBeats[keyBeatI]
@@ -1314,6 +1310,14 @@ final class CopyEditor: Editor {
             option.keyBeats.remove(at: keyBeatI)
             
             Pasteboard.shared.copiedObjects = [.normalizationRationalValue(keyBeat)]
+            
+            sheetView.newUndoGroup()
+            sheetView.set(option)
+            return true
+        } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
+                  sheetView.scoreView.model.notes.isEmpty {
+            var option = sheetView.model.score.option
+            option.enabled = false
             
             sheetView.newUndoGroup()
             sheetView.set(option)
@@ -1778,8 +1782,7 @@ final class CopyEditor: Editor {
             }
         }
         func updateNotes(_ notes: [Note]) {
-            guard let sheetView = document.sheetView(at: shp),
-                  sheetView.model.score.enabled else { return }
+            guard let sheetView = document.madeSheetView(at: shp) else { return }
             let scoreView = sheetView.scoreView
             let scoreP = scoreView.convertFromWorld(p)
             let pitchInterval = document.currentPitchInterval
@@ -1791,6 +1794,11 @@ final class CopyEditor: Editor {
                 beganPitch = pitch
                 
                 sheetView.newUndoGroup()
+                if !sheetView.scoreView.model.enabled {
+                    var option = sheetView.scoreView.option
+                    option.enabled = true
+                    sheetView.set(option)
+                }
                 sheetView.append(notes)
                 
                 let count = scoreView.model.notes.count
@@ -1950,15 +1958,12 @@ final class CopyEditor: Editor {
                                                    in: Rect(size: frame.size))
                         if !nLines.isEmpty,
                            let (sheetView, isNew) = document
-                            .madeSheetViewIsNew(at: nshp,
-                                                isNewUndoGroup:
-                                                    isRootNewUndoGroup) {
-                            if sheetView.model.enabledAnimation {
-                                let idSet = Set(sheetView.model.picture.lines.map { $0.id })
-                                for (i, l) in nLines.enumerated() {
-                                    if idSet.contains(l.id) {
-                                        nLines[i].id = UUID()
-                                    }
+                            .madeSheetViewIsNew(at: nshp, isNewUndoGroup: isRootNewUndoGroup) {
+                            
+                            let idSet = Set(sheetView.model.picture.lines.map { $0.id })
+                            for (i, l) in nLines.enumerated() {
+                                if idSet.contains(l.id) {
+                                    nLines[i].id = UUID()
                                 }
                             }
                             if isNew {
@@ -3191,10 +3196,14 @@ final class LineColorCopier: InputKeyEditor {
                     let scale = 1 / document.worldToScreenScale
                     let lw = Line.defaultLineWidth
                     let nlw = max(lw * 1.5, lw * 2.5 * scale, 1 * scale)
+                    
+                    let lineNoteNode = Node(path: .init([scoreP, pitP], isClosed: false),
+                                            lineWidth: nlw, lineType: .color(.selected))
+                    
                     let noteNode = Node(path: Path(circleRadius: nlw, position: nPitP),
                                         fillType: .color(.selected))
                     noteNode.attitude.position = scoreView.node.convertToWorld(Point())
-                    selectingLineNode.children = [noteNode]
+                    selectingLineNode.children = [noteNode, lineNoteNode]
                 }
                 
                 let score = scoreView.model

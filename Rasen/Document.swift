@@ -2066,6 +2066,7 @@ final class Document {
             
             closeLookingUp()
         }
+        
         if let i = selections.firstIndex(where: { $0.rect.contains(p) }) {
             selections.remove(at: i)
         } else {
