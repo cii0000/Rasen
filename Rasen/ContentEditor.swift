@@ -157,7 +157,7 @@ final class ContentSlider: DragEditor {
 }
 
 struct ContentLayout {
-    static let spectrogramX = 10.0, spectrogramHeight = 4.0
+    static let spectrogramX = 10.0, isShownSpectrogramHeight = 4.0
 }
 
 final class ContentView<T: BinderProtocol>: SpectrgramView {
@@ -379,38 +379,13 @@ extension ContentView {
         var borderPathlines = [Pathline]()
         var noteLineNodes = [Node]()
         
-        func timeStringFrom(time: Rational,
-                            frameRate: Int) -> String {
-            let minusStr = time < 0 ? "-" : ""
-            let time = abs(time)
-            if time >= 60 {
-                let c = Int(time * Rational(frameRate))
-                let s = c / frameRate
-                let minutes = s / 60
-                let sec = s - minutes * 60
-                let frame = c - s * frameRate
-                let minutesStr = String(format: "%d", minutes)
-                let secStr = String(format: "%02d", sec)
-                let frameStr = String(format: "%02d", frame)
-                return minusStr + minutesStr + ":" + secStr + "." + frameStr
-            } else {
-                let c = Int(time * Rational(frameRate))
-                let s = c / frameRate
-                let sec = s
-                let frame = c - s * frameRate
-                let secStr = String(format: "%d", sec)
-                let frameStr = String(format: "%02d", frame)
-                return minusStr + secStr + "." + frameStr
-            }
-        }
-        
         if let localBeatRange = content.localBeatRange {
             if localBeatRange.start < 0 {
                 let beat = -min(localBeatRange.start, 0)
                 - min(timeOption.beatRange.start, 0)
-                let timeText = Text(string: timeStringFrom(time: beat, frameRate: 48),
+                let timeText = Text(string: Animation.timeString(fromTime: beat, frameRate: 12),
                                     size: Font.smallSize)
-                let timeP = Point(sx + 1, y + noteHeight)
+                let timeP = Point(sx + 1, y + timeText.size / 2 + 1)
                 textNodes.append(Node(attitude: Attitude(position: timeP),
                                       path: Path(timeText.typesetter, isPolygon: false),
                                       fillType: .color(.content)))
@@ -425,10 +400,10 @@ extension ContentView {
             if timeOption.beatRange.start + localBeatRange.end > timeOption.beatRange.end {
                 let beat = timeOption.beatRange.length - localBeatRange.start
                 
-                let timeText = Text(string: timeStringFrom(time: beat, frameRate: 48),
+                let timeText = Text(string: Animation.timeString(fromTime: beat, frameRate: 12),
                                     size: Font.smallSize)
                 let timeFrame = timeText.frame ?? Rect()
-                let timeP = Point(ex - timeFrame.width - 2, y + noteHeight)
+                let timeP = Point(ex - timeFrame.width - 2, y + timeText.size / 2 + 1)
                 textNodes.append(Node(attitude: Attitude(position: timeP),
                                       path: Path(timeText.typesetter,
                                                  isPolygon: false),
@@ -487,7 +462,14 @@ extension ContentView {
                           borderPathlines: &borderPathlines)
         
         if content.type.isAudio {
-            let sprH = ContentLayout.spectrogramHeight
+            if content.isShownSpectrogram {
+                makeBeatPathlines(in: timeOption.beatRange, sy: ey + ContentLayout.isShownSpectrogramHeight, ey: ey + ContentLayout.isShownSpectrogramHeight + Self.spectrogramHeight,
+                                  subBorderPathlines: &subBorderPathlines,
+                                  fullEditBorderPathlines: &fullEditBorderPathlines,
+                                  borderPathlines: &borderPathlines)
+            }
+            
+            let sprH = ContentLayout.isShownSpectrogramHeight
             let sprKnobW = knobH, sprKbobH = knobW
             let np = Point(ContentLayout.spectrogramX + sx, ey)
             contentPathlines.append(Pathline(Rect(x: np.x - 1 / 2,
@@ -558,13 +540,13 @@ extension ContentView {
         spectrogramNode = nil
         
         let content = model
-        guard content.isShownSpectrogram, let sm = pcmNoder?.spectrogram,
-              let timeOption = content.timeOption else { return }
+        guard content.isShownSpectrogram, let timeOption = content.timeOption,
+              let contentSecRange = content.contentSecRange,
+              let sm = pcmNoder?.spectrogram(fromSecRange: .init(contentSecRange)) else { return }
         
-        let firstX = x(atBeat: timeOption.beatRange.start + timeOption.localStartBeat)
-        let y = timeLineCenterY + Sheet.timelineHalfHeight + ContentLayout.spectrogramHeight
-        let allBeat = content.localBeatRange?.length ?? 0
-        let allW = width(atDurBeat: allBeat)
+        let firstX = x(atBeat: timeOption.beatRange.start + max(timeOption.localStartBeat, 0))
+        let y = timeLineCenterY + Sheet.timelineHalfHeight + ContentLayout.isShownSpectrogramHeight
+        let allW = width(atDurSec: contentSecRange.length)
         var nodes = [Node](), maxH = 0.0
         func spNode(width: Int, at xi: Int) -> Node? {
             guard let image = sm.image(width: width, at: xi),
@@ -701,7 +683,7 @@ extension ContentView {
             Rect(x: timelineFrame.minX + ContentLayout.spectrogramX - Sheet.knobHeight / 2,
                  y: Sheet.timelineHalfHeight - Sheet.knobWidth / 2,
                  width: Sheet.knobHeight,
-                 height: ContentLayout.spectrogramHeight + Sheet.knobWidth)
+                 height: ContentLayout.isShownSpectrogramHeight + Sheet.knobWidth)
             .outset(by: scale * 3)
             .contains(p)
         } else {
@@ -717,7 +699,7 @@ extension ContentView {
     
     func isShownSpectrogram(at p :Point) -> Bool {
         if model.type.isAudio {
-            p.y > Sheet.timelineHalfHeight + ContentLayout.spectrogramHeight / 2
+            p.y > Sheet.timelineHalfHeight + ContentLayout.isShownSpectrogramHeight / 2
         } else {
             false
         }

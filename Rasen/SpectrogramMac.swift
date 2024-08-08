@@ -402,7 +402,7 @@ struct Spectrogram {
     var frames = [Frame]()
     var stereoCount = 0
     var type = FqType.pitch
-    var durSec = 0.0
+    var secRange = 0.0 ..< 0.0
     
     static let minLinearFq = 0.0, maxLinearFq = Audio.defaultSampleRate / 2
     static let minPitch = Score.doubleMinPitch, maxPitch = Score.doubleMaxPitch
@@ -411,6 +411,7 @@ struct Spectrogram {
         case linear, pitch
     }
     init(_ oBuffer: PCMBuffer,
+         secRange: Range<Double>? = nil,
          fftCount: Int = 2048, windowOverlap: Double = 0.875,
          isNormalized: Bool = false,
          type: FqType = .pitch) {
@@ -431,6 +432,7 @@ struct Spectrogram {
         }
         
         let channelCount = buffer.channelCount
+        let sampleRate = buffer.sampleRate
         let frameCount = buffer.frameCount
         guard channelCount >= 1, fftCount > 0, frameCount >= fftCount,
               let fft = try? Fft(count: fftCount) else { return }
@@ -442,11 +444,15 @@ struct Spectrogram {
             vDSP.multiply(racf, windowSamples, result: &windowSamples)
         }
         
-        let sampleRate = buffer.sampleRate
         let hFftCount = fftCount / 2
         let volmCount = hFftCount
         
-        let secs: [(i: Int, sec: Double)] = stride(from: 0, to: frameCount, by: overlapCount).map { i in
+        let startFrameI = secRange != nil ?
+        Int(secRange!.start * sampleRate).clipped(min: 0, max: frameCount) : 0
+        let endFrameI = secRange != nil ? 
+        Int(secRange!.end * sampleRate).clipped(min: 0, max: frameCount) : frameCount
+        
+        let secs: [(i: Int, sec: Double)] = stride(from: startFrameI, to: endFrameI, by: overlapCount).map { i in
             (i, Double(i) / sampleRate)
         }
         let loudnessScales = volmCount.range.map {
@@ -507,7 +513,7 @@ struct Spectrogram {
                 }
                 let volmCount2 = fftCount2 / 2
                 
-                let secs2: [(i: Int, sec: Double)] = stride(from: 0, to: frameCount, by: overlapCount2).map { i in
+                let secs2: [(i: Int, sec: Double)] = stride(from: startFrameI, to: endFrameI, by: overlapCount2).map { i in
                     (i, Double(i) / sampleRate)
                 }
                 let loudnessScales2 = volmCount2.range.map {
@@ -594,7 +600,7 @@ struct Spectrogram {
         self.frames = frames
         self.stereoCount = frames.isEmpty ? 0 : frames[0].stereos.count
         self.type = type
-        self.durSec = Double(frameCount) / sampleRate
+        self.secRange = secRange ?? (0 ..< Double(frameCount) / sampleRate)
     }
     
     static let (redRatio, greenRatio) = {

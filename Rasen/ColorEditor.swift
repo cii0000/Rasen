@@ -299,7 +299,7 @@ final class ColorEditor: Editor {
     private var sheetView: SheetView?
     private var scoreResult: ScoreView.ColorHitResult?
     private var beganEnvelope = Envelope(), beganNotes = [Int: Note]()
-    private var beganNotePits = [UUID: [Int: (note: Note, pits: [Int: (pit: Pit, sprolIs: Set<Int>)])]]()
+    private var beganNotePits = [UUID: (nid: UUID, nColor: Color, dic: [Int: (note: Note, pits: [Int: (pit: Pit, sprolIs: Set<Int>)])])]()
     private var beganContents = [Int: Content]()
     private var beganSP = Point(), beganVolm = 0.0
     private var notePlayer: NotePlayer?, playerBeatNoteIndexes = [Int](), beganBeat = Rational(0)
@@ -414,13 +414,13 @@ final class ColorEditor: Editor {
                             let pit = score.notes[$1.key].pits[pitI]
                             let id = pit[type]
                             if $0[id] != nil {
-                                if $0[id]![$1.key] != nil {
-                                    $0[id]![$1.key]!.pits[pitI] = (pit, sprolIs)
+                                if $0[id]!.dic[$1.key] != nil {
+                                    $0[id]!.dic[$1.key]!.pits[pitI] = (pit, sprolIs)
                                 } else {
-                                    $0[id]![$1.key] = (score.notes[$1.key], [pitI: (pit, sprolIs)])
+                                    $0[id]!.dic[$1.key] = (score.notes[$1.key], [pitI: (pit, sprolIs)])
                                 }
                             } else {
-                                $0[id] = [$1.key: (score.notes[$1.key], [pitI: (pit, sprolIs)])]
+                                $0[id] = (UUID(), Tone.randomColor(), [$1.key: (score.notes[$1.key], [pitI: (pit, sprolIs)])])
                             }
                         }
                     }
@@ -477,7 +477,7 @@ final class ColorEditor: Editor {
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
                     }
                     
-                    let noteIsSet = Set(beganNotePits.values.flatMap { $0.keys }).sorted()
+                    let noteIsSet = Set(beganNotePits.values.flatMap { $0.dic.keys }).sorted()
                     let vs = score.noteIAndPits(atBeat: beganBeat, in: noteIsSet)
                     playerBeatNoteIndexes = vs.map { $0.noteI }
                     
@@ -538,14 +538,13 @@ final class ColorEditor: Editor {
                 case .note, .pit:
                     var nvs = [Int: Note]()
                     for (_, v) in beganNotePits {
-                        let nid = UUID()
-                        for (noteI, nv) in v {
+                        for (noteI, nv) in v.dic {
                             if nvs[noteI] == nil {
                                 nvs[noteI] = nv.note
                             }
                             nv.pits.forEach { (pitI, beganPit) in
                                 nvs[noteI]?.pits[pitI].stereo.volm = newVolm(from: beganPit.pit.stereo.volm)
-                                nvs[noteI]?.pits[pitI].stereo.id = nid
+                                nvs[noteI]?.pits[pitI].stereo.id = v.nid
                             }
                         }
                     }
@@ -554,15 +553,14 @@ final class ColorEditor: Editor {
                 case .evenVolm:
                     var nvs = [Int: Note]()
                     for (_, v) in beganNotePits {
-                        let nid = UUID()
-                        for (noteI, nv) in v {
+                        for (noteI, nv) in v.dic {
                             if nvs[noteI] == nil {
                                 nvs[noteI] = nv.note
                             }
                             nv.pits.forEach { (pitI, beganPit) in
                                 let nVolm = newVolm(from: beganPit.pit.tone.overtone[.evenVolm])
                                 nvs[noteI]?.pits[pitI].tone.overtone[.evenVolm] = nVolm
-                                nvs[noteI]?.pits[pitI].tone.id = nid
+                                nvs[noteI]?.pits[pitI].tone.id = v.nid
                             }
                         }
                     }
@@ -571,15 +569,14 @@ final class ColorEditor: Editor {
                 case .oddVolm:
                     var nvs = [Int: Note]()
                     for (_, v) in beganNotePits {
-                        let nid = UUID()
-                        for (noteI, nv) in v {
+                        for (noteI, nv) in v.dic {
                             if nvs[noteI] == nil {
                                 nvs[noteI] = nv.note
                             }
                             nv.pits.forEach { (pitI, beganPit) in
                                 let nVolm = newVolm(from: beganPit.pit.tone.overtone[.oddVolm])
                                 nvs[noteI]?.pits[pitI].tone.overtone[.oddVolm] = nVolm
-                                nvs[noteI]?.pits[pitI].tone.id = nid
+                                nvs[noteI]?.pits[pitI].tone.id = v.nid
                             }
                         }
                     }
@@ -588,8 +585,7 @@ final class ColorEditor: Editor {
                 case .sprol:
                     var nvs = [Int: Note]()
                     for (_, v) in beganNotePits {
-                        let nid = UUID()
-                        for (noteI, nv) in v {
+                        for (noteI, nv) in v.dic {
                             if nvs[noteI] == nil {
                                 nvs[noteI] = nv.note
                             }
@@ -598,7 +594,12 @@ final class ColorEditor: Editor {
                                     let nVolm = newVolm(from: beganPit.pit.tone.spectlope.sprols[sprolI].volm)
                                     nvs[noteI]?.pits[pitI].tone.spectlope.sprols[sprolI].volm = nVolm
                                 }
-                                nvs[noteI]?.pits[pitI].tone.id = nid
+                                
+                                if let tone = nvs[noteI]?.pits[pitI].tone,
+                                   !tone.isDefault && tone.color == .background {
+                                    nvs[noteI]?.pits[pitI].tone.color = v.nColor
+                                }
+                                nvs[noteI]?.pits[pitI].tone.id = v.nid
                             }
                         }
                     }
@@ -644,7 +645,7 @@ final class ColorEditor: Editor {
                     var noteIVs = [IndexValue<Note>](), oldNoteIVs = [IndexValue<Note>]()
                     
                     let beganNoteIAndNotes = beganNotePits.reduce(into: [Int: Note]()) {
-                        for (noteI, v) in $1.value {
+                        for (noteI, v) in $1.value.dic {
                             $0[noteI] = v.note
                         }
                     }
@@ -832,13 +833,13 @@ final class ColorEditor: Editor {
                             let pit = score.notes[$1.key].pits[pitI]
                             let id = pit[type]
                             if $0[id] != nil {
-                                if $0[id]![$1.key] != nil {
-                                    $0[id]![$1.key]!.pits[pitI] = (pit, sprolIs)
+                                if $0[id]!.dic[$1.key] != nil {
+                                    $0[id]!.dic[$1.key]!.pits[pitI] = (pit, sprolIs)
                                 } else {
-                                    $0[id]![$1.key] = (score.notes[$1.key], [pitI: (pit, sprolIs)])
+                                    $0[id]!.dic[$1.key] = (score.notes[$1.key], [pitI: (pit, sprolIs)])
                                 }
                             } else {
-                                $0[id] = [$1.key: (score.notes[$1.key], [pitI: (pit, sprolIs)])]
+                                $0[id] = (UUID(), Tone.randomColor(), [$1.key: (score.notes[$1.key], [pitI: (pit, sprolIs)])])
                             }
                         }
                     }
@@ -891,7 +892,7 @@ final class ColorEditor: Editor {
                         document.rootNode.append(child: panNode)
                     }
                     
-                    let noteIsSet = Set(beganNotePits.values.flatMap { $0.keys }).sorted()
+                    let noteIsSet = Set(beganNotePits.values.flatMap { $0.dic.keys }).sorted()
                     let vs = score.noteIAndPits(atBeat: beganBeat, in: noteIsSet)
                     playerBeatNoteIndexes = vs.map { $0.noteI }
                     updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
@@ -946,8 +947,7 @@ final class ColorEditor: Editor {
                 
                 var nvs = [Int: Note]()
                 for (_, v) in beganNotePits {
-                    let nid = UUID()
-                    for (noteI, nv) in v {
+                    for (noteI, nv) in v.dic {
                         if nvs[noteI] == nil {
                             nvs[noteI] = nv.note
                         }
@@ -956,7 +956,11 @@ final class ColorEditor: Editor {
                                 let nNoise = newNoise(from: beganPit.pit.tone.spectlope.sprols[sprolI].noise)
                                 nvs[noteI]?.pits[pitI].tone.spectlope.sprols[sprolI].noise = nNoise
                             }
-                            nvs[noteI]?.pits[pitI].tone.id = nid
+                            if let tone = nvs[noteI]?.pits[pitI].tone,
+                                !tone.isDefault && tone.color == .background {
+                                nvs[noteI]?.pits[pitI].tone.color = v.nColor
+                            }
+                            nvs[noteI]?.pits[pitI].tone.id = v.nid
                         }
                     }
                 }
@@ -997,15 +1001,14 @@ final class ColorEditor: Editor {
                     
                     var nvs = [Int: Note]()
                     for (_, v) in beganNotePits {
-                        let nid = UUID()
-                        for (noteI, nv) in v {
+                        for (noteI, nv) in v.dic {
                             if nvs[noteI] == nil {
                                 nvs[noteI] = nv.note
                             }
                             nv.pits.forEach { (pitI, beganPit) in
                                 let nPan = newPan(from: beganPit.pit.stereo.pan)
                                 nvs[noteI]?.pits[pitI].stereo.pan = nPan
-                                nvs[noteI]?.pits[pitI].stereo.id = nid
+                                nvs[noteI]?.pits[pitI].stereo.id = v.nid
                             }
                         }
                     }
@@ -1044,7 +1047,7 @@ final class ColorEditor: Editor {
                     var noteIVs = [IndexValue<Note>](), oldNoteIVs = [IndexValue<Note>]()
                     
                     let beganNoteIAndNotes = beganNotePits.reduce(into: [Int: Note]()) {
-                        for (noteI, v) in $1.value {
+                        for (noteI, v) in $1.value.dic {
                             $0[noteI] = v.note
                         }
                     }

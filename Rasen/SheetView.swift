@@ -1346,24 +1346,18 @@ final class SheetView: View {
                        frameRate: Rational(animationView.frameRate))
     }
     func currentTimeString() -> String {
-        Self.timeString(time: model.animation.localBeat,
-                        frameRate: Rational(frameRate))
+        Animation.timeString(fromTime: model.animation.localBeat,
+                             frameRate: Rational(frameRate))
     }
     func currentTimeNodes() -> [Node] {
         Self.timeNodes(duration: model.animation.currentDurBeat,
                        time: model.animation.localBeat,
                        frameRate: Rational(frameRate))
     }
-    static func timeString(time: Rational,
-                           frameRate: Rational) -> String {
-        let ss = Int(time.decimalPart * frameRate)
-        let s = time.integralPart
-        return time == 0 ? " 0" : String(format: "%2d.%02d", s, ss)
-    }
     static func timeNodes(duration: Rational,
                           time: Rational,
                           frameRate: Rational) -> [Node] {
-        let u = timeString(time: time, frameRate: frameRate)
+        let u = Animation.timeString(fromTime: time, frameRate: frameRate)
         let size = Font.largeSize
         let text = Text(string: u, size: size)
         let b = text.frame ?? Rect()
@@ -1395,6 +1389,25 @@ final class SheetView: View {
             }
         }
         return false
+    }
+    func tempo(at p: Point, maxDistance: Double) -> Rational? {
+        if animationView.containsSec(p, maxDistance: maxDistance) {
+            return animationView.tempo
+        }
+        if scoreView.containsSec(p, maxDistance: maxDistance) {
+            return scoreView.tempo
+        }
+        for textView in textsView.elementViews {
+            if textView.containsSec(p, maxDistance: maxDistance) {
+                return textView.tempo
+            }
+        }
+        for contentView in contentsView.elementViews {
+            if contentView.containsSec(p, maxDistance: maxDistance) {
+                return contentView.tempo
+            }
+        }
+        return nil
     }
     
     func tempoString(from animationView: AnimationView) -> String {

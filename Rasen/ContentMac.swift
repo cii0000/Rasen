@@ -164,6 +164,16 @@ extension Content {
         }
     }
     
+    var contentSecRange: Range<Double>? {
+        if let timeOption {
+            let sSec = Double(timeOption.sec(fromBeat: max(-timeOption.localStartBeat, 0)))
+            let durSec = durSec
+            return sSec ..< min(sSec + .init(timeOption.secRange.length), durSec)
+        } else {
+            return nil
+        }
+    }
+    
     var imageFrame: Rect? {
         if type == .image {
             Rect(origin: origin, size: size)

@@ -2478,26 +2478,25 @@ final class CopyEditor: Editor {
             
             let scale = firstScale / document.worldToScreenScale
             let nnp = content.origin * scale + sheetP
-            let log10Scale: Double = .log10(document.worldToScreenScale)
-            let clipScale = max(0.0, log10Scale)
-            let decimalPlaces = Int(clipScale + 2)
-            content.origin = nnp.rounded(decimalPlaces: decimalPlaces)
+            
+            if content.type.hasDur, var timeOption = content.timeOption {
+                let tempo = sheetView.nearestTempo(at: sheetP) ?? timeOption.tempo
+                let interval = document.currentBeatInterval
+                let startBeat = sheetView.animationView.beat(atX: sheetP.x, interval: interval)
+                timeOption.beatRange.start += startBeat
+                timeOption.tempo = tempo
+                content.timeOption = timeOption
+                content.origin = .init(sheetView.animationView.x(atBeat: timeOption.beatRange.start), nnp.y)
+            } else {
+                let log10Scale: Double = .log10(document.worldToScreenScale)
+                let clipScale = max(0.0, log10Scale)
+                let decimalPlaces = Int(clipScale + 2)
+                content.origin = nnp.rounded(decimalPlaces: decimalPlaces)
+            }
             
             content.size = content.size * scale
             if content.size.width > Sheet.width || content.size.height > Sheet.height {
                 content.size *= min(Sheet.width / content.size.width, Sheet.height / content.size.height)
-            }
-            
-            if content.type.hasDur {
-                let tempo = sheetView.nearestTempo(at: sheetP) ?? Music.defaultTempo
-                let interval = document.currentBeatInterval
-                let startBeat = sheetView.animationView.beat(atX: sheetP.x, interval: interval)
-                let durBeat = ContentTimeOption.beat(fromSec: content.durSec,
-                                                     tempo: tempo,
-                                                     beatRate: Keyframe.defaultFrameRate,
-                                                     rounded: .up)
-                let beatRange = Range(start: startBeat, length: durBeat)
-                content.timeOption = .init(beatRange: beatRange, tempo: tempo)
             }
             
             content.id = .init()
@@ -3256,6 +3255,108 @@ final class LineColorCopier: InputKeyEditor {
                     showPit(pitI: pitI, isTone: true)
                 }
                 return true
+            }
+        }
+        return false
+    }
+}
+
+final class ToneCopier: InputKeyEditor {
+    let document: Document
+    let isEditingSheet: Bool
+    
+    init(_ document: Document) {
+        self.document = document
+        isEditingSheet = document.isEditingSheet
+    }
+    
+    var selectingLineNode = Node(lineWidth: 1.5)
+    var firstScale = 1.0, editingP = Point(), editingSP = Point()
+    
+    func updateNode() {
+        if selectingLineNode.children.isEmpty {
+            selectingLineNode.lineWidth = document.worldLineWidth
+        } else {
+            let w = document.worldLineWidth
+            for node in selectingLineNode.children {
+                node.lineWidth = w
+            }
+        }
+        if isEditingSheet {
+            updateWithCopy(for: editingP, isSendPasteboard: true,
+                                       isCutColor: false)
+        }
+    }
+    
+    func send(_ event: InputKeyEvent) {
+        guard isEditingSheet else {
+            return
+        }
+        let sp = document.selectedScreenPositionNoneCursor
+            ?? event.screenPoint
+        switch event.phase {
+        case .began:
+            document.cursor = .arrow
+            
+            firstScale = document.worldToScreenScale
+            editingSP = sp
+            editingP = document.convertScreenToWorld(sp)
+            updateWithCopy(for: editingP,
+                           isSendPasteboard: true, isCutColor: false)
+            document.rootNode.append(child: selectingLineNode)
+        case .changed:
+            break
+        case .ended:
+            selectingLineNode.removeFromParent()
+            
+            document.cursor = Document.defaultCursor
+        }
+    }
+    
+    @discardableResult
+    func updateWithCopy(for p: Point, isSendPasteboard: Bool, isCutColor: Bool) -> Bool {
+        if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+            let scoreView = sheetView.scoreView
+            let scoreP = scoreView.convertFromWorld(p)
+            if let (noteI, pitI) = scoreView.noteAndPitIEnabledNote(at: scoreP,
+                                                                    scale: document.screenToWorldScale) {
+                
+                func showPit(pitI: Int, isTone: Bool = false) {
+                    let pitP = scoreView.pitPosition(atPit: pitI, at: noteI)
+                    let nPitP = (isTone ? Point(pitP.x, scoreView.toneY(at: pitP, at: noteI)) : pitP)
+                    let scale = 1 / document.worldToScreenScale
+                    let lw = Line.defaultLineWidth
+                    let nlw = max(lw * 1.5, lw * 2.5 * scale, 1 * scale)
+                    
+                    let lineNoteNode = Node(path: .init([scoreP, pitP], isClosed: false),
+                                            lineWidth: nlw, lineType: .color(.selected))
+                    
+                    let noteNode = Node(path: Path(circleRadius: nlw, position: nPitP),
+                                        fillType: .color(.selected))
+                    noteNode.attitude.position = scoreView.node.convertToWorld(Point())
+                    selectingLineNode.children = [noteNode, lineNoteNode]
+                }
+                
+                let score = scoreView.model
+                
+                if let pitI = scoreView.pitI(at: scoreP, scale: .infinity, at: noteI) {
+                    let tone = score.notes[noteI].pits[pitI].tone
+                    if isSendPasteboard {
+                        Pasteboard.shared.copiedObjects = [.tone(tone)]
+                    }
+                    showPit(pitI: pitI)
+                } else {
+                    let tone = score.notes[noteI].pits[pitI].tone
+                    if isSendPasteboard {
+                        Pasteboard.shared.copiedObjects = [.tone(tone)]
+                    }
+                    let scale = 1 / document.worldToScreenScale
+                    let lw = Line.defaultLineWidth
+                    let nlw = max(lw * 1.5, lw * 2.5 * scale, 1 * scale)
+                    let noteNode = scoreView.noteNode(from: score.notes[noteI], color: .selected, lineWidth: nlw).node
+                    noteNode.attitude.position = scoreView.node.convertToWorld(Point())
+                    selectingLineNode.children = [noteNode]
+                }
             }
         }
         return false

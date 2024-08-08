@@ -49,7 +49,7 @@ final class KeyframePreviousMover: InputKeyEditor {
             
             sheetView?.showOtherTimeNodeFromMainBeat()
             
-            document.cursor = document.cursor(from: sheetView?.currentTimeString() ?? SheetView.timeString(time: 0, frameRate: 0))
+            document.cursor = document.cursor(from: sheetView?.currentTimeString() ?? Animation.timeString(fromTime: 0, frameRate: 0))
         case .changed:
             if event.isRepeat, let sheetView {
                 move(from: sheetView, at: p)
@@ -102,7 +102,7 @@ final class KeyframeNextMover: InputKeyEditor {
             
             sheetView?.showOtherTimeNodeFromMainBeat()
             
-            document.cursor = document.cursor(from: sheetView?.currentTimeString() ?? SheetView.timeString(time: 0, frameRate: 0))
+            document.cursor = document.cursor(from: sheetView?.currentTimeString() ?? Animation.timeString(fromTime: 0, frameRate: 0))
         case .changed:
             if event.isRepeat, let sheetView {
                 move(from: sheetView, at: p)
@@ -154,7 +154,7 @@ final class TimePreviousMover: InputKeyEditor {
             
             sheetView?.showOtherTimeNodeFromMainBeat()
             
-            document.cursor = document.cursor(from: sheetView?.currentTimeString() ?? SheetView.timeString(time: 0, frameRate: 0))
+            document.cursor = document.cursor(from: sheetView?.currentTimeString() ?? Animation.timeString(fromTime: 0, frameRate: 0))
         case .changed:
             if event.isRepeat, let sheetView {
                 move(from: sheetView, at: p)
@@ -207,7 +207,7 @@ final class TimeNextMover: InputKeyEditor {
             
             sheetView?.showOtherTimeNodeFromMainBeat()
             
-            document.cursor = document.cursor(from: sheetView?.currentTimeString() ?? SheetView.timeString(time: 0, frameRate: 0))
+            document.cursor = document.cursor(from: sheetView?.currentTimeString() ?? Animation.timeString(fromTime: 0, frameRate: 0))
         case .changed:
             if event.isRepeat, let sheetView {
                 move(from: sheetView, at: p)
@@ -281,7 +281,7 @@ final class KeyframeSwiper: SwipeEditor {
                 
                 document.cursor = document.cursor(from: sheetView.currentTimeString())
             } else {
-                document.cursor = document.cursor(from: SheetView.timeString(time: 0, frameRate: 0))
+                document.cursor = document.cursor(from: Animation.timeString(fromTime: 0, frameRate: 0))
             }
             
             sheetView?.showOtherTimeNodeFromMainBeat()
@@ -429,7 +429,7 @@ final class KeyframeSlider: DragEditor {
                 
                 document.cursor = document.cursor(from: sheetView.currentTimeString())
             } else {
-                document.cursor = document.cursor(from: SheetView.timeString(time: 0, frameRate: 0))
+                document.cursor = document.cursor(from: Animation.timeString(fromTime: 0, frameRate: 0))
             }
             
             sheetView?.showOtherTimeNodeFromMainBeat()
@@ -602,7 +602,7 @@ final class FrameEditor: Editor {
                     animationView.shownInterTypeKeyframeIndex = sheetView.model.animation.index
                 }
             }
-            document.cursor = document.cursor(from: sheetView?.currentTimeString() ?? SheetView.timeString(time: 0, frameRate: 0))
+            document.cursor = document.cursor(from: sheetView?.currentTimeString() ?? Animation.timeString(fromTime: 0, frameRate: 0))
             
             sheetView?.showOtherTimeNodeFromMainBeat()
         case .changed:
@@ -1020,8 +1020,8 @@ final class TempoSlider: DragEditor {
                 self.sheetView = sheetView
                 let inP = sheetView.convertFromWorld(p)
                 beganSheetP = inP
-                if sheetView.containsTempo(inP, maxDistance: document.worldKnobEditDistance) {
-                    beganTempo = sheetView.model.animation.tempo
+                if let tempo = sheetView.tempo(at: inP, maxDistance: document.worldKnobEditDistance) {
+                    beganTempo = tempo
                     oldTempo = beganTempo
                     
                     beganContents = sheetView.contentsView.elementViews.enumerated().reduce(into: .init()) { (dic, v) in

@@ -124,17 +124,17 @@ extension Pitch {
         } else if hidableDecimal && deltaPitch.decimalPart == 0 {
             deltaStr = " (\(deltaDPartStr))"
         } else {
-            let ddPart = deltaPitch.decimalPart * 12
-            let ddPartStr = ddPart.decimalPart == 0 ? String(format: "%02d", Int(abs(ddPart))) : "\(abs(ddPart.decimalPart))"
+            let ddPart = deltaPitch.decimalPart * 6
+            let ddPartStr = ddPart.decimalPart == 0 ? String(format: "%d", Int(abs(ddPart))) : "\(abs(ddPart.decimalPart))"
             deltaStr = " (\(deltaDPartStr).\(ddPartStr))"
         }
         
         if hidableDecimal && dPart.decimalPart == 0 {
-            return "C\(iPart).\(dPartStr)" + deltaStr
+            return "\(iPart).\(dPartStr)" + deltaStr
         } else {
-            let ddPart = dPart.decimalPart * 12
-            let ddPartStr = ddPart.decimalPart == 0 ? String(format: "%02d", Int(ddPart)) : "\(ddPart.decimalPart)"
-            return "C\(iPart).\(dPartStr).\(ddPartStr)" + deltaStr
+            let ddPart = dPart.decimalPart * 6
+            let ddPartStr = ddPart.decimalPart == 0 ? String(format: "%d", Int(ddPart)) : "\(ddPart.decimalPart)"
+            return "\(iPart).\(dPartStr).\(ddPartStr)" + deltaStr
         }
     }
 }
@@ -756,6 +756,10 @@ extension Tone {
     }
     var isDefault: Bool {
         overtone == .init() && spectlope == .init()
+    }
+    
+    static func randomColor() -> Color {
+        .randomLightnessAndHue(60 ... 90)
     }
 }
 extension Tone: MonoInterpolatable {

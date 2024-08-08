@@ -2088,6 +2088,23 @@ extension Animation: BeatRangeType {
             keyframes[$0.index].set($0.value)
         }
     }
+    
+    static func timeString(fromTime time: Rational, frameRate: Rational) -> String {
+        if time == 0 {
+            return "0"
+        }
+        let minusStr = time < 0 ? "-" : ""
+        let time = abs(time)
+        let dPart = time.decimalPart * frameRate
+        let idPart = Int(dPart)
+        let iPart = time.integralPart
+        let iddPart = Int(dPart.decimalPart * 6)
+        return if iddPart != 0 {
+            minusStr + String(format: "%2d.%02d.%d", iPart, idPart, iddPart)
+        } else {
+            minusStr + String(format: "%2d.%02d", iPart, idPart)
+        }
+    }
 }
 extension Animation {
     var option: AnimationOption {

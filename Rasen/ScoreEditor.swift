@@ -263,7 +263,7 @@ final class ScoreSlider: DragEditor {
     private var sprolI: Int?, beganSprol = Sprol()
     private var beganScoreOption: ScoreOption?
     private var beganNotes = [Int: Note]()
-    private var beganNotePits = [UUID: [Int: (note: Note, pits: [Int: (pit: Pit, sprolIs: Set<Int>)])]]()
+    private var beganNotePits = [UUID: (nid: UUID, nColor: Color, dic: [Int: (note: Note, pits: [Int: (pit: Pit, sprolIs: Set<Int>)])])]()
     
     func send(_ event: DragEvent) {
         guard isEditingSheet else {
@@ -399,13 +399,13 @@ final class ScoreSlider: DragEditor {
                                     let pit = score.notes[$1.key].pits[pitI]
                                     let id = pit[.tone]
                                     if $0[id] != nil {
-                                        if $0[id]![$1.key] != nil {
-                                            $0[id]![$1.key]!.pits[pitI] = (pit, sprolIs)
+                                        if $0[id]!.dic[$1.key] != nil {
+                                            $0[id]!.dic[$1.key]!.pits[pitI] = (pit, sprolIs)
                                         } else {
-                                            $0[id]![$1.key] = (score.notes[$1.key], [pitI: (pit, sprolIs)])
+                                            $0[id]!.dic[$1.key] = (score.notes[$1.key], [pitI: (pit, sprolIs)])
                                         }
                                     } else {
-                                        $0[id] = [$1.key: (score.notes[$1.key], [pitI: (pit, sprolIs)])]
+                                        $0[id] = (UUID(), Tone.randomColor(), [$1.key: (score.notes[$1.key], [pitI: (pit, sprolIs)])])
                                     }
                                 }
                             }
@@ -413,7 +413,7 @@ final class ScoreSlider: DragEditor {
                         
                         updatePitsWithSelection()
                         
-                        let noteIsSet = Set(beganNotePits.values.flatMap { $0.keys }).sorted()
+                        let noteIsSet = Set(beganNotePits.values.flatMap { $0.dic.keys }).sorted()
                         let vs = score.noteIAndPits(atBeat: note.pits[pitI].beat + note.beatRange.start,
                                                     in: noteIsSet)
                         playerBeatNoteIndexes = vs.map { $0.noteI }
@@ -720,8 +720,7 @@ final class ScoreSlider: DragEditor {
                         
                         var nvs = [Int: Note]()
                         for (_, v) in beganNotePits {
-                            let nid = UUID()
-                            for (noteI, nv) in v {
+                            for (noteI, nv) in v.dic {
                                 if nvs[noteI] == nil {
                                     nvs[noteI] = nv.note
                                 }
@@ -731,7 +730,11 @@ final class ScoreSlider: DragEditor {
                                             .clipped(min: Score.doubleMinPitch, max: Score.doubleMaxPitch)
                                         nvs[noteI]?.pits[pitI].tone.spectlope.sprols[sprolI].pitch = pitch
                                     }
-                                    nvs[noteI]?.pits[pitI].tone.id = nid
+                                    if let tone = nvs[noteI]?.pits[pitI].tone,
+                                        !tone.isDefault && tone.color == .background {
+                                        nvs[noteI]?.pits[pitI].tone.color = v.nColor
+                                    }
+                                    nvs[noteI]?.pits[pitI].tone.id = v.nid
                                 }
                             }
                         }
@@ -836,7 +839,7 @@ final class ScoreSlider: DragEditor {
                         var noteIVs = [IndexValue<Note>](), oldNoteIVs = [IndexValue<Note>]()
                         
                         let beganNoteIAndNotes = beganNotePits.reduce(into: [Int: Note]()) {
-                            for (noteI, v) in $1.value {
+                            for (noteI, v) in $1.value.dic {
                                 $0[noteI] = v.note
                             }
                         }
@@ -1296,7 +1299,7 @@ extension ScoreView {
                                                width: lw, height: rulerH)))
         }
         
-        let sprH = ContentLayout.spectrogramHeight
+        let sprH = ContentLayout.isShownSpectrogramHeight
         let sprKnobW = knobH, sprKbobH = knobW
         let np = Point(ContentLayout.spectrogramX + sx, ey)
         contentPathlines.append(Pathline(Rect(x: np.x - 1 / 2,
@@ -2252,14 +2255,14 @@ extension ScoreView {
         
         let score = model
         for (noteI, note) in score.notes.enumerated() {
-            guard note.isShownTone && toneFrame(from: note).outset(by: maxD).contains(p) else { continue }
+            guard note.isShownTone else { continue }
             if note.pits.count == 1 {
                 let pitP = Point(x(atBeat: note.beatRange.start), y(fromPitch: note.firstPitch))
                 
                 let evenY = toneY(at: pitP, from: note) + ScoreLayout.evenY
                 var ds = p.y.distanceSquared(evenY)
                 if p.x >= pitP.x - maxD && p.x < x(atBeat: note.beatRange.end) + maxD
-                    && ds < minDS {
+                    && ds < minDS && ds < maxDS {
                     
                     minDS = ds
                     minNoteI = noteI
@@ -2269,7 +2272,7 @@ extension ScoreView {
                 let oddY = toneY(at: pitP, from: note) + ScoreLayout.oddY
                 ds = p.y.distanceSquared(oddY)
                 if p.x >= pitP.x - maxD && p.x < x(atBeat: note.beatRange.end) + maxD
-                    && ds < minDS {
+                    && ds < minDS && ds < maxDS {
                     
                     minDS = ds
                     minNoteI = noteI
@@ -2284,7 +2287,7 @@ extension ScoreView {
                         
                         let evenP = Point(pitP.x, toneY(at: pitP, from: note) + ScoreLayout.evenY)
                         let evenDsd = evenP.distanceSquared(p)
-                        if evenDsd < minDS {
+                        if evenDsd < minDS && evenDsd < maxDS {
                             minDS = evenDsd
                             minNoteI = noteI
                             minResult = .evenVolm(pitI: pitI)
@@ -2292,7 +2295,7 @@ extension ScoreView {
                         
                         let oddP = Point(pitP.x, toneY(at: pitP, from: note) + ScoreLayout.oddY)
                         let oddDsd = oddP.distanceSquared(p)
-                        if oddDsd < minDS {
+                        if oddDsd < minDS && oddDsd < maxDS {
                             minDS = oddDsd
                             minNoteI = noteI
                             minResult = .oddVolm(pitI: pitI)
@@ -2618,7 +2621,7 @@ extension ScoreView {
         guard score.isShownSpectrogram, let sm = score.spectrogram else { return }
         
         let firstX = x(atBeat: score.beatRange.start)
-        let y = timeLineCenterY + Sheet.timelineHalfHeight + ContentLayout.spectrogramHeight + Sheet.knobWidth / 2
+        let y = timeLineCenterY + Sheet.timelineHalfHeight + ContentLayout.isShownSpectrogramHeight + Sheet.knobWidth / 2
         let allBeat = score.beatRange.length
         let allW = width(atDurBeat: allBeat)
         var nodes = [Node](), maxH = 0.0
@@ -2682,13 +2685,13 @@ extension ScoreView {
         Rect(x: timelineFrame.minX + ContentLayout.spectrogramX - Sheet.knobHeight / 2,
                  y: timeLineCenterY + Sheet.timelineHalfHeight - Sheet.knobWidth / 2,
                  width: Sheet.knobHeight,
-                 height: ContentLayout.spectrogramHeight + Sheet.knobWidth)
+                 height: ContentLayout.isShownSpectrogramHeight + Sheet.knobWidth)
             .outset(by: scale * 3)
             .contains(p)
     }
     
     func isShownSpectrogram(at p :Point) -> Bool {
-        p.y > timeLineCenterY + Sheet.timelineHalfHeight + ContentLayout.spectrogramHeight / 2
+        p.y > timeLineCenterY + Sheet.timelineHalfHeight + ContentLayout.isShownSpectrogramHeight / 2
     }
     var isShownSpectrogram: Bool {
         get {

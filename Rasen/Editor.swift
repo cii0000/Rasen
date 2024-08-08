@@ -508,10 +508,8 @@ final class FaceEditor: Editor {
                                     .init(pitch: 84, volm: .random(in: 0 ..< 1), noise: 0),
                                     .init(pitch: 96, volm: .random(in: 0 ..< 0.125), noise: 0)
                                 ])
-                                let tone = Tone(overtone: .init(),
-                                                spectlope: spectlope,
-                                                color: .randomLightnessAndHue(60 ... 90),
-                                                id: .init())
+                                var tone = Tone(spectlope: spectlope)
+                                tone.color = Tone.randomColor()
                                 tones[pit.tone.id] = tone
                                 note.pits[pi].tone = tone
                             }

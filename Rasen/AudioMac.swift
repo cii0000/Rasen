@@ -178,8 +178,8 @@ final class PCMNoder {
         }
     }
     
-    var spectrogram: Spectrogram? {
-        .init(pcmBuffer)
+    func spectrogram(fromSecRange secRange: Range<Double>? = nil) -> Spectrogram? {
+        .init(pcmBuffer, secRange: secRange)
     }
     
     private var timeOption: TimeOption

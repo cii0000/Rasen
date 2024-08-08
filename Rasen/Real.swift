@@ -626,6 +626,9 @@ extension Range where Bound == Double {
     init(_ v: Range<Int>) {
         self = Double(v.lowerBound) ..< Double(v.upperBound)
     }
+    init(_ v: Range<Rational>) {
+        self = Double(v.lowerBound) ..< Double(v.upperBound)
+    }
 }
 extension Range where Bound == Int {
     init(_ v: Range<Double>) {

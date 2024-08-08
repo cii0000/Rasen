@@ -3999,6 +3999,7 @@ final class Document {
         case .cut: Cutter(self)
         case .copy: Copier(self)
         case .copyLineColor: LineColorCopier(self)
+        case .copyTone: ToneCopier(self)
         case .paste: Paster(self)
         case .undo: Undoer(self)
         case .redo: Redoer(self)

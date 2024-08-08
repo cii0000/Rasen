@@ -366,6 +366,7 @@ extension Quasimode {
     static let paste = Quasimode(modifier: [.command], .v)
     static let scalingPaste = Quasimode(modifier: [.command], .vPinch)
     static let copyLineColor = Quasimode(modifier: [.option, .command], .c)
+    static let copyTone = Quasimode(modifier: [.shift, .command], .c)
     
     static let find = Quasimode(modifier: [.command], .f)
     
