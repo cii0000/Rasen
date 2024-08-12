@@ -166,7 +166,7 @@ extension Color {
     static let subInterpolated = Color(white: 0.5, opacity: 0.25)
     static let warning = Color(red: 1, green: 0.5, blue: 0)
     
-    static let octave = Color(white: 0, opacity: 0.125)
+    static let octave = Color(white: 0.75, opacity: 0.5)
 }
 
 extension Color {

@@ -397,7 +397,7 @@ extension Sprol: Protobuf {
     }
 }
 extension Sprol {
-    var noisedVolm: Double {
+    var overtonesVolm: Double {
         volm * (1 - noise)
     }
     var noiseVolm: Double {
@@ -531,23 +531,49 @@ extension Spectlope {
         Volm.amp(fromVolm: noise(atPitch: Pitch.pitch(fromFq: fq)))
     }
     
-    func noisedVolm(atPitch pitch: Double) -> Double {
-        sprol(atPitch: pitch).noisedVolm
+    func overtonesVolm(atPitch pitch: Double) -> Double {
+        sprol(atPitch: pitch).overtonesVolm
     }
-    func noisedVolm(atFq fq: Double) -> Double {
-        noisedVolm(atPitch: Pitch.pitch(fromFq: fq))
+    func overtonesVolm(atFq fq: Double) -> Double {
+        overtonesVolm(atPitch: Pitch.pitch(fromFq: fq))
     }
     
     var sumVolm: Double {
-        sprols.isEmpty ? 0 : (1 ..< sprols.count).sum {
-            let dPitch = sprols[$0].pitch - sprols[$0 - 1].pitch
-            return (sprols[$0].volm + sprols[$0 - 1].volm) * dPitch / 2
+        sprols.isEmpty ? 0 : (0 ... sprols.count).sum {
+            let (prePitch, preVolm) = $0 == 0 ?
+            (Score.doubleMinPitch, sprols[$0].volm) : (sprols[$0 - 1].pitch, sprols[$0 - 1].volm)
+            let (nextPitch, nextVolm) = $0 == sprols.count ?
+            (Score.doubleMaxPitch, sprols[$0 - 1].volm) : (sprols[$0].pitch, sprols[$0].volm)
+            let dPitch = nextPitch - prePitch
+            return (nextVolm + preVolm) * dPitch / 2
+        }
+    }
+    func sumVolm(fromPitch pitch: Double) -> Double {
+        let pitchSprol = sprol(atPitch: pitch)
+        let fi = sprols.firstIndex(where: { $0.pitch > pitch }) ?? sprols.count - 1
+        return sprols.isEmpty ? 0 : (fi ... sprols.count).sum {
+            let preSprol = $0 == fi ? pitchSprol : sprols[$0 - 1]
+            let dPitch = ($0 == sprols.count ? Score.doubleMaxPitch : sprols[$0].pitch) - preSprol.pitch
+            return (($0 == sprols.count ? preSprol.volm : sprols[$0].volm) + preSprol.volm) * dPitch / 2
+        }
+    }
+    func sumOvertonesVolm(fromPitch pitch: Double) -> Double {
+        let pitchSprol = sprol(atPitch: pitch)
+        let fi = sprols.firstIndex(where: { $0.pitch > pitch }) ?? sprols.count - 1
+        return sprols.isEmpty ? 0 : (fi ... sprols.count).sum {
+            let preSprol = $0 == fi ? pitchSprol : sprols[$0 - 1]
+            let dPitch = ($0 == sprols.count ? Score.doubleMaxPitch : sprols[$0].pitch) - preSprol.pitch
+            return (($0 == sprols.count ? preSprol.overtonesVolm : sprols[$0].overtonesVolm) + preSprol.overtonesVolm) * dPitch / 2
         }
     }
     var sumNoiseVolm: Double {
-        sprols.isEmpty ? 0 : (1 ..< sprols.count).sum {
-            let dPitch = sprols[$0].pitch - sprols[$0 - 1].pitch
-            return (sprols[$0].volm * sprols[$0].noise + sprols[$0 - 1].volm * sprols[$0 - 1].noise) * dPitch / 2
+        sprols.isEmpty ? 0 : (0 ... sprols.count).sum {
+            let (prePitch, preVolm) = $0 == 0 ?
+            (Score.doubleMinPitch, sprols[$0].noiseVolm) : (sprols[$0 - 1].pitch, sprols[$0 - 1].noiseVolm)
+            let (nextPitch, nextVolm) = $0 == sprols.count ?
+            (Score.doubleMaxPitch, sprols[$0 - 1].noiseVolm) : (sprols[$0].pitch, sprols[$0].noiseVolm)
+            let dPitch = nextPitch - prePitch
+            return (nextVolm + preVolm) * dPitch / 2
         }
     }
     
@@ -759,7 +785,7 @@ extension Tone {
     }
     
     static func randomColor() -> Color {
-        .randomLightnessAndHue(60 ... 90)
+        .randomLightnessAndHue(60 ... 80)
     }
 }
 extension Tone: MonoInterpolatable {
@@ -1008,6 +1034,10 @@ extension Note {
     struct PitResult: Hashable {
         var notePitch: Rational, pitch: ResultPitch, stereo: Stereo,
             tone: Tone, lyric: String, envelope: Envelope, id: UUID
+        
+        var sumTone: Double {
+            tone.spectlope.sumVolm
+        }
     }
     func pitResult(atBeat beat: Double) -> PitResult {
         if pits.count == 1 || beat <= .init(pits[0].beat) {

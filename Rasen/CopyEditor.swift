@@ -1384,7 +1384,7 @@ final class CopyEditor: Editor {
     }
     
     private var oldScale: Double?, firstRotation = 0.0,
-                oldSnapP: Point?, oldFillSnapP: Point?, beganPitch = Rational(0), 
+                oldSnapP: Point?, oldFillSnapP: Point?, beganPitch = Rational(0),
                 octaveNode: Node?, beganNotes = [Int: Note](),
                 textNode: Node?, imageNode: Node?, textFrame: Rect?, textScale = 1.0
     var snapDistance = 1.0
@@ -1803,7 +1803,9 @@ final class CopyEditor: Editor {
                 
                 let count = scoreView.model.notes.count
                 beganNotes = notes.enumerated().reduce(into: .init()) {
-                    $0[count - notes.count + $1.offset] = $1.element
+                    var note = $1.element
+                    note.id = .init()
+                    $0[count - notes.count + $1.offset] = note
                 }
                 
                 let octaveNode = scoreView.octaveNode(fromPitch: pitch,
@@ -1814,7 +1816,7 @@ final class CopyEditor: Editor {
                 document.rootNode.append(child: octaveNode)
             }
             
-            var notes = notes
+            var notes = beganNotes.sorted(by: { $0.key < $1.key }).map { $0.value }
             for j in 0 ..< notes.count {
                 notes[j].pitch += pitch - Score.pitchRange.start
                 notes[j].beatRange.start += beat

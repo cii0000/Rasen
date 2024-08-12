@@ -263,7 +263,8 @@ final class PCMNoder {
         self.durSec = durSec
         self.id = id
         self.pcmBuffer = pcmBuffer
-        node = AVAudioSourceNode(format: pcmBuffer.format) {
+        let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2)!
+        node = AVAudioSourceNode(format: format) {
             [weak self]
             isSilence, timestamp, frameCount, outputData in
 
@@ -296,15 +297,15 @@ final class PCMNoder {
                 }
                 
                 for i in 0 ..< outputBLP.count {
-                    let oFrames = data[i]
+                    let oFrames = data[i < pcmBuffer.channelCount ? i : pcmBuffer.channelCount - 1]
                     let nFrames = outputBLP[i].mData!.assumingMemoryBound(to: Float.self)
                     for j in 0 ..< frameCount {
                         let ni = sampleSec + Double(j)
                         if ni >= to.csSampleSec && ni < to.sampleFrameLength - 1 {
                             let rni = ni.rounded(.down)
                             let nii = Int(rni)
-                            nFrames[j] = .linear(oFrames[nii],
-                                                 oFrames[nii + 1],
+                            nFrames[j] = .linear(oFrames[nii * pcmBuffer.stride],
+                                                 oFrames[(nii + 1) * pcmBuffer.stride],
                                                  t: ni - rni)
                             
                         }
@@ -325,7 +326,7 @@ final class PCMNoder {
                     for j in 0 ..< frameCount {
                         let ni = secI + j
                         if ni >= to.cst && ni < to.frameLength {
-                            nFrames[j] = oFrames[ni]
+                            nFrames[j] = oFrames[ni * pcmBuffer.stride]
                         }
                     }
                 }

@@ -105,9 +105,9 @@ extension Note {
                 "[" : (fi == mora.keyFormantFilters.count - 1 ? lyric : "")
                 ivps.append(.init(value: .init(beat: fBeat,
                                                pitch: result.pitch.rationalValue(intervalScale: Sheet.fullEditBeatInterval) + ff.pitch,
-                                               stereo: .init(volm: pits[i].stereo.volm * ff.volm,
+                                               stereo: .init(volm: pits[i].stereo.volm,
                                                              pan: result.stereo.pan,
-                                                             id: ff.volm == 1 ? result.stereo.id : .init()),
+                                                             id: result.stereo.id),
                                                tone: .init(spectlope: ff.formantFilter.spectlope, id: ff.id),
                                                lyric: lyric),
                                   index: fi + minI))

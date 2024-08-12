@@ -973,6 +973,22 @@ final class Document {
             }
         }
     }
+//    func resetAllContents(_ handler: (String) -> (Bool)) {
+//        var contentURLs = Set<URL>()
+//        for (i, v) in sheetRecorders.enumerated() {
+//            let (_, sheetRecorder) = v
+//            guard handler("\(i) / \(sheetRecorders.count - 1)") else { return }
+//            autoreleasepool {
+//                let record = sheetRecorder.sheetRecord
+//                guard let sheet = record.decodedValue else { return }
+//                for content in sheet.contents {
+//                    contentURLs.insert(content.url)
+//                }
+//            }
+//        }
+//        contentsDirectory.childrenURLs
+//        
+//    }
     func resetAllAnimationSheets(_ handler: (String) -> (Bool)) {
         for (i, v) in sheetRecorders.enumerated() {
             let (_, sheetRecorder) = v

@@ -613,11 +613,12 @@ final class AnimationView: TimelineView {
             let kx = x(atBeat: keyframe.beat + beatRange.start)
             
             let nKnobH = keyframe.isKey ? knobH : iKnobH
+            let nKnobW = keyframe.beat % .init(1, 12) == 0 ? knobW : knobW / 2
             let topD: Double
             if !keyframe.draftPicture.isEmpty {
-                let pathline = Pathline(Rect(x: kx - knobW / 2,
+                let pathline = Pathline(Rect(x: kx - nKnobW / 2,
                                              y: centerY + nKnobH / 2 - knobW,
-                                             width: knobW, height: knobW))
+                                             width: nKnobW, height: knobW))
                 if iSet.contains(i) {
                     selectedPathlines.append(pathline)
                 } else {
@@ -630,9 +631,9 @@ final class AnimationView: TimelineView {
             
             let bottomD: Double
             if keyframe.previousNext != .none {
-                let pathline = Pathline(Rect(x: kx - knobW / 2,
+                let pathline = Pathline(Rect(x: kx - nKnobW / 2,
                                              y: centerY - nKnobH / 2,
-                                             width: knobW, height: knobW))
+                                             width: nKnobW, height: knobW))
                 if iSet.contains(i) {
                     selectedPathlines.append(pathline)
                 } else {
@@ -643,13 +644,14 @@ final class AnimationView: TimelineView {
                 bottomD = 0
             }
             
+            let niKnobW = keyframe.beat % .init(1, 12) == 0 ? iKnobW : iKnobW / 2
             let pathline = keyframe.isKey ?
-            Pathline(Rect(x: kx - knobW / 2,
+            Pathline(Rect(x: kx - nKnobW / 2,
                           y: centerY - nKnobH / 2 + bottomD,
-                          width: knobW, height: nKnobH - bottomD - topD)) :
-            Pathline(Rect(x: kx - iKnobW / 2,
+                          width: nKnobW, height: nKnobH - bottomD - topD)) :
+            Pathline(Rect(x: kx - niKnobW / 2,
                           y: centerY - nKnobH / 2 + bottomD,
-                          width: iKnobW, height: nKnobH - bottomD - topD))
+                          width: niKnobW, height: nKnobH - bottomD - topD))
             if iSet.contains(i) {
                 selectedPathlines.append(pathline)
             } else {
