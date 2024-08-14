@@ -161,6 +161,7 @@ message PBStereo {
 }
 
 message PBContent {
+    string directoryName = 9;
     string name = 1;
     PBStereo stereo = 2;
     PBSize size = 4;

@@ -122,9 +122,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         appMenu.addItem(databaseMenuItem)
         
         appMenu.addItem(NSMenuItem.separator())
-        appMenu.addItem(withTitle: "Show Imported Contents in Finder...".localized,
-                        action: #selector(AppDelegate.showImportedContentsInFinder(_:)),
-                        keyEquivalent: "")
         appMenu.addItem(withTitle: "Clear Root History...".localized,
                         action: #selector(SubMTKView.clearHistoryDatabase(_:)),
                         keyEquivalent: "")
@@ -153,7 +150,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         let fileString = "File".localized
         let fileMenu = NSMenu(title: fileString)
         fileMenu.delegate = self
-        fileMenu.addItem(withTitle: "Import Document...".localized,
+        fileMenu.addItem(withTitle: "Import...".localized,
                          action: #selector(SubMTKView.importDocument(_:)))
         fileMenu.addItem(NSMenuItem.separator())
         fileMenu.addItem(withTitle: "Export as Image...".localized,
@@ -403,11 +400,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         acknowledgmentsPanel
             = AppDelegate.makePanel(from: string,
                                     title: "Acknowledgments".localized)
-    }
-    
-    @objc func showImportedContentsInFinder(_ sender: Any) {
-        NSWorkspace.shared.selectFile(nil,
-                                      inFileViewerRootedAtPath: view.document.contentsDirectory.url.path())
     }
     
     static func makePanel(from string: String, title: String) -> NSPanel {

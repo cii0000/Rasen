@@ -43,22 +43,18 @@ extension ContentTimeOption: Protobuf {
 
 struct Content: Hashable, Codable {
     enum FileType: FileTypeProtocol, CaseIterable {
-        case m4a
-        case mp4
-        case mov
         case wav
         case mp3
+        case m4a
         case aiff
         case png
         case jpeg
         
         var name: String {
             switch self {
-            case .mp4: "MP4"
-            case .mov: "MOV"
-            case .m4a: "M4A"
-            case .mp3: "MP3"
             case .wav: "WAV"
+            case .mp3: "MP3"
+            case .m4a: "M4A"
             case .aiff: "AIFF"
             case .png: "PNG"
             case .jpeg: "JPEG"
@@ -66,11 +62,9 @@ struct Content: Hashable, Codable {
         }
         var utType: UTType {
             switch self {
-            case .mp4: .init(filenameExtension: "mp4")!
-            case .mov: .init(filenameExtension: "mov")!
-            case .m4a: .init(filenameExtension: "m4a")!
-            case .mp3: .init(filenameExtension: "mp3")!
             case .wav: .init(filenameExtension: "wav")!
+            case .mp3: .init(filenameExtension: "mp3")!
+            case .m4a: .init(filenameExtension: "m4a")!
             case .aiff: .init(filenameExtension: "aiff")!
             case .png: .init(filenameExtension: "png")!
             case .jpeg: .init(filenameExtension: "jpg")!
@@ -106,8 +100,17 @@ struct Content: Hashable, Codable {
         }
     }
     
+    var directoryName: String {
+        didSet {
+            url = URL.library
+                .appending(component: "sheets")
+                .appending(component: directoryName)
+                .appending(component: "contents")
+                .appending(component: name)
+        }
+    }
     let name: String
-    let url: URL
+    private(set) var url: URL
     let type: ContentType
     let durSec: Double
     let image: Image?
@@ -119,11 +122,18 @@ struct Content: Hashable, Codable {
     var timeOption: ContentTimeOption?
     var id = UUID()
     
-    init(name: String = "empty", stereo: Stereo = .init(volm: 1, pan: 0),
+    init(directoryName: String = "", name: String = "",
+         stereo: Stereo = .init(volm: 1, pan: 0),
          size: Size = Size(width: 100, height: 100), origin: Point = Point(),
          isShownSpectrogram: Bool = false, timeOption: ContentTimeOption? = nil) {
+        
+        self.directoryName = directoryName
         self.name = name
-        url = URL.contents.appending(component: name)
+        url = URL.library
+            .appending(component: "sheets")
+            .appending(component: directoryName)
+            .appending(component: "contents")
+            .appending(component: name)
         type = Self.type(from: url)
         durSec = type.hasDur ? Self.durSec(from: url) : 0
         image = Image(url: url)
@@ -133,12 +143,6 @@ struct Content: Hashable, Codable {
         self.origin = origin
         self.isShownSpectrogram = isShownSpectrogram
         self.timeOption = timeOption
-        
-        if type.hasDur, let lufs = integratedLoudness, lufs > -14 {
-            let gain = Loudness.normalizeLoudnessScale(inputLoudness: lufs,
-                                                       targetLoudness: -14)
-            self.stereo.volm = Volm.volm(fromAmp: Volm.amp(fromVolm: stereo.volm) * gain)
-        }
     }
     
     static func durSec(from url: URL) -> Double {
@@ -148,6 +152,13 @@ struct Content: Hashable, Codable {
             Double(file.length) / file.fileFormat.sampleRate
         } else {
             0
+        }
+    }
+    mutating func normalizeVolm() {
+        if type.hasDur, let lufs = integratedLoudness, lufs > -14 {
+            let gain = Loudness.normalizeLoudnessScale(inputLoudness: lufs,
+                                                       targetLoudness: -14)
+            stereo.volm = Volm.volm(fromAmp: Volm.amp(fromVolm: stereo.volm) * gain)
         }
     }
 }
@@ -168,7 +179,8 @@ extension Content {
         if let timeOption {
             let sSec = Double(timeOption.sec(fromBeat: max(-timeOption.localStartBeat, 0)))
             let durSec = durSec
-            return sSec ..< min(sSec + .init(timeOption.secRange.length), durSec)
+            let eSec = min(sSec + .init(timeOption.secRange.length), durSec)
+            return sSec < eSec ? sSec ..< eSec : nil
         } else {
             return nil
         }
@@ -188,11 +200,20 @@ extension Content {
     var integratedLoudness: Double? {
         pcmBuffer?.integratedLoudness
     }
+    
+    func isEqualFile(_ other: Self) -> Bool {
+        directoryName == other.directoryName && name == other.name
+    }
 }
 extension Content: Protobuf {
     init(_ pb: PBContent) throws {
+        directoryName = pb.directoryName
         name = pb.name
-        url = URL.contents.appending(component: name)
+        url = URL.library
+            .appending(component: "sheets")
+            .appending(component: directoryName)
+            .appending(component: "contents")
+            .appending(component: name)
         type = Content.type(from: url)
         durSec = type.hasDur ? Content.durSec(from: url) : 0
         image = type == .image ? Image(url: url) : nil
@@ -210,6 +231,7 @@ extension Content: Protobuf {
     }
     var pb: PBContent {
         .with {
+            $0.directoryName = directoryName
             $0.name = name
             $0.stereo = stereo.pb
             $0.size = size.pb
@@ -233,41 +255,4 @@ extension Content {
         && lhs.timeOption == rhs.timeOption
         && lhs.id == rhs.id
     }
-}
-
-final class ContentPlayer {
-    var content: Content
-    private let player: AVAudioPlayer
-    init(_ content: Content) throws {
-        self.content = content
-        
-        player = try AVAudioPlayer(contentsOf: content.url)
-        if content.stereo.volm != 1 {
-            player.volume = Float(Volm.amp(fromVolm: content.stereo.volm))
-        }
-    }
-    deinit {
-        player.stop()
-    }
-    func play() {
-        player.play()
-    }
-    func stop() {
-        player.stop()
-    }
-    func play(atStartTime startTime: Rational, contentTime: Rational) {
-        self.startTime = startTime
-        self.contentTime = contentTime
-        self.time = Double(contentTime)
-        if startTime == 0 {
-            player.play()
-        } else {
-            player.play(atTime: player.deviceCurrentTime + Double(startTime))
-        }
-    }
-    var time: Double {
-        get { player.currentTime }
-        set { player.currentTime = newValue }
-    }
-    var startTime = Rational(0), contentTime = Rational(0)
 }

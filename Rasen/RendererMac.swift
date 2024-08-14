@@ -1551,7 +1551,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         menuEditor = Exporter(document)
         menuEditor?.send(event)
         menu.delegate = self
-        menu.addItem(SubNSMenuItem(title: "Import Document...".localized, closure: { [weak self] in
+        menu.addItem(SubNSMenuItem(title: "Import...".localized, closure: { [weak self] in
             guard let self else { return }
             let editor = Importer(self.document)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))

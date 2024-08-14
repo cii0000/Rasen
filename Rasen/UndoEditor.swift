@@ -637,6 +637,7 @@ final class HistoryCleaner: InputKeyEditor {
                         for (j, shp) in shps.enumerated() {
                             if let sheetView = self.document.sheetView(at: shp) {
                                 sheetView.clearHistory()
+                                self.document.clearContents(from: sheetView)
                             } else {
                                 self.document.removeUndo(at: shp)
                             }
@@ -692,6 +693,7 @@ final class HistoryCleaner: InputKeyEditor {
                 let ok: () -> () = {
                     if let sheetView = self.document.sheetView(at: shp) {
                         sheetView.clearHistory()
+                        self.document.clearContents(from: sheetView)
                     } else {
                         self.document.removeUndo(at: shp)
                     }

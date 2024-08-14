@@ -2481,6 +2481,16 @@ final class CopyEditor: Editor {
             let scale = firstScale / document.worldToScreenScale
             let nnp = content.origin * scale + sheetP
             
+            if !sheetView.contentsView.model.contains(where: { $0.isEqualFile(content) }) {
+                if let directory = document.sheetRecorders[sheetView.id]?.contentsDirectory {
+                    directory.isWillwrite = true
+                    try? directory.write()
+                    try? directory.copy(name: content.name, from: content.url)
+                }
+            }
+            
+            content.directoryName = sheetView.id.uuidString
+            
             if content.type.hasDur, var timeOption = content.timeOption {
                 let tempo = sheetView.nearestTempo(at: sheetP) ?? timeOption.tempo
                 let interval = document.currentBeatInterval
@@ -2510,7 +2520,11 @@ final class CopyEditor: Editor {
             let sheetP = sheetView.convertFromWorld(p)
             
             let name = UUID().uuidString + ".tiff"
-            try? image.write(.tiff, to: document.contentsDirectory.url.appending(component: name))
+            if let directory = document.sheetRecorders[sheetView.id]?.contentsDirectory {
+                directory.isWillwrite = true
+                try? directory.write()
+                try? directory.write(image, .tiff, name: name)
+            }
             
             let scale = firstScale / document.worldToScreenScale
             let log10Scale: Double = .log10(document.worldToScreenScale)
@@ -2518,7 +2532,7 @@ final class CopyEditor: Editor {
             let decimalPlaces = Int(clipScale + 2)
             let nnp = sheetP.rounded(decimalPlaces: decimalPlaces)
             
-            var content = Content(name: name, origin: nnp)
+            var content = Content(directoryName: sheetView.id.uuidString, name: name, origin: nnp)
             if let size = content.image?.size {
                 var size = size / 2
                 if size.width > Sheet.width || size.height > Sheet.height {

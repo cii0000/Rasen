@@ -942,14 +942,20 @@ final class IOEditor: Editor {
                     let filename = url.deletingPathExtension().lastPathComponent
                     let name = UUID().uuidString + "." + url.pathExtension
                     
-                    try? document.contentsDirectory.copy(name: name, from: url)
+                    if let directory = document.sheetRecorders[sheetView.id]?.contentsDirectory {
+                        directory.isWillwrite = true
+                        try? directory.write()
+                        try? directory.copy(name: name, from: url)
+                    }
                     
                     let log10Scale: Double = .log10(document.worldToScreenScale)
                     let clipScale = max(0.0, log10Scale)
                     let decimalPlaces = Int(clipScale + 2)
                     let nnp = np.rounded(decimalPlaces: decimalPlaces)
                     
-                    var content = Content(name: name, origin: nnp)
+                    var content = Content(directoryName: sheetView.id.uuidString,
+                                          name: name, origin: nnp)
+                    content.normalizeVolm()
                     if let size = content.image?.size {
                         var size = size / 2
                         if size.width > Sheet.width || size.height > Sheet.height {
@@ -2069,18 +2075,12 @@ final class IOEditor: Editor {
                 nDocument.world.sheetIDs[shp] = nsid
                 nDocument.world.sheetPositions[nsid] = shp
                 
-                nsrr.sheetRecord.data
-                    = osrr.sheetRecord.decodedData
-                nsrr.thumbnail4Record.data
-                    = osrr.thumbnail4Record.decodedData
-                nsrr.thumbnail16Record.data
-                    = osrr.thumbnail16Record.decodedData
-                nsrr.thumbnail64Record.data
-                    = osrr.thumbnail64Record.decodedData
-                nsrr.thumbnail256Record.data
-                    = osrr.thumbnail256Record.decodedData
-                nsrr.thumbnail1024Record.data
-                    = osrr.thumbnail1024Record.decodedData
+                nsrr.sheetRecord.data = osrr.sheetRecord.decodedData
+                nsrr.thumbnail4Record.data = osrr.thumbnail4Record.decodedData
+                nsrr.thumbnail16Record.data = osrr.thumbnail16Record.decodedData
+                nsrr.thumbnail64Record.data = osrr.thumbnail64Record.decodedData
+                nsrr.thumbnail256Record.data = osrr.thumbnail256Record.decodedData
+                nsrr.thumbnail1024Record.data = osrr.thumbnail1024Record.decodedData
                 nsrr.stringRecord.data = osrr.stringRecord.decodedData
                 nsrr.sheetRecord.isWillwrite = true
                 nsrr.thumbnail4Record.isWillwrite = true
@@ -2094,6 +2094,23 @@ final class IOEditor: Editor {
                     nsrr.sheetHistoryRecord.data
                         = osrr.sheetHistoryRecord.decodedData
                     nsrr.sheetHistoryRecord.isWillwrite = true
+                }
+                
+                if !osrr.contentsDirectory.childrenURLs.isEmpty {
+                    for (key, url) in osrr.contentsDirectory.childrenURLs {
+                        nsrr.contentsDirectory.isWillwrite = true
+                        try? nsrr.contentsDirectory.write()
+                        try? nsrr.contentsDirectory.copy(name: key, from: url)
+                    }
+                    if var sheet = nsrr.sheetRecord.decodedValue {
+                        if !sheet.contents.isEmpty {
+                            let dn = nsid.uuidString
+                            for i in sheet.contents.count.range {
+                                sheet.contents[i].directoryName = dn
+                            }
+                            nsrr.sheetRecord.value = sheet
+                        }
+                    }
                 }
                 
                 progressHandler(Double(i + 1) / Double(csv.sheetIDs.count + 1), &isStop)

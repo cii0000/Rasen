@@ -272,8 +272,14 @@ extension Directory {
     }
     
     func copy(name: String, from url: URL) throws {
-        try FileManager.default.copyItem(at: url,
-                                     to: self.url.appending(component: name))
+        let nURL = self.url.appending(component: name)
+        childrenURLs[name] = nURL
+        try FileManager.default.copyItem(at: url, to: nURL)
+    }
+    func write(_ image: Image, _ type: Image.FileType, name: String) throws {
+        let nURL = self.url.appending(component: name)
+        childrenURLs[name] = nURL
+        try image.write(type, to: nURL)
     }
     
     func remove(_ file: File) throws {
@@ -281,6 +287,12 @@ extension Directory {
         children[file.key] = nil
         file.parent = nil
         try FileManager.default.removeItem(at: file.url)
+    }
+    
+    func remove(from url: URL, key: String) throws {
+        childrenURLs[key] = nil
+        children[key] = nil
+        try FileManager.default.removeItem(at: url)
     }
 }
 

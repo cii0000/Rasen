@@ -1183,14 +1183,16 @@ final class SheetView: View {
                 rightTimeSliderRect(atSec: sec))
     }
     func leftTimeSliderRect(atSec sec: Rational) -> Rect {
-        let bt = Double(sec / model.allDurSec).clipped(min: 0, max: 1)
+        let allDurSec = model.allDurSec
+        let bt = allDurSec == 0 ? 0 : Double(sec / allDurSec).clipped(min: 0, max: 1)
         let knobW = 2.0, knobH = 6.0
         return Rect(x: bounds.width / 2 * bt,
                     y: 0,
                     width: knobW, height: knobH)
     }
     func rightTimeSliderRect(atSec sec: Rational) -> Rect {
-        let bt = Double(sec / model.allDurSec).clipped(min: 0, max: 1)
+        let allDurSec = model.allDurSec
+        let bt = allDurSec == 0 ? 0 : Double(sec / allDurSec).clipped(min: 0, max: 1)
         let knobW = 2.0, knobH = 6.0
         return Rect(x: bounds.midX + bounds.width / 2 * bt,
                     y: 0,

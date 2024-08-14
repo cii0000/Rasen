@@ -130,7 +130,7 @@
 "Export as Caption..." = "キャプションとして書き出す...";
 "Export as Document..." = "書類として書き出す...";
 "Export as Document with History..." = "履歴付き書類として書き出す...";
-"Import Document..." = "書類を読み込む...";
+"Import..." = "読み込む...";
 "Clear History..." = "履歴を消去...";
 "Show About Run" = "実行について表示";
 
@@ -196,7 +196,6 @@
 
 "About %@" = "%@について";
 "%@ Data" = "%@データ";
-"Show Imported Contents in Finder..." = "読み込んだコンテンツをファインダーで表示...";
 "Clear Root History..." = "全体履歴を消去...";
 "Replace..." = "置き換える...";
 "Export..." = "書き出す...";

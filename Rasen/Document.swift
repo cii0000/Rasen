@@ -515,9 +515,6 @@ final class Document {
             .makeDirectory(forKey: Document.sheetsDirectoryKey)
         sheetRecorders = Document.sheetRecorders(from: sheetsDirectory)
         
-        contentsDirectory = rootDirectory
-            .makeDirectory(forKey: Document.contentsDirectoryKey)
-        
         var baseThumbnailDatas = [SheetID: Texture.BytesData]()
         sheetRecorders.forEach {
             guard let data = $0.value.thumbnail4Record.decodedData else { return }
@@ -700,9 +697,6 @@ final class Document {
     
     static let sheetsDirectoryKey = "sheets"
     let sheetsDirectory: Directory
-    
-    static let contentsDirectoryKey = "contents"
-    let contentsDirectory: Directory
     
     var world = World() {
         didSet {
@@ -973,22 +967,6 @@ final class Document {
             }
         }
     }
-//    func resetAllContents(_ handler: (String) -> (Bool)) {
-//        var contentURLs = Set<URL>()
-//        for (i, v) in sheetRecorders.enumerated() {
-//            let (_, sheetRecorder) = v
-//            guard handler("\(i) / \(sheetRecorders.count - 1)") else { return }
-//            autoreleasepool {
-//                let record = sheetRecorder.sheetRecord
-//                guard let sheet = record.decodedValue else { return }
-//                for content in sheet.contents {
-//                    contentURLs.insert(content.url)
-//                }
-//            }
-//        }
-//        contentsDirectory.childrenURLs
-//        
-//    }
     func resetAllAnimationSheets(_ handler: (String) -> (Bool)) {
         for (i, v) in sheetRecorders.enumerated() {
             let (_, sheetRecorder) = v
@@ -1052,8 +1030,18 @@ final class Document {
             }
         }
         history.reset()
+        history.reset()
         worldHistoryRecord.value = history
         worldHistoryRecord.isWillwrite = true
+    }
+    
+    func clearContents(from sheetView: SheetView) {
+        if let directory = sheetRecorders[sheetView.id]?.contentsDirectory {
+            let nUrls = Set(sheetView.model.contents.map { $0.url })
+            directory.childrenURLs.filter { !nUrls.contains($0.value) }.forEach {
+                try? directory.remove(from: $0.value, key: $0.key)
+            }
+        }
     }
     
     static var defaultCursor = Cursor.drawLine
@@ -2233,6 +2221,9 @@ final class Document {
         static let sheetHistoryKey = "sheet_h.pb"
         let sheetHistoryRecord: Record<SheetHistory>
         
+        static let contentsDirectoryKey = "contents"
+        let contentsDirectory: Directory
+        
         static let thumbnail4Key = "t4.jpg"
         let thumbnail4Record: Record<Thumbnail>
         static let thumbnail16Key = "t16.jpg"
@@ -2275,6 +2266,7 @@ final class Document {
             self.directory = directory
             sheetRecord = directory.makeRecord(forKey: SheetRecorder.sheetKey)
             sheetHistoryRecord = directory.makeRecord(forKey: SheetRecorder.sheetHistoryKey)
+            contentsDirectory = directory.makeDirectory(forKey: SheetRecorder.contentsDirectoryKey)
             thumbnail4Record = directory.makeRecord(forKey: SheetRecorder.thumbnail4Key)
             thumbnail16Record = directory.makeRecord(forKey: SheetRecorder.thumbnail16Key)
             thumbnail64Record = directory.makeRecord(forKey: SheetRecorder.thumbnail64Key)
@@ -3131,22 +3123,31 @@ final class Document {
                 }
             }
         } else if let osrr = sheetRecorders[sid] {
-            nsrr.sheetRecord.data
-                = osrr.sheetRecord.valueDataOrDecodedData
-            nsrr.thumbnail4Record.data
-                = osrr.thumbnail4Record.valueDataOrDecodedData
-            nsrr.thumbnail16Record.data
-                = osrr.thumbnail16Record.valueDataOrDecodedData
-            nsrr.thumbnail64Record.data
-                = osrr.thumbnail64Record.valueDataOrDecodedData
-            nsrr.thumbnail256Record.data
-                = osrr.thumbnail256Record.valueDataOrDecodedData
-            nsrr.thumbnail1024Record.data
-                = osrr.thumbnail1024Record.valueDataOrDecodedData
-            nsrr.sheetHistoryRecord.data
-                = osrr.sheetHistoryRecord.valueDataOrDecodedData
-            nsrr.stringRecord.data
-                = osrr.stringRecord.valueDataOrDecodedData
+            nsrr.sheetRecord.data = osrr.sheetRecord.valueDataOrDecodedData
+            nsrr.thumbnail4Record.data = osrr.thumbnail4Record.valueDataOrDecodedData
+            nsrr.thumbnail16Record.data = osrr.thumbnail16Record.valueDataOrDecodedData
+            nsrr.thumbnail64Record.data = osrr.thumbnail64Record.valueDataOrDecodedData
+            nsrr.thumbnail256Record.data = osrr.thumbnail256Record.valueDataOrDecodedData
+            nsrr.thumbnail1024Record.data = osrr.thumbnail1024Record.valueDataOrDecodedData
+            nsrr.sheetHistoryRecord.data = osrr.sheetHistoryRecord.valueDataOrDecodedData
+            nsrr.stringRecord.data = osrr.stringRecord.valueDataOrDecodedData
+        }
+        
+        if let osrr = sheetRecorders[sid], !osrr.contentsDirectory.childrenURLs.isEmpty {
+            nsrr.contentsDirectory.isWillwrite = true
+            try? nsrr.contentsDirectory.write()
+            for (key, url) in osrr.contentsDirectory.childrenURLs {
+                try? nsrr.contentsDirectory.copy(name: key, from: url)
+            }
+            if var sheet = nsrr.sheetRecord.decodedValue {
+                if !sheet.contents.isEmpty {
+                    let dn = nsid.uuidString
+                    for i in sheet.contents.count.range {
+                        sheet.contents[i].directoryName = dn
+                    }
+                    nsrr.sheetRecord.data = try? sheet.serializedData()
+                }
+            }
         }
         nsrr.sheetRecord.isWillwrite = true
         nsrr.thumbnail4Record.isWillwrite = true
@@ -3162,22 +3163,31 @@ final class Document {
     func appendSheet(from osrr: SheetRecorder) -> SheetID {
         let nsid = SheetID()
         let nsrr = makeSheetRecorder(at: nsid)
-        nsrr.sheetRecord.data
-            = osrr.sheetRecord.valueDataOrDecodedData
-        nsrr.thumbnail4Record.data
-            = osrr.thumbnail4Record.valueDataOrDecodedData
-        nsrr.thumbnail16Record.data
-            = osrr.thumbnail16Record.valueDataOrDecodedData
-        nsrr.thumbnail64Record.data
-            = osrr.thumbnail64Record.valueDataOrDecodedData
-        nsrr.thumbnail256Record.data
-            = osrr.thumbnail256Record.valueDataOrDecodedData
-        nsrr.thumbnail1024Record.data
-            = osrr.thumbnail1024Record.valueDataOrDecodedData
-        nsrr.sheetHistoryRecord.data
-            = osrr.sheetHistoryRecord.valueDataOrDecodedData
-        nsrr.stringRecord.data
-            = osrr.stringRecord.valueDataOrDecodedData
+        nsrr.sheetRecord.data = osrr.sheetRecord.valueDataOrDecodedData
+        nsrr.thumbnail4Record.data = osrr.thumbnail4Record.valueDataOrDecodedData
+        nsrr.thumbnail16Record.data = osrr.thumbnail16Record.valueDataOrDecodedData
+        nsrr.thumbnail64Record.data = osrr.thumbnail64Record.valueDataOrDecodedData
+        nsrr.thumbnail256Record.data = osrr.thumbnail256Record.valueDataOrDecodedData
+        nsrr.thumbnail1024Record.data = osrr.thumbnail1024Record.valueDataOrDecodedData
+        nsrr.sheetHistoryRecord.data = osrr.sheetHistoryRecord.valueDataOrDecodedData
+        nsrr.stringRecord.data = osrr.stringRecord.valueDataOrDecodedData
+        
+        if !osrr.contentsDirectory.childrenURLs.isEmpty {
+            nsrr.contentsDirectory.isWillwrite = true
+            try? nsrr.contentsDirectory.write()
+            for (key, url) in osrr.contentsDirectory.childrenURLs {
+                try? nsrr.contentsDirectory.copy(name: key, from: url)
+            }
+            if var sheet = nsrr.sheetRecord.decodedValue {
+                if !sheet.contents.isEmpty {
+                    let dn = nsid.uuidString
+                    for i in sheet.contents.count.range {
+                        sheet.contents[i].directoryName = dn
+                    }
+                    nsrr.sheetRecord.data = try? sheet.serializedData()
+                }
+            }
+        }
         nsrr.sheetRecord.isWillwrite = true
         nsrr.thumbnail4Record.isWillwrite = true
         nsrr.thumbnail16Record.isWillwrite = true

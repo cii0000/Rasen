@@ -810,6 +810,11 @@ struct PBContent: @unchecked Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
+  var directoryName: String {
+    get {return _storage._directoryName}
+    set {_uniqueStorage()._directoryName = newValue}
+  }
+
   var name: String {
     get {return _storage._name}
     set {_uniqueStorage()._name = newValue}
@@ -4514,6 +4519,7 @@ extension PBStereo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationB
 extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBContent"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
+    9: .same(proto: "directoryName"),
     1: .same(proto: "name"),
     2: .same(proto: "stereo"),
     4: .same(proto: "size"),
@@ -4524,6 +4530,7 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
   ]
 
   fileprivate class _StorageClass {
+    var _directoryName: String = String()
     var _name: String = String()
     var _stereo: PBStereo? = nil
     var _size: PBSize? = nil
@@ -4545,6 +4552,7 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     private init() {}
 
     init(copying source: _StorageClass) {
+      _directoryName = source._directoryName
       _name = source._name
       _stereo = source._stereo
       _size = source._size
@@ -4589,6 +4597,7 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
           }
         }()
         case 8: try { try decoder.decodeSingularMessageField(value: &_storage._id) }()
+        case 9: try { try decoder.decodeSingularStringField(value: &_storage._directoryName) }()
         default: break
         }
       }
@@ -4622,6 +4631,9 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       try { if let v = _storage._id {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
       } }()
+      if !_storage._directoryName.isEmpty {
+        try visitor.visitSingularStringField(value: _storage._directoryName, fieldNumber: 9)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -4631,6 +4643,7 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
         let _storage = _args.0
         let rhs_storage = _args.1
+        if _storage._directoryName != rhs_storage._directoryName {return false}
         if _storage._name != rhs_storage._name {return false}
         if _storage._stereo != rhs_storage._stereo {return false}
         if _storage._size != rhs_storage._size {return false}
