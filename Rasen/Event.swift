@@ -325,7 +325,6 @@ extension Quasimode {
     
     static let lassoCut = Quasimode(modifier: [.command], .drag)
     static let selectByRange = Quasimode(modifier: [.shift, .command], .drag)
-    static let unselect = Quasimode(modifier: [.shift, .command], .click)
     
     static let changeLightness = Quasimode(modifier: [.option], .drag)
     static let changeTint = Quasimode(modifier: [.shift, .option], .drag)
@@ -335,38 +334,38 @@ extension Quasimode {
     static let movePreviousTime = Quasimode(modifier: [.control, .option], .z)
     static let moveNextTime = Quasimode(modifier: [.control, .option], .x)
     static let selectTime = Quasimode(modifier: [.control, .option], .drag)
-    static let slideLine = Quasimode(modifier: [.control, .option, .command], .drag)
-    static let slideLineZ = Quasimode(modifier: [.control, .command, .command], .drag)
+    
     static let slide = Quasimode(modifier: [.control], .drag)
-    static let selectMultiFrame = Quasimode(modifier: [.control, .shift, .command], .drag)
-    static let playDrag = Quasimode(.otherDrag)
-    static let play = Quasimode(modifier: [.control], .click)
-    static let controlPlay = Quasimode(.control)
-    static let addScore = Quasimode(modifier: [.command], .no3)
-    static let showTone = Quasimode(modifier: [.command], .click)
+    static let slideLine = Quasimode(modifier: [.control, .option, .command], .drag)
+    static let moveLineZ = Quasimode(modifier: [.control, .command], .drag)
     
     static let selectVersion = Quasimode(modifier: [.control, .shift], .drag)
     
-    static let zoom = Quasimode(.pinch)
-    static let rotate = Quasimode(.rotate)
-    static let scroll = Quasimode(.scroll)
+    static let play = Quasimode(modifier: [.control], .click)
+    static let otherDragPlay = Quasimode(.otherDrag)
+    static let controlPlay = Quasimode(.control)
+    static let showTone = Quasimode(modifier: [.command], .click)
+    static let run = Quasimode(.click)
+    static let openMenu = Quasimode(.subClick)
+    static let lookUp = Quasimode(.lookUpTap)
     
     static let inputCharacter = Quasimode(.keyInput)
     static let newWrap = Quasimode(modifier: [.shift], .enter)
     static let deleteWrap = Quasimode(modifier: [.shift], .delete)
-    static let lookUp = Quasimode(.lookUpTap)
-    static let run = Quasimode(.click)
-    static let openMenu = Quasimode(.subClick)
+    
+    static let zoom = Quasimode(.pinch)
+    static let rotate = Quasimode(.rotate)
+    static let scroll = Quasimode(.scroll)
     
     static let undo = Quasimode(modifier: [.command], .z)
     static let redo = Quasimode(modifier: [.shift, .command], .z)
     
     static let cut = Quasimode(modifier: [.command], .x)
     static let copy = Quasimode(modifier: [.command], .c)
-    static let paste = Quasimode(modifier: [.command], .v)
-    static let scalingPaste = Quasimode(modifier: [.command], .vPinch)
     static let copyLineColor = Quasimode(modifier: [.option, .command], .c)
     static let copyTone = Quasimode(modifier: [.shift, .command], .c)
+    static let paste = Quasimode(modifier: [.command], .v)
+    static let scalingPaste = Quasimode(modifier: [.command], .vPinch)
     
     static let find = Quasimode(modifier: [.command], .f)
     
@@ -383,7 +382,7 @@ extension Quasimode {
     static let changeToHorizontalText = Quasimode(modifier: [.command, .shift], .l)
     
     static let insertKeyframe = Quasimode(modifier: [.command], .e)
-    static let cutKeyframe = Quasimode(modifier: [.command, .shift], .e)
+    static let addScore = Quasimode(modifier: [.command, .shift], .e)
     
     static let interpolate = Quasimode(modifier: [.command], .s)
     static let crossErase = Quasimode(modifier: [.shift, .command], .s)

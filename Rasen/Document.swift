@@ -946,7 +946,8 @@ final class Document {
                                                record: record)
                 let sheetView = SheetView(binder: sheetBinder,
                                           keyPath: \SheetBinder.value)
-                sheetView.bounds = sheetFrame(with: shp)
+                let frame = self.sheetFrame(with: shp)
+                sheetView.bounds = Rect(size: frame.size)
                 sheetView.node.allChildrenAndSelf { $0.updateDatas() }
                 
                 makeThumbnailRecord(at: sheetID, with: sheetView)
@@ -1813,7 +1814,8 @@ final class Document {
                                                                record: record)
                                 let sheetView = SheetView(binder: sheetBinder,
                                                             keyPath: \SheetBinder.value)
-                                sheetView.bounds = self.sheetFrame(with: shp)
+                                let frame = self.sheetFrame(with: shp)
+                                sheetView.bounds = Rect(size: frame.size)
                                 sheetView.node.allChildrenAndSelf { $0.updateDatas() }
                                 
                                 if make(sheetView) {
@@ -2520,7 +2522,7 @@ final class Document {
         let p = convertScreenToWorld(sp)
         guard let sheetView = sheetView(at: p) else { return false }
         let inP = sheetView.convertFromWorld(p)
-        return sheetView.animationView.containsTimeline(inP)
+        return sheetView.animationView.containsTimeline(inP, scale: screenToWorldScale)
         || sheetView.containsOtherTimeline(inP, scale: screenToWorldScale)
     }
     func isPlaying(with event: Event) -> Bool {
@@ -3911,7 +3913,7 @@ final class Document {
         case .slide: Slider(self)
         case .selectTime: FrameSelecter(self)
         case .slideLine: LineSlider(self)
-        case .slideLineZ: LineZSlider(self)
+        case .moveLineZ: LineZSlider(self)
         case .selectVersion: VersionSelector(self)
         default: nil
         }
@@ -4033,10 +4035,8 @@ final class Document {
         case .lookUp: Looker(self)
         case .changeToVerticalText: VerticalTextChanger(self)
         case .changeToHorizontalText: HorizontalTextChanger(self)
-        case .changeToSuperscript:
-            System.isVersion3 ? SuperscriptChanger(self) : nil
-        case .changeToSubscript:
-            System.isVersion3 ? SubscriptChanger(self) : nil
+        case .changeToSuperscript: System.isVersion3 ? SuperscriptChanger(self) : nil
+        case .changeToSubscript: System.isVersion3 ? SubscriptChanger(self) : nil
         case .run: Runner(self)
         case .changeToDraft: DraftChanger(self)
         case .cutDraft: DraftCutter(self)
@@ -4048,10 +4048,9 @@ final class Document {
         case .movePreviousTime: TimePreviousMover(self)
         case .moveNextTime: TimeNextMover(self)
         case .insertKeyframe: KeyframeInserter(self)
-        case .cutKeyframe: KeyframeCutter(self)
+        case .addScore: ScoreAdder(self)
         case .interpolate: Interpolater(self)
         case .crossErase: CrossEraser(self)
-        case .addScore: ScoreAdder(self)
         case .showTone: ToneShower(self)
         default: nil
         }

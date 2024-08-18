@@ -667,7 +667,7 @@ final class CopyEditor: Editor {
         let d = 5 / document.worldToScreenScale
         
         if let sheetView = document.sheetView(at: p),
-           sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p)),
+           sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p), scale: document.screenToWorldScale),
            let ki = sheetView.animationView.keyframeIndex(at: sheetView.convertFromWorld(p)) {
             
             let animationView = sheetView.animationView
@@ -827,8 +827,8 @@ final class CopyEditor: Editor {
             }
             return true
         } else if let sheetView = document.sheetView(at: p),
-                  let (_, textView) = sheetView.textIndexAndView(at: sheetView.convertFromWorld(p)),
-                  textView.containsTimeline(textView.convertFromWorld(p)),
+                  let (_, textView) = sheetView.textIndexAndView(at: sheetView.convertFromWorld(p), scale: document.screenToWorldScale),
+                  textView.containsTimeline(textView.convertFromWorld(p), scale: document.screenToWorldScale),
                   let beatRange = textView.beatRange, let tf = textView.timelineFrame {
             
             if isSendPasteboard {
@@ -871,7 +871,7 @@ final class CopyEditor: Editor {
                                                   scale: document.screenToWorldScale) {
             let contentView = sheetView.contentsView.elementViews[ci]
             let contentP = contentView.convertFromWorld(p)
-            if contentView.containsTimeline(contentP),
+            if contentView.containsTimeline(contentP, scale: document.screenToWorldScale),
                let beatRange = contentView.beatRange, let tf = contentView.timelineFrame {
                 
                 if isSendPasteboard {
@@ -1007,7 +1007,7 @@ final class CopyEditor: Editor {
         let d = 5 / document.worldToScreenScale
         
         if let sheetView = document.sheetView(at: p),
-           sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p)),
+           sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p), scale: document.screenToWorldScale),
            let ki = sheetView.animationView.keyframeIndex(at: sheetView.convertFromWorld(p)) {
             
             let animationView = sheetView.animationView
@@ -1176,8 +1176,8 @@ final class CopyEditor: Editor {
             sheetView.removeText(at: ti)
             return true
         } else if let sheetView = document.sheetView(at: p),
-                  let (ti, textView) = sheetView.textIndexAndView(at: sheetView.convertFromWorld(p)),
-                  textView.containsTimeline(textView.convertFromWorld(p)),
+                  let (ti, textView) = sheetView.textIndexAndView(at: sheetView.convertFromWorld(p), scale: document.screenToWorldScale),
+                  textView.containsTimeline(textView.convertFromWorld(p), scale: document.screenToWorldScale),
                   let beatRange = textView.beatRange {
                 
             Pasteboard.shared.copiedObjects = [.beatRange(beatRange)]
@@ -1191,7 +1191,7 @@ final class CopyEditor: Editor {
         } else if let sheetView = document.sheetView(at: p),
                   let (ci, contentView) = sheetView.contentIndexAndView(at: sheetView.convertFromWorld(p),
                                                                         scale: document.screenToWorldScale) {
-            if contentView.containsTimeline(contentView.convertFromWorld(p)),
+            if contentView.containsTimeline(contentView.convertFromWorld(p), scale: document.screenToWorldScale),
                let beatRange = contentView.beatRange, !contentView.model.type.isAudio {
                 
                 Pasteboard.shared.copiedObjects = [.beatRange(beatRange)]
@@ -2577,7 +2577,7 @@ final class CopyEditor: Editor {
                 }
                 sheetView.newUndoGroup()
                 sheetView.replace(content, at: ci)
-            } else if let ti = sheetView.textIndex(at: sheetP) {
+            } else if let ti = sheetView.textIndex(at: sheetP, scale: document.screenToWorldScale) {
                 var text = sheetView.model.texts[ti]
                 let beatRange = Range(start: sheetView.animationView.beat(atX: text.origin.x),
                                       length: beatRange.length)

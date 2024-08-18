@@ -157,7 +157,7 @@ final class ContentSlider: DragEditor {
 }
 
 struct ContentLayout {
-    static let spectrogramX = 10.0, isShownSpectrogramHeight = 4.0
+    static let spectrogramX = 10.0, isShownSpectrogramHeight = 6.0
 }
 
 final class ContentView<T: BinderProtocol>: SpectrgramView {
@@ -190,12 +190,12 @@ final class ContentView<T: BinderProtocol>: SpectrgramView {
         }
     }
     func updateFromPeakVolm() {
-        guard let node = currentPeakVolmNode,
-              let frame = timelineFrame else { return }
-        let y = frame.height * peakVolm
+        guard let node = currentPeakVolmNode, let frame = timelineFrame else { return }
+        let y = isShownSpectrogram ? frame.height + Self.spectrogramHeight + ContentLayout.isShownSpectrogramHeight : frame.height
         node.path = Path([Point(), Point(0, y)])
         if peakVolm < Audio.headroomVolm {
-            node.lineType = .color(.background)
+            node.lineType = .color(Color(lightness: (1 - peakVolm) * 100))
+//            currentPeakVolmNode.lineType = .color(.background)
         } else {
             node.lineType = .color(.warning)
         }
@@ -268,7 +268,7 @@ extension ContentView {
             timelineNode.children = self.timelineNode(with: model)
             
             let timeNode = Node(lineWidth: 3, lineType: .color(.content))
-            let volmNode = Node(lineWidth: 1, lineType: .color(.background))
+            let volmNode = Node(lineWidth: 2, lineType: .color(.background))
             timeNode.append(child: volmNode)
             timelineNode.children.append(timeNode)
             self.timeNode = timeNode
@@ -473,17 +473,17 @@ extension ContentView {
             let sprKnobW = knobH, sprKbobH = knobW
             let np = Point(ContentLayout.spectrogramX + sx, ey)
             contentPathlines.append(Pathline(Rect(x: np.x - 1 / 2,
-                                                  y: np.y,
+                                                  y: np.y + 1,
                                                   width: 1,
-                                                  height: sprH)))
+                                                  height: sprH - 2)))
             if content.isShownSpectrogram {
                 contentPathlines.append(Pathline(Rect(x: np.x - sprKnobW / 2,
-                                                      y: np.y + sprH - sprKbobH / 2,
+                                                      y: np.y + sprH - 1 - sprKbobH / 2,
                                                       width: sprKnobW,
                                                       height: sprKbobH)))
             } else {
                 contentPathlines.append(Pathline(Rect(x: np.x - sprKnobW / 2,
-                                                      y: np.y - sprKbobH / 2,
+                                                      y: np.y + 1 - sprKbobH / 2,
                                                       width: sprKnobW,
                                                       height: sprKbobH)))
             }
@@ -608,7 +608,7 @@ extension ContentView {
         if let timeNode = timeNode, let frame = timelineFrame {
             let x = self.x(atSec: sec)
             if x >= frame.minX && x < frame.maxX {
-                timeNode.path = Path([Point(), Point(0, frame.height)])
+                timeNode.path = Path([Point(), Point(0, isShownSpectrogram ? frame.height + Self.spectrogramHeight + ContentLayout.isShownSpectrogramHeight : frame.height)])
                 timeNode.attitude.position = Point(x, frame.minY)
                 updateFromPeakVolm()
             } else {
@@ -658,8 +658,8 @@ extension ContentView {
         model.imageFrame?.bounds
     }
     
-    func containsTimeline(_ p : Point) -> Bool {
-        timelineFrame?.contains(p) ?? false
+    func containsTimeline(_ p : Point, scale: Double) -> Bool {
+        timelineFrame?.outset(by: 3 * scale).contains(p) ?? false
     }
     var timelineFrame: Rect? {
         guard let timeOption = model.timeOption else { return nil }
@@ -667,7 +667,7 @@ extension ContentView {
         let ex = x(atBeat: timeOption.beatRange.end)
         let thh = Sheet.timelineHalfHeight
         return Rect(x: sx, y: model.type.hasDur ? -thh : -thh * 2,
-                    width: ex - sx, height: thh * 2).outset(by: 3)
+                    width: ex - sx, height: thh * 2)
     }
     var transformedTimelineFrame: Rect? {
         if var f = timelineFrame {
@@ -679,11 +679,11 @@ extension ContentView {
     }
     
     func containsIsShownSpectrogram(_ p: Point, scale: Double) -> Bool {
-        if let timelineFrame {
-            Rect(x: timelineFrame.minX + ContentLayout.spectrogramX - Sheet.knobHeight / 2,
-                 y: Sheet.timelineHalfHeight - Sheet.knobWidth / 2,
+        if let timeOption = model.timeOption {
+            Rect(x: x(atBeat: timeOption.beatRange.start) + ContentLayout.spectrogramX - Sheet.knobHeight / 2,
+                 y: Sheet.timelineHalfHeight,
                  width: Sheet.knobHeight,
-                 height: ContentLayout.isShownSpectrogramHeight + Sheet.knobWidth)
+                 height: ContentLayout.isShownSpectrogramHeight)
             .outset(by: scale * 3)
             .contains(p)
         } else {
@@ -693,7 +693,7 @@ extension ContentView {
     
     func contains(_ p: Point, scale: Double) -> Bool {
         containsContent(p)
-        || containsTimeline(p)
+        || containsTimeline(p, scale: scale)
         || containsIsShownSpectrogram(p, scale: scale)
     }
     

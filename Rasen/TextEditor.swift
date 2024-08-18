@@ -47,7 +47,8 @@ final class TextSlider: DragEditor {
             document.cursor = .arrow
             
             if let sheetView = document.sheetView(at: p),
-                let ci = sheetView.textIndex(at: sheetView.convertFromWorld(p)) {
+               let ci = sheetView.textIndex(at: sheetView.convertFromWorld(p),
+                                            scale: document.screenToWorldScale) {
                 
                 let sheetP = sheetView.convertFromWorld(p)
                 let textView = sheetView.textsView.elementViews[ci]
@@ -1736,8 +1737,8 @@ extension TextView {
         }
     }
     
-    func containsTimeline(_ p : Point) -> Bool {
-        timelineFrame?.contains(p) ?? false
+    func containsTimeline(_ p : Point, scale: Double) -> Bool {
+        timelineFrame?.outset(by: 3 * scale).contains(p) ?? false
     }
     var timelineFrame: Rect? {
         guard let timeOption = model.timeOption else { return nil }
@@ -1745,7 +1746,7 @@ extension TextView {
         let ex = x(atBeat: timeOption.beatRange.end)
         let y = typesetter.firstReturnBounds?.minY ?? 0
         return Rect(x: sx, y: y,
-                    width: ex - sx, height: Sheet.timelineHalfHeight * 2).outset(by: 3)
+                    width: ex - sx, height: Sheet.timelineHalfHeight * 2)
     }
     var transformedTimelineFrame: Rect? {
         if var f = timelineFrame {
@@ -1756,8 +1757,8 @@ extension TextView {
         }
     }
     
-    func contains(_ p: Point) -> Bool {
-        containsTimeline(p)
+    func contains(_ p: Point, scale: Double) -> Bool {
+        containsTimeline(p, scale: scale)
         || (bounds?.contains(p) ?? false)
     }
     

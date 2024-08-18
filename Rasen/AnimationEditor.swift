@@ -788,7 +788,7 @@ final class Player: InputKeyEditor {
                             sec = score.sec(fromBeat: beat)
                             secRange = score.secRange
                             ids.insert(scoreNoder.id)
-                        } else if scoreView.containsMainLine(scoreP, distance: 5 * document.screenToWorldScale) {
+                        } else if scoreView.containsMainLine(scoreP, scale: document.screenToWorldScale) {
                             ids.insert(scoreNoder.id)
                         }
                         if secRange != nil {
@@ -886,7 +886,7 @@ final class FrameSlideEditor: Editor {
         case .began:
             document.cursor = .arrow
             if let sheetView = document.sheetView(at: p),
-               sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p)) {
+               sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p), scale: document.screenToWorldScale) {
                 
                 self.sheetView = sheetView
                 let animationView = sheetView.animationView
@@ -1165,7 +1165,7 @@ final class AnimationSlider: DragEditor {
                 beganSheetP = inP
                 beganTimelineX = sheetView.animationView
                     .x(atBeat: sheetView.animationView.model.beatRange.start)
-                if sheetView.animationView.containsTimeline(inP) {
+                if sheetView.animationView.containsTimeline(inP, scale: document.screenToWorldScale) {
                     let animationView = sheetView.animationView
                     
                     if animationView.isEndBeat(at: inP, scale: document.screenToWorldScale) {
@@ -1808,15 +1808,13 @@ final class Slider: DragEditor {
                 } else if let ci = sheetView.contentIndex(at: inP, scale: document.screenToWorldScale),
                           sheetView.model.contents[ci].timeOption != nil {
                     type = .content(ContentSlider(document))
-                } else if let ti = sheetView.textIndex(at: inP),
+                } else if let ti = sheetView.textIndex(at: inP, scale: document.screenToWorldScale),
                            sheetView.model.texts[ti].timeOption != nil {
                     type = .text(TextSlider(document))
-                } else if sheetView.scoreView.containsTimeline(inP) 
-                            || sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
-                                                             scale: document.screenToWorldScale,
-                                                             enabledRelease: true) != nil {
+                } else if sheetView.scoreView.contains(sheetView.scoreView.convertFromWorld(p),
+                                                       scale: document.screenToWorldScale) {
                     type = .score(ScoreSlider(document))
-                } else if sheetView.animationView.containsTimeline(inP) {
+                } else if sheetView.animationView.containsTimeline(inP, scale: document.screenToWorldScale) {
                     type = .animation(AnimationSlider(document))
                 } else {
                     type = .keyframe(KeyframeSlider(document))
@@ -1872,7 +1870,7 @@ final class KeyframeInserter: InputKeyEditor {
                 let inP = sheetView.convertFromWorld(p)
                 
                 let animationView = sheetView.animationView
-                if animationView.containsTimeline(inP),
+                if animationView.containsTimeline(inP, scale: document.screenToWorldScale),
                    let i = animationView
                        .slidableKeyframeIndex(at: inP,
                                               maxDistance: document.worldKnobEditDistance,
@@ -1908,7 +1906,7 @@ final class KeyframeInserter: InputKeyEditor {
                     sheetView.rootBeat = animationView.model.localDurBeat * count + beat
                     document.updateEditorNode()
                     document.updateSelects()
-                } else if sheetView.animationView.containsTimeline(inP) {
+                } else if sheetView.animationView.containsTimeline(inP, scale: document.screenToWorldScale) {
                     sheetView.selectedFrameIndexes = []
                     
                     let animationView = sheetView.animationView
@@ -2032,7 +2030,7 @@ final class KeyframeInserter: InputKeyEditor {
                                 sheetView.updatePlaying()
                             }
                         }
-                    } else if scoreView.containsTimeline(scoreP) {
+                    } else if scoreView.containsTimeline(scoreP, scale: document.screenToWorldScale) {
                         let interval = document.currentBeatInterval
                         let beat = scoreView.beat(atX: inP.x, interval: interval)
                         var option = scoreView.model.option
@@ -2054,7 +2052,7 @@ final class KeyframeInserter: InputKeyEditor {
                         
                         sheetView.updatePlaying()
                     }
-                } else if let ti = sheetView.textIndex(at: inP) {
+                } else if let ti = sheetView.textIndex(at: inP, scale: document.screenToWorldScale) {
                     let textView = sheetView.textsView.elementViews[ti]
                     if textView.model.timeOption == nil {
                         var text = textView.model
@@ -2078,39 +2076,6 @@ final class KeyframeInserter: InputKeyEditor {
                 document.updateEditorNode()
                 document.updateSelects()
             }
-        case .changed:
-            break
-        case .ended:
-            linesNode.removeFromParent()
-            
-            document.cursor = Document.defaultCursor
-        }
-    }
-}
-
-final class KeyframeCutter: InputKeyEditor {
-    let document: Document
-    let isEditingSheet: Bool
-    
-    init(_ document: Document) {
-        self.document = document
-        isEditingSheet = document.isEditingSheet
-    }
-    
-    private var linesNode = Node()
-    
-    func send(_ event: InputKeyEvent) {
-        guard isEditingSheet else {
-            document.stop(with: event)
-            return
-        }
-        if document.isPlaying(with: event) {
-            document.stopPlaying(with: event)
-        }
-        switch event.phase {
-        case .began:
-            document.cursor = .arrow
-            
         case .changed:
             break
         case .ended:

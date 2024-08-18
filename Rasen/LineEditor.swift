@@ -32,7 +32,8 @@ final class RangeSelector: DragEditor {
         switch event.phase {
         case .began:
             if let sheetView = document.sheetView(at: p),
-               sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p)) {
+               sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p),
+                                                        scale: document.screenToWorldScale) {
                 
                 multiFrameSlider = MultiFrameSlider(document)
                 multiFrameSlider?.send(event)

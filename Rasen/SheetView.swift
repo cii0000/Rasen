@@ -505,7 +505,7 @@ final class AnimationView: TimelineView {
         node.children = [keyframeView.node]
     }
     
-    func containsTimeline(_ p: Point) -> Bool {
+    func containsTimeline(_ p: Point, scale: Double) -> Bool {
         model.enabled ? (transformedPaddingTimelineBounds?.contains(p) ?? false) : false
     }
     var transformedPaddingTimelineBounds: Rect? {
@@ -1276,7 +1276,7 @@ final class SheetView: View {
                 scoreView.timeNode.lineType = .color(.content)
                 scoreView.updateTimeNode(atSec: sec)
                 scoreView.peakVolm = 0
-                scoreView.timeNode.lineWidth = isPlaying ? 4 : 1
+                scoreView.timeNode.lineWidth = isPlaying ? 3 : 1
                 scoreView.timeNode.isHidden = false
             } else {
                 scoreView.timeNode.isHidden = true
@@ -1439,16 +1439,16 @@ final class SheetView: View {
     
     func containsOtherTimeline(_ p: Point, scale: Double) -> Bool {
         if scoreView.containsMainFrame(scoreView.convert(p, from: node))
-            || scoreView.containsTimeline(scoreView.convert(p, from: node)) {
+            || scoreView.containsTimeline(scoreView.convert(p, from: node), scale: scale) {
             return true
         }
         for view in contentsView.elementViews {
-            if view.containsTimeline(view.convert(p, from: node)) {
+            if view.containsTimeline(view.convert(p, from: node), scale: scale) {
                 return true
             }
         }
         for view in textsView.elementViews {
-            if view.containsTimeline(view.convert(p, from: node)) {
+            if view.containsTimeline(view.convert(p, from: node), scale: scale) {
                 return true
             }
         }
@@ -1470,16 +1470,16 @@ final class SheetView: View {
             nil
         }
     }
-    func textIndex(at p: Point) -> Int? {
+    func textIndex(at p: Point, scale: Double) -> Int? {
         for (i, view) in textsView.elementViews.enumerated().reversed() {
-            if view.contains(view.convert(p, from: node)) {
+            if view.contains(view.convert(p, from: node), scale: scale) {
                 return i
             }
         }
         return nil
     }
-    func textIndexAndView(at p: Point) -> (Int, SheetTextView)? {
-        if let ti = textIndex(at: p) {
+    func textIndexAndView(at p: Point, scale: Double) -> (Int, SheetTextView)? {
+        if let ti = textIndex(at: p, scale: scale) {
             (ti, textsView.elementViews[ti])
         } else {
             nil

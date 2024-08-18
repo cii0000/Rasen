@@ -288,7 +288,7 @@ final class DraftEditor: Editor {
                             sheetView.changeToDraft(withNoteInexes: nis)
                             document.updateSelects()
                         }
-                    } else if sheetView.animationView.containsTimeline(inP),
+                    } else if sheetView.animationView.containsTimeline(inP, scale: document.screenToWorldScale),
                        let ki = sheetView.animationView.keyframeIndex(at: inP) {
                         
                         let animationView = sheetView.animationView
@@ -400,7 +400,7 @@ final class DraftEditor: Editor {
                             
                             Pasteboard.shared.copiedObjects = [.notesValue(.init(notes: notes))]//
                         }
-                    } else if sheetView.animationView.containsTimeline(inP),
+                    } else if sheetView.animationView.containsTimeline(inP, scale: document.screenToWorldScale),
                        let ki = sheetView.animationView.keyframeIndex(at: inP) {
                         
                         let animationView = sheetView.animationView

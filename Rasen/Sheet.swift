@@ -1652,7 +1652,7 @@ extension AnimationZipper: Protobuf {
 struct Animation {
     static let defaultDurBeat = Music.defaultDurBeat
     static let defaultBeatRange = 0 ..< defaultDurBeat
-    static let timelineY = 15.0
+    static let timelineY = 16.0
     
     var keyframes = [Keyframe]()
 

@@ -34,7 +34,7 @@ protocol TimelineView: View, TempoType {
     func sec(atX x: Double) -> Rational
     var origin: Point { get }
     var frameRate: Int { get }
-    func containsTimeline(_ p: Point) -> Bool
+    func containsTimeline(_ p: Point, scale: Double) -> Bool
     var timeLineCenterY: Double { get }
     var beatRange: Range<Rational>? { get }
     var localBeatRange: Range<Rational>? { get }
@@ -107,9 +107,9 @@ extension TimelineView {
     func mainLineDistance(_ p: Point) -> Double {
         abs(p.y - timeLineCenterY)
     }
-    func containsMainLine(_ p: Point, distance: Double) -> Bool {
-        guard containsTimeline(p) else { return false }
-        return mainLineDistance(p) < distance
+    func containsMainLine(_ p: Point, scale: Double) -> Bool {
+        guard containsTimeline(p, scale: scale) else { return false }
+        return mainLineDistance(p) < 5 * scale
     }
 }
 protocol SpectrgramView: TimelineView {
@@ -424,13 +424,15 @@ final class ScoreSlider: DragEditor {
                     case nil:
                         let nsx = scoreView.x(atBeat: note.beatRange.start)
                         let nex = scoreView.x(atBeat: note.beatRange.end)
+                        let nsy = scoreView.noteY(atBeat: note.beatRange.start, from: note)
+                        let ney = scoreView.noteY(atBeat: note.beatRange.end, from: note)
                         let nfsw = (nex - nsx) * document.worldToScreenScale
                         let dx = nfsw.clipped(min: 3, max: 30, newMin: 1, newMax: 10)
                         * document.screenToWorldScale
                         
-                        type = if scoreP.x - nsx < dx {
+                        type = if scoreP.x - nsx < dx && abs(scoreP.y - nsy) < dx {
                             .startNoteBeat
-                        } else if scoreP.x - nex > -dx {
+                        } else if scoreP.x - nex > -dx && abs(scoreP.y - ney) < dx {
                             .endNoteBeat
                         } else {
                             .note
@@ -874,6 +876,7 @@ struct ScoreLayout {
     static let toneColorY = 2.0
     static let tonePadding = 4.0
     static let spectlopeHeight = 20.0
+    static let isShownSpectrogramHeight = 6.0
 }
 
 final class ScoreView: TimelineView {
@@ -898,8 +901,8 @@ final class ScoreView: TimelineView {
         }
     }
     
-    let currentPeakVolmNode = Node(lineWidth: 3, lineType: .color(.background))
-    let timeNode = Node(lineWidth: 4, lineType: .color(.content))
+    let currentPeakVolmNode = Node(lineWidth: 2, lineType: .color(.background))
+    let timeNode = Node(lineWidth: 3, lineType: .color(.content))
     
     var peakVolm = 0.0 {
         didSet {
@@ -909,8 +912,7 @@ final class ScoreView: TimelineView {
     }
     func updateFromPeakVolm() {
         let frame = mainFrame
-        let y = frame.height// * volm
-        currentPeakVolmNode.path = Path([Point(), Point(0, y)])
+        currentPeakVolmNode.path = Path([Point(), Point(0, frame.maxY - timelineFrame.minY)])
         if peakVolm < Audio.headroomVolm {
             currentPeakVolmNode.lineType = .color(Color(lightness: (1 - peakVolm) * 100))
 //            currentPeakVolmNode.lineType = .color(.background)
@@ -1071,7 +1073,7 @@ extension ScoreView {
     }
     
     var pitchStartY: Double {
-        32
+        timeLineCenterY + Sheet.timelineHalfHeight + ScoreLayout.isShownSpectrogramHeight
     }
     func pitch(atY y: Double, interval: Rational) -> Rational {
         Rational((y - pitchStartY) / pitchHeight, intervalScale: interval)
@@ -1303,17 +1305,17 @@ extension ScoreView {
         let sprKnobW = knobH, sprKbobH = knobW
         let np = Point(ContentLayout.spectrogramX + sx, ey)
         contentPathlines.append(Pathline(Rect(x: np.x - 1 / 2,
-                                              y: np.y,
+                                              y: np.y + 1,
                                               width: 1,
-                                              height: sprH)))
+                                              height: sprH - 2)))
         if score.isShownSpectrogram {
             contentPathlines.append(Pathline(Rect(x: np.x - sprKnobW / 2,
-                                                  y: np.y + sprH - sprKbobH / 2,
+                                                  y: np.y + sprH - 1 - sprKbobH / 2,
                                                   width: sprKnobW,
                                                   height: sprKbobH)))
         } else {
             contentPathlines.append(Pathline(Rect(x: np.x - sprKnobW / 2,
-                                                  y: np.y - sprKbobH / 2,
+                                                  y: np.y + 1 - sprKbobH / 2,
                                                   width: sprKnobW,
                                                   height: sprKbobH)))
         }
@@ -2108,8 +2110,8 @@ extension ScoreView {
             let frame = mainFrame
             let x = self.x(atSec: sec)
             if x >= frame.minX && x < frame.maxX {
-                timeNode.path = Path([Point(), Point(0, frame.height)])
-                timeNode.attitude.position = Point(x, frame.minY)
+                timeNode.path = Path([Point(), Point(0, frame.maxY - timelineFrame.minY)])
+                timeNode.attitude.position = Point(x, timelineFrame.minY)
                 updateFromPeakVolm()
             } else {
                 timeNode.path = Path()
@@ -2132,24 +2134,29 @@ extension ScoreView {
         }
     }
     
+    func contains(_ p : Point, scale: Double) -> Bool {
+        containsTimeline(p, scale: scale)
+        || containsIsShownSpectrogram(p, scale: scale)
+        || noteIndex(at: p, scale: scale, enabledRelease: true) != nil
+    }
     func containsMainFrame(_ p: Point) -> Bool {
         model.enabled ? mainFrame.contains(p) : false
     }
-    func containsTimeline(_ p : Point) -> Bool {
-        model.enabled ? timelineFrame.contains(p) : false
+    func containsTimeline(_ p : Point, scale: Double) -> Bool {
+        model.enabled ? timelineFrame.outset(by: 3 * scale).contains(p) : false
     }
     var timelineFrame: Rect {
         let sx = self.x(atBeat: model.beatRange.start)
         let ex = self.x(atBeat: model.beatRange.end)
         return Rect(x: sx, y: timeLineCenterY - Sheet.timelineHalfHeight,
-                    width: ex - sx, height: Sheet.timelineHalfHeight * 2).outset(by: 3)
+                    width: ex - sx, height: Sheet.timelineHalfHeight * 2)
     }
     var transformedTimelineFrame: Rect? {
         timelineFrame
     }
     
     func keyBeatIndex(at p: Point, scale: Double) -> Int? {
-        guard containsTimeline(p) else { return nil }
+        guard containsTimeline(p, scale: scale) else { return nil }
         let maxD = Sheet.knobEditDistance * scale
         let maxDS = maxD * maxD
         var minDS = Double.infinity, minI: Int?
@@ -2657,7 +2664,7 @@ extension ScoreView {
         guard score.isShownSpectrogram, let sm = score.spectrogram else { return }
         
         let firstX = x(atBeat: score.beatRange.start)
-        let y = timeLineCenterY + Sheet.timelineHalfHeight + ContentLayout.isShownSpectrogramHeight + Sheet.knobWidth / 2
+        let y = mainFrame.minY
         let allBeat = score.beatRange.length
         let allW = width(atDurBeat: allBeat)
         var nodes = [Node](), maxH = 0.0
@@ -2718,10 +2725,10 @@ extension ScoreView {
     }
     
     func containsIsShownSpectrogram(_ p: Point, scale: Double) -> Bool {
-        Rect(x: timelineFrame.minX + ContentLayout.spectrogramX - Sheet.knobHeight / 2,
-                 y: timeLineCenterY + Sheet.timelineHalfHeight - Sheet.knobWidth / 2,
+        Rect(x: x(atBeat: model.beatRange.start) + ContentLayout.spectrogramX - Sheet.knobHeight / 2,
+                 y: timeLineCenterY + Sheet.timelineHalfHeight,
                  width: Sheet.knobHeight,
-                 height: ContentLayout.isShownSpectrogramHeight + Sheet.knobWidth)
+                 height: ContentLayout.isShownSpectrogramHeight)
             .outset(by: scale * 3)
             .contains(p)
     }

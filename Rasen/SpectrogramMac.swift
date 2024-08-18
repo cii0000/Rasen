@@ -411,17 +411,12 @@ struct Spectrogram {
         case linear, pitch
     }
     init(_ oBuffer: PCMBuffer,
-         secRange: Range<Double>? = nil,
+         secRange: Range<Double>? = nil, maxSecLength: Double = 60,
          fftCount: Int = 2048, windowOverlap: Double = 0.875,
          isNormalized: Bool = false,
          type: FqType = .pitch) {
         
         let fftCount = vDSP.nextPow2(fftCount)
-        
-        guard oBuffer.frameCount < Int(oBuffer.sampleRate) * 60 * 10 else {
-            print("unsupported")
-            return
-        }
         
         let buffer: PCMBuffer
         if oBuffer.sampleRate != Audio.defaultSampleRate {
@@ -433,7 +428,7 @@ struct Spectrogram {
         
         let channelCount = buffer.channelCount
         let sampleRate = buffer.sampleRate
-        let frameCount = buffer.frameCount
+        let frameCount = min(buffer.frameCount, Int(maxSecLength * oBuffer.sampleRate))
         guard channelCount >= 1, fftCount > 0, frameCount >= fftCount,
               let fft = try? Fft(count: fftCount) else { return }
         
