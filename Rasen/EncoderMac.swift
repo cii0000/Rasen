@@ -526,6 +526,34 @@ extension Range where Bound == Double {
 }
 
 extension Movie {
+    static func m4aFromMP4(from fromUrl: URL, to toUrl: URL, isRemoveFromUrl: Bool = true) async throws {
+        let fileManager = FileManager.default
+        if fileManager.fileExists(atPath: toUrl.path) {
+            try fileManager.removeItem(at: toUrl)
+        }
+        
+        let asset = AVURLAsset(url: fromUrl)
+        guard let session = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetPassthrough)
+        else { throw Self.exportError }
+        session.outputFileType = AVFileType.m4a
+        session.outputURL = toUrl
+        
+        await session.export()
+        
+        switch session.status {
+        case .completed:
+            if isRemoveFromUrl {
+                try fileManager.removeItem(at: fromUrl)
+            }
+        default:
+            if let error = session.error {
+                throw error
+            }
+        }
+    }
+}
+
+extension Movie {
     static func toMP4(from url: URL, to outputURL: URL) async throws {
         let asset = AVAsset(url: url)
         
@@ -588,7 +616,7 @@ final class ToMP4MovieEditor: InputKeyEditor {
             let complete2: (IOResult) -> () = { ioResult1 in
                 let fromURL = ioResult0s[0].url
                 let toURL = ioResult1.url
-                Task.detached {
+                Task {
                     do {
                         try await Movie.toMP4(from: fromURL, to: toURL)
                     } catch {
@@ -636,8 +664,8 @@ final class MoviePlayer {
                                width: CVPixelBufferGetWidth(pb),
                                height: CVPixelBufferGetHeight(pb))
                 let ctx = CIContext()
-                if let cgimage = ctx.createCGImage(ciImage, from: b) {
-                    handler(time, cgimage)
+                if let cgImage = ctx.createCGImage(ciImage, from: b) {
+                    handler(time, cgImage)
                 }
             }
             time += 1 / fps

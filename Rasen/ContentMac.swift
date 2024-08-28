@@ -16,6 +16,7 @@
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
 import AVFAudio
+import AVFoundation
 
 struct ContentTimeOption: Codable, Hashable, BeatRangeType {
     var beatRange = 0 ..< Rational(0)
@@ -107,11 +108,21 @@ struct Content: Hashable, Codable {
                 .appending(component: directoryName)
                 .appending(component: "contents")
                 .appending(component: name)
+            type = Self.type(from: url)
         }
     }
-    let name: String
+    var name: String {
+        didSet {
+            url = URL.library
+                .appending(component: "sheets")
+                .appending(component: directoryName)
+                .appending(component: "contents")
+                .appending(component: name)
+            type = Self.type(from: url)
+        }
+    }
     private(set) var url: URL
-    let type: ContentType
+    private(set) var type: ContentType
     let durSec: Double
     let image: Image?
     

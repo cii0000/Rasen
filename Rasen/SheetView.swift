@@ -1090,9 +1090,9 @@ final class SheetView: View {
                                 keyPath: keyPath.appending(path: \Model.borders))
         
         node = Node(children: [animationView.previousNextNode,
-                               animationView.node,
                                scoreView.node,
                                contentsView.node,
+                               animationView.node,
                                textsView.node,
                                bordersView.node,
                                animationView.timelineNode,
@@ -6255,8 +6255,14 @@ final class SheetView: View {
                                     }
                                     idI = j
                                 }
-                                aSplitLines[idI].id = aLine.id
-                                aSplitLines[idI].interType = aLine.interType
+                                for i in aSplitLines.count.range {
+                                    if i == idI {
+                                        aSplitLines[idI].id = aLine.id
+                                        aSplitLines[idI].interType = aLine.interType
+                                    } else {
+                                        aSplitLines[i].id = .init()
+                                    }
+                                }
                                 
                                 splitedLines += aSplitLines
                             }
@@ -6332,8 +6338,7 @@ final class SheetView: View {
         if isEnableText {
             for (ti, textView) in textsView.elementViews.enumerated().reversed() {
                 
-                guard textView.transformedBounds
-                        .intersects(nlb) else { continue }
+                guard textView.transformedBounds.intersects(nlb) else { continue }
                 var ranges = [Range<String.Index>]()
                 if !selections.isEmpty {
                     let string = textView.model.string

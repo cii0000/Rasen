@@ -948,10 +948,7 @@ final class IOEditor: Editor {
                         try? directory.copy(name: name, from: url)
                     }
                     
-                    let log10Scale: Double = .log10(document.worldToScreenScale)
-                    let clipScale = max(0.0, log10Scale)
-                    let decimalPlaces = Int(clipScale + 2)
-                    let nnp = np.rounded(decimalPlaces: decimalPlaces)
+                    let nnp = document.roundedPoint(from: np)
                     
                     var content = Content(directoryName: sheetView.id.uuidString,
                                           name: name, origin: nnp)

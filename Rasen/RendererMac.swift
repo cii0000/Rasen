@@ -1377,7 +1377,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                        ns: nsEvent, inputContext: inputContext)
     }
     
-    private var isOneFlag = false
+    private var isOneFlag = false, oneFlagTime: Double?
     override func flagsChanged(with nsEvent: NSEvent) {
         let oldModifierKeys = document.modifierKeys
         
@@ -1385,8 +1385,10 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         
         if oldModifierKeys.isEmpty && document.modifierKeys.isOne {
             isOneFlag = true
+            oneFlagTime = nsEvent.timestamp
         } else if let oneKey = oldModifierKeys.oneInputKeyTYpe,
-                  document.modifierKeys.isEmpty && isOneFlag {
+                  document.modifierKeys.isEmpty && isOneFlag, 
+            let oneFlagTime, nsEvent.timestamp - oneFlagTime < 0.175 {
             document.inputKey(inputKeyEventWith(nsEvent, oneKey, .began))
             document.inputKey(inputKeyEventWith(nsEvent, oneKey, .ended))
             isOneFlag = false

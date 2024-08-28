@@ -468,7 +468,7 @@ final class LineEditor: Editor {
                       sheetLineWidth: Double,
                       _ phase: Phase) {
             let wtsScale = worldToScreenScale
-            var p = p.rounded(decimalPlaces: Int(max(0, .log10(wtsScale)) + 2))
+            var p = Document.roundedPoint(from: p, scale: wtsScale)
             let pressure = revision(pressure: pressure).rounded(decimalPlaces: 2)
             
             switch phase {
@@ -518,7 +518,7 @@ final class LineEditor: Editor {
                         snapDC?.point *= 0.75
                         p += nSnapDC.point * 0.75
                         
-                        p = p.rounded(decimalPlaces: Int(max(0, .log10(wtsScale)) + 2))
+                        p = Document.roundedPoint(from: p, scale: wtsScale)
                     }
                     p = clipBounds.clipped(p)
                 }
@@ -756,7 +756,7 @@ final class LineEditor: Editor {
                       sheetLineWidth: Double,
                       _ phase: Phase) {
             let wtsScale = worldToScreenScale
-            var p = p.rounded(decimalPlaces: Int(max(0, .log10(wtsScale)) + 2))
+            var p = Document.roundedPoint(from: p, scale: wtsScale)
             let pressure = Self.revision(pressure: pressure).rounded(decimalPlaces: 2)
             
             switch phase {
@@ -800,7 +800,7 @@ final class LineEditor: Editor {
                         snapDC?.point *= 0.75
                         p += nSnapDC.point * 0.75
                         
-                        p = p.rounded(decimalPlaces: Int(max(0, .log10(wtsScale)) + 2))
+                        p = Document.roundedPoint(from: p, scale: wtsScale)
                     }
                     p = clipBounds.clipped(p)
                 }
@@ -1248,7 +1248,7 @@ final class LineEditor: Editor {
                 self.isStraightNode = isStraightNode
                 document.rootNode.insert(child: isStraightNode,
                                          at: document.accessoryNodeIndex + 1)
-                firstPoint = (p - centerOrigin).rounded(decimalPlaces: Int(max(0, .log10(document.worldToScreenScale)) + 2))
+                firstPoint = document.roundedPoint(from: p - centerOrigin)
                 updateStraightNode()
             }
             
@@ -1499,14 +1499,16 @@ final class LineEditor: Editor {
                     if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
                         removeNote(with: event)
                     } else {
-                        lassoCopy(isRemove: true, distance: lassoDistance, at: p)
+                        lassoCopy(isRemove: true, distance: lassoDistance,
+                                  at: document.roundedPoint(from: p))
                     }
                 } else {
                     cutSheets(at: p)
                 }
             case .copy:
                 if isEditingSheet {
-                    lassoCopy(isRemove: false, distance: lassoDistance, at: p)
+                    lassoCopy(isRemove: false, distance: lassoDistance, 
+                              at: document.roundedPoint(from: p))
                 } else {
                     copySheets(at: p)
                 }

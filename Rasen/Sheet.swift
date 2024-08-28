@@ -2192,17 +2192,14 @@ extension Sheet: Hashable, Codable {}
 extension Sheet {
     static let width = 512.0, height = 724.0
     static let defaultBounds = Rect(width: width, height: height)
-    static let defaultAnimationBounds = Rect(width: 400, height: 300)
     static let defalutBackgroundUUColor = UU(Color.background, id: .zero)
     static let textPadding = Size(width: 16, height: 15)
     static let beatWidth = 30.0, secPadding = 16.0
     static let timelineHalfHeight = 12.0
     static let knobWidth = 2.0, knobHeight = 12.0, rulerHeight = 4.0
-    static let fullEditPitchInterval = Rational(1, 6)
-    static let pitchInterval = Rational(1)
-    static let fullEditBeatInterval = Rational(1, 72)
-    static let beatInterval = Rational(1, 12)
     static let knobEditDistance = 15.0
+    static let fullEditPitchInterval = Rational(1, 6), pitchInterval = Rational(1)
+    static let fullEditBeatInterval = Rational(1, 72), beatInterval = Rational(1, 12)
 }
 extension Sheet {
     var picture: Picture {

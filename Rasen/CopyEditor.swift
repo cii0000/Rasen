@@ -584,7 +584,7 @@ final class CopyEditor: Editor {
                                        isCutColor: false)
             case .paste:
                 let p = document.convertScreenToWorld(editingSP)
-                updateWithPaste(at: p, atScreen: editingSP, .began)
+                updateWithPaste(at: p, atScreen: editingSP, .changed)
             }
         }
     }
@@ -738,7 +738,7 @@ final class CopyEditor: Editor {
                                      isEnablePlane: !document.isSelectedText,
                                      isSplitLine: false,
                                      selections: document.selections,
-                                     at: p)
+                                     at: document.roundedPoint(from: p))
                     }
                 }
                 let rects = document.isSelectedText ?
@@ -1091,7 +1091,7 @@ final class CopyEditor: Editor {
                                      isEnablePlane: !document.isSelectedText,
                                      isSplitLine: false,
                                      selections: document.selections,
-                                     at: p)
+                                     at: document.roundedPoint(from: p))
                     }
                 }
             }
@@ -1424,7 +1424,7 @@ final class CopyEditor: Editor {
                 let snapP = value.origin + sb.origin
                 nSnapP = snapP
                 np = snapP.distance(p) < snapDistance * document.screenToWorldScale && firstScale == document.worldToScreenScale ?
-                    snapP : p
+                    snapP : document.roundedPoint(from: p)
                 let isSnapped = np == snapP
                 if isSnapped {
                     if oldFillSnapP != np {
@@ -1438,7 +1438,7 @@ final class CopyEditor: Editor {
                 }
                 oldFillSnapP = np
             } else {
-                np = p
+                np = document.roundedPoint(from: p)
                 nSnapP = nil
             }
             
@@ -1548,10 +1548,7 @@ final class CopyEditor: Editor {
                     let np = sheetView.convertFromWorld(np)
                     let scale = firstScale / document.worldToScreenScale
                     let nnp = text.origin * scale + np
-                    let log10Scale: Double = .log10(document.worldToScreenScale)
-                    let clipScale = max(0.0, log10Scale)
-                    let decimalPlaces = Int(clipScale + 2)
-                    let fp1 = nnp.rounded(decimalPlaces: decimalPlaces)
+                    let fp1 = document.roundedPoint(from: nnp)
                     let lp1 = fp1 + (text.typesetter.typelines.last?.origin ?? Point())
                     for textView in sheetView.textsView.elementViews {
                         guard !textView.typesetter.typelines.isEmpty else { continue }
@@ -1924,6 +1921,7 @@ final class CopyEditor: Editor {
         }
         
         func pasteLines(_ lines: [Line], at p: Point) {
+            let p = document.roundedPoint(from: p)
             let pt = firstTransform(at: p)
             let ratio = firstScale / document.worldToScreenScale
             let pLines: [Line] = lines.map {
@@ -1979,6 +1977,7 @@ final class CopyEditor: Editor {
             }
         }
         func pastePlanes(_ planes: [Plane], at p: Point) {
+            let p = document.roundedPoint(from: p)
             let pt = firstTransform(at: p)
             let pPlanes = planes.map { $0 * pt }
             guard !pPlanes.isEmpty, let rect = pPlanes.bounds else { return }
@@ -2019,6 +2018,7 @@ final class CopyEditor: Editor {
             }
         }
         func pasteTexts(_ texts: [Text], at p: Point) {
+            let p = document.roundedPoint(from: p)
             let pt = firstTransform(at: p)
             guard !texts.isEmpty else { return }
             
@@ -2114,10 +2114,7 @@ final class CopyEditor: Editor {
                 let np = sheetView.convertFromWorld(p)
                 let scale = firstScale / document.worldToScreenScale
                 let nnp = text.origin * scale + np
-                let log10Scale: Double = .log10(document.worldToScreenScale)
-                let clipScale = max(0.0, log10Scale)
-                let decimalPlaces = Int(clipScale + 2)
-                let fp1 = nnp.rounded(decimalPlaces: decimalPlaces)
+                let fp1 = document.roundedPoint(from: nnp)
                 let lp1 = fp1 + (text.typesetter.typelines.last?.origin ?? Point())
                 for (i, textView) in sheetView.textsView.elementViews.enumerated() {
                     guard !textView.typesetter.typelines.isEmpty else { continue }
@@ -2179,10 +2176,7 @@ final class CopyEditor: Editor {
                 let np = sheetView.convertFromWorld(p)
                 let scale = firstScale / document.worldToScreenScale
                 let nnp = text.origin * scale + np
-                let log10Scale: Double = .log10(document.worldToScreenScale)
-                let clipScale = max(0.0, log10Scale)
-                let decimalPlaces = Int(clipScale + 2)
-                text.origin = nnp.rounded(decimalPlaces: decimalPlaces)
+                text.origin = document.roundedPoint(from: nnp)
                 text.size = text.size * scale
                 let sb = sheetView.bounds.inset(by: Sheet.textPadding)
                 if let textFrame = text.frame, !sb.contains(textFrame) {
@@ -2500,10 +2494,7 @@ final class CopyEditor: Editor {
                 content.timeOption = timeOption
                 content.origin = .init(sheetView.animationView.x(atBeat: timeOption.beatRange.start), nnp.y)
             } else {
-                let log10Scale: Double = .log10(document.worldToScreenScale)
-                let clipScale = max(0.0, log10Scale)
-                let decimalPlaces = Int(clipScale + 2)
-                content.origin = nnp.rounded(decimalPlaces: decimalPlaces)
+                content.origin = document.roundedPoint(from: nnp)
             }
             
             content.size = content.size * scale
@@ -2527,10 +2518,7 @@ final class CopyEditor: Editor {
             }
             
             let scale = firstScale / document.worldToScreenScale
-            let log10Scale: Double = .log10(document.worldToScreenScale)
-            let clipScale = max(0.0, log10Scale)
-            let decimalPlaces = Int(clipScale + 2)
-            let nnp = sheetP.rounded(decimalPlaces: decimalPlaces)
+            let nnp = document.roundedPoint(from: sheetP)
             
             var content = Content(directoryName: sheetView.id.uuidString, name: name, origin: nnp)
             if let size = content.image?.size {

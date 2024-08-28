@@ -1167,6 +1167,14 @@ final class Document {
         v * worldToScreenTransform
     }
     
+    func roundedPoint(from p: Point) -> Point {
+        Self.roundedPoint(from: p, scale: worldToScreenScale)
+    }
+    static func roundedPoint(from p: Point, scale: Double) -> Point {
+        let decimalPlaces = Int(max(0, .log10(scale)) + 2)
+        return p.rounded(decimalPlaces: decimalPlaces)
+    }
+    
     func updateWithIsFullEdit() {
         sheetViewValues.forEach {
             if let view = $0.value.view {
@@ -4042,7 +4050,7 @@ final class Document {
         case .cutDraft: DraftCutter(self)
         case .makeFaces: FacesMaker(self)
         case .cutFaces: FacesCutter(self)
-        case .controlPlay, .play: Player(self)
+        case .play: Player(self)
         case .movePreviousKeyframe: KeyframePreviousMover(self)
         case .moveNextKeyframe: KeyframeNextMover(self)
         case .movePreviousTime: TimePreviousMover(self)
