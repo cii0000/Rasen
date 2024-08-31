@@ -47,7 +47,7 @@ struct Rational: SignedNumeric, Hashable {
         }
     }
     
-    private init(_ x: Double, maxDenominator: Int = 10000000,
+    init(_ x: Double, maxDenominator: Int = 10000000,
          tolerance: Double = 0.000001) {
         guard x != 0 else { 
             self.init(0, 1)

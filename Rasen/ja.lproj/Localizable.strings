@@ -54,7 +54,7 @@
 "Open Menu" = "メニューを開く";
 
 "Slide" = "スライド";
-"Select Time" = "時間を選択";
+"Select Frame" = "フレームを選択";
 "Play" = "再生";
 "Move Line Z" = "線の高さを変更";
 
@@ -79,6 +79,7 @@
 "Area" = "面積";
 "Sheet" = "シート";
 "Root" = "全体";
+"Size" = "サイズ";
 "File Size" = "ファイルサイズ";
 
 "Major" = "メジャー";

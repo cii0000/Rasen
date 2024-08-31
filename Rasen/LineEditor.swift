@@ -1197,15 +1197,6 @@ final class LineEditor: Editor {
         drawLine(with: event, isStraight: true)
     }
     
-    func lineUUColor(atWorld wp: Point) -> UUColor {
-        document.sheetView(at: wp)?.model.mainLineUUColor
-        ?? Line.defaultUUColor
-    }
-    func lineUUColor(at sheetP: Sheetpos) -> UUColor {
-        document.sheetView(at: sheetP)?.model.mainLineUUColor
-        ?? Line.defaultUUColor
-    }
-    
     struct DrawLineEvent {
         var p: Point,
             sp: Point, pressure: Double,
@@ -1228,7 +1219,7 @@ final class LineEditor: Editor {
             let tempLineNode = Node(attitude: Attitude(position: centerOrigin),
                                     path: Path(),
                                     lineWidth: document.sheetLineWidth,
-                                    lineType: .color(lineUUColor(atWorld: p).value))
+                                    lineType: .color(Line.defaultUUColor.value))
             self.tempLineNode = tempLineNode
             document.rootNode.insert(child: tempLineNode,
                                      at: document.accessoryNodeIndex)
@@ -1299,7 +1290,7 @@ final class LineEditor: Editor {
                                         worldToScreenScale: document.worldToScreenScale,
                                         screenToWorldScale: document.screenToWorldScale,
                                         phase: .ended))
-            var tempLine = Self.line(from: drawLineEvents,
+            let tempLine = Self.line(from: drawLineEvents,
                                      firstSnapLines: snapLines,
                                      lastSnapLines: snapLines,
                                      clipBounds: clipBounds,
@@ -1315,7 +1306,6 @@ final class LineEditor: Editor {
                 return
             }
             
-            tempLine.uuColor = lineUUColor(atWorld: p)
             if centerBounds.contains(lb),
                let sheetView = document.madeSheetView(at: centerSHP) {
                 
@@ -1331,9 +1321,7 @@ final class LineEditor: Editor {
                     if lb.intersects(b),
                        let sheetView = document.madeSheetView(at: shp, isNewUndoGroup: isWorldNewUndoGroup) {
                         isWorldNewUndoGroup = false
-                        let nLine = tempLine
-                        * Transform(translation: -b.origin)
-                        let uuColor = lineUUColor(at: shp)
+                        let nLine = tempLine * Transform(translation: -b.origin)
                         if let b = sheetView.node.bounds {
                             let nLines = Sheet.clipped([nLine], in: b).filter {
                                 if let b = $0.bounds {
@@ -1342,10 +1330,6 @@ final class LineEditor: Editor {
                                 } else {
                                     return true
                                 }
-                            }.map {
-                                var line = $0
-                                line.uuColor = uuColor
-                                return line
                             }
                             if !nLines.isEmpty {
                                 sheetView.newUndoGroup()

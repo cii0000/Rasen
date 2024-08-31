@@ -2257,6 +2257,7 @@ final class Document {
             size += thumbnail64Record.size ?? 0
             size += thumbnail256Record.size ?? 0
             size += thumbnail1024Record.size ?? 0
+            size += contentsDirectory.size ?? 0
             size += stringRecord.size ?? 0
             return size
         }
@@ -2268,6 +2269,7 @@ final class Document {
             size += thumbnail64Record.size ?? 0
             size += thumbnail256Record.size ?? 0
             size += thumbnail1024Record.size ?? 0
+            size += contentsDirectory.size ?? 0
             size += stringRecord.size ?? 0
             return size
         }
@@ -3919,7 +3921,7 @@ final class Document {
         case .changeLightness: LightnessChanger(self)
         case .changeTint: TintChanger(self)
         case .slide: Slider(self)
-        case .selectTime: FrameSelecter(self)
+        case .selectFrame: FrameSelecter(self)
         case .slideLine: LineSlider(self)
         case .moveLineZ: LineZSlider(self)
         case .selectVersion: VersionSelector(self)
@@ -3933,7 +3935,7 @@ final class Document {
             updateLastEditedSheetpos(from: event)
             stopInputTextEvent()
             let quasimode = Quasimode(modifier: modifierKeys, .drag)
-            if quasimode != .selectTime {
+            if quasimode != .selectFrame {
                 stopInputKeyEvent()
             }
             dragEditor = self.dragEditor(with: quasimode)
@@ -4053,8 +4055,8 @@ final class Document {
         case .play: Player(self)
         case .movePreviousKeyframe: KeyframePreviousMover(self)
         case .moveNextKeyframe: KeyframeNextMover(self)
-        case .movePreviousTime: TimePreviousMover(self)
-        case .moveNextTime: TimeNextMover(self)
+        case .movePreviousFrame: FramePreviousMover(self)
+        case .moveNextFrame: FrameNextMover(self)
         case .insertKeyframe: KeyframeInserter(self)
         case .addScore: ScoreAdder(self)
         case .interpolate: Interpolater(self)

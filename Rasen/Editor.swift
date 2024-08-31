@@ -1266,11 +1266,7 @@ final class IOEditor: Editor {
                 let nSize = size.snapped(Size(width: 800, height: 1200)).rounded()
                 self.exportGIF(from: nvs, size: nSize, at: ioResult)
             case .movie:
-                let nSize = size == Size(width: 426, height: 240) || size == Size(width: 800, height: 450) ?
-                    Size(width: 1920, height: 1080) :
-                (size == Size(width: 426, height: 320) ?
-                        Size(width: 1440, height: 1080) :
-                        size.snapped(Size(width: 1200, height: 1920)).rounded())
+                let nSize = size.snapped(size.width > size.height ? Size(width: 1920, height: 1080) : Size(width: 1200, height: 1920)).rounded()
                 self.exportMovie(from: nvs, isHighQuality: false,
                                  size: nSize, at: ioResult)
             case .sound:
@@ -1278,12 +1274,8 @@ final class IOEditor: Editor {
             case .caption:
                 self.exportCaption(from: nvs, at: ioResult)
             case .highQualityMovie:
-                let nSize = size == Size(width: 426, height: 240) || size == Size(width: 800, height: 450) ?
-                    Size(width: 3840, height: 2160) :
-                (size == Size(width: 426, height: 320) ?
-                        Size(width: 2880, height: 2160) :
-                        size.snapped(Size(width: 3840, height: 2160)).rounded())
-                self.exportMovie(from: nvs,  isHighQuality: true,
+                let nSize = size.snapped(Size(width: 3840, height: 2160)).rounded()
+                self.exportMovie(from: nvs, isHighQuality: true,
                                  size: nSize, at: ioResult)
             case .document:
                 self.exportDocument(from: nvs, isHistory: false, at: ioResult)
@@ -1648,8 +1640,9 @@ final class IOEditor: Editor {
                         let ot = t
                         let b = isMainFrame ? (sheet.mainFrame ?? v.bounds) : v.bounds
                         
-                        let duration = sheet.animation.sec(fromBeat: sheet.allDurBeat)
-                        let frameCount = sheet.animation.count(fromBeat: sheet.allDurBeat,
+                        let allDurBeat = sheet.allDurBeat
+                        let duration = sheet.animation.sec(fromBeat: allDurBeat == 0 ? 1 : allDurBeat)
+                        let frameCount = sheet.animation.count(fromBeat: allDurBeat == 0 ? 1 : allDurBeat,
                                                                frameRate: frameRate)
                         
                         movie.writeMovie(frameCount: frameCount,
@@ -1684,7 +1677,7 @@ final class IOEditor: Editor {
                             }
                             node.attitude.position = origin
                            
-                            if let image =  node.renderedAntialiasFillImage(in: b, to: size, backgroundColor: .background) {
+                            if let image = node.renderedAntialiasFillImage(in: b, to: size, backgroundColor: .background) {
                                 return image
                             } else {
                                 return nil

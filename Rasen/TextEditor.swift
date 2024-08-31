@@ -325,17 +325,15 @@ final class Looker: InputKeyEditor {
             let nfq = Pitch(value: pitchRat).fq
             let fqStr = "\(Pitch(value: pitchRat).octaveString()) (\(nfq.string(digitsCount: 1)) Hz)".localized
             document.show(fqStr, at: p)
-        } else if !document.isDefaultUUColor(at: p) {
-            let colorOwners = document.readColorOwners(at: p)
-            if !colorOwners.isEmpty,
-               let sheetView = document.sheetView(at: p),
-               let plane = sheetView.plane(at: sheetView.convertFromWorld(p)) {
-                
-                let rgba = plane.uuColor.value.rgba
-                document.show("Face".localized + "\n\t\("Area".localized):  \(plane.topolygon.area.string(digitsCount: 4))\n\tsRGB: \(rgba.r) \(rgba.g) \(rgba.b)", at: p)
-            } else {
-                document.show("Background".localized, at: p)
-            }
+        } else if !document.isDefaultUUColor(at: p),
+                  let sheetView = document.sheetView(at: p),
+                  let plane = sheetView.plane(at: sheetView.convertFromWorld(p)) {
+            let rgba = plane.uuColor.value.rgba
+            document.show("Face".localized + "\n\t\("Area".localized):  \(plane.topolygon.area.string(digitsCount: 4))\n\tsRGB: \(rgba.r) \(rgba.g) \(rgba.b)", at: p)
+        } else if let sheetView = document.sheetView(at: p) {
+            let bounds = sheetView.model.boundsTuple(at: sheetView.convertFromWorld(p),
+                                                     in: document.sheetFrame(with: document.sheetPosition(at: p)).bounds).bounds.integral
+            document.show("Background".localized + "\n\t\("Size".localized): \(Self.sizeString(from: bounds.size))", at: p)
         } else {
             document.show("Background".localized, at: p)
         }
@@ -361,6 +359,24 @@ final class Looker: InputKeyEditor {
                       fromSize: fromSize,
                       rects: rects.map { sheetView.convertToWorld($0) },
                       textView.model.orientation)
+    }
+    
+    static func sizeString(from size: Size) -> String {
+        let width = size.width, height = size.height
+        let widthStr = width.string(digitsCount: 1, enabledZeroInteger: false)
+        let heightStr = height.string(digitsCount: 1, enabledZeroInteger: false)
+        let iWidth = max(Int(width.rounded()), 1), iHeight = max(Int(height.rounded()), 1)
+        return if Rational(iWidth, iHeight) == Rational(16, 9) {
+            "\(widthStr) x \(heightStr) 16:9"
+        } else if Rational(iWidth, iHeight) == Rational(16, 10) {
+            "\(widthStr) x \(heightStr) 16:10"
+        } else if Rational(iWidth, iHeight) == Rational(16, 11) {
+            "\(widthStr) x \(heightStr) 16:11"
+        } else if Rational(iWidth, iHeight) == Rational(4, 3) {
+            "\(widthStr) x \(heightStr) 4:3"
+        } else {
+            "\(widthStr) x \(heightStr)"
+        }
     }
 }
 

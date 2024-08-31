@@ -594,39 +594,43 @@ final class CopyEditor: Editor {
         if sb.width < sb.height {
             switch orientation {
             case .horizontal:
-                 [202,
-                  242,
-                  sb.height - 202,
-                  sb.height - 242,
+                 [206,
+                  219,
+                  232,
+                  245,
+                  sb.height - 206,
+                  sb.height - 219,
+                  sb.height - 232,
+                  sb.height - 245,
                   (sb.height / 4).rounded(),
                   (sb.height / 2).rounded(),
                   (3 * sb.height / 4).rounded()].sorted()
             case .vertical:
-                 [43,
-                  sb.width - 43,
+                 [48,
+                  sb.width - 48,
                   (sb.width / 4).rounded(),
-                  (sb.width / 3).rounded(),
                   (sb.width / 2).rounded(),
-                  (2 * sb.width / 3).rounded(),
                   (3 * sb.width / 4).rounded()].sorted()
             }
         } else {
             switch orientation {
             case .horizontal:
-                 [137,
+                 [62,
+                  87,
+                  112,
+                  137,
+                  sb.height - 62,
+                  sb.height - 87,
+                  sb.height - 112,
                   sb.height - 137,
                   (sb.height / 4).rounded(),
-                  (sb.height / 3).rounded(),
                   (sb.height / 2).rounded(),
-                  (2 * sb.height / 3).rounded(),
                   (3 * sb.height / 4).rounded()].sorted()
             case .vertical:
                  [112,
                   sb.width - 112,
                   (sb.width / 4).rounded(),
-                  (sb.width / 3).rounded(),
                   (sb.width / 2).rounded(),
-                  (2 * sb.width / 3).rounded(),
                   (3 * sb.width / 4).rounded()].sorted()
             }
         }
@@ -1679,15 +1683,8 @@ final class CopyEditor: Editor {
                     borders.forEach { append(border: $0) }
                     let nxs = xs.sorted(), nys = ys.sorted()
                     let width = nxs[1] - nxs[0], height = nys[1] - nys[0]
-                    let widthStr = width.string(digitsCount: 1, enabledZeroInteger: false)
-                    let heightStr = height.string(digitsCount: 1, enabledZeroInteger: false)
-                    document.cursor = if width == 426 && height == 320 {
-                        document.cursor(from: "\(widthStr) x \(heightStr) (4:3)")
-                    } else if (width == 426 && height == 240) || (width == 800 && height == 450) {
-                        document.cursor(from: "\(widthStr) x \(heightStr) (16:9)")
-                    } else {
-                        document.cursor(from: "\(widthStr) x \(heightStr)")
-                    }
+                    let nString = nBorder.location.string(digitsCount: 1, enabledZeroInteger: false)
+                    document.cursor = document.cursor(from: "\(nString) (\(Looker.sizeString(from: .init(width: width, height: height))))")
                 } else {
                     let nString = nBorder.location.string(digitsCount: 1, enabledZeroInteger: false)
                     document.cursor = switch nBorder.orientation {
@@ -2498,8 +2495,9 @@ final class CopyEditor: Editor {
             }
             
             content.size = content.size * scale
-            if content.size.width > Sheet.width || content.size.height > Sheet.height {
-                content.size *= min(Sheet.width / content.size.width, Sheet.height / content.size.height)
+            let maxSize = document.sheetFrame(with: shp).size
+            if content.size.width > maxSize.width || content.size.height > maxSize.height {
+                content.size *= min(maxSize.width / content.size.width, maxSize.height / content.size.height)
             }
             
             content.id = .init()
@@ -2522,9 +2520,10 @@ final class CopyEditor: Editor {
             
             var content = Content(directoryName: sheetView.id.uuidString, name: name, origin: nnp)
             if let size = content.image?.size {
+                let maxSize = document.sheetFrame(with: shp).size
                 var size = size / 2
-                if size.width > Sheet.width || size.height > Sheet.height {
-                    size *= min(Sheet.width / size.width, Sheet.height / size.height)
+                if size.width > maxSize.width || size.height > maxSize.height {
+                    size *= min(maxSize.width / size.width, maxSize.height / size.height)
                 }
                 content.size = size
             }

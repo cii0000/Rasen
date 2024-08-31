@@ -331,9 +331,9 @@ extension Quasimode {
     
     static let movePreviousKeyframe = Quasimode(modifier: [.control], .z)
     static let moveNextKeyframe = Quasimode(modifier: [.control], .x)
-    static let movePreviousTime = Quasimode(modifier: [.control, .option], .z)
-    static let moveNextTime = Quasimode(modifier: [.control, .option], .x)
-    static let selectTime = Quasimode(modifier: [.control, .option], .drag)
+    static let movePreviousFrame = Quasimode(modifier: [.control, .option], .z)
+    static let moveNextFrame = Quasimode(modifier: [.control, .option], .x)
+    static let selectFrame = Quasimode(modifier: [.control, .option], .drag)
     
     static let slide = Quasimode(modifier: [.control], .drag)
     static let slideLine = Quasimode(modifier: [.control, .option, .command], .drag)

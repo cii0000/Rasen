@@ -917,7 +917,7 @@ final class AnimationView: TimelineView {
                     }
                     
                     $0.node.lineType = switch $0.model.interType {
-                    case .interpolated: .color(.interpolated)
+                    case .interpolated: .color(nColor.lightness < 80 ? .init(lightness: min(nColor.lightness + 40, 80)) : .init(lightness: nColor.lightness - 20))
                     case .key, .none: .color(nColor)
                     }
                 }
@@ -1216,11 +1216,12 @@ final class SheetView: View {
     func currentSelectiongTimeNode(indexInterval: Double) -> Node {
         Self.selectingTimeNode(duration: model.animation.currentDurBeat,
                                time: model.animation.localBeat,
+                               isKey: model.animation.currentKeyframe.isKey,
                                indexInterval: indexInterval,
                                frameRate: Rational(frameRate),
                                enabledSelect: model.enabledAnimation)
     }
-    static func selectingTimeNode(duration: Rational, time: Rational,
+    static func selectingTimeNode(duration: Rational, time: Rational, isKey: Bool,
                                   indexInterval: Double,
                                   frameRate: Rational,
                                   enabledSelect: Bool) -> Node {
@@ -1244,7 +1245,7 @@ final class SheetView: View {
         }
         
         let timeNodes = Self.timeNodes(duration: duration,
-                                       time: time, frameRate: frameRate)
+                                       time: time, isKey: isKey, frameRate: frameRate)
         return Node(children: nodes + timeNodes)
     }
     
@@ -1347,21 +1348,25 @@ final class SheetView: View {
     func timeNodes(from animationView: AnimationView) -> [Node] {
         Self.timeNodes(duration: animationView.model.currentDurBeat,
                        time: animationView.model.localBeat,
+                       isKey: animationView.model.currentKeyframe.isKey,
                        frameRate: Rational(animationView.frameRate))
     }
     func currentTimeString() -> String {
         Animation.timeString(fromTime: model.animation.localBeat,
                              frameRate: Rational(frameRate))
+        + (model.animation.currentKeyframe.isKey ? "" : " i")
     }
     func currentTimeNodes() -> [Node] {
         Self.timeNodes(duration: model.animation.currentDurBeat,
                        time: model.animation.localBeat,
+                       isKey: model.animation.currentKeyframe.isKey,
                        frameRate: Rational(frameRate))
     }
     static func timeNodes(duration: Rational,
                           time: Rational,
+                          isKey: Bool,
                           frameRate: Rational) -> [Node] {
-        let u = Animation.timeString(fromTime: time, frameRate: frameRate)
+        let u = Animation.timeString(fromTime: time, frameRate: frameRate) + (isKey ? "" : "i")
         let size = Font.largeSize
         let text = Text(string: u, size: size)
         let b = text.frame ?? Rect()
@@ -1546,14 +1551,14 @@ final class SheetView: View {
         }
         animationView.movePreviousInterKeyframe()
     }
-    func moveNextTime() {
+    func moveNextFrame() {
         if isPlaying {
             stop()
         }
         let deltaTime = Rational(1, animationView.frameRate)
         self.rootBeat = Rational.saftyAdd(rootBeat, deltaTime)
     }
-    func movePreviousTime() {
+    func movePreviousFrame() {
         if isPlaying {
             stop()
         }
@@ -5966,7 +5971,8 @@ final class SheetView: View {
         var minI: Int?, minDSquared = Double.infinity
         for (i, line) in model.picture.lines.enumerated() {
             guard line.uuColor != removingUUColor else { continue }
-            let nd = isSmall ? (line.size / 2 + ds) / 4 : line.size / 2 + ds * 5
+            let nd = line.uuColor != Line.defaultUUColor ?
+            line.size / 2 : (isSmall ? (line.size / 2 + ds) / 4 : line.size / 2 + ds * 5)
             let ldSquared = nd * nd
             let dSquared = line.minDistanceSquared(at: p)
             if dSquared < minDSquared && dSquared < ldSquared {

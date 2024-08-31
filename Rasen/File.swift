@@ -294,6 +294,10 @@ extension Directory {
         children[key] = nil
         try FileManager.default.removeItem(at: url)
     }
+    
+    var size: Int? {
+        url.allFileSize
+    }
 }
 
 final class Record<Value: Codable & Serializable>: File {
