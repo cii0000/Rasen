@@ -124,7 +124,7 @@ extension Pitch {
         } else if hidableDecimal && deltaPitch.decimalPart == 0 {
             deltaStr = " (\(deltaDPartStr))"
         } else {
-            let ddPart = deltaPitch.decimalPart * 6
+            let ddPart = deltaPitch.decimalPart * 12
             let ddPartStr = ddPart.decimalPart == 0 ? String(format: "%d", Int(abs(ddPart))) : "\(abs(ddPart.decimalPart))"
             deltaStr = " (\(deltaDPartStr).\(ddPartStr))"
         }
@@ -132,7 +132,7 @@ extension Pitch {
         if hidableDecimal && dPart.decimalPart == 0 {
             return "\(iPart).\(dPartStr)" + deltaStr
         } else {
-            let ddPart = dPart.decimalPart * 6
+            let ddPart = dPart.decimalPart * 12
             let ddPartStr = ddPart.decimalPart == 0 ? String(format: "%d", Int(ddPart)) : "\(ddPart.decimalPart)"
             return "\(iPart).\(dPartStr).\(ddPartStr)" + deltaStr
         }
@@ -870,7 +870,7 @@ extension Pit {
 }
 
 struct Envelope: Hashable, Codable {
-    var attackSec = 0.0, decaySec = 0.0, sustainVolm = 1.0, releaseSec = 0.01
+    var attackSec = 0.01171875, decaySec = 0.0, sustainVolm = 1.0, releaseSec = 0.01171875
     var id = UUID()
 }
 extension Envelope: Protobuf {
@@ -1646,6 +1646,14 @@ extension TempoType {
                      rounded rule: FloatingPointRoundingRule = .toNearestOrAwayFromZero) -> Rational {
         Rational(Int((sec * Double(tempo) / 60 * Double(beatRate)).rounded(rule)),
                  beatRate)
+    }
+    static func beat(fromSec sec: Double,
+                     tempo: Rational,
+                     interval: Rational,
+                     rounded rule: FloatingPointRoundingRule = .toNearestOrAwayFromZero) -> Rational {
+        let ii = interval.inversed!
+        return Rational(Int((sec * Double(tempo) / 60 * Double(ii)).rounded(rule)))
+        / ii
     }
     static func count(fromBeat beat: Rational,
                       tempo: Rational, frameRate: Int) -> Int {

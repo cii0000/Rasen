@@ -629,7 +629,6 @@ final class FrameEditor: Editor {
                     
                     let nRootI = beganRootI.addingReportingOverflow(deltaI).partialValue
                     
-                    let deltaTime = Rational(deltaI, animationView.frameRate)
                     let oldKI = animationView.model.index
                     if animationView.rootKeyframeIndex != nRootI {
                         if sheetView.isPlaying {
@@ -679,7 +678,6 @@ final class FrameEditor: Editor {
             document.cursor = Document.defaultCursor
             
             if let sheetView {
-                let animationView = sheetView.animationView
                 sheetView.hideOtherTimeNode()
                     
                 for (sec, rootI) in lastRootBeats.reversed() {
@@ -807,7 +805,6 @@ final class TimeEditor: Editor {
             document.cursor = Document.defaultCursor
             
             if let sheetView {
-                let animationView = sheetView.animationView
                 sheetView.hideOtherTimeNode()
                     
                 for (sec, rootBeat) in lastRootBeats.reversed() {

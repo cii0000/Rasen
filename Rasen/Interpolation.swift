@@ -542,11 +542,11 @@ struct Monospline {
         h0 = x1 - x0
         h1 = x2 - x1
         h2 = x3 - x2
-        reciprocalH0 = 1 / h0
+        reciprocalH0 = xType == .last ? 0 : 1 / h0
         reciprocalH1 = 1 / h1
-        reciprocalH2 = 1 / h2
-        reciprocalH0H1 = 1 / (h0 + h1)
-        reciprocalH1H2 = 1 / (h1 + h2)
+        reciprocalH2 = xType == .first ? 0 : 1 / h2
+        reciprocalH0H1 = xType == .last ? 0 : 1 / (h0 + h1)
+        reciprocalH1H2 = xType == .first ? 0 : 1 / (h1 + h2)
         reciprocalH1H1 = 1 / (h1 * h1)
         xx1 = h1 * t
         xx2 = xx1 * xx1

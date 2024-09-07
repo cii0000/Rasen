@@ -2198,8 +2198,8 @@ extension Sheet {
     static let timelineHalfHeight = 12.0
     static let knobWidth = 2.0, knobHeight = 12.0, rulerHeight = 4.0
     static let knobEditDistance = 15.0
-    static let fullEditPitchInterval = Rational(1, 6), pitchInterval = Rational(1)
-    static let fullEditBeatInterval = Rational(1, 72), beatInterval = Rational(1, 12)
+    static let fullEditPitchInterval = Rational(1, 12), pitchInterval = Rational(1)
+    static let fullEditBeatInterval = Rational(1, 144), beatInterval = Rational(1, 12)
 }
 extension Sheet {
     var picture: Picture {

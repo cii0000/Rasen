@@ -1512,6 +1512,14 @@ extension ScoreView {
                 if pit.lyric == "[" {
                     lyricLinePathlines.append(.init(Rect(x: p.x - 0.25, y: p.y - 3,
                                                          width: 0.5, height: 3)))
+                    lyricLinePathlines.append(.init(Rect(x: p.x - 0.25, y: p.y - 3.5,
+                                                         width: 1.5, height: 0.5)))
+                    return nil
+                } else if pit.lyric == "]" {
+                    lyricLinePathlines.append(.init(Rect(x: p.x - 0.25, y: p.y - 3,
+                                                         width: 0.5, height: 3)))
+                    lyricLinePathlines.append(.init(Rect(x: p.x - 0.25 - 1, y: p.y - 3.5,
+                                                         width: 1.5, height: 0.5)))
                     return nil
                 } else {
                     let lyricText = Text(string: pit.lyric, size: 6)
@@ -1992,7 +2000,7 @@ extension ScoreView {
                 $0[$1.color]?.append(($1.p, $1.r))
             }
         }
-        for (color, prs) in knobPrcsDic {
+        for (color, prs) in knobPrcsDic.sorted(by: { $0.key.lightness < $1.key.lightness }) {
             let backKnobPathlines = prs.map {
                 Pathline(circleRadius: $0.r * 1.5, position: $0.p)
             }
@@ -2018,7 +2026,7 @@ extension ScoreView {
                 $0[$1.color]?.append(($1.p, $1.r))
             }
         }
-        for (color, prs) in prsDic {
+        for (color, prs) in prsDic.sorted(by: { $0.key.lightness < $1.key.lightness }) {
             let toneKnobPathlines = prs.map {
                 Pathline(circleRadius: $0.r, position: $0.p)
             }

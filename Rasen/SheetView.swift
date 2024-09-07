@@ -4839,7 +4839,7 @@ final class SheetView: View {
                 let oldNIVS = nivs.map { IndexValue(value: model.score.notes[$0.index],
                                                     index: $0.index) }
                 if oldNIVS != nivs {
-                    print(model.score.notes.count, oldNIVS, nivs)
+                    print("InsertNotesUndoError", model.score.notes.count, oldNIVS, nivs)
                     history[result.version].values[result.valueIndex]
                         .saveUndoItemValue?.set(.insertNotes(oldNIVS), type: reversedType)
                 }
