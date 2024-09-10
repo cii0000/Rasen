@@ -414,7 +414,7 @@ final class ScoreSlider: DragEditor {
                         updatePitsWithSelection()
                         
                         let noteIsSet = Set(beganNotePits.values.flatMap { $0.dic.keys }).sorted()
-                        let vs = score.noteIAndPits(atBeat: note.pits[pitI].beat + note.beatRange.start,
+                        let vs = score.noteIAndNormarizedPits(atBeat: note.pits[pitI].beat + note.beatRange.start,
                                                     in: noteIsSet)
                         playerBeatNoteIndexes = vs.map { $0.noteI }
                         
@@ -465,8 +465,8 @@ final class ScoreSlider: DragEditor {
                         case .endNoteBeat: note.beatRange.end
                         default: scoreView.beat(atX: scoreP.x)
                         }
-                        let vs = score.noteIAndPits(atBeat: playerBeat,
-                                                    in: Set(beganNotes.keys).sorted())
+                        let vs = score.noteIAndNormarizedPits(atBeat: playerBeat,
+                                                              in: Set(beganNotes.keys).sorted())
                         playerBeatNoteIndexes = vs.map { $0.noteI }
                         
                         updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
@@ -546,7 +546,7 @@ final class ScoreSlider: DragEditor {
                             
                             if pitch != oldPitch {
                                 notePlayer?.notes = playerBeatNoteIndexes.map {
-                                    scoreView.pitResult(atBeat: nsBeat, at: $0)
+                                    scoreView.normarizedPitResult(atBeat: nsBeat, at: $0)
                                 }
                                 oldPitch = pitch
                                 
@@ -597,7 +597,7 @@ final class ScoreSlider: DragEditor {
                             
                             if pitch != oldPitch {
                                 notePlayer?.notes = playerBeatNoteIndexes.map {
-                                    scoreView.pitResult(atBeat: neBeat, at: $0)
+                                    scoreView.normarizedPitResult(atBeat: neBeat, at: $0)
                                 }
                                 oldPitch = pitch
                                 
@@ -649,7 +649,7 @@ final class ScoreSlider: DragEditor {
                             if pitch != oldPitch {
                                 let beat: Rational = scoreView.beat(atX: scoreP.x)
                                 notePlayer?.notes = playerBeatNoteIndexes.map {
-                                    scoreView.pitResult(atBeat: beat, at: $0)
+                                    scoreView.normarizedPitResult(atBeat: beat, at: $0)
                                 }
                                 oldPitch = pitch
                                 
@@ -744,7 +744,7 @@ final class ScoreSlider: DragEditor {
                         scoreView.replace(nivs)
                         
                         notePlayer?.notes = playerBeatNoteIndexes.map {
-                            scoreView.pitResult(atBeat: beganStartBeat, at: $0)
+                            scoreView.normarizedPitResult(atBeat: beganStartBeat, at: $0)
                         }
                         
                         document.cursor = .circle(string: Pitch(value: .init(nPitch, intervalScale: Sheet.fullEditPitchInterval)).octaveString(hidableDecimal: false))
@@ -1090,6 +1090,9 @@ extension ScoreView {
     
     func pitResult(atBeat beat: Rational, at noteI: Int) -> Note.PitResult {
         self[noteI].pitResult(atBeat: .init(beat - self[noteI].beatRange.start))
+    }
+    func normarizedPitResult(atBeat beat: Rational, at noteI: Int) -> Note.PitResult {
+        self[noteI].normarizedPitResult(atBeat: .init(beat - self[noteI].beatRange.start))
     }
     
     var option: ScoreOption {

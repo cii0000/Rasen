@@ -66,11 +66,7 @@ extension Note {
         
         let previousPhoneme: Phoneme?, previousFormantFilter: FormantFilter?, previousID: UUID?
         if let preI = i.range.reversed().first(where: { !pits[$0].lyric.isEmpty }) {
-            var preLyric = pits[preI].lyric
-            if preLyric.last == "/" {
-                preLyric.removeLast()
-            }
-            previousPhoneme = Phoneme.phonemes(fromHiragana: preLyric).last
+            previousPhoneme = Phoneme.phonemes(fromHiragana: pits[preI].lyric).last
             previousFormantFilter = .init(spectlope: pits[preI].tone.spectlope)
             previousID = pits[preI].tone.id
         } else {
@@ -767,18 +763,6 @@ extension FormantFilter {
             var n = self
             n[0].pitch -= 20
             n[1].pitch -= 16
-            n = phoneme.isDakuon ? n.toDakuon() : n.multiplyAllVolm(0)
-            return n
-        case .s, .ts, .dz, .ɕ, .tɕ, .dʒ:
-            var n = self
-            n[0].pitch -= 20
-            if phoneme == .ɕ || phoneme == .tɕ || phoneme == .dʒ {
-                n[1].pitch += 7
-                n[2].pitch += 2
-            } else {
-                n[1].pitch += 4
-                n[2].pitch += 1
-            }
             n = phoneme.isDakuon ? n.toDakuon() : n.toVoiceless()
             return n
         case .ha:
@@ -808,9 +792,9 @@ extension FormantFilter {
             var n = withSelfA(to: .a)
             n[0].pitch -= 20
             n[1].dPitch *= 0.75
-            n[1].pitch += 12
+            n[1].pitch += 10
             n[2].pitch -= 2
-            n = n.toDakuon()
+            n = phoneme.isDakuon ? n.toDakuon() : n.toVoiceless()
             return n
         case .kj, .gj:
             var n = withSelfA(to: .i)
@@ -844,24 +828,31 @@ extension FormantFilter {
             n[2].pitch -= 3
             n = phoneme.isDakuon ? n.toDakuon() : n.toVoiceless()
             return n
-        case .ta, .da:
+        case .sa, .dza, .ta, .da:
             var n = self
             n[0].pitch -= 20
             n[2].pitch += 1
             n = phoneme.isDakuon ? n.toDakuon() : n.toVoiceless()
             return n
-        case .ti, .di, .tu, .du, .to, .do:
+        case .sβ, .dzβ, .so, .dzo, .tβ, .dβ, .ts, .to, .do:
             var n = self
             n[0].pitch -= 20
             n[1].pitch += 4
             n[2].pitch += 1
             n = phoneme.isDakuon ? n.toDakuon() : n.toVoiceless()
             return n
-        case .te, .de:
+        case .se, .dze, .te, .de:
             var n = withSelfA(to: .e)
             n[0].pitch -= 20
             n[1].pitch -= 4
             n[2].pitch += 1
+            n = phoneme.isDakuon ? n.toDakuon() : n.toVoiceless()
+            return n
+        case .ɕ, .dʒ, .tɕ, .tj, .dj:
+            var n = self
+            n[0].pitch -= 20
+            n[1].pitch += 7
+            n[2].pitch += 2
             n = phoneme.isDakuon ? n.toDakuon() : n.toVoiceless()
             return n
         case .off:
@@ -870,28 +861,32 @@ extension FormantFilter {
             n[3].formMultiplyNoise(0.6)
             n[4].formMultiplyNoise(0.5)
             return n
+        case .sokuon:
+            return withSelfA(to: .ɯ).toSokuon()
+        case .haBreath:
+            return withSelfA(to: .a).toFricative(isO: false).toNoise().toBreath()
+        case .aBreath, .iBreath, .ɯBreath, .eBreath, .oBreath:
+            let nPhoneme: Phoneme = switch phoneme {
+            case .aBreath: .ha
+            case .iBreath: .ç
+            case .ɯBreath: .ɸ
+            case .eBreath: .he
+            case .oBreath: .ho
+            default: fatalError()
+            }
+            return withSelfA(to: nPhoneme).applyNoise(nPhoneme).toBreath()
         default: return self
         }
     }
     
-    func applyNoise(_ phoneme: Phoneme, opacity: Double) -> Self {
+    func applyNoise(_ phoneme: Phoneme, opacity: Double = 1) -> Self {
         switch phoneme {
-        case .ta, .ti, .tu, .te, .to, 
-                .da, .di, .du, .de, .do,
-                .ka, .kj, .kβ, .ke, .ko,
-                .ga, .gj, .gβ, .ge, .go:
+        case .ta, .tj, .tβ, .te, .to, .da, .dj, .dβ, .de, .do:
             var n = offVolm(from: 4)
-            switch phoneme {
-            case .ta, .ti, .tu, .te, .to,
-                    .da, .di, .du, .de, .do,
-                    .ka, .kj, .kβ, .ke, .ko:
-                n[0].fillAllVolm(0)
-                n.formFillEsVolm(0, at: 0)
-            default:
-                n[0].fillAllVolm(0.6)
-                n.formFillEsVolm(0, at: 0)
-            }
+            n[0].fillAllVolm(0)
+            n.formFillEsVolm(0, at: 0)
             n.fillEsVolm(0, at: 1)
+            n[1].fillVolm(0)
             n.fillEsNoise(1, at: 1)
             n[2].fillVolm(0.25)
             n[2].fillNoise(1)
@@ -901,49 +896,63 @@ extension FormantFilter {
             n[3].fillNoise(1)
             n.fillEsVolm(0.25, at: 3)
             n.fillEsNoise(0.75, at: 3)
-            switch phoneme {
-            case .ta, .ti, .tu, .te, .to,
-                    .da, .di, .du, .de, .do:
-                n[1].fillVolm(0)
-                n[4].fillVolm(0.25)
-                n[5].fillVolm(0.125)
-            default:
-                n[4].fillVolm(0.35)
-                n[5].fillVolm(0.1)
-            }
+            n[4].fillVolm(0.25)
             n[4].fillNoise(1)
             n.fillEsNoise(0.25, at: 4)
+            n[5].fillVolm(0.125)
             n[5].fillNoise(1)
             return .linear(self, n, t: opacity)
-        case .s, .ts, .dz:
-            var n = toNoise(from: 2)
-            if phoneme == .s || phoneme == .ts {
+        case .ka, .kj, .kβ, .ke, .ko, .ga, .gj, .gβ, .ge, .go:
+            var n = offVolm(from: 4)
+            switch phoneme {
+            case .ka, .kj, .kβ, .ke, .ko:
                 n[0].fillAllVolm(0)
-                n.formFillEsVolm(0, at: 0)
-            } else {
+            default: break
+            }
+            n.formFillEsVolm(0, at: 0)
+            n.fillEsVolm(0, at: 1)
+            n.fillEsNoise(1, at: 1)
+            n[2].fillVolm(0.0625)
+            n[2].fillNoise(1)
+            n.fillEsVolm(0.125, at: 2)
+            n.fillEsNoise(1, at: 2)
+            n[3].fillVolm(0.125)
+            n[3].fillNoise(1)
+            n.fillEsVolm(0.125, at: 3)
+            n.fillEsNoise(1, at: 3)
+            n[4].fillVolm(0.0625)
+            n[4].fillNoise(1)
+            n[5].fillVolm(0)
+            return .linear(self, n, t: opacity)
+        case .sa, .sβ, .se, .so, .dza, .dzβ, .dze, .dzo, .ts:
+            var n = toNoise(from: 2)
+            if phoneme.isDakuon {
                 n[0].fillAllVolm(0.6)
                 n.formFillEsVolm(0, at: 0)
+            } else {
+                n[0].fillAllVolm(0)
+                n.formFillEsVolm(0, at: 0)
             }
-            n[1].fillVolm(0)
+            n[1].fillVolm(0.0625)
             n.fillEsVolm(0, at: 1)
             n[2].fillVolm(0.1)
             n.formFillEsVolm(0.05, at: 2)
             n[3].fillVolm(0.15)
-            n.formFillEsVolm(0.2, at: 3)
-            n[4].sVolm = 0.3
-            n[4].eVolm = 0.4
-            n.formFillEsVolm(0.55, at: 4)
-            n[5].sVolm = 0.45
+            n.formFillEsVolm(0.45, at: 3)
+            n[4].sVolm = 0.5
+            n[4].eVolm = 0.55
+            n.formFillEsVolm(0.65, at: 4)
+            n[5].sVolm = 0.55
             n[5].eVolm = 0.3
             n[5].edVolm = 0.2
             return .linear(self, n, t: opacity)
-        case .ɕ, .tɕ, .dʒ:
+        case .ɕ, .dʒ, .tɕ:
             var n = toNoise(from: 2)
-            if phoneme == .ɕ || phoneme == .tɕ {
-                n[0].fillAllVolm(0)
+            if phoneme.isDakuon {
+                n[0].fillAllVolm(0.6)
                 n.formFillEsVolm(0, at: 0)
             } else {
-                n[0].fillAllVolm(0.6)
+                n[0].fillAllVolm(0)
                 n.formFillEsVolm(0, at: 0)
             }
             n[1].fillVolm(0)
@@ -1179,34 +1188,25 @@ struct Mora: Hashable, Codable {
             vowel = phonemes.last!
             phonemes.removeLast()
         case .sokuon:
-            let ff = baseFf.withSelfA(to: .ɯ).toSokuon()
+            let ff = baseFf.withSelfA(to: .sokuon)
             keyFormantFilters = if let preFf = previousFormantFilter {
-                [.init(preFf, durSec: -0.06), .init(ff, durSec: 0)]
+                [.init(preFf, durSec: 0.06, sec: -0.06), .init(ff, sec: 0)]
             } else {
-                [.init(ff, durSec: 0)]
+                [.init(ff, sec: 0)]
             }
             return
         case .haBreath:
-            let aFf = baseFf.withSelfA(to: .a)
-            let ff = aFf.toFricative(isO: false).toNoise().toBreath()
+            let ff = baseFf.withSelfA(to: .haBreath)
             keyFormantFilters = if let preFf = previousFormantFilter {
-                [.init(preFf, durSec: -0.06), .init(ff, durSec: 0)]
+                [.init(preFf, durSec: 0.06, sec: -0.06), .init(ff, durSec: 0)]
             } else {
                 [.init(ff, durSec: 0)]
             }
             return
         case .aBreath, .iBreath, .ɯBreath, .eBreath, .oBreath:
-            let nPhoneme: Phoneme = switch phonemes.last! {
-            case .aBreath: .ha
-            case .iBreath: .ç
-            case .ɯBreath: .ɸ
-            case .eBreath: .he
-            case .oBreath: .ho
-            default: fatalError()
-            }
-            let ff = baseFf.withSelfA(to: nPhoneme).applyNoise(nPhoneme, opacity: 1).toBreath()
+            let ff = baseFf.withSelfA(to: phonemes.last!)
             keyFormantFilters = if let preFf = previousFormantFilter {
-                [.init(preFf, durSec: -0.06), .init(ff, durSec: 0)]
+                [.init(preFf,durSec: 0.06,  sec: -0.06), .init(ff, durSec: 0)]
             } else {
                 [.init(ff, durSec: 0)]
             }
@@ -1267,14 +1267,15 @@ struct Mora: Hashable, Codable {
         } else {
             let oph = phonemes[0]
             let onsetScale = previousPhoneme == .sokuon ? 1.5 : 1
-            let onsetDurSec: Double
-            var pitch = Rational(0), paddingSec = 0.05, offSec = 0.0
+            let onsetDurSec: Double, pitch: Rational, paddingSec: Double
             switch oph {
             case .n, .nj:
                 onsetDurSec = 0.06
+                pitch = 0
                 paddingSec = 0.03
             case .m, .mj:
                 onsetDurSec = 0.04
+                pitch = 0
                 paddingSec = 0.03
             case .ɾ, .ɾj:
                 onsetDurSec = 0.0075
@@ -1283,66 +1284,122 @@ struct Mora: Hashable, Codable {
             case .p, .pj:
                 onsetDurSec = 0.03
                 pitch = -2
+                paddingSec = 0.05
             case .b, .bj:
                 onsetDurSec = 0.01
                 pitch = -2
-            case .s, .ɕ:
-                onsetDurSec = 0.06 * onsetScale
+                paddingSec = 0.05
+            case .sa, .ɕ, .sβ, .se, .so:
+                onsetDurSec = 0.065 * onsetScale
                 pitch = -3
-            case .dz, .dʒ:
+                paddingSec = 0.05
+            case .dza, .dʒ, .dzβ, .dze, .dzo:
                 onsetDurSec = 0.02 * onsetScale
                 pitch = -3
+                paddingSec = 0.05
             case .ha, .he, .ho:
                 onsetDurSec = 0.02 * onsetScale
                 pitch = -3
+                paddingSec = 0.05
             case .ç:
                 onsetDurSec = 0.04 * onsetScale
                 pitch = -3
+                paddingSec = 0.05
             case .ɸ:
                 onsetDurSec = 0.02 * onsetScale
                 pitch = -3
+                paddingSec = 0.05
             case .ka, .kj, .kβ, .ke, .ko:
-                offSec = 0.04
                 onsetDurSec = 0.0075
                 pitch = -3
+                paddingSec = 0.05
             case .ga, .gj, .gβ, .ge, .go:
                 onsetDurSec = 0.0075
                 pitch = -3
-            case .ta, .ti, .tu, .te, .to:
-                offSec = 0.035
+                paddingSec = 0.05
+            case .ta, .tj, .tβ, .te, .to:
                 onsetDurSec = 0.01
-                paddingSec = 0.03
                 pitch = -3
+                paddingSec = 0.03
             case .tɕ:
-                offSec = 0.02
                 onsetDurSec = 0.05 * onsetScale
                 pitch = -3
+                paddingSec = 0.05
             case .ts:
-                offSec = 0.02
                 onsetDurSec = 0.03 * onsetScale
                 pitch = -3
-            case .da, .di, .du, .de, .do:
+                paddingSec = 0.05
+            case .da, .dj, .dβ, .de, .do:
                 onsetDurSec = 0.03
-                paddingSec = 0.03
                 pitch = -3
+                paddingSec = 0.03
             default:
                 onsetDurSec = 0
+                pitch = 0
+                paddingSec = 0.05
             }
             
             let nextFf = youonFf ?? vowelFf
             let nFf = baseFf.withSelfA(to: oph)
             switch oph {
+            case .n, .nj:
+                if let preFf = previousFormantFilter, let id = previousID {
+                    var ff1 = preFf
+                    ff1[1] = .linear(ff1[1], nFf[1], t: 0.5)
+                    
+                    kffs.append(.init(preFf, durSec: paddingSec * 0.75, id: id))
+                    kffs.append(.init(ff1, durSec: paddingSec))
+                }
+                kffs.append(.init(nFf, durSec: onsetDurSec, pitch: pitch))
+                kffs.append(.init(nFf, durSec: paddingSec * 0.75, pitch: pitch))
+                centerI = kffs.count
+                if let youonFf {
+                    kffs.append(.init(youonFf, durSec: youonDurSec))
+                    kffs.append(.init(vowelFf, durSec: 0))
+                } else {
+                    var ff0 = nextFf
+                    ff0[0].pitch = .linear(nFf[0].pitch, nextFf[0].pitch, t: 0.5)
+                    ff0[1].fillVolm(.linear(nFf[1].volm, nextFf[1].volm, t: 0.25))
+                    ff0[1].pitch = .linear(nFf[1].pitch, nextFf[1].pitch, t: 0.75)
+                    
+                    kffs.append(.init(ff0, durSec: paddingSec))
+                    kffs.append(.init(vowelFf, durSec: 0))
+                }
+            case .ɾ, .ɾj:
+                if let preFf = previousFormantFilter, let id = previousID {
+                    var ff1 = preFf
+                    ff1[1] = .linear(ff1[1], nFf[1], t: 0.5)
+                    
+                    kffs.append(.init(preFf, durSec: paddingSec * 0.75, id: id))
+                    kffs.append(.init(ff1, durSec: paddingSec))
+                }
+                kffs.append(.init(nFf, durSec: onsetDurSec, pitch: pitch))
+                kffs.append(.init(nFf, durSec: paddingSec, pitch: pitch))
+                centerI = kffs.count
+                if let youonFf {
+                    kffs.append(.init(youonFf, durSec: youonDurSec))
+                    kffs.append(.init(vowelFf, durSec: 0))
+                } else {
+                    var ff0 = nextFf
+                    ff0[1].fillVolm(.linear(nextFf[1].volm, nFf[1].volm, t: 0.75))
+                    ff0[1].pitch = .linear(nextFf[1].pitch, nFf[1].pitch, t: 0.75)
+                    
+                    kffs.append(.init(ff0, durSec: paddingSec * 1.5))
+                    kffs.append(.init(vowelFf, durSec: 0))
+                }
             case .ha, .ç, .ɸ, .he, .ho:
-                let onsetFf = nFf.applyNoise(oph, opacity: 1)
+                let onsetFf = nFf.applyNoise(oph)
                 if let preFf = previousFormantFilter, let id = previousID {
                     var ff0 =  preFf
                     ff0[1] = .linear(preFf[1], onsetFf[1], t: 0.35)
+                    
                     kffs.append(.init(preFf, durSec: paddingSec * 0.5, id: id))
                     kffs.append(.init(ff0, durSec: paddingSec, pitch: 0))
                 }
                 var ff0 = onsetFf
                 ff0[2].fillVolm(onsetFf[3].sdVolm)
                 ff0[4].fillVolm(onsetFf[4].edVolm)
+                
                 kffs.append(.init(ff0, durSec: onsetDurSec, pitch: pitch))
                 kffs.append(.init(onsetFf, durSec: paddingSec, pitch: pitch))
                 centerI = kffs.count
@@ -1350,8 +1407,74 @@ struct Mora: Hashable, Codable {
                     kffs.append(.init(youonFf, durSec: youonDurSec))
                 }
                 kffs.append(.init(vowelFf, durSec: 0))
-            case .s, .ɕ:
-                let onsetFf = nFf.applyNoise(oph, opacity: 1)
+            case .ka, .kj, .kβ, .ke, .ko:
+                if let preFf = previousFormantFilter, let id = previousID {
+                    let nnFf = FormantFilter.linear(preFf, nFf, t: 0.75)
+                    kffs.append(.init(preFf, durSec: 0.03, id: id))
+                    kffs.append(.init(nnFf.multiplyAllVolm(0), durSec: 0.04, pitch: pitch))
+                } else {
+                    kffs.append(.init(nFf.multiplyAllVolm(0), durSec: 0.04, pitch: pitch))
+                }
+                kffs.append(.init(nFf.multiplyAllVolm(0), durSec: paddingSec * 0.25, pitch: pitch))
+                
+                var ff0 = nFf.applyNoise(oph)
+                ff0[1].pitch = .linear(nFf[1].pitch, nextFf[1].pitch, t: 0.25)
+                let fScale = switch oph {
+                case .ka: 0.6
+                case .kj, .ke: 1.0
+                default: 1.25
+                }
+                ff0[1].fillVolm(fScale * .linear(nFf[1].volm, nextFf[1].volm, t: 0.75))
+                ff0[1].fillNoise(0.75)
+                ff0[1].sdPitch *= 1.25
+                ff0[1].dPitch *= 2
+                ff0[1].edPitch *= 1.25
+                
+                kffs.append(.init(ff0, durSec: paddingSec * 0.25, pitch: pitch * 4 / 5))
+                
+                var ff1 = FormantFilter.linear(ff0, nextFf, t: 0.25)
+                ff1[3].edVolm = nextFf[3].edVolm
+                ff1[4] = nextFf[4]
+                ff1[5] = nextFf[5]
+                
+                kffs.append(.init(ff1, durSec: paddingSec * 0.5, pitch: pitch / 2))
+                centerI = kffs.count
+                if let youonFf {
+                    kffs.append(.init(youonFf, durSec: youonDurSec))
+                }
+                kffs.append(.init(vowelFf, durSec: 0))
+            case .ga, .gj, .gβ, .ge, .go:
+                if let preFf = previousFormantFilter, let id = previousID {
+                    kffs.append(.init(preFf, durSec: paddingSec, id: id))
+                }
+                kffs.append(.init(nFf, durSec: paddingSec * 0.25, pitch: pitch))
+                
+                var ff0 = nFf.applyNoise(oph)
+                let fScale = switch oph {
+                case .ga: 0.6
+                case .gj, .ge: 1.0
+                default: 1.25
+                }
+                ff0[1].fillVolm(fScale * .linear(ff0[1].volm, nextFf[1].volm, t: 0.75))
+                ff0[1].fillNoise(0.75)
+                ff0[1].sdPitch *= 1.25
+                ff0[1].dPitch *= 2
+                ff0[1].edPitch *= 1.25
+                
+                kffs.append(.init(ff0, durSec: paddingSec * 0.25, pitch: pitch * 4 / 5))
+                
+                var ff1 = ff0.mid(nextFf)
+                ff1[1].pitch = .linear(ff0[1].pitch, nextFf[1].pitch, t: 0.25)
+                ff1[1].fillVolm(ff0[1].volm)
+                
+                kffs.append(.init(ff1, durSec: paddingSec * 0.5, pitch: pitch / 2))
+                centerI = kffs.count
+                if let youonFf {
+                    kffs.append(.init(youonFf, durSec: youonDurSec))
+                }
+                kffs.append(.init(vowelFf, durSec: 0))
+            case .sa, .ɕ, .sβ, .se, .so:
+                let onsetFf = nFf.applyNoise(oph)
                 if let preFf = previousFormantFilter, let id = previousID {
                     var ff00 = preFf.mid(onsetFf)
                     for i in ff00.count.range {
@@ -1359,6 +1482,7 @@ struct Mora: Hashable, Codable {
                     }
                     ff00[0].fillVolm(.linear(preFf[0].volm, onsetFf[0].volm, t: 0.25))
                     ff00[1].fillVolm(.linear(preFf[1].volm, onsetFf[1].volm, t: 0.25))
+                    
                     kffs.append(.init(preFf, durSec: 0.03, id: id))
                     kffs.append(.init(ff00, durSec: 0.02, id: id))
                 } else {
@@ -1366,19 +1490,23 @@ struct Mora: Hashable, Codable {
                 }
                 var onsetFf0 = onsetFf
                 onsetFf0.formMultiplyEsVolm(0.7, at: 4)
+                
                 kffs.append(.init(onsetFf0, durSec: onsetDurSec, pitch: pitch))
                 kffs.append(.init(onsetFf, durSec: 0.03, pitch: pitch))
+                
                 var ff0 = nextFf
                 ff0[0] = .linear(onsetFf[0], nextFf[0], t: 0.5)
                 ff0[1] = .linear(onsetFf[1], nextFf[1], t: 0.5)
+                ff0[1].fillVolm(.linear(onsetFf[1].volm, nextFf[1].volm, t: 0.75))
+                
                 kffs.append(.init(ff0, durSec: 0.03))
                 centerI = kffs.count
                 if let youonFf {
                     kffs.append(.init(youonFf, durSec: youonDurSec))
                 }
                 kffs.append(.init(vowelFf, durSec: 0))
-            case .dz, .dʒ:
-                let onsetFf = nFf.applyNoise(oph, opacity: 1)
+            case .dza, .dʒ, .dzβ, .dze, .dzo:
+                let onsetFf = nFf.applyNoise(oph)
                 if let preFf = previousFormantFilter, let id = previousID {
                     kffs.append(.init(preFf, durSec: paddingSec, id: id))
                 } else {
@@ -1394,53 +1522,18 @@ struct Mora: Hashable, Codable {
                     ff0[3].edVolm = nextFf[3].edVolm
                     ff0[4] = nextFf[4]
                     ff0[5] = nextFf[5]
+                    
                     centerI = kffs.count
                     kffs.append(.init(ff0, durSec: 0.02))
                 }
                 kffs.append(.init(vowelFf, durSec: 0))
-            case .ka, .kj, .kβ, .ke, .ko:
-                let onsetFf = nFf.applyNoise(oph, opacity: 1)
-                if let preFf = previousFormantFilter, let id = previousID {
-                    let nnFf = FormantFilter.linear(preFf, nFf, t: 0.75)
-                    kffs.append(.init(preFf, durSec: 0.03, id: id))
-                    kffs.append(.init(nnFf.multiplyAllVolm(0), durSec: offSec, pitch: pitch))
-                } else {
-                    kffs.append(.init(onsetFf.multiplyAllVolm(0), durSec: offSec, pitch: pitch))
+            case .ta, .tj, .tβ, .te, .to, .tɕ, .ts:
+                let offSec = switch oph {
+                case .tɕ, .ts: 0.02
+                default: 0.035
                 }
-                kffs.append(.init(onsetFf.multiplyAllVolm(0), durSec: paddingSec * 0.25, pitch: pitch))
-                var ff0 = onsetFf
-                ff0[1].pitch = .linear(nFf[1].pitch, nextFf[1].pitch, t: 0.25)
-                ff0[1].fillVolm((oph == .ka ? 0.8 : 1.5) * .linear(nFf[1].volm, nextFf[1].volm, t: 0.65))
-                ff0[1].sdPitch *= 1.25
-                ff0[1].dPitch *= 2
-                ff0[1].edPitch *= 1.25
-                kffs.append(.init(ff0, durSec: paddingSec * 0.75, pitch: pitch / 2))
-                centerI = kffs.count
-                if let youonFf {
-                    kffs.append(.init(youonFf, durSec: youonDurSec))
-                }
-                kffs.append(.init(vowelFf, durSec: 0))
-            case .ga, .gj, .gβ, .ge, .go:
-                if let preFf = previousFormantFilter, let id = previousID {
-                    kffs.append(.init(preFf, durSec: paddingSec, id: id))
-                }
-                kffs.append(.init(nFf, durSec: onsetDurSec, pitch: pitch))
-                kffs.append(.init(nFf, durSec: paddingSec * 0.25, pitch: pitch))
-                var ff0 = nFf.mid(nextFf)
-                ff0[1].pitch = .linear(nFf[1].pitch, nextFf[1].pitch, t: 0.25)
-                ff0[1].fillVolm((oph == .ga ? 0.8 : 1.5) * .linear(nFf[1].volm, nextFf[1].volm, t: 0.65))
-                ff0[1].sdPitch *= 1.25
-                ff0[1].dPitch *= 2
-                ff0[1].edPitch *= 1.25
-                kffs.append(.init(ff0, durSec: paddingSec * 0.75, pitch: pitch / 2))
-                centerI = kffs.count
-                if let youonFf {
-                    kffs.append(.init(youonFf, durSec: youonDurSec))
-                }
-                kffs.append(.init(vowelFf, durSec: 0))
-            case .ta, .ti, .tu, .te, .to, .tɕ, .ts:
                 let onsetLastDurSec = 0.015
-                let onsetFf = nFf.applyNoise(oph, opacity: 1)
+                let onsetFf = nFf.applyNoise(oph)
                 if let preFf = previousFormantFilter, let id = previousID {
                     let nnFf = FormantFilter.linear(preFf, nFf, t: 0.75)
                     kffs.append(.init(preFf, durSec: paddingSec, id: id))
@@ -1460,13 +1553,15 @@ struct Mora: Hashable, Codable {
                     ff0[1].fillVolm(nextFf[1].volm)
                     ff0[1].pitch = .linear(nFf[1].pitch, nextFf[1].pitch, t: 0.75)
                     ff0.formMultiplyEsVolm(.linear(nFf[0].volm, nextFf[0].volm, t: 0.25), at: 0)
+                    
                     kffs.append(.init(ff0, durSec: paddingSec * 2))
                     kffs.append(.init(vowelFf, durSec: 0))
                 }
-            case .da, .di, .du, .de, .do:
+            case .da, .dj, .dβ, .de, .do:
                 if let preFf = previousFormantFilter, let id = previousID {
                     var ff1 = preFf
                     ff1[1] = .linear(ff1[1], nFf[1], t: 0.5)
+                    
                     kffs.append(.init(preFf, durSec: paddingSec * 0.75, id: id))
                     kffs.append(.init(ff1, durSec: paddingSec))
                 }
@@ -1482,48 +1577,8 @@ struct Mora: Hashable, Codable {
                     ff0[1].fillVolm(nextFf[1].volm)
                     ff0[1].pitch = .linear(nFf[1].pitch, nextFf[1].pitch, t: 0.75)
                     ff0.formMultiplyEsVolm(.linear(nFf[0].volm, nextFf[0].volm, t: 0.25), at: 0)
+                    
                     kffs.append(.init(ff0, durSec: paddingSec * 2))
-                    kffs.append(.init(vowelFf, durSec: 0))
-                }
-            case .n, .nj:
-                if let preFf = previousFormantFilter, let id = previousID {
-                    var ff1 = preFf
-                    ff1[1] = .linear(ff1[1], nFf[1], t: 0.5)
-                    kffs.append(.init(preFf, durSec: paddingSec * 0.75, id: id))
-                    kffs.append(.init(ff1, durSec: paddingSec))
-                }
-                kffs.append(.init(nFf, durSec: onsetDurSec, pitch: pitch))
-                kffs.append(.init(nFf, durSec: paddingSec * 0.75, pitch: pitch))
-                centerI = kffs.count
-                if let youonFf {
-                    kffs.append(.init(youonFf, durSec: youonDurSec))
-                    kffs.append(.init(vowelFf, durSec: 0))
-                } else {
-                    var ff0 = nextFf
-                    ff0[0].pitch = .linear(nFf[0].pitch, nextFf[0].pitch, t: 0.5)
-                    ff0[1].fillVolm(.linear(nFf[1].volm, nextFf[1].volm, t: 0.25))
-                    ff0[1].pitch = .linear(nFf[1].pitch, nextFf[1].pitch, t: 0.75)
-                    kffs.append(.init(ff0, durSec: paddingSec))
-                    kffs.append(.init(vowelFf, durSec: 0))
-                }
-            case .ɾ, .ɾj:
-                if let preFf = previousFormantFilter, let id = previousID {
-                    var ff1 = preFf
-                    ff1[1] = .linear(ff1[1], nFf[1], t: 0.5)
-                    kffs.append(.init(preFf, durSec: paddingSec * 0.75, id: id))
-                    kffs.append(.init(ff1, durSec: paddingSec))
-                }
-                kffs.append(.init(nFf, durSec: onsetDurSec, pitch: pitch))
-                kffs.append(.init(nFf, durSec: paddingSec, pitch: pitch))
-                centerI = kffs.count
-                if let youonFf {
-                    kffs.append(.init(youonFf, durSec: youonDurSec))
-                    kffs.append(.init(vowelFf, durSec: 0))
-                } else {
-                    var ff0 = nextFf
-                    ff0[1].fillVolm(.linear(nextFf[1].volm, nFf[1].volm, t: 0.75))
-                    ff0[1].pitch = .linear(nextFf[1].pitch, nFf[1].pitch, t: 0.75)
-                    kffs.append(.init(ff0, durSec: paddingSec * 1.5))
                     kffs.append(.init(vowelFf, durSec: 0))
                 }
             default:
@@ -1558,15 +1613,18 @@ enum Phoneme: String, Hashable, Codable, CaseIterable {
     case a, i, ɯ, e, o, j, ja, β, ɴ,
          n, nj, m, mj, ɾ, ɾj,
          ha, ç, ɸ, he, ho,
-         p, pj,
-         s, ɕ,
-         tɕ, ts, ta, ti, tu, te, to,
+         p, pj, b, bj,
          ka, kj, kβ, ke, ko,
-         kjRes = "/kj", kβRes = "/kβ", tɕRes = "/tɕ", tsRes = "/tsβ", pjRes = "/pj", pRes = "/p",
-         çRes = "/ç", ɸRes = "/ɸ", sjRes = "/sj", sβRes = "/sβ",
-         b, bj,
-         dz, dʒ, da, di, du, de, `do`,
          ga, gj, gβ, ge, go,
+         sa, ɕ, sβ, se, so,
+         dza, dʒ, dzβ, dze, dzo,
+         ta, tj, tβ, te, to, tɕ, ts,
+         da, dj, dβ, de, `do`,
+         çRes = "/ç", ɸRes = "/ɸ",
+         pjRes = "/pj", pRes = "/p",
+         kjRes = "/kj", kβRes = "/kβ",
+         ɕRes = "/ɕ", sβRes = "/sβ",
+         tɕRes = "/tɕ", tsRes = "/ts",
          sokuon = "_", off = ".", voiceless = ",",
          haBreath = "~a",
          aBreath = "^a", iBreath = "^i", ɯBreath = "^ɯ", eBreath = "^e", oBreath = "^o"
@@ -1585,7 +1643,8 @@ extension Phoneme {
     var isDakuon: Bool {
         switch self {
         case .ga, .gj, .gβ, .ge, .go, 
-                .dz, .dʒ, .da, .di, .du, .de, .do,
+                .dza, .dʒ, .dzβ, .dze, .dzo,
+                .da, .dj, .dβ, .de, .do,
                 .b, .bj: true
         default: false
         }
@@ -1593,8 +1652,8 @@ extension Phoneme {
     var isHaretsu: Bool {
         switch self {
         case .ka, .kj, .kβ, .ke, .ko,
-                .s, .ɕ,
-                .tɕ, .ts, .ta, .ti, .tu, .te, .to,
+                .sa, .ɕ, .sβ, .se, .so,
+                .ta, .tj, .tβ, .te, .to, .tɕ, .ts,
                 .ha, .ç, .ɸ, .he, .ho,
                 .p, .pj: true
         default: false
@@ -1614,20 +1673,32 @@ extension Phoneme {
     }
     var isVowelReduction: Bool {
         switch self {
-        case .kjRes, .kβRes, .tɕRes, .tsRes, .pjRes, .pRes, .çRes, .ɸRes, .sjRes, .sβRes: true
+        case .kjRes, .kβRes, .tɕRes, .tsRes, .pjRes, .pRes, .çRes, .ɸRes, .ɕRes, .sβRes: true
         default: false
         }
     }
     
     var isK: Bool {
         switch self {
-        case .ka, .kj, .kβ, .ke, .ko: true
+        case .ka, .kj, .kβ, .ke, .ko, .kjRes, .kβRes: true
         default: false
         }
     }
     var isG: Bool {
         switch self {
         case .ga, .gj, .gβ, .ge, .go: true
+        default: false
+        }
+    }
+    var isS: Bool {
+        switch self {
+        case .sa, .ɕ, .sβ, .se, .so, .ɕRes, .sβRes: true
+        default: false
+        }
+    }
+    var isDz: Bool {
+        switch self {
+        case .dza, .dʒ, .dzβ, .dze, .dzo: true
         default: false
         }
     }
@@ -1666,39 +1737,39 @@ extension Phoneme {
         case "ぐぃ", "gwi": [.gβ, .β, .ɯ]
         case "ぐぇ", "gwe": [.gβ, .β, .e]
         case "ぐぉ", "gwo": [.gβ, .β, .o]
-        case "さ", "sa": [.s, .a]
+        case "さ", "sa": [.sa, .a]
         case "し", "si", "shi": [.ɕ, .i]
-        case "す", "su": [.s, .ɯ]
-        case "せ", "se": [.s, .e]
-        case "そ", "so": [.s, .o]
+        case "す", "su": [.sβ, .ɯ]
+        case "せ", "se": [.se, .e]
+        case "そ", "so": [.so, .o]
         case "しゃ", "sya", "sha": [.ɕ, .a]
         case "しゅ", "syu", "shu": [.ɕ, .ɯ]
         case "しぇ", "sye", "she": [.ɕ, .e]
         case "しょ", "syo", "sho": [.ɕ, .o]
-        case "すぁ", "すゎ", "swa": [.s, .β, .a]
-        case "すぃ", "swi": [.s, .β, .i]
-        case "すぇ", "swe": [.s, .β, .e]
-        case "すぉ", "swo": [.s, .β, .o]
-        case "ざ", "za": [.dz, .a]
+        case "すぁ", "すゎ", "swa": [.sβ, .β, .a]
+        case "すぃ", "swi": [.sβ, .β, .i]
+        case "すぇ", "swe": [.sβ, .β, .e]
+        case "すぉ", "swo": [.sβ, .β, .o]
+        case "ざ", "za": [.dza, .a]
         case "じ", "ぢ", "zi", "ji", "di": [.dʒ, .i]
-        case "ず", "づ", "zu", "du": [.dz, .ɯ]
-        case "ぜ", "ze": [.dz, .e]
-        case "ぞ", "zo": [.dz, .o]
+        case "ず", "づ", "zu", "du": [.dzβ, .ɯ]
+        case "ぜ", "ze": [.dze, .e]
+        case "ぞ", "zo": [.dzo, .o]
         case "じゃ", "ぢゃ", "ja", "jya", "zya", "dya": [.dʒ, .ja, .a]
         case "じゅ", "ぢゅ", "ju", "jyu", "zyu", "dyu": [.dʒ, .j, .ɯ]
         case "じぇ", "ぢぇ", "je", "jye", "zye", "dye": [.dʒ, .j, .e]
         case "じょ", "ぢょ", "jo", "jyo", "zyo", "dyo": [.dʒ, .j, .o]
-        case "ずぁ", "ずゎ", "づぁ", "づゎ", "zwa": [.dz, .β, .a]
-        case "ずぃ", "づぃ", "zwi", "dwi": [.dz, .β, .i]
-        case "ずぇ", "づぇ", "zwe", "dwe": [.dz, .β, .e]
-        case "ずぉ", "づぉ", "zwo", "dwo": [.dz, .β, .o]
+        case "ずぁ", "ずゎ", "づぁ", "づゎ", "zwa": [.dzβ, .β, .a]
+        case "ずぃ", "づぃ", "zwi", "dwi": [.dzβ, .β, .i]
+        case "ずぇ", "づぇ", "zwe", "dwe": [.dzβ, .β, .e]
+        case "ずぉ", "づぉ", "zwo", "dwo": [.dzβ, .β, .o]
         case "た", "ta": [.ta, .a]
         case "ち", "ti", "chi": [.tɕ, .i]
         case "つ", "tu", "tsu": [.ts, .ɯ]
         case "て", "te": [.te, .e]
         case "と", "to": [.to, .o]
-        case "てぃ", "thi": [.ti, .i]
-        case "とぅ", "twu": [.tu, .ɯ]
+        case "てぃ", "thi": [.tj, .i]
+        case "とぅ", "twu": [.tβ, .ɯ]
         case "ちゃ", "cya", "cha": [.tɕ, .ja, .a]
         case "ちゅ", "cyu", "chu": [.tɕ, .j, .ɯ]
         case "ちぇ", "cye", "che": [.tɕ, .j, .e]
@@ -1707,27 +1778,27 @@ extension Phoneme {
         case "つぃ", "tuxi": [.ts, .β, .i]
         case "つぇ", "tuxe": [.ts, .β, .e]
         case "つぉ", "tuxo": [.ts, .β, .o]
-        case "てゃ", "tha": [.ti, .ja, .a]
-        case "てゅ", "thu": [.ti, .j, .ɯ]
-        case "てぇ", "the": [.ti, .j, .e]
-        case "てょ", "tho": [.ti, .j, .o]
-        case "とぁ", "とゎ", "twa": [.tu, .β, .a]
-        case "とぃ", "twi": [.tu, .β, .i]
-        case "とぇ", "twe": [.tu, .β, .e]
-        case "とぉ", "two": [.tu, .β, .o]
+        case "てゃ", "tha": [.tj, .ja, .a]
+        case "てゅ", "thu": [.tj, .j, .ɯ]
+        case "てぇ", "the": [.tj, .j, .e]
+        case "てょ", "tho": [.tj, .j, .o]
+        case "とぁ", "とゎ", "twa": [.tβ, .β, .a]
+        case "とぃ", "twi": [.tβ, .β, .i]
+        case "とぇ", "twe": [.tβ, .β, .e]
+        case "とぉ", "two": [.tβ, .β, .o]
         case "だ", "da": [.da, .a]
-        case "でぃ", "dhi": [.di, .i]
-        case "どぅ", "dhwu": [.du, .ɯ]
+        case "でぃ", "dhi": [.dj, .i]
+        case "どぅ", "dhwu": [.dβ, .ɯ]
         case "で", "de": [.de, .e]
         case "ど", "do": [.do, .o]
-        case "でゃ", "dha": [.di, .ja, .a]
-        case "でゅ", "dhu": [.di, .j, .ɯ]
-        case "でぇ", "dhe": [.di, .j, .e]
-        case "でょ", "dho": [.di, .j, .o]
-        case "どぁ", "どゎ", "dhwa": [.du, .β, .a]
-        case "どぃ", "dhwi": [.du, .β, .i]
-        case "どぇ", "dhwe": [.du, .β, .e]
-        case "どぉ", "dhwo": [.du, .β, .o]
+        case "でゃ", "dha": [.dj, .ja, .a]
+        case "でゅ", "dhu": [.dj, .j, .ɯ]
+        case "でぇ", "dhe": [.dj, .j, .e]
+        case "でょ", "dho": [.dj, .j, .o]
+        case "どぁ", "どゎ", "dhwa": [.dβ, .β, .a]
+        case "どぃ", "dhwi": [.dβ, .β, .i]
+        case "どぇ", "dhwe": [.dβ, .β, .e]
+        case "どぉ", "dhwo": [.dβ, .β, .o]
         case "な", "na": [.n, .a]
         case "に", "ni": [.nj, .i]
         case "ぬ", "nu": [.n, .ɯ]

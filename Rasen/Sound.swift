@@ -1086,6 +1086,18 @@ extension Note {
                      tone: value.tone, lyric: value.lyric,
                      envelope: envelope, id: id)
     }
+    func normarizedPitResult(atBeat beat: Double) -> PitResult {
+        let firstSpectlope = pits.first!.tone.spectlope
+        let isEqualAllSpectlope = pits.allSatisfy { $0.tone.spectlope == firstSpectlope }
+        if isEqualAllSpectlope {
+            return pitResult(atBeat: .init(beat))
+        } else {
+            let maxSumVolm = pits.maxValue { $0.tone.spectlope.sumVolm } ?? 0
+            var result = pitResult(atBeat: .init(beat))
+            result.stereo.volm *= maxSumVolm == 0 ? 0 : result.sumTone / maxSumVolm
+            return result
+        }
+    }
     
     var isEmpty: Bool {
         pits.count == 1 && pits[0].beat == 0 && pits[0].pitch == 0
@@ -1601,6 +1613,17 @@ extension Score {
             let note = notes[noteI]
             return if note.beatRange.contains(beat) || note.beatRange.end == beat {
                 (noteI, note.pitResult(atBeat: Double(beat - note.beatRange.start)))
+            } else {
+                nil
+            }
+        }
+    }
+    func noteIAndNormarizedPits(atBeat beat: Rational,
+                      in noteIs: [Int]) -> [(noteI: Int, pitResult: Note.PitResult)] {
+        noteIs.compactMap { noteI in
+            let note = notes[noteI]
+            return if note.beatRange.contains(beat) || note.beatRange.end == beat {
+                (noteI, note.normarizedPitResult(atBeat: Double(beat - note.beatRange.start)))
             } else {
                 nil
             }

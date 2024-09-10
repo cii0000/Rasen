@@ -274,6 +274,18 @@ final class Looker: InputKeyEditor {
                         
                         let str = "\(startPitch.octaveString()) ... \(endPitch.octaveString())  (\(startPitch.fq.string(digitsCount: 1)) ... \(endPitch.fq.string(digitsCount: 1)) Hz)".localized
                         document.show(str, at: p)
+                    } else {
+                        let nSelection = sheetView.convertFromWorld(selection)
+                        let rect = scoreView.convertFromWorld(selection.rect)
+                        let minY = rect.minY, maxY = rect.maxY
+                        let pitchInterval = document.currentPitchInterval
+                        let minPitch = scoreView.pitch(atY: minY, interval: pitchInterval)
+                        let minFq = Pitch(value: minPitch).fq
+                        let maxPitch = scoreView.pitch(atY: maxY, interval: pitchInterval)
+                        let maxFq = Pitch(value: maxPitch).fq
+                        let minSec: Double = sheetView.animationView.sec(atX: nSelection.rect.minX)
+                        let maxSec: Double = sheetView.animationView.sec(atX: nSelection.rect.maxX)
+                        document.show("Δ\((maxSec - minSec).string(digitsCount: 4)) sec, Δ\(Pitch(value: maxPitch - minPitch).octaveString()), (Δ\((maxFq - minFq).string(digitsCount: 1)) Hz)", at: p)
                     }
                 } else {
                     document.show("No selection".localized, at: p)

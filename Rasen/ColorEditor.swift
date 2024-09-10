@@ -478,7 +478,7 @@ final class ColorEditor: Editor {
                     }
                     
                     let noteIsSet = Set(beganNotePits.values.flatMap { $0.dic.keys }).sorted()
-                    let vs = score.noteIAndPits(atBeat: beganBeat, in: noteIsSet)
+                    let vs = score.noteIAndNormarizedPits(atBeat: beganBeat, in: noteIsSet)
                     playerBeatNoteIndexes = vs.map { $0.noteI }
                     
                     updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
@@ -610,11 +610,11 @@ final class ColorEditor: Editor {
                 switch scoreResult {
                 case .sprol:
                     notePlayer?.notes = playerBeatNoteIndexes.map {
-                        scoreView.pitResult(atBeat: beganBeat, at: $0)
+                        scoreView.normarizedPitResult(atBeat: beganBeat, at: $0)
                     }
                 default:
                     notePlayer?.changeStereo(from: playerBeatNoteIndexes.map {
-                        scoreView.pitResult(atBeat: beganBeat, at: $0)
+                        scoreView.normarizedPitResult(atBeat: beganBeat, at: $0)
                     })
                 }
             } else if !beganContents.isEmpty {
@@ -893,7 +893,7 @@ final class ColorEditor: Editor {
                     }
                     
                     let noteIsSet = Set(beganNotePits.values.flatMap { $0.dic.keys }).sorted()
-                    let vs = score.noteIAndPits(atBeat: beganBeat, in: noteIsSet)
+                    let vs = score.noteIAndNormarizedPits(atBeat: beganBeat, in: noteIsSet)
                     playerBeatNoteIndexes = vs.map { $0.noteI }
                     updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
                 } else if let ci = sheetView.contentIndex(at: sheetP, scale: document.screenToWorldScale),
@@ -970,7 +970,7 @@ final class ColorEditor: Editor {
                 colorPointNode.attitude.position = .init(panWidth * noise, 0)
                 
                 notePlayer?.notes = playerBeatNoteIndexes.map {
-                    scoreView.pitResult(atBeat: beganBeat, at: $0)
+                    scoreView.normarizedPitResult(atBeat: beganBeat, at: $0)
                 }
             } else {
                 let oPan = beganPan + (sp.x - document.convertWorldToScreen(beganWorldP).x) / (panWidth / 2)
@@ -1016,7 +1016,7 @@ final class ColorEditor: Editor {
                     scoreView.replace(nivs)
                     
                     notePlayer?.changeStereo(from: playerBeatNoteIndexes.map {
-                        scoreView.pitResult(atBeat: beganBeat, at: $0)
+                        scoreView.normarizedPitResult(atBeat: beganBeat, at: $0)
                     })
                 } else if !beganContents.isEmpty {
                     for (ci, beganContent) in beganContents {
