@@ -451,30 +451,30 @@ extension Formant: MonoInterpolatable {
 }
 
 struct FormantFilter: Hashable, Codable {
-    var formants: [Formant] = [.init(sdVolm: 0.7, sdNoise: 0.10,
+    var formants: [Formant] = [.init(sdVolm: 0.7, sdNoise: 0,
                                      sdPitch: 9.1, sPitch: 67.3, ePitch: 74.0, edPitch: 6.3,
                                      volm: 0.9, noise: 0.13,
-                                     edVolm: 0.50, edNoise: 0.18),
+                                     edVolm: 0.5, edNoise: 0.18),
                                .init(sdVolm: 0.5, sdNoise: 0.13,
                                      sdPitch: 5.7, sPitch: 79.5, ePitch: 81.2, edPitch: 5.2,
                                      volm: 0.9, noise: 0.3,
                                      edVolm: 0.33, edNoise: 0.26),
                                .init(sdVolm: 0.3, sdNoise: 0.23,
-                                     sdPitch: 1.6, sPitch: 96.8, ePitch: 97.9, edPitch: 1.1,
+                                     sdPitch: 1.6, sPitch: 95.4, ePitch: 97, edPitch: 1.1,
                                      volm: 0.71, noise: 0.35,
                                      edVolm: 0.33, edNoise: 0.69),
                                .init(sdVolm: 0.4, sdNoise: 0.69,
-                                     sdPitch: 0.5, sPitch: 99.8, ePitch: 101.2, edPitch: 1.2,
+                                     sdPitch: 0.5, sPitch: 98.5, ePitch: 100.2, edPitch: 1.2,
                                      volm: 0.54, noise: 0.39,
-                                     edVolm: 0.00, edNoise: 1.00),
-                               .init(sdVolm: 0.0, sdNoise: 1.00,
-                                     sdPitch: 0.8, sPitch: 106.6, ePitch: 109.8, edPitch: 0.9,
-                                     volm: 0.30, noise: 0.61,
-                                     edVolm: 0.10, edNoise: 1.00),
-                               .init(sdVolm: 0.1, sdNoise: 1.00,
-                                     sdPitch: 0.6, sPitch: 112.8, ePitch: 115.6, edPitch: 0.8,
-                                     volm: 0.20, noise: 0.93,
-                                     edVolm: 0.00, edNoise: 1.00)]
+                                     edVolm: 0, edNoise: 1),
+                               .init(sdVolm: 0, sdNoise: 1,
+                                     sdPitch: 0.8, sPitch: 107.4, ePitch: 109.1, edPitch: 0.9,
+                                     volm: 0.3, noise: 0.61,
+                                     edVolm: 0.1, edNoise: 1),
+                               .init(sdVolm: 0.1, sdNoise: 1,
+                                     sdPitch: 0.6, sPitch: 113.2, ePitch: 114.8, edPitch: 0.8,
+                                     volm: 0.2, noise: 0.93,
+                                     edVolm: 0, edNoise: 1)]
 }
 extension FormantFilter {
     init(spectlope: Spectlope) {
@@ -1044,11 +1044,14 @@ extension FormantFilter {
     }
     func toBreath() -> Self {
         var n = offVolm(from: 4)
-        n[0].sdVolm = n[1].edVolm * 0.7
-        n[2].formMultiplyVolm(0.85)
+        n[0].sdVolm = 0
         n[0].fillVolm(n[2].volm * 0.7)
+        n[1].fillNoise(1)
+        n[2].formMultiplyVolm(0.85)
+        n[2].fillNoise(1)
         n.formMultiplyEsVolm(0.7, at: 2)
         n[3].formMultiplyVolm(0.7)
+        n[3].fillNoise(1)
         return n
     }
     func toVoiceless() -> Self {
@@ -1242,8 +1245,8 @@ struct Mora: Hashable, Codable {
         if phonemes.isEmpty {
             if let preFf = previousFormantFilter, let id = previousID {
                 if vowel == .off {
-                    centerI = kffs.count
                     kffs.append(.init(preFf, durSec: 0.12, id: id))
+                    centerI = kffs.count
                 } else if youonFf == nil {
                     kffs.append(.init(preFf, durSec: 0.04, id: id))
                     var ff0 = FormantFilter.linear(preFf, vowelFf, t: 0.25)
@@ -1254,8 +1257,8 @@ struct Mora: Hashable, Codable {
                     ff1[1].formMultiplyVolm(0.75)
                     kffs.append(.init(ff1, durSec: 0.04))
                 } else {
-                    centerI = kffs.count
                     kffs.append(.init(preFf, durSec: isβ ? 0.05 : 0.1, id: id))
+                    centerI = kffs.count
                 }
             } else {
                 centerI = kffs.count
