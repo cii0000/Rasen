@@ -28,12 +28,12 @@ struct Edge: Hashable {
     }
 }
 extension Edge: Codable {
-    init(from decoder: Decoder) throws {
+    init(from decoder: any Decoder) throws {
         var container = try decoder.unkeyedContainer()
         p0 = try container.decode(Point.self)
         p1 = try container.decode(Point.self)
     }
-    func encode(to encoder: Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var container = encoder.unkeyedContainer()
         try container.encode(p0)
         try container.encode(p1)

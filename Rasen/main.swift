@@ -18,6 +18,6 @@
 import AppKit
 
 let app = SubNSApplication.shared
-let delegate = AppDelegate()
+nonisolated(unsafe) let delegate = AppDelegate()
 app.delegate = delegate
 app.run()

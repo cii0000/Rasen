@@ -92,12 +92,12 @@ extension Rect {
     }
 }
 extension Rect: Codable {
-    init(from decoder: Decoder) throws {
+    init(from decoder: any Decoder) throws {
         var container = try decoder.unkeyedContainer()
         origin = try container.decode(Point.self)
         size = try container.decode(Size.self)
     }
-    func encode(to encoder: Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var container = encoder.unkeyedContainer()
         try container.encode(origin)
         try container.encode(size)

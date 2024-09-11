@@ -97,7 +97,7 @@ final class Rotater: RotateEditor {
     
     let correction = .pi / 40.0, clipD = .pi / 8.0
     var isClipped = false
-    func send(_ event: RotateEvent) {
+    @MainActor func send(_ event: RotateEvent) {
         switch event.phase {
         case .began: isClipped = false
         default: break
@@ -128,12 +128,11 @@ final class Rotater: RotateEditor {
             document.camera = camera
         }
         if document.camera.rotation != 0 {
-            Document.defaultCursor
-                = Cursor.rotate(rotation: -document.camera.rotation + .pi / 2)
-            document.cursor = Document.defaultCursor
+            document.defaultCursor = Cursor.rotate(rotation: -document.camera.rotation + .pi / 2)
+            document.cursor = document.defaultCursor
         } else {
-            Document.defaultCursor = .drawLine
-            document.cursor = Document.defaultCursor
+            document.defaultCursor = .drawLine
+            document.cursor = document.defaultCursor
         }
     }
 }
@@ -313,7 +312,7 @@ final class DraftEditor: Editor {
         case .changed:
             break
         case .ended:
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
     func cutDraft(with event: InputKeyEvent) {
@@ -426,7 +425,7 @@ final class DraftEditor: Editor {
         case .changed:
             break
         case .ended:
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }
@@ -549,7 +548,7 @@ final class FaceEditor: Editor {
         case .changed:
             break
         case .ended:
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
     func cutFaces(with event: InputKeyEvent) {
@@ -625,7 +624,7 @@ final class FaceEditor: Editor {
         case .changed:
             break
         case .ended:
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }
@@ -809,7 +808,7 @@ final class IOEditor: Editor {
             document.updateSelects()
         }
         if isUpdateCursor {
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
         document.updateSelectedColor(isMain: true)
     }
@@ -1354,7 +1353,7 @@ final class IOEditor: Editor {
             return nil
         }
         
-        let fType: FileTypeProtocol = switch type {
+        let fType: any FileTypeProtocol = switch type {
         case .image:
             nvs.count > 1 && unionFrame == nil ?
                 Image.FileType.pngs : Image.FileType.png
@@ -1591,7 +1590,7 @@ final class IOEditor: Editor {
     func exportMovie(from vs: [SelectingValue], isHighQuality: Bool,
                      size: Size, at ioResult: IOResult) {
         func export(progressHandler: (Double, inout Bool) -> (),
-                    completionHandler handler: @escaping (Bool, Error?) -> ()) {
+                    completionHandler handler: @escaping (Bool, (any Error)?) -> ()) {
             do {
                 let colorSpace = self.document.colorSpace
                 let movie = try Movie(url: ioResult.url, renderSize: size,
@@ -1816,7 +1815,7 @@ final class IOEditor: Editor {
     
     func exportSound(from vs: [SelectingValue], at ioResult: IOResult) {
         func export(progressHandler: (Double, inout Bool) -> (),
-                    completionHandler handler: @escaping (Error?) -> ()) {
+                    completionHandler handler: @escaping ((any Error)?) -> ()) {
             do {
                 var audiotracks = [Audiotrack]()
                 
@@ -1888,7 +1887,7 @@ final class IOEditor: Editor {
     
     func exportCaption(from vs: [SelectingValue], at ioResult: IOResult) {
         func export(progressHandler: (Double, inout Bool) -> (),
-                    completionHandler handler: @escaping (Error?) -> ()) {
+                    completionHandler handler: @escaping ((any Error)?) -> ()) {
             do {
                 let cce = try CaptionRenderer(url: ioResult.url)
                 

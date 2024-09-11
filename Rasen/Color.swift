@@ -151,12 +151,10 @@ extension Color {
     static let selectedWhite = 0.5
     static let subSelectedWhite = 0.8
     static let subSelectedOpacity = 0.25
-    static var selected = Color(white: selectedWhite)
-    static var subSelected = Color(white: subSelectedWhite,
-                                   opacity: subSelectedOpacity)
+    nonisolated(unsafe) static var selected = Color(white: selectedWhite)
+    nonisolated(unsafe) static var subSelected = Color(white: subSelectedWhite, opacity: subSelectedOpacity)
     static let diselected = Color(white: 0.75)
-    static let subDiselected = Color(white: 0.9,
-                                     opacity: subSelectedOpacity)
+    static let subDiselected = Color(white: 0.9, opacity: subSelectedOpacity)
 
     static let removing = Color(white: 0.7)
     static let subRemoving = Color(white: 1, opacity: 0.8)
@@ -411,7 +409,7 @@ extension LCHA: Protobuf {
     }
 }
 extension LCHA: Codable {
-    init(from decoder: Decoder) throws {
+    init(from decoder: any Decoder) throws {
         var container = try decoder.unkeyedContainer()
         l = try container.decode(Double.self).notNaN()
             .clipped(min: Color.minLightness, max: Color.whiteLightness)
@@ -422,7 +420,7 @@ extension LCHA: Codable {
         a = try container.decode(Double.self).notNaN()
             .clipped(min: 0, max: 1)
     }
-    func encode(to encoder: Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var container = encoder.unkeyedContainer()
         try container.encode(l)
         try container.encode(c)
@@ -549,14 +547,14 @@ extension RGBA {
     }
 }
 extension RGBA: Codable {
-    init(from decoder: Decoder) throws {
+    init(from decoder: any Decoder) throws {
         var container = try decoder.unkeyedContainer()
         r = try container.decode(Float.self).notInfiniteAndNAN()
         g = try container.decode(Float.self).notInfiniteAndNAN()
         b = try container.decode(Float.self).notInfiniteAndNAN()
         a = try container.decode(Float.self).notNaN().clipped(min: 0, max: 1)
     }
-    func encode(to encoder: Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var container = encoder.unkeyedContainer()
         try container.encode(r)
         try container.encode(g)

@@ -68,7 +68,7 @@ final class KeyframePreviousMover: InputKeyEditor {
             }
             sheetView?.hideOtherTimeNode()
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
     
@@ -128,7 +128,7 @@ final class KeyframeNextMover: InputKeyEditor {
                 sheetView.animationView.shownInterTypeKeyframeIndex = nil
             }
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
     
@@ -180,7 +180,7 @@ final class FramePreviousMover: InputKeyEditor {
         case .ended:
             sheetView?.hideOtherTimeNode()
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
     
@@ -233,7 +233,7 @@ final class FrameNextMover: InputKeyEditor {
         case .ended:
             sheetView?.hideOtherTimeNode()
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
     
@@ -370,7 +370,7 @@ final class KeyframeSwiper: SwipeEditor {
                 }
             }
         case .ended:
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
             
             interpolatedNode.removeFromParent()
             if let sheetView {
@@ -517,7 +517,7 @@ final class KeyframeSlider: DragEditor {
                 }
             }
         case .ended:
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
             
             interpolatedNode.removeFromParent()
             if let sheetView {
@@ -675,7 +675,7 @@ final class FrameEditor: Editor {
                 }
             }
         case .ended:
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
             
             if let sheetView {
                 sheetView.hideOtherTimeNode()
@@ -802,7 +802,7 @@ final class TimeEditor: Editor {
                 }
             }
         case .ended:
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
             
             if let sheetView {
                 sheetView.hideOtherTimeNode()
@@ -942,7 +942,7 @@ final class Player: InputKeyEditor {
             if isEndStop {
                 sheetView?.stop()
             }
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }
@@ -1111,7 +1111,7 @@ final class FrameSlideEditor: Editor {
                 }
             }
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }
@@ -1249,7 +1249,7 @@ final class TempoSlider: DragEditor {
                 }
             }
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }
@@ -1457,7 +1457,7 @@ final class AnimationSlider: DragEditor {
                 }
             }
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }
@@ -1727,7 +1727,7 @@ final class LineSlider: DragEditor {
                 }
             }
 
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }
@@ -1897,7 +1897,7 @@ final class LineZSlider: DragEditor {
                 }
             }
 
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }
@@ -2218,7 +2218,7 @@ final class KeyframeInserter: InputKeyEditor {
         case .ended:
             linesNode.removeFromParent()
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }
@@ -2565,7 +2565,7 @@ final class Interpolater: InputKeyEditor {
         case .ended:
             linesNode.removeFromParent()
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }
@@ -3152,7 +3152,7 @@ final class CrossEraser: InputKeyEditor {
         case .ended:
             linesNode.removeFromParent()
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }

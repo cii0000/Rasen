@@ -15,6 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
+import struct Foundation.UUID
+
 typealias Real1 = Double
 
 struct OSheet {
@@ -324,83 +326,75 @@ struct ORange: Hashable {
         case all
     }
     let type: RangeType, delta: O
+    
     init(_ type: RangeType, delta: O) {
         self.type = type
         self.delta = delta
     }
 }
 extension ORange {
-    func rounded(_ rule: FloatingPointRoundingRule
-                    = .toNearestOrAwayFromZero) -> ORange {
+    func rounded(_ rule: FloatingPointRoundingRule = .toNearestOrAwayFromZero) -> ORange {
         switch type {
         case .fili(let f, let l):
             if f.isInt && l.isInt && delta.isInt {
-                return self
+                self
             } else {
-                return ORange(.fili(f.rounded(rule), l.rounded(rule)),
-                              delta: delta.rounded(rule))
+                ORange(.fili(f.rounded(rule), l.rounded(rule)), delta: delta.rounded(rule))
             }
         case .filo(let f, let l):
             if f.isInt && l.isInt && delta.isInt {
-                return self
+                self
             } else {
-                return ORange(.filo(f.rounded(rule), l.rounded(rule)),
-                              delta: delta.rounded(rule))
+                ORange(.filo(f.rounded(rule), l.rounded(rule)), delta: delta.rounded(rule))
             }
         case .foli(let f, let l):
             if f.isInt && l.isInt && delta.isInt {
-                return self
+                self
             } else {
-                return ORange(.foli(f.rounded(rule), l.rounded(rule)),
-                              delta: delta.rounded(rule))
+                ORange(.foli(f.rounded(rule), l.rounded(rule)), delta: delta.rounded(rule))
             }
         case .folo(let f, let l):
             if f.isInt && l.isInt && delta.isInt {
-                return self
+                self
             } else {
-                return ORange(.folo(f.rounded(rule), l.rounded(rule)),
-                              delta: delta.rounded(rule))
+                ORange(.folo(f.rounded(rule), l.rounded(rule)), delta: delta.rounded(rule))
             }
         case .fi(let f):
             if f.isInt && delta.isInt {
-                return self
+                self
             } else {
-                return ORange(.fi(f.rounded(rule)),
-                              delta: delta.rounded(rule))
+                ORange(.fi(f.rounded(rule)), delta: delta.rounded(rule))
             }
         case .fo(let f):
             if f.isInt && delta.isInt {
-                return self
+                self
             } else {
-                return ORange(.fo(f.rounded(rule)),
-                              delta: delta.rounded(rule))
+                ORange(.fo(f.rounded(rule)), delta: delta.rounded(rule))
             }
         case .li(let l):
             if l.isInt && delta.isInt {
-                return self
+                self
             } else {
-                return ORange(.li(l.rounded(rule)),
-                              delta: delta.rounded(rule))
+                ORange(.li(l.rounded(rule)), delta: delta.rounded(rule))
             }
         case .lo(let l):
             if l.isInt && delta.isInt {
-                return self
+                self
             } else {
-                return ORange(.lo(l.rounded(rule)),
-                              delta: delta.rounded(rule))
+                ORange(.lo(l.rounded(rule)), delta: delta.rounded(rule))
             }
         case .all:
             if delta.isInt {
-                return self
+                self
             } else {
-                return ORange(.all, delta: delta.rounded(rule))
+                ORange(.all, delta: delta.rounded(rule))
             }
         }
     }
 }
 
 enum G: String, Hashable, CaseIterable {
-    case empty = "Ø"
+    case empty = "Nil"
     case b = "B", n0 = "N0", n1 = "N1", z = "Z", q = "Q", r = "R"
     case string = "String", array = "Array", dic = "Dic"
     case f = "F", all = "All"
@@ -408,7 +402,7 @@ enum G: String, Hashable, CaseIterable {
 extension G {
     var displayString: String {
         switch self {
-        case .empty: "\("Empty".localized) (\("Key input".localized): ⇧⌥ o)"
+        case .empty: "\("Empty".localized)"
         case .b: "Bool".localized
         case .n0: "Whole number".localized
         case .n1: "Natural number".localized
@@ -468,8 +462,7 @@ struct Selected: Hashable {
     }
 }
 extension Selected {
-    func rounded(_ rule: FloatingPointRoundingRule
-                    = .toNearestOrAwayFromZero) -> Selected {
+    func rounded(_ rule: FloatingPointRoundingRule = .toNearestOrAwayFromZero) -> Selected {
         Selected(o.rounded(rule), ranges: ranges.rounded(rule))
     }
 }
@@ -537,51 +530,25 @@ extension OKey: CustomStringConvertible {
 struct Argument: Hashable {
     var inKey: OKey?, outKey = OKey("")
 }
-final class FMemo {
-//    static var initCount = 0
-//    struct ArgKey: Hashable {
-//        var os: [O]
-//        private var aHashValue: Int
-//        init(_ os: [O]) {
-//            self.os = os
-//            self.aHashValue = os.hashValue
-//        }
-//        func hash(into hasher: inout Hasher) {
-//            hasher.combine(aHashValue)
-//        }
-//    }
-    fileprivate var rpn: RPN?
-//    var argDic = [ArgKey: O]()
-    init() {
-//        FMemo.initCount += 1
-    }
-    deinit {
-//        FMemo.initCount -= 1
-//        print("deinit:", FMemo.initCount, rpn?.oidfs.count ?? 0)
-    }
-    func rpnMemo(from os: [O], _ oDic: inout [OKey: O]) -> RPN {
-        if let rpn = rpn {
-            return rpn
-        } else {
-            let rpn = O.rpn(os, &oDic)
-            self.rpn = rpn
-            return rpn
-        }
-    }
-}
-struct F {
+struct F: Sendable, Hashable {
     enum AssociativityType: String {
         case left, right
     }
     enum FType: String {
         case empty, left, right, binary
     }
-    enum HandlerType {
-        case o(O), send(O, O), special(OKey), custom
+    enum RunType {
+        case pow, apow, multiply, division, modulo, addition, subtraction,
+             equal, notEqual, less, greater, lessEqual, greaterEqual,
+             not, floor, round, ceil, abs, sqrt, sin, cos, tan, asin, acos, atan, atan2, plus, minus,
+             filiZ, filoZ,
+             counta, at, select, set, insert, remove, makeMatrix, releaseMatrix, `is`,
+             random, asLabel, asString, asError, isError,
+             send, showAllDefinitions, draw, drawAxes, plot, flip, map, filter, reduce, custom
     }
-    typealias Handler = ([O]) -> (HandlerType)
     
     let precedence: Int, associativity: AssociativityType
+    let rpn: RPN?
     let isBlock: Bool
     let type: FType
     let leftArguments: [Argument], rightArguments: [Argument]
@@ -589,38 +556,12 @@ struct F {
     let definitions: [OKey: F]
     let os: [O]
     let isShortCircuit: Bool
-    let handler: Handler
-    private let aHashValue: Int
-    fileprivate let memo = FMemo()
-    fileprivate static var fCount = 0
-}
-extension F: Hashable {
-    static func == (lhs: F, rhs: F) -> Bool {
-        lhs.hashValue == rhs.hashValue
-//        return lhs.precedence == rhs.precedence
-//            && lhs.associativity == rhs.associativity
-//            && lhs.leftArguments == rhs.leftArguments
-//            && lhs.rightArguments == rhs.rightArguments
-//            && lhs.definitions == rhs.definitions
-//            && lhs.os == rhs.os
-    }
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(aHashValue)
-    }
-//    var hashValue: Int {
-//        var hasher = Hasher()
-//        hasher.combine(precedence)
-//        hasher.combine(associativity)
-//        hasher.combine(leftArguments)
-//        hasher.combine(rightArguments)
-//        hasher.combine(definitions)
-//        hasher.combine(os)
-//        return hasher.finalize()
-//    }
+    let runType: RunType
+    fileprivate let id = UUID()
 }
 extension F.FType: CustomStringConvertible {
     var description: String {
-        return rawValue
+        rawValue
     }
 }
 extension F.FType {
@@ -642,7 +583,7 @@ extension F {
          left leftKeywords: [String],
          right rightKeywords: [String],
          isShortCircuit: Bool = false,
-         _ handler: @escaping Handler = { _ in .custom })  {
+         _ runType: RunType = .custom)  {
         
         let la = leftKeywords.enumerated().map { (i, str) in
             Argument(inKey: !str.isEmpty ? OKey(str) : nil,
@@ -655,33 +596,33 @@ extension F {
         self.init(precedence: precedence, associativity: associativity,
                   left: la, right: ra, [:], os: [],
                   isShortCircuit: isShortCircuit,
-                  handler)
+                  runType)
     }
     init(_ precedence: Int = F.defaultPrecedence,
          _ associativity: AssociativityType = .left,
          right rightCount: Int,
          definitions: [OKey: F] = [:], os: [O] = [],
          isShortCircuit: Bool = false,
-         _ handler: @escaping Handler = { _ in .custom })  {
+         _ runType: RunType = .custom)  {
         
         let ra = (0 ..< rightCount).map { Argument(inKey: nil, outKey: OKey("$\($0)")) }
         self.init(precedence: precedence, associativity: associativity,
                   left: [], right: ra, definitions, os: os,
                   isShortCircuit: isShortCircuit,
-                  handler)
+                  runType)
     }
     init(_ precedence: Int = F.defaultPrecedence,
          _ associativity: AssociativityType = .left,
          left leftCount: Int,
          definitions: [OKey: F] = [:], os: [O] = [],
          isShortCircuit: Bool = false,
-         _ handler: @escaping Handler = { _ in .custom })  {
+         _ runType: RunType = .custom)  {
         
         let la = (0 ..< leftCount).map { Argument(inKey: nil, outKey: OKey("$\($0)")) }
         self.init(precedence: precedence, associativity: associativity,
                   left: la, right: [], definitions, os: os,
                   isShortCircuit: isShortCircuit,
-                  handler)
+                  runType)
     }
     init(_ precedence: Int = F.defaultPrecedence,
          _ associativity: AssociativityType = .left,
@@ -689,7 +630,7 @@ extension F {
          right rightCount: Int,
          definitions: [OKey: F] = [:], os: [O] = [],
          isShortCircuit: Bool = false,
-         _ handler: @escaping Handler = { _ in .custom })  {
+         _ runType: RunType = .custom)  {
         
         let la = (0 ..< leftCount).map {
             Argument(inKey: nil, outKey: OKey("$\($0)"))
@@ -700,7 +641,7 @@ extension F {
         self.init(precedence: precedence, associativity: associativity,
                   left: la, right: ra, definitions, os: os,
                   isShortCircuit: isShortCircuit,
-                  handler)
+                  runType)
     }
     init(precedence: Int = F.defaultPrecedence,
          associativity: AssociativityType = .left,
@@ -708,7 +649,7 @@ extension F {
          right rightArguments: [Argument] = [],
          _ definitions: [OKey: F] = [:], os: [O] = [],
          isShortCircuit: Bool = false,
-         _ handler: @escaping Handler = { _ in .custom }) {
+         _ runType: RunType = .custom) {
         
         self.precedence = precedence
         if leftArguments.isEmpty {
@@ -720,20 +661,19 @@ extension F {
             self.associativity = rightArguments.isEmpty ?
                 .left : associativity
         }
+        rpn = nil
         isBlock = false
         self.leftArguments = leftArguments
         self.rightArguments = rightArguments
         self.definitions = definitions
         self.os = os
         self.isShortCircuit = isShortCircuit
-        self.handler = handler
-        outKeys = leftArguments.map { $0.outKey }
-            + rightArguments.map { $0.outKey }
-        aHashValue = F.fCount
-        F.fCount += 1
+        self.runType = runType
+        outKeys = leftArguments.map { $0.outKey } + rightArguments.map { $0.outKey }
     }
     init(_ os: [O]) {
         precedence = F.defaultPrecedence
+        rpn = nil
         isBlock = false
         type = .empty
         associativity = .left
@@ -742,13 +682,11 @@ extension F {
         definitions = [:]
         self.os = os
         self.isShortCircuit = false
-        handler = { _ in .custom }
+        runType = .custom
         outKeys = []
-        aHashValue = F.fCount
-        F.fCount += 1
     }
     init(_ rpn: RPN, isBlock: Bool) {
-        memo.rpn = rpn
+        self.rpn = rpn
         precedence = F.defaultPrecedence
         self.isBlock = isBlock
         type = .empty
@@ -758,55 +696,71 @@ extension F {
         definitions = [:]
         os = []
         self.isShortCircuit = false
-        handler = { _ in .custom }
+        runType = .custom
         outKeys = []
-        aHashValue = F.fCount
-        F.fCount += 1
-    }
-//    func blocked() -> F {
-//        let os: [O] = self.os.map {
-//            switch $0 {
-//            case .f(let sf): O(sf.subBlocked())
-//            default: $0
-//            }
-//        }
-//        let hashValue = F.fCount
-//        F.fCount += 1
-//        return F(precedence: precedence, associativity: associativity,
-//                 isBlock: isBlock,
-//                 type: type,
-//                 leftArguments: leftArguments, rightArguments: rightArguments,
-//                 outKeys: outKeys,
-//                 definitions: definitions, os: os,
-//                 handler: handler, hashValue: hashValue)
-//    }
-//    func subBlocked() -> F {
-//        let hashValue = F.fCount
-//        F.fCount += 1
-//        return F(precedence: precedence, associativity: associativity,
-//                 isBlock: true,
-//                 type: type,
-//                 leftArguments: leftArguments, rightArguments: rightArguments,
-//                 outKeys: outKeys,
-//                 definitions: definitions, os: os,
-//                 handler: handler, hashValue: hashValue)
-//    }
-    func with(isBlock: Bool) -> F {
-        let aHashValue = F.fCount
-        F.fCount += 1
-        return F(precedence: precedence, associativity: associativity,
-                 isBlock: isBlock,
-                 type: type,
-                 leftArguments: leftArguments, rightArguments: rightArguments,
-                 outKeys: outKeys,
-                 definitions: definitions, os: os,
-                 isShortCircuit: isShortCircuit,
-                 handler: handler, aHashValue: aHashValue)
     }
     
-    func rpn(_ oDic: inout [OKey: O]) -> RPN {
-        return memo.rpnMemo(from: os, &oDic)
+    func run(_ args: [O]) -> O? {
+        switch runType {
+        case .pow: args[0] ** args[1]
+        case .apow: .apow(args[0], args[1])
+        case .multiply: args[0] * args[1]
+        case .division: args[0] / args[1]
+        case .modulo: args[0] % args[1]
+        case .addition: args[0] + args[1]
+        case .subtraction: args[0] - args[1]
+        case .equal: .equalO(args[0], args[1])
+        case .notEqual: .notEqualO(args[0], args[1])
+        case .less: .lessO(args[0], args[1])
+        case .greater: .greaterO(args[0], args[1])
+        case .lessEqual: .lessEqualO(args[0], args[1])
+        case .greaterEqual: .greaterEqualO(args[0], args[1])
+        case .not: !args[0]
+        case .floor: args[0].floor
+        case .round: args[0].round
+        case .ceil: args[0].ceil
+        case .abs: args[0].absV
+        case .sqrt: args[0].sqrt
+        case .sin: args[0].sin
+        case .cos: args[0].cos
+        case .tan: args[0].tan
+        case .asin: args[0].asin
+        case .acos: args[0].acos
+        case .atan: args[0].atan
+        case .atan2: args[0].atan2
+        case .plus: +args[0]
+        case .minus: -args[0]
+        case .filiZ: .rangeO(.fili(args[0], args[1]), isSmooth: false)
+        case .filoZ: .rangeO(.filo(args[0], args[1]), isSmooth: false)
+        case .counta: args[0].counta
+        case .at: .at(args[0], args[1])
+        case .select: .select(args[0], args[1])
+        case .set: .set(args[0], args[1])
+        case .insert: .insert(args[0], args[1])
+        case .remove: .remove(args[0])
+        case .makeMatrix: .makeMatrix(args[0])
+        case .releaseMatrix: .releaseMatrix(args[0])
+        case .is: .isO(args[0], args[1])
+        case .random: args[0].random
+        case .asLabel: args[0].asLabel
+        case .asString: args[0].asStringO
+        case .asError: args[0].asError
+        case .isError: args[0].isErrorO
+        case .send, .showAllDefinitions, .draw, .drawAxes, .plot, .flip, .map, .filter, .reduce, .custom: nil
+        }
     }
+    
+    func with(isBlock: Bool) -> F {
+        F(precedence: precedence, associativity: associativity,
+          rpn: rpn, isBlock: isBlock,
+          type: type,
+          leftArguments: leftArguments, rightArguments: rightArguments,
+          outKeys: outKeys,
+          definitions: definitions, os: os,
+          isShortCircuit: isShortCircuit,
+          runType: runType)
+    }
+    
     func key(from str: String, info: OKeyInfo? = nil) -> OKey {
         func argumentString(from args: [Argument]) -> String {
              return args.reduce(into: "") {
@@ -825,7 +779,7 @@ extension F {
 }
 extension F: CustomStringConvertible {
     func argsString(from args: [Argument]) -> String {
-        return args.reduce(into: "") {
+        args.reduce(into: "") {
             if let str = $1.inKey?.string {
                 $0 += ($0.isEmpty ? "" : " ") + str + ": " + $1.outKey.string
             } else {
@@ -906,23 +860,16 @@ extension F {
     static let defaultPrecedence = 200
 }
 extension F {
-    func rounded(_ rule: FloatingPointRoundingRule
-                    = .toNearestOrAwayFromZero) -> F {
-        var definitions = [OKey: F]()
-        for (key, value) in self.definitions {
-            definitions[key] = value.rounded(rule)
-        }
-        let aHashValue = F.fCount
-        F.fCount += 1
-        let os = self.os.rounded(rule)
-        return F(precedence: precedence, associativity: associativity,
-                 isBlock: isBlock,
-                 type: type,
-                 leftArguments: leftArguments, rightArguments: rightArguments,
-                 outKeys: outKeys,
-                 definitions: definitions, os: os,
-                 isShortCircuit: isShortCircuit,
-                 handler: handler, aHashValue: aHashValue)
+    func rounded(_ rule: FloatingPointRoundingRule = .toNearestOrAwayFromZero) -> F {
+        F(precedence: precedence, associativity: associativity,
+          rpn: rpn, isBlock: isBlock,
+          type: type,
+          leftArguments: leftArguments, rightArguments: rightArguments,
+          outKeys: outKeys,
+          definitions: definitions.reduce(into: .init()) { $0[$1.key] = $1.value.rounded(rule) },
+          os: os.rounded(rule),
+          isShortCircuit: isShortCircuit,
+          runType: runType)
     }
 }
 
@@ -1027,31 +974,23 @@ extension RPN {
 }
 
 struct OError: Hashable {
-    fileprivate static var idCount = 0
-    let o: O, id: Int
+    let message: String
     static func undefined(with str: String) -> OError {
         OError("\("Undefined".localized): \(str)")
     }
 }
 extension OError {
-    init(_ o: O) {
-        self.o = o
-        id = OError.idCount
-        OError.idCount += 1
-    }
     init(_ d: String) {
-        o = O(d)
-        id = OError.idCount
-        OError.idCount += 1
+        message = d
     }
 }
 extension OError: CustomStringConvertible {
     var description: String {
-        "?" + o.asString
+        "?" + message
     }
 }
 
-enum O {
+enum O: Sendable {
     case bool(Bool)
     case int(Int)
     case rational(Rational)
@@ -1174,11 +1113,7 @@ extension O {
             }
         }
     }
-    init(_ text: Text, range: Range<String.Index>? = nil,
-         isDictionary: Bool = false, _ oDic: inout [OKey: O]) {
-        F.fCount = 0
-        OError.idCount = 0
-        
+    init(_ text: Text, range: Range<String.Index>? = nil, isDictionary: Bool = false, _ oDic: inout [OKey: O]) {
         let range = range ?? (text.string.startIndex ..< text.string.endIndex)
         guard !text.isEmpty && !range.isEmpty else {
             self = O()
@@ -1680,8 +1615,7 @@ extension O {
                     let f = F(precedence: option.prece ?? F.defaultPrecedence,
                               associativity: option.asso,
                               left: option.leftVs, right: option.rightVs,
-                              [:], os: [],
-                              { _ in .custom })
+                              [:], os: [])
                     let fname = f.key(from: name)
                     oldDic[fname] = oDic[fname]
                     oDic[fname] = O()
@@ -1716,8 +1650,7 @@ extension O {
                     let f = F(precedence: option.prece ?? F.defaultPrecedence,
                               associativity: option.asso,
                               left: option.leftVs, right: option.rightVs,
-                              [:], os: fos,
-                              { _ in .custom })
+                              [:], os: fos)
                     foDic[f.key(from: name)] = f
                 case .fo: fatalError()
                 case .string(let name):
@@ -1804,8 +1737,7 @@ extension O {
                                    associativity: option.asso,
                                    left: option.leftVs,
                                    right: option.rightVs,
-                                   foDic, os: fos,
-                                   { _ in .custom }).with(isBlock: true))
+                                   foDic, os: fos).with(isBlock: true))
                     }
                 } else {
                     if fi0 == ts.startIndex {//(| a)
@@ -1834,8 +1766,7 @@ extension O {
                                    associativity: option.asso,
                                    left: option.leftVs,
                                    right: option.rightVs,
-                                   [:], os: fos,
-                                   { _ in .custom }).with(isBlock: true))
+                                   [:], os: fos).with(isBlock: true))
                     } else {
                         var oldDic = [OKey: O?]()
                         
@@ -2344,6 +2275,8 @@ extension O {
                     os.append(O(false))
                 } else if tss == "true" {
                     os.append(O(true))
+                } else if tss == "nil" {
+                    os.append(O(OArray([])))
                 } else if tss == "∞" {
                     os.append(O(Double.infinity))
                 } else if case id(let id)? = os.last, id.key == OKey(".") {
@@ -2955,19 +2888,21 @@ extension O {
                           _ oDic: inout [OKey: O],
                           _ stopHandler: StopHandler,
                           _ handler: Handler) -> O {
+        var memoRPN = [UUID: RPN]()
         switch o {
         case .f(let f):
             if f.outKeys.isEmpty {
-                return calculate(f, nil, args: [], &oDic, stopHandler, handler)
+                return calculate(f, nil, args: [], &oDic, &memoRPN, stopHandler, handler)
             }
         default: break
         }
         return o
     }
     static func calculate(_ ff: F, _ fid: ID?, args fargs: [O],
-                           _ oDic: inout [OKey: O],
-                           _ stopHandler: StopHandler,
-                           _ handler: Handler) -> O {
+                          _ oDic: inout [OKey: O],
+                          _ memoRPN: inout [UUID: RPN],
+                          _ stopHandler: StopHandler,
+                          _ handler: Handler) -> O {
         enum Loop {
             case first(_ f: F, _ id: ID?, args: [O])
             case l0(_ id: ID?)
@@ -2983,78 +2918,18 @@ extension O {
                 if loopStack.elements.count == maxStackCount { return .stackOverflow }
                 if stopHandler() { return .stopped }
                 
-                switch f.handler(args) {
-                case .o(let oo):
+                if let oo = f.run(args) {
                     o = oo
-                case .send(let oo, let oso):
-                    if case .f(let subF) = oo {
-                        let os = oso.asArray
-                        guard os.count == subF.outKeys.count
-                        else {
-                            let o = sendArgsErrorO(withCount: subF.outKeys.count,
-                                                   notCount: os.count)
-                            handler(id, o)
-                            if loopStack.isEmpty {
-                                return o
-                            } else {
-                                returnStack.push(o)
-                                continue loop
-                            }
-                        }
-                        loopStack.push(.l0(id))
-                        loopStack.push(.first(subF, nil, args: oso.asArray))
-                        continue loop
-                    } else {
-                        o = oo
-                    }
-                case .special(let key):
-                    o = operateSpecial(key, id, args: args, &oDic, stopHandler, handler)
-                case .custom:
-                    var oldDic = [OKey: O]()
-                    oldDic.reserveCapacity(f.outKeys.count + f.definitions.count)
-                    for (i, key) in f.outKeys.enumerated() {
-                        oldDic[key] = oDic[key]
-                        oDic[key] = args[i]
-                    }
-                    for (key, value) in f.definitions {
-                        oldDic[key] = oDic[key]
-                        oDic[key] = O(value)
-                    }
-                    for i in f.definitions.indices {
-                        let (key, value) = f.definitions[i]
-                        if value.type == .empty && !value.isBlock {
-                            let j = f.definitions.index(after: i)
-                            loopStack.push(.l1(id, oldDic: oldDic, f, key, i: j))
-                            loopStack.push(.first(value, id, args: []))
-                            continue loop
-                        }
-                    }
-                    
-                    let oidfs = f.rpn(&oDic).oidfs
-                    var oStack = [O]()
-                    for (oi, oidf) in oidfs.enumerated() {
-                        switch oidf {
-                        case .oOrBlockO(let o):
-                            oStack.append(o)
-                        case .calculateON0(let f):
-                            loopStack.push(.l2(id, oldDic: oldDic, oidfs, oStack, oj: oi + 1))
-                            loopStack.push(.first(f, nil, args: []))
-                            continue loop
-                        case .calculateVN0(let v):
-                            let o = oDic[v.key] ?? O(v)
-                            if case .f(let subF) = o, subF.type == .empty && !subF.isBlock {
-                                loopStack.push(.l2(id, oldDic: oldDic, oidfs, oStack, oj: oi + 1))
-                                loopStack.push(.first(subF, nil, args: []))
-                                continue loop
-                            } else {
-                                oStack.append(o)
-                            }
-                        case .calculateVN1(let idf):
-                            let subF = idf.f
-                            let count = subF.outKeys.count
-                            let noCount = oStack.count - count
-                            guard noCount >= 0 else {
-                                let o = argsErrorO(withCount: count, notCount: oStack.count)
+                } else {
+                    switch f.runType {
+                    case .send:
+                        let oo = args[0], oso = args[1]
+                        if case .f(let subF) = oo {
+                            let os = oso.asArray
+                            guard os.count == subF.outKeys.count
+                            else {
+                                let o = sendArgsErrorO(withCount: subF.outKeys.count,
+                                                       notCount: os.count)
                                 handler(id, o)
                                 if loopStack.isEmpty {
                                     return o
@@ -3063,18 +2938,90 @@ extension O {
                                     continue loop
                                 }
                             }
-                            let nos = (0 ..< count).map { oStack[noCount + $0] }
-                            oStack.removeLast(count)
-                            loopStack.push(.l2(id, oldDic: oldDic, oidfs, oStack, oj: oi + 1))
-                            loopStack.push(.first(subF, idf.v, args: nos))
+                            loopStack.push(.l0(id))
+                            loopStack.push(.first(subF, nil, args: oso.asArray))
                             continue loop
+                        } else {
+                            o = oo
                         }
+                    case .custom:
+                        var oldDic = [OKey: O]()
+                        oldDic.reserveCapacity(f.outKeys.count + f.definitions.count)
+                        for (i, key) in f.outKeys.enumerated() {
+                            oldDic[key] = oDic[key]
+                            oDic[key] = args[i]
+                        }
+                        for (key, value) in f.definitions {
+                            oldDic[key] = oDic[key]
+                            oDic[key] = O(value)
+                        }
+                        for i in f.definitions.indices {
+                            let (key, value) = f.definitions[i]
+                            if value.type == .empty && !value.isBlock {
+                                let j = f.definitions.index(after: i)
+                                loopStack.push(.l1(id, oldDic: oldDic, f, key, i: j))
+                                loopStack.push(.first(value, id, args: []))
+                                continue loop
+                            }
+                        }
+                        
+                        let nRPN: RPN
+                        if let rpn = f.rpn ?? memoRPN[f.id] {
+                            nRPN = rpn
+                        } else {
+                            let rpn = O.rpn(f.os, &oDic)
+                            memoRPN[f.id] = rpn
+                            nRPN = rpn
+                        }
+                        let oidfs = nRPN.oidfs
+                        var oStack = [O]()
+                        for (oi, oidf) in oidfs.enumerated() {
+                            switch oidf {
+                            case .oOrBlockO(let o):
+                                oStack.append(o)
+                            case .calculateON0(let f):
+                                loopStack.push(.l2(id, oldDic: oldDic, oidfs, oStack, oj: oi + 1))
+                                loopStack.push(.first(f, nil, args: []))
+                                continue loop
+                            case .calculateVN0(let v):
+                                let o = oDic[v.key] ?? O(v)
+                                if case .f(let subF) = o, subF.type == .empty && !subF.isBlock {
+                                    loopStack.push(.l2(id, oldDic: oldDic, oidfs, oStack, oj: oi + 1))
+                                    loopStack.push(.first(subF, nil, args: []))
+                                    continue loop
+                                } else {
+                                    oStack.append(o)
+                                }
+                            case .calculateVN1(let idf):
+                                let subF = idf.f
+                                let count = subF.outKeys.count
+                                let noCount = oStack.count - count
+                                guard noCount >= 0 else {
+                                    let o = argsErrorO(withCount: count, notCount: oStack.count)
+                                    handler(id, o)
+                                    if loopStack.isEmpty {
+                                        return o
+                                    } else {
+                                        returnStack.push(o)
+                                        continue loop
+                                    }
+                                }
+                                let nos = (0 ..< count).map { oStack[noCount + $0] }
+                                oStack.removeLast(count)
+                                loopStack.push(.l2(id, oldDic: oldDic, oidfs, oStack, oj: oi + 1))
+                                loopStack.push(.first(subF, idf.v, args: nos))
+                                continue loop
+                            }
+                        }
+                        
+                        for (key, value) in oldDic { oDic[key] = value }
+                        
+                        o = O.union(from: oStack)
+                    default:
+                        o = operateSpecial(f.runType, id, args: args, &oDic, &memoRPN, stopHandler, handler)
                     }
-                    
-                    for (key, value) in oldDic { oDic[key] = value }
-                    
-                    o = O.union(from: oStack)
                 }
+                
                 nid = id
             case .l0(let id):
                 o = returnStack.pop()!
@@ -3094,7 +3041,15 @@ extension O {
                     i = f.definitions.index(after: i)
                 }
                 
-                let oidfs = f.rpn(&oDic).oidfs
+                let nRPN: RPN
+                if let rpn = f.rpn ?? memoRPN[f.id] {
+                    nRPN = rpn
+                } else {
+                    let rpn = O.rpn(f.os, &oDic)
+                    memoRPN[f.id] = rpn
+                    nRPN = rpn
+                }
+                let oidfs = nRPN.oidfs
                 var oStack = [O]()
                 for (oi, oidf) in oidfs.enumerated() {
                     switch oidf {
@@ -3200,91 +3155,103 @@ extension O {
     }
     private static func calculateS(_ f: F, _ id: ID?, args: [O],
                                    _ oDic: inout [OKey: O],
+                                   _ memoRPN: inout [UUID: RPN],
                                    _ stopHandler: StopHandler,
                                    _ handler: Handler) -> O {
         if stopHandler() {
             return .stopped
         }
         
-        switch f.handler(args) {
-        case .o(let o):
+        if let o = f.run(args) {
             handler(id, o)
             return o
-        case .send(let o, let oso):
-            if case .f(let subF) = o {
-                let os = oso.asArray
-                guard os.count == subF.outKeys.count
-                else {
-                    let o = sendArgsErrorO(withCount: subF.outKeys.count,
-                                           notCount: os.count)
-                    handler(id, o)
-                    return o
-                }
-                let o = calculateS(subF, nil, args: os, &oDic, stopHandler, handler)
-                handler(id, o)
-                return o
-            } else {
-                handler(id, o)
-                return o
-            }
-        case .special(let key):
-            let o = operateSpecial(key, id, args: args, &oDic, stopHandler, handler)
-            handler(id, o)
-            return o
-        case .custom:
-            var oldDic = [OKey: O]()
-            oldDic.reserveCapacity(f.outKeys.count + f.definitions.count)
-            for (i, key) in f.outKeys.enumerated() {
-                oldDic[key] = oDic[key]
-                oDic[key] = args[i]
-            }
-            for (key, value) in f.definitions {
-                oldDic[key] = oDic[key]
-                oDic[key] = O(value)
-            }
-            for (key, value) in f.definitions {
-                if value.type == .empty && !value.isBlock {
-                    oDic[key] = calculateS(value, id, args: [], &oDic, stopHandler, handler)
-                }
-            }
-            
-            let oidfs = f.rpn(&oDic).oidfs
-            var oStack = [O]()
-            for oidf in oidfs {
-                switch oidf {
-                case .oOrBlockO(let o):
-                    oStack.append(o)
-                case .calculateON0(let f):
-                    oStack.append(calculateS(f, nil, args: [], &oDic, stopHandler, handler))
-                case .calculateVN0(let v):
-                    let o = oDic[v.key] ?? O(v)
-                    if case .f(let subF) = o, subF.type == .empty && !subF.isBlock {
-                        let o = calculateS(subF, nil, args: [], &oDic, stopHandler, handler)
-                        oStack.append(o)
-                    } else {
-                        oStack.append(o)
-                    }
-                case .calculateVN1(let idf):
-                    let subF = idf.f
-                    let count = subF.outKeys.count
-                    let noCount = oStack.count - count
-                    guard noCount >= 0 else {
-                        let o = argsErrorO(withCount: count, notCount: oStack.count)
+        } else {
+            switch f.runType {
+            case .send:
+                let o = args[0], oso = args[1]
+                if case .f(let subF) = o {
+                    let os = oso.asArray
+                    guard os.count == subF.outKeys.count
+                    else {
+                        let o = sendArgsErrorO(withCount: subF.outKeys.count,
+                                               notCount: os.count)
                         handler(id, o)
                         return o
                     }
-                    let nos = (0 ..< count).map { oStack[noCount + $0] }
-                    oStack.removeLast(count)
-                    oStack.append(calculateS(subF, idf.v,
-                                             args: nos, &oDic, stopHandler, handler))
+                    let o = calculateS(subF, nil, args: os, &oDic, &memoRPN, stopHandler, handler)
+                    handler(id, o)
+                    return o
+                } else {
+                    handler(id, o)
+                    return o
                 }
+            case .custom:
+                var oldDic = [OKey: O]()
+                oldDic.reserveCapacity(f.outKeys.count + f.definitions.count)
+                for (i, key) in f.outKeys.enumerated() {
+                    oldDic[key] = oDic[key]
+                    oDic[key] = args[i]
+                }
+                for (key, value) in f.definitions {
+                    oldDic[key] = oDic[key]
+                    oDic[key] = O(value)
+                }
+                for (key, value) in f.definitions {
+                    if value.type == .empty && !value.isBlock {
+                        oDic[key] = calculateS(value, id, args: [], &oDic, &memoRPN, stopHandler, handler)
+                    }
+                }
+                
+                let nRPN: RPN
+                if let rpn = f.rpn ?? memoRPN[f.id] {
+                    nRPN = rpn
+                } else {
+                    let rpn = O.rpn(f.os, &oDic)
+                    memoRPN[f.id] = rpn
+                    nRPN = rpn
+                }
+                let oidfs = nRPN.oidfs
+                var oStack = [O]()
+                for oidf in oidfs {
+                    switch oidf {
+                    case .oOrBlockO(let o):
+                        oStack.append(o)
+                    case .calculateON0(let f):
+                        oStack.append(calculateS(f, nil, args: [], &oDic, &memoRPN, stopHandler, handler))
+                    case .calculateVN0(let v):
+                        let o = oDic[v.key] ?? O(v)
+                        if case .f(let subF) = o, subF.type == .empty && !subF.isBlock {
+                            let o = calculateS(subF, nil, args: [], &oDic, &memoRPN, stopHandler, handler)
+                            oStack.append(o)
+                        } else {
+                            oStack.append(o)
+                        }
+                    case .calculateVN1(let idf):
+                        let subF = idf.f
+                        let count = subF.outKeys.count
+                        let noCount = oStack.count - count
+                        guard noCount >= 0 else {
+                            let o = argsErrorO(withCount: count, notCount: oStack.count)
+                            handler(id, o)
+                            return o
+                        }
+                        let nos = (0 ..< count).map { oStack[noCount + $0] }
+                        oStack.removeLast(count)
+                        oStack.append(calculateS(subF, idf.v,
+                                                 args: nos, &oDic, &memoRPN, stopHandler, handler))
+                    }
+                }
+                
+                for (key, value) in oldDic { oDic[key] = value }
+                
+                let o = O.union(from: oStack)
+                handler(id, o)
+                return o
+            default:
+                let o = operateSpecial(f.runType, id, args: args, &oDic, &memoRPN, stopHandler, handler)
+                handler(id, o)
+                return o
             }
-            
-            for (key, value) in oldDic { oDic[key] = value }
-            
-            let o = O.union(from: oStack)
-            handler(id, o)
-            return o
         }
     }
     
@@ -3333,42 +3300,33 @@ extension O {
     }
     
     static let sendName = "send"
-    static let sendKey = OKey("$\(sendName)$")
-    static let showAllDefinitionsKey = OKey("$\(showAllDefinitionsName)")
-    static let drawKey = OKey("\(drawName)$")
-    static let drawAxesKey = OKey("\(drawAxesName)$base$$$")
-    static let plotKey = OKey("\(plotName)$base$$")
-    static let flipKey = OKey("\(flipName)$")
-    static let mapKey = OKey("$\(mapName)$")
-    static let filterKey = OKey("$\(filterName)$")
-    static let reduceKey = OKey("$\(reduceName)$$")
-    private static func operateSpecial(_ key: OKey, _ id: ID?, args: [O],
+    private static func operateSpecial(_ runType: F.RunType, _ id: ID?, args: [O],
                                        _ oDic: inout [OKey: O],
+                                       _ memoRPN: inout [UUID: RPN],
                                        _ stopHandler: StopHandler,
                                        _ handler: Handler) -> O {
-        switch key {
-        case flipKey: flip(args[0], &oDic)
-        case showAllDefinitionsKey: showAllDefinitions(args[0], &oDic)
-        case drawAxesKey: drawAxes(base: args[0], args[1], args[2], &oDic)
-        case plotKey: plot(base: args[0], args[1], &oDic)
-        case drawKey: draw(args[0], &oDic)
-        case mapKey://再帰バグ
+        switch runType {
+        case .flip: flip(args[0], &oDic)
+        case .showAllDefinitions: showAllDefinitions(args[0], &oDic)
+        case .drawAxes: drawAxes(base: args[0], args[1], args[2], &oDic)
+        case .plot: plot(base: args[0], args[1], &oDic)
+        case .draw: draw(args[0], &oDic)
+        case .map://再帰バグ
             O.map(args[0], args[1]) {
                 if stopHandler() { return .stopped }
-                return calculate($0, id, args: [$1], &oDic, stopHandler, handler)
+                return calculate($0, id, args: [$1], &oDic, &memoRPN, stopHandler, handler)
             }
-        case filterKey:
+        case .filter:
             O.filter(args[0], args[1]) {
                 if stopHandler() { return .stopped }
-                return calculate($0, id, args: [$1], &oDic, stopHandler, handler)
+                return calculate($0, id, args: [$1], &oDic, &memoRPN, stopHandler, handler)
             }
-        case reduceKey:
+        case .reduce:
             O.reduce(args[0], args[1], args[2]) {
                 if stopHandler() { return .stopped }
-                return calculate($0, id, args: [$1, $2], &oDic, stopHandler, handler)
+                return calculate($0, id, args: [$1, $2], &oDic, &memoRPN, stopHandler, handler)
             }
-        default:
-            fatalError()
+        default: fatalError()
         }
     }
 }

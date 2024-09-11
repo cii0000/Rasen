@@ -29,12 +29,12 @@ struct IntPoint {
 }
 extension IntPoint: Hashable {}
 extension IntPoint: Codable {
-    init(from decoder: Decoder) throws {
+    init(from decoder: any Decoder) throws {
         var container = try decoder.unkeyedContainer()
         x = try container.decode(Int.self)
         y = try container.decode(Int.self)
     }
-    func encode(to encoder: Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var container = encoder.unkeyedContainer()
         try container.encode(x)
         try container.encode(y)
@@ -64,12 +64,12 @@ struct PolarPoint {
 }
 extension PolarPoint: Hashable {}
 extension PolarPoint: Codable {
-    init(from decoder: Decoder) throws {
+    init(from decoder: any Decoder) throws {
         var container = try decoder.unkeyedContainer()
         r = try container.decode(Double.self)
         theta = try container.decode(Double.self)
     }
-    func encode(to encoder: Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var container = encoder.unkeyedContainer()
         try container.encode(r)
         try container.encode(theta)

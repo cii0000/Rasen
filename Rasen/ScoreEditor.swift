@@ -155,7 +155,7 @@ final class ScoreAdder: InputKeyEditor {
         case .changed:
             break
         case .ended:
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }
@@ -223,7 +223,7 @@ final class ToneShower: InputKeyEditor {
             break
         case .ended:
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }
@@ -861,7 +861,7 @@ final class ScoreSlider: DragEditor {
                 }
             }
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }

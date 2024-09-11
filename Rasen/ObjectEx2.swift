@@ -523,7 +523,7 @@ extension O {
         switch self {
         case .string(let a): O(OError(a))
         case .error: self
-        default: O(OError(self))
+        default: O(OError(description))
         }
     }
     
@@ -541,8 +541,13 @@ extension O {
         }
     }
     
-    static let errorCoalescingName = "??"
+    static let errorCoalescingName = "???"
     static func errorCoalescing(_ ao: O, _ bo: O) -> O {
         ao.isError ? bo : ao
+    }
+    
+    static let nilCoalescingName = "??"
+    static func nilCoalescing(_ ao: O, _ bo: O) -> O {
+        ao == O.nilV ? bo : ao
     }
 }

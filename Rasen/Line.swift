@@ -207,7 +207,7 @@ extension Line.Control: Protobuf {
 }
 extension Line.Control: Hashable {}
 extension Line.Control: Codable {
-    init(from decoder: Decoder) throws {
+    init(from decoder: any Decoder) throws {
         var container = try decoder.unkeyedContainer()
         point = try container.decode(Point.self).notInfiniteAndNAN()
         weight = (try container.decode(Double.self).notNaN())
@@ -215,7 +215,7 @@ extension Line.Control: Codable {
         pressure = (try container.decode(Double.self).notNaN())
             .clipped(min: 0, max: 1)
     }
-    func encode(to encoder: Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var container = encoder.unkeyedContainer()
         try container.encode(point)
         try container.encode(weight)
@@ -312,7 +312,7 @@ extension Line.Control {
 
 extension Line: Hashable {}
 extension Line: Codable {
-    init(from decoder: Decoder) throws {
+    init(from decoder: any Decoder) throws {
         var container = try decoder.unkeyedContainer()
         controls = try container.decode([Control].self)
         let size = (try? container.decode(Double.self)) ?? Line.defaultLineWidth
@@ -321,7 +321,7 @@ extension Line: Codable {
         self.interType = try container.decode(InterType.self)
         self.uuColor = try container.decode(UUColor.self)
     }
-    func encode(to encoder: Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var container = encoder.unkeyedContainer()
         try container.encode(controls)
         try container.encode(size)
@@ -2142,12 +2142,12 @@ extension Lasso: Codable {
     private enum CodingKeys: String, CodingKey {
         case line
     }
-    init(from decoder: Decoder) throws {
+    init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         line = try values.decode(Line.self, forKey: .line)
         path = line.path(isClosed: true, isPolygon: false)
     }
-    func encode(to encoder: Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(line, forKey: .line)
     }

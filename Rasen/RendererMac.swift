@@ -63,9 +63,9 @@ extension String {
 }
 
 final class Renderer {
-    let device: MTLDevice
-    let library: MTLLibrary
-    let commandQueue: MTLCommandQueue
+    let device: any MTLDevice
+    let library: any MTLLibrary
+    let commandQueue: any MTLCommandQueue
     let colorSpace = CGColorSpace.sRGBColorSpace!
     let pixelFormat = MTLPixelFormat.bgra8Unorm
     let imageColorSpace = CGColorSpace.sRGBColorSpace!
@@ -74,9 +74,9 @@ final class Renderer {
     let hdrPixelFormat = MTLPixelFormat.rgba16Float
     var defaultColorBuffers: [RGBA: Buffer]
     
-    static let shared = try! Renderer()
+    nonisolated(unsafe) static let shared = try! Renderer()
     
-    static var metalError: Error {
+    static var metalError: any Error {
         NSError(domain: NSCocoaErrorDomain, code: 0)
     }
     
@@ -132,23 +132,23 @@ final class Renderer {
 
 final class Renderstate {
     let sampleCount: Int
-    let opaqueColorRenderPipelineState: MTLRenderPipelineState
-    let minColorRenderPipelineState: MTLRenderPipelineState
-    let alphaColorRenderPipelineState: MTLRenderPipelineState
-    let colorsRenderPipelineState: MTLRenderPipelineState
-    let maxColorsRenderPipelineState: MTLRenderPipelineState
-    let opaqueTextureRenderPipelineState: MTLRenderPipelineState
-    let alphaTextureRenderPipelineState: MTLRenderPipelineState
-    let stencilRenderPipelineState: MTLRenderPipelineState
-    let stencilBezierRenderPipelineState: MTLRenderPipelineState
-    let invertDepthStencilState: MTLDepthStencilState
-    let normalDepthStencilState: MTLDepthStencilState
-    let clippingDepthStencilState: MTLDepthStencilState
-    let cacheSamplerState: MTLSamplerState
+    let opaqueColorRenderPipelineState: any MTLRenderPipelineState
+    let minColorRenderPipelineState: any MTLRenderPipelineState
+    let alphaColorRenderPipelineState: any MTLRenderPipelineState
+    let colorsRenderPipelineState: any MTLRenderPipelineState
+    let maxColorsRenderPipelineState: any MTLRenderPipelineState
+    let opaqueTextureRenderPipelineState: any MTLRenderPipelineState
+    let alphaTextureRenderPipelineState: any MTLRenderPipelineState
+    let stencilRenderPipelineState: any MTLRenderPipelineState
+    let stencilBezierRenderPipelineState: any MTLRenderPipelineState
+    let invertDepthStencilState: any MTLDepthStencilState
+    let normalDepthStencilState: any MTLDepthStencilState
+    let clippingDepthStencilState: any MTLDepthStencilState
+    let cacheSamplerState: any MTLSamplerState
     
-    static let sampleCount1 = try? Renderstate(sampleCount: 1)
-    static let sampleCount4 = try? Renderstate(sampleCount: 4)
-    static let sampleCount8 = try? Renderstate(sampleCount: 8)
+    nonisolated(unsafe) static let sampleCount1 = try? Renderstate(sampleCount: 1)
+    nonisolated(unsafe) static let sampleCount4 = try? Renderstate(sampleCount: 4)
+    nonisolated(unsafe) static let sampleCount8 = try? Renderstate(sampleCount: 8)
     
     init(sampleCount: Int) throws {
         let device = Renderer.shared.device
@@ -1809,11 +1809,11 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     var lastRotationQuantity = 0.0
     var isBeganSwipe = false, swipePosition: Point?
     
-    var scrollTimer: DispatchSourceTimer?
-    var pinchTimer: DispatchSourceTimer?
+    var scrollTimer: (any DispatchSourceTimer)?
+    var pinchTimer: (any DispatchSourceTimer)?
     
     struct TouchID: Hashable {
-        var id: NSCopying & NSObjectProtocol
+        var id: any NSCopying & NSObjectProtocol
         
         static func ==(lhs: Self, rhs: Self) -> Bool {
             lhs.id.isEqual(rhs.id)
@@ -2548,10 +2548,10 @@ extension SubMTKView {
 typealias NodeOwner = SubMTKView
 
 final class Context {
-    fileprivate var encoder: MTLRenderCommandEncoder
+    fileprivate var encoder: any MTLRenderCommandEncoder
     fileprivate let rs: Renderstate
     
-    fileprivate init(_ encoder: MTLRenderCommandEncoder,
+    fileprivate init(_ encoder: any MTLRenderCommandEncoder,
                      _ rs: Renderstate) {
         self.encoder = encoder
         self.rs = rs
@@ -2650,7 +2650,7 @@ extension Node {
             owner.showDefinition(for: attString, at: sp.cg)
         }
     }
-    func show(_ error: Error) {
+    func show(_ error: any Error) {
         guard let window = owner?.window else { return }
         NSAlert(error: error).beginSheetModal(for: window,
                                               completionHandler: { _ in })
@@ -2809,7 +2809,7 @@ extension Node {
             }
         }
         
-        let rpd: MTLRenderPassDescriptor, mtlTexture: MTLTexture
+        let rpd: MTLRenderPassDescriptor, mtlTexture: any MTLTexture
         if sampleCount > 1 {
             let td = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: renderer.pixelFormat,
                                                               width: width,
@@ -3304,20 +3304,20 @@ extension Color {
 }
 
 struct Buffer {
-    fileprivate let mtl: MTLBuffer
+    fileprivate let mtl: any MTLBuffer
 }
 
 struct Texture {
     static let maxWidth = 16384, maxHeight = 16384
     
-    fileprivate let mtl: MTLTexture
+    fileprivate let mtl: any MTLTexture
     let isOpaque: Bool
     let cgColorSpace: CGColorSpace
     var cgImage: CGImage? {
         mtl.cgImage(with: cgColorSpace)
     }
     
-    fileprivate init(_ mtl: MTLTexture, isOpaque: Bool, colorSpace: CGColorSpace) {
+    fileprivate init(_ mtl: any MTLTexture, isOpaque: Bool, colorSpace: CGColorSpace) {
         self.mtl = mtl
         self.isOpaque = isOpaque
         self.cgColorSpace = colorSpace
@@ -3328,7 +3328,7 @@ struct Texture {
     struct TextureError: Error {}
     static func texture(mipmapData: Data,
                         completionHandler: @escaping (Texture) -> (),
-                        cancelHandler: @escaping (Error) -> ()) throws {
+                        cancelHandler: @escaping (any Error) -> ()) throws {
         guard let cgImageSource = CGImageSourceCreateWithData(mipmapData as CFData, nil) else {
             throw TextureError()
         }
@@ -3342,7 +3342,7 @@ struct Texture {
     static func texture(mipmapImage: Image,
                         isOpaque: Bool = true,
                         completionHandler: @escaping (Texture) -> (),
-                        cancelHandler: @escaping (Error) -> ()) throws {
+                        cancelHandler: @escaping (any Error) -> ()) throws {
         try texture(mipmapCGImage: mipmapImage.cg, isOpaque: isOpaque,
                     completionHandler: completionHandler,
                     cancelHandler: cancelHandler)
@@ -3350,7 +3350,7 @@ struct Texture {
     static func texture(mipmapCGImage cgImage: CGImage,
                         isOpaque: Bool = true,
                         completionHandler: @escaping (Texture) -> (),
-                        cancelHandler: @escaping (Error) -> ()) throws {
+                        cancelHandler: @escaping (any Error) -> ()) throws {
         guard let dp = cgImage.dataProvider, let data = dp.data else { throw TextureError() }
         let iw = cgImage.width, ih = cgImage.height
         

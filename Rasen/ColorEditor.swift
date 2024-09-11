@@ -695,7 +695,7 @@ final class ColorEditor: Editor {
             
             isEditingLightness = false
             lightnessNode.removeFromParent()
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
     
@@ -1079,7 +1079,7 @@ final class ColorEditor: Editor {
             
             colorPointNode.removeFromParent()
             panNode.removeFromParent()
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
     
@@ -1181,7 +1181,7 @@ final class ColorEditor: Editor {
             tintBorderNode.removeFromParent()
             tintNode.removeFromParent()
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
     
@@ -1363,7 +1363,7 @@ final class ColorEditor: Editor {
             tintNode.removeFromParent()
             tintBorderNode.removeFromParent()
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }

@@ -161,14 +161,14 @@ extension Double3x3 {
 }
 extension Double3x3: Hashable {}
 extension Double3x3: Codable {
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         var container = try decoder.unkeyedContainer()
         let column0 = try container.decode(Double3.self)
         let column1 = try container.decode(Double3.self)
         let column2 = try container.decode(Double3.self)
         self.init(column0: column0, column1: column1, column2: column2)
     }
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var container = encoder.unkeyedContainer()
         try container.encode(self[0])
         try container.encode(self[1])

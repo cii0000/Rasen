@@ -123,13 +123,13 @@ extension UndoItemValue: Codable {
     private enum CodingKeys: String, CodingKey {
         case undo, redo
     }
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         let undoItem = try? values.decode(T.self, forKey: .undo)
         let redoItem = try? values.decode(T.self, forKey: .redo)
         try self.init(undoItem: undoItem, redoItem: redoItem)
     }
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         let (item, type) = encodeTuple()
         switch type {
@@ -268,12 +268,12 @@ extension UndoDataValue: Protobuf {
     }
 }
 extension UndoDataValue: Codable {
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         var container = try decoder.unkeyedContainer()
         undoItemData = try container.decode(Data.self)
         redoItemData = try container.decode(Data.self)
     }
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var container = encoder.unkeyedContainer()
         try container.encode(undoItemData)
         try container.encode(redoItemData)
@@ -315,12 +315,12 @@ extension UndoGroup: Protobuf {
     }
 }
 extension UndoGroup: Codable {
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         var container = try decoder.unkeyedContainer()
         values = try container.decode([UndoDataValue<T>].self)
         isFirstReverse = try container.decode(Bool.self)
     }
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var container = encoder.unkeyedContainer()
         try container.encode(values)
         try container.encode(isFirstReverse)
@@ -437,13 +437,13 @@ extension Branch {
     }
 }
 extension Branch: Codable {
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         var container = try decoder.unkeyedContainer()
         groups = try container.decode([UndoGroup<T>].self)
         childrenCount = try container.decode(Int.self)
         selectedChildIndex = try container.decodeIfPresent(Int.self)
     }
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var container = encoder.unkeyedContainer()
         try container.encode(groups)
         try container.encode(children.count)
@@ -532,12 +532,12 @@ extension BranchCoder {
     }
 }
 extension BranchCoder: Codable {
-    public init(from decoder: Decoder) throws {
+    public init(from decoder: any Decoder) throws {
         var container = try decoder.unkeyedContainer()
         let allBranches = try container.decode([Branch<T>].self)
         rootBranch = BranchCoder.rootBranch(from: allBranches)
     }
-    public func encode(to encoder: Encoder) throws {
+    public func encode(to encoder: any Encoder) throws {
         var container = encoder.unkeyedContainer()
         try container.encode(allBranches)
     }
@@ -569,7 +569,7 @@ extension History: Codable {
     private enum CodingKeys: String, CodingKey {
         case rootBranch, currentVersionIndex
     }
-    init(from decoder: Decoder) throws {
+    init(from decoder: any Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
         rootBranch = try values.decode(BranchCoder.self,
                                        forKey: .rootBranch).rootBranch
@@ -598,7 +598,7 @@ extension History: Codable {
         currentVersionIndex = j + ug.groups.count - 1
         currentVersion = Version(indexPath: ip, groupIndex: ug.groups.count - 1)
     }
-    func encode(to encoder: Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(BranchCoder(rootBranch: rootBranch),
                              forKey: .rootBranch)

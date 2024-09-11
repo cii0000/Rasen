@@ -143,7 +143,7 @@ final class Directory: File {
     
     enum ChildType {
         case directory(_ directory: Directory)
-        case file(_ file: File)
+        case file(_ file: any File)
     }
     private(set) var children = [String: ChildType]()
     private(set) var childrenURLs: [String: URL]
@@ -282,7 +282,7 @@ extension Directory {
         try image.write(type, to: nURL)
     }
     
-    func remove(_ file: File) throws {
+    func remove(_ file: any File) throws {
         childrenURLs[file.key] = nil
         children[file.key] = nil
         file.parent = nil

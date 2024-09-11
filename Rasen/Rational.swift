@@ -16,7 +16,7 @@
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
 struct Rational: SignedNumeric, Hashable {
-    static var ulpOfOne = Rational(.ulpOfOne)
+    static let ulpOfOne = Rational(.ulpOfOne)
     var p, q: Int
     
     init() {
@@ -370,7 +370,7 @@ extension Rational: Comparable {
     }
 }
 extension Rational: Codable {
-    init(from decoder: Decoder) throws {
+    init(from decoder: any Decoder) throws {
         var container = try decoder.unkeyedContainer()
         p = try container.decode(Int.self)
         q = try container.decode(Int.self)
@@ -380,7 +380,7 @@ extension Rational: Codable {
                                     debugDescription: "Division by zero")
         }
     }
-    func encode(to encoder: Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var container = encoder.unkeyedContainer()
         try container.encode(p)
         try container.encode(q)

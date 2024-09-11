@@ -80,7 +80,7 @@ final class RangeSelector: DragEditor {
                 multiFrameSlider.send(event)
                 return
             }
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }
@@ -101,7 +101,7 @@ final class Unselector: InputKeyEditor {
         case .changed:
             break
         case .ended:
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }
@@ -1105,7 +1105,7 @@ final class LineEditor: Editor {
             
             notePlayer?.stop()
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
     
@@ -1205,7 +1205,7 @@ final class LineEditor: Editor {
             worldToScreenScale: Double, screenToWorldScale: Double,
             phase: Phase
     }
-    var drawLineTimer: DispatchSourceTimer?, oldDrawLineEventsCount = 0
+    var drawLineTimer: (any DispatchSourceTimer)?, oldDrawLineEventsCount = 0
     var drawLineEvents = [DrawLineEvent](), drawLineEventsCount = 0, snapLines = [Line]()
     var textView: SheetTextView?
     
@@ -1213,7 +1213,7 @@ final class LineEditor: Editor {
         let p = document.convertScreenToWorld(event.screenPoint)
         switch event.phase {
         case .began:
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
             
             updateClipBoundsAndIndexRange(at: p)
             let tempLineNode = Node(attitude: Attitude(position: centerOrigin),
@@ -1280,7 +1280,7 @@ final class LineEditor: Editor {
                                         screenToWorldScale: document.screenToWorldScale,
                                         phase: .changed))
         case .ended:
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
             
             drawLineTimer?.cancel()
             
@@ -1361,7 +1361,7 @@ final class LineEditor: Editor {
         let p = document.convertScreenToWorld(event.screenPoint)
         switch event.phase {
         case .began:
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
             
             let isScore = document.sheetView(at: p)?.model.score.enabled ?? false
             
@@ -1457,7 +1457,7 @@ final class LineEditor: Editor {
                                         screenToWorldScale: document.screenToWorldScale,
                                         phase: .changed))
         case .ended:
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
             
             drawLineTimer?.cancel()
             

@@ -1566,7 +1566,7 @@ final class SheetView: View {
         self.rootBeat = Rational.saftyAdd(rootBeat, deltaTime)
     }
     
-    private var playingTimer: DispatchSourceTimer?,
+    private var playingTimer: (any DispatchSourceTimer)?,
                 playingOldKeyframeIndex: Int?
     private var playingCaptions = [Caption](),
                 playingCaption: Caption?, playingCaptionNodes = [Node]()

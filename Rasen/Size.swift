@@ -31,12 +31,12 @@ extension Size: Protobuf {
     }
 }
 extension Size: Codable {
-    init(from decoder: Decoder) throws {
+    init(from decoder: any Decoder) throws {
         var container = try decoder.unkeyedContainer()
         width = try container.decode(Double.self)
         height = try container.decode(Double.self)
     }
-    func encode(to encoder: Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var container = encoder.unkeyedContainer()
         try container.encode(width)
         try container.encode(height)

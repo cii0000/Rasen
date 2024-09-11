@@ -377,7 +377,7 @@ final class Movie {
         seq.endEngine()
     }
     
-    func finish(completionHandler handler: @escaping (Bool, Error?) -> ()) {
+    func finish(completionHandler handler: @escaping (Bool, (any Error)?) -> ()) {
         videoInput.markAsFinished()
         audioInput.markAsFinished()
         
@@ -474,7 +474,7 @@ final class CaptionRenderer {
         allDuration += duration
         currentTime += duration
     }
-    func finish(completionHandler handler: @escaping (Error?) -> ()) {
+    func finish(completionHandler handler: @escaping ((any Error)?) -> ()) {
         captionInput.markAsFinished()
 
         if !append || stop {

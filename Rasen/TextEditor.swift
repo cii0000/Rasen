@@ -138,7 +138,7 @@ final class TextSlider: DragEditor {
                 sheetView.updatePlaying()
             }
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }
@@ -194,7 +194,7 @@ final class Finder: InputKeyEditor {
         case .changed:
             break
         case .ended:
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }
@@ -216,7 +216,7 @@ final class Looker: InputKeyEditor {
         case .changed:
             break
         case .ended:
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
     func show(for p: Point) {
@@ -455,7 +455,7 @@ final class TextOrientationEditor: Editor {
             case .changed:
                 break
             case .ended:
-                document.cursor = Document.defaultCursor
+                document.cursor = document.defaultCursor
             }
             
             return
@@ -540,7 +540,7 @@ final class TextOrientationEditor: Editor {
         case .changed:
             break
         case .ended:
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }
@@ -695,7 +695,7 @@ final class TextScriptEditor: Editor {
         case .changed:
             break
         case .ended:
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }
@@ -779,7 +779,7 @@ final class TextEditor: Editor {
     }
     func sendEnd() {
         if document.oldInputTextKeys.isEmpty && !Cursor.isHidden {
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
     func stopInputKey(isEndEdit: Bool = true) {

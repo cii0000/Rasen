@@ -151,7 +151,7 @@ final class ContentSlider: DragEditor {
                 }
             }
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }

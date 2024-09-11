@@ -88,7 +88,7 @@ extension InteroptionsValue: Protobuf {
     }
 }
 
-enum PastableObject {
+enum PastableObject: Sendable {
     case copiedSheetsValue(_ copiedSheetsValue: CopiedSheetsValue)
     case sheetValue(_ sheetValue: SheetValue)
     case border(_ border: Border)
@@ -383,7 +383,7 @@ extension PastableObject: Codable {
         case tone = "14"
         case envelope = "21"
     }
-    init(from decoder: Decoder) throws {
+    init(from decoder: any Decoder) throws {
         var container = try decoder.unkeyedContainer()
         let key = try container.decode(CodingTypeKey.self)
         switch key {
@@ -429,7 +429,7 @@ extension PastableObject: Codable {
             self = .envelope(try container.decode(Envelope.self))
         }
     }
-    func encode(to encoder: Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var container = encoder.unkeyedContainer()
         switch self {
         case .copiedSheetsValue(let copiedSheetsValue):
@@ -2773,7 +2773,7 @@ final class CopyEditor: Editor {
         case .ended:
             selectingLineNode.removeFromParent()
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
     
@@ -2800,7 +2800,7 @@ final class CopyEditor: Editor {
         case .ended:
             selectingLineNode.removeFromParent()
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
     
@@ -2896,7 +2896,7 @@ final class CopyEditor: Editor {
             document.updateFinding(at: editingP)
             document.updateTextCursor()
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
     
@@ -3034,7 +3034,7 @@ final class CopyEditor: Editor {
         case .changed:
             break
         case .ended:
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
     
@@ -3070,7 +3070,7 @@ final class CopyEditor: Editor {
         case .ended:
             selectingLineNode.removeFromParent()
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
     var pasteSheetNode = Node()
@@ -3105,7 +3105,7 @@ final class CopyEditor: Editor {
             document.updateSelects()
             document.updateWithFinding()
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }
@@ -3158,7 +3158,7 @@ final class LineColorCopier: InputKeyEditor {
         case .ended:
             selectingLineNode.removeFromParent()
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
     
@@ -3312,7 +3312,7 @@ final class ToneCopier: InputKeyEditor {
         case .ended:
             selectingLineNode.removeFromParent()
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
     

@@ -266,7 +266,7 @@ final class UndoEditor: Editor {
                 document.updateFinding(from: sheetView)
             }
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
     func updateUndoOrRedo(at p: Point, isRedo: Bool) {
@@ -567,7 +567,7 @@ final class UndoEditor: Editor {
                 document.updateFinding(from: sheetView)
             }
             
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }
@@ -586,7 +586,7 @@ final class HistoryCleaner: InputKeyEditor {
     func end() {
         selectingLineNode.removeFromParent()
         
-        document.cursor = Document.defaultCursor
+        document.cursor = document.defaultCursor
         
         document.updateSelectedColor(isMain: true)
     }

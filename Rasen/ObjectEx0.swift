@@ -45,36 +45,35 @@ extension O {
         }
         
         let constantGroup = OKeyInfo.Group(name: "Constant".localized)
-        append(OKey(piName, OKeyInfo(constantGroup, "Archimedes' constant. Key input: ⌥ p".localized)),
-               pi)
+        append(OKey(piName, OKeyInfo(constantGroup, "Archimedes' constant. Key input: ⌥ p".localized)), pi)
         
         let bboGroup = OKeyInfo.Group(name: "Basic binary operation".localized)
         append(powName, OKeyInfo(bboGroup, "Exponentiation (Principal value). a ** b = abͬ".localized),
-               F(170, .right, left: 1, right: 1, { .o($0[0] ** $0[1]) }))
+               F(170, .right, left: 1, right: 1, .pow))
         append(apowName, OKeyInfo(bboGroup, "Logarithm (Principal value). b */ a = loga᷊b".localized),
-               F(170, .right, left: 1, right: 1, { .o(.apow($0[0], $0[1])) }))
+               F(170, .right, left: 1, right: 1, .apow))
         append(multiplyName, OKeyInfo(bboGroup, "Multiply.".localized),
-               F(160, left: 1, right: 1, { .o($0[0] * $0[1]) }))
+               F(160, left: 1, right: 1, .multiply))
         append(divisionName, OKeyInfo(bboGroup, "Division.".localized),
-               F(160, left: 1, right: 1, { .o($0[0] / $0[1]) }))
+               F(160, left: 1, right: 1, .division))
         append(moduloName, OKeyInfo(bboGroup, "Modulo.".localized),
-               F(160, left: 1, right: 1, { .o($0[0] % $0[1]) }))
+               F(160, left: 1, right: 1, .modulo))
         append(additionName, OKeyInfo(bboGroup, "Add.".localized),
-               F(150, left: 1, right: 1, { .o($0[0] + $0[1]) }))
+               F(150, left: 1, right: 1, .addition))
         append(subtractionName, OKeyInfo(bboGroup, "Subtract.".localized),
-               F(150, left: 1, right: 1, { .o($0[0] - $0[1]) }))
+               F(150, left: 1, right: 1,  .subtraction))
         append(equalName, OKeyInfo(bboGroup, "Equal.".localized),
-               F(130, left: 1, right: 1, { .o(.equalO($0[0], $0[1])) }))
+               F(130, left: 1, right: 1, .equal))
         append(notEqualName, OKeyInfo(bboGroup, "Not equal.".localized),
-               F(130, left: 1, right: 1, { .o(.notEqualO($0[0], $0[1])) }))
+               F(130, left: 1, right: 1, .notEqual))
         append(lessName, OKeyInfo(bboGroup, "$0 < $1"),
-               F(130, left: 1, right: 1, { .o(.lessO($0[0], $0[1])) }))
+               F(130, left: 1, right: 1, .less))
         append(greaterName, OKeyInfo(bboGroup, "$0 > $1"),
-               F(130, left: 1, right: 1, { .o(.greaterO($0[0], $0[1])) }))
+               F(130, left: 1, right: 1, .greater))
         append(lessEqualName, OKeyInfo(bboGroup, "$0 ≤ $1"),
-               F(130, left: 1, right: 1, { .o(.lessEqualO($0[0], $0[1])) }))
+               F(130, left: 1, right: 1, .lessEqual))
         append(greaterEqualName, OKeyInfo(bboGroup, "$0 ≥ $1"),
-               F(130, left: 1, right: 1, { .o(.greaterEqualO($0[0], $0[1])) }))
+               F(130, left: 1, right: 1, .greaterEqual))
         append(andName, OKeyInfo(bboGroup, "Logical multiply. Short circuit evaluation.".localized),
                F(precedence: 120,
                  left: [Argument(inKey: nil, outKey: OKey("a"))],
@@ -90,71 +89,69 @@ extension O {
         
         let buoGroup = OKeyInfo.Group(name: "Basic unary operation".localized)
         append(notName, OKeyInfo(buoGroup, "Negation.".localized),
-               F(right: 1, { .o(!$0[0]) }))
+               F(right: 1, .not))
         append(floorName, OKeyInfo(buoGroup, "Floor function.".localized),
-               F(right: 1, { .o($0[0].floor) }))
+               F(right: 1, .floor))
         append(roundName, OKeyInfo(buoGroup, "Rounding function.".localized),
-               F(right: 1, { .o($0[0].round) }))
+               F(right: 1, .round))
         append(ceilName, OKeyInfo(buoGroup, "Ceiling function.".localized),
-               F(right: 1, { .o($0[0].ceil) }))
+               F(right: 1, .ceil))
         append(absName, OKeyInfo(buoGroup, "Absolute value function.".localized),
-               F(right: 1, { .o($0[0].absV) }))
+               F(right: 1, .abs))
         append(sqrtName, OKeyInfo(buoGroup, "Square root (Principal value).".localized),
-               F(right: 1, { .o($0[0].sqrt) }))
+               F(right: 1, .sqrt))
         append(sinName, OKeyInfo(buoGroup, "Sine.".localized),
-               F(right: 1, { .o($0[0].sin) }))
+               F(right: 1, .sin))
         append(cosName, OKeyInfo(buoGroup, "Cosine.".localized),
-               F(right: 1, { .o($0[0].cos) }))
+               F(right: 1, .cos))
         append(tanName, OKeyInfo(buoGroup, "Tangent.".localized),
-               F(right: 1, { .o($0[0].tan) }))
+               F(right: 1, .tan))
         append(asinName, OKeyInfo(buoGroup, "Arcsine (Principal value).".localized),
-               F(right: 1, { .o($0[0].asin) }))
+               F(right: 1, .asin))
         append(acosName, OKeyInfo(buoGroup, "Arccosine (Principal value).".localized),
-               F(right: 1, { .o($0[0].acos) }))
+               F(right: 1, .acos))
         append(atanName, OKeyInfo(buoGroup, "Arctangent (Principal value).".localized),
-               F(right: 1, { .o($0[0].atan) }))
+               F(right: 1, .atan))
         append(atan2Name, OKeyInfo(buoGroup, "Arctangent2 (Principal value).".localized),
-               F(right: 1, { .o($0[0].atan2) }))
+               F(right: 1, .atan2))
         append(plusName, OKeyInfo(buoGroup, "Plus.".localized),
-               F(150, right: 1, { .o(+$0[0]) }))
+               F(150, right: 1, .plus))
         append(minusName, OKeyInfo(buoGroup, "Minus.".localized),
-               F(150, right: 1, { .o(-$0[0]) }))
+               F(150, right: 1, .minus))
         
         let rangeGroup = OKeyInfo.Group(name: "Range".localized)
         append(filiZName, OKeyInfo(rangeGroup, "{x | $0 ≤ x ≤ $1, x ∈ Z}"),
-               F(140, left: 1, right: 1,
-                 { .o(.rangeO(.fili($0[0], $0[1]), isSmooth: false)) }))
+               F(140, left: 1, right: 1, .filiZ))
         append(filoZName, OKeyInfo(rangeGroup, "{x | $0 ≤ x < $1, x ∈ Z}"),
-               F(140, left: 1, right: 1,
-                 { .o(.rangeO(.filo($0[0], $0[1]), isSmooth: false)) }))
+               F(140, left: 1, right: 1, .filoZ))
         
         let arrayGroup = OKeyInfo.Group(name: "Array or set".localized)
         append(countaName, OKeyInfo(arrayGroup, "Get count.".localized),
-               F(200, left: 1, { .o($0[0].counta) }))
+               F(200, left: 1, .counta))
         append(atName, OKeyInfo(arrayGroup, "Get, e.g. (3 4 5).2 = 5".localized),
-               F(140, left: 1, right: 1, { .o(.at($0[0], $0[1])) }))
+               F(140, left: 1, right: 1, .at))
         append(selectName, OKeyInfo(arrayGroup, "Select.".localized),
-               F(140, left: 1, right: 1, { .o(.select($0[0], $0[1])) }))
+               F(140, left: 1, right: 1, .select))
         append(setName, OKeyInfo(arrayGroup, "Replace, e.g. (3 4 5)/.1 <- 2 = (3 2 5)".localized),
-               F(140, left: 1, right: 1, { .o(.set($0[0], $0[1])) }))
+               F(140, left: 1, right: 1, .set))
         append(insertName, OKeyInfo(arrayGroup, "Append, e.g. (3 4)/.1 ++ 5 = (3 5 4), (3 4) ++ 5 = (3 4 5)".localized),
-               F(140, left: 1, right: 1, { .o(.insert($0[0], $0[1])) }))
+               F(140, left: 1, right: 1, .insert))
         append(removeName, OKeyInfo(arrayGroup, "Remove, e.g. (3 4 5)/.1 -- = (3 5)".localized),
-               F(140, left: 1, { .o(.remove($0[0])) }))
+               F(140, left: 1, .remove))
         append(makeMatrixName, OKeyInfo(arrayGroup, "Make matrix".localized),
-               F(140, left: 1, { .o(.makeMatrix($0[0])) }))
+               F(140, left: 1, .makeMatrix))
         append(releaseMatrixName, OKeyInfo(arrayGroup, "Release matrix".localized),
-               F(140, left: 1, { .o(.releaseMatrix($0[0])) }))
+               F(140, left: 1, .releaseMatrix))
         append(isName, OKeyInfo(arrayGroup, "$0 is $1 = $0 ∈ $1"),
-               F(200, left: 1, right: 1, { .o(.isO($0[0], $0[1])) }))
+               F(200, left: 1, right: 1, .is))
         append(mapName, OKeyInfo(arrayGroup, "Map function, e.g. (3 4 5) map (x | x + 2) = (5 6 7)".localized),
-               F(200, left: 1, right: 1, { _ in .special(mapKey) }))
+               F(200, left: 1, right: 1, .map))
         append(filterName, OKeyInfo(arrayGroup, "Filter function, e.g. (3 4 5 6) filter (x | x % 2 != 0) = (3 5)".localized),
-               F(200, left: 1, right: 1, { _ in .special(filterKey) }))
+               F(200, left: 1, right: 1, .filter))
         append(reduceName, OKeyInfo(arrayGroup, "Reduce function, e.g. (3 4 5) reduce 0 (y x | y + x) = 12".localized),
-               F(200, left: 1, right: 2, { _ in .special(reduceKey) }))
+               F(200, left: 1, right: 2, .reduce))
         append(randomName, OKeyInfo(arrayGroup, "Random, e.g. (3 4 5) random = 4".localized),
-               F(200, left: 1, { .o($0[0].random) }))
+               F(200, left: 1, .random))
         
         let orientationGroup = OKeyInfo.Group(name: "Orientation".localized)
         append(OKey(horizontalName, OKeyInfo(orientationGroup, "Horizontal.".localized)),
@@ -174,34 +171,34 @@ extension O {
         append(OKey(printPName, OKeyInfo(sheetGroup, "Display position of the execution result.".localized)),
                O(printP))
         append(showAllDefinitionsName, OKeyInfo(sheetGroup, "Show all definitions.".localized),
-               F(left: 1, { _ in .special(showAllDefinitionsKey) }))
+               F(left: 1, .showAllDefinitions))
         append(drawName, OKeyInfo(sheetGroup, "Draw points $0 on sheet, e.g. draw ((100 100) (200 200))".localized),
-               F(right: 1, { _ in .special(drawKey) }))
+               F(right: 1, .draw))
         append(drawAxesName, OKeyInfo(sheetGroup, "Draw axes on the sheet with $0 as the base scale, $1 as the x axis name, $2 as the y axis name, and the center of the sheet as the origin,\ne.g. drawAxes base: 1 \"X\" \"Y\"".localized),
-               F(left: [], right: ["base", "", ""], { _ in .special(drawAxesKey) }))
+               F(left: [], right: ["base", "", ""], .drawAxes))
         append(plotName, OKeyInfo(sheetGroup, "Plot points $1 on the sheet with $0 as the base scale, center of the sheet as the origin,\ne.g. plot base: 1 ((0 0) (1 1))".localized),
-               F(left: [], right: ["base", ""], { _ in .special(plotKey) }))
+               F(left: [], right: ["base", ""], .plot))
         append(flipName, OKeyInfo(sheetGroup, "Flip sheet based on $0, e.g. flip horizontal".localized),
-               F(right: 1, { _ in .special(flipKey) }))
+               F(right: 1, .flip))
         
         let otherGroup = OKeyInfo.Group(name: "Other".localized)
         append(asLabelName, OKeyInfo(otherGroup, "Make label.".localized),
-               F(left: 1, { .o($0[0].asLabel) }))
+               F(left: 1, .asLabel))
         append(asStringName, OKeyInfo(otherGroup, "Make string.".localized),
-               F(right: 1, { .o($0[0].asStringO) }))
+               F(right: 1, .asString))
         append(asErrorName, OKeyInfo(otherGroup, "Make error.".localized),
-               F(right: 1, { .o($0[0].asError) }))
+               F(right: 1, .asError))
         append(isErrorName, OKeyInfo(otherGroup, "Error check.".localized),
-               F(130, left: 1, { .o($0[0].isErrorO) }))
-        append(errorCoalescingName, OKeyInfo(otherGroup, "Error coalescing. Short circuit evaluation, e.g. (0 1).2 ?? 3 = 3".localized),
+               F(130, left: 1, .isError))
+        append(nilCoalescingName, OKeyInfo(otherGroup, "Nil coalescing. Short circuit evaluation, e.g. (0 1).2 ?? 3 = 3".localized),
                F(precedence: 140,
                  left: [Argument(inKey: nil, outKey: OKey("a"))],
                  right: [Argument(inKey: nil, outKey: OKey("b"))],
                  os: [O(F([O(F([O(F([O(ID("a"))]).with(isBlock: true)),
-                                O(ID("b"))])), O(ID(atName)), O(F([O(ID("a")), O(ID(isErrorName))]))])), O(ID(sendName)), O()],
+                                O(ID("b"))])), O(ID(atName)), O(F([O(ID("a")), O(ID(equalName)), O.nilV]))])), O(ID(sendName)), O()],
                  isShortCircuit: true))
         append(sendName, OKeyInfo(otherGroup, "Send $1 to $0. $+$ send (a b) = a + b".localized),
-               F(left: 1, right: 1, { .send($0[0], $0[1]) }))
+               F(left: 1, right: 1, .send))
         
         return oDic
     }
@@ -416,6 +413,9 @@ extension O {
 extension O {
     static let piName = "π"
     static let pi = O(Real1.pi)
+    
+    static let nilName = "nil"
+    static let nilV = O(OArray([]))
 }
 extension O {
     static let powName = "**"
@@ -1182,7 +1182,7 @@ extension O: Equatable {
             }
         case .error(let a):
             switch rhs {
-            case .error(let b): return a.o == b.o
+            case .error(let b): return a == b
             default: return false
             }
         }

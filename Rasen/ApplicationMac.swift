@@ -446,7 +446,7 @@ private extension NSMenu {
 enum Appearance {
     case light, dark
     
-    static var current: Appearance = .light
+    nonisolated(unsafe) static var current: Appearance = .light
 }
 
 private extension NSImage {
@@ -743,7 +743,7 @@ extension URL {
                      prompt: String? = nil,
                      canChooseDirectories: Bool = false,
                      allowsMultipleSelection: Bool = false,
-                     fileTypes: [FileTypeProtocol],
+                     fileTypes: [any FileTypeProtocol],
                      completionClosure closure: @escaping ([IOResult]) -> (),
                      cancelClosure: @escaping () -> () = {}) {
         guard let window = SubNSApplication.shared.mainWindow else { return }
@@ -778,7 +778,7 @@ extension URL {
                      name: String? = nil,
                      directoryURL: URL? = nil,
                      prompt: String? = nil,
-                     fileTypes: [FileTypeProtocol],
+                     fileTypes: [any FileTypeProtocol],
                      completionClosure closure: @escaping (IOResult) -> (),
                      cancelClosure: @escaping () -> () = {}) {
         guard let window = SubNSApplication.shared.mainWindow else { return }
@@ -813,7 +813,7 @@ extension URL {
     static func export(message: String? = nil,
                        name: String? = nil,
                        directoryURL: URL? = nil,
-                       fileType: FileTypeProtocol,
+                       fileType: any FileTypeProtocol,
                        fileTypeOptionName: String? = nil,
                        fileSizeHandler: @escaping () -> (Int?),
                        completionClosure closure: @escaping (IOResult) -> (),
@@ -936,10 +936,10 @@ extension URL {
         }
         return fileSize
     }
-    static var readError: Error {
+    static var readError: any Error {
         NSError(domain: NSCocoaErrorDomain, code: NSFileReadUnknownError)
     }
-    static var writeError: Error {
+    static var writeError: any Error {
         NSError(domain: NSCocoaErrorDomain, code: NSFileWriteUnknownError)
     }
 }
@@ -1087,7 +1087,7 @@ struct System {
 }
 
 final class Pasteboard {
-    static let shared = Pasteboard()
+    nonisolated(unsafe) static let shared = Pasteboard()
     
     private var aCopiedObjects: [PastableObject]?
     private var nsChangedCount = NSPasteboard.general.changeCount
@@ -2038,7 +2038,7 @@ extension Image {
 extension Image: Hashable {}
 extension Image: Codable {
     struct CodableError: Error {}
-    init(from decoder: Decoder) throws {
+    init(from decoder: any Decoder) throws {
         let container = try decoder.singleValueContainer()
         let data = try container.decode(Data.self)
         guard let aSelf = Image(data: data) else {
@@ -2046,7 +2046,7 @@ extension Image: Codable {
         }
         self = aSelf
     }
-    func encode(to encoder: Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var container = encoder.singleValueContainer()
         if let data = data(fileType) {
             try container.encode(data)
@@ -2207,17 +2207,17 @@ final class Bitmap<Value: FixedWidthInteger & UnsignedInteger> {
 }
 
 struct Cursor {
-    static let arrow = arrowWith()
-    static let drawLine = circle()
-    static let block = ban()
-    static let stop = rect()
+    nonisolated(unsafe) static let arrow = arrowWith()
+    nonisolated(unsafe) static let drawLine = circle()
+    nonisolated(unsafe) static let block = ban()
+    nonisolated(unsafe) static let stop = rect()
     
-    static var current = arrow {
+    nonisolated(unsafe) static var current = arrow {
         didSet {
             current.ns.set()
         }
     }
-    static var isHidden = false {
+    nonisolated(unsafe) static var isHidden = false {
         didSet {
             if isHidden != oldValue {
                 if isHidden {
@@ -2607,8 +2607,7 @@ final class TextInputContext {
     }
 }
 struct InputTextEvent: Event {
-    var screenPoint: Point, time: Double, pressure: Double, phase: Phase,
-        isRepeat: Bool
+    var screenPoint: Point, time: Double, pressure: Double, phase: Phase, isRepeat: Bool
     var inputKeyType: InputKeyType
     var ns: NSEvent, inputContext: NSTextInputContext?
 }
@@ -2620,8 +2619,7 @@ extension InputTextEvent {
 
 struct Feedback {
     static func performAlignment() {
-        NSHapticFeedbackManager.defaultPerformer.perform(.alignment,
-                                                         performanceTime: .now)
+        NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
     }
 }
 

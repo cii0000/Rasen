@@ -1080,7 +1080,7 @@ extension SheetUndoItem: Codable {
         case setScoreOption = "48"
         case setIsShownTones = "51"
     }
-    init(from decoder: Decoder) throws {
+    init(from decoder: any Decoder) throws {
         var container = try decoder.unkeyedContainer()
         let key = try container.decode(CodingTypeKey.self)
         switch key {
@@ -1184,7 +1184,7 @@ extension SheetUndoItem: Codable {
             self = .setIsShownTones(try container.decode([IndexValue<Bool>].self))
         }
     }
-    func encode(to encoder: Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var container = encoder.unkeyedContainer()
         switch self {
         case .appendLine(let line):

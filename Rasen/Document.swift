@@ -253,7 +253,7 @@ extension WorldUndoItem: Codable {
         case insertSheets = "0"
         case removeSheets = "1"
     }
-    init(from decoder: Decoder) throws {
+    init(from decoder: any Decoder) throws {
         var container = try decoder.unkeyedContainer()
         let key = try container.decode(CodingTypeKey.self)
         switch key {
@@ -263,7 +263,7 @@ extension WorldUndoItem: Codable {
             self = .removeSheets(try container.decode([Sheetpos].self))
         }
     }
-    func encode(to encoder: Encoder) throws {
+    func encode(to encoder: any Encoder) throws {
         var container = encoder.unkeyedContainer()
         switch self {
         case .insertSheets(let sids):
@@ -558,9 +558,8 @@ final class Document {
         }
         
         if camera.rotation != 0 {
-            Document.defaultCursor
-                = Cursor.rotate(rotation: -camera.rotation + .pi / 2)
-            cursor = Document.defaultCursor
+            defaultCursor = Cursor.rotate(rotation: -camera.rotation + .pi / 2)
+            cursor = defaultCursor
         }
         updateTransformsWithCamera()
         updateWithWorld()
@@ -1045,9 +1044,9 @@ final class Document {
         }
     }
     
-    static var defaultCursor = Cursor.drawLine
+    var defaultCursor = Cursor.drawLine
     var cursorNotifications = [((Document, Cursor) -> ())]()
-    var cursor = Document.defaultCursor {
+    var cursor = Cursor.drawLine {
         didSet {
             guard cursor != oldValue else { return }
             cursorNotifications.forEach { $0(self, cursor) }
@@ -2527,7 +2526,7 @@ final class Document {
         return .texture(texture)
     }
     
-    func containsAllTimelines(with event: Event) -> Bool {
+    func containsAllTimelines(with event: any Event) -> Bool {
         let sp = lastEditedSheetScreenCenterPositionNoneCursor ?? event.screenPoint
         let p = convertScreenToWorld(sp)
         guard let sheetView = sheetView(at: p) else { return false }
@@ -2535,7 +2534,7 @@ final class Document {
         return sheetView.animationView.containsTimeline(inP, scale: screenToWorldScale)
         || sheetView.containsOtherTimeline(inP, scale: screenToWorldScale)
     }
-    func isPlaying(with event: Event) -> Bool {
+    func isPlaying(with event: any Event) -> Bool {
         let sp = lastEditedSheetScreenCenterPositionNoneCursor ?? event.screenPoint
         let p = convertScreenToWorld(sp)
         if let sheetView = sheetView(at: p), sheetView.isPlaying {
@@ -3225,7 +3224,7 @@ final class Document {
     
     private(set) var lastEditedSheetpos: Sheetpos?
     private var lastEditedSheetNode: Node?
-    func updateLastEditedSheetpos(from event: Event) {
+    func updateLastEditedSheetpos(from event: any Event) {
         lastEditedSheetpos
             = sheetPosition(at: convertScreenToWorld(event.screenPoint))
     }
@@ -3830,7 +3829,7 @@ final class Document {
     }
     
     private(set) var oldRotateEvent: RotateEvent?, rotater: Rotater?
-    func rotate(_ event: RotateEvent) {
+    @MainActor func rotate(_ event: RotateEvent) {
         switch event.phase {
         case .began:
             rotater = Rotater(self)
@@ -3846,7 +3845,7 @@ final class Document {
         }
     }
     
-    private(set) var oldStrongDragEvent: DragEvent?, strongDragEditor: DragEditor?
+    private(set) var oldStrongDragEvent: DragEvent?, strongDragEditor: (any DragEditor)?
     func strongDrag(_ event: DragEvent) {
 //        switch event.phase {
 //        case .began:
@@ -3868,7 +3867,7 @@ final class Document {
 //        }
     }
     
-    private(set) var oldSubDragEvent: DragEvent?, subDragEditor: DragEditor?
+    private(set) var oldSubDragEvent: DragEvent?, subDragEditor: (any DragEditor)?
     func subDrag(_ event: DragEvent) {
         switch event.phase {
         case .began:
@@ -3890,7 +3889,7 @@ final class Document {
         }
     }
     
-    private(set) var oldMiddleDragEvent: DragEvent?, middleDragEditor: DragEditor?
+    private(set) var oldMiddleDragEvent: DragEvent?, middleDragEditor: (any DragEditor)?
     func middleDrag(_ event: DragEvent) {
         switch event.phase {
         case .began:
@@ -3912,7 +3911,7 @@ final class Document {
         }
     }
     
-    private func dragEditor(with quasimode: Quasimode) -> DragEditor? {
+    private func dragEditor(with quasimode: Quasimode) -> (any DragEditor)? {
         switch quasimode {
         case .drawLine: LineDrawer(self)
         case .drawStraightLine: StraightLineDrawer(self)
@@ -3928,7 +3927,7 @@ final class Document {
         default: nil
         }
     }
-    private(set) var oldDragEvent: DragEvent?, dragEditor: DragEditor?
+    private(set) var oldDragEvent: DragEvent?, dragEditor: (any DragEditor)?
     func drag(_ event: DragEvent) {
         switch event.phase {
         case .began:
@@ -4032,7 +4031,7 @@ final class Document {
         }
     }
     
-    private func inputKeyEditor(with quasimode: Quasimode) -> InputKeyEditor? {
+    private func inputKeyEditor(with quasimode: Quasimode) -> (any InputKeyEditor)? {
         switch quasimode {
         case .cut: Cutter(self)
         case .copy: Copier(self)
@@ -4066,7 +4065,7 @@ final class Document {
         }
     }
     private(set) var oldInputKeyEvent: InputKeyEvent?
-    private(set) var inputKeyEditor: InputKeyEditor?
+    private(set) var inputKeyEditor: (any InputKeyEditor)?
 //    var inputKeyEditorNotification: ((Document, InputKeyEditor?,
 //                                      InputKeyEvent) -> ())?
     func inputKey(_ event: InputKeyEvent) {
@@ -4117,17 +4116,17 @@ final class Document {
         }
     }
     
-    func stop(with event: Event) {
+    func stop(with event: any Event) {
         switch event.phase {
         case .began:
             cursor = .block
         case .changed:
             break
         case .ended:
-            cursor = Document.defaultCursor
+            cursor = defaultCursor
         }
     }
-    func stopPlaying(with event: Event) {
+    func stopPlaying(with event: any Event) {
         switch event.phase {
         case .began:
             cursor = .stop
@@ -4138,7 +4137,7 @@ final class Document {
         case .changed:
             break
         case .ended:
-            cursor = Document.defaultCursor
+            cursor = defaultCursor
         }
     }
     

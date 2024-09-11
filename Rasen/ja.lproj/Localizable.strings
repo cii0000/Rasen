@@ -407,6 +407,7 @@
 "Make error." = "エラーを作成。";
 "Error check." = "エラーチェック。";
 "Error coalescing. Short circuit evaluation, e.g. (0 1).2 ?? 3 = 3" = "エラー結合。短絡評価。例: (0 1).2 ?? 3 = 3";
+"Nil coalescing. Short circuit evaluation, e.g. (0 1).2 ?? 3 = 3" = "ニル結合。短絡評価。例: (0 1).2 ?? 3 = 3";
 
 "Sheets dictionary where key is coordinates. Key of the sheet at the cursor position is the origin (0 0). The keys on the other sheets are relative to the origin."
 =

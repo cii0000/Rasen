@@ -61,7 +61,7 @@ final class RunEditor: InputKeyEditor {
     
     var stepString = ""
     var stepNode = Node(fillType: .color(.content))
-    var stepTimer: DispatchSourceTimer?
+    var stepTimer: (any DispatchSourceTimer)?
     
     let isDebug: Bool
     var debugString = ""
@@ -73,7 +73,7 @@ final class RunEditor: InputKeyEditor {
     }
     var debugNodeValues = [Point: DebugNodeValue]()
     var debugTexts = [(ID, O)]()
-    var errorIDs = Set<Int>(), firstErrorNode: Node?
+    var firstErrorNode: Node?
     var oldDebugNode: Node?
     var debugCount = 0 {
         didSet {
@@ -116,18 +116,6 @@ final class RunEditor: InputKeyEditor {
             oldDebugNode?.children.first?.fillType = .color(.removing)
             oldDebugNode?.lineType = .color(.removing)
             oldDebugNode = newNode
-        }
-    }
-    func append(_ id: ID?, _ o: O) {
-        if !isStopped, let id = id {
-            if case .error(let error) = o, !errorIDs.contains(error.id) {
-                errorIDs.insert(error.id)
-                drawFirstError(id)
-            }
-            debugTexts.append((id, o))
-            if let p = id.typoBounds?.origin, debugNodeValues[p] == nil {
-                drawEmpty(id)
-            }
         }
     }
     func drawFirstError(_ id: ID) {
@@ -353,7 +341,7 @@ final class RunEditor: InputKeyEditor {
         case .changed:
             break
         case .ended:
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }
@@ -528,16 +516,27 @@ extension RunEditor {
             
             let firstDate = Date()
             
-            var errors = [Int: ID?]()
+            var errorID: ID?
             let isDebug = self.isDebug, no: O
             if isDebug {
-                no = O.calculate(xo, &oDic, { self.isStopped }) { (v, o) in
-                    DispatchQueue.main.async { self.append(v, o) }
+                no = O.calculate(xo, &oDic, { self.isStopped }) { (id, o) in
+                    if !self.isStopped, let id {
+                        DispatchQueue.main.async {
+                            if case .error = o, errorID == nil {
+                                errorID = id
+                                self.drawFirstError(id)
+                            }
+                            self.debugTexts.append((id, o))
+                            if let p = id.typoBounds?.origin, self.debugNodeValues[p] == nil {
+                                self.drawEmpty(id)
+                            }
+                        }
+                    }
                 }
             } else {
-                no = O.calculate(xo, &oDic, { self.isStopped }) { (v, o) in
-                    if case .error(let error) = o, errors[error.id] == nil {
-                        errors[error.id] = v
+                no = O.calculate(xo, &oDic, { self.isStopped }) { (id, o) in
+                    if case .error = o, errorID == nil {
+                        errorID = id
                     }
                 }
             }
@@ -554,17 +553,7 @@ extension RunEditor {
                     let t = Date().timeIntervalSince(firstDate)
                     if let sheetView = self.document.madeReadSheetView(at: self.printOrigin) {
                         let shp = self.document.sheetPosition(at: self.printOrigin)
-                        let errorID: ID?
-                        if case .error(let error) = no,
-                            let oid = errors[error.id], let id = oid {
-                            
-                            errorID = id
-                        } else {
-                            errorID = nil
-                        }
-                        self.draw(nno, from: text, time: t,
-                                   errorID: errorID,
-                                   in: sheetView, shp)
+                        self.draw(nno, from: text, time: t, in: sheetView, shp)
                     }
                 }
                 self.document.updateTextCursor()
@@ -593,7 +582,6 @@ extension RunEditor {
         return Point(text.origin.x + padding + size.width, text.origin.y)
     }
     func draw(_ o: O, from text: Text, time: Double,
-              errorID: ID?,
               in sheetView: SheetView, _ shp: Sheetpos) {
 //        var isUp = false
         func drawO(_ o: O) {
@@ -984,7 +972,7 @@ final class AboutRunShower: InputKeyEditor {
         case .changed:
             break
         case .ended:
-            document.cursor = Document.defaultCursor
+            document.cursor = document.defaultCursor
         }
     }
 }
