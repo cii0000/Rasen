@@ -28,9 +28,11 @@ struct Interpolation<Value: MonoInterpolatable & Equatable> {
     var keys = [Key]()
     var duration = 1.0
 }
+extension Interpolation.Key: Sendable where Value: Sendable {}
 extension Interpolation.Key: Equatable where Value: Equatable {}
 extension Interpolation.Key: Hashable where Value: Hashable {}
 extension Interpolation.Key: Codable where Value: Codable {}
+extension Interpolation: Sendable where Value: Sendable {}
 extension Interpolation: Equatable where Value: Equatable {}
 extension Interpolation: Hashable where Value: Hashable {}
 extension Interpolation: Codable where Value: Codable {}

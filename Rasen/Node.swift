@@ -15,7 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
-final class Node {
+final class Node: @unchecked Sendable {
     weak var owner: NodeOwner?
     private func setNeedsDisplay() {
         owner?.update()

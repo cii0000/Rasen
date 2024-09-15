@@ -15,7 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
-import Dispatch
 import struct Foundation.Data
 import struct Foundation.UUID
 import struct Foundation.URL
@@ -51,7 +50,7 @@ protocol InputKeyEditor: Editor {
     func send(_ event: InputKeyEvent)
 }
 
-final class Zoomer: PinchEditor {
+final class Zoomer: PinchEditor, @unchecked Sendable {
     let document: Document
     
     init(_ document: Document) {
@@ -88,7 +87,7 @@ final class Zoomer: PinchEditor {
     }
 }
 
-final class Rotater: RotateEditor {
+final class Rotater: RotateEditor, @unchecked Sendable {
     let document: Document
     
     init(_ document: Document) {
@@ -97,7 +96,7 @@ final class Rotater: RotateEditor {
     
     let correction = .pi / 40.0, clipD = .pi / 8.0
     var isClipped = false
-    @MainActor func send(_ event: RotateEvent) {
+    func send(_ event: RotateEvent) {
         switch event.phase {
         case .began: isClipped = false
         default: break
@@ -137,7 +136,7 @@ final class Rotater: RotateEditor {
     }
 }
 
-final class Scroller: ScrollEditor {
+final class Scroller: ScrollEditor, @unchecked Sendable {
     let document: Document
     
     init(_ document: Document) {
@@ -200,7 +199,7 @@ final class Scroller: ScrollEditor {
     }
 }
 
-final class DraftChanger: InputKeyEditor {
+final class DraftChanger: InputKeyEditor, @unchecked Sendable {
     let editor: DraftEditor
     
     init(_ document: Document) {
@@ -214,7 +213,7 @@ final class DraftChanger: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class DraftCutter: InputKeyEditor {
+final class DraftCutter: InputKeyEditor, @unchecked Sendable {
     let editor: DraftEditor
     
     init(_ document: Document) {
@@ -228,7 +227,7 @@ final class DraftCutter: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class DraftEditor: Editor {
+final class DraftEditor: Editor, @unchecked Sendable {
     let document: Document
     let isEditingSheet: Bool
     
@@ -430,7 +429,7 @@ final class DraftEditor: Editor {
     }
 }
 
-final class FacesMaker: InputKeyEditor {
+final class FacesMaker: InputKeyEditor, @unchecked Sendable {
     let editor: FaceEditor
     
     init(_ document: Document) {
@@ -444,7 +443,7 @@ final class FacesMaker: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class FacesCutter: InputKeyEditor {
+final class FacesCutter: InputKeyEditor, @unchecked Sendable {
     let editor: FaceEditor
     
     init(_ document: Document) {
@@ -458,7 +457,7 @@ final class FacesCutter: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class FaceEditor: Editor {
+final class FaceEditor: Editor, @unchecked Sendable {
     let document: Document
     let isEditingSheet: Bool
     
@@ -629,7 +628,7 @@ final class FaceEditor: Editor {
     }
 }
 
-final class Importer: InputKeyEditor {
+final class Importer: InputKeyEditor, @unchecked Sendable {
     let editor: IOEditor
     
     init(_ document: Document) {
@@ -637,13 +636,13 @@ final class Importer: InputKeyEditor {
     }
     
     func send(_ event: InputKeyEvent) {
-        editor.import(with: event)
+        editor.importFile(with: event)
     }
     func updateNode() {
         editor.updateNode()
     }
 }
-final class Exporter: InputKeyEditor {
+final class Exporter: InputKeyEditor, @unchecked Sendable {
     let editor: IOEditor
     
     init(_ document: Document) {
@@ -651,13 +650,13 @@ final class Exporter: InputKeyEditor {
     }
     
     func send(_ event: InputKeyEvent) {
-        editor.export(with: event, .image)
+        editor.exportFile(with: event, .image)
     }
     func updateNode() {
         editor.updateNode()
     }
 }
-final class ImageExporter: InputKeyEditor {
+final class ImageExporter: InputKeyEditor, @unchecked Sendable {
     let editor: IOEditor
     
     init(_ document: Document) {
@@ -665,13 +664,13 @@ final class ImageExporter: InputKeyEditor {
     }
     
     func send(_ event: InputKeyEvent) {
-        editor.export(with: event, .image)
+        editor.exportFile(with: event, .image)
     }
     func updateNode() {
         editor.updateNode()
     }
 }
-final class PDFExporter: InputKeyEditor {
+final class PDFExporter: InputKeyEditor, @unchecked Sendable {
     let editor: IOEditor
     
     init(_ document: Document) {
@@ -679,13 +678,13 @@ final class PDFExporter: InputKeyEditor {
     }
     
     func send(_ event: InputKeyEvent) {
-        editor.export(with: event, .pdf)
+        editor.exportFile(with: event, .pdf)
     }
     func updateNode() {
         editor.updateNode()
     }
 }
-final class GIFExporter: InputKeyEditor {
+final class GIFExporter: InputKeyEditor, @unchecked Sendable {
     let editor: IOEditor
     
     init(_ document: Document) {
@@ -693,13 +692,13 @@ final class GIFExporter: InputKeyEditor {
     }
     
     func send(_ event: InputKeyEvent) {
-        editor.export(with: event, .gif)
+        editor.exportFile(with: event, .gif)
     }
     func updateNode() {
         editor.updateNode()
     }
 }
-final class MovieExporter: InputKeyEditor {
+final class MovieExporter: InputKeyEditor, @unchecked Sendable {
     let editor: IOEditor
     
     init(_ document: Document) {
@@ -708,13 +707,13 @@ final class MovieExporter: InputKeyEditor {
     
     func send(_ event: InputKeyEvent) {
         
-        editor.export(with: event, .movie)
+        editor.exportFile(with: event, .movie)
     }
     func updateNode() {
         editor.updateNode()
     }
 }
-final class HighQualityMovieExporter: InputKeyEditor {
+final class HighQualityMovieExporter: InputKeyEditor, @unchecked Sendable {
     let editor: IOEditor
     
     init(_ document: Document) {
@@ -722,13 +721,13 @@ final class HighQualityMovieExporter: InputKeyEditor {
     }
     
     func send(_ event: InputKeyEvent) {
-        editor.export(with: event, .highQualityMovie)
+        editor.exportFile(with: event, .highQualityMovie)
     }
     func updateNode() {
         editor.updateNode()
     }
 }
-final class SoundExporter: InputKeyEditor {
+final class SoundExporter: InputKeyEditor, @unchecked Sendable {
     let editor: IOEditor
     
     init(_ document: Document) {
@@ -736,13 +735,13 @@ final class SoundExporter: InputKeyEditor {
     }
     
     func send(_ event: InputKeyEvent) {
-        editor.export(with: event, .sound)
+        editor.exportFile(with: event, .sound)
     }
     func updateNode() {
         editor.updateNode()
     }
 }
-final class CaptionExporter: InputKeyEditor {
+final class CaptionExporter: InputKeyEditor, @unchecked Sendable {
     let editor: IOEditor
     
     init(_ document: Document) {
@@ -750,13 +749,13 @@ final class CaptionExporter: InputKeyEditor {
     }
     
     func send(_ event: InputKeyEvent) {
-        editor.export(with: event, .caption)
+        editor.exportFile(with: event, .caption)
     }
     func updateNode() {
         editor.updateNode()
     }
 }
-final class DocumentExporter: InputKeyEditor {
+final class DocumentExporter: InputKeyEditor, @unchecked Sendable {
     let editor: IOEditor
     
     init(_ document: Document) {
@@ -764,13 +763,13 @@ final class DocumentExporter: InputKeyEditor {
     }
     
     func send(_ event: InputKeyEvent) {
-        editor.export(with: event, .documentWithHistory)
+        editor.exportFile(with: event, .documentWithHistory)
     }
     func updateNode() {
         editor.updateNode()
     }
 }
-final class DocumentWithoutHistoryExporter: InputKeyEditor {
+final class DocumentWithoutHistoryExporter: InputKeyEditor, @unchecked Sendable {
     let editor: IOEditor
     
     init(_ document: Document) {
@@ -778,13 +777,13 @@ final class DocumentWithoutHistoryExporter: InputKeyEditor {
     }
     
     func send(_ event: InputKeyEvent) {
-        editor.export(with: event, .document)
+        editor.exportFile(with: event, .document)
     }
     func updateNode() {
         editor.updateNode()
     }
 }
-final class IOEditor: Editor {
+final class IOEditor: Editor, @unchecked Sendable {
     let document: Document
     let isEditingSheet: Bool
     
@@ -855,8 +854,7 @@ final class IOEditor: Editor {
         }
     }
     
-    @discardableResult
-    func beginImport(at sp: Point) -> Sheetpos {
+    @discardableResult func beginImportFile(at sp: Point) -> Sheetpos {
         fp = document.convertScreenToWorld(sp)
         selectingLineNode.lineWidth = document.worldLineWidth
         selectingLineNode.fillType = .color(.subSelected)
@@ -873,9 +871,9 @@ final class IOEditor: Editor {
         
         return shp
     }
-    func `import`(from urls: [URL], at shp: Sheetpos) {
+    func importFile(from urls: [URL], at shp: Sheetpos) {
         var mshp = shp
-        var nSHPs = [Sheetpos](), willremoveSHPs = [Sheetpos]()
+        var onSHPs = [Sheetpos](), willremoveSHPs = [Sheetpos]()
         for url in urls {
             let importedDocument = Document(url: url)
             
@@ -889,7 +887,7 @@ final class IOEditor: Editor {
                     willremoveSHPs.append(nshp)
                 }
                 
-                nSHPs.append(nshp)
+                onSHPs.append(nshp)
                 
                 if nshp.x > maxX {
                     maxX = nshp.x
@@ -897,6 +895,7 @@ final class IOEditor: Editor {
             }
             mshp.x = maxX + 2
         }
+        let nSHPs = onSHPs
         
         var oldP: Point?
         let viewSHPs = sorted(nSHPs.map { SelectingValue(shp: $0, bounds: Rect()) }, with: .maxXMinY)
@@ -993,17 +992,9 @@ final class IOEditor: Editor {
             return
         }
         
-        let ok: () -> () = {
-            self.load(from: urls, at: shp)
-            
-            self.end(isUpdateSelect: true)
-        }
-        let cancel: () -> () = {
-            self.end(isUpdateSelect: true)
-        }
-        
         if willremoveSHPs.isEmpty && urls.count == 1 {
-            ok()
+            loadFile(from: urls, at: shp)
+            end(isUpdateSelect: true)
         } else {
             let message: String
             if willremoveSHPs.isEmpty {
@@ -1019,15 +1010,23 @@ final class IOEditor: Editor {
                     message = String(format: "Do you want to import $1$d sheets and replace the %2$d existing sheets?".localized, nSHPs.count, willremoveSHPs.count)
                 }
             }
-            document.rootNode
-                .show(message: message,
-                      infomation: "This operation can be undone when in root mode, but the data will remain until the root history is cleared.".localized,
-                      okTitle: "Import".localized,
-                      isSaftyCheck: nSHPs.count > 100 || length > 20*1024*1024,
-                      okClosure: ok, cancelClosure: cancel)
+            Task { @MainActor in
+                let result = await document.rootNode
+                    .show(message: message,
+                          infomation: "This operation can be undone when in root mode, but the data will remain until the root history is cleared.".localized,
+                          okTitle: "Import".localized,
+                          isSaftyCheck: nSHPs.count > 100 || length > 20*1024*1024)
+                switch result {
+                case .ok:
+                    loadFile(from: urls, at: shp)
+                    end(isUpdateSelect: true)
+                case .cancel:
+                    end(isUpdateSelect: true)
+                }
+            }
         }
     }
-    func load(from urls: [URL], at shp: Sheetpos) {
+    func loadFile(from urls: [URL], at shp: Sheetpos) {
         var mshp = shp
         var nSIDs = [Sheetpos: SheetID](), willremoveSHPs = [Sheetpos]()
         var resetSIDs = Set<SheetID>()
@@ -1068,28 +1067,28 @@ final class IOEditor: Editor {
             document.updateNode()
         }
     }
-    func `import`(with event: InputKeyEvent) {
+    func importFile(with event: InputKeyEvent) {
         switch event.phase {
         case .began:
             document.cursor = .arrow
             
-            let sp = document.lastEditedSheetScreenCenterPositionNoneSelectedNoneCursor
-                ?? event.screenPoint
-            beginImport(at: sp)
+            let sp = document.lastEditedSheetScreenCenterPositionNoneSelectedNoneCursor ?? event.screenPoint
+            beginImportFile(at: sp)
         case .changed:
             break
         case .ended:
-            let shp = document.sheetPosition(at: fp)
-            let complete: ([IOResult]) -> () = { ioResults in
-                self.import(from: ioResults.map { $0.url }, at: shp)
+            Task { @MainActor in
+                let result = await URL.load(prompt: "Import".localized,
+                                            allowsMultipleSelection: true,
+                                            fileTypes: Document.FileType.allCases + Content.FileType.allCases)
+                switch result {
+                case .complete(let ioResults):
+                    let shp = document.sheetPosition(at: fp)
+                    importFile(from: ioResults.map { $0.url }, at: shp)
+                case .cancel:
+                    end(isUpdateSelect: true)
+                }
             }
-            let cancel: () -> () = {
-                self.end(isUpdateSelect: true)
-            }
-            URL.load(prompt: "Import".localized,
-                     allowsMultipleSelection: true,
-                     fileTypes: Document.FileType.allCases + Content.FileType.allCases,
-                     completionClosure: complete, cancelClosure: cancel)
         }
     }
     
@@ -1105,7 +1104,7 @@ final class IOEditor: Editor {
         }
     }
     
-    func export(with event: InputKeyEvent, _ type: ExportType) {
+    func exportFile(with event: InputKeyEvent, _ type: ExportType) {
         switch event.phase {
         case .began:
             document.cursor = .arrow
@@ -1198,15 +1197,13 @@ final class IOEditor: Editor {
         case .changed:
             break
         case .ended:
-            beginExport(type, at: fp)
+            beginExportFile(type, at: fp)
         }
     }
-    func beginExport(_ type: ExportType, at p: Point) {
-        var nvs = [SelectingValue]()
-        
-        let unionFrame: Rect?
+    func beginExportFile(_ type: ExportType, at p: Point) {
+        let nvs: [SelectingValue], unionFrame: Rect?
         if document.isSelectNoneCursor(at: p), !document.isSelectedText {
-            for selection in document.selections {
+            nvs = document.selections.flatMap { selection in
                 let vs: [SelectingValue] = document.world.sheetIDs.keys.compactMap { shp in
                     let frame = document.sheetFrame(with: shp)
                     if let rf = selection.rect.intersection(frame) {
@@ -1222,22 +1219,23 @@ final class IOEditor: Editor {
                         return nil
                     }
                 }
-                nvs += sorted(vs, with: selection.rectCorner)
+                return sorted(vs, with: selection.rectCorner)
             }
             
-            unionFrame = document.isEditingSheet
-                && nvs.count > 1 && !type.isDocument ?
-                    document.multiSelection.firstSelection(at: p)?.rect : nil
+            unionFrame = document.isEditingSheet && nvs.count > 1 && !type.isDocument ?
+            document.multiSelection.firstSelection(at: p)?.rect : nil
         } else {
-            unionFrame = nil
             let (shp, sheetView, frame, _) = document.sheetViewAndFrame(at: p)
-            if let sheetView = sheetView {
-                let bounds = sheetView.model.boundsTuple(at: sheetView.convertFromWorld(p), in: document.sheetFrame(with: shp).bounds).bounds.integral
-                nvs.append(SelectingValue(shp: shp, bounds: bounds))
+            if let sheetView {
+                let bounds = sheetView.model.boundsTuple(at: sheetView.convertFromWorld(p),
+                                                         in: document.sheetFrame(with: shp).bounds).bounds.integral
+                nvs = [SelectingValue(shp: shp, bounds: bounds)]
             } else {
                 let bounds = Rect(size: frame.size)
-                nvs.append(SelectingValue(shp: shp, bounds: bounds))
+                nvs = [SelectingValue(shp: shp, bounds: bounds)]
             }
+            
+            unionFrame = nil
         }
         
         guard let fv = nvs.first else {
@@ -1251,42 +1249,19 @@ final class IOEditor: Editor {
             return
         }
         
-        let complete: (IOResult) -> () = { (ioResult) in
-            self.document.syncSave()
-            switch type {
-            case .image:
-                self.exportImage(from: nvs, unionFrame: unionFrame,
-                                 size: size,
-                                 scale: Picture.renderingScale, at: ioResult)
-            case .pdf:
-                self.exportPDF(from: nvs, unionFrame: unionFrame,
-                               size: size, at: ioResult)
-            case .gif:
-                let nSize = size.snapped(Size(width: 800, height: 1200)).rounded()
-                self.exportGIF(from: nvs, size: nSize, at: ioResult)
-            case .movie:
-                let nSize = size.snapped(size.width > size.height ? Size(width: 1920, height: 1080) : Size(width: 1200, height: 1920)).rounded()
-                self.exportMovie(from: nvs, isHighQuality: false,
-                                 size: nSize, at: ioResult)
-            case .sound:
-                self.exportSound(from: nvs, at: ioResult)
-            case .caption:
-                self.exportCaption(from: nvs, at: ioResult)
-            case .highQualityMovie:
-                let nSize = size.snapped(Size(width: 3840, height: 2160)).rounded()
-                self.exportMovie(from: nvs, isHighQuality: true,
-                                 size: nSize, at: ioResult)
-            case .document:
-                self.exportDocument(from: nvs, isHistory: false, at: ioResult)
-            case .documentWithHistory:
-                self.exportDocument(from: nvs, isHistory: true, at: ioResult)
-            }
-            self.end()
+        let fType: any FileTypeProtocol = switch type {
+        case .image: nvs.count > 1 && unionFrame == nil ? Image.FileType.pngs : Image.FileType.png
+        case .gif: Image.FileType.gif
+        case .pdf: PDF.FileType.pdf
+        case .movie, .highQualityMovie: Movie.FileType.mp4
+        case .sound: Content.FileType.wav
+        case .caption: Caption.FileType.scc
+        case .document: Document.FileType.rasendoc
+        case .documentWithHistory: Document.FileType.rasendoch
         }
-        let cancel: () -> () = {
-            self.end()
-        }
-        let fileSize: () -> (Int?) = {
+        
+        let fileSize: @Sendable () -> (Int?) = { [nvs, weak self] in
+            guard let self else { return nil }
             switch type {
             case .image:
                 if nvs.count == 1 {
@@ -1353,30 +1328,44 @@ final class IOEditor: Editor {
             return nil
         }
         
-        let fType: any FileTypeProtocol = switch type {
-        case .image:
-            nvs.count > 1 && unionFrame == nil ?
-                Image.FileType.pngs : Image.FileType.png
-        case .gif:
-            Image.FileType.gif
-        case .pdf:
-            PDF.FileType.pdf
-        case .movie, .highQualityMovie:
-            Movie.FileType.mp4
-        case .sound:
-            Content.FileType.wav
-        case .caption:
-            Caption.FileType.scc
-        case .document:
-            Document.FileType.rasendoc
-        case .documentWithHistory:
-            Document.FileType.rasendoch
+        Task { @MainActor in
+            let result = await URL.export(name: name(from: nvs.map { $0.shp }),
+                                          fileType: fType,
+                                          fileSizeHandler: fileSize)
+            switch result {
+            case .complete(let ioResult):
+                document.syncSave()
+                
+                switch type {
+                case .image:
+                    exportImage(from: nvs, unionFrame: unionFrame,
+                                size: size, scale: Picture.renderingScale, at: ioResult)
+                case .pdf:
+                    exportPDF(from: nvs, unionFrame: unionFrame, size: size, at: ioResult)
+                case .gif:
+                    let nSize = size.snapped(Size(width: 800, height: 1200)).rounded()
+                    exportGIF(from: nvs, size: nSize, at: ioResult)
+                case .movie:
+                    let nSize = size.snapped(size.width > size.height ?
+                                             Size(width: 1920, height: 1080) : Size(width: 1200, height: 1920)).rounded()
+                    exportMovie(from: nvs, isHighQuality: false, size: nSize, at: ioResult)
+                case .sound:
+                    exportSound(from: nvs, at: ioResult)
+                case .caption:
+                    exportCaption(from: nvs, at: ioResult)
+                case .highQualityMovie:
+                    let nSize = size.snapped(Size(width: 3840, height: 2160)).rounded()
+                    exportMovie(from: nvs, isHighQuality: true, size: nSize, at: ioResult)
+                case .document:
+                    exportDocument(from: nvs, isHistory: false, at: ioResult)
+                case .documentWithHistory:
+                    exportDocument(from: nvs, isHistory: true, at: ioResult)
+                }
+                end()
+            case .cancel:
+                end()
+            }
         }
-        
-        URL.export(name: name(from: nvs.map { $0.shp }),
-                   fileType: fType,
-                   fileSizeHandler: fileSize,
-                   completionClosure: complete, cancelClosure: cancel)
     }
     
     func exportImage(from vs: [SelectingValue], unionFrame: Rect?,
@@ -1395,8 +1384,8 @@ final class IOEditor: Editor {
                     for v in vs {
                         let origin = document.sheetFrame(with: v.shp).origin - unionFrame.origin
                         
-                        if let sid = self.document.sheetID(at: v.shp),
-                           let node = self.document.renderableSheetNode(at: sid) {
+                        if let sid = document.sheetID(at: v.shp),
+                           let node = document.renderableSheetNode(at: sid) {
                             if let image = node.renderedAntialiasFillImage(in: v.bounds, to: size, backgroundColor: .background) {
                                 nImage = nImage?.drawn(image, in: (v.bounds + origin) * Transform(scale: scale))
                             }
@@ -1411,8 +1400,8 @@ final class IOEditor: Editor {
                     try nImage?.write(.png, to: ioResult.url)
                 } else {
                     let v = vs[0]
-                    if let sid = self.document.sheetID(at: v.shp),
-                       let node = self.document.renderableSheetNode(at: sid) {
+                    if let sid = document.sheetID(at: v.shp),
+                       let node = document.renderableSheetNode(at: sid) {
                         let image = node.renderedAntialiasFillImage(in: v.bounds, to: size, backgroundColor: .background)
                         try image?.write(.png, to: ioResult.url)
                     } else {
@@ -1426,17 +1415,16 @@ final class IOEditor: Editor {
                 
                 try ioResult.setAttributes()
             } catch {
-                self.document.rootNode.show(error)
+                document.rootNode.show(error)
             }
         } else {
-            let message = "Exporting Images".localized
-            let progressPanel = ProgressPanel(message: message)
-            self.document.rootNode.show(progressPanel)
+            let progressPanel = ProgressPanel(message: "Exporting Images".localized)
+            document.rootNode.show(progressPanel)
             do {
                 try ioResult.remove()
                 try ioResult.makeDirectory()
                 
-                func export(progressHandler: (Double, inout Bool) -> ()) throws {
+                @Sendable func export(progressHandler: (Double, inout Bool) -> ()) throws {
                     let colorSpace = self.document.colorSpace
                     var isStop = false
                     for (j, v) in vs.enumerated() {
@@ -1461,30 +1449,30 @@ final class IOEditor: Editor {
                         if isStop { break }
                     }
                 }
-                
-                DispatchQueue.global().async {
+                let task = Task.detached {
                     do {
                         try export { (progress, isStop) in
-                            if progressPanel.isCancel {
+                            if Task.isCancelled {
                                 isStop = true
-                            } else {
-                                DispatchQueue.main.async {
-                                    progressPanel.progress = progress
-                                }
+                                return
+                            }
+                            Task { @MainActor in
+                                progressPanel.progress = progress
                             }
                         }
-                        DispatchQueue.main.async {
+                        Task { @MainActor in
                             progressPanel.closePanel()
                             self.end()
                         }
                     } catch {
-                        DispatchQueue.main.async {
+                        Task { @MainActor in
                             self.document.rootNode.show(error)
                             progressPanel.closePanel()
                             self.end()
                         }
                     }
                 }
+                progressPanel.cancelHandler = { task.cancel() }
             } catch {
                 self.document.rootNode.show(error)
                 progressPanel.closePanel()
@@ -1495,7 +1483,7 @@ final class IOEditor: Editor {
     
     func exportPDF(from vs: [SelectingValue],  unionFrame: Rect?,
                    size: Size, at ioResult: IOResult) {
-        func export(progressHandler: (Double, inout Bool) -> ()) throws {
+        @Sendable func export(progressHandler: (Double, inout Bool) -> ()) throws {
             var isStop = false
             let pdf = try PDF(url: ioResult.url, mediaBox: Rect(size: size))
             
@@ -1544,52 +1532,52 @@ final class IOEditor: Editor {
         if vs.count == 1 {
             do {
                 try export { (_, isStop) in }
-                self.end()
+                end()
             } catch {
-                self.document.rootNode.show(error)
-                self.end()
+                document.rootNode.show(error)
+                end()
             }
         } else {
-            let message = "Exporting PDF".localized
-            let progressPanel = ProgressPanel(message: message)
-            self.document.rootNode.show(progressPanel)
+            let progressPanel = ProgressPanel(message: "Exporting PDF".localized)
+            document.rootNode.show(progressPanel)
             do {
                 try ioResult.remove()
                 
-                DispatchQueue.global().async {
+                let task = Task.detached {
                     do {
                         try export { (progress, isStop) in
-                            if progressPanel.isCancel {
+                            if Task.isCancelled {
                                 isStop = true
-                            } else {
-                                DispatchQueue.main.async {
-                                    progressPanel.progress = progress
-                                }
+                                return
+                            }
+                            Task { @MainActor in
+                                progressPanel.progress = progress
                             }
                         }
-                        DispatchQueue.main.async {
+                        Task { @MainActor in
                             progressPanel.closePanel()
                             self.end()
                         }
                     } catch {
-                        DispatchQueue.main.async {
+                        Task { @MainActor in
                             self.document.rootNode.show(error)
                             progressPanel.closePanel()
                             self.end()
                         }
                     }
                 }
+                progressPanel.cancelHandler = { task.cancel() }
             } catch {
-                self.document.rootNode.show(error)
+                document.rootNode.show(error)
                 progressPanel.closePanel()
-                self.end()
+                end()
             }
         }
     }
     
     func exportMovie(from vs: [SelectingValue], isHighQuality: Bool,
                      size: Size, at ioResult: IOResult) {
-        func export(progressHandler: (Double, inout Bool) -> (),
+        @Sendable func export(progressHandler: (Double, inout Bool) -> (),
                     completionHandler handler: @escaping (Bool, (any Error)?) -> ()) {
             do {
                 let colorSpace = self.document.colorSpace
@@ -1773,25 +1761,24 @@ final class IOEditor: Editor {
             }
         }
         
-        let message = "Exporting Movie".localized
-        let progressPanel = ProgressPanel(message: message)
-        self.document.rootNode.show(progressPanel)
+        let progressPanel = ProgressPanel(message: "Exporting Movie".localized)
+        document.rootNode.show(progressPanel)
         do {
             try ioResult.remove()
             
-            DispatchQueue.global().async {
+            let task = Task.detached {
                 export(progressHandler: { (progress, isStop) in
-                    if progressPanel.isCancel {
+                    if Task.isCancelled {
                         isStop = true
-                    } else {
-                        DispatchQueue.main.async {
-                            progressPanel.progress = progress
-                        }
+                        return
+                    }
+                    Task { @MainActor in
+                        progressPanel.progress = progress
                     }
                 }, completionHandler: { (stop, error) in
-                    DispatchQueue.main.async {
+                    Task { @MainActor in
                         if !stop {
-                            if let error = error {
+                            if let error {
                                 self.document.rootNode.show(error)
                             } else {
                                 do {
@@ -1806,15 +1793,16 @@ final class IOEditor: Editor {
                     }
                 })
             }
+            progressPanel.cancelHandler = { task.cancel() }
         } catch {
-            self.document.rootNode.show(error)
+            document.rootNode.show(error)
             progressPanel.closePanel()
-            self.end()
+            end()
         }
     }
     
     func exportSound(from vs: [SelectingValue], at ioResult: IOResult) {
-        func export(progressHandler: (Double, inout Bool) -> (),
+        @Sendable func export(progressHandler: (Double, inout Bool) -> (),
                     completionHandler handler: @escaping ((any Error)?) -> ()) {
             do {
                 var audiotracks = [Audiotrack]()
@@ -1847,24 +1835,23 @@ final class IOEditor: Editor {
             }
         }
         
-        let message = "Exporting Sound".localized
-        let progressPanel = ProgressPanel(message: message)
-        self.document.rootNode.show(progressPanel)
+        let progressPanel = ProgressPanel(message: "Exporting Sound".localized)
+        document.rootNode.show(progressPanel)
         do {
             try ioResult.remove()
             
-            DispatchQueue.global().async {
+            let task = Task.detached {
                 export(progressHandler: { (progress, isStop) in
-                    if progressPanel.isCancel {
+                    if Task.isCancelled {
                         isStop = true
-                    } else {
-                        DispatchQueue.main.async {
-                            progressPanel.progress = progress
-                        }
+                        return
+                    }
+                    Task { @MainActor in
+                        progressPanel.progress = progress
                     }
                 }, completionHandler: { error in
-                    DispatchQueue.main.async {
-                        if let error = error {
+                    Task { @MainActor in
+                        if let error {
                             self.document.rootNode.show(error)
                         } else {
                             do {
@@ -1878,16 +1865,17 @@ final class IOEditor: Editor {
                     }
                 })
             }
+            progressPanel.cancelHandler = { task.cancel() }
         } catch {
-            self.document.rootNode.show(error)
+            document.rootNode.show(error)
             progressPanel.closePanel()
-            self.end()
+            end()
         }
     }
     
     func exportCaption(from vs: [SelectingValue], at ioResult: IOResult) {
-        func export(progressHandler: (Double, inout Bool) -> (),
-                    completionHandler handler: @escaping ((any Error)?) -> ()) {
+        @Sendable func export(progressHandler: (Double, inout Bool) -> (),
+                              completionHandler handler: @escaping ((any Error)?) -> ()) {
             do {
                 let cce = try CaptionRenderer(url: ioResult.url)
                 
@@ -1918,24 +1906,23 @@ final class IOEditor: Editor {
             }
         }
         
-        let message = "Exporting Caption".localized
-        let progressPanel = ProgressPanel(message: message)
+        let progressPanel = ProgressPanel(message: "Exporting Caption".localized)
         self.document.rootNode.show(progressPanel)
         do {
             try ioResult.remove()
             
-            DispatchQueue.global().async {
+            let task = Task.detached {
                 export(progressHandler: { (progress, isStop) in
-                    if progressPanel.isCancel {
+                    if Task.isCancelled {
                         isStop = true
-                    } else {
-                        DispatchQueue.main.async {
-                            progressPanel.progress = progress
-                        }
+                        return
+                    }
+                    Task { @MainActor in
+                        progressPanel.progress = progress
                     }
                 }, completionHandler: { error in
-                    DispatchQueue.main.async {
-                        if let error = error {
+                    Task { @MainActor in
+                        if let error {
                             self.document.rootNode.show(error)
                         } else {
                             do {
@@ -1949,6 +1936,7 @@ final class IOEditor: Editor {
                     }
                 })
             }
+            progressPanel.cancelHandler = { task.cancel() }
         } catch {
             self.document.rootNode.show(error)
             progressPanel.closePanel()
@@ -1958,7 +1946,7 @@ final class IOEditor: Editor {
     
     func exportGIF(from vs: [SelectingValue],
                    size: Size, at ioResult: IOResult) {
-        func export(progressHandler: (Double, inout Bool) -> ()) throws {
+        @Sendable func export(progressHandler: (Double, inout Bool) -> ()) throws {
             var images = [(image: Image, time: Rational)]()
             var isStop = false, t = 0.0
             let allC = vs.count + 1
@@ -2002,35 +1990,35 @@ final class IOEditor: Editor {
             try ioResult.setAttributes()
         }
         
-        let message = "Exporting Movie".localized
-        let progressPanel = ProgressPanel(message: message)
-        self.document.rootNode.show(progressPanel)
+        let progressPanel = ProgressPanel(message: "Exporting Movie".localized)
+        document.rootNode.show(progressPanel)
         do {
             try ioResult.remove()
             
-            DispatchQueue.global().async {
+            let task = Task.detached {
                 do {
                     try export { (progress, isStop) in
-                        if progressPanel.isCancel {
+                        if Task.isCancelled {
                             isStop = true
-                        } else {
-                            DispatchQueue.main.async {
-                                progressPanel.progress = progress
-                            }
+                            return
+                        }
+                        Task { @MainActor in
+                            progressPanel.progress = progress
                         }
                     }
-                    DispatchQueue.main.async {
+                    Task { @MainActor in
                         progressPanel.closePanel()
                         self.end()
                     }
                 } catch {
-                    DispatchQueue.main.async {
+                    Task { @MainActor in
                         self.document.rootNode.show(error)
                         progressPanel.closePanel()
                         self.end()
                     }
                 }
             }
+            progressPanel.cancelHandler = { task.cancel() }
         } catch {
             document.rootNode.show(error)
             progressPanel.closePanel()
@@ -2043,7 +2031,7 @@ final class IOEditor: Editor {
                         at ioResult: IOResult) {
         guard let shp0 = vs.first?.shp else { return }
         
-        func export(progressHandler: (Double, inout Bool) -> ()) throws {
+        @Sendable func export(progressHandler: (Double, inout Bool) -> ()) throws {
             try ioResult.remove()
             
             let sids = vs.reduce(into: [Sheetpos: SheetID]()) {
@@ -2114,38 +2102,38 @@ final class IOEditor: Editor {
         if vs.count == 1 {
             do {
                 try export { (_, isStop) in }
-                self.end()
+                end()
             } catch {
-                self.document.rootNode.show(error)
-                self.end()
+                document.rootNode.show(error)
+                end()
             }
         } else {
-            let message = "Exporting Document".localized
-            let progressPanel = ProgressPanel(message: message)
-            self.document.rootNode.show(progressPanel)
-            DispatchQueue.global().async {
+            let progressPanel = ProgressPanel(message: "Exporting Document".localized)
+            document.rootNode.show(progressPanel)
+            let task = Task.detached {
                 do {
                     try export { (progress, isStop) in
-                        if progressPanel.isCancel {
+                        if Task.isCancelled {
                             isStop = true
-                        } else {
-                            DispatchQueue.main.async {
-                                progressPanel.progress = progress
-                            }
+                            return
+                        }
+                        Task { @MainActor in
+                            progressPanel.progress = progress
                         }
                     }
-                    DispatchQueue.main.async {
+                    Task { @MainActor in
                         progressPanel.closePanel()
                         self.end()
                     }
                 } catch {
-                    DispatchQueue.main.async {
+                    Task { @MainActor in
                         self.document.rootNode.show(error)
                         progressPanel.closePanel()
                         self.end()
                     }
                 }
             }
+            progressPanel.cancelHandler = { task.cancel() }
         }
     }
 }

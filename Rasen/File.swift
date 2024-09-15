@@ -300,7 +300,7 @@ extension Directory {
     }
 }
 
-final class Record<Value: Codable & Serializable>: File {
+final class Record<Value: Codable & Serializable>: File, @unchecked Sendable {
     weak var parent: Directory?
     
     var url: URL

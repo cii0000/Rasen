@@ -563,9 +563,8 @@ extension Movie {
         
         let comp = AVMutableComposition()
         
-        guard let nmTrack = comp
-            .addMutableTrack(withMediaType: .video,
-                             preferredTrackID: kCMPersistentTrackID_Invalid)
+        guard let nmTrack = comp.addMutableTrack(withMediaType: .video,
+                                                 preferredTrackID: kCMPersistentTrackID_Invalid)
         else { throw Self.exportError }
         
         for mTrack in mTracks {
@@ -573,18 +572,16 @@ extension Movie {
             try? nmTrack.insertTimeRange(timeRange, of: mTrack, at: CMTime())
         }
         
-        if !aTracks.isEmpty, let naTrack = comp
-            .addMutableTrack(withMediaType: .audio,
-                             preferredTrackID: kCMPersistentTrackID_Invalid) {
+        if !aTracks.isEmpty, let naTrack = comp.addMutableTrack(withMediaType: .audio,
+                                                                preferredTrackID: kCMPersistentTrackID_Invalid) {
             for aTrack in aTracks {
                 guard let timeRange = try? await aTrack.load(.timeRange) else { continue }
                 try? naTrack.insertTimeRange(timeRange, of: aTrack, at: CMTime())
             }
         }
         
-        guard let session
-                = AVAssetExportSession(asset: comp,
-                                       presetName: AVAssetExportPresetHighestQuality)
+        guard let session = AVAssetExportSession(asset: comp,
+                                                 presetName: AVAssetExportPresetHighestQuality)
         else { throw Self.exportError }
         
         session.outputURL = outputURL
@@ -604,7 +601,7 @@ extension Movie {
         }
     }
 }
-final class ToMP4MovieEditor: InputKeyEditor {
+final class ToMP4MovieEditor: InputKeyEditor, @unchecked Sendable {
     let document: Document
     
     init(_ document: Document) {
@@ -612,28 +609,32 @@ final class ToMP4MovieEditor: InputKeyEditor {
     }
     
     func send(_ event: InputKeyEvent) {
-        let complete: ([IOResult]) -> () = { ioResult0s in
-            let complete2: (IOResult) -> () = { ioResult1 in
-                let fromURL = ioResult0s[0].url
-                let toURL = ioResult1.url
-                Task {
-                    do {
-                        try await Movie.toMP4(from: fromURL, to: toURL)
-                    } catch {
-                        print(error)
+        Task { @MainActor in
+            let result = await URL.load(prompt: "Import".localized,
+                                        fileTypes: [Movie.FileType.mp4, Movie.FileType.mov])
+            switch result {
+            case .complete(let ioResult0s):
+                let result = await URL.export(name: "",
+                                              fileType: Movie.FileType.mp4,
+                                              fileSizeHandler: { return nil })
+                switch result {
+                case .complete(let ioResult1):
+                    let fromURL = ioResult0s[0].url
+                    let toURL = ioResult1.url
+                    Task.detached {
+                        do {
+                            try await Movie.toMP4(from: fromURL, to: toURL)
+                        } catch {
+                            Task { @MainActor in
+                                self.document.rootNode.show(error)
+                            }
+                        }
                     }
+                case .cancel: break
                 }
+            case .cancel: break
             }
-            URL.export(name: "",
-                       fileType: Movie.FileType.mp4,
-                       fileSizeHandler: {  return nil },
-                       completionClosure: complete2,
-                       cancelClosure: {})
         }
-        let cancel: () -> () = {}
-        URL.load(prompt: "Import".localized,
-                 fileTypes: [Movie.FileType.mp4, Movie.FileType.mov],
-                 completionClosure: complete, cancelClosure: cancel)
     }
 }
 

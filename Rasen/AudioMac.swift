@@ -461,7 +461,8 @@ final class ScoreNoder {
                 var notewaveBoxs = nwrrs.count.range.map { _ in NotewaveBox() }
                 let dMod = nwrrs.count % threadCount
                 let dCount = nwrrs.count / threadCount
-                notewaveBoxs.withUnsafeMutableBufferPointer { notewavesPtr in
+                notewaveBoxs.withUnsafeMutableBufferPointer { aNotewavesPtr in
+                    nonisolated(unsafe) let notewavesPtr = aNotewavesPtr, nwrrs = nwrrs
                     if nThreadCount == nwrrs.count {
                         DispatchQueue.concurrentPerform(iterations: nThreadCount) { threadI in
                             notewavesPtr[threadI] = .init(nwrrs[threadI].1.notewave(sampleRate: sampleRate))

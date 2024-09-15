@@ -37,7 +37,7 @@ struct Version: Hashable, Codable {
 enum UndoItemType {
     case unreversible, lazyReversible, reversible
 }
-protocol UndoItem: Codable, Protobuf {
+protocol UndoItem: Codable, Sendable, Protobuf {
     var type: UndoItemType { get }
     func reversed() -> Self?
 }

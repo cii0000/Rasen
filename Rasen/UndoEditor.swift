@@ -15,7 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
-import Dispatch
 import struct Foundation.Date
 
 final class Undoer: InputKeyEditor {
@@ -572,7 +571,23 @@ final class UndoEditor: Editor {
     }
 }
 
-final class HistoryCleaner: InputKeyEditor {
+extension Document {
+    func clearHistorys(from shps: [Sheetpos], progressHandler: (Double, inout Bool) -> ()) throws {
+        var isStop = false
+        for (j, shp) in shps.enumerated() {
+            if let sheetView = sheetView(at: shp) {
+                sheetView.clearHistory()
+                clearContents(from: sheetView)
+            } else {
+                removeUndo(at: shp)
+            }
+            progressHandler(Double(j + 1) / Double(shps.count), &isStop)
+            if isStop { break }
+        }
+    }
+}
+
+final class HistoryCleaner: InputKeyEditor, @unchecked Sendable {
     let document: Document
     
     init(_ document: Document) {
@@ -592,8 +607,7 @@ final class HistoryCleaner: InputKeyEditor {
     }
     
     func send(_ event: InputKeyEvent) {
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
-            ?? event.screenPoint
+        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor ?? event.screenPoint
         let p = document.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
@@ -628,86 +642,73 @@ final class HistoryCleaner: InputKeyEditor {
             break
         case .ended:
             if document.isSelectNoneCursor(at: p), !document.isSelectedText {
-                
                 let shps = document.sheetposWithSelection()
                 
-                let ok: () -> () = {
-                    func clearHistorys(progressHandler: (Double, inout Bool) -> ()) throws {
-                        var isStop = false
-                        for (j, shp) in shps.enumerated() {
-                            if let sheetView = self.document.sheetView(at: shp) {
-                                sheetView.clearHistory()
-                                self.document.clearContents(from: sheetView)
-                            } else {
-                                self.document.removeUndo(at: shp)
-                            }
-                            progressHandler(Double(j + 1) / Double(shps.count), &isStop)
-                            if isStop { break }
-                        }
-                    }
-                    
-                    let message = "Clearing Historys".localized
-                    let progressPanel = ProgressPanel(message: message)
-                    self.document.rootNode.show(progressPanel)
-                    DispatchQueue.global().async {
-                        do {
-                            try clearHistorys { (progress, isStop) in
-                                if progressPanel.isCancel {
-                                    isStop = true
-                                } else {
-                                    DispatchQueue.main.async {
+                let mes = shps.count == 1 ?
+                    "Do you want to clear history of this sheet?".localized :
+                    String(format: "Do you want to clear %d historys?".localized, shps.count)
+                Task { @MainActor in
+                    let result = await document.rootNode
+                        .show(message: mes,
+                              infomation: "You can’t undo this action. \nHistory is what is used in \"Undo\", \"Redo\" or \"Select Version\", and if you clear it, you will not be able to return to the previous work.".localized,
+                              okTitle: "Clear History".localized,
+                              isSaftyCheck: shps.count > 30)
+                    switch result {
+                    case .ok:
+                        let progressPanel = ProgressPanel(message: "Clearing Historys".localized)
+                        self.document.rootNode.show(progressPanel)
+                        let task = Task.detached {
+                            do {
+                                try self.document.clearHistorys(from: shps) { (progress, isStop) in
+                                    if Task.isCancelled {
+                                        isStop = true
+                                        return
+                                    }
+                                    Task { @MainActor in
                                         progressPanel.progress = progress
                                     }
                                 }
-                            }
-                            DispatchQueue.main.async {
-                                progressPanel.closePanel()
-                                self.end()
-                            }
-                        } catch {
-                            DispatchQueue.main.async {
-                                self.document.rootNode.show(error)
-                                progressPanel.closePanel()
-                                self.end()
+                                Task { @MainActor in
+                                    progressPanel.closePanel()
+                                    self.end()
+                                }
+                            } catch {
+                                Task { @MainActor in
+                                    self.document.rootNode.show(error)
+                                    progressPanel.closePanel()
+                                    self.end()
+                                }
                             }
                         }
+                        progressPanel.cancelHandler = { task.cancel() }
+                        
+                        end()
+                    case .cancel:
+                        end()
                     }
-                    
-                    self.end()
                 }
-                let cancel: () -> () = {
-                    self.end()
-                }
-                let mes = shps.count == 1 ?
-                    "Do you want to clear history of this sheet?".localized :
-                    String(format: "Do you want to clear %d historys?".localized,
-                           shps.count)
-                document.rootNode
-                    .show(message: mes,
-                          infomation: "You can’t undo this action. \nHistory is what is used in \"Undo\", \"Redo\" or \"Select Version\", and if you clear it, you will not be able to return to the previous work.".localized,
-                          okTitle: "Clear History".localized,
-                          isSaftyCheck: shps.count > 30,
-                          okClosure: ok, cancelClosure: cancel)
             } else {
                 let shp = document.sheetPosition(at: p)
-                let ok: () -> () = {
-                    if let sheetView = self.document.sheetView(at: shp) {
-                        sheetView.clearHistory()
-                        self.document.clearContents(from: sheetView)
-                    } else {
-                        self.document.removeUndo(at: shp)
+                
+                Task { @MainActor in
+                    let result = await document.rootNode
+                        .show(message: "Do you want to clear history of this sheet?".localized,
+                              infomation: "You can’t undo this action. \nHistory is what is used in \"Undo\", \"Redo\" or \"Select Version\", and if you clear it, you will not be able to return to the previous work.".localized,
+                              okTitle: "Clear History".localized)
+                    switch result {
+                    case .ok:
+                        if let sheetView = document.sheetView(at: shp) {
+                            sheetView.clearHistory()
+                            document.clearContents(from: sheetView)
+                        } else {
+                            document.removeUndo(at: shp)
+                        }
+                        
+                        end()
+                    case .cancel:
+                        end()
                     }
-                    
-                    self.end()
                 }
-                let cancel: () -> () = {
-                    self.end()
-                }
-                document.rootNode
-                    .show(message: "Do you want to clear history of this sheet?".localized,
-                          infomation: "You can’t undo this action. \nHistory is what is used in \"Undo\", \"Redo\" or \"Select Version\", and if you clear it, you will not be able to return to the previous work.".localized,
-                          okTitle: "Clear History".localized,
-                          okClosure: ok, cancelClosure: cancel)
             }
         }
     }

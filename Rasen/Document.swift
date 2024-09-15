@@ -431,7 +431,7 @@ extension World {
 
 typealias WorldHistory = History<WorldUndoItem>
 
-final class Document {
+final class Document: @unchecked Sendable {
     let url: URL
     
     let rootNode = Node()
@@ -571,6 +571,10 @@ final class Document {
 //        updateCursorNode()
     }
     deinit {
+        cancelTasks()
+    }
+    
+    func cancelTasks() {
         autosavingTimer.cancel()
         sheetViewValues.forEach {
             $0.value.workItem?.cancel()
@@ -578,7 +582,7 @@ final class Document {
         thumbnailNodeValues.forEach {
             $0.value.workItem?.cancel()
         }
-        runners.forEach { $0.stop() }
+        runners.forEach { $0.cancel() }
     }
     
     let autosavingDelay = 60.0
@@ -604,11 +608,11 @@ final class Document {
             do {
                 try self?.rootDirectory.writeAll()
             } catch {
-                DispatchQueue.main.async {
+                DispatchQueue.main.async { [weak self] in
                     self?.rootNode.show(error)
                 }
             }
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
                 self?.rootDirectory.resetWriteAll()
                 self?.savingItem = nil
                 
@@ -634,8 +638,9 @@ final class Document {
         }
     }
     func endSave(completionHandler: @escaping (Document?) -> ()) {
-        let message = "Saving".localized
-        let progressPanel = ProgressPanel(message: message,
+        runners.forEach { $0.cancel() }
+        
+        let progressPanel = ProgressPanel(message: "Saving".localized,
                                           isCancel : false,
                                           isIndeterminate: true)
         
@@ -652,11 +657,11 @@ final class Document {
                 do {
                     try self?.rootDirectory.writeAll()
                 } catch {
-                    DispatchQueue.main.async {
+                    DispatchQueue.main.async { [weak self] in
                         self?.rootNode.show(error)
                     }
                 }
-                DispatchQueue.main.async {
+                DispatchQueue.main.async { [weak self] in
                     self?.rootDirectory.resetWriteAll()
                     timer.cancel()
                     progressPanel.close()
@@ -1029,7 +1034,7 @@ final class Document {
                 if isStop { break }
             }
         }
-        history.reset()
+        
         history.reset()
         worldHistoryRecord.value = history
         worldHistoryRecord.isWillwrite = true
@@ -1766,8 +1771,8 @@ final class Document {
                         oldString: String? = nil,
                         oldTextView: SheetTextView? = nil) {
         let fromStr = finding.string
-        func make(isRecord: Bool = false) {
-            func make(_ sheetView: SheetView) -> Bool {
+        @Sendable func make(isRecord: Bool = false) {
+            @Sendable func make(_ sheetView: SheetView) -> Bool {
                 var isNewUndoGroup = true
                 func updateUndoGroup() {
                     if isNewUndoGroup {
@@ -1805,10 +1810,14 @@ final class Document {
             }
             
             if isRecord {
-                func replaceSheets(progressHandler: (Double, inout Bool) -> ()) throws {
-                    var isStop = false
-                    for (j, v) in findingNodes.enumerated() {
-                        DispatchQueue.main.async {
+                syncSave()
+                
+                let progressPanel = ProgressPanel(message: "Replacing sheets".localized)
+                rootNode.show(progressPanel)
+                let task = Task.detached {
+                    let progress = ActorProgress(total: self.findingNodes.count)
+                    for v in self.findingNodes {
+                        Task { @MainActor in
                             let shp = v.key
                             if let sheetView = self.sheetViewValues[shp]?.view {
                                 _ = make(sheetView)
@@ -1817,10 +1826,8 @@ final class Document {
                                 let record = sheetRecorder.sheetRecord
                                 guard let sheet = record.decodedValue else { return }
                                 
-                                let sheetBinder = RecordBinder(value: sheet,
-                                                               record: record)
-                                let sheetView = SheetView(binder: sheetBinder,
-                                                            keyPath: \SheetBinder.value)
+                                let sheetBinder = RecordBinder(value: sheet, record: record)
+                                let sheetView = SheetView(binder: sheetBinder, keyPath: \SheetBinder.value)
                                 let frame = self.sheetFrame(with: shp)
                                 sheetView.bounds = Rect(size: frame.size)
                                 sheetView.node.allChildrenAndSelf { $0.updateDatas() }
@@ -1828,7 +1835,8 @@ final class Document {
                                 if make(sheetView) {
                                     if self.savingItem != nil {
                                         self.savingFuncs.append { [model = sheetView.model, um = sheetView.history,
-                                                                   tm = self.thumbnailMipmap(from: sheetView), weak self] in
+                                                                   tm = self.thumbnailMipmap(from: sheetView),
+                                                                   weak self] in
                                             
                                             sheetRecorder.sheetRecord.value = model
                                             sheetRecorder.sheetRecord.isWillwrite = true
@@ -1850,40 +1858,22 @@ final class Document {
                                 }
                             }
                         }
+                        
+                        guard !Task.isCancelled else { return }
                         Sleep.start(atTime: 0.1)
-                        progressHandler(Double(j + 1) / Double(findingNodes.count), &isStop)
-                        if isStop { break }
-                    }
-                }
-                
-                let message = "Replacing sheets".localized
-                let progressPanel = ProgressPanel(message: message)
-                rootNode.show(progressPanel)
-                
-                syncSave()
-                DispatchQueue.global().async {
-                    do {
-                        try replaceSheets { (progress, isStop) in
-                            if progressPanel.isCancel {
-                                isStop = true
-                            } else {
-                                DispatchQueue.main.async {
-                                    progressPanel.progress = progress
-                                }
-                            }
-                        }
-                        DispatchQueue.main.async {
-                            progressPanel.closePanel()
-                            self.finding.string = toStr
-                        }
-                    } catch {
-                        DispatchQueue.main.async {
-                            self.rootNode.show(error)
-                            progressPanel.closePanel()
-                            self.finding.string = toStr
+                        
+                        await progress.addCount()
+                        Task { @MainActor in
+                            progressPanel.progress = await progress.fractionCompleted
                         }
                     }
+
+                    Task { @MainActor in
+                        progressPanel.closePanel()
+                        self.finding.string = toStr
+                    }
                 }
+                progressPanel.cancelHandler = { task.cancel() }
             } else {
                 for (shp, _) in findingNodes {
                     if let sheetView = sheetViewValues[shp]?.view {
@@ -1910,12 +1900,19 @@ final class Document {
                     recordCount += 1
                 }
             }
-            rootNode.show(message: String(format: "Do you want to replace the \"%2$@\" written on the %1$d sheets with the \"%3$@\"?".localized, recordCount, fromStr.omit(count: 12), toStr.omit(count: 12)),
-                          infomation: "This operation can be undone for each sheet, but not for all sheets at once.".localized,
-                          okTitle: "Replace".localized,
-                          isDefaultButton: true) {
-                make(isRecord: true)
-            } cancelClosure: {}
+            let nRecordCount = recordCount
+            
+            Task { @MainActor in
+                let result = await rootNode
+                    .show(message: String(format: "Do you want to replace the \"%2$@\" written on the %1$d sheets with the \"%3$@\"?".localized, nRecordCount, fromStr.omit(count: 12), toStr.omit(count: 12)),
+                              infomation: "This operation can be undone for each sheet, but not for all sheets at once.".localized,
+                              okTitle: "Replace".localized,
+                              isDefaultButton: true)
+                switch result {
+                case .ok: make(isRecord: true)
+                case .cancel: break
+                }
+            }
         } else {
             make()
         }
@@ -2695,12 +2692,12 @@ final class Document {
             }
             guard !item.isCancelled else { return }
             if let thumbnail = thumbnailRecord?.value {
-                try? Texture.texture(mipmapImage: thumbnail) { thumbnailTexture in
+                try? Texture.texture(mipmapImage: thumbnail) { [weak node] thumbnailTexture in
                     node?.fillType = .texture(thumbnailTexture)//
                 } cancelHandler: { _ in }
             } else {
                 guard let data = thumbnailRecord?.decodedData else { return }
-                try? Texture.texture(mipmapData: data) { thumbnailTexture in
+                try? Texture.texture(mipmapData: data) { [weak node] thumbnailTexture in
                     node?.fillType = .texture(thumbnailTexture)
                 } cancelHandler: { _ in }
             }
@@ -3829,7 +3826,7 @@ final class Document {
     }
     
     private(set) var oldRotateEvent: RotateEvent?, rotater: Rotater?
-    @MainActor func rotate(_ event: RotateEvent) {
+    func rotate(_ event: RotateEvent) {
         switch event.phase {
         case .began:
             rotater = Rotater(self)
@@ -3994,7 +3991,7 @@ final class Document {
                                        cornerRadius: 8),
                             lineWidth: 1, lineType: .color(.border),
                             fillType: .color(.background))
-            return ($0.printOrigin, node)
+            return ($0.worldPrintOrigin, node)
         }
         runnerNodes.forEach { rootNode.append(child: $0.node) }
         
@@ -4044,8 +4041,8 @@ final class Document {
         case .lookUp: Looker(self)
         case .changeToVerticalText: VerticalTextChanger(self)
         case .changeToHorizontalText: HorizontalTextChanger(self)
-        case .changeToSuperscript: System.isVersion3 ? SuperscriptChanger(self) : nil
-        case .changeToSubscript: System.isVersion3 ? SubscriptChanger(self) : nil
+        case .changeToSuperscript: SuperscriptChanger(self)
+        case .changeToSubscript: SubscriptChanger(self)
         case .run: Runner(self)
         case .changeToDraft: DraftChanger(self)
         case .cutDraft: DraftCutter(self)
@@ -4066,8 +4063,6 @@ final class Document {
     }
     private(set) var oldInputKeyEvent: InputKeyEvent?
     private(set) var inputKeyEditor: (any InputKeyEditor)?
-//    var inputKeyEditorNotification: ((Document, InputKeyEditor?,
-//                                      InputKeyEvent) -> ())?
     func inputKey(_ event: InputKeyEvent) {
         switch event.phase {
         case .began:
@@ -4075,42 +4070,28 @@ final class Document {
             guard inputKeyEditor == nil else { return }
             let quasimode = Quasimode(modifier: modifierKeys,
                                       event.inputKeyType)
-            if System.isVersion3 {
-                if textEditor.editingTextView != nil
-                    && quasimode != .changeToSuperscript
-                    && quasimode != .changeToSubscript
-                    && quasimode != .changeToHorizontalText
-                    && quasimode != .changeToVerticalText
-                    && quasimode != .paste {
-                    
-                    stopInputTextEvent(isEndEdit: quasimode != .undo
-                                        && quasimode != .redo)
-                }
-                if quasimode == .run {
-                    textEditor.moveEndInputKey()
-                }
-            } else {
-                if textEditor.editingTextView != nil
-                    && quasimode != .changeToHorizontalText
-                    && quasimode != .changeToVerticalText
-                    && quasimode != .paste {
-                    
-                    stopInputTextEvent(isEndEdit: quasimode != .undo
-                                        && quasimode != .redo)
-                }
+            if textEditor.editingTextView != nil
+                && quasimode != .changeToSuperscript
+                && quasimode != .changeToSubscript
+                && quasimode != .changeToHorizontalText
+                && quasimode != .changeToVerticalText
+                && quasimode != .paste {
+                
+                stopInputTextEvent(isEndEdit: quasimode != .undo
+                                    && quasimode != .redo)
+            }
+            if quasimode == .run {
+                textEditor.moveEndInputKey()
             }
             stopDragEvent()
             inputKeyEditor = self.inputKeyEditor(with: quasimode)
-//            inputKeyEditorNotification?(self, inputKeyEditor, event)
             inputKeyEditor?.send(event)
             oldInputKeyEvent = event
         case .changed:
-//            inputKeyEditorNotification?(self, inputKeyEditor, event)
             inputKeyEditor?.send(event)
             oldInputKeyEvent = event
         case .ended:
             oldInputKeyEvent = nil
-//            inputKeyEditorNotification?(self, inputKeyEditor, event)
             inputKeyEditor?.send(event)
             inputKeyEditor = nil
         }

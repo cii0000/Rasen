@@ -279,6 +279,7 @@ struct IndexValue<Value> {
     var value: Value
     var index: Int
 }
+extension IndexValue: Sendable where Value: Sendable {}
 extension IndexValue: Equatable where Value: Equatable {}
 extension IndexValue: Hashable where Value: Hashable {}
 extension IndexValue: CustomStringConvertible {

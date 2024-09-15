@@ -17,6 +17,37 @@
 
 import Dispatch
 
+struct Timer: AsyncSequence {
+    typealias Element = Double
+    
+    struct Iterator: AsyncIteratorProtocol {
+        let clock: SuspendingClock,
+            first: SuspendingClock.Instant,
+            interval: SuspendingClock.Duration, tolerance: SuspendingClock.Duration?
+        var current: SuspendingClock.Instant?
+        
+        mutating func next() async throws -> Element? {
+            let next = (current ?? first).advanced(by: interval)
+            try await clock.sleep(until: next, tolerance: tolerance)
+            current = next
+            return first.duration(to: clock.now).sec
+        }
+    }
+    
+    var clock = SuspendingClock(), interval = 1.0, tolerance: Double?
+    
+    func makeAsyncIterator() -> Iterator {
+        .init(clock: clock, first: clock.now, interval: .seconds(interval),
+              tolerance: tolerance != nil ? .seconds(tolerance!) : nil)
+    }
+}
+
+extension Duration {
+    var sec: Double {
+        .init(components.seconds) + .init(components.attoseconds) * 1e-18
+    }
+}
+
 final class OneshotTimer {
     private(set) var workItem: DispatchWorkItem?
     private var cancelClosure: (() -> ())?
@@ -69,7 +100,7 @@ extension DispatchSource {
     static func scheduledTimer(withTimeInterval t: Double,
                                block: @escaping () -> ()) -> any DispatchSourceTimer {
         let dsTimer = DispatchSource.makeTimerSource()
-        dsTimer.schedule(deadline: .now(), repeating: t)
+        dsTimer.schedule(deadline: .now() + t, repeating: t)
         dsTimer.setEventHandler(handler: block)
         dsTimer.resume()
         return dsTimer

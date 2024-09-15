@@ -21,6 +21,10 @@ import class Foundation.NSMutableAttributedString
 import struct Foundation.NSRange
 import CoreText
 
+extension CTFont: @unchecked Sendable {}
+extension CTLine: @unchecked Sendable {}
+extension CTRun: @unchecked Sendable {}
+
 struct Font {
     static let jpName = "GensenJP-Medium"
     static let cnName = "GensenCN-Medium"

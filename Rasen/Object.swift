@@ -530,7 +530,7 @@ extension OKey: CustomStringConvertible {
 struct Argument: Hashable {
     var inKey: OKey?, outKey = OKey("")
 }
-struct F: Sendable, Hashable {
+struct F: Hashable, Sendable {
     enum AssociativityType: String {
         case left, right
     }
@@ -874,7 +874,10 @@ extension F {
 }
 
 struct ID {
-    var key: OKey, isInactivity: Bool
+    var key: OKey {
+        didSet { aHashValue = key.hashValue }
+    }
+    var isInactivity: Bool
     private var aHashValue: Int
     var typobute: Typobute?, typoBounds: Rect?
 }
@@ -2879,20 +2882,19 @@ extension O {
     }
 }
 extension O {
-    typealias Handler = (ID?, O) -> ()
-    typealias StopHandler = () -> (Bool)
+    typealias Handler = (ID?, O) -> (Bool)
     static let stopped = O(OError("Stopped"))
     static let maxStackCount = 100000
     static let stackOverflow = O(OError(String(format: "Stack has exceeded the limit %d".localized, maxStackCount)))
-    static func calculate(_ o: O,
-                          _ oDic: inout [OKey: O],
-                          _ stopHandler: StopHandler,
-                          _ handler: Handler) -> O {
-        var memoRPN = [UUID: RPN]()
+    static func asyncCalculate(_ o: O, _ oDic: [OKey: O], _ handler: Handler) async -> O {
+        calculate(o, oDic, handler)
+    }
+    static func calculate(_ o: O, _ oDic: [OKey: O], _ handler: Handler) -> O {
+        var oDic = oDic, memoRPN = [UUID: RPN]()
         switch o {
         case .f(let f):
             if f.outKeys.isEmpty {
-                return calculate(f, nil, args: [], &oDic, &memoRPN, stopHandler, handler)
+                return calculate(f, nil, args: [], &oDic, &memoRPN, handler)
             }
         default: break
         }
@@ -2901,7 +2903,6 @@ extension O {
     static func calculate(_ ff: F, _ fid: ID?, args fargs: [O],
                           _ oDic: inout [OKey: O],
                           _ memoRPN: inout [UUID: RPN],
-                          _ stopHandler: StopHandler,
                           _ handler: Handler) -> O {
         enum Loop {
             case first(_ f: F, _ id: ID?, args: [O])
@@ -2916,7 +2917,6 @@ extension O {
             switch loopStack.pop()! {
             case .first(let f, let id, let args):
                 if loopStack.elements.count == maxStackCount { return .stackOverflow }
-                if stopHandler() { return .stopped }
                 
                 if let oo = f.run(args) {
                     o = oo
@@ -2930,7 +2930,7 @@ extension O {
                             else {
                                 let o = sendArgsErrorO(withCount: subF.outKeys.count,
                                                        notCount: os.count)
-                                handler(id, o)
+                                guard handler(id, o) else { return .stopped }
                                 if loopStack.isEmpty {
                                     return o
                                 } else {
@@ -2998,7 +2998,7 @@ extension O {
                                 let noCount = oStack.count - count
                                 guard noCount >= 0 else {
                                     let o = argsErrorO(withCount: count, notCount: oStack.count)
-                                    handler(id, o)
+                                    guard handler(id, o) else { return .stopped }
                                     if loopStack.isEmpty {
                                         return o
                                     } else {
@@ -3018,7 +3018,7 @@ extension O {
                         
                         o = O.union(from: oStack)
                     default:
-                        o = operateSpecial(f.runType, id, args: args, &oDic, &memoRPN, stopHandler, handler)
+                        o = operateSpecial(f.runType, id, args: args, &oDic, &memoRPN, handler)
                     }
                 }
                 
@@ -3074,7 +3074,7 @@ extension O {
                         let noCount = oStack.count - count
                         guard noCount >= 0 else {
                             let o = argsErrorO(withCount: count, notCount: oStack.count)
-                            handler(id, o)
+                            guard handler(id, o) else { return .stopped }
                             if loopStack.isEmpty {
                                 return o
                             } else {
@@ -3121,7 +3121,7 @@ extension O {
                         let noCount = oStack.count - count
                         guard noCount >= 0 else {
                             let o = argsErrorO(withCount: count, notCount: oStack.count)
-                            handler(id, o)
+                            guard handler(id, o) else { return .stopped }
                             if loopStack.isEmpty {
                                 return o
                             } else {
@@ -3143,7 +3143,7 @@ extension O {
                 nid = id
             }
             
-            handler(nid, o)
+            guard handler(nid, o) else { return .stopped }
             
             if loopStack.isEmpty {
                 return o
@@ -3156,14 +3156,9 @@ extension O {
     private static func calculateS(_ f: F, _ id: ID?, args: [O],
                                    _ oDic: inout [OKey: O],
                                    _ memoRPN: inout [UUID: RPN],
-                                   _ stopHandler: StopHandler,
                                    _ handler: Handler) -> O {
-        if stopHandler() {
-            return .stopped
-        }
-        
         if let o = f.run(args) {
-            handler(id, o)
+            guard handler(id, o) else { return .stopped }
             return o
         } else {
             switch f.runType {
@@ -3175,14 +3170,14 @@ extension O {
                     else {
                         let o = sendArgsErrorO(withCount: subF.outKeys.count,
                                                notCount: os.count)
-                        handler(id, o)
+                        guard handler(id, o) else { return .stopped }
                         return o
                     }
-                    let o = calculateS(subF, nil, args: os, &oDic, &memoRPN, stopHandler, handler)
-                    handler(id, o)
+                    let o = calculateS(subF, nil, args: os, &oDic, &memoRPN, handler)
+                    guard handler(id, o) else { return .stopped }
                     return o
                 } else {
-                    handler(id, o)
+                    guard handler(id, o) else { return .stopped }
                     return o
                 }
             case .custom:
@@ -3198,7 +3193,7 @@ extension O {
                 }
                 for (key, value) in f.definitions {
                     if value.type == .empty && !value.isBlock {
-                        oDic[key] = calculateS(value, id, args: [], &oDic, &memoRPN, stopHandler, handler)
+                        oDic[key] = calculateS(value, id, args: [], &oDic, &memoRPN, handler)
                     }
                 }
                 
@@ -3217,11 +3212,11 @@ extension O {
                     case .oOrBlockO(let o):
                         oStack.append(o)
                     case .calculateON0(let f):
-                        oStack.append(calculateS(f, nil, args: [], &oDic, &memoRPN, stopHandler, handler))
+                        oStack.append(calculateS(f, nil, args: [], &oDic, &memoRPN, handler))
                     case .calculateVN0(let v):
                         let o = oDic[v.key] ?? O(v)
                         if case .f(let subF) = o, subF.type == .empty && !subF.isBlock {
-                            let o = calculateS(subF, nil, args: [], &oDic, &memoRPN, stopHandler, handler)
+                            let o = calculateS(subF, nil, args: [], &oDic, &memoRPN, handler)
                             oStack.append(o)
                         } else {
                             oStack.append(o)
@@ -3232,24 +3227,23 @@ extension O {
                         let noCount = oStack.count - count
                         guard noCount >= 0 else {
                             let o = argsErrorO(withCount: count, notCount: oStack.count)
-                            handler(id, o)
+                            guard handler(id, o) else { return .stopped }
                             return o
                         }
                         let nos = (0 ..< count).map { oStack[noCount + $0] }
                         oStack.removeLast(count)
-                        oStack.append(calculateS(subF, idf.v,
-                                                 args: nos, &oDic, &memoRPN, stopHandler, handler))
+                        oStack.append(calculateS(subF, idf.v, args: nos, &oDic, &memoRPN, handler))
                     }
                 }
                 
                 for (key, value) in oldDic { oDic[key] = value }
                 
                 let o = O.union(from: oStack)
-                handler(id, o)
+                guard handler(id, o) else { return .stopped }
                 return o
             default:
-                let o = operateSpecial(f.runType, id, args: args, &oDic, &memoRPN, stopHandler, handler)
-                handler(id, o)
+                let o = operateSpecial(f.runType, id, args: args, &oDic, &memoRPN, handler)
+                guard handler(id, o) else { return .stopped }
                 return o
             }
         }
@@ -3303,7 +3297,6 @@ extension O {
     private static func operateSpecial(_ runType: F.RunType, _ id: ID?, args: [O],
                                        _ oDic: inout [OKey: O],
                                        _ memoRPN: inout [UUID: RPN],
-                                       _ stopHandler: StopHandler,
                                        _ handler: Handler) -> O {
         switch runType {
         case .flip: flip(args[0], &oDic)
@@ -3312,20 +3305,11 @@ extension O {
         case .plot: plot(base: args[0], args[1], &oDic)
         case .draw: draw(args[0], &oDic)
         case .map://再帰バグ
-            O.map(args[0], args[1]) {
-                if stopHandler() { return .stopped }
-                return calculate($0, id, args: [$1], &oDic, &memoRPN, stopHandler, handler)
-            }
+            O.map(args[0], args[1]) { calculate($0, id, args: [$1], &oDic, &memoRPN, handler) }
         case .filter:
-            O.filter(args[0], args[1]) {
-                if stopHandler() { return .stopped }
-                return calculate($0, id, args: [$1], &oDic, &memoRPN, stopHandler, handler)
-            }
+            O.filter(args[0], args[1]) { calculate($0, id, args: [$1], &oDic, &memoRPN, handler) }
         case .reduce:
-            O.reduce(args[0], args[1], args[2]) {
-                if stopHandler() { return .stopped }
-                return calculate($0, id, args: [$1, $2], &oDic, &memoRPN, stopHandler, handler)
-            }
+            O.reduce(args[0], args[1], args[2]) { calculate($0, id, args: [$1, $2], &oDic, &memoRPN, handler) }
         default: fatalError()
         }
     }

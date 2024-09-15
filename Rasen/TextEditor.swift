@@ -1465,7 +1465,7 @@ final class TextEditor: Editor {
     }
 }
 
-final class TextView<T: BinderProtocol>: TimelineView {
+final class TextView<T: BinderProtocol>: TimelineView, @unchecked Sendable {
     typealias Model = Text
     typealias Binder = T
     let binder: Binder

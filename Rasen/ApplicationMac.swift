@@ -32,24 +32,16 @@ final class SubNSApplication: NSApplication {
     }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
-                         NSMenuDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuDelegate {
     static let isFullscreenKey = "isFullscreen"
     static let defaultViewSize = NSSize(width: 900, height: 700)
     var window: NSWindow!
-    var view: SubMTKView
+    var view: SubMTKView!
     weak var fileMenu: NSMenu?, editMenu: NSMenu?, editMenuItem: NSMenuItem?
     
     override init() {
         AppDelegate.updateSelectedColor()
-        
-        view = SubMTKView(url: URL.library)
         super.init()
-        
-        NotificationCenter.default.addObserver(forName: NSColor.systemColorsDidChangeNotification,
-                                               object: nil, queue: nil) { [weak self] (_) in
-            self?.updateSelectedColor()
-        }
     }
     deinit {
         urlTimer.cancel()
@@ -75,6 +67,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
     }
     
     func applicationWillFinishLaunching(_ notification: Notification) {
+        view = SubMTKView(url: URL.library)
         view.frame = NSRect(origin: NSPoint(),
                             size: AppDelegate.defaultViewSize)
         
@@ -96,6 +89,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         
         SubNSApplication.shared.servicesMenu = NSMenu()
         SubNSApplication.shared.mainMenu = mainMenu()
+        
+        NotificationCenter.default.addObserver(forName: NSColor.systemColorsDidChangeNotification,
+                                               object: nil, queue: nil) { [weak self] (_) in
+            self?.updateSelectedColor()
+        }
     }
     private func mainMenu() -> NSMenu {
         let appName = System.appName
@@ -176,11 +174,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         fileMenu.addItem(NSMenuItem.separator())
         fileMenu.addItem(withTitle: "Clear History...".localized,
                          action: #selector(SubMTKView.clearHistory(_:)))
-        if System.isVersion3 {
-            fileMenu.addItem(NSMenuItem.separator())
-            fileMenu.addItem(withTitle: "Show About Run".localized,
-                             action: #selector(SubMTKView.showAboutRun(_:)))
-        }
         self.fileMenu = fileMenu
         let fileMenuItem = NSMenuItem(title: fileString,
                                       action: nil, keyEquivalent: "")
@@ -295,6 +288,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
     
     func applicationShouldTerminateAfterLastWindowClosed(_ document: NSApplication) -> Bool { true }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        view.cancelTasks()
         view.document.endSave { _ in
             SubNSApplication.shared.reply(toApplicationShouldTerminate: true)
         }
@@ -323,8 +317,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
                 guard !urls.isEmpty else { return }
                 let editor = IOEditor(self.view.document)
                 let sp =  self.view.bounds.my.centerPoint
-                let shp = editor.beginImport(at: sp)
-                editor.import(from: urls, at: shp)
+                let shp = editor.beginImportFile(at: sp)
+                editor.importFile(from: urls, at: shp)
                 self.urls = []
             }
         }
@@ -397,9 +391,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate,
         let url = Bundle.main.url(forResource: "Acknowledgments",
                                   withExtension: "txt")!
         let string = try! String(contentsOf: url)
-        acknowledgmentsPanel
-            = AppDelegate.makePanel(from: string,
-                                    title: "Acknowledgments".localized)
+        acknowledgmentsPanel = AppDelegate.makePanel(from: string, title: "Acknowledgments".localized)
     }
     
     static func makePanel(from string: String, title: String) -> NSPanel {
@@ -520,7 +512,7 @@ private extension NSImage {
                 Node(path: Path([sp2]),
                      lineWidth: lw, lineType: .color(.content))]
     }
-    static func exportAppIcon() {
+    @MainActor static func exportAppIcon() {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.begin { [weak panel] result in
@@ -568,7 +560,7 @@ private extension NSImage {
     enum DocumentIconType: String {
         case doc = "DOC", doch = "DOCH", data = "DATA"
     }
-    static func exportDocumentIcon(_ type: DocumentIconType) {
+    @MainActor static func exportDocumentIcon(_ type: DocumentIconType) {
         let panel = NSOpenPanel()
         panel.canChooseDirectories = true
         panel.begin { [weak panel] result in
@@ -701,7 +693,7 @@ struct UTType {
     }
 }
 
-protocol FileTypeProtocol {
+protocol FileTypeProtocol: Sendable {
     var name: String { get }
     var utType: UTType { get }
 }
@@ -738,15 +730,16 @@ struct IOResult {
     }
 }
 extension URL {
-    static func load(message: String? = nil,
-                     directoryURL: URL? = nil,
-                     prompt: String? = nil,
-                     canChooseDirectories: Bool = false,
-                     allowsMultipleSelection: Bool = false,
-                     fileTypes: [any FileTypeProtocol],
-                     completionClosure closure: @escaping ([IOResult]) -> (),
-                     cancelClosure: @escaping () -> () = {}) {
-        guard let window = SubNSApplication.shared.mainWindow else { return }
+    enum LoadedResult {
+        case complete([IOResult]), cancel
+    }
+    @MainActor static func load(message: String? = nil,
+                                directoryURL: URL? = nil,
+                                prompt: String? = nil,
+                                canChooseDirectories: Bool = false,
+                                allowsMultipleSelection: Bool = false,
+                                fileTypes: [any FileTypeProtocol]) async -> LoadedResult {
+        guard let window = SubNSApplication.shared.mainWindow else { return .cancel }
         let loadPanel = NSOpenPanel()
         loadPanel.message = message
         loadPanel.allowsMultipleSelection = allowsMultipleSelection
@@ -758,30 +751,30 @@ extension URL {
         }
         loadPanel.canChooseDirectories = canChooseDirectories
         loadPanel.allowedContentTypes = fileTypes.map { $0.utType.uti }
-        loadPanel.beginSheetModal(for: window) { [weak loadPanel] result in
-            guard let loadPanel = loadPanel else { return }
-            if result == .OK {
-                let isExtensionHidden = loadPanel.isExtensionHidden
-                let urls = loadPanel.url != nil && loadPanel.urls.count <= 1 ?
-                    [loadPanel.url!] : loadPanel.urls
-                let results = urls.map {
-                    IOResult(url: $0, name: $0.lastPathComponent,
-                             isExtensionHidden: isExtensionHidden)
-                }
-                closure(results)
-            } else {
-                cancelClosure()
+        let result = await loadPanel.beginSheetModal(for: window)
+        if result == .OK {
+            let isExtensionHidden = loadPanel.isExtensionHidden
+            let urls = loadPanel.url != nil && loadPanel.urls.count <= 1 ?
+                [loadPanel.url!] : loadPanel.urls
+            let results = urls.map {
+                IOResult(url: $0, name: $0.lastPathComponent,
+                         isExtensionHidden: isExtensionHidden)
             }
+            return .complete(results)
+        } else {
+            return .cancel
         }
     }
-    static func save(message: String? = nil,
-                     name: String? = nil,
-                     directoryURL: URL? = nil,
-                     prompt: String? = nil,
-                     fileTypes: [any FileTypeProtocol],
-                     completionClosure closure: @escaping (IOResult) -> (),
-                     cancelClosure: @escaping () -> () = {}) {
-        guard let window = SubNSApplication.shared.mainWindow else { return }
+    
+    enum ExportedResult {
+        case complete(IOResult), cancel
+    }
+    @MainActor static func save(message: String? = nil,
+                                name: String? = nil,
+                                directoryURL: URL? = nil,
+                                prompt: String? = nil,
+                                fileTypes: [any FileTypeProtocol]) async -> ExportedResult {
+        guard let window = SubNSApplication.shared.mainWindow else { return .cancel }
         let savePanel = NSSavePanel()
         savePanel.message = message
         if let name = name {
@@ -799,26 +792,22 @@ extension URL {
         }
         savePanel.canSelectHiddenExtension = true
         savePanel.allowedContentTypes = fileTypes.map { $0.utType.uti }
-        savePanel.beginSheetModal(for: window) { [weak savePanel] result in
-            guard let savePanel = savePanel else { return }
-            if result == .OK, let url = savePanel.url {
-                closure(IOResult(url: url,
-                                 name: savePanel.nameFieldStringValue,
-                                 isExtensionHidden: savePanel.isExtensionHidden))
-            } else {
-                cancelClosure()
-            }
+        let result = await savePanel.beginSheetModal(for: window)
+        return if result == .OK, let url = savePanel.url {
+            .complete(IOResult(url: url,
+                               name: savePanel.nameFieldStringValue,
+                               isExtensionHidden: savePanel.isExtensionHidden))
+        } else {
+            .cancel
         }
     }
-    static func export(message: String? = nil,
-                       name: String? = nil,
-                       directoryURL: URL? = nil,
-                       fileType: any FileTypeProtocol,
-                       fileTypeOptionName: String? = nil,
-                       fileSizeHandler: @escaping () -> (Int?),
-                       completionClosure closure: @escaping (IOResult) -> (),
-                       cancelClosure: @escaping () -> () = {}) {
-        guard let window = SubNSApplication.shared.mainWindow else { return }
+    @MainActor static func export(message: String? = nil,
+                                  name: String? = nil,
+                                  directoryURL: URL? = nil,
+                                  fileType: any FileTypeProtocol,
+                                  fileTypeOptionName: String? = nil,
+                                  fileSizeHandler: @Sendable @escaping () -> (Int?)) async -> ExportedResult {
+        guard let window = SubNSApplication.shared.mainWindow else { return .cancel }
         
         let savePanel = NSSavePanel()
         savePanel.message = message
@@ -856,7 +845,7 @@ extension URL {
         fileSizeView.controlSize = .small
         fileSizeView.sizeToFit()
         
-        let fileSizeValueView = NSTextField(labelWithString: "Calculating Size...".localized)
+        let fileSizeValueView = NSTextField(labelWithString: "Calculating Size".localized)
         fileSizeValueView.font = NSFont.systemFont(ofSize: NSFont.systemFontSize(for: .small))
         fileSizeValueView.controlSize = .small
         fileSizeValueView.sizeToFit()
@@ -889,29 +878,26 @@ extension URL {
         
         savePanel.allowedContentTypes = [fileType.utType.uti]
         
-        DispatchQueue.global().async {
-            let string: String
-            if let fileSize = fileSizeHandler() {
-                string = IOResult.fileSizeNameFrom(fileSize: fileSize)
+        Task.detached {
+            let string = if let fileSize = fileSizeHandler() {
+                IOResult.fileSizeNameFrom(fileSize: fileSize)
             } else {
-                string = "--"
+                "--"
             }
-            DispatchQueue.main.async {
+            Task { @MainActor in
                 fileSizeValueView.stringValue = string
                 fileSizeValueView.sizeToFit()
             }
         }
         
         savePanel.canSelectHiddenExtension = true
-        savePanel.beginSheetModal(for: window) { [weak savePanel] result in
-            guard let savePanel = savePanel else { return }
-            if result == .OK, let url = savePanel.url {
-                closure(IOResult(url: url,
-                                 name: savePanel.nameFieldStringValue,
-                                 isExtensionHidden: savePanel.isExtensionHidden))
-            } else {
-                cancelClosure()
-            }
+        let result = await savePanel.beginSheetModal(for: window)
+        return if result == .OK, let url = savePanel.url {
+            .complete(IOResult(url: url,
+                               name: savePanel.nameFieldStringValue,
+                               isExtensionHidden: savePanel.isExtensionHidden))
+        } else {
+            .cancel
         }
     }
 }
@@ -996,6 +982,11 @@ struct Sleep {
         usleep(useconds_t(1000000 * t))
     }
 }
+extension Task where Success == Never, Failure == Never {
+    static func sleep(sec: Double) async throws {
+        try await sleep(nanoseconds: .init(sec * 1_000_000_000))
+    }
+}
 
 extension String {
     var localized: String {
@@ -1005,7 +996,7 @@ extension String {
 
 extension URLSession {
     static func attributedString(fromURLString str: String,
-                                 completionHandler: @escaping (NSAttributedString?) -> ()) {
+                                 completionHandler: @Sendable @escaping (NSAttributedString?) -> ()) {
         guard let str = str.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
               let url = URL(string: str) else { return }
         
@@ -1031,59 +1022,6 @@ struct System {
     static let oldAppName = "Shikishi".localized
     static let oldDataName = String(format: "%@ Data".localized, oldAppName)
     static let oldID = "net.cii0.Shikishi"
-    
-    static let version = Bundle.main
-        .object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
-        ?? "0.0"
-    static let isVersion3 = version >= "3.0"
-    
-    static var usedMemory: UInt64? {
-        var info = mach_task_basic_info()
-        var count = UInt32(MemoryLayout<vm_statistics_data_t>.size / MemoryLayout<integer_t>.size)
-        let result = withUnsafeMutablePointer(to: &info) {
-            $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
-                task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO),
-                          $0, &count)
-            }
-        }
-        return result == KERN_SUCCESS ? info.resident_size : nil
-    }
-    static var freeMemory: UInt64? {
-        var count = UInt32(MemoryLayout<vm_statistics64_data_t>.size / MemoryLayout<integer_t>.size) as mach_msg_type_number_t
-        var info = vm_statistics64()
-        let result = withUnsafeMutablePointer(to: &info) {
-            $0.withMemoryRebound(to: integer_t.self, capacity: 1) {
-                host_statistics64(mach_host_self(), host_flavor_t(HOST_VM_INFO64),
-                                  $0, &count)
-            }
-        }
-        return result == KERN_SUCCESS ?
-            UInt64(info.free_count) * UInt64(vm_kernel_page_size) : nil
-    }
-    static var memoryTotalBytes: UInt64 {
-        ProcessInfo.processInfo.physicalMemory
-    }
-    static var memoryRatio: Double? {
-        if let usedMemory = usedMemory {
-            return Double(usedMemory) / Double(memoryTotalBytes)
-        } else {
-            return nil
-        }
-    }
-    static var freeMemoryRatio: Double? {
-        if let freeMemory = freeMemory {
-            return Double(freeMemory) / Double(memoryTotalBytes)
-        } else {
-            return nil
-        }
-    }
-    static var memoryDisplayString: String {
-        let um = ByteCountFormatter.string(fromByteCount: Int64(usedMemory ?? 0),
-                                           countStyle: .memory)
-        let tb = ByteCountFormatter.string(fromByteCount: Int64(memoryTotalBytes),
-                                           countStyle: .memory)
-        return "\(um) / \(tb)"
-    }
 }
 
 final class Pasteboard {
@@ -1566,15 +1504,56 @@ final class SubNSMenuItem: NSMenuItem {
     }
 }
 
-final class ProgressPanel: NSWindow {
-    weak var window: NSWindow?
-    fileprivate var progressIndicator
-        = NSProgressIndicator(frame: NSRect(x: 20, y: 50, width: 360, height: 20))
+final class ProgressButton: NSButton {
+    var closure: () -> ()
+    
+    init(frame: NSRect, title: String, closure: @escaping () -> ()) {
+        self.closure = closure
+        
+        super.init(frame: frame)
+        self.title = title
+        self.action = #selector(closureAction(_:))
+        target = self
+    }
+    required init(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    @objc func closureAction(_ sender: Any) {
+        closure()
+    }
+}
+
+actor ActorProgress {
+    var total = 0, count = 0
+    
+    init(total: Int = 0, count: Int = 0) {
+        self.total = total
+        self.count = count
+    }
+    
+    var fractionCompleted: Double {
+        total == 0 ? 0 : Double(count) / Double(total)
+    }
+    
+    func addTotal() {
+        total += 1
+    }
+    func addCount() {
+        count += 1
+    }
+}
+
+final class ProgressPanel: @unchecked Sendable {
+    weak var topWindow: NSWindow?
+    let window: NSWindow
+    fileprivate var progressIndicator = NSProgressIndicator(frame: NSRect(x: 20, y: 50, width: 360, height: 20))
     fileprivate var titleField: NSTextField
-    fileprivate var cancelButton
-        = NSButton(frame: NSRect(x: 278, y: 8, width: 110, height: 40))
+    fileprivate var cancelButton = ProgressButton(frame: NSRect(x: 278, y: 8, width: 110, height: 40),
+                                                  title: "Cancel".localized, closure: {})
     private let isIndeterminate: Bool
-    init(message: String, isCancel: Bool = true, isIndeterminate: Bool = false) {
+    init(message: String, isCancel: Bool = true, isIndeterminate: Bool = false, 
+         cancelHandler: @escaping () -> () = {}) {
         self.message = message
         titleField = NSTextField(labelWithString: message)
         titleField.frame.origin = NSPoint(x: 18, y: 80)
@@ -1584,11 +1563,12 @@ final class ProgressPanel: NSWindow {
         self.isIndeterminate = isIndeterminate
         if isIndeterminate {
             progressIndicator.isIndeterminate = isIndeterminate
+            if isIndeterminate {
+                progressIndicator.startAnimation(nil)
+            }
         }
         cancelButton.bezelStyle = .rounded
-        cancelButton.setButtonType(.onOff)
-        cancelButton.title = "Cancel".localized
-        cancelButton.action = #selector(ProgressPanel.cancel(_:))
+        cancelButton.setButtonType(.momentaryPushIn)
         if !isCancel {
             cancelButton.isEnabled = false
         }
@@ -1597,9 +1577,13 @@ final class ProgressPanel: NSWindow {
         view.addSubview(titleField)
         view.addSubview(progressIndicator)
         view.addSubview(cancelButton)
-        super.init(contentRect: b,
-                   styleMask: .titled, backing: .buffered, defer: true)
-        contentView = view
+        
+        window = .init(contentRect: b, styleMask: .titled, backing: .buffered, defer: true)
+        window.contentView = view
+        
+        cancelButton.closure = { [weak self] in
+            self?.cancel()
+        }
     }
     
     var message = ""
@@ -1621,8 +1605,8 @@ final class ProgressPanel: NSWindow {
         progressIndicator.stopAnimation(nil)
     }
     func show() {
-        center()
-        makeKeyAndOrderFront(nil)
+        window.center()
+        window.makeKeyAndOrderFront(nil)
         begin()
     }
     func closePanel() {
@@ -1631,14 +1615,26 @@ final class ProgressPanel: NSWindow {
             progressIndicator.isIndeterminate = true
         }
         progressIndicator.stopAnimation(nil)
-        if isSheet {
-            window?.endSheet(self)
+        if window.isSheet {
+            topWindow?.endSheet(window)
         }
     }
     var isCancel = false
-    @objc func cancel(_ sender: Any) {
+    var cancelHandler: (() -> ())?
+    func cancel() {
         isCancel = true
+        titleField.stringValue = "Stopping Task".localized
+        titleField.sizeToFit()
         cancelButton.state = .on
+        cancelButton.isEnabled = false
+        progressIndicator.doubleValue = 1
+        progressIndicator.isIndeterminate = true
+        progressIndicator.startAnimation(nil)
+        cancelHandler?()
+    }
+    
+    func close() {
+        window.close()
     }
 }
 

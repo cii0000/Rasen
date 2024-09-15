@@ -15,12 +15,11 @@
 // You should have received a copy of the GNU General Public License
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
-import Dispatch
 import struct Foundation.Date
 import struct Foundation.UUID
 import struct Foundation.URL
 
-final class Runner: InputKeyEditor {
+final class Runner: InputKeyEditor, @unchecked Sendable {
     let editor: RunEditor
     
     init(_ document: Document) {
@@ -34,7 +33,7 @@ final class Runner: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class Debugger: InputKeyEditor {
+final class Debugger: InputKeyEditor, @unchecked Sendable {
     let editor: RunEditor
     
     init(_ document: Document) {
@@ -48,7 +47,7 @@ final class Debugger: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class RunEditor: InputKeyEditor {
+final class RunEditor: InputKeyEditor, @unchecked Sendable {
     let document: Document
     let isEditingSheet: Bool
     
@@ -57,11 +56,13 @@ final class RunEditor: InputKeyEditor {
     var maxSheetByte = 100 * 1024 * 1024
     
     var runText = Text(), runTypobute = Typobute()
-    var printOrigin = Point()
+    var worldPrintOrigin = Point()
     
     var stepString = ""
     var stepNode = Node(fillType: .color(.content))
-    var stepTimer: (any DispatchSourceTimer)?
+    var stepTimerTask: Task<Void, any Error>?
+    
+    var task: Task<O, Never>?
     
     let isDebug: Bool
     var debugString = ""
@@ -119,8 +120,9 @@ final class RunEditor: InputKeyEditor {
         }
     }
     func drawFirstError(_ id: ID) {
-        guard let ratio = id.typobute?.font.defaultRatio,
-            let idb = id.typoBounds else { return }
+        guard firstErrorNode == nil,
+              let ratio = id.typobute?.font.defaultRatio,
+              let idb = id.typoBounds else { return }
         let idOrigin = idb.origin
         guard !(debugNodeValues[idOrigin]?.isEmpty ?? false) else { return }
         let b = idb.insetBy(dx: -1 * ratio, dy: 0)
@@ -199,13 +201,15 @@ final class RunEditor: InputKeyEditor {
         return node
     }
     
-    var isStopped = false
-    var noFreeMemoryO: O?
-    
     init(_ document: Document, isDebug: Bool) {
         self.document = document
         isEditingSheet = document.isEditingSheet
         self.isDebug = isDebug
+    }
+    
+    deinit {
+        task?.cancel()
+        stepTimerTask?.cancel()
     }
     
     func send(_ event: InputKeyEvent) {
@@ -355,19 +359,17 @@ extension RunEditor: Hashable {
 }
 extension RunEditor {
     func containsStep(_ p: Point) -> Bool {
-       return stepNode.path.bounds?
-        .contains(stepNode.convertFromWorld(p)) ?? false
+        stepNode.path.bounds?.contains(stepNode.convertFromWorld(p)) ?? false
     }
     func containsDebug(_ p: Point) -> Bool {
-        return debugNodeValues.contains {
+        debugNodeValues.contains {
             $0.value.node.path.bounds?
                 .contains($0.value.node.convertFromWorld(p)) ?? false
         }
     }
     func showStep(_ string: String) {
         stepString = string
-        stepNode.path = Typesetter(string: string,
-                                   typobute: runTypobute).path()
+        stepNode.path = Typesetter(string: string, typobute: runTypobute).path()
     }
     func append(_ id: ID, at sheetView: SheetView) {
         if let b = id.typoBounds, let ratio = id.typobute?.font.defaultRatio {
@@ -434,7 +436,7 @@ extension RunEditor {
         }
         
         let printOrigin = nodePoint(from: text)
-        self.printOrigin = sheetView.convertToWorld(printOrigin)
+        self.worldPrintOrigin = sheetView.convertToWorld(printOrigin)
         
         var oDic = O.defaultDictionary(with: sheetView.model, 
                                        bounds: sf.bounds,
@@ -477,98 +479,75 @@ extension RunEditor {
         let xo = O(nText, &oDic)
         
         stepNode.attitude.position = nodePoint(from: nText)
-        
-//        if let i = sheetView.model.texts
-//            .firstIndex(where: { $0.origin == nodePoint(from: oText) }) {
-//
-//            sheetView.newUndoGroup()
-//            sheetView.removeText(at: i)
-//        }
-        
         document.rootNode.append(child: stepNode)
         
-        let firstDate = Date()
-//        let oldDate = firstDate
-        stepTimer = DispatchSource.scheduledTimer(withTimeInterval: 0.1) { [weak self] in
-            guard let self else { return }
-            let date = Date()
-    //            if date.timeIntervalSince(oldDate) > 1 {
-    //                ds = System.memoryDisplayString
-    //                guard System.freeMemory != 0 else {
-    //                    self.noFreeMemoryO = RunEditor.noFreeMemoryO
-    //                    t.invalidate()
-    //                    return
-    //                }
-    //                oldDate = date
-    //            }
-            DispatchQueue.main.async {
-                let t = date.timeIntervalSince(firstDate)
-                let ts = String(format: "%.1f", t)
-                let str = "Calculating".localized + "\n" + "\(ts) s"
-                self.showStep(str)
+        let timer = Timer(interval: 1)
+        stepTimerTask = Task { @MainActor in
+            for try await sec in timer {
+                showStep("Calculating".localized + "\n" + "\(Int(sec.rounded())) s")
             }
-    //            oldTime = time
         }
         
         document.runners.insert(self)
-        DispatchQueue.global(qos: .userInteractive).async { [weak self] in
-            guard let self else { return }
-            
+        
+        let xoDic = oDic, isDebug = self.isDebug
+        Task { @MainActor in
             let firstDate = Date()
-            
-            var errorID: ID?
-            let isDebug = self.isDebug, no: O
-            if isDebug {
-                no = O.calculate(xo, &oDic, { self.isStopped }) { (id, o) in
-                    if !self.isStopped, let id {
-                        DispatchQueue.main.async {
-                            if case .error = o, errorID == nil {
-                                errorID = id
-                                self.drawFirstError(id)
-                            }
-                            self.debugTexts.append((id, o))
-                            if let p = id.typoBounds?.origin, self.debugNodeValues[p] == nil {
-                                self.drawEmpty(id)
+            let task = Task.detached {
+                if isDebug {
+                    O.calculate(xo, xoDic) { (id, o) in
+                        if Task.isCancelled {
+                            return false
+                        }
+                        if let id {
+                            Task { @MainActor in
+                                if case .error = o {
+                                    self.drawFirstError(id)
+                                }
+                                self.debugTexts.append((id, o))
+                                if let p = id.typoBounds?.origin, self.debugNodeValues[p] == nil {
+                                    self.drawEmpty(id)
+                                }
                             }
                         }
+                        return true
                     }
-                }
-            } else {
-                no = O.calculate(xo, &oDic, { self.isStopped }) { (id, o) in
-                    if case .error = o, errorID == nil {
-                        errorID = id
-                    }
+                } else {
+                    O.calculate(xo, xoDic) { (_, _) in !Task.isCancelled }
                 }
             }
+            self.task = task
+            let no = await task.value
+            self.task = nil
             
-            DispatchQueue.main.async {
-                self.stepTimer?.cancel()
-                self.stepTimer = nil
-                if !isDebug {
-                    self.document.runners.remove(self)
-                }
-                self.stepNode.removeFromParent()
-                let nno = self.noFreeMemoryO ?? no
-                if nno != .stopped {
-                    let t = Date().timeIntervalSince(firstDate)
-                    if let sheetView = self.document.madeReadSheetView(at: self.printOrigin) {
-                        let shp = self.document.sheetPosition(at: self.printOrigin)
-                        self.draw(nno, from: text, time: t, in: sheetView, shp)
-                    }
-                }
-                self.document.updateTextCursor()
+            stepTimerTask?.cancel()
+            stepTimerTask = nil
+            if !isDebug {
+                document.runners.remove(self)
             }
+            stepNode.removeFromParent()
+            
+            if no != .stopped {
+                let t = Date().timeIntervalSince(firstDate)
+                if let sheetView = document.madeReadSheetView(at: worldPrintOrigin) {
+                    let shp = document.sheetPosition(at: worldPrintOrigin)
+                    draw(no, from: text, time: t, in: sheetView, shp)
+                }
+            }
+            document.updateTextCursor()
         }
     }
-    func stop() {
-        stepTimer?.cancel()
-        stepTimer = nil
-        isStopped = true
+    func cancel() {
+        stepTimerTask?.cancel()
+        stepTimerTask = nil
         if isDebug {
-            stopDebug()
+            cancelDebug()
         }
+        
+        task?.cancel()
+        task = nil
     }
-    func stopDebug() {
+    func cancelDebug() {
         document.runners.remove(self)
         firstErrorNode?.removeFromParent()
         debugNode.removeFromParent()
@@ -745,217 +724,162 @@ final class AboutRunShower: InputKeyEditor {
             document.cursor = .arrow
             
             if let sheetView = document.madeSheetView(at: p) {
-                let aboutRunS = "About run".localized
-                
-                let languageS = "Shikigo"
-                // (Objective Dynamic Typing Functional Language)
-                
-                let definitionS = "To show all definitions, run the following statement".localized
-                let definitionStatementS = "sheet showAllDefinitions"
-                
-                let boolS = """
-\("Bool".localized)
-\tfalse
-\ttrue
-"""
-                let intS = """
-\("Rational number".localized)
-\t0
-\t1
-\t+3
-\t-20
-\t1/2
-"""
-                let realS = """
-\("Real number".localized)
-\t0.0
-\t1.3
-\t+1.02
-\t-20.0
-"""
-                let infinityS = """
-\("Infinity".localized)
-\t∞ -∞ +∞ (\("Key input".localized): ⌥ 5)
-"""
-                let stringS = """
-\("String".localized)
-\t"A AA" -> A AA
-\t"AA\"A" -> AA"A
-\t"AAAAA\\nAA" ->
-\t\tAAAAA
-\t\tAA
-"""
-                let arrayS = """
-\("Array".localized)
-\ta b c
-\t(a b c)
-\t(a b (c d))
-"""
-                let dicS = """
-\("Dictionary".localized)
-\t(a: d  b: e  c: f)
-\t= ((\"a\"): d  (\"b\"): e  (\"c\"): f)
-"""
-                let functionS = """
-\("Function".localized)
-\t(1 + 2) = 3
-\t(a: 1  b: 2  c: 3 | a + b + c) = 6
-\t(a(b c): b + c | a 1 2 + 3) = 6
-\t((b)a(c): b + c | 1 a 2 + 3) = 6
-\t((b)a(c: d): b + d | 1 a c: 2 + 3) = 6
-\t((b)a(c)100: b + c | 2 a 2 * 3 + 1) = 9
-\t\t\("Precedence".localized): 100  \("Associaticity".localized): \("Left".localized)
-\t((b)a(c)150r: b / c | 1 a 2 a 3 + 1) = 5 / 2
-\t\t\("Precedence".localized): 150  \("Associaticity".localized): \("Right".localized)
-"""
-                let bFunctionS = """
-\("Block function".localized)
-\t(| 1 + 2) send () = 3
-\t(| a: 1  b: 2  c: 3 | a + b + c) send () = 6
-\t(a b c | a + b + c) send (1 2 3) = 6
-\t(a b c | d: a + b | d + c) send (1 2 3) = 6
-"""
-                // Issue?: if 1 == 2
-                // switch "a"
-                let iFunctionS = """
-\("Conditional function".localized)
-\t\t1 = 2
-\t\t-> 3
-\t\t-! 4
-\t= 4,
-\t\t1 = 2
-\t\t-> 3
-\t\t-!
-\t\t4 * 5
-\t\tcase 10      -> 100
-\t\tcase 10 + 10 -> 200
-\t\t-! 300
-\t= 200,
-\t\t"a"
-\t\tcase "a" -> 1
-\t\tcase "b" -> 2
-\t\tcase "c" -> 3
-\t= 1
-"""
-                var setS = "Set".localized
-                for v in G.allCases {
-                    setS += "\n\t" + v.rawValue + ": " + v.displayString
-                }
-                
-                let lineBracketS = """
-\("Lines bracket".localized)
-\ta + b +
-\t\tc +
-\t\t\td + e
-\t= a + b + (c + (d + e))
-"""
-                let splitS = """
-\("Split".localized)
-\t(a + b, b + c, c) = ((a + b) (b + c) (c))
-"""
-                let separatorD = """
-\("Separator".localized) (\("Separator character".localized) \(O.defaultLiteralSeparator)):
-\tabc12+3 = abc12 + 3
-\tabc12++3 = abc12 ++ 3
-"""
-                let unionS = """
-\("Union".localized)
-\ta + b+c = a + (b + c)
-\ta+b*c + d/e = (a + b * c) + (d / e)
-"""
-                let omitS = """
-\("Omit multiplication sign".localized)
-\t3a + b = 3 * a + b
-\t3a\("12".toSubscript)c\("3".toSubscript) + b = 3 * a\("12".toSubscript) * c\("3".toSubscript) + b
-\ta\("2".toSubscript)''b\("2".toSubscript)c'd = a\("2".toSubscript)'' * b\("2".toSubscript) * c' * d
-\t(x + 1)(x - 1) = (x + 1) * (x - 1)
-"""
-                let powS = """
-\("Pow".localized)
-\tx\("1+2".toSuperscript) = x ** (1 + 2)
-"""
-                let atS = """
-\("Get".localized)
-\ta.b.c = a . "b" . "c"
-"""
-                let selectS = """
-\("Select".localized)
-\ta/.b.c = a /. "b" /. "c"
-"""
-                let xyzwS = """
-\("xyzw".localized)
-\ta is Array -> a.x = a . 0
-\ta is Array -> a.y = a . 1
-\ta is Array -> a.z = a . 2
-\ta is Array -> a.w = a . 3
-"""
-                let sheetBondS = """
-\("Sheet bond".localized)
-\t\("Put '+' string beside the frame of the sheet you want to connect.".localized)
-""" // + xxxx -> border bond
-                var s0 = ""
-                s0 += boolS + "\n\n"
-                s0 += intS + "\n\n"
-                s0 += realS + "\n\n"
-                s0 += infinityS + "\n\n"
-                s0 += stringS + "\n\n"
-                s0 += arrayS + "\n\n"
-                s0 += dicS + "\n\n"
-                s0 += functionS + "\n\n"
-                s0 += bFunctionS + "\n\n"
-                s0 += iFunctionS
-                
-                var s1 = ""
-                s1 += setS + "\n\n"
-                s1 += lineBracketS + "\n\n"
-                s1 += splitS + "\n\n"
-                s1 += separatorD + "\n\n"
-                s1 += unionS + "\n\n"
-                s1 += omitS + "\n\n"
-                s1 += powS + "\n\n"
-                s1 += atS + "\n\n"
-                s1 += selectS + "\n\n"
-                s1 += xyzwS + "\n\n"
-                s1 += sheetBondS
-                
                 let b = sheetView.bounds
                 let lPadding = 20.0
                 
                 var p = Point(0, -lPadding), allSize = Size()
                 
-                var t0 = Text(string: aboutRunS, size: 20, origin: p)
+                var t0 = Text(string: "About Run".localized, size: 20, origin: p)
                 let size0 = t0.typesetter.typoBounds?.size ?? Size()
                 p.y -= size0.height + lPadding / 4
                 allSize.width = max(allSize.width, size0.width)
                 
-                var t1 = Text(string: languageS, origin: p)
-                let size1 = t1.typesetter.typoBounds?.size ?? Size()
-                p.y -= size1.height + lPadding * 2
-                
-                var t2 = Text(string: definitionS, origin: p)
-                let size2 = t2.typesetter.typoBounds?.size ?? Size()
+                var t1 = Text(string: "To show all definitions, run the following statement".localized, origin: p)
+                let size2 = t1.typesetter.typoBounds?.size ?? Size()
                 p.y -= size2.height * 2
                 
-                var t3 = Text(string: definitionStatementS, origin: p)
-                let size3 = t3.typesetter.typoBounds?.size ?? Size()
+                var t2 = Text(string: "sheet showAllDefinitions", origin: p)
+                let size3 = t2.typesetter.typoBounds?.size ?? Size()
                 p.y -= size3.height + lPadding * 2
                 
-                let t4 = Text(string: s0, origin: p)
-                let size4 = t4.typesetter.typoBounds?.size ?? Size()
+                let s0 = """
+\("Bool".localized)
+    false
+    true
+
+\("Rational number".localized)
+    0
+    1
+    +3
+    -20
+    1/2
+
+\("Real number".localized)
+    0.0
+    1.3
+    +1.02
+    -20.0
+
+\("Infinity".localized)
+    ∞ -∞ +∞ (\("Key input".localized): ⌥ 5)
+
+\("String".localized)
+    "A AA" -> A AA
+    "AA\"A" -> AA"A
+    "AAAAA\\nAA" ->
+        AAAAA
+        AA
+
+\("Array".localized)
+    a b c
+    (a b c)
+    (a b (c d))
+
+\("Dictionary".localized)
+    (a: d  b: e  c: f)
+    = ((\"a\"): d  (\"b\"): e  (\"c\"): f)
+
+\("Function".localized)
+    (1 + 2) = 3
+    (a: 1  b: 2  c: 3 | a + b + c) = 6
+    (a(b c): b + c | a 1 2 + 3) = 6
+    ((b)a(c): b + c | 1 a 2 + 3) = 6
+    ((b)a(c: d): b + d | 1 a c: 2 + 3) = 6
+    ((b)a(c)100: b + c | 2 a 2 * 3 + 1) = 9
+        \("Precedence".localized): 100  \("Associaticity".localized): \("Left".localized)
+    ((b)a(c)150r: b / c | 1 a 2 a 3 + 1) = 5 / 2
+        \("Precedence".localized): 150  \("Associaticity".localized): \("Right".localized)
+
+\("Block function".localized)
+    (| 1 + 2) send () = 3
+    (| a: 1  b: 2  c: 3 | a + b + c) send () = 6
+    (a b c | a + b + c) send (1 2 3) = 6
+    (a b c | d: a + b | d + c) send (1 2 3) = 6
+
+\("Conditional function".localized)
+        1 == 2
+        -> 3
+        -! 4
+    = 4,
+        1 == 2
+        -> 3
+        -!
+        4 * 5
+        case 10      -> 100
+        case 10 + 10 -> 200
+        -! 300
+    = 200,
+        "a"
+        case "a" -> 1
+        case "b" -> 2
+        case "c" -> 3
+    = 1
+"""
+                // Issue?: if 1 == 2
+                // switch "a"
                 
-                let t5 = Text(string: s1, origin: p + Point(size4.width + lPadding * 2, 0))
-                let size5 = t5.typesetter.typoBounds?.size ?? Size()
+                let t3 = Text(string: s0, origin: p)
+                let size4 = t3.typesetter.typoBounds?.size ?? Size()
+                
+                let setS = G.allCases.reduce(into: "") { $0 += "\n\t" + $1.rawValue + ": " + $1.displayString }
+                let s1 = """
+\("Set".localized)
+    \(setS)
+
+\("Lines bracket".localized)
+    a + b +
+        c +
+            d + e
+    = a + b + (c + (d + e))
+
+\("Split".localized)
+    (a + b, b + c, c) = ((a + b) (b + c) (c))
+
+\("Separator".localized) (\("Separator character".localized) \(O.defaultLiteralSeparator)):
+    abc12+3 = abc12 + 3
+    abc12++3 = abc12 ++ 3
+
+\("Union".localized)
+    a + b+c = a + (b + c)
+    a+b*c + d/e = (a + b * c) + (d / e)
+
+\("Omit multiplication sign".localized)
+    3a + b = 3 * a + b
+    3a\("12".toSubscript)c\("3".toSubscript) + b = 3 * a\("12".toSubscript) * c\("3".toSubscript) + b
+    a\("2".toSubscript)''b\("2".toSubscript)c'd = a\("2".toSubscript)'' * b\("2".toSubscript) * c' * d
+    (x + 1)(x - 1) = (x + 1) * (x - 1)
+
+\("Pow".localized)
+    x\("1+2".toSuperscript) = x ** (1 + 2)
+
+\("Get".localized)
+    a.b.c = a . "b" . "c"
+
+\("Select".localized)
+    a/.b.c = a /. "b" /. "c"
+
+\("xyzw".localized)
+    a is Array -> a.x = a . 0
+    a is Array -> a.y = a . 1
+    a is Array -> a.z = a . 2
+    a is Array -> a.w = a . 3
+
+\("Sheet bond".localized)
+    \("Put '+' string beside the frame of the sheet you want to connect.".localized)
+""" // + xxxx -> border bond
+                
+                let t4 = Text(string: s1, origin: p + Point(size4.width + lPadding * 2, 0))
+                let size5 = t4.typesetter.typoBounds?.size ?? Size()
                 
                 p.y -= max(size4.height, size5.height) + lPadding
                 allSize.width = size4.width + size5.width + lPadding * 2
                 
                 t0.origin.x = (allSize.width - size0.width) / 2
-                t1.origin.x = (allSize.width - size1.width) / 2
-                t2.origin.x = (allSize.width - size2.width) / 2
-                t3.origin.x = (allSize.width - size3.width) / 2
+                t1.origin.x = (allSize.width - size2.width) / 2
+                t2.origin.x = (allSize.width - size3.width) / 2
                 
                 let w = allSize.width, h = -p.y
-                let ts = [t0, t1, t2, t3, t4, t5]
+                let ts = [t0, t1, t2, t3, t4]
                 
                 let size = Size(width: w + lPadding * 2,
                                 height: h + lPadding * 2)

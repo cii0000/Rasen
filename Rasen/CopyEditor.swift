@@ -2737,12 +2737,12 @@ final class CopyEditor: Editor {
             if runner.containsStep(p) {
                 Pasteboard.shared.copiedObjects
                     = [.string(runner.stepString)]
-                runner.stop()
+                runner.cancel()
                 return
             } else if runner.containsDebug(p) {
                 Pasteboard.shared.copiedObjects
                     = [.string(runner.debugString)]
-                runner.stop()
+                runner.cancel()
                 return
             }
         }

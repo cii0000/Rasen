@@ -17,7 +17,6 @@
 
 import MetalKit
 import MetalPerformanceShaders
-//import AVFoundation
 
 extension NSRange {
     init(_ cfRange: CFRange) {
@@ -425,6 +424,11 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         fatalError("init(coder:) has not been implemented")
     }
     
+    func cancelTasks() {
+        scrollTimer?.cancel()
+        pinchTimer?.cancel()
+    }
+    
     override func viewDidChangeEffectiveAppearance() {
         updateWithAppearance()
     }
@@ -737,223 +741,239 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     
     @objc func clearHistoryDatabase(_ sender: Any) {
-        let ok: () -> () = {
-            let message = "Clearing Root History".localized
-            let progressPanel = ProgressPanel(message: message)
-            self.document.rootNode.show(progressPanel)
-            DispatchQueue.global().async {
-                self.document.clearHistory { (progress, isStop) in
-                    if progressPanel.isCancel {
-                        isStop = true
-                    } else {
-                        DispatchQueue.main.async {
+        Task { @MainActor in
+            let result = await document.rootNode
+                .show(message: "Do you want to clear root history?".localized,
+                      infomation: "You can’t undo this action. \nRoot history is what is used in \"Undo\", \"Redo\" or \"Select Version\" when in root operation, and if you clear it, you will not be able to return to the previous work.".localized,
+                      okTitle: "Clear Root History".localized,
+                      isSaftyCheck: true)
+            switch result {
+            case .ok:
+                let progressPanel = ProgressPanel(message: "Clearing Root History".localized)
+                self.document.rootNode.show(progressPanel)
+                let task = Task.detached {
+                    await self.document.clearHistory { (progress, isStop) in
+                        if Task.isCancelled {
+                            isStop = true
+                            return
+                        }
+                        Task { @MainActor in
                             progressPanel.progress = progress
                         }
                     }
+                    Task { @MainActor in
+                        progressPanel.closePanel()
+                    }
                 }
-                DispatchQueue.main.async {
-                    progressPanel.closePanel()
-                }
+                progressPanel.cancelHandler = { task.cancel() }
+            case .cancel: break
             }
         }
-        let cancel: () -> () = {}
-        document.rootNode
-            .show(message: "Do you want to clear root history?".localized,
-                  infomation: "You can’t undo this action. \nRoot history is what is used in \"Undo\", \"Redo\" or \"Select Version\" when in root operation, and if you clear it, you will not be able to return to the previous work.".localized,
-                  okTitle: "Clear Root History".localized,
-                  isSaftyCheck: true,
-                  okClosure: ok, cancelClosure: cancel)
     }
+    
     func replacingDatabase(from url: URL) {
-        func replace(progressHandler: (Double, inout Bool) -> ()) throws {
+        @Sendable func replace(to toURL: URL, progressHandler: (Double, inout Bool) -> ()) throws {
             var stop = false
-            
-            self.document.syncSave()
             
             progressHandler(0.5, &stop)
             if stop { return }
             
-            let oldURL = self.document.url
-            guard oldURL != url else { throw URL.readError }
+            guard toURL != url else { throw URL.readError }
             let fm = FileManager.default
-            if fm.fileExists(atPath: oldURL.path) {
-                try fm.trashItem(at: oldURL, resultingItemURL: nil)
+            if fm.fileExists(atPath: toURL.path) {
+                try fm.trashItem(at: toURL, resultingItemURL: nil)
             }
-            try fm.copyItem(at: url, to: oldURL)
+            try fm.copyItem(at: url, to: toURL)
             
             progressHandler(1, &stop)
             if stop { return }
         }
-        let message = String(format: "Replacing %@".localized, System.dataName)
-        let progressPanel = ProgressPanel(message: message)
-        self.document.rootNode.show(progressPanel)
-        DispatchQueue.global().async {
+        
+        document.syncSave()
+        
+        let toURL = document.url
+        
+        let progressPanel = ProgressPanel(message: String(format: "Replacing %@".localized, System.dataName))
+        document.rootNode.show(progressPanel)
+        let task = Task.detached {
             do {
-                try replace { (progress, isStop) in
-                    if progressPanel.isCancel {
+                try replace(to: toURL) { (progress, isStop) in
+                    if Task.isCancelled {
                         isStop = true
-                    } else {
-                        DispatchQueue.main.async {
-                            progressPanel.progress = progress
-                        }
+                        return
+                    }
+                    Task { @MainActor in
+                        progressPanel.progress = progress
                     }
                 }
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     self.updateWithURL()
                     progressPanel.closePanel()
                 }
             } catch {
-                DispatchQueue.main.async {
+                Task { @MainActor in
                     self.document.rootNode.show(error)
                     self.updateWithURL()
                     progressPanel.closePanel()
                 }
             }
         }
+        progressPanel.cancelHandler = { task.cancel() }
     }
     func replaceDatabase(from url: URL) {
-        let ok: () -> () = {
-            self.replacingDatabase(from: url)
+        Task { @MainActor in
+            let result = await document.rootNode
+                .show(message: String(format: "Do you want to replace %@?".localized, System.dataName),
+                      infomation: String(format: "You can’t undo this action. \n%1$@ is all the data written to this %2$@, if you replace %1$@ with new %1$@, all old %1$@ will be moved to the Trash.".localized, System.dataName, System.appName),
+                      okTitle: String(format: "Replace %@".localized, System.dataName),
+                      isSaftyCheck: true)
+            switch result {
+            case .ok: replacingDatabase(from: url)
+            case .cancel: break
+            }
         }
-        let cancel: () -> () = {}
-        document.rootNode
-            .show(message: String(format: "Do you want to replace %@?".localized, System.dataName),
-                  infomation: String(format: "You can’t undo this action. \n%1$@ is all the data written to this %2$@, if you replace %1$@ with new %1$@, all old %1$@ will be moved to the Trash.".localized, System.dataName, System.appName),
-                  okTitle: String(format: "Replace %@".localized, System.dataName),
-                  isSaftyCheck: true,
-                  okClosure: ok, cancelClosure: cancel)
     }
     @objc func replaceDatabase(_ sender: Any) {
-        let ok: () -> () = {
-            let complete: ([IOResult]) -> () = { ioResults in
-                self.replacingDatabase(from: ioResults[0].url)
+        Task { @MainActor in
+            let result = await document.rootNode
+                .show(message: String(format: "Do you want to replace %@?".localized, System.dataName),
+                      infomation: String(format: "You can’t undo this action. \n%1$@ is all the data written to this %2$@, if you replace %1$@ with new %1$@, all old %1$@ will be moved to the Trash.".localized, System.dataName, System.appName),
+                      okTitle: String(format: "Replace %@...".localized, System.dataName),
+                      isSaftyCheck: document.url.allFileSize > 20*1024*1024)
+            switch result {
+            case .ok:
+                let loadResult = await URL.load(prompt: "Replace".localized,
+                                                fileTypes: [Document.FileType.rasendata,
+                                                            Document.FileType.sksdata])
+                switch loadResult {
+                case .complete(let ioResults): 
+                    replacingDatabase(from: ioResults[0].url)
+                case .cancel: break
+                }
+            case .cancel: break
             }
-            let cancel: () -> () = {}
-            URL.load(prompt: "Replace".localized,
-                     fileTypes: [Document.FileType.rasendata,
-                                 Document.FileType.sksdata],
-                     completionClosure: complete, cancelClosure: cancel)
         }
-        let cancel: () -> () = {}
-        document.rootNode
-            .show(message: String(format: "Do you want to replace %@?".localized, System.dataName),
-                  infomation: String(format: "You can’t undo this action. \n%1$@ is all the data written to this %2$@, if you replace %1$@ with new %1$@, all old %1$@ will be moved to the Trash.".localized, System.dataName, System.appName),
-                  okTitle: String(format: "Replace %@...".localized, System.dataName),
-                  isSaftyCheck: self.document.url.allFileSize > 20*1024*1024,
-                  okClosure: ok, cancelClosure: cancel)
     }
+    
     @objc func exportDatabase(_ sender: Any) {
-        let complete: (IOResult) -> () = { (ioResult) in
-            func export(progressHandler: (Double, inout Bool) -> ()) throws {
-                var stop = false
+        Task { @MainActor in
+            let url = document.url
+            let result = await URL.export(name: "User", fileType: Document.FileType.rasendata,
+                                          fileSizeHandler: { url.allFileSize })
+            switch result {
+            case .complete(let ioResult):
+                document.syncSave()
                 
-                self.document.syncSave()
-                
-                progressHandler(0.5, &stop)
-                if stop { return }
-                
-                let url = self.document.url
-                guard url != ioResult.url else { throw URL.readError }
-                let fm = FileManager.default
-                if fm.fileExists(atPath: ioResult.url.path) {
-                    try fm.removeItem(at: ioResult.url)
+                @Sendable func export(progressHandler: @Sendable (Double, inout Bool) -> ()) async throws {
+                    var stop = false
+                    
+                    progressHandler(0.5, &stop)
+                    if stop { return }
+                    
+                    guard url != ioResult.url else { throw URL.readError }
+                    let fm = FileManager.default
+                    if fm.fileExists(atPath: ioResult.url.path) {
+                        try fm.removeItem(at: ioResult.url)
+                    }
+                    if fm.fileExists(atPath: url.path) {
+                        try fm.copyItem(at: url, to: ioResult.url)
+                    } else {
+                        try fm.createDirectory(at: ioResult.url,
+                                               withIntermediateDirectories: false)
+                    }
+                    
+                    try ioResult.setAttributes()
+                    
+                    progressHandler(1, &stop)
+                    if stop { return }
                 }
-                if fm.fileExists(atPath: url.path) {
-                    try fm.copyItem(at: url, to: ioResult.url)
-                } else {
-                    try fm.createDirectory(at: ioResult.url,
-                                           withIntermediateDirectories: false)
-                }
                 
-                try ioResult.setAttributes()
-                
-                progressHandler(1, &stop)
-                if stop { return }
-            }
-            let message = String(format: "Exporting %@".localized, System.dataName)
-            let progressPanel = ProgressPanel(message: message)
-            self.document.rootNode.show(progressPanel)
-            DispatchQueue.global().async {
-                do {
-                    try export { (progress, isStop) in
-                        if progressPanel.isCancel {
-                            isStop = true
-                        } else {
-                            DispatchQueue.main.async {
+                let progressPanel = ProgressPanel(message: String(format: "Exporting %@".localized, System.dataName))
+                document.rootNode.show(progressPanel)
+                let task = Task.detached {
+                    do {
+                        try await export { (progress, isStop) in
+                            if Task.isCancelled {
+                                isStop = true
+                                return
+                            }
+                            Task { @MainActor in
                                 progressPanel.progress = progress
                             }
                         }
-                    }
-                    DispatchQueue.main.async {
-                        progressPanel.closePanel()
-                    }
-                } catch {
-                    DispatchQueue.main.async {
-                        self.document.rootNode.show(error)
-                        progressPanel.closePanel()
+                        Task { @MainActor in
+                            progressPanel.closePanel()
+                        }
+                    } catch {
+                        Task { @MainActor in
+                            self.document.rootNode.show(error)
+                            progressPanel.closePanel()
+                        }
                     }
                 }
+                progressPanel.cancelHandler = { task.cancel() }
+            case .cancel: break
             }
         }
-        let cancel: () -> () = {}
-        let fileSize: () -> (Int?) = { self.document.url.allFileSize }
-        URL.export(name: "User", fileType: Document.FileType.rasendata,
-                   fileSizeHandler: fileSize,
-                   completionClosure: complete, cancelClosure: cancel)
     }
+    
     @objc func resetDatabase(_ sender: Any) {
-        let ok: () -> () = {
-            func reset(progressHandler: (Double, inout Bool) -> ()) throws {
-                var stop = false
-                
-                self.document.syncSave()
-                
-                progressHandler(0.5, &stop)
-                if stop { return }
-                
-                let url = self.document.url
-                let fm = FileManager.default
-                if fm.fileExists(atPath: url.path) {
-                    try fm.trashItem(at: url, resultingItemURL: nil)
+        Task { @MainActor in
+            let result = await document.rootNode
+                .show(message: String(format: "Do you want to reset the %@?".localized, System.dataName),
+                      infomation: String(format: "You can’t undo this action. \n%1$@ is all the data written to this %2$@, if you reset %1$@, all %1$@ will be moved to the Trash.".localized, System.dataName, System.appName),
+                      okTitle: String(format: "Reset %@".localized, System.dataName),
+                      isSaftyCheck: document.url.allFileSize > 20*1024*1024)
+            switch result {
+            case .ok:
+                @Sendable func reset(in url: URL, progressHandler: (Double, inout Bool) -> ()) throws {
+                    var stop = false
+                    
+                    progressHandler(0.5, &stop)
+                    if stop { return }
+                    
+                    let fm = FileManager.default
+                    if fm.fileExists(atPath: url.path) {
+                        try fm.trashItem(at: url, resultingItemURL: nil)
+                    }
+                    
+                    progressHandler(1, &stop)
+                    if stop { return }
                 }
                 
-                progressHandler(1, &stop)
-                if stop { return }
-            }
-            let message = String(format: "Resetting %@".localized, System.dataName)
-            let progressPanel = ProgressPanel(message: message)
-            self.document.rootNode.show(progressPanel)
-            DispatchQueue.global().async {
-                do {
-                    try reset { (progress, isStop) in
-                        if progressPanel.isCancel {
-                            isStop = true
-                        } else {
-                            DispatchQueue.main.async {
+                document.syncSave()
+                
+                let url = document.url
+                
+                let progressPanel = ProgressPanel(message: String(format: "Resetting %@".localized, System.dataName))
+                self.document.rootNode.show(progressPanel)
+                let task = Task.detached {
+                    do {
+                        try reset(in: url) { (progress, isStop) in
+                            if progressPanel.isCancel {
+                                isStop = true
+                                return
+                            }
+                            Task { @MainActor in
                                 progressPanel.progress = progress
                             }
                         }
-                    }
-                    DispatchQueue.main.async {
-                        self.updateWithURL()
-                        progressPanel.closePanel()
-                    }
-                } catch {
-                    DispatchQueue.main.async {
-                        self.document.rootNode.show(error)
-                        self.updateWithURL()
-                        progressPanel.closePanel()
+                        Task { @MainActor in
+                            self.updateWithURL()
+                            progressPanel.closePanel()
+                        }
+                    } catch {
+                        Task { @MainActor in
+                            self.document.rootNode.show(error)
+                            self.updateWithURL()
+                            progressPanel.closePanel()
+                        }
                     }
                 }
+                progressPanel.cancelHandler = { task.cancel() }
+            case .cancel: break
             }
         }
-        let cancel: () -> () = {}
-        document.rootNode
-            .show(message: String(format: "Do you want to reset the %@?".localized, System.dataName),
-                  infomation: String(format: "You can’t undo this action. \n%1$@ is all the data written to this %2$@, if you reset %1$@, all %1$@ will be moved to the Trash.".localized, System.dataName, System.appName),
-                  okTitle: String(format: "Reset %@".localized, System.dataName),
-                  isSaftyCheck: self.document.url.allFileSize > 20*1024*1024,
-                  okClosure: ok, cancelClosure: cancel)
     }
     
     @objc func shownActionList(_ sender: Any) {
@@ -1630,15 +1650,6 @@ final class SubMTKView: MTKView, MTKViewDelegate,
 //            self.isEnabledRotate = !self.isEnabledRotate
 //        }))
         
-        if System.isVersion3 {
-            menu.addItem(NSMenuItem.separator())
-            menu.addItem(SubNSMenuItem(title: "Show About Run".localized, closure: { [weak self] in
-                guard let self else { return }
-                let editor = AboutRunShower(self.document)
-                editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-                editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
-            }))
-        }
         document.stopAllEvents()
         NSMenu.popUpContextMenu(menu, with: nsEvent, for: self)
     }
@@ -1677,36 +1688,32 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         beganMiddleDragEvent = nil
     }
     
-    let scrollEndTime = 0.1
-    private var scrollWorkItem: DispatchWorkItem?
+    let scrollEndSec = 0.1
+    private var scrollTask: Task<(), any Error>?
     override func scrollWheel(with nsEvent: NSEvent) {
         guard !isEnabledScroll else { return }
         
         func beginEvent() -> Phase {
-            if scrollWorkItem != nil {
-                scrollWorkItem?.cancel()
-                scrollWorkItem = nil
+            if scrollTask != nil {
+                scrollTask?.cancel()
+                scrollTask = nil
                 return .changed
             } else {
                 return .began
             }
         }
         func endEvent() {
-            let workItem = DispatchWorkItem() { [weak self] in
-                guard let self else { return }
-                guard !(self.scrollWorkItem?.isCancelled ?? true) else { return }
-                var event = self.scrollEventWith(nsEvent, .ended,
-                                                  touchPhase: nil,
-                                                  momentumPhase: nil)
-                event.screenPoint = self.screenPointFromCursor.my
-                event.time += self.scrollEndTime
-                self.document.scroll(event)
-                self.scrollWorkItem?.cancel()
-                self.scrollWorkItem = nil
+            scrollTask = Task {
+                try await Task.sleep(sec: scrollEndSec)
+                try Task.checkCancellation()
+                
+                var event = scrollEventWith(nsEvent, .ended, touchPhase: nil, momentumPhase: nil)
+                event.screenPoint = screenPointFromCursor.my
+                event.time += scrollEndSec
+                document.scroll(event)
+                
+                scrollTask = nil
             }
-            self.scrollWorkItem = workItem
-            DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + scrollEndTime,
-                                          execute: workItem)
         }
         if nsEvent.phase.contains(.began) {
             allScrollPosition = .init()
@@ -2650,13 +2657,14 @@ extension Node {
             owner.showDefinition(for: attString, at: sp.cg)
         }
     }
+    
     func show(_ error: any Error) {
         guard let window = owner?.window else { return }
         NSAlert(error: error).beginSheetModal(for: window,
                                               completionHandler: { _ in })
     }
-    func show(message: String = "", infomation: String = "",
-              isCaution: Bool = false) {
+    
+    func show(message: String = "", infomation: String = "", isCaution: Bool = false) {
         guard let window = owner?.window else { return }
         let alert = NSAlert()
         alert.messageText = message
@@ -2667,12 +2675,14 @@ extension Node {
         }
         alert.beginSheetModal(for: window) { _ in }
     }
-    func show(message: String, infomation: String, okTitle: String,
-              isSaftyCheck: Bool = false,
-              isDefaultButton: Bool = false,
-              okClosure: @escaping () -> (),
-              cancelClosure: @escaping () -> ()) {
-        guard let window = owner?.window else { return }
+    
+    enum AlertResult {
+        case ok, cancel
+    }
+    @MainActor func show(message: String, infomation: String, okTitle: String,
+                         isSaftyCheck: Bool = false,
+                         isDefaultButton: Bool = false) async -> AlertResult {
+        guard let window = owner?.window else { return .cancel }
         let alert = NSAlert()
         let okButton = alert.addButton(withTitle: okTitle)
         alert.addButton(withTitle: "Cancel".localized)
@@ -2691,44 +2701,39 @@ extension Node {
         if !isDefaultButton {
             alert.window.defaultButtonCell = nil
         }
-        alert.beginSheetModal(for: window) { (mr) in
-            switch mr {
-            case .alertFirstButtonReturn:
-                okClosure()
-            default:
-                cancelClosure()
-            }
+        let result = await alert.beginSheetModal(for: window)
+        return switch result {
+        case .alertFirstButtonReturn: .ok
+        default: .cancel
         }
     }
-    func show(message: String, infomation: String, titles: [String],
-              closure: @escaping (Int) -> ()) {
-        guard let window = owner?.window else { return }
+    
+    @MainActor func show(message: String, infomation: String, titles: [String]) async -> Int? {
+        guard let window = owner?.window else { return nil }
         let alert = NSAlert()
         for title in titles {
             alert.addButton(withTitle: title)
         }
         alert.messageText = message
         alert.informativeText = infomation
-        alert.beginSheetModal(for: window) { (mr) in
-            closure(mr.rawValue)
-        }
+        return await alert.beginSheetModal(for: window).rawValue
     }
-    func show(message: String, infomation: String,
-              doneClosure: @escaping () -> ()) {
+    
+    @MainActor func show(message: String, infomation: String) async {
         guard let window = owner?.window else { return }
         let alert = NSAlert()
         alert.addButton(withTitle: "Done".localized)
         alert.messageText = message
         alert.informativeText = infomation
-        alert.beginSheetModal(for: window) { (_) in
-            doneClosure()
-        }
+        
+        _ = await alert.beginSheetModal(for: window)
     }
+    
     func show(_ progressPanel: ProgressPanel) {
         guard let window = owner?.window else { return }
-        progressPanel.window = window
+        progressPanel.topWindow = window
         progressPanel.begin()
-        window.beginSheet(progressPanel) { _ in }
+        window.beginSheet(progressPanel.window) { _ in }
     }
 }
 
@@ -3327,8 +3332,8 @@ struct Texture {
     }
     struct TextureError: Error {}
     static func texture(mipmapData: Data,
-                        completionHandler: @escaping (Texture) -> (),
-                        cancelHandler: @escaping (any Error) -> ()) throws {
+                        completionHandler: @Sendable @escaping (Texture) -> (),
+                        cancelHandler: @Sendable @escaping (any Error) -> ()) throws {
         guard let cgImageSource = CGImageSourceCreateWithData(mipmapData as CFData, nil) else {
             throw TextureError()
         }
@@ -3341,16 +3346,16 @@ struct Texture {
     }
     static func texture(mipmapImage: Image,
                         isOpaque: Bool = true,
-                        completionHandler: @escaping (Texture) -> (),
-                        cancelHandler: @escaping (any Error) -> ()) throws {
+                        completionHandler: @Sendable @escaping (Texture) -> (),
+                        cancelHandler: @Sendable @escaping (any Error) -> ()) throws {
         try texture(mipmapCGImage: mipmapImage.cg, isOpaque: isOpaque,
                     completionHandler: completionHandler,
                     cancelHandler: cancelHandler)
     }
     static func texture(mipmapCGImage cgImage: CGImage,
                         isOpaque: Bool = true,
-                        completionHandler: @escaping (Texture) -> (),
-                        cancelHandler: @escaping (any Error) -> ()) throws {
+                        completionHandler: @Sendable @escaping (Texture) -> (),
+                        cancelHandler: @Sendable @escaping (any Error) -> ()) throws {
         guard let dp = cgImage.dataProvider, let data = dp.data else { throw TextureError() }
         let iw = cgImage.width, ih = cgImage.height
         

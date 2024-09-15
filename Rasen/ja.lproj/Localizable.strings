@@ -70,6 +70,7 @@
 "Music Scale" = "音階";
 
 "Making Faces" = "面を作成中";
+"Stopping Task" = "タスクを停止中";
 
 "Line" = "線";
 "Length" = "長さ";
@@ -148,7 +149,7 @@
 "%1$@ Document" = "%1$@書類";
 "%1$@ Document with History" = "%1$@履歴付き書類";
 "File Size" = "ファイルサイズ";
-"Calculating Size..." = "サイズを計算中...";
+"Calculating Size" = "サイズを計算中";
 "Exporting Images" = "画像を書き出し中";
 "Exporting PDF" = "PDFを書き出し中";
 "Exporting Movie" = "動画を書き出し中";
@@ -227,6 +228,7 @@
 
 
 
+"Calculating" = "計算中";
 
 "'%1$@' overlaps with multiplication by multiple single character variables" = "「%1$@」は一文字の変数による乗算と重複しています";
 "'%1$@' is unknown literal" = "「%1$@」は不明な記述です";
@@ -235,15 +237,12 @@
 "Conditional function syntax error" = "条件分岐関数の構文エラー";
 "Unterminated function literal ')'" = "関数記述の終端「)」がありません";
 "Unterminated string literal '\"'" = "文字列記述の終端「\"」がありません";
-
-"Calculating" = "計算中";
 "Stack has exceeded the limit %d" = "スタックが上限%dを超えました";
 "No free memory" = "空きメモリがありません";
 "Not support more than %1$@ in total" = "合計 %1$@ 以上はサポートしていません";
 "'%1$@' is out of bounds" = "「%1$@」が範囲外です";
 "Line is out of bounds" = "線が範囲外です";
 "Text is out of bounds" = "テキストが範囲外です";
-
 "Undefined" = "未定義";
 "-! value" = "-!値";
 "Arguments count should be %1$d, not %2$d" = "引数の個数は%2$dではなく%1$dである必要があります";
@@ -254,7 +253,6 @@
 "'%1$d' is out of bounds array range 0 ... %2$d" = "「%1$d」は配列範囲の0 ... %2$dを超えています";
 "'%1$@' is out of bounds dictionary range" = "「%1$@」は辞書範囲を超えています";
 "Argument $0 must be sheet, not '%1$@'" = "引数$0は「%1$@」ではなくシートである必要があります";
-
 "'%1$@' is not positive real" = "「%1$@」は正の実数ではありません";
 "'%1$@' is not complex point" = "「%1$@」は複素座標ではありません";
 "'%1$@' is not 0 or positive integer" = "「%1$@」は0または正の整数ではありません";
@@ -271,7 +269,7 @@
 "'%1$@' is not horizontal or vertical" = "「%1$@」は横または縦ではありません";
 
 
-"About run" = "実行について";
+"About Run" = "実行について";
 "To show all definitions, run the following statement" = "すべての定義を表示するには下記の文を実行します";
 "Literal" = "記述";
 "Bool" = "ブール";

@@ -101,6 +101,7 @@ extension UU: Hashable {
         hasher.combine(id)
     }
 }
+extension UU: Sendable where Value: Sendable {}
 extension UU: Interpolatable where Value: Interpolatable {
     static func linear(_ f0: Self, _ f1: Self, t: Double) -> Self {
         let value = Value.linear(f0.value, f1.value, t: t)

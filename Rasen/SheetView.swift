@@ -1038,7 +1038,7 @@ final class AnimationView: TimelineView {
 typealias SheetBinder = RecordBinder<Sheet>
 typealias SheetHistory = History<SheetUndoItem>
 
-final class SheetView: View {
+final class SheetView: View, @unchecked Sendable {
     typealias Model = Sheet
     typealias Binder = SheetBinder
     let binder: Binder
@@ -1722,10 +1722,9 @@ final class SheetView: View {
             
             if seqTracks.contains(where: { !$0.isEmpty }) {
                 let sequencer = Sequencer(tracks: seqTracks) { [weak self] (peak) in
-                    DispatchQueue.main.async {
+                    DispatchQueue.main.async { [weak self] in
                         guard let self else { return }
-                        if (self.waringDate == nil
-                            || Date().timeIntervalSince(self.waringDate!) > 1 / 10.0)
+                        if (self.waringDate == nil || Date().timeIntervalSince(self.waringDate!) > 1 / 10.0)
                             && !self.isHiddenOtherTimeNode {
                             
                             let peakVolm = Volm.volm(fromAmp: Double(peak))
@@ -1757,7 +1756,7 @@ final class SheetView: View {
             playingFrameRate = Rational(60)
             let timeInterval = Double(1 / playingFrameRate)
             playingTimer = DispatchSource.scheduledTimer(withTimeInterval: timeInterval) { [weak self] in
-                DispatchQueue.main.async {
+                DispatchQueue.main.async { [weak self] in
                     guard !(self?.playingTimer?.isCancelled ?? true) else { return }
                     self?.loopPlay()
                 }
@@ -6699,72 +6698,61 @@ final class SheetView: View {
     }
     
     func makeFaces(with path: Path?, isSelection: Bool) {
-        if !selectedFrameIndexes.isEmpty {
-            let indexes = selectedFrameIndexes.sorted()
-            var nPolyses = [[Topolygon]](repeating: [], count: indexes.count)
-            let b = bounds, borders = model.borders
-            let pictures = model.animation.keyframes[indexes].map { $0.picture }
-            
-            func makeTopolygons(handler: @escaping (Double, inout Bool) -> ()) {
-                var k = 0, isStop = false
-                let group = DispatchGroup()
-                let queue = DispatchQueue(label: System.id + ".planes.queue",
-                                          qos: .utility,
-                                          attributes: .concurrent)
-                for (i, _) in indexes.enumerated() {
-                    if isStop { break }
-                    queue.async(group: group) {
-                        if isStop { return }
-                        let nPolys = pictures[i].makePolygons(inFrame: b,
-                                                                clipingPath: path,
-                                                                borders: borders,
-                                                                isSelection: isSelection)
-                        nPolyses[i] = nPolys
-                        k += 1
-                        handler(Double(k) / Double(indexes.count) * 0.75,
-                                &isStop)
-                    }
-                }
-                
-                group.wait()
-            }
-            
-            let message = "Making Faces".localized
-            let progressPanel = ProgressPanel(message: message)
-            node.root.show(progressPanel)
-            DispatchQueue.global().async {
-                makeTopolygons { (progress, isStop) in
-                    if progressPanel.isCancel {
-                        isStop = true
-                    } else {
-                        DispatchQueue.main.async {
-                            progressPanel.progress = progress
-                        }
-                    }
-                }
-                
-                DispatchQueue.main.async { [weak self] in
-                    defer { progressPanel.closePanel() }
-                    if progressPanel.isCancel { return }
-                    guard let self else { return }
-                    self.newUndoGroup()
-                    for (j, i) in indexes.enumerated() {
-                        autoreleasepool {
-                            self.setRootKeyframeIndex(rootKeyframeIndex: i)
-                            self.makeFacesFromKeyframeIndex(with: path,
-                                                       topolygons: nPolyses[j],
-                                                       isSelection: isSelection,
-                                                       isNewUndoGroup: false)
-                            self.setRootKeyframeIndex(rootKeyframeIndex: i)
-                        }
-                        if progressPanel.isCancel { return }
-                        progressPanel.progress = Double(j) / Double(indexes.count) * 0.25 + 0.75
-                    }
-                }
-            }
-        } else {
+        if selectedFrameIndexes.isEmpty {
             makeFacesFromKeyframeIndex(with: path, isSelection: isSelection)
+            return
         }
+        
+        let indexes = selectedFrameIndexes.sorted()
+        let b = bounds, borders = model.borders
+        let pictures = model.animation.keyframes[indexes].map { $0.picture }
+        
+        let progressPanel = ProgressPanel(message: "Making Faces".localized)
+        node.root.show(progressPanel)
+        let task = Task.detached {
+            let progress = ActorProgress(total: indexes.count)
+            let nPolyss = await withTaskGroup(of: (Int, [Topolygon]).self,
+                                              returning: [[Topolygon]]?.self) { group in
+                for i in indexes.count.range {
+                    group.addTask {
+                        (i, pictures[i].makePolygons(inFrame: b, clipingPath: path,
+                                                     borders: borders, isSelection: isSelection))
+                    }
+                }
+                
+                guard !Task.isCancelled else { return nil }
+                
+                var nPolyss = [[Topolygon]](repeating: [], count: indexes.count)
+                for await (i, nPolys) in group {
+                    guard !Task.isCancelled else { return nil }
+                    
+                    nPolyss[i] = nPolys
+                    await progress.addCount()
+                    Task { @MainActor in
+                        progressPanel.progress = await progress.fractionCompleted * 0.75
+                    }
+                }
+                return nPolyss
+            }
+            let mainTask = Task { @MainActor in
+                defer { progressPanel.closePanel() }
+                guard let nPolyss, nPolyss.count == indexes.count else { return }
+                self.newUndoGroup()
+                for (j, i) in indexes.enumerated() {
+                    autoreleasepool {
+                        self.setRootKeyframeIndex(rootKeyframeIndex: i)
+                        self.makeFacesFromKeyframeIndex(with: path,
+                                                        topolygons: nPolyss[j],
+                                                        isSelection: isSelection,
+                                                        isNewUndoGroup: false)
+                        self.setRootKeyframeIndex(rootKeyframeIndex: i)
+                    }
+                    progressPanel.progress = Double(j) / Double(indexes.count) * 0.25 + 0.75
+                }
+            }
+            await mainTask.value
+        }
+        progressPanel.cancelHandler = { task.cancel() }
     }
     func makeFacesFromKeyframeIndex(with path: Path?, isSelection: Bool,
                                     isNewUndoGroup: Bool = true) {
