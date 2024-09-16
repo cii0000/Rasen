@@ -39,52 +39,6 @@ extension OSheet {
         self.bounds = bounds
         undos = []
     }
-//    static func undoed(from os: Sheet, to ns: Sheet) -> OSheet {
-//        let oldLines = os.picture.lines
-//        let newLines = ns.picture.lines
-//
-//        var i0Dic = [Line: [Int]]()
-//        for (i, line) in oldLines.enumerated() {
-//            if i0Dic[line] != nil {
-//                i0Dic[line] = [i]
-//            } else {
-//                i0Dic[line]?.append(i)
-//            }
-//        }
-//        var i1Dic = [Line: [Int]]()
-//        for (i, line) in oldLines.enumerated() {
-//            if i1Dic[line] != nil {
-//                i1Dic[line] = [i]
-//            } else {
-//                i1Dic[line]?.append(i)
-//            }
-//        }
-//
-//        var newOSheet = OSheet(os)
-//        var i0 = 0, i1 = 0, fi1: Int?
-//        while i0 < oldLines.count && i1 < newLines.count {
-//            if oldLines[i0] == newLines[i1] {
-//                if let ffi1 = fi1 {
-//                    newOSheet.append(Array(newLines[ffi1 ..< i1]))
-//                    fi1 = nil
-//                }
-//                i0 += 1
-//                i1 += 1
-//            } else {
-//                fi1 = i1
-//                i1 += 1
-//            }
-//        }
-//        if i0 < oldLines.count {
-//
-//        } else if i1 < newLines.count {
-//            newOSheet.append(Array(newLines[i1...]))
-//        }
-//
-//        os.texts
-//
-//        return newOSheet
-//    }
     private mutating func append(undo undoItem: SheetUndoItem,
                         redo redoItem: SheetUndoItem) {
         undos.append(UndoItemValue(undoItem: undoItem, redoItem: redoItem))
@@ -201,6 +155,14 @@ extension OSheet {
         append(undo: undoItem, redo: redoItem)
         set(redoItem)
     }
+    mutating func removeAll() {
+        if !value.picture.lines.isEmpty {
+            removeLines(at: Array(0 ..< value.picture.lines.count))
+        }
+        if !value.texts.isEmpty {
+            removeTexts(at: Array(0 ..< value.texts.count))
+        }
+    }
 }
 extension Sheet {
     func rounded(_ rule: FloatingPointRoundingRule = .toNearestOrAwayFromZero) -> Sheet {
@@ -266,10 +228,8 @@ extension OArray {
                 }
             }
             self.init(value, dimension: d + 1, nextCount: nextCount)
-            return
         default:
             self.init(value)
-            return
         }
     }
     
@@ -289,12 +249,8 @@ extension OArray {
         value.index(after: i)
     }
     subscript(i: Int) -> O {
-        get {
-            value[i]
-        }
-        set {
-            value[i] = newValue
-        }
+        get { value[i] }
+        set { value[i] = newValue }
     }
     
     func isEqualDimension(_ other: OArray) -> Bool {
@@ -302,14 +258,12 @@ extension OArray {
             && dimension == other.dimension
             && nextCount == other.nextCount
     }
-    func with(_ value: [O]) -> OArray {
-        OArray(value, dimension: dimension, nextCount: nextCount)
+    func with(_ value: [O]) -> Self {
+        .init(value, dimension: dimension, nextCount: nextCount)
     }
     
-    func rounded(_ rule: FloatingPointRoundingRule
-                    = .toNearestOrAwayFromZero) -> OArray {
-        OArray(dimension: dimension, nextCount: nextCount,
-               value: value.rounded(rule))
+    func rounded(_ rule: FloatingPointRoundingRule = .toNearestOrAwayFromZero) -> Self {
+        .init(dimension: dimension, nextCount: nextCount, value: value.rounded(rule))
     }
 }
 
@@ -544,7 +498,8 @@ struct F: Hashable, Sendable {
              filiZ, filoZ,
              counta, at, select, set, insert, remove, makeMatrix, releaseMatrix, `is`,
              random, asLabel, asString, asError, isError,
-             send, showAllDefinitions, draw, drawAxes, plot, flip, map, filter, reduce, custom
+             send, showAboutRun, showAllDefinitions,
+             draw, drawAxes, plot, flip, map, filter, reduce, custom
     }
     
     let precedence: Int, associativity: AssociativityType
@@ -746,7 +701,9 @@ extension F {
         case .asString: args[0].asStringO
         case .asError: args[0].asError
         case .isError: args[0].isErrorO
-        case .send, .showAllDefinitions, .draw, .drawAxes, .plot, .flip, .map, .filter, .reduce, .custom: nil
+        case .showAboutRun: .showAboutRun(args[0])
+        case .send, .showAllDefinitions,
+                .draw, .drawAxes, .plot, .flip, .map, .filter, .reduce, .custom: nil
         }
     }
     
@@ -2886,10 +2843,11 @@ extension O {
     static let stopped = O(OError("Stopped"))
     static let maxStackCount = 100000
     static let stackOverflow = O(OError(String(format: "Stack has exceeded the limit %d".localized, maxStackCount)))
-    static func asyncCalculate(_ o: O, _ oDic: [OKey: O], _ handler: Handler) async -> O {
+    static func asyncCalculate(_ o: O, _ oDic: [OKey: O],
+                               _ handler: Handler) async -> (o: O, id: ID?) {
         calculate(o, oDic, handler)
     }
-    static func calculate(_ o: O, _ oDic: [OKey: O], _ handler: Handler) -> O {
+    static func calculate(_ o: O, _ oDic: [OKey: O], _ handler: Handler) -> (o: O, id: ID?) {
         var oDic = oDic, memoRPN = [UUID: RPN]()
         switch o {
         case .f(let f):
@@ -2898,12 +2856,12 @@ extension O {
             }
         default: break
         }
-        return o
+        return (o, nil)
     }
     static func calculate(_ ff: F, _ fid: ID?, args fargs: [O],
                           _ oDic: inout [OKey: O],
                           _ memoRPN: inout [UUID: RPN],
-                          _ handler: Handler) -> O {
+                          _ handler: Handler) -> (o: O, id: ID?) {
         enum Loop {
             case first(_ f: F, _ id: ID?, args: [O])
             case l0(_ id: ID?)
@@ -2916,7 +2874,7 @@ extension O {
             let o: O, nid: ID?
             switch loopStack.pop()! {
             case .first(let f, let id, let args):
-                if loopStack.elements.count == maxStackCount { return .stackOverflow }
+                if loopStack.elements.count == maxStackCount { return (.stackOverflow, id) }
                 
                 if let oo = f.run(args) {
                     o = oo
@@ -2930,9 +2888,12 @@ extension O {
                             else {
                                 let o = sendArgsErrorO(withCount: subF.outKeys.count,
                                                        notCount: os.count)
-                                guard handler(id, o) else { return .stopped }
+                                if case .error = o {
+                                    return (o, id)
+                                }
+                                guard handler(id, o) else { return (.stopped, nil) }
                                 if loopStack.isEmpty {
-                                    return o
+                                    return (o, id)
                                 } else {
                                     returnStack.push(o)
                                     continue loop
@@ -2998,9 +2959,12 @@ extension O {
                                 let noCount = oStack.count - count
                                 guard noCount >= 0 else {
                                     let o = argsErrorO(withCount: count, notCount: oStack.count)
-                                    guard handler(id, o) else { return .stopped }
+                                    if case .error = o {
+                                        return (o, id)
+                                    }
+                                    guard handler(id, o) else { return (.stopped, nil) }
                                     if loopStack.isEmpty {
-                                        return o
+                                        return (o, id)
                                     } else {
                                         returnStack.push(o)
                                         continue loop
@@ -3074,9 +3038,12 @@ extension O {
                         let noCount = oStack.count - count
                         guard noCount >= 0 else {
                             let o = argsErrorO(withCount: count, notCount: oStack.count)
-                            guard handler(id, o) else { return .stopped }
+                            if case .error = o {
+                                return (o, id)
+                            }
+                            guard handler(id, o) else { return (.stopped, nil) }
                             if loopStack.isEmpty {
-                                return o
+                                return (o, id)
                             } else {
                                 returnStack.push(o)
                                 continue loop
@@ -3121,9 +3088,12 @@ extension O {
                         let noCount = oStack.count - count
                         guard noCount >= 0 else {
                             let o = argsErrorO(withCount: count, notCount: oStack.count)
-                            guard handler(id, o) else { return .stopped }
+                            if case .error = o {
+                                return (o, id)
+                            }
+                            guard handler(id, o) else { return (.stopped, nil) }
                             if loopStack.isEmpty {
-                                return o
+                                return (o, id)
                             } else {
                                 returnStack.push(o)
                                 continue loop
@@ -3143,10 +3113,13 @@ extension O {
                 nid = id
             }
             
-            guard handler(nid, o) else { return .stopped }
+            if case .error = o {
+                return (o, nid)
+            }
+            guard handler(nid, o) else { return (.stopped, nil) }
             
             if loopStack.isEmpty {
-                return o
+                return (o, nid)
             } else {
                 returnStack.push(o)
                 continue loop
@@ -3305,11 +3278,11 @@ extension O {
         case .plot: plot(base: args[0], args[1], &oDic)
         case .draw: draw(args[0], &oDic)
         case .map://再帰バグ
-            O.map(args[0], args[1]) { calculate($0, id, args: [$1], &oDic, &memoRPN, handler) }
+            O.map(args[0], args[1]) { calculate($0, id, args: [$1], &oDic, &memoRPN, handler).o }
         case .filter:
-            O.filter(args[0], args[1]) { calculate($0, id, args: [$1], &oDic, &memoRPN, handler) }
+            O.filter(args[0], args[1]) { calculate($0, id, args: [$1], &oDic, &memoRPN, handler).o }
         case .reduce:
-            O.reduce(args[0], args[1], args[2]) { calculate($0, id, args: [$1, $2], &oDic, &memoRPN, handler) }
+            O.reduce(args[0], args[1], args[2]) { calculate($0, id, args: [$1, $2], &oDic, &memoRPN, handler).o }
         default: fatalError()
         }
     }

@@ -221,8 +221,32 @@ extension Substring {
 }
 
 extension Character {
-    static let superscriptScalar: Unicode.Scalar = "\u{F87E}"
-    static let subscriptScalar: Unicode.Scalar = "\u{F87F}"
+    static let toSuperscriptDic: [Character: Character] = [
+        "0": "⁰",
+        "1": "¹",
+        "2": "²",
+        "3": "³",
+        "4": "⁴",
+        "5": "⁵",
+        "6": "⁶",
+        "7": "⁷",
+        "8": "⁸",
+        "9": "⁹",
+    ]
+    static let fromSuperscriptDic = toSuperscriptDic.swap()
+    static let toSubscriptDic: [Character: Character] = [
+        "0": "₀",
+        "1": "₁",
+        "2": "₂",
+        "3": "₃",
+        "4": "₄",
+        "5": "₅",
+        "6": "₆",
+        "7": "₇",
+        "8": "₈",
+        "9": "₉",
+    ]
+    static let fromSubscriptDic = toSubscriptDic.swap()
     
     var isSuperscript: Bool {
         fromSuperscript != nil
@@ -231,30 +255,16 @@ extension Character {
         fromSubscript != nil
     }
     var toSuperscript: Character? {
-        let s = "\(self)\(Character.superscriptScalar)"
-        return s.count == 1 ? s.first : nil
+        Self.toSuperscriptDic[self]
     }
     var toSubscript: Character? {
-        let s = "\(self)\(Character.subscriptScalar)"
-        return s.count == 1 ? s.first : nil
+        Self.toSubscriptDic[self]
     }
     var fromSuperscript: Character? {
-        if unicodeScalars.count == 2,
-           unicodeScalars.last == Character.superscriptScalar,
-           let us = unicodeScalars.first {
-            
-            return Character(us)
-        }
-        return nil
+        Self.fromSuperscriptDic[self]
     }
     var fromSubscript: Character? {
-        if unicodeScalars.count == 2,
-           unicodeScalars.last == Character.subscriptScalar,
-           let us = unicodeScalars.first {
-            
-            return Character(us)
-        }
-        return nil
+        Self.fromSubscriptDic[self]
     }
 }
 

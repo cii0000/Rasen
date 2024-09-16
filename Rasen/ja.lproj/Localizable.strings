@@ -343,8 +343,8 @@
 "Horizontal." = "横。";
 "Vertical." = "縦。";
 
-"Exponentiation (Principal value). a ** b = abͬ" = "冪乗（主値）。 a ** b = abͬ";
-"Logarithm (Principal value). b */ a = loga᷊b" = "対数（主値）。 b */ a = loga᷊b";
+"Exponentiation (Principal value). a ** b = aᵇ" = "冪乗（主値）。 a ** b = aᵇ";
+"Logarithm (Principal value). b */ a = logₐb" = "対数（主値）。 b */ a = logₐb";
 "Multiply." = "乗算。";
 "Division." = "除算。";
 "Modulo." = "剰余。";
@@ -414,6 +414,7 @@
 "Sheet size." = "シートサイズ。";
 "Cursor position." = "カーソル位置。";
 "Display position of the execution result." = "実行結果の表示位置。";
+"Show about Run." = "実行についてを表示。";
 "Show all definitions." = "すべての定義を表示。";
 "Draw points $0 on sheet, e.g. draw ((100 100) (200 200))" = "シートに座標配列$0を描画。例: draw ((100 100) (200 200))";
 "Draw axes on the sheet with $0 as the base scale, $1 as the x axis name, $2 as the y axis name, and the center of the sheet as the origin,\ne.g. drawAxes base: 1 \"X\" \"Y\"" = "ベーススケールを$0、X軸名を$1、Y軸名を$2、シートの中心を原点としてシートに座標軸を描画。\n例: drawAxes base: 1 \"X\" \"Y\"";

@@ -655,9 +655,6 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             return document.isSelectedNoneCursor
         case #selector(SubMTKView.clearHistory(_:)):
             return document.isSelectedNoneCursor
-        case #selector(SubMTKView.showAboutRun(_:)):
-            return document.isEditingSheet
-                && document.isSelectedNoneCursor
             
         case #selector(SubMTKView.undo(_:)):
             if isEnableMenuCommand {
@@ -1080,15 +1077,6 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     @objc func clearHistory(_ sender: Any) {
         document.isNoneCursor = true
         let editor = HistoryCleaner(document)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
-    }
-    
-    @objc func showAboutRun(_ sender: Any) {
-        document.isNoneCursor = true
-        let editor = AboutRunShower(document)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))

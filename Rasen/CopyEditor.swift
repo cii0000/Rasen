@@ -2733,19 +2733,6 @@ final class CopyEditor: Editor {
         let sp = document.selectedScreenPositionNoneCursor
             ?? event.screenPoint
         let p = document.convertScreenToWorld(sp)
-        for runner in document.runners {
-            if runner.containsStep(p) {
-                Pasteboard.shared.copiedObjects
-                    = [.string(runner.stepString)]
-                runner.cancel()
-                return
-            } else if runner.containsDebug(p) {
-                Pasteboard.shared.copiedObjects
-                    = [.string(runner.debugString)]
-                runner.cancel()
-                return
-            }
-        }
         if document.containsLookingUp(at: p) {
             document.closeLookingUpNode()
             return

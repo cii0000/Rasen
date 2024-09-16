@@ -26,6 +26,182 @@ extension O {
     static let printPName = "printP"
 }
 extension O {
+    static let showAboutRunName = "showAboutRun"
+    static func showAboutRun(_ ao: O) -> O {
+        guard case .sheet(var sheet) = ao else { return O(OError(String(format: "Argument $0 must be sheet, not '%1$@'".localized, ao.name))) }
+        
+        let b = sheet.bounds
+        let lPadding = 20.0
+        
+        var p = Point(0, -lPadding), allSize = Size()
+        
+        var t0 = Text(string: "About Run".localized, size: 20, origin: p)
+        let size0 = t0.typesetter.typoBounds?.size ?? Size()
+        p.y -= size0.height + lPadding / 4
+        allSize.width = max(allSize.width, size0.width)
+        
+        var t1 = Text(string: "To show all definitions, run the following statement".localized, origin: p)
+        let size2 = t1.typesetter.typoBounds?.size ?? Size()
+        p.y -= size2.height * 2
+        
+        var t2 = Text(string: "sheet showAllDefinitions =", origin: p)
+        let size3 = t2.typesetter.typoBounds?.size ?? Size()
+        p.y -= size3.height + lPadding * 2
+        
+        let s0 = """
+\("Bool".localized)
+	false
+	true
+
+\("Rational number".localized)
+	0
+	1
+	+3
+	-20
+	1/2
+
+\("Real number".localized)
+	0.0
+	1.3
+	+1.02
+	-20.0
+
+\("Infinity".localized)
+	∞ -∞ +∞ (\("Key input".localized): ⌥ 5)
+
+\("String".localized)
+	"A AA" -> A AA
+	"AA\"A" -> AA"A
+	"AAAAA\\nAA" ->
+		AAAAA
+		AA
+
+\("Array".localized)
+	a b c
+	(a b c)
+	(a b (c d))
+
+\("Dictionary".localized)
+	(a: d  b: e  c: f)
+	= ((\"a\"): d  (\"b\"): e  (\"c\"): f)
+
+\("Function".localized)
+	(1 + 2) = 3
+	(a: 1  b: 2  c: 3 | a + b + c) = 6
+	(a(b c): b + c | a 1 2 + 3) = 6
+	((b)a(c): b + c | 1 a 2 + 3) = 6
+	((b)a(c: d): b + d | 1 a c: 2 + 3) = 6
+	((b)a(c)100: b + c | 2 a 2 * 3 + 1) = 9
+		\("Precedence".localized): 100  \("Associaticity".localized): \("Left".localized)
+	((b)a(c)150r: b / c | 1 a 2 a 3 + 1) = 5 / 2
+		\("Precedence".localized): 150  \("Associaticity".localized): \("Right".localized)
+
+\("Block function".localized)
+	(| 1 + 2) send () = 3
+	(| a: 1  b: 2  c: 3 | a + b + c) send () = 6
+	(a b c | a + b + c) send (1 2 3) = 6
+	(a b c | d: a + b | d + c) send (1 2 3) = 6
+
+\("Conditional function".localized)
+		1 == 2
+		-> 3
+		-! 4
+	= 4,
+		1 == 2
+		-> 3
+		-!
+		4 * 5
+		case 10	  -> 100
+		case 10 + 10 -> 200
+		-! 300
+	= 200,
+		"a"
+		case "a" -> 1
+		case "b" -> 2
+		case "c" -> 3
+	= 1
+"""
+        // Issue?: if 1 == 2
+        // switch "a"
+        
+        let t3 = Text(string: s0, origin: p)
+        let size4 = t3.typesetter.typoBounds?.size ?? Size()
+        
+        let setS = G.allCases.reduce(into: "") {
+            $0 += ($0.isEmpty ? "" : "\n\t") + $1.rawValue + ": " + $1.displayString
+        }
+        let s1 = """
+\("Set".localized)
+	\(setS)
+
+\("Lines bracket".localized)
+	a + b +
+		c +
+			d + e
+	= a + b + (c + (d + e))
+
+\("Split".localized)
+	(a + b, b + c, c) = ((a + b) (b + c) (c))
+
+\("Separator".localized) (\("Separator character".localized) \(O.defaultLiteralSeparator)):
+	abc12+3 = abc12 + 3
+	abc12++3 = abc12 ++ 3
+
+\("Union".localized)
+	a + b+c = a + (b + c)
+	a+b*c + d/e = (a + b * c) + (d / e)
+
+\("Omit multiplication sign".localized)
+	3a + b = 3 * a + b
+	3a\("12".toSubscript)c\("3".toSubscript) + b = 3 * a\("12".toSubscript) * c\("3".toSubscript) + b
+	a\("2".toSubscript)''b\("2".toSubscript)c'd = a\("2".toSubscript)'' * b\("2".toSubscript) * c' * d
+	(x + 1)(x - 1) = (x + 1) * (x - 1)
+
+\("Pow".localized)
+	x\("1+2".toSuperscript) = x ** (1 + 2)
+
+\("Get".localized)
+	a.b.c = a . "b" . "c"
+
+\("Select".localized)
+	a/.b.c = a /. "b" /. "c"
+
+\("xyzw".localized)
+	a is Array -> a.x = a . 0
+	a is Array -> a.y = a . 1
+	a is Array -> a.z = a . 2
+	a is Array -> a.w = a . 3
+
+\("Sheet bond".localized)
+	\("Put '+' string beside the frame of the sheet you want to connect.".localized)
+""" // + xxxx -> border bond
+        
+        let t4 = Text(string: s1, origin: p + Point(size4.width + lPadding * 2, 0))
+        let size5 = t4.typesetter.typoBounds?.size ?? Size()
+        
+        p.y -= max(size4.height, size5.height) + lPadding
+        allSize.width = size4.width + size5.width + lPadding * 2
+        
+        t0.origin.x = (allSize.width - size0.width) / 2
+        t1.origin.x = (allSize.width - size2.width) / 2
+        t2.origin.x = (allSize.width - size3.width) / 2
+        
+        let w = allSize.width, h = -p.y
+        let ts = [t0, t1, t2, t3, t4]
+        
+        let size = Size(width: w + lPadding * 2,
+                        height: h + lPadding * 2)
+        let scale = min(1, b.width / size.width, b.height / size.height)
+        let dx = (b.width - size.width * scale) / 2
+        let t = Transform(scale: scale)
+            * Transform(translation: b.minXMaxYPoint + Point(lPadding * scale + dx, -lPadding * scale))
+        let nts = ts.map { $0 * t }
+        
+        sheet.removeAll()
+        sheet.append(nts)
+        return O(sheet)
+    }
+    
     static let showAllDefinitionsName = "showAllDefinitions"
     static func showAllDefinitions(_ ao: O, _ oDic: inout [OKey: O],
                                    enableCustom: Bool = true) -> O {
@@ -189,12 +365,7 @@ extension O {
         var line = Line(edge: Edge(Point(-groupW - lPadding, (typeH + lPadding) / 2), Point(w - groupW, (typeH + lPadding) / 2))) * t
         line.size *= scale
         
-        if !sheet.value.picture.lines.isEmpty {
-            sheet.removeLines(at: Array(0 ..< sheet.value.picture.lines.count))
-        }
-        if !sheet.value.texts.isEmpty {
-            sheet.removeTexts(at: Array(0 ..< sheet.value.texts.count))
-        }
+        sheet.removeAll()
         sheet.append(line)
         sheet.append(ts)
         return O(sheet)

@@ -264,7 +264,7 @@ extension Typesetter {
         }
         
         let attributes = typobute.attributes()
-        if str.contains(where: { $0.isSubscript || $0.isSuperscript || ":;ー〜〰０１２３４５６７８９".contains($0) }) {
+        if str.contains(where: { ":;ー〜〰０１２３４５６７８９".contains($0) }) {
             var sFont = typobute.font
             sFont.size = typobute.font.size * 3 / 4
             
@@ -382,19 +382,7 @@ extension Typesetter {
                         tempStr.append(c)
                     }
                 }
-                if let nc = c.fromSubscript {
-                    appendFromTemp()
-                    let nnc = Character("\(nc)\u{034f}")
-                    attributedString
-                        .append(NSAttributedString(string: String(nnc).nsBased,
-                                                   attributes: subSet))
-                } else if let nc = c.fromSuperscript {
-                    appendFromTemp()
-                    let nnc = Character("\(nc)\u{034f}")
-                    attributedString
-                        .append(NSAttributedString(string: String(nnc).nsBased,
-                                                   attributes: superSet))
-                } else if c == ":" {
+                if c == ":" {
                     if isLower ?? (preC?.isLowercase ?? false) {
                         isLower = true
                         tempStr.append("\u{E010}")

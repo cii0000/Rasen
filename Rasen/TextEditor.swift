@@ -590,19 +590,19 @@ final class TextScriptEditor: Editor {
         func moveCharacter(isSuper: Bool, from c: Character) -> Character? {
             if isSuper {
                 if c.isSuperscript {
-                    return nil
+                    nil
                 } else if c.isSubscript {
-                    return c.fromSubscript
+                    c.fromSubscript
                 } else {
-                    return c.toSuperscript
+                    c.toSuperscript
                 }
             } else {
                 if c.isSuperscript {
-                    return c.fromSuperscript
+                    c.fromSuperscript
                 } else if c.isSubscript {
-                    return nil
+                    nil
                 } else {
-                    return c.toSubscript
+                    c.toSubscript
                 }
             }
         }
@@ -661,8 +661,7 @@ final class TextScriptEditor: Editor {
                 guard let sheetView = document.sheetView(at: p) else { return }
                 if let aTextView = document.textEditor.editingTextView,
                    !aTextView.isHiddenSelectedRange,
-                   let ai = sheetView.textsView.elementViews
-                    .firstIndex(of: aTextView) {
+                   let ai = sheetView.textsView.elementViews.firstIndex(of: aTextView) {
                     
                     document.textEditor.endInputKey(isUnmarkText: true,
                                                     isRemoveText: true)

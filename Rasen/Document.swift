@@ -585,6 +585,9 @@ final class Document: @unchecked Sendable {
         runners.forEach { $0.cancel() }
     }
     
+    let queue = DispatchQueue(label: System.id + ".queue",
+                              qos: .userInteractive)
+    
     let autosavingDelay = 60.0
     private var autosavingTimer = OneshotTimer()
     private func updateAutosavingTimer() {
@@ -2300,9 +2303,6 @@ final class Document: @unchecked Sendable {
     private(set) var sheetViewValues = [Sheetpos: SheetViewValue]()
     private(set) var thumbnailNodeValues = [Sheetpos: ThumbnailNodeValue]()
     
-    let queue = DispatchQueue(label: System.id + ".queue",
-                              qos: .userInteractive)
-    
     static func sheetRecorders(from sheetsDirectory: Directory) -> [SheetID: SheetRecorder] {
         var srrs = [SheetID: SheetRecorder]()
         srrs.reserveCapacity(sheetsDirectory.childrenURLs.count)
@@ -2702,7 +2702,7 @@ final class Document: @unchecked Sendable {
                 } cancelHandler: { _ in }
             }
         }
-        queue.async(execute: item)
+        DispatchQueue.global(qos: .userInteractive).async(execute: item)
         thumbnailNodeValues[shp]?.node?.removeFromParent()
         thumbnailNodeValues[shp] = ThumbnailNodeValue(type: type, sheetID: sid, node: node,
                                                       workItem: item)
@@ -2864,7 +2864,7 @@ final class Document: @unchecked Sendable {
             sheetViewValues[shp]?.view?.node.removeFromParent()
             sheetViewValues[shp] = SheetViewValue(sheetID: sid, view: nil,
                                                   workItem: item)
-            queue.async(execute: item)
+            DispatchQueue.global(qos: .userInteractive).async(execute: item)
         }
     }
     

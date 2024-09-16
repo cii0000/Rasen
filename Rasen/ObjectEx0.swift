@@ -48,9 +48,9 @@ extension O {
         append(OKey(piName, OKeyInfo(constantGroup, "Archimedes' constant. Key input: ⌥ p".localized)), pi)
         
         let bboGroup = OKeyInfo.Group(name: "Basic binary operation".localized)
-        append(powName, OKeyInfo(bboGroup, "Exponentiation (Principal value). a ** b = abͬ".localized),
+        append(powName, OKeyInfo(bboGroup, "Exponentiation (Principal value). a ** b = aᵇ".localized),
                F(170, .right, left: 1, right: 1, .pow))
-        append(apowName, OKeyInfo(bboGroup, "Logarithm (Principal value). b */ a = loga᷊b".localized),
+        append(apowName, OKeyInfo(bboGroup, "Logarithm (Principal value). b */ a = logₐb".localized),
                F(170, .right, left: 1, right: 1, .apow))
         append(multiplyName, OKeyInfo(bboGroup, "Multiply.".localized),
                F(160, left: 1, right: 1, .multiply))
@@ -170,6 +170,8 @@ extension O {
                O(cursorP))
         append(OKey(printPName, OKeyInfo(sheetGroup, "Display position of the execution result.".localized)),
                O(printP))
+        append(showAboutRunName, OKeyInfo(sheetGroup, "Show about Run.".localized),
+               F(left: 1, .showAboutRun))
         append(showAllDefinitionsName, OKeyInfo(sheetGroup, "Show all definitions.".localized),
                F(left: 1, .showAllDefinitions))
         append(drawName, OKeyInfo(sheetGroup, "Draw points $0 on sheet, e.g. draw ((100 100) (200 200))".localized),

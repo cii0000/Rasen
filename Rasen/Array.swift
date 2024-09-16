@@ -402,3 +402,9 @@ extension Array {
         }
     }
 }
+
+extension Dictionary where Value: Hashable {
+    func swap() -> [Value: Key] {
+        reduce(into: .init()) { $0[$1.value] = $1.key }
+    }
+}
