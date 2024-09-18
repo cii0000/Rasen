@@ -382,7 +382,6 @@
 "Transpose." = "転置。";
 "Determinant." = "行列式。";
 "Gamma function." = "ガンマ関数。";
-"Riemann zeta function." = "リーマンゼータ関数。";
 
 "Change spacing between elements, e.g. 0 ..< 10 __ 2 = (0 2 4 6 8)" = "要素同士の間隔を変更。例: 0 ..< 10 __ 2 = (0 2 4 6 8)";
 

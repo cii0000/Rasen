@@ -1916,7 +1916,7 @@ struct Image {
     }
     var texture: Texture? {
         if let data = self.data(.jpeg) {
-            return Texture(data: data, isOpaque: true)
+            return try? Texture(imageData: data, isOpaque: true)
         }
         return nil
     }

@@ -15,9 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
-import Dispatch
-
-final class RangeSelector: DragEditor {
+final class RangeSelector: DragEditor, @unchecked Sendable {
     let document: Document
     
     init(_ document: Document) {
@@ -84,7 +82,7 @@ final class RangeSelector: DragEditor {
         }
     }
 }
-final class Unselector: InputKeyEditor {
+final class Unselector: InputKeyEditor, @unchecked Sendable {
     let document: Document
     
     init(_ document: Document) {
@@ -106,7 +104,7 @@ final class Unselector: InputKeyEditor {
     }
 }
 
-final class LineDrawer: DragEditor {
+final class LineDrawer: DragEditor, @unchecked Sendable {
     let editor: LineEditor
     
     init(_ document: Document) {
@@ -120,7 +118,7 @@ final class LineDrawer: DragEditor {
         editor.updateNode()
     }
 }
-final class StraightLineDrawer: DragEditor {
+final class StraightLineDrawer: DragEditor, @unchecked Sendable {
     let editor: LineEditor
     
     init(_ document: Document) {
@@ -134,7 +132,7 @@ final class StraightLineDrawer: DragEditor {
         editor.updateNode()
     }
 }
-final class LassoCutter: DragEditor {
+final class LassoCutter: DragEditor, @unchecked Sendable {
     let editor: LineEditor
     
     init(_ document: Document) {
@@ -148,7 +146,7 @@ final class LassoCutter: DragEditor {
         editor.updateNode()
     }
 }
-final class LassoCopier: DragEditor {
+final class LassoCopier: DragEditor, @unchecked Sendable {
     let editor: LineEditor
     
     init(_ document: Document) {
@@ -165,7 +163,7 @@ final class LassoCopier: DragEditor {
 enum LassoType {
     case cut, copy, makeFaces, cutFaces, changeDraft, cutDraft
 }
-final class LineEditor: Editor {
+final class LineEditor: Editor, @unchecked Sendable {
     let document: Document
     let isEditingSheet: Bool
     
@@ -1205,8 +1203,9 @@ final class LineEditor: Editor {
             worldToScreenScale: Double, screenToWorldScale: Double,
             phase: Phase
     }
-    var drawLineTimer: (any DispatchSourceTimer)?, oldDrawLineEventsCount = 0
-    var drawLineEvents = [DrawLineEvent](), drawLineEventsCount = 0, snapLines = [Line]()
+    private var drawLineTimerTask: Task<Void, any Error>?
+    private var  oldDrawLineEventsCount = 0
+    private var drawLineEvents = [DrawLineEvent](), drawLineEventsCount = 0, snapLines = [Line]()
     var textView: SheetTextView?
     
     func drawLine(with event: DragEvent, isStraight: Bool) {
@@ -1243,14 +1242,15 @@ final class LineEditor: Editor {
                 updateStraightNode()
             }
             
-            drawLineTimer = DispatchSource.scheduledTimer(withTimeInterval: 1 / 60) { [weak self] in
-                DispatchQueue.main.async {
-                    guard let self, !(self.drawLineTimer?.isCancelled ?? true) else { return }
-                    if self.drawLineEvents.count != self.oldDrawLineEventsCount {
+            let timer = Timer(interval: 1 / 60)
+            drawLineTimerTask = Task.detached {
+                for try await _ in timer {
+                    Task { @MainActor in
+                        guard self.drawLineEvents.count != self.oldDrawLineEventsCount else { return }
                         let events = self.drawLineEvents
                         self.oldDrawLineEventsCount = events.count
                         let snapLines = self.snapLines, clipBounds = self.clipBounds
-                        DispatchQueue.global().async {
+                        Task.detached {
                             let (tempLine, isSnapStraight) = Self.line(from: events,
                                                                        firstSnapLines: snapLines,
                                                                        lastSnapLines: snapLines,
@@ -1258,9 +1258,9 @@ final class LineEditor: Editor {
                                                                        isStraight: isStraight)
                             let path = Path(tempLine)
                             let (linePathData, linePathBufferVertexCounts) = path.linePointsDataWith(lineWidth: tempLine.size)
-                            DispatchQueue.main.async { [weak self] in
-                                guard let self, !(self.drawLineTimer?.isCancelled ?? true),
-                                        events.count > self.drawLineEventsCount else { return }
+                            Task { @MainActor in
+                                try Task.checkCancellation()
+                                guard events.count > self.drawLineEventsCount else { return }
                                 self.tempLineNode?.update(path: path,
                                                           withLinePathData: linePathData,
                                                           bufferVertexCounts: linePathBufferVertexCounts)
@@ -1282,7 +1282,7 @@ final class LineEditor: Editor {
         case .ended:
             document.cursor = document.defaultCursor
             
-            drawLineTimer?.cancel()
+            drawLineTimerTask?.cancel()
             
             drawLineEvents.append(.init(p: p - centerOrigin,
                                         sp: event.screenPoint, pressure: event.pressure, 
@@ -1413,23 +1413,24 @@ final class LineEditor: Editor {
             snapLines = document.sheetView(at: centerSHP)?
                 .model.picture.lines ?? []
             
-            drawLineTimer = DispatchSource.scheduledTimer(withTimeInterval: 1 / 60) { [weak self] in
-                DispatchQueue.main.async {
-                    guard let self, !(self.drawLineTimer?.isCancelled ?? true) else { return }
-                    if self.drawLineEvents.count != self.oldDrawLineEventsCount {
+            let timer = Timer(interval: 1 / 60)
+            drawLineTimerTask = Task.detached {
+                for try await _ in timer {
+                    Task { @MainActor in
+                        guard self.drawLineEvents.count != self.oldDrawLineEventsCount else { return }
                         let events = self.drawLineEvents
                         self.oldDrawLineEventsCount = events.count
                         let snapLines = self.snapLines, clipBounds = self.clipBounds
-                        DispatchQueue.global().async {
+                        Task.detached {
                             let (tempLine, _) = Self.line(from: events,
-                                                                       firstSnapLines: snapLines,
-                                                                       lastSnapLines: snapLines,
-                                                                       clipBounds: clipBounds,
-                                                                       isStraight: false)
+                                                          firstSnapLines: snapLines,
+                                                          lastSnapLines: snapLines,
+                                                          clipBounds: clipBounds,
+                                                          isStraight: false)
                             let path = tempLine.path(isClosed: true, isPolygon: false)
-                            DispatchQueue.main.async { [weak self] in
-                                guard let self, !(self.drawLineTimer?.isCancelled ?? true),
-                                        events.count > self.drawLineEventsCount else { return }
+                            Task { @MainActor in
+                                try Task.checkCancellation()
+                                guard events.count > self.drawLineEventsCount else { return }
                                 
                                 self.outlineLassoNode?.path = path
                                 self.lassoNode?.path = path
@@ -1459,7 +1460,7 @@ final class LineEditor: Editor {
         case .ended:
             document.cursor = document.defaultCursor
             
-            drawLineTimer?.cancel()
+            drawLineTimerTask?.cancel()
             
             drawLineEvents.append(.init(p: p - centerOrigin,
                                         sp: event.screenPoint,

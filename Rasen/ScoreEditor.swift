@@ -2681,9 +2681,7 @@ extension ScoreView {
         var nodes = [Node](), maxH = 0.0
         func spNode(width: Int, at xi: Int) -> Node? {
             guard let image = sm.image(width: width, at: xi),
-                  let texture = Texture(image: image,
-                                        isOpaque: false,
-                                        colorSpace: .sRGB) else { return nil }
+                  let texture = try? Texture(image: image, isOpaque: false, colorSpace: .sRGB) else { return nil }
             let w = allW * Double(width) / Double(sm.frames.count)
             let h = Self.spectrogramHeight
             maxH = max(maxH, h)

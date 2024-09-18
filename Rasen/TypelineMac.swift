@@ -21,9 +21,9 @@ import class Foundation.NSMutableAttributedString
 import struct Foundation.NSRange
 import CoreText
 
-extension CTFont: @unchecked Sendable {}
-extension CTLine: @unchecked Sendable {}
-extension CTRun: @unchecked Sendable {}
+extension CTFont: @unchecked @retroactive Sendable {}
+extension CTLine: @unchecked @retroactive Sendable {}
+extension CTRun: @unchecked @retroactive Sendable {}
 
 struct Font {
     static let jpName = "GensenJP-Medium"
@@ -1323,8 +1323,8 @@ extension Typerun {
     }
 }
 
-extension CFRange: Equatable {
-    public static func == (lhs: CFRange, rhs: CFRange) -> Bool {
+extension CFRange: @retroactive Equatable {
+    static func == (lhs: CFRange, rhs: CFRange) -> Bool {
         return lhs.location == rhs.location && lhs.length == rhs.length
     }
 }

@@ -126,7 +126,7 @@ extension Point {
         return .init(lhs.x / di, lhs.y / di)
     }
 }
-extension Point: AdditiveArithmetic {
+extension Point: @retroactive AdditiveArithmetic {
     public static let zero = Self.init()
 }
 extension Point: AppliableTransform {

@@ -341,6 +341,15 @@ final class PCMNoder {
     }
 }
 
+private final class NotewaveBox {
+    var notewave: Notewave
+    
+    init(_ notewave: Notewave = .init(fqScale: 1, isLoop: false, samples: [], stereos: [])) {
+        self.notewave = notewave
+    }
+}
+extension UnsafeMutableBufferPointer: @unchecked @retroactive Sendable where Element: NotewaveBox {}
+
 final class ScoreNoder {
     fileprivate weak var sequencer: Sequencer?
     fileprivate var node: AVAudioSourceNode!
@@ -450,19 +459,11 @@ final class ScoreNoder {
                 let threadCount = 8
                 let nThreadCount = min(nwrrs.count, threadCount)
                 
-                final class NotewaveBox {
-                    var notewave: Notewave
-                    
-                    init(_ notewave: Notewave = .init(fqScale: 1, isLoop: false, samples: [], stereos: [])) {
-                        self.notewave = notewave
-                    }
-                }
-                
                 var notewaveBoxs = nwrrs.count.range.map { _ in NotewaveBox() }
                 let dMod = nwrrs.count % threadCount
                 let dCount = nwrrs.count / threadCount
                 notewaveBoxs.withUnsafeMutableBufferPointer { aNotewavesPtr in
-                    nonisolated(unsafe) let notewavesPtr = aNotewavesPtr, nwrrs = nwrrs
+                    let notewavesPtr = aNotewavesPtr, nwrrs = nwrrs
                     if nThreadCount == nwrrs.count {
                         DispatchQueue.concurrentPerform(iterations: nThreadCount) { threadI in
                             notewavesPtr[threadI] = .init(nwrrs[threadI].1.notewave(sampleRate: sampleRate))

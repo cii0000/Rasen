@@ -3315,294 +3315,125 @@ struct Texture {
         self.isOpaque = isOpaque
         self.cgColorSpace = colorSpace
     }
-    static func mipmapLevel(from size: Size) -> Int {
-        Int(Double.log2(max(size.width, size.height)).rounded(.down)) + 1
-    }
+    
     struct TextureError: Error {}
-    static func texture(mipmapData: Data,
-                        completionHandler: @Sendable @escaping (Texture) -> (),
-                        cancelHandler: @Sendable @escaping (any Error) -> ()) throws {
-        guard let cgImageSource = CGImageSourceCreateWithData(mipmapData as CFData, nil) else {
+    
+    struct Block {
+        struct Item {
+            let providerData: Data, width: Int, height: Int, mipmapLevel: Int, bytesPerRow: Int
+        }
+        
+        var items: [Item]
+        var isMipmapped: Bool { items.count > 1 }
+    }
+    static func block(fromImageData data: Data, isMipmapped: Bool = false) throws -> Block {
+        guard let cgImageSource = CGImageSourceCreateWithData(data as CFData, nil) else {
             throw TextureError()
         }
         guard let cgImage = CGImageSourceCreateImageAtIndex(cgImageSource, 0, nil) else {
             throw TextureError()
         }
-        try Texture.texture(mipmapCGImage: cgImage,
-                            completionHandler: completionHandler,
-                            cancelHandler: cancelHandler)
+        return try block(fromCGImage: cgImage, isMipmapped: isMipmapped)
     }
-    static func texture(mipmapImage: Image,
-                        isOpaque: Bool = true,
-                        completionHandler: @Sendable @escaping (Texture) -> (),
-                        cancelHandler: @Sendable @escaping (any Error) -> ()) throws {
-        try texture(mipmapCGImage: mipmapImage.cg, isOpaque: isOpaque,
-                    completionHandler: completionHandler,
-                    cancelHandler: cancelHandler)
+    static func block(fromImage image: Image, isMipmapped: Bool = false) throws -> Block {
+        try block(fromCGImage: image.cg, isMipmapped: isMipmapped)
     }
-    static func texture(mipmapCGImage cgImage: CGImage,
-                        isOpaque: Bool = true,
-                        completionHandler: @Sendable @escaping (Texture) -> (),
-                        cancelHandler: @Sendable @escaping (any Error) -> ()) throws {
+    static func block(fromCGImage cgImage: CGImage, isMipmapped: Bool = false) throws -> Block {
         guard let dp = cgImage.dataProvider, let data = dp.data else { throw TextureError() }
         let iw = cgImage.width, ih = cgImage.height
         
-        struct Mipmap {
-            let data: Data, width: Int, height: Int, level: Int, bytesPerRow: Int
-        }
-        var mipmaps = [Mipmap]()
-        let colorSpace = Renderer.shared.imageColorSpace
-        var image = Image(cgImage: cgImage)
-        var level = 1
-        var mipW = iw / 2, mipH = ih / 2
-        while mipW >= 1 && mipH >= 1 {
-            guard let aImage = image.resize(with: Size(width: mipW, height: mipH)) else { throw TextureError() }
-            image = aImage
-            let cgImage = image.cg
-            guard let ndp = cgImage.dataProvider, let ndata = ndp.data else { throw TextureError() }
-            mipmaps.append(Mipmap(data: ndata as Data, width: mipW, height: mipH,
-                                  level: level, bytesPerRow: cgImage.bytesPerRow))
-            
-            mipW /= 2
-            mipH /= 2
-            level += 1
-        }
-        
-        DispatchQueue.main.async {
-            let td = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: Renderer.shared.imagePixelFormat,
-                                                              width: iw, height: ih,
-                                                              mipmapped: true)
-            guard let mtl = Renderer.shared.device.makeTexture(descriptor: td) else {
-                cancelHandler(TextureError())
-                return
+        var items = [Block.Item(providerData: data as Data, width: iw, height: ih, mipmapLevel: 0,
+                                bytesPerRow: cgImage.bytesPerRow)]
+        if isMipmapped {
+            var image = Image(cgImage: cgImage), level = 1, mipW = iw / 2, mipH = ih / 2
+            while mipW >= 1 && mipH >= 1 {
+                guard let aImage = image.resize(with: Size(width: mipW, height: mipH)) else { throw TextureError() }
+                image = aImage
+                let cgImage = image.cg
+                guard let ndp = cgImage.dataProvider, let ndata = ndp.data else { throw TextureError() }
+                items.append(.init(providerData: ndata as Data, width: mipW, height: mipH,
+                                   mipmapLevel: level, bytesPerRow: cgImage.bytesPerRow))
+                
+                mipW /= 2
+                mipH /= 2
+                level += 1
             }
-            
-            guard let baseBytes = CFDataGetBytePtr(data) else {
-                cancelHandler(TextureError())
-                return
-            }
-            let region = MTLRegionMake2D(0, 0, iw, ih)
-            mtl.replace(region: region, mipmapLevel: 0,
-                        withBytes: baseBytes, bytesPerRow: cgImage.bytesPerRow)
-            
-            mipmaps.forEach {
-                guard let bytes
-                        = CFDataGetBytePtr(($0.data as CFData)) else {
-                    cancelHandler(TextureError())
-                    return
-                }
-                let region = MTLRegionMake2D(0, 0, $0.width, $0.height)
-                mtl.replace(region: region, mipmapLevel: $0.level,
-                            withBytes: bytes, bytesPerRow: $0.bytesPerRow)
-            }
-            
-            completionHandler(Texture(mtl, isOpaque: isOpaque, colorSpace: colorSpace))
         }
-    }
-    static func bc1Texture(mipmapData: Data, isOpaque: Bool,
-                           completionHandler: @escaping (Texture) -> ()) {
-        guard let cgImageSource = CGImageSourceCreateWithData(mipmapData as CFData, nil) else { return }
-        guard let cgImage = CGImageSourceCreateImageAtIndex(cgImageSource, 0, nil) else { return }
-        guard let dp = cgImage.dataProvider, let data = dp.data else { return }
-        guard let baseBytes = CFDataGetBytePtr(data) else { return }
-        let iw = cgImage.width, ih = cgImage.height
-        let bc1Data = Texture.bc1Data(with: baseBytes, width: iw, height: ih)
-        guard let bc1Bytes = CFDataGetBytePtr((bc1Data.data as CFData)) else { return }
-        
-        DispatchQueue.main.async {
-            let td = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: .bc1_rgba,
-                                                              width: iw, height: ih,
-                                                              mipmapped: false)
-            guard let mtl = Renderer.shared.device.makeTexture(descriptor: td) else { return }
-            
-            let region = MTLRegionMake2D(0, 0, iw, ih)
-            mtl.replace(region: region, mipmapLevel: 0,
-                        withBytes: bc1Bytes, bytesPerRow: 8 * bc1Data.blockW)
-            
-            completionHandler(Texture(mtl, isOpaque: isOpaque,
-                                      colorSpace: Renderer.shared.colorSpace))
-        }
-    }
-    init?(data: Data, isOpaque: Bool) {
-        guard let cgImageSource = CGImageSourceCreateWithData(data as CFData, nil) else {
-            return nil
-        }
-        guard let cgImage = CGImageSourceCreateImageAtIndex(cgImageSource, 0, nil) else {
-            return nil
-        }
-        guard let dp = cgImage.dataProvider, let data = dp.data else {
-            return nil
-        }
-        let iw = cgImage.width, ih = cgImage.height
-        
-        struct Mipmap {
-            let data: Data, width: Int, height: Int, level: Int, bytesPerRow: Int
-        }
-        var mipmaps = [Mipmap]()
-        let colorSpace = Renderer.shared.imageColorSpace
-        var image = Image(cgImage: cgImage)
-        var level = 1
-        var mipW = iw / 2, mipH = ih / 2
-        while mipW >= 1 && mipH >= 1 {
-            guard let aImage = image.resize(with: Size(width: mipW, height: mipH)) else {
-                return nil
-            }
-            image = aImage
-            let nCGImage = image.cg
-            guard let ndp = nCGImage.dataProvider, let ndata = ndp.data else {
-                return nil
-            }
-            mipmaps.append(Mipmap(data: ndata as Data, width: mipW, height: mipH,
-                                  level: level, bytesPerRow: nCGImage.bytesPerRow))
-            
-            mipW /= 2
-            mipH /= 2
-            level += 1
-        }
-        
-        let td = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: Renderer.shared.imagePixelFormat,
-                                                          width: iw, height: ih,
-                                                          mipmapped: true)
-        guard let mtl = Renderer.shared.device.makeTexture(descriptor: td) else {
-            return nil
-        }
-        
-        guard let abaseBytes = CFDataGetBytePtr(data) else {
-            return nil
-        }
-        let region = MTLRegionMake2D(0, 0, iw, ih)
-        mtl.replace(region: region, mipmapLevel: 0,
-                    withBytes: abaseBytes, bytesPerRow: cgImage.bytesPerRow)
-        
-        mipmaps.forEach {
-            guard let bytes
-                    = CFDataGetBytePtr(($0.data as CFData)) else { return }
-            let region = MTLRegionMake2D(0, 0, $0.width, $0.height)
-            mtl.replace(region: region, mipmapLevel: $0.level,
-                        withBytes: bytes, bytesPerRow: $0.bytesPerRow)
-        }
-        
-        self.mtl = mtl
-        self.cgColorSpace = colorSpace
-        self.isOpaque = isOpaque
+        return .init(items: items)
     }
     
-    init?(mipmapData: Data, isOpaque: Bool) {
-        guard let cgImageSource = CGImageSourceCreateWithData(mipmapData as CFData, nil) else {
-            return nil
-        }
-        guard let cgImage = CGImageSourceCreateImageAtIndex(cgImageSource, 0, nil) else {
-            return nil
-        }
-        self.init(mipmapCGImage: cgImage, isOpaque: isOpaque)
+//    @MainActor
+    init(imageData: Data,
+         isMipmapped: Bool = false,
+         isOpaque: Bool = true,
+         colorSpace: RGBColorSpace = .sRGB) throws {
+        let block = try Self.block(fromImageData: imageData, isMipmapped: isMipmapped)
+        try self.init(block: block, isOpaque: isOpaque, colorSpace: colorSpace)
     }
-    init?(mipmapImage image: Image, isOpaque: Bool) {
-        self.init(mipmapCGImage: image.cg, isOpaque: isOpaque)
+//    @MainActor
+    init(image: Image,
+         isMipmapped: Bool = false,
+         isOpaque: Bool = true,
+         colorSpace: RGBColorSpace = .sRGB) throws {
+        let block = try Self.block(fromImage: image, isMipmapped: isMipmapped)
+        try self.init(block: block, isOpaque: isOpaque, colorSpace: colorSpace)
     }
-    init?(mipmapCGImage cgImage: CGImage, isOpaque: Bool) {
-        let colorSpace = Renderer.shared.imageColorSpace
-        var cgImage = cgImage
-        let iw = cgImage.width, ih = cgImage.height
-        let td = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: Renderer.shared.imagePixelFormat,
-                                                          width: iw, height: ih,
-                                                          mipmapped: false)
-        guard let mtl = Renderer.shared.device.makeTexture(descriptor: td) else {
-            return nil
-        }
-        
-        guard let dp = cgImage.dataProvider, let data = dp.data else {
-            return nil
-        }
-        guard let baseBytes = CFDataGetBytePtr(data) else {
-            return nil
-        }
-        let region = MTLRegionMake2D(0, 0, iw, ih)
-        mtl.replace(region: region, mipmapLevel: 0,
-                    withBytes: baseBytes, bytesPerRow: cgImage.bytesPerRow)
-        
-        var level = 1
-        var mipW = mtl.width / 2, mipH = mtl.height / 2
-        while mipW >= 1 && mipH >= 1 {
-            let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipFirst.rawValue |
-                                            CGBitmapInfo.byteOrder32Little.rawValue)
-            guard let ctx = CGContext(data: nil, width: mipW, height: mipH,
-                                      bitsPerComponent: 8, bytesPerRow: 0,
-                                      space: CGColorSpace.default,
-                                      bitmapInfo: bitmapInfo.rawValue) else { return nil }
-            guard let bytes = ctx.data else { return nil }
-            ctx.interpolationQuality = .medium
-            ctx.draw(cgImage, in: CGRect(x: 0, y: 0, width: mipW, height: mipH))
-            guard let aCGImage = ctx.makeImage() else { return nil }
-            cgImage = aCGImage
-            
-            let region = MTLRegionMake2D(0, 0, mipW, mipH)
-            mtl.replace(region: region, mipmapLevel: level,
-                        withBytes: bytes, bytesPerRow: cgImage.bytesPerRow)
-            mipW /= 2
-            mipH /= 2
-            level += 1
-        }
-        self.mtl = mtl
-        self.cgColorSpace = colorSpace
-        self.isOpaque = isOpaque
+//    @MainActor
+    init(cgImage: CGImage,
+         isMipmapped: Bool = false,
+         isOpaque: Bool = true,
+         colorSpace: RGBColorSpace = .sRGB) throws {
+        let block = try Self.block(fromCGImage: cgImage, isMipmapped: isMipmapped)
+        try self.init(block: block, isOpaque: isOpaque, colorSpace: colorSpace)
     }
-    
-    init?(image: Image, isOpaque: Bool, colorSpace: RGBColorSpace) {
-        self.init(cgImage: image.cg, isOpaque: isOpaque,
-                  colorSpace: colorSpace)
-    }
-    init?(cgImage: CGImage, isOpaque: Bool, colorSpace: RGBColorSpace) {
-        guard let cgColorSpace = colorSpace.cg else { return nil }
-        let iw = cgImage.width, ih = cgImage.height
-        guard iw <= Self.maxWidth && ih <= Self.maxHeight else { return nil }
-        let format: MTLPixelFormat
-        if colorSpace.isHDR {
-            format = MTLPixelFormat.bgr10_xr_srgb
+//    @MainActor
+    init(block: Block,
+                    isOpaque: Bool = true,
+                    colorSpace: RGBColorSpace = .sRGB) throws {
+        guard let cgColorSpace = colorSpace.cg, !block.items.isEmpty else { throw TextureError() }
+        let format = if colorSpace.isHDR {
+            MTLPixelFormat.bgr10_xr_srgb
         } else {
-            format = Renderer.shared.imagePixelFormat
+            Renderer.shared.imagePixelFormat
         }
-        
         let td = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: format,
-                                                          width: iw, height: ih,
-                                                          mipmapped: false)
-        guard let mtl = Renderer.shared.device.makeTexture(descriptor: td) else {
-            return nil
+                                                          width: block.items[0].width,
+                                                          height: block.items[0].height,
+                                                          mipmapped: block.isMipmapped)
+        guard let mtl = Renderer.shared.device.makeTexture(descriptor: td) else { throw TextureError() }
+        
+        for item in block.items {
+            guard let bytes = CFDataGetBytePtr(item.providerData as CFData) else { throw TextureError() }
+            let region = MTLRegionMake2D(0, 0, item.width, item.height)
+            mtl.replace(region: region, mipmapLevel: item.mipmapLevel,
+                        withBytes: bytes, bytesPerRow: item.bytesPerRow)
         }
         
-        guard let dp = cgImage.dataProvider, let data = dp.data else {
-            return nil
-        }
-        guard let baseBytes = CFDataGetBytePtr(data) else {
-            return nil
-        }
-        let region = MTLRegionMake2D(0, 0, iw, ih)
-        mtl.replace(region: region, mipmapLevel: 0,
-                    withBytes: baseBytes, bytesPerRow: cgImage.bytesPerRow)
-        
-        self.mtl = mtl
-        self.cgColorSpace = cgColorSpace
-        self.isOpaque = isOpaque
+        self.init(mtl, isOpaque: isOpaque, colorSpace: cgColorSpace)
     }
     
-    static func textureWithGPU(mipmapData: Data, isOpaque: Bool,
-                               completionHandler: @escaping (Texture) -> ()) {
-        guard let cgImageSource
-                = CGImageSourceCreateWithData(mipmapData as CFData, nil) else { return }
-        guard let cgImage
-                = CGImageSourceCreateImageAtIndex(cgImageSource, 0, nil) else { return }
-        guard let dp = cgImage.dataProvider, let data = dp.data else { return }
-        guard let baseBytes = CFDataGetBytePtr(data) else { return }
-        let iw = cgImage.width, ih = cgImage.height
-        let colorSpace = Renderer.shared.imageColorSpace
-        let td = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: Renderer.shared.imagePixelFormat,
-                                                          width: iw, height: ih,
-                                                          mipmapped: true)
-        guard let mtl
-                = Renderer.shared.device.makeTexture(descriptor: td) else { return }
+    @MainActor static func withGPU(block: Block,
+                                   isOpaque: Bool,
+                                   colorSpace: RGBColorSpace = .sRGB,
+                                   completionHandler: @escaping (Texture) -> ()) throws {
+        guard let cgColorSpace = colorSpace.cg, !block.items.isEmpty else { throw TextureError() }
+        let format = if colorSpace.isHDR {
+            MTLPixelFormat.bgr10_xr_srgb
+        } else {
+            Renderer.shared.imagePixelFormat
+        }
+        let td = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: format,
+                                                          width: block.items[0].width,
+                                                          height: block.items[0].height,
+                                                          mipmapped: block.isMipmapped)
+        guard let mtl = Renderer.shared.device.makeTexture(descriptor: td) else { return }
         
-        let region = MTLRegionMake2D(0, 0, iw, ih)
-        mtl.replace(region: region, mipmapLevel: 0,
-                    withBytes: baseBytes, bytesPerRow: cgImage.bytesPerRow)
+        for item in block.items {
+            guard let bytes = CFDataGetBytePtr(item.providerData as CFData) else { throw TextureError() }
+            let region = MTLRegionMake2D(0, 0, item.width, item.height)
+            mtl.replace(region: region, mipmapLevel: item.mipmapLevel,
+                        withBytes: bytes, bytesPerRow: item.bytesPerRow)
+        }
         
         let commandQueue = Renderer.shared.commandQueue
         let commandBuffer = commandQueue.makeCommandBuffer()
@@ -3610,144 +3441,24 @@ struct Texture {
         commandEncoder?.generateMipmaps(for: mtl)
         commandEncoder?.endEncoding()
         commandBuffer?.addCompletedHandler { _ in
-            completionHandler(Texture(mtl, isOpaque: isOpaque, colorSpace: colorSpace))
+            completionHandler(Texture(mtl, isOpaque: isOpaque, colorSpace: cgColorSpace))
         }
         commandBuffer?.commit()
     }
     
-    struct BytesData {
-        let data: Data, width: Int, height: Int, bytesPerRow: Int
-    }
-    static func bytesData(with data: Data) -> BytesData? {
-        guard let cgImageSource = CGImageSourceCreateWithData(data as CFData, nil) else {
-            return nil
+    @MainActor func with(mipmapLevel: Int) throws -> Self {
+        guard let cgImage = mtl.cgImage(with: cgColorSpace, mipmapLevel: mipmapLevel) else {
+            throw TextureError()
         }
-        guard let cgImage = CGImageSourceCreateImageAtIndex(cgImageSource, 0, nil) else {
-            return nil
-        }
-        return bytesData(with: cgImage)
-    }
-    static func bytesData(with Image: Image) -> BytesData? {
-        bytesData(with: Image.cg)
-    }
-    static func bytesData(with cgImage: CGImage) -> BytesData? {
-        guard let dp = cgImage.dataProvider, let nData = dp.data else {
-            return nil
-        }
-        return BytesData(data: nData as Data,
-                         width: cgImage.width, height: cgImage.height,
-                         bytesPerRow: cgImage.bytesPerRow)
-    }
-    init?(bytesData: BytesData, isOpaque: Bool) {
-        let colorSpace = Renderer.shared.imageColorSpace
-        let iw = bytesData.width, ih = bytesData.height
-        let td = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: Renderer.shared.imagePixelFormat,
-                                                          width: iw, height: ih,
-                                                          mipmapped: false)
-        guard let mtl = Renderer.shared.device.makeTexture(descriptor: td) else {
-            return nil
-        }
-        
-        guard let baseBytes = CFDataGetBytePtr(bytesData.data as CFData) else {
-            return nil
-        }
-        let region = MTLRegionMake2D(0, 0, iw, ih)
-        mtl.replace(region: region, mipmapLevel: 0,
-                    withBytes: baseBytes, bytesPerRow: bytesData.bytesPerRow)
-        
-        self.mtl = mtl
-        self.cgColorSpace = colorSpace
-        self.isOpaque = isOpaque
-    }
-    
-    static func bc1Data(with bytes: UnsafePointer<UInt8>,
-                        width: Int, height: Int) -> (data: Data, blockW: Int, blockH: Int) {
-        struct RGB888 {
-            let r, g, b: UInt8
-            func mid(_ other: RGB888) -> RGB888 {
-                return RGB888(r: (r >> 2) + (other.r >> 2),
-                              g: (g >> 2) + (other.g >> 2),
-                              b: (b >> 2) + (other.b >> 2))
-            }
-            func delta(_ rhs: RGB888) -> Int {
-                let dr = abs(Int(r) - Int(rhs.r))
-                let dg = abs(Int(g) - Int(rhs.g))
-                let db = abs(Int(b) - Int(rhs.b))
-                return dr + dg + db
-            }
-        }
-        func rgb565(with rgb888: RGB888) -> UInt16 {
-            let r = UInt16(rgb888.r & 0b11111000)
-            let g = UInt16(rgb888.g & 0b11111100)
-            let b = UInt16(rgb888.b)
-            return (r << 8) | (g << 3) | (b >> 3)
-        }
-        func rgb888(atX x: Int, y: Int) -> RGB888 {
-            let r = bytes[(x + y * width) * 4 + 0]
-            let g = bytes[(x + y * width) * 4 + 1]
-            let b = bytes[(x + y * width) * 4 + 2]
-            return RGB888(r: r, g: g, b: b)
-        }
-        let wBlockCount = max(1, width / 4), hBlockCount = max(1, height / 4)
-        var nBytes = [UInt32]()
-        nBytes.reserveCapacity(wBlockCount * hBlockCount * 2)
-        for yb in 0 ..< hBlockCount {
-            for xb in 0 ..< wBlockCount {
-                let nx = xb * 4, ny = yb * 4
-                let color0 = rgb888(atX: nx, y: ny)
-                let color1 = rgb888(atX: nx + 3, y: ny + 3)
-                let color2 = color0.mid(color1)
-                let c0 = UInt32(rgb565(with: color0))
-                let c1 = UInt32(rgb565(with: color1))
-                var v: UInt32 = 0, i = 0
-                for y in 0 ..< 4 {
-                    for x in 0 ..< 4 {
-                        let color = rgb888(atX: nx + x, y: ny + y)
-                        var d = (color.delta(color0), 0b00000000)
-                        let d1 = (color.delta(color1), 0b00000001)
-                        if d1.0 < d.0 {
-                            d = d1
-                        }
-                        let d2 = (color.delta(color2), 0b00000010)
-                        if d2.0 < d.0 {
-                            d = d2
-                        }
-                        v |= UInt32(d.1) << i
-                        i += 2
-                    }
-                }
-                nBytes.append(c0 | (c1 << 16))
-                nBytes.append(v)
-            }
-        }
-        return (Data(nBytes.withUnsafeBytes { $0 }), wBlockCount, hBlockCount)
-    }
-    
-    init?(_ texture: Texture, mipmapLevel: Int) {
-        guard let cgImage = texture.mtl.cgImage(with: texture.cgColorSpace,
-                                                mipmapLevel: mipmapLevel) else {
-            return nil
-        }
-        guard let dp = cgImage.dataProvider, let data = dp.data else { return nil }
-        guard let baseBytes = CFDataGetBytePtr(data) else { return nil }
-        let iw = cgImage.width, ih = cgImage.height
-        
-        let td = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: Renderer.shared.imagePixelFormat,
-                                                          width: iw, height: ih,
-                                                          mipmapped: true)
-        guard let mtl
-                = Renderer.shared.device.makeTexture(descriptor: td) else { return nil }
-        
-        let region = MTLRegionMake2D(0, 0, iw, ih)
-        mtl.replace(region: region, mipmapLevel: 0,
-                    withBytes: baseBytes, bytesPerRow: cgImage.bytesPerRow)
-        
-        self.mtl = mtl
-        self.cgColorSpace = texture.cgColorSpace
-        self.isOpaque = texture.isOpaque
+        let block = try Self.block(fromCGImage: cgImage, isMipmapped: false)
+        return try .init(block: block)
     }
 }
 extension Texture {
+    static func mipmapLevel(from size: Size) -> Int {
+        Int(Double.log2(max(size.width, size.height)).rounded(.down)) + 1
+    }
+    
     var size: Size {
         Size(width: mtl.width, height: mtl.height)
     }
@@ -3758,17 +3469,17 @@ extension Texture {
 extension Texture {
     var image: Image? {
         if let cgImage = cgImage {
-            return Image(cgImage: cgImage)
+            Image(cgImage: cgImage)
         } else {
-            return nil
+            nil
         }
     }
     func image(mipmapLevel: Int) -> Image? {
         if let cgImage = mtl.cgImage(with: cgColorSpace,
                                      mipmapLevel: mipmapLevel) {
-            return Image(cgImage: cgImage)
+            Image(cgImage: cgImage)
         } else {
-            return nil
+            nil
         }
     }
 }

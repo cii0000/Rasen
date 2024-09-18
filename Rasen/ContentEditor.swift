@@ -209,7 +209,7 @@ final class ContentView<T: BinderProtocol>: SpectrgramView {
         self.keyPath = keyPath
         
         if let image = binder[keyPath: keyPath].image,
-           let texture = Texture(image: image, isOpaque: false, colorSpace: .sRGB) {
+           let texture = try? Texture(image: image, isOpaque: false, colorSpace: .sRGB) {
             node = Node(children: [timelineNode, clippingNode],
                         attitude: Attitude(position: binder[keyPath: keyPath].origin),
                         path: Path(Rect(size: binder[keyPath: keyPath].size)),
@@ -231,7 +231,7 @@ extension ContentView {
     func updateWithModel() {
         node.attitude.position = model.origin
         if let image = model.image,
-           let texture = Texture(image: image, isOpaque: false, colorSpace: .sRGB) {
+           let texture = try? Texture(image: image, isOpaque: false, colorSpace: .sRGB) {
             node.fillType = .texture(texture)
             node.path = Path(Rect(size: model.size))
         }
@@ -550,9 +550,7 @@ extension ContentView {
         var nodes = [Node](), maxH = 0.0
         func spNode(width: Int, at xi: Int) -> Node? {
             guard let image = sm.image(width: width, at: xi),
-                  let texture = Texture(image: image,
-                                        isOpaque: false,
-                                        colorSpace: .sRGB) else { return nil }
+                  let texture = try? Texture(image: image, isOpaque: false, colorSpace: .sRGB) else { return nil }
             let w = allW * Double(width) / Double(sm.frames.count)
             let h = Self.spectrogramHeight
             maxH = max(maxH, h)
