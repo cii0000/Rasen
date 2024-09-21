@@ -15,6 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
+import Dispatch
 import struct Foundation.Date
 import struct Foundation.UUID
 import struct Foundation.URL
@@ -45,7 +46,7 @@ final class RunEditor: InputKeyEditor, @unchecked Sendable {
     
     private var calculatingString = ""
     private var calculatingNode = Node(fillType: .color(.content))
-    private var calculatingTimerTask: Task<Void, any Error>?
+    private var calculatingTimer: (any DispatchSourceTimer)?
     
     private var task: Task<(o: O, id: ID?), Never>?
     private var firstErrorNode: Node?
@@ -296,10 +297,10 @@ extension RunEditor {
         calculatingNode.attitude.position = nodePoint(from: nText)
         document.rootNode.append(child: calculatingNode)
         
-        let timer = Timer(interval: 1)
-        calculatingTimerTask = Task { @MainActor in
-            for try await sec in timer {
-                showCalculating(sec: sec)
+        let clock = SuspendingClock.now
+        calculatingTimer = DispatchSource.scheduledTimer(withTimeInterval: 1) { [weak self] in
+            DispatchQueue.main.async { [weak self] in
+                self?.showCalculating(sec: clock.duration(to: .now).sec.rounded())
             }
         }
         
@@ -315,8 +316,8 @@ extension RunEditor {
             let (no, id) = await task.value
             self.task = nil
             
-            calculatingTimerTask?.cancel()
-            calculatingTimerTask = nil
+            calculatingTimer?.cancel()
+            calculatingTimer = nil
             
             document.runners.remove(self)
             
@@ -334,8 +335,8 @@ extension RunEditor {
     }
     
     func cancel() {
-        calculatingTimerTask?.cancel()
-        calculatingTimerTask = nil
+        calculatingTimer?.cancel()
+        calculatingTimer = nil
         
         task?.cancel()
         task = nil
@@ -456,7 +457,7 @@ extension RunEditor {
         let padding = runTypobute.font.size * 2 * 2 / 3
         let p = Point(text.origin.x + padding + size.width,
                       text.origin.y + runTypobute.font.size * 1.5)
-        let nt = Text(string: String(format: "%.4f", t),
+        let nt = Text(string: String(format: "%.4f s", t),
                       size: runTypobute.font.size,
                       origin: p)
         if !sheetView.model.texts.contains(nt) {

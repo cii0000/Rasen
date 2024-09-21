@@ -17,31 +17,6 @@
 
 import Dispatch
 
-struct Timer: AsyncSequence {
-    typealias Element = Double
-    
-    struct Iterator: AsyncIteratorProtocol {
-        let clock: SuspendingClock,
-            first: SuspendingClock.Instant,
-            interval: SuspendingClock.Duration, tolerance: SuspendingClock.Duration?
-        var current: SuspendingClock.Instant?
-        
-        mutating func next() async throws -> Element? {
-            let next = (current ?? first).advanced(by: interval)
-            try await clock.sleep(until: next, tolerance: tolerance)
-            current = next
-            return first.duration(to: clock.now).sec
-        }
-    }
-    
-    var clock = SuspendingClock(), interval = 1.0, tolerance: Double?
-    
-    func makeAsyncIterator() -> Iterator {
-        .init(clock: clock, first: clock.now, interval: .seconds(interval),
-              tolerance: tolerance != nil ? .seconds(tolerance!) : nil)
-    }
-}
-
 extension Duration {
     var sec: Double {
         .init(components.seconds) + .init(components.attoseconds) * 1e-18

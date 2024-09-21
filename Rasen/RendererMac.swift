@@ -426,7 +426,9 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     func cancelTasks() {
         scrollTimer?.cancel()
+        scrollTimer = nil
         pinchTimer?.cancel()
+        pinchTimer = nil
     }
     
     override func viewDidChangeEffectiveAppearance() {
@@ -1804,8 +1806,10 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     var lastRotationQuantity = 0.0
     var isBeganSwipe = false, swipePosition: Point?
     
-    var scrollTimer: (any DispatchSourceTimer)?
-    var pinchTimer: (any DispatchSourceTimer)?
+    private var scrollTimeValue = 0.0
+    private var scrollTimer: (any DispatchSourceTimer)?
+    private var pinchTimeValue = 0.0
+    private var pinchTimer: (any DispatchSourceTimer)?
     
     struct TouchID: Hashable {
         var id: any NSCopying & NSObjectProtocol
@@ -2076,6 +2080,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         oldTouchPoints = [:]
         touchedIDs = []
     }
+    
     func endPinch(with event: NSEvent,
                   timeInterval: Double = 1 / 60) {
         guard isBeganPinch else { return }
@@ -2091,9 +2096,9 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         let sd = pinchVs.last!.d
         let sign = sd < 0 ? -1.0 : 1.0
         let (a, b) = Double.leastSquares(xs: pinchVs[fpi...].map { $0.time },
-                            ys: pinchVs[fpi...].map { abs($0.d) })
+                                         ys: pinchVs[fpi...].map { abs($0.d) })
         let v = min(a * t + b, 10)
-        var tv = v / timeInterval
+        let tv = v / timeInterval
         let minTV = 0.01
         let sv = tv / (tv - minTV)
         if tv.isNaN || v < 0.04 || a == 0 {
@@ -2102,26 +2107,26 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                                  magnification: 0,
                                  phase: .ended))
         } else {
+            pinchTimeValue = tv
+            let screenPoint = screenPoint(with: event).my, time = event.timestamp
             pinchTimer = DispatchSource.scheduledTimer(withTimeInterval: timeInterval) { [weak self] in
-                DispatchQueue.main.async {
-                    guard let self, !(self.pinchTimer?.isCancelled ?? true) else {
-                        self?.pinchTimer?.cancel()
-                        self?.pinchTimer = nil
-                        return
-                    }
-                    tv *= 0.8
-                    if tv < minTV {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    let ntv = self.pinchTimeValue * 0.8
+                    self.pinchTimeValue = ntv
+                    if ntv < minTV {
                         self.pinchTimer?.cancel()
                         self.pinchTimer = nil
+                        self.pinchTimeValue = 0
                         
-                        self.document.pinch(.init(screenPoint: self.screenPoint(with: event).my,
-                                              time: event.timestamp,
+                        self.document.pinch(.init(screenPoint: screenPoint,
+                                              time: time,
                                               magnification: 0,
                                               phase: .ended))
                     } else {
-                        let m = timeInterval * (tv - minTV) * sv * sign
-                        self.document.pinch(.init(screenPoint: self.screenPoint(with: event).my,
-                                              time: event.timestamp,
+                        let m = timeInterval * (ntv - minTV) * sv * sign
+                        self.document.pinch(.init(screenPoint: screenPoint,
+                                              time: time,
                                               magnification: m,
                                               phase: .changed))
                     }
@@ -2159,7 +2164,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         let v = min(a * t + b, 700)
         let scale = v.clipped(min: 100, max: 700,
                               newMin: 0.9, newMax: 0.95)
-        var tv = v / timeInterval
+        let tv = v / timeInterval
         let minTV = 100.0
         let sv = tv / (tv - minTV)
         if tv.isNaN || v < 5 || a == 0 {
@@ -2177,33 +2182,31 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                                   touchPhase: .ended,
                                   momentumPhase: .began))
             
+            scrollTimeValue = tv
+            let screenPoint = screenPoint(with: event).my, time = event.timestamp
             scrollTimer = DispatchSource.scheduledTimer(withTimeInterval: timeInterval) { [weak self] in
-                DispatchQueue.main.async {
-                    guard let self, !(self.scrollTimer?.isCancelled ?? true) else {
-                        self?.scrollTimer?.cancel()
-                        self?.scrollTimer = nil
-                        return
-                    }
-                    tv *= scale
-                    let sdp = Point()
-                        .movedWith(distance: timeInterval * (tv - minTV) * sv, angle: angle)
-                    if tv < minTV {
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    let ntv = self.scrollTimeValue * scale
+                    self.scrollTimeValue = ntv
+                    let sdp = Point().movedWith(distance: timeInterval * (ntv - minTV) * sv,
+                                                angle: angle)
+                    if ntv < minTV {
                         self.scrollTimer?.cancel()
                         self.scrollTimer = nil
+                        self.scrollTimeValue = 0
                         
-                        self.document.scroll(.init(screenPoint: self.screenPoint(with: event).my,
-                                              time: event.timestamp,
+                        self.document.scroll(.init(screenPoint: screenPoint,
+                                              time: time,
                                               scrollDeltaPoint: .init(),
                                               phase: .ended,
-                                              touchPhase: nil,
-                                                   momentumPhase: .ended))
+                                              touchPhase: nil, momentumPhase: .ended))
                     } else {
-                        self.document.scroll(.init(screenPoint: self.screenPoint(with: event).my,
-                                              time: event.timestamp,
+                        self.document.scroll(.init(screenPoint: screenPoint,
+                                              time: time,
                                               scrollDeltaPoint: sdp,
                                               phase: .changed,
-                                              touchPhase: nil,
-                                            momentumPhase: .changed))
+                                              touchPhase: nil, momentumPhase: .changed))
                     }
                 }
             }
@@ -3326,19 +3329,28 @@ struct Texture {
         var items: [Item]
         var isMipmapped: Bool { items.count > 1 }
     }
-    static func block(fromImageData data: Data, isMipmapped: Bool = false) throws -> Block {
+    static func block(from record: Record<Image>, isMipmapped: Bool = false) throws -> Block {
+        if let image = record.value {
+            try Self.block(from: image, isMipmapped: isMipmapped)
+        } else if let data = record.decodedData {
+            try Self.block(from: data, isMipmapped: isMipmapped)
+        } else {
+            throw TextureError()
+        }
+    }
+    static func block(from data: Data, isMipmapped: Bool = false) throws -> Block {
         guard let cgImageSource = CGImageSourceCreateWithData(data as CFData, nil) else {
             throw TextureError()
         }
         guard let cgImage = CGImageSourceCreateImageAtIndex(cgImageSource, 0, nil) else {
             throw TextureError()
         }
-        return try block(fromCGImage: cgImage, isMipmapped: isMipmapped)
+        return try block(from: cgImage, isMipmapped: isMipmapped)
     }
-    static func block(fromImage image: Image, isMipmapped: Bool = false) throws -> Block {
-        try block(fromCGImage: image.cg, isMipmapped: isMipmapped)
+    static func block(from image: Image, isMipmapped: Bool = false) throws -> Block {
+        try block(from: image.cg, isMipmapped: isMipmapped)
     }
-    static func block(fromCGImage cgImage: CGImage, isMipmapped: Bool = false) throws -> Block {
+    static func block(from cgImage: CGImage, isMipmapped: Bool = false) throws -> Block {
         guard let dp = cgImage.dataProvider, let data = dp.data else { throw TextureError() }
         let iw = cgImage.width, ih = cgImage.height
         
@@ -3367,7 +3379,7 @@ struct Texture {
          isMipmapped: Bool = false,
          isOpaque: Bool = true,
          colorSpace: RGBColorSpace = .sRGB) throws {
-        let block = try Self.block(fromImageData: imageData, isMipmapped: isMipmapped)
+        let block = try Self.block(from: imageData, isMipmapped: isMipmapped)
         try self.init(block: block, isOpaque: isOpaque, colorSpace: colorSpace)
     }
 //    @MainActor
@@ -3375,7 +3387,7 @@ struct Texture {
          isMipmapped: Bool = false,
          isOpaque: Bool = true,
          colorSpace: RGBColorSpace = .sRGB) throws {
-        let block = try Self.block(fromImage: image, isMipmapped: isMipmapped)
+        let block = try Self.block(from: image, isMipmapped: isMipmapped)
         try self.init(block: block, isOpaque: isOpaque, colorSpace: colorSpace)
     }
 //    @MainActor
@@ -3383,7 +3395,7 @@ struct Texture {
          isMipmapped: Bool = false,
          isOpaque: Bool = true,
          colorSpace: RGBColorSpace = .sRGB) throws {
-        let block = try Self.block(fromCGImage: cgImage, isMipmapped: isMipmapped)
+        let block = try Self.block(from: cgImage, isMipmapped: isMipmapped)
         try self.init(block: block, isOpaque: isOpaque, colorSpace: colorSpace)
     }
 //    @MainActor
@@ -3450,7 +3462,7 @@ struct Texture {
         guard let cgImage = mtl.cgImage(with: cgColorSpace, mipmapLevel: mipmapLevel) else {
             throw TextureError()
         }
-        let block = try Self.block(fromCGImage: cgImage, isMipmapped: false)
+        let block = try Self.block(from: cgImage, isMipmapped: false)
         return try .init(block: block)
     }
 }

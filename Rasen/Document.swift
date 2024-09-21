@@ -518,13 +518,13 @@ final class Document: @unchecked Sendable {
         var baseThumbnailBlocks = [SheetID: Texture.Block]()
         sheetRecorders.forEach {
             guard let data = $0.value.thumbnail4Record.decodedData else { return }
-            if let block = try? Texture.block(fromImageData: data) {
+            if let block = try? Texture.block(from: data) {
                 baseThumbnailBlocks[$0.key] = block
             } else if let image = Image(size: Size(width: 4, height: 4),
                                         color: .init(red: 1.0, green: 0, blue: 0)) {
                 $0.value.thumbnail4Record.value = image
                 $0.value.thumbnail4Record.isWillwrite = true
-                baseThumbnailBlocks[$0.key] = try? Texture.block(fromImage: image)
+                baseThumbnailBlocks[$0.key] = try? Texture.block(from: image)
             } else {
                 baseThumbnailBlocks[$0.key] = nil
             }
@@ -745,8 +745,7 @@ final class Document: @unchecked Sendable {
                     thumbnailNode(at: shp)?.removeFromParent()
                     sheetView(at: shp)?.node.removeFromParent()
                     sheetsNode.append(child: node)
-                    thumbnailNodeValues[shp] = ThumbnailNodeValue(type: thumbnailType,
-                                                                  sheetID: sid, node: node, workItem: nil)
+                    thumbnailNodeValues[shp] = .init(type: thumbnailType, sheetID: sid, node: node)
                     
                     if let oldSID = world.sheetIDs[shp] {
                         world.sheetPositions[oldSID] = nil
@@ -1849,7 +1848,7 @@ final class Document: @unchecked Sendable {
                                             if let tm = tm {
                                                 self?.saveThumbnailRecord(tm, in: sheetRecorder)
                                                 self?.baseThumbnailBlocks[sid]
-                                                = try? Texture.block(fromImageData: tm.thumbnail4Data)
+                                                = try? Texture.block(from: tm.thumbnail4Data)
                                             }
                                         }
                                     } else {
@@ -2321,7 +2320,7 @@ final class Document: @unchecked Sendable {
     func append(_ srr: SheetRecorder, at sid: SheetID) {
         sheetRecorders[sid] = srr
         if let data = srr.thumbnail4Record.decodedData {
-            baseThumbnailBlocks[sid] = try? Texture.block(fromImageData: data)
+            baseThumbnailBlocks[sid] = try? Texture.block(from: data)
         }
     }
     func remove(_ srr: SheetRecorder) {
@@ -2460,7 +2459,7 @@ final class Document: @unchecked Sendable {
                 
                 saveThumbnailRecord(tm, in: sheetRecorder,
                                     isPreparedWrite: isPreparedWrite)
-                baseThumbnailBlocks[sid] = try? Texture.block(fromImageData: tm.thumbnail4Data)
+                baseThumbnailBlocks[sid] = try? Texture.block(from: tm.thumbnail4Data)
             }
         }
         updateStringRecord(at: sid, with: sheetView,
@@ -2645,7 +2644,7 @@ final class Document: @unchecked Sendable {
             } else {
                 type = nil
             }
-            let tv = thumbnailNodeValues[shp] ?? .init(type: .none, sheetID: sid, node: nil, workItem: nil)
+            let tv = thumbnailNodeValues[shp] ?? .init(type: .none, sheetID: sid, node: nil)
             if tv.type != type {
                 set(type, in: tv, at: sid, shp)
             }
@@ -2668,49 +2667,38 @@ final class Document: @unchecked Sendable {
                 tv.workItem?.cancel()
                 tv.node?.removeFromParent()
                 thumbnailNodeValues[shp]?.node?.removeFromParent()
-                thumbnailNodeValues[shp] = .init(type: type, sheetID: sid, node: nil, workItem: nil)
+                thumbnailNodeValues[shp] = .init(type: type, sheetID: sid, node: nil)
             }
         }
     }
     func openThumbnail(at shp: Sheetpos, _ sid: SheetID, _ node: Node?,
                        _ type: ThumbnailType) {
         let node = node ?? emptyNode(at: shp)
-        guard type != .w4 else {
+        guard type != .w4, let thumbnailRecord = self.thumbnailRecord(at: sid, with: type) else {
             node.fillType = baseFillType(at: shp)
             thumbnailNodeValues[shp]?.node?.removeFromParent()
-            thumbnailNodeValues[shp] = .init(type: type, sheetID: sid, node: node, workItem: nil)
+            thumbnailNodeValues[shp] = .init(type: type, sheetID: sid, node: node)
             sheetsNode.append(child: node)
             return
         }
-        let thumbnailRecord = self.thumbnailRecord(at: sid, with: type)
-        var item: DispatchWorkItem!
-        item = DispatchWorkItem() { [weak thumbnailRecord, weak node] in
-            defer {
-                item = nil
-            }
-            guard !item.isCancelled else { return }
-            if let thumbnail = thumbnailRecord?.value,
-               let block = try? Texture.block(fromImage: thumbnail, isMipmapped: true) {
-                
-                DispatchQueue.main.async { [weak node] in
-                    if let thumbnailTexture = try? Texture(block: block) {
-                        node?.fillType = .texture(thumbnailTexture)
-                    }
-                }
-            } else {
-                guard let data = thumbnailRecord?.decodedData,
-                      let block = try? Texture.block(fromImageData: data, isMipmapped: true) else { return }
-                
-                DispatchQueue.main.async { [weak node] in
-                    if let thumbnailTexture = try? Texture(block: block) {
-                        node?.fillType = .texture(thumbnailTexture)
-                    }
+        
+        var workItem: DispatchWorkItem!
+        workItem = DispatchWorkItem() { [weak thumbnailRecord, weak node] in
+            defer { workItem = nil }
+            guard !workItem.isCancelled else { return }
+            
+            guard let thumbnailRecord,
+                  let block = try? Texture.block(from: thumbnailRecord, isMipmapped: true) else { return }
+            DispatchQueue.main.async { [weak node] in
+                if let thumbnailTexture = try? Texture(block: block) {
+                    node?.fillType = .texture(thumbnailTexture)
                 }
             }
         }
-        DispatchQueue.global().async(execute: item)
+        DispatchQueue.global().async(execute: workItem)
+        
         thumbnailNodeValues[shp]?.node?.removeFromParent()
-        thumbnailNodeValues[shp] = ThumbnailNodeValue(type: type, sheetID: sid, node: node, workItem: item)
+        thumbnailNodeValues[shp] = .init(type: type, sheetID: sid, node: node, workItem: workItem)
         sheetsNode.append(child: node)
     }
     
@@ -2742,7 +2730,7 @@ final class Document: @unchecked Sendable {
                     let tNode = Node(path: Path(ssFrame), fillType: .color(.disabled))
                     tNode.fillType = .texture(texture)
                     thumbnailNodeValues[shp]?.node?.removeFromParent()
-                    thumbnailNodeValues[shp] = .init(type: thumbnailType, sheetID: sid, node: tNode, workItem: nil)
+                    thumbnailNodeValues[shp] = .init(type: thumbnailType, sheetID: sid, node: tNode)
                     sheetsNode.append(child: tNode)
                 }
             } else if let tv = thumbnailNodeValues[shp] {
@@ -2778,7 +2766,7 @@ final class Document: @unchecked Sendable {
                             if let tm = tm {
                                 self?.saveThumbnailRecord(tm, in: sheetRecorder)
                                 self?.baseThumbnailBlocks[sid]
-                                = try? Texture.block(fromImageData: tm.thumbnail4Data)
+                                = try? Texture.block(from: tm.thumbnail4Data)
                             }
                         }
                     } else {
@@ -2823,7 +2811,7 @@ final class Document: @unchecked Sendable {
                 updateWithIsFullEdit(in: sheetView)
                 do {
                     guard let thumbnail = sheetRecorder.thumbnail1024Record.decodedValue else { throw ReadingError() }
-                    let block = try Texture.block(fromImage: thumbnail, isMipmapped: true)
+                    let block = try Texture.block(from: thumbnail, isMipmapped: true)
                     DispatchQueue.main.async {
                         sheetView.node.cacheTexture = try? .init(block: block)
                     }
