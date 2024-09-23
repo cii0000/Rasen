@@ -1338,13 +1338,11 @@ extension AVAudioPCMBuffer {
         let gain = Loudness.normalizePeakScale(data: doubleData,
                                                target: target)
         self *= Float(gain)
-        print("Peak Scale: \(gain) \(integratedLoudness) LUFS")
     }
     func normalizeLoudness(targetLoudness: Double) {
         let gain = Loudness.normalizeLoudnessScale(inputLoudness: integratedLoudness,
                                                    targetLoudness: targetLoudness)
         self *= Float(gain)
-        print("Loudness Scale: \(gain) \(integratedLoudness) LUFS")
     }
     
     static func *= (lhs: PCMBuffer, rhs: Float) {

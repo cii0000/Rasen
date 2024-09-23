@@ -259,7 +259,7 @@ extension O {
         case .bool(let a): return Int(a)
         case .int(let a): return a
         case .rational(let a): return a.isInteger ? Int(a) : nil
-        case .real1(let a): return a.isInteger ? Int(exactly: a) : nil
+        case .double(let a): return a.isInteger ? Int(exactly: a) : nil
         case .string(let a):
             switch a {//
             case "x": return 0
@@ -272,12 +272,12 @@ extension O {
         }
     }
     
-    var asReal1: Real1? {
+    var asDouble: Double? {
         switch self {
-        case .bool(let a): return Real1(a)
-        case .int(let a): return Real1(a)
-        case .rational(let a): return Real1(a)
-        case .real1(let a): return a
+        case .bool(let a): return Double(a)
+        case .int(let a): return Double(a)
+        case .rational(let a): return Double(a)
+        case .double(let a): return a
         default: return nil
         }
     }
@@ -285,7 +285,7 @@ extension O {
     var asPoint: Point? {
         switch self {
         case .array(let a):
-            if a.count == 2, let x = a[0].asReal1, let y = a[1].asReal1 {
+            if a.count == 2, let x = a[0].asDouble, let y = a[1].asDouble {
                 return Point(x, y)
             } else {
                 return nil
@@ -329,7 +329,7 @@ extension O {
             if a.count == 4,
                let string = a[O(O.stringName)]?.asTextBasedString,
                let orientation = a[O(O.orientationName)]?.asOrientation,
-               let size = a[O(O.sizeName)]?.asReal1,
+               let size = a[O(O.sizeName)]?.asDouble,
                let origin = a[O(O.originName)]?.asPoint {
                 
                 return Text(string: string, orientation: orientation,
@@ -346,8 +346,8 @@ extension O {
         case .dic(let a):
             if a.count == 3,
                let point = a[O(O.pointName)]?.asPoint,
-               let weight = a[O(O.weightName)]?.asReal1,
-               let pressure = a[O(O.pressureName)]?.asReal1 {
+               let weight = a[O(O.weightName)]?.asDouble,
+               let pressure = a[O(O.pressureName)]?.asDouble {
                 
                 return Line.Control(point: point,
                                     weight: weight,
@@ -414,7 +414,7 @@ extension O {
 
 extension O {
     static let piName = "π"
-    static let pi = O(Real1.pi)
+    static let pi = O(Double.pi)
     
     static let nilName = "nil"
     static let nilV = O(OArray([]))
@@ -443,8 +443,8 @@ extension O {
                     }
                 }
             case .int(let b): return O(Int.overPow(Int(a), b))
-            case .rational(let b): return O(Real1(a) ** Real1(b))
-            case .real1(let b): return O(Real1(a) ** b)
+            case .rational(let b): return O(Double(a) ** Double(b))
+            case .double(let b): return O(Double(a) ** b)
             case .error: return bo
             default: break
             }
@@ -455,8 +455,8 @@ extension O {
             switch bo {
             case .bool(let b): return O(Int.overPow(a, Int(b)))
             case .int(let b): return O(Int.overPow(a, b))
-            case .rational(let b): return O(Real1(a) ** Real1(b))
-            case .real1(let b): return O(Real1(a) ** b)
+            case .rational(let b): return O(Double(a) ** Double(b))
+            case .double(let b): return O(Double(a) ** b)
             case .error: return bo
             default: break
             }
@@ -467,20 +467,20 @@ extension O {
             switch bo {
             case .bool(let b): return O(Rational.overPow(a, Int(b)))
             case .int(let b): return O(Rational.overPow(a, b))
-            case .rational(let b): return O(Real1(a) ** Real1(b))
-            case .real1(let b): return O(Real1(a) ** b)
+            case .rational(let b): return O(Double(a) ** Double(b))
+            case .double(let b): return O(Double(a) ** b)
             case .error: return bo
             default: break
             }
-        case .real1(let a):
+        case .double(let a):
             if a < 0 {
                 return O(OError.undefined(with: "\(ao.name) \(powName) \(bo.name)"))//
             }
             switch bo {
-            case .bool(let b): return O(a ** Real1(b))
-            case .int(let b): return O(a ** Real1(b))
-            case .rational(let b): return O(a ** Real1(b))
-            case .real1(let b): return O(a ** b)
+            case .bool(let b): return O(a ** Double(b))
+            case .int(let b): return O(a ** Double(b))
+            case .rational(let b): return O(a ** Double(b))
+            case .double(let b): return O(a ** b)
             case .error: return bo
             default: break
             }
@@ -502,37 +502,37 @@ extension O {
         switch ao {
         case .bool(let a):
             switch bo {
-            case .bool(let b): return O(.apow(Real1(a), Real1(b)))
-            case .int(let b): return O(.apow(Real1(a), Real1(b)))
-            case .rational(let b): return O(.apow(Real1(a), Real1(b)))
-            case .real1(let b): return O(.apow(Real1(a), b))
+            case .bool(let b): return O(.apow(Double(a), Double(b)))
+            case .int(let b): return O(.apow(Double(a), Double(b)))
+            case .rational(let b): return O(.apow(Double(a), Double(b)))
+            case .double(let b): return O(.apow(Double(a), b))
             case .error: return bo
             default: break
             }
         case .int(let a):
             switch bo {
-            case .bool(let b): return O(.apow(Real1(a), Real1(b)))
-            case .int(let b): return O(.apow(Real1(a), Real1(b)))
-            case .rational(let b): return O(.apow(Real1(a), Real1(b)))
-            case .real1(let b): return O(.apow(Real1(a), b))
+            case .bool(let b): return O(.apow(Double(a), Double(b)))
+            case .int(let b): return O(.apow(Double(a), Double(b)))
+            case .rational(let b): return O(.apow(Double(a), Double(b)))
+            case .double(let b): return O(.apow(Double(a), b))
             case .error: return bo
             default: break
             }
         case .rational(let a):
             switch bo {
-            case .bool(let b): return O(.apow(Real1(a), Real1(b)))
-            case .int(let b): return O(.apow(Real1(a), Real1(b)))
-            case .rational(let b): return O(.apow(Real1(a), Real1(b)))
-            case .real1(let b): return O(.apow(Real1(a), b))
+            case .bool(let b): return O(.apow(Double(a), Double(b)))
+            case .int(let b): return O(.apow(Double(a), Double(b)))
+            case .rational(let b): return O(.apow(Double(a), Double(b)))
+            case .double(let b): return O(.apow(Double(a), b))
             case .error: return bo
             default: break
             }
-        case .real1(let a):
+        case .double(let a):
             switch bo {
-            case .bool(let b): return O(.apow(a, Real1(b)))
-            case .int(let b): return O(.apow(a, Real1(b)))
-            case .rational(let b): return O(.apow(a, Real1(b)))
-            case .real1(let b): return O(.apow(a, b))
+            case .bool(let b): return O(.apow(a, Double(b)))
+            case .int(let b): return O(.apow(a, Double(b)))
+            case .rational(let b): return O(.apow(a, Double(b)))
+            case .double(let b): return O(.apow(a, b))
             case .error: return bo
             default: break
             }
@@ -554,11 +554,11 @@ extension O {
             case .bool(let b): return O(a && b)
             case .int(let b): return O(Int.overMulti(Int(a), b))
             case .rational(let b): return O(Rational.overMulti(Rational(a), b))
-            case .real1(let b):
+            case .double(let b):
                 if b.isInfinite && !a {
                     return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
                 }
-                return O(Real1(a) * b)
+                return O(Double(a) * b)
             case .error: return bo
             default: break
             }
@@ -567,11 +567,11 @@ extension O {
             case .bool(let b): return O(Int.overMulti(a, Int(b)))
             case .int(let b): return O(Int.overMulti(a, b))
             case .rational(let b): return O(Rational.overMulti(Rational(a), b))
-            case .real1(let b):
+            case .double(let b):
                 if b.isInfinite && a == 0 {
                     return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
                 }
-                return O(Real1(a) * b)
+                return O(Double(a) * b)
             case .error: return bo
             default: break
             }
@@ -580,32 +580,32 @@ extension O {
             case .bool(let b): return O(Rational.overMulti(a, Rational(b)))
             case .int(let b): return O(Rational.overMulti(a, Rational(b)))
             case .rational(let b): return O(Rational.overMulti(a, b))
-            case .real1(let b):
+            case .double(let b):
                 if b.isInfinite && a == 0 {
                     return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
                 }
-                return O(Real1(a) * b)
+                return O(Double(a) * b)
             case .error: return bo
             default: break
             }
-        case .real1(let a):
+        case .double(let a):
             switch bo {
             case .bool(let b):
                 if a.isInfinite && !b {
                     return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
                 }
-                return O(a * Real1(b))
+                return O(a * Double(b))
             case .int(let b):
                 if a.isInfinite && b == 0 {
                     return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
                 }
-                return O(a * Real1(b))
+                return O(a * Double(b))
             case .rational(let b):
                 if a.isInfinite && b == 0 {
                     return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
                 }
-                return O(a * Real1(b))
-            case .real1(let b):
+                return O(a * Double(b))
+            case .double(let b):
                 if a.isInfinite || b.isInfinite {
                     if (a.isInfinite && b == 0) || (a == 0 && b.isInfinite) {
                         return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
@@ -618,7 +618,6 @@ extension O {
         case .array(let a):
             switch bo {
             case .array(let b):
-                print(a, b)
                 guard a.dimension == b.dimension else {
                     return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
                 }
@@ -682,7 +681,7 @@ extension O {
                     if b {
                         return O(true)
                     } else {
-                        return O(Real1.infinity)
+                        return O(Double.infinity)
                     }
                 } else {
                     if b {
@@ -693,13 +692,13 @@ extension O {
                 }
             case .int(let b):
                 return b == 0 ?
-                    O(Real1(a) / Real1(b)) :
+                    O(Double(a) / Double(b)) :
                     O(Rational(Int(a), b))
             case .rational(let b):
                 return b == 0 ?
-                    O(Real1(a) / Real1(b)) :
+                    O(Double(a) / Double(b)) :
                     O(Rational.overDiv(Rational(a), b))
-            case .real1(let b): return O(Real1(a) / b)
+            case .double(let b): return O(Double(a) / b)
             case .error: return bo
             default: break
             }
@@ -707,17 +706,17 @@ extension O {
             switch bo {
             case .bool(let b):
                 return !b ?
-                    O(Real1(a) / Real1(b)) :
+                    O(Double(a) / Double(b)) :
                     O(Rational(a, Int(b)))
             case .int(let b):
                 return b == 0 ?
-                    O(Real1(a) / Real1(b)) :
+                    O(Double(a) / Double(b)) :
                     O(Rational(a, b))
             case .rational(let b):
                 return b == 0 ?
-                    O(Real1(a) / Real1(b)) :
+                    O(Double(a) / Double(b)) :
                     O(Rational.overDiv(Rational(a), b))
-            case .real1(let b): return O(Real1(a) / b)
+            case .double(let b): return O(Double(a) / b)
             case .error: return bo
             default: break
             }
@@ -725,26 +724,26 @@ extension O {
             switch bo {
             case .bool(let b):
                 return !b ?
-                    O(Real1(a) / Real1(b)) :
+                    O(Double(a) / Double(b)) :
                     O(Rational.overDiv(a, Rational(b)))
             case .int(let b):
                 return b == 0 ?
-                    O(Real1(a) / Real1(b)) :
+                    O(Double(a) / Double(b)) :
                     O(Rational.overDiv(a, Rational(b)))
             case .rational(let b):
                 return b == 0 ?
-                    O(Real1(a) / Real1(b)) :
+                    O(Double(a) / Double(b)) :
                     O(Rational.overDiv(a, b))
-            case .real1(let b): return O(Real1(a) / b)
+            case .double(let b): return O(Double(a) / b)
             case .error: return bo
             default: break
             }
-        case .real1(let a):
+        case .double(let a):
             switch bo {
-            case .bool(let b): return O(a / Real1(b))
-            case .int(let b): return O(a / Real1(b))
-            case .rational(let b): return O(a / Real1(b))
-            case .real1(let b):
+            case .bool(let b): return O(a / Double(b))
+            case .int(let b): return O(a / Double(b))
+            case .rational(let b): return O(a / Double(b))
+            case .double(let b):
                 if a.isInfinite && b.isInfinite {
                     return O(OError.undefined(with: "\(ao.name) \(divisionName) \(bo.name)"))
                 }
@@ -789,7 +788,7 @@ extension O {
                 }
             case .int(let b): return O(Int.overMod(Int(a), b))
             case .rational(let b): return O(Rational.overMod(Rational(a), b))
-            case .real1(let b): return O(Real1(a).truncatingRemainder(dividingBy: b))
+            case .double(let b): return O(Double(a).truncatingRemainder(dividingBy: b))
             case .error: return bo
             default: break
             }
@@ -798,8 +797,8 @@ extension O {
             case .bool(let b): return O(Int.overMod(a, Int(b)))
             case .int(let b): return O(Int.overMod(a, b))
             case .rational(let b): return O(Rational.overMod(Rational(a), b))
-            case .real1(let b):
-                return O(Real1(a).truncatingRemainder(dividingBy: b))
+            case .double(let b):
+                return O(Double(a).truncatingRemainder(dividingBy: b))
             case .error: return bo
             default: break
             }
@@ -808,20 +807,20 @@ extension O {
             case .bool(let b): return O(Rational.overMod(a, Rational(b)))
             case .int(let b): return O(Rational.overMod(a, Rational(b)))
             case .rational(let b): return O(Rational.overMod(a, b))
-            case .real1(let b):
-                return O(Real1(a).truncatingRemainder(dividingBy: b))
+            case .double(let b):
+                return O(Double(a).truncatingRemainder(dividingBy: b))
             case .error: return bo
             default: break
             }
-        case .real1(let a):
+        case .double(let a):
             switch bo {
             case .bool(let b):
-                return O(a.truncatingRemainder(dividingBy: Real1(b)))
+                return O(a.truncatingRemainder(dividingBy: Double(b)))
             case .int(let b):
-                return O(a.truncatingRemainder(dividingBy: Real1(b)))
+                return O(a.truncatingRemainder(dividingBy: Double(b)))
             case .rational(let b):
-                return O(a.truncatingRemainder(dividingBy: Real1(b)))
-            case .real1(let b):
+                return O(a.truncatingRemainder(dividingBy: Double(b)))
+            case .double(let b):
                 if a.isInfinite && b.isInfinite {
                     return O(OError.undefined(with: "\(ao.name) \(moduloName) \(bo.name)"))
                 }
@@ -847,7 +846,7 @@ extension O {
             case .bool(let b): return O(a != b)
             case .int(let b): return O(Int.overAdd(Int(a), b))
             case .rational(let b): return O(Rational.overAdd(Rational(a), b))
-            case .real1(let b): return O(Real1(a) + b)
+            case .double(let b): return O(Double(a) + b)
             case .error: return bo
             default: break
             }
@@ -856,7 +855,7 @@ extension O {
             case .bool(let b): return O(Int.overAdd(a, Int(b)))
             case .int(let b): return O(Int.overAdd(a, b))
             case .rational(let b): return O(Rational.overAdd(Rational(a), b))
-            case .real1(let b): return O(Real1(a) + b)
+            case .double(let b): return O(Double(a) + b)
             case .error: return bo
             default: break
             }
@@ -865,16 +864,16 @@ extension O {
             case .bool(let b): return O(Rational.overAdd(a, Rational(b)))
             case .int(let b): return O(Rational.overAdd(a, Rational(b)))
             case .rational(let b): return O(Rational.overAdd(a, b))
-            case .real1(let b): return O(Real1(a) + b)
+            case .double(let b): return O(Double(a) + b)
             case .error: return bo
             default: break
             }
-        case .real1(let a):
+        case .double(let a):
             switch bo {
-            case .bool(let b): return O(a + Real1(b))
-            case .int(let b): return O(a + Real1(b))
-            case .rational(let b): return O(a + Real1(b))
-            case .real1(let b):
+            case .bool(let b): return O(a + Double(b))
+            case .int(let b): return O(a + Double(b))
+            case .rational(let b): return O(a + Double(b))
+            case .double(let b):
                 if a.isInfinite && b.isInfinite {
                     if (a < 0 && b > 0) || (a > 0 && b < 0) {
                         return O(OError.undefined(with: "\(ao.name) \(additionName) \(bo.name)"))
@@ -961,7 +960,7 @@ extension O {
                 }
             case .int(let b): return O(Int.overDiff(Int(a), b))
             case .rational(let b): return O(Rational.overDiff(Rational(a), b))
-            case .real1(let b): return O(Real1(a) - b)
+            case .double(let b): return O(Double(a) - b)
             case .error: return bo
             default: break
             }
@@ -970,7 +969,7 @@ extension O {
             case .bool(let b): return O(Int.overDiff(a, Int(b)))
             case .int(let b): return O(Int.overDiff(a, b))
             case .rational(let b): return O(Rational.overDiff(Rational(a), b))
-            case .real1(let b): return O(Real1(a) - b)
+            case .double(let b): return O(Double(a) - b)
             case .error: return bo
             default: break
             }
@@ -979,16 +978,16 @@ extension O {
             case .bool(let b): return O(Rational.overDiff(a, Rational(b)))
             case .int(let b): return O(Rational.overDiff(a, Rational(b)))
             case .rational(let b): return O(Rational.overDiff(a, b))
-            case .real1(let b): return O(Real1(a) - b)
+            case .double(let b): return O(Double(a) - b)
             case .error: return bo
             default: break
             }
-        case .real1(let a):
+        case .double(let a):
             switch bo {
-            case .bool(let b): return O(a - Real1(b))
-            case .int(let b): return O(a - Real1(b))
-            case .rational(let b): return O(a - Real1(b))
-            case .real1(let b):
+            case .bool(let b): return O(a - Double(b))
+            case .int(let b): return O(a - Double(b))
+            case .rational(let b): return O(a - Double(b))
+            case .double(let b):
                 if a.isInfinite && b.isInfinite {
                     if (a > 0 && b > 0) || (a < 0 && b < 0) {
                         return O(OError.undefined(with: "\(ao.name) \(subtractionName) \(bo.name)"))
@@ -1103,7 +1102,7 @@ extension O: Equatable {
             case .bool(let b): return a == b
             case .int(let b): return Int(a) == b
             case .rational(let b): return Rational(a) == b
-            case .real1(let b): return Real1(a) == b
+            case .double(let b): return Double(a) == b
             default: return false
             }
         case .int(let a):
@@ -1111,7 +1110,7 @@ extension O: Equatable {
             case .bool(let b): return a == Int(b)
             case .int(let b): return a == b
             case .rational(let b): return Rational(a) == b
-            case .real1(let b): return Real1(a) == b
+            case .double(let b): return Double(a) == b
             default: return false
             }
         case .rational(let a):
@@ -1119,15 +1118,15 @@ extension O: Equatable {
             case .bool(let b): return a == Rational(b)
             case .int(let b): return a == Rational(b)
             case .rational(let b): return a == b
-            case .real1(let b): return Real1(a) == b
+            case .double(let b): return Double(a) == b
             default: return false
             }
-        case .real1(let a):
+        case .double(let a):
             switch rhs {
-            case .bool(let b): return a == Real1(b)
-            case .int(let b): return a == Real1(b)
-            case .rational(let b): return a == Real1(b)
-            case .real1(let b): return a == b
+            case .bool(let b): return a == Double(b)
+            case .int(let b): return a == Double(b)
+            case .rational(let b): return a == Double(b)
+            case .double(let b): return a == b
             default: return false
             }
         case .array(let a):
@@ -1227,7 +1226,7 @@ extension O: Comparable {
             switch rhs {
             case .int(let b): return Int(a) < b
             case .rational(let b): return Rational(a) < b
-            case .real1(let b): return Real1(a) < b
+            case .double(let b): return Double(a) < b
             default: return nil
             }
         case .int(let a):
@@ -1235,7 +1234,7 @@ extension O: Comparable {
             case .bool(let b): return a < Int(b)
             case .int(let b): return a < b
             case .rational(let b): return Rational(a) < b
-            case .real1(let b): return Real1(a) < b
+            case .double(let b): return Double(a) < b
             default: return nil
             }
         case .rational(let a):
@@ -1243,15 +1242,15 @@ extension O: Comparable {
             case .bool(let b): return a < Rational(b)
             case .int(let b): return a < Rational(b)
             case .rational(let b): return a < b
-            case .real1(let b): return Real1(a) < b
+            case .double(let b): return Double(a) < b
             default: return nil
             }
-        case .real1(let a):
+        case .double(let a):
             switch rhs {
-            case .bool(let b): return a < Real1(b)
-            case .int(let b): return a < Real1(b)
-            case .rational(let b): return a < Real1(b)
-            case .real1(let b): return a < b
+            case .bool(let b): return a < Double(b)
+            case .int(let b): return a < Double(b)
+            case .rational(let b): return a < Double(b)
+            case .double(let b): return a < b
             default: return nil
             }
         case .string:
@@ -1349,10 +1348,10 @@ extension O: Comparable {
 extension O: Hashable {
     func hash(into hasher: inout Hasher) {
         switch self {
-        case .bool(let a): hasher.combine(Real1(a))
-        case .int(let a): hasher.combine(Real1(a))
-        case .rational(let a): hasher.combine(Real1(a))
-        case .real1(let a): hasher.combine(a)
+        case .bool(let a): hasher.combine(Double(a))
+        case .int(let a): hasher.combine(Double(a))
+        case .rational(let a): hasher.combine(Double(a))
+        case .double(let a): hasher.combine(a)
         case .array(let a): hasher.combine(a)
         case .range(let a): hasher.combine(a)
         case .dic(let a): hasher.combine(a)
@@ -1378,7 +1377,7 @@ extension O {
             return O(Int.overDiff(1, a))
         case .rational(let a):
             return O(Rational.overDiff(1, a))
-        case .real1(let a):
+        case .double(let a):
             return O(1 - a)
         case .array(let a):
             var n = [O]()
@@ -1424,7 +1423,7 @@ extension O {
         case .bool: return self
         case .int: return self
         case .rational(let a): return O(a.rounded(rule))
-        case .real1(let a): return O(a.rounded(rule))
+        case .double(let a): return O(a.rounded(rule))
         case .array(let a): return O(a.rounded(rule))
         case .range(let a): return O(a.rounded(rule))
         case .dic(let a): return O(a.rounded(rule))
@@ -1460,7 +1459,7 @@ extension O {
         case .bool(let a): return O(a)
         case .int(let a): return O(abs(a))
         case .rational(let a): return O(abs(a))
-        case .real1(let a): return O(abs(a))
+        case .double(let a): return O(abs(a))
         case .array(let a):
             var n = O(0)
             for e in a {
@@ -1495,13 +1494,13 @@ extension O {
             if a < 0 {
                 return O(OError.undefined(with: "\(O.sqrtName) \(name)"))
             }
-            return O(Real1(a).squareRoot())
+            return O(Double(a).squareRoot())
         case .rational(let a):
             if a < 0 {
                 return O(OError.undefined(with: "\(O.sqrtName) \(name)"))
             }
-            return O(Real1(a).squareRoot())
-        case .real1(let a):
+            return O(Double(a).squareRoot())
+        case .double(let a):
             if a < 0 {
                 return O(OError.undefined(with: "\(O.sqrtName) \(name)"))
             }
@@ -1514,10 +1513,10 @@ extension O {
     static let sinName = "sin"
     var sin: O {
         switch self {
-        case .bool(let a): return O(.sin(Real1(a)))
-        case .int(let a): return O(.sin(Real1(a)))
-        case .rational(let a): return O(.sin(Real1(a)))
-        case .real1(let a):
+        case .bool(let a): return O(.sin(Double(a)))
+        case .int(let a): return O(.sin(Double(a)))
+        case .rational(let a): return O(.sin(Double(a)))
+        case .double(let a):
             if a.isInfinite {
                 return O(OError.undefined(with: "\(O.sinName) \(name)"))
             }
@@ -1529,10 +1528,10 @@ extension O {
     static let cosName = "cos"
     var cos: O {
         switch self {
-        case .bool(let a): return O(.cos(Real1(a)))
-        case .int(let a): return O(.cos(Real1(a)))
-        case .rational(let a): return O(.cos(Real1(a)))
-        case .real1(let a):
+        case .bool(let a): return O(.cos(Double(a)))
+        case .int(let a): return O(.cos(Double(a)))
+        case .rational(let a): return O(.cos(Double(a)))
+        case .double(let a):
             if a.isInfinite {
                 return O(OError.undefined(with: "\(O.cosName) \(name)"))
             }
@@ -1544,10 +1543,10 @@ extension O {
     static let tanName = "tan"
     var tan: O {
         switch self {
-        case .bool(let a): return O(.tan(Real1(a)))
-        case .int(let a): return O(.tan(Real1(a)))
-        case .rational(let a): return O(.tan(Real1(a)))
-        case .real1(let a):
+        case .bool(let a): return O(.tan(Double(a)))
+        case .int(let a): return O(.tan(Double(a)))
+        case .rational(let a): return O(.tan(Double(a)))
+        case .double(let a):
             if a.isInfinite {
                 return O(OError.undefined(with: "\(O.tanName) \(name)"))
             }
@@ -1559,18 +1558,18 @@ extension O {
     static let asinName = "asin"
     var asin: O {
         switch self {
-        case .bool(let a): return O(.asin(Real1(a)))
+        case .bool(let a): return O(.asin(Double(a)))
         case .int(let a):
             if a < -1 || a > 1 {
                 return O(OError.undefined(with: "\(O.asinName) \(name)"))
             }
-            return O(.asin(Real1(a)))
+            return O(.asin(Double(a)))
         case .rational(let a):
             if a < -1 || a > 1 {
                 return O(OError.undefined(with: "\(O.asinName) \(name)"))
             }
-            return O(.asin(Real1(a)))
-        case .real1(let a):
+            return O(.asin(Double(a)))
+        case .double(let a):
             if a < -1 || a > 1 {
                 return O(OError.undefined(with: "\(O.asinName) \(name)"))
             }
@@ -1582,18 +1581,18 @@ extension O {
     static let acosName = "acos"
     var acos: O {
         switch self {
-        case .bool(let a): return O(.acos(Real1(a)))
+        case .bool(let a): return O(.acos(Double(a)))
         case .int(let a):
             if a < -1 || a > 1 {
                 return O(OError.undefined(with: "\(O.acosName) \(name)"))
             }
-            return O(.acos(Real1(a)))
+            return O(.acos(Double(a)))
         case .rational(let a):
             if a < -1 || a > 1 {
                 return O(OError.undefined(with: "\(O.acosName) \(name)"))
             }
-            return O(.acos(Real1(a)))
-        case .real1(let a):
+            return O(.acos(Double(a)))
+        case .double(let a):
             if a < -1 || a > 1 {
                 return O(OError.undefined(with: "\(O.acosName) \(name)"))
             }
@@ -1605,10 +1604,10 @@ extension O {
     static let atanName = "atan"
     var atan: O {
         switch self {
-        case .bool(let a): return O(.atan(Real1(a)))
-        case .int(let a): return O(.atan(Real1(a)))
-        case .rational(let a): return O(.atan(Real1(a)))
-        case .real1(let a): return O(.atan(a))
+        case .bool(let a): return O(.atan(Double(a)))
+        case .int(let a): return O(.atan(Double(a)))
+        case .rational(let a): return O(.atan(Double(a)))
+        case .double(let a): return O(.atan(a))
         case .error: return self
         default: return O(OError.undefined(with: "\(O.atanName) \(name)"))
         }
@@ -1633,7 +1632,7 @@ extension O {
         case .bool(let a): return O(a)
         case .int(let a): return O(-a)
         case .rational(let a): return O(-a)
-        case .real1(let a): return O(-a)
+        case .double(let a): return O(-a)
         case .array(let a):
             var n = [O]()
             n.reserveCapacity(a.count)

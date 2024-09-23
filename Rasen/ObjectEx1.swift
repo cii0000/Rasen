@@ -52,22 +52,22 @@ extension O {
         default: count
         }
     }
-    var endReal: Real1 {
+    var endReal: Double {
         switch self {
         case .range(let a):
             switch a.type {
-            case .fili(_, let l): l.asReal1 ?? 0
-            case .filo(_, let l): l.asReal1 ?? 0
-            case .foli(_, let l): l.asReal1 ?? 0
-            case .folo(_, let l): l.asReal1 ?? 0
+            case .fili(_, let l): l.asDouble ?? 0
+            case .filo(_, let l): l.asDouble ?? 0
+            case .foli(_, let l): l.asDouble ?? 0
+            case .folo(_, let l): l.asDouble ?? 0
             case .fi: 0
             case .fo: 0
-            case .li(let l): l.asReal1 ?? 0
-            case .lo(let l): l.asReal1 ?? 0
+            case .li(let l): l.asDouble ?? 0
+            case .lo(let l): l.asDouble ?? 0
             case .all: 0
             }
-        case .array(let a): Real1(a.endIndex)
-        default: Real1(count)
+        case .array(let a): Double(a.endIndex)
+        default: Double(count)
         }
     }
     var count: Int {
@@ -75,7 +75,7 @@ extension O {
         case .bool(_): return 1
         case .int(_): return 1
         case .rational(_): return 1
-        case .real1(_): return 1
+        case .double(_): return 1
         case .string(let a): return a.count
         case .range(let a):
             let dlo = a.delta
@@ -86,7 +86,7 @@ extension O {
                 switch dlo {
                 case .int(let a): return a == 0 ? 0 : d / a
                 case .rational(let a): return Int(a == 0 ? 0 : Rational(d) / a)
-                case .real1(let a): return Int(a == 0 ? 0 : Real1(d) / a)
+                case .double(let a): return Int(a == 0 ? 0 : Double(d) / a)
                 default: return 0
                 }
             }
@@ -115,9 +115,9 @@ extension O {
     
     struct Elements: Sequence, IteratorProtocol {
         private let o: O
-        let underestimatedCount: Int, endIndex: Int, endV: Real1
+        let underestimatedCount: Int, endIndex: Int, endV: Double
         
-        private var i = 0, realI = 0.0, delta = 1, realDelta: Real1?
+        private var i = 0, realI = 0.0, delta = 1, realDelta: Double?
         private var containsLast = true
         mutating func next() -> O? {
             if let realDelta = realDelta {
@@ -146,27 +146,27 @@ extension O {
                 switch a.type {
                 case .fili(let f, let l):
                     i = f.asInt ?? 0
-                    realI = f.asReal1 ?? 0
+                    realI = f.asDouble ?? 0
                     endIndex = l.rounded(.down).asInt ?? 0
-                    endV = l.asReal1 ?? 0
+                    endV = l.asDouble ?? 0
                     containsLast = true
                 case .filo(let f, let l):
                     i = f.asInt ?? 0
-                    realI = f.asReal1 ?? 0
+                    realI = f.asDouble ?? 0
                     endIndex = l.rounded(.up).asInt ?? 0
-                    endV = l.asReal1 ?? 0
+                    endV = l.asDouble ?? 0
                     containsLast = false
                 case .foli(let f, let l):
                     i = f.asInt ?? 0
-                    realI = f.asReal1 ?? 0
+                    realI = f.asDouble ?? 0
                     endIndex = l.rounded(.down).asInt ?? 0
-                    endV = l.asReal1 ?? 0
+                    endV = l.asDouble ?? 0
                     containsLast = true
                 case .folo(let f, let l):
                     i = f.asInt ?? 0
-                    realI = f.asReal1 ?? 0
+                    realI = f.asDouble ?? 0
                     endIndex = l.rounded(.up).asInt ?? 0
-                    endV = l.asReal1 ?? 0
+                    endV = l.asDouble ?? 0
                     containsLast = false
                 default:
                     endIndex = 0
@@ -185,7 +185,7 @@ extension O {
                             = (s == 0 && !containsLast ? -1 : 0)
                             + (Int(exactly: (endV - realI) / Double(delta)) ?? 0)
                     }
-                case .real1(let a):
+                case .double(let a):
                     realDelta = a
                     let s = (endV - realI).truncatingRemainder(dividingBy: a)
                     underestimatedCount
@@ -467,7 +467,7 @@ extension O {
                                     break iosLoop
                                 }
                             case "weight":
-                                if let weight = bo.asReal1 {
+                                if let weight = bo.asDouble {
                                     var line = ss.value.picture.lines[li]
                                     line.controls[lci].weight = weight
                                     ss.replace([IndexValue(value: line, index: li)])
@@ -479,7 +479,7 @@ extension O {
                                     break iosLoop
                                 }
                             case "pressure":
-                                if let pressure = bo.asReal1 {
+                                if let pressure = bo.asDouble {
                                     var line = ss.value.picture.lines[li]
                                     line.controls[lci].pressure = pressure
                                     ss.replace([IndexValue(value: line, index: li)])
@@ -499,7 +499,7 @@ extension O {
                             
                             switch lccpi {
                             case 0:
-                                if let v = bo.asReal1 {
+                                if let v = bo.asDouble {
                                     var line = ss.value.picture.lines[li]
                                     line.controls[lci].point.x = v
                                     ss.replace([IndexValue(value: line, index: li)])
@@ -511,7 +511,7 @@ extension O {
                                     break iosLoop
                                 }
                             case 1:
-                                if let v = bo.asReal1 {
+                                if let v = bo.asDouble {
                                     var line = ss.value.picture.lines[li]
                                     line.controls[lci].point.y = v
                                     ss.replace([IndexValue(value: line, index: li)])
@@ -569,7 +569,7 @@ extension O {
                                     return O(OError(String(format: "'%1$d' is not '%2$d'".localized, bo.name, "Orientation".localized)))
                                 }
                             case O("size"):
-                                if let size = bo.asReal1 {
+                                if let size = bo.asDouble {
                                     var text = ss.value.texts[ti]
                                     text.size = size
                                     ss.replace([IndexValue(value: text, index: ti)])
@@ -618,7 +618,7 @@ extension O {
                             
                             switch ttoi {
                             case 0:
-                                if let v = bo.asReal1 {
+                                if let v = bo.asDouble {
                                     var text = ss.value.texts[ti]
                                     text.origin.x = v
                                     ss.replace([IndexValue(value: text, index: ti)])
@@ -630,7 +630,7 @@ extension O {
                                     break iosLoop
                                 }
                             case 1:
-                                if let v = bo.asReal1 {
+                                if let v = bo.asDouble {
                                     var text = ss.value.texts[ti]
                                     text.origin.y = v
                                     ss.replace([IndexValue(value: text, index: ti)])
@@ -983,7 +983,7 @@ extension O {
         case .bool: return O(true)
         case .int(let a): return O(a == 0 || a == 1)
         case .rational(let a): return O(a == 0 || a == 1)
-        case .real1(let a): return O(a == 0 || a == 1)
+        case .double(let a): return O(a == 0 || a == 1)
         default: return O(false)
         }
     }
@@ -1012,7 +1012,7 @@ extension O {
         case .bool: return true
         case .int: return true
         case .rational(let a): return a.isInteger
-        case .real1(let a): return a.isInteger
+        case .double(let a): return a.isInteger
         default: return false
         }
     }
@@ -1021,7 +1021,7 @@ extension O {
         case .bool: return O(true)
         case .int: return O(true)
         case .rational(let a): return O(a.isInteger)
-        case .real1(let a): return O(a.isInteger)
+        case .double(let a): return O(a.isInteger)
         case .error: return self
         default: return O(false)
         }
@@ -1031,17 +1031,17 @@ extension O {
         case .bool: return O(true)
         case .int: return O(true)
         case .rational: return O(true)
-        case .real1: return O(true)
+        case .double: return O(true)
         case .error: return self
         default: return O(false)
         }
     }
-    var isReal1: O {
+    var isDouble: O {
         switch self {
         case .bool: return O(true)
         case .int: return O(true)
         case .rational: return O(true)
-        case .real1: return O(true)
+        case .double: return O(true)
         case .error: return self
         default: return O(false)
         }
@@ -1136,7 +1136,7 @@ extension O {
             case .n1: return ao.isNatural1
             case .z: return ao.isIntO
             case .q: return ao.isRational
-            case .r: return ao.isReal1
+            case .r: return ao.isDouble
             case .f: return ao.isF
             case .string: return ao.isString
             case .array: return ao.isArray
@@ -1370,7 +1370,7 @@ extension O {
         case `in`, out
     }
     private static func random(in range: ClosedRange<Int>, _ inOut: InOut,
-                               delta: Real1, _ o: O) -> O {
+                               delta: Double, _ o: O) -> O {
         if delta == 1 {
             let f = inOut == .out ?
                 range.lowerBound + 1 : range.lowerBound
@@ -1379,15 +1379,15 @@ extension O {
             return O(Int.random(in: f ... l))
         } else {
             let f = inOut == .out ?
-                (Real1(range.lowerBound) + (delta > 0 ? delta : .ulpOfOne)) :
-                Real1(range.lowerBound)
-            let l = Real1(range.upperBound)
+                (Double(range.lowerBound) + (delta > 0 ? delta : .ulpOfOne)) :
+                Double(range.lowerBound)
+            let l = Double(range.upperBound)
             guard f <= l else { return rangeError(O(f), "<=", O(l)) }
             guard !f.isInfinite && !l.isInfinite else { return O(OError.undefined(with: "\(o.name) \(randomName)")) }
             if delta == 0 {
-                return O(Real1.random(in: f ... l))
+                return O(Double.random(in: f ... l))
             } else if delta > 0 {
-                let v = Real1.random(in: f ... l)
+                let v = Double.random(in: f ... l)
                 return O((v - f).interval(scale: delta) + f)
             } else {
                 fatalError()
@@ -1395,31 +1395,31 @@ extension O {
         }
     }
     private static func random(in range: ClosedRange<Rational>, _ inOut: InOut,
-                               delta: Real1, _ o: O) -> O {
+                               delta: Double, _ o: O) -> O {
         let f = inOut == .out ?
-            (Real1(range.lowerBound) + (delta > 0 ? delta : .ulpOfOne)) :
-            Real1(range.lowerBound)
-        let l = Real1(range.upperBound)
+            (Double(range.lowerBound) + (delta > 0 ? delta : .ulpOfOne)) :
+            Double(range.lowerBound)
+        let l = Double(range.upperBound)
         guard f <= l else { return rangeError(O(f), "<=", O(l)) }
         guard !f.isInfinite && !l.isInfinite else { return O(OError.undefined(with: "\(o.name) \(randomName)")) }
         if delta == 0 {
-            return O(Real1.random(in: f ... l))
+            return O(Double.random(in: f ... l))
         } else if delta > 0 {
-            let v = Real1.random(in: f ... l)
+            let v = Double.random(in: f ... l)
             return O((v - f).interval(scale: delta) + f)
         } else {
             fatalError()
         }
     }
-    private static func random(in range: ClosedRange<Real1>, _ inOut: InOut,
-                               delta: Real1, _ o: O) -> O {
+    private static func random(in range: ClosedRange<Double>, _ inOut: InOut,
+                               delta: Double, _ o: O) -> O {
         let f = inOut == .out ?
             (range.lowerBound + (delta > 0 ? delta : .ulpOfOne)) :
             range.lowerBound
         let l = range.upperBound
         guard f <= l else { return rangeError(O(f), "<=", O(l)) }
         guard !f.isInfinite && !l.isInfinite else { return O(OError.undefined(with: "\(o.name) \(randomName)")) }
-        let v = Real1.random(in: f ... l)
+        let v = Double.random(in: f ... l)
         if delta == 0 {
             return O(v)
         } else if delta > 0 {
@@ -1430,7 +1430,7 @@ extension O {
         }
     }
     private static func random(in range: Range<Int>, _ inOut: InOut,
-                               delta: Real1, _ o: O) -> O {
+                               delta: Double, _ o: O) -> O {
         if delta == 1 {
             let f = inOut == .out ?
                 range.lowerBound + 1 : range.lowerBound
@@ -1439,15 +1439,15 @@ extension O {
             return O(Int.random(in: f ..< l))
         } else {
             let f = inOut == .out ?
-                (Real1(range.lowerBound) + (delta > 0 ? delta : .ulpOfOne)) :
-                Real1(range.lowerBound)
-            let l = Real1(range.upperBound)
+                (Double(range.lowerBound) + (delta > 0 ? delta : .ulpOfOne)) :
+                Double(range.lowerBound)
+            let l = Double(range.upperBound)
             guard f < l else { return rangeError(O(f), "<", O(l)) }
             guard !f.isInfinite && !l.isInfinite else { return O(OError.undefined(with: "\(o.name) \(randomName)")) }
             if delta == 0 {
-                return O(Real1.random(in: f ..< l))
+                return O(Double.random(in: f ..< l))
             } else if delta > 0 {
-                let v = Real1.random(in: f ..< l)
+                let v = Double.random(in: f ..< l)
                 return O((v - f).interval(scale: delta) + f)
             } else {
                 fatalError()
@@ -1455,31 +1455,31 @@ extension O {
         }
     }
     private static func random(in range: Range<Rational>, _ inOut: InOut,
-                               delta: Real1, _ o: O) -> O {
+                               delta: Double, _ o: O) -> O {
         let f = inOut == .out ?
-            (Real1(range.lowerBound) + (delta > 0 ? delta : .ulpOfOne)) :
-            Real1(range.lowerBound)
-        let l = Real1(range.upperBound)
+            (Double(range.lowerBound) + (delta > 0 ? delta : .ulpOfOne)) :
+            Double(range.lowerBound)
+        let l = Double(range.upperBound)
         guard f < l else { return rangeError(O(f), "<", O(l)) }
         guard !f.isInfinite && !l.isInfinite else { return O(OError.undefined(with: "\(o.name) \(randomName)")) }
         if delta == 0 {
-            return O(Real1.random(in: f ..< l))
+            return O(Double.random(in: f ..< l))
         } else if delta > 0 {
-            let v = Real1.random(in: f ..< l)
+            let v = Double.random(in: f ..< l)
             return O((v - f).interval(scale: delta) + f)
         } else {
             fatalError()
         }
     }
-    private static func random(in range: Range<Real1>, _ inOut: InOut,
-                               delta: Real1, _ o: O) -> O {
+    private static func random(in range: Range<Double>, _ inOut: InOut,
+                               delta: Double, _ o: O) -> O {
         let f = inOut == .out ?
             (range.lowerBound + (delta > 0 ? delta : .ulpOfOne)) :
             range.lowerBound
         let l = range.upperBound
         guard f < l else { return rangeError(O(f), "<", O(l)) }
         guard !f.isInfinite && !l.isInfinite else { return O(OError.undefined(with: "\(o.name) \(randomName)")) }
-        let v = Real1.random(in: f ..< l)
+        let v = Double.random(in: f ..< l)
         if delta == 0 {
             return O(v)
         } else if delta > 0 {
@@ -1493,7 +1493,7 @@ extension O {
     var random: O {
         switch self {
         case .range(let range):
-            let d = range.delta.asReal1 ?? 0
+            let d = range.delta.asDouble ?? 0
             switch range.type {
             case .fili(let ao, let bo):
                 switch ao {
@@ -1505,8 +1505,8 @@ extension O {
                         return .random(in: Int(a) ... b, .in, delta: d, self)
                     case .rational(let b):
                         return .random(in: Rational(a) ... b, .in, delta: d, self)
-                    case .real1(let b):
-                        return .random(in: Real1(a) ... b, .in, delta: d, self)
+                    case .double(let b):
+                        return .random(in: Double(a) ... b, .in, delta: d, self)
                     default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
                     }
                 case .int(let a):
@@ -1517,8 +1517,8 @@ extension O {
                         return .random(in: a ... b, .in, delta: d, self)
                     case .rational(let b):
                         return .random(in: Rational(a) ... b, .in, delta: d, self)
-                    case .real1(let b):
-                        return .random(in: Real1(a) ... b, .in, delta: d, self)
+                    case .double(let b):
+                        return .random(in: Double(a) ... b, .in, delta: d, self)
                     default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
                     }
                 case .rational(let a):
@@ -1529,19 +1529,19 @@ extension O {
                         return .random(in: a ... Rational(b), .in, delta: d, self)
                     case .rational(let b):
                         return .random(in: a ... b, .in, delta: d, self)
-                    case .real1(let b):
-                        return .random(in: Real1(a) ... b, .in, delta: d, self)
+                    case .double(let b):
+                        return .random(in: Double(a) ... b, .in, delta: d, self)
                     default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
                     }
-                case .real1(let a):
+                case .double(let a):
                     switch bo {
                     case .bool(let b):
-                        return .random(in: a ... Real1(b), .in, delta: d, self)
+                        return .random(in: a ... Double(b), .in, delta: d, self)
                     case .int(let b):
-                        return .random(in: a ... Real1(b), .in, delta: d, self)
+                        return .random(in: a ... Double(b), .in, delta: d, self)
                     case .rational(let b):
-                        return .random(in: a ... Real1(b), .in, delta: d, self)
-                    case .real1(let b):
+                        return .random(in: a ... Double(b), .in, delta: d, self)
+                    case .double(let b):
                         return .random(in: a ... b, .in, delta: d, self)
                     default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
                     }
@@ -1556,8 +1556,8 @@ extension O {
                         return .random(in: Int(a) ..< b, .in, delta: d, self)
                     case .rational(let b):
                         return .random(in: Rational(a) ..< b, .in, delta: d, self)
-                    case .real1(let b):
-                        return .random(in: Real1(a) ..< b, .in, delta: d, self)
+                    case .double(let b):
+                        return .random(in: Double(a) ..< b, .in, delta: d, self)
                     default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
                     }
                 case .int(let a):
@@ -1568,8 +1568,8 @@ extension O {
                         return .random(in: a ..< b, .in, delta: d, self)
                     case .rational(let b):
                         return .random(in: Rational(a) ..< b, .in, delta: d, self)
-                    case .real1(let b):
-                        return .random(in: Real1(a) ..< b, .in, delta: d, self)
+                    case .double(let b):
+                        return .random(in: Double(a) ..< b, .in, delta: d, self)
                     default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
                     }
                 case .rational(let a):
@@ -1580,19 +1580,19 @@ extension O {
                         return .random(in: a ..< Rational(b), .in, delta: d, self)
                     case .rational(let b):
                         return .random(in: a ..< b, .in, delta: d, self)
-                    case .real1(let b):
-                        return .random(in: Real1(a) ..< b, .in, delta: d, self)
+                    case .double(let b):
+                        return .random(in: Double(a) ..< b, .in, delta: d, self)
                     default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
                     }
-                case .real1(let a):
+                case .double(let a):
                     switch bo {
                     case .bool(let b):
-                        return .random(in: a ..< Real1(b), .in, delta: d, self)
+                        return .random(in: a ..< Double(b), .in, delta: d, self)
                     case .int(let b):
-                        return .random(in: a ..< Real1(b), .in, delta: d, self)
+                        return .random(in: a ..< Double(b), .in, delta: d, self)
                     case .rational(let b):
-                        return .random(in: a ..< Real1(b), .in, delta: d, self)
-                    case .real1(let b):
+                        return .random(in: a ..< Double(b), .in, delta: d, self)
+                    case .double(let b):
                         return .random(in: a ..< b, .in, delta: d, self)
                     default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
                     }
@@ -1607,8 +1607,8 @@ extension O {
                         return .random(in: Int(a) ... b, .out, delta: d, self)
                     case .rational(let b):
                         return .random(in: Rational(a) ... b, .out, delta: d, self)
-                    case .real1(let b):
-                        return .random(in: Real1(a) ... b, .out, delta: d, self)
+                    case .double(let b):
+                        return .random(in: Double(a) ... b, .out, delta: d, self)
                     default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
                     }
                 case .int(let a):
@@ -1619,8 +1619,8 @@ extension O {
                         return .random(in: a ... b, .out, delta: d, self)
                     case .rational(let b):
                         return .random(in: Rational(a) ... b, .out, delta: d, self)
-                    case .real1(let b):
-                        return .random(in: Real1(a) ... b, .out, delta: d, self)
+                    case .double(let b):
+                        return .random(in: Double(a) ... b, .out, delta: d, self)
                     default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
                     }
                 case .rational(let a):
@@ -1631,19 +1631,19 @@ extension O {
                         return .random(in: a ... Rational(b), .out, delta: d, self)
                     case .rational(let b):
                         return .random(in: a ... b, .out, delta: d, self)
-                    case .real1(let b):
-                        return .random(in: Real1(a) ... b, .out, delta: d, self)
+                    case .double(let b):
+                        return .random(in: Double(a) ... b, .out, delta: d, self)
                     default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
                     }
-                case .real1(let a):
+                case .double(let a):
                     switch bo {
                     case .bool(let b):
-                        return .random(in: a ... Real1(b), .out, delta: d, self)
+                        return .random(in: a ... Double(b), .out, delta: d, self)
                     case .int(let b):
-                        return .random(in: a ... Real1(b), .out, delta: d, self)
+                        return .random(in: a ... Double(b), .out, delta: d, self)
                     case .rational(let b):
-                        return .random(in: a ... Real1(b), .out, delta: d, self)
-                    case .real1(let b):
+                        return .random(in: a ... Double(b), .out, delta: d, self)
+                    case .double(let b):
                         return .random(in: a ... b, .out, delta: d, self)
                     default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
                     }
@@ -1658,8 +1658,8 @@ extension O {
                         return .random(in: Int(a) ..< b, .out, delta: d, self)
                     case .rational(let b):
                         return .random(in: Rational(a) ..< b, .out, delta: d, self)
-                    case .real1(let b):
-                        return .random(in: Real1(a) ..< b, .out, delta: d, self)
+                    case .double(let b):
+                        return .random(in: Double(a) ..< b, .out, delta: d, self)
                     default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
                     }
                 case .int(let a):
@@ -1670,8 +1670,8 @@ extension O {
                         return .random(in: a ..< b, .out, delta: d, self)
                     case .rational(let b):
                         return .random(in: Rational(a) ..< b, .out, delta: d, self)
-                    case .real1(let b):
-                        return .random(in: Real1(a) ..< b, .out, delta: d, self)
+                    case .double(let b):
+                        return .random(in: Double(a) ..< b, .out, delta: d, self)
                     default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
                     }
                 case .rational(let a):
@@ -1682,19 +1682,19 @@ extension O {
                         return .random(in: a ..< Rational(b), .out, delta: d, self)
                     case .rational(let b):
                         return .random(in: a ..< b, .out, delta: d, self)
-                    case .real1(let b):
-                        return .random(in: Real1(a) ..< b, .out, delta: d, self)
+                    case .double(let b):
+                        return .random(in: Double(a) ..< b, .out, delta: d, self)
                     default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
                     }
-                case .real1(let a):
+                case .double(let a):
                     switch bo {
                     case .bool(let b):
-                        return .random(in: a ..< Real1(b), .out, delta: d, self)
+                        return .random(in: a ..< Double(b), .out, delta: d, self)
                     case .int(let b):
-                        return .random(in: a ..< Real1(b), .out, delta: d, self)
+                        return .random(in: a ..< Double(b), .out, delta: d, self)
                     case .rational(let b):
-                        return .random(in: a ..< Real1(b), .out, delta: d, self)
-                    case .real1(let b):
+                        return .random(in: a ..< Double(b), .out, delta: d, self)
+                    case .double(let b):
                         return .random(in: a ..< b, .out, delta: d, self)
                     default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
                     }
@@ -1705,15 +1705,15 @@ extension O {
                 case .bool(let a):
                     return O(a ? true : Bool.random())
                 case .int(let a):
-                    return O.random(in: Real1(a) ... .infinity, .in, delta: d, self).rounded()
+                    return O.random(in: Double(a) ... .infinity, .in, delta: d, self).rounded()
                 case .rational(let a):
-                    let n = O.random(in: Real1(a) ... .infinity, .in, delta: d, self)
-                    if case .real1(let r) = n, let nn = Rational(exactly: r) {
+                    let n = O.random(in: Double(a) ... .infinity, .in, delta: d, self)
+                    if case .double(let r) = n, let nn = Rational(exactly: r) {
                         return O(nn)
                     } else {
                         return n
                     }
-                case .real1(let a):
+                case .double(let a):
                     return .random(in: a ... .infinity, .in, delta: d, self)
                 default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
                 }
@@ -1722,15 +1722,15 @@ extension O {
                 case .bool(let a):
                     return a ? .empty : O(true)
                 case .int(let a):
-                    return O.random(in: Real1(a) ... .infinity, .out, delta: d, self).rounded()
+                    return O.random(in: Double(a) ... .infinity, .out, delta: d, self).rounded()
                 case .rational(let a):
-                    let n = O.random(in: Real1(a) ... .infinity, .out, delta: d, self)
-                    if case .real1(let r) = n, let nn = Rational(exactly: r) {
+                    let n = O.random(in: Double(a) ... .infinity, .out, delta: d, self)
+                    if case .double(let r) = n, let nn = Rational(exactly: r) {
                         return O(nn)
                     } else {
                         return n
                     }
-                case .real1(let a):
+                case .double(let a):
                     return .random(in: a ... .infinity, .out, delta: d, self)
                 default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
                 }
@@ -1739,15 +1739,15 @@ extension O {
                 case .bool(let a):
                     return O(a ? Bool.random() : false)
                 case .int(let a):
-                    return O.random(in: -.infinity ... Real1(a), .in, delta: d, self).rounded()
+                    return O.random(in: -.infinity ... Double(a), .in, delta: d, self).rounded()
                 case .rational(let a):
-                    let n = O.random(in: -.infinity ... Real1(a), .in, delta: d, self)
-                    if case .real1(let r) = n, let nn = Rational(exactly: r) {
+                    let n = O.random(in: -.infinity ... Double(a), .in, delta: d, self)
+                    if case .double(let r) = n, let nn = Rational(exactly: r) {
                         return O(nn)
                     } else {
                         return n
                     }
-                case .real1(let a):
+                case .double(let a):
                     return .random(in: -.infinity ... a, .in, delta: d, self)
                 default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
                 }
@@ -1756,15 +1756,15 @@ extension O {
                 case .bool(let a):
                     return a ? O(false) : .empty
                 case .int(let a):
-                    return O.random(in: -.infinity ..< Real1(a), .in, delta: d, self).rounded()
+                    return O.random(in: -.infinity ..< Double(a), .in, delta: d, self).rounded()
                 case .rational(let a):
-                    let n = O.random(in: -.infinity ..< Real1(a), .in, delta: d, self)
-                    if case .real1(let r) = n, let nn = Rational(exactly: r) {
+                    let n = O.random(in: -.infinity ..< Double(a), .in, delta: d, self)
+                    if case .double(let r) = n, let nn = Rational(exactly: r) {
                         return O(nn)
                     } else {
                         return n
                     }
-                case .real1(let a):
+                case .double(let a):
                     return .random(in: -.infinity ..< a, .in, delta: d, self)
                 default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
                 }

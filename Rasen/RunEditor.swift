@@ -16,7 +16,6 @@
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
 import Dispatch
-import struct Foundation.Date
 import struct Foundation.UUID
 import struct Foundation.URL
 
@@ -44,7 +43,7 @@ final class RunEditor: InputKeyEditor, @unchecked Sendable {
     
     private var runText = Text(), runTypobute = Typobute()
     
-    private var calculatingString = ""
+    private(set) var calculatingString = ""
     private var calculatingNode = Node(fillType: .color(.content))
     private var calculatingTimer: (any DispatchSourceTimer)?
     
@@ -308,7 +307,7 @@ extension RunEditor {
         
         let xoDic = oDic
         Task { @MainActor in
-            let firstDate = Date()
+            let clock = SuspendingClock.now
             let task = Task.detached {
                 O.calculate(xo, xoDic) { _,_ in !Task.isCancelled }
             }
@@ -324,10 +323,10 @@ extension RunEditor {
             calculatingNode.removeFromParent()
             
             if no != .stopped {
-                let t = Date().timeIntervalSince(firstDate)
+                let time = clock.duration(to: .now).sec
                 if let sheetView = document.madeReadSheetView(at: worldPrintOrigin) {
                     let shp = document.sheetPosition(at: worldPrintOrigin)
-                    draw(no, id, from: text, time: t, in: sheetView, shp)
+                    draw(no, id, from: text, time: time, in: sheetView, shp)
                 }
             }
             document.updateTextCursor()
@@ -342,7 +341,7 @@ extension RunEditor {
         task = nil
     }
     
-    func containsStep(_ p: Point) -> Bool {
+    func containsCalculating(_ p: Point) -> Bool {
         calculatingNode.path.bounds?.contains(calculatingNode.convertFromWorld(p)) ?? false
     }
     func nodePoint(from text: Text) -> Point {

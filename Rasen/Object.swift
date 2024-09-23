@@ -17,8 +17,6 @@
 
 import struct Foundation.UUID
 
-typealias Real1 = Double
-
 struct OSheet {
     var value: Sheet
     var bounds: Rect
@@ -954,7 +952,7 @@ enum O: Sendable {
     case bool(Bool)
     case int(Int)
     case rational(Rational)
-    case real1(Real1)
+    case double(Double)
     indirect case array(OArray)
     indirect case range(ORange)
     indirect case dic([O: O])
@@ -973,7 +971,7 @@ extension O {
     init(_ v: Bool) { self = .bool(v) }
     init(_ v: Int) { self = .int(v) }
     init(_ v: Rational) { self = .rational(v) }
-    init(_ v: Real1) { self = .real1(v) }
+    init(_ v: Double) { self = .double(v) }
     init(_ v: OArray) { self = .array(v) }
 //    init(_ v: [O]) { self = .array(OArray(v)) }
     init(_ v: ORange) { self = .range(v) }
@@ -1040,13 +1038,13 @@ extension O {
     init(_ v: Int.OverResult) {
         switch v {
         case .int(let i): self = .int(i)
-        case .double(let d): self = .real1(d)
+        case .double(let d): self = .double(d)
         }
     }
     init(_ v: Rational.OverResult) {
         switch v {
         case .rational(let r): self = .rational(r)
-        case .double(let d): self = .real1(d)
+        case .double(let d): self = .double(d)
         }
     }
 }
@@ -2204,7 +2202,7 @@ extension O {
             case .int:
                 if let i = Int(tss) {
                     os.append(O(i))
-                } else if let d = Real1(tss) {
+                } else if let d = Double(tss) {
                     os.append(O(d))
                 } else {
                     os.append(O(OError(String(format: "'%1$@' is unknown literal".localized, "\(tss)"))))
@@ -2213,7 +2211,7 @@ extension O {
             case .real:
                 if let i = Int(tss) {
                     os.append(O(i))
-                } else if let d = Real1(tss) {
+                } else if let d = Double(tss) {
                     os.append(O(d))
                 } else {
                     os.append(O(OError(String(format: "'%1$@' is unknown literal".localized, "\(tss)"))))

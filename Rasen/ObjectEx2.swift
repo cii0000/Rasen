@@ -389,7 +389,7 @@ extension O {
     static let drawAxesName = "drawAxes"
     static func drawAxes(base bo: O, _ xo: O, _ yo: O,
                          _ oDic: inout [OKey: O]) -> O {
-        guard let base = bo.asReal1, base > 0 else { return O(OError(String(format: "'%1$@' is not positive real".localized, bo.name))) }
+        guard let base = bo.asDouble, base > 0 else { return O(OError(String(format: "'%1$@' is not positive real".localized, bo.name))) }
         guard case .sheet(var sheet)? = oDic[OKey(sheetName)] else { return O(OError(String(format: "'%1$@' does not exist".localized, sheetName))) }
         let xName = xo.asTextBasedString, yName = yo.asTextBasedString
         
@@ -436,7 +436,7 @@ extension O {
     
     static let plotName = "plot"
     static func plot(base bo: O, _ ao: O, _ oDic: inout [OKey: O]) -> O {
-        guard let base = bo.asReal1, base > 0 else { return O(OError(String(format: "'%1$@' is not positive real".localized, bo.name))) }
+        guard let base = bo.asDouble, base > 0 else { return O(OError(String(format: "'%1$@' is not positive real".localized, bo.name))) }
         
         switch ao {
         case .error: return ao
@@ -584,7 +584,7 @@ extension O {
         case .bool(let a): return String(a)
         case .int(let a): return String(a)
         case .rational(let a): return String(a)
-        case .real1(let a): return String(oBased: a)
+        case .double(let a): return String(oBased: a)
         case .array(let a):
             let bs = a.reduce(into: "") {
                 let s = $1.asString

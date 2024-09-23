@@ -19,7 +19,6 @@ import struct Foundation.UUID
 import RealModule
 import enum Accelerate.vDSP
 import struct Accelerate.DSPDoubleSplitComplex
-import struct Foundation.Date
 
 /// xoshiro256**
 struct Random: Hashable, Codable {
@@ -370,13 +369,9 @@ extension Rendnote {
     func notewave(stftCount: Int = 1024, fAlpha: Double = 1, rmsSize: Int = 2048,
                   cutFq: Double = 16384, cutStartFq: Double = 15800, sampleRate: Double,
                   fftCount: Int = 65536) -> Notewave {
-//        let date = Date()
-        
         let notewave = aNotewave(stftCount: stftCount, fAlpha: fAlpha, rmsSize: rmsSize,
                                  cutFq: cutFq, 
                                  cutStartFq: cutStartFq, sampleRate: sampleRate, fftCount: fftCount)
-        
-//        print(Date().timeIntervalSince(date), fq, notewave.isLoop, notewave.samples.count)
         
         if notewave.samples.contains(where: { $0.isNaN || $0.isInfinite }) {
             print(notewave.samples.contains(where: { $0.isInfinite }) ? "inf" : "nan")

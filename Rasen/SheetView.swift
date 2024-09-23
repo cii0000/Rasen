@@ -17,7 +17,6 @@
 
 import Dispatch
 import struct Foundation.UUID
-import struct Foundation.Date
 
 final class LineView<T: BinderProtocol>: View {
     typealias Model = Line
@@ -1583,7 +1582,7 @@ final class SheetView: View, @unchecked Sendable {
                 firstSec: Rational?
     private var willPlaySec: Rational?, playingOtherTimelineIDs = Set<UUID>()
     private var playingFrameRate: Rational = 24, firstDeltaSec: Rational = 0
-    private var waringDate: Date?
+    private var waringClock: SuspendingClock.Instant?
     let frameRate = Keyframe.defaultFrameRate
     var isPlaying = false {
         didSet {
@@ -1724,7 +1723,7 @@ final class SheetView: View, @unchecked Sendable {
                 let sequencer = Sequencer(tracks: seqTracks) { [weak self] (peak) in
                     DispatchQueue.main.async { [weak self] in
                         guard let self else { return }
-                        if (self.waringDate == nil || Date().timeIntervalSince(self.waringDate!) > 1 / 10.0)
+                        if (self.waringClock == nil || self.waringClock!.duration(to: .now).sec > 1 / 10)
                             && !self.isHiddenOtherTimeNode {
                             
                             let peakVolm = Volm.volm(fromAmp: Double(peak))
@@ -1735,7 +1734,7 @@ final class SheetView: View, @unchecked Sendable {
                                 contentView.peakVolm = peakVolm
                             }
                             self.scoreView.peakVolm = peakVolm
-                            self.waringDate = Date()
+                            self.waringClock = .now
                         }
                     }
                 }

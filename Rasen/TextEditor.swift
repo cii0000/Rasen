@@ -1122,13 +1122,11 @@ final class TextEditor: Editor {
 //                                cursorP: Point(), printP: Point())
 //            dic.keys.forEach { (key) in
 //                if key.baseString == str {
-//                    print(key.baseString)
 //                }
 //            }
-//            print("SS:", str)
 //        }
         
-        // Spell Check (Version 2.0)
+        // Spell Check
         
         let isChangeOption = captureOrigin != textView.model.origin
             || captureSize != textView.model.size

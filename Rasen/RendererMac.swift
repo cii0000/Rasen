@@ -396,7 +396,6 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             colorPixelFormat = Renderer.shared.hdrPixelFormat
             colorspace = Renderer.shared.hdrColorSpace
             (layer as? CAMetalLayer)?.wantsExtendedDynamicRangeContent = true
-            Swift.print("HDR")
         } else {
             colorPixelFormat = Renderer.shared.pixelFormat
             colorspace = Renderer.shared.colorSpace
@@ -1906,7 +1905,6 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                                          magnification: magnification.mid(lastMagnification),
                                          phase: .changed))
                     pinchVs.append((magnification, event.timestamp))
-//                    print("A", magnification)
                     self.oldPinchDistance = nPinchDistance
                     lastMagnification = magnification
                 } else if isEnabledScroll && !(isSubDrag && isSubTouth)
@@ -2282,7 +2280,6 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             pinchVs = []
         } else if nsEvent.phase.contains(.changed) {
             pinchVs.append((Double(nsEvent.magnification), nsEvent.timestamp))
-//            print("B", Double(nsEvent.magnification))
             document.pinch(pinchEventWith(nsEvent, .changed))
         }
     }
@@ -2536,7 +2533,6 @@ extension SubMTKView {
             let debugMaxGPUSize = Int(Double(maxSize) / (1024 * 1024))
             let string0 = isShownClock ? "\(Date().defaultString)" : ""
             let string1 = isShownDebug ? "GPU Memory: \(debugGPUSize) / \(debugMaxGPUSize) MB" : ""
-            print(string0)
             debugNode.path = Text(string: string0 + (isShownClock && isShownDebug ? " " : "") + string1).typesetter.path()
         }
         let t = document.screenToViewportTransform
@@ -3310,7 +3306,7 @@ struct Texture {
     let isOpaque: Bool
     let cgColorSpace: CGColorSpace
     var cgImage: CGImage? {
-        mtl.cgImage(with: cgColorSpace)
+        try? mtl.cgImage(with: cgColorSpace)
     }
     
     fileprivate init(_ mtl: any MTLTexture, isOpaque: Bool, colorSpace: CGColorSpace) {
@@ -3319,7 +3315,9 @@ struct Texture {
         self.cgColorSpace = colorSpace
     }
     
-    struct TextureError: Error {}
+    struct TextureError: Error {
+        var localizedDescription = ""
+    }
     
     struct Block {
         struct Item {
@@ -3459,9 +3457,7 @@ struct Texture {
     }
     
     @MainActor func with(mipmapLevel: Int) throws -> Self {
-        guard let cgImage = mtl.cgImage(with: cgColorSpace, mipmapLevel: mipmapLevel) else {
-            throw TextureError()
-        }
+        let cgImage = try mtl.cgImage(with: cgColorSpace, mipmapLevel: mipmapLevel)
         let block = try Self.block(from: cgImage, isMipmapped: false)
         return try .init(block: block)
     }
@@ -3487,8 +3483,8 @@ extension Texture {
         }
     }
     func image(mipmapLevel: Int) -> Image? {
-        if let cgImage = mtl.cgImage(with: cgColorSpace,
-                                     mipmapLevel: mipmapLevel) {
+        if let cgImage = try? mtl.cgImage(with: cgColorSpace,
+                                          mipmapLevel: mipmapLevel) {
             Image(cgImage: cgImage)
         } else {
             nil
@@ -3501,16 +3497,16 @@ extension Texture: Equatable {
     }
 }
 extension MTLTexture {
-    func cgImage(with colorSpace: CGColorSpace, mipmapLevel: Int = 0) -> CGImage? {
+    func cgImage(with colorSpace: CGColorSpace, mipmapLevel: Int = 0) throws -> CGImage {
         if pixelFormat != .rgba8Unorm && pixelFormat != .rgba8Unorm_srgb
             && pixelFormat != .bgra8Unorm && pixelFormat != .bgra8Unorm_srgb {
-            print("Texture: Unsupport pixel format \(pixelFormat)")
+            throw Texture.TextureError(localizedDescription: "Texture: Unsupport pixel format \(pixelFormat)")
         }
         let nl = 2 ** mipmapLevel
         let nw = width / nl, nh = height / nl
         let bytesSize = nw * nh * 4
         guard let bytes = malloc(bytesSize) else {
-            return nil
+            throw Texture.TextureError()
         }
         defer {
             free(bytes)
@@ -3525,12 +3521,16 @@ extension MTLTexture {
                             | CGBitmapInfo.byteOrder32Little.rawValue)
         guard let provider = CGDataProvider(dataInfo: nil, data: bytes, size: bytesSize,
                                             releaseData: { _, _, _ in }) else {
-            return nil
+            throw Texture.TextureError()
         }
-        return CGImage(width: nw, height: nh,
-                       bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: bytesPerRow,
-                       space: colorSpace, bitmapInfo: bitmapInfo, provider: provider,
-                       decode: nil, shouldInterpolate: true, intent: .defaultIntent)
+        guard let cgImage = CGImage(width: nw, height: nh,
+                                    bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: bytesPerRow,
+                                    space: colorSpace, bitmapInfo: bitmapInfo, provider: provider,
+                                    decode: nil, shouldInterpolate: true,
+                                    intent: .defaultIntent) else {
+            throw Texture.TextureError()
+        }
+        return cgImage
     }
 }
 extension CGContext {

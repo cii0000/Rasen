@@ -656,7 +656,7 @@ final class Document: @unchecked Sendable {
             autosavingTimer.cancel()
             autosavingTimer = OneshotTimer()
             rootDirectory.prepareToWriteAll()
-            let item = DispatchWorkItem(flags: .barrier) { [weak self] in
+            let workItem = DispatchWorkItem(flags: .barrier) { [weak self] in
                 do {
                     try self?.rootDirectory.writeAll()
                 } catch {
@@ -671,13 +671,13 @@ final class Document: @unchecked Sendable {
                     completionHandler(self)
                 }
             }
-            queue.async(execute: item)
+            queue.async(execute: workItem)
         } else if let workItem = savingItem {
-            workItem.notify(queue: .main, execute: {
+            workItem.notify(queue: .main) { [weak self] in
                 timer.cancel()
                 progressPanel.close()
                 completionHandler(self)
-            })
+            }
         } else {
             timer.cancel()
             progressPanel.close()
@@ -2788,11 +2788,10 @@ final class Document: @unchecked Sendable {
         case .sheet:
             if sheetViewValues.contains(where: { $0.value.sheetID == sid }) { return }
             
-            var item: DispatchWorkItem!
-            item = DispatchWorkItem(qos: qos) { [weak self] in
-                defer { item = nil }
-                guard let self,
-                      !item.isCancelled,
+            var workItem: DispatchWorkItem!
+            workItem = DispatchWorkItem(qos: qos) { [weak self] in
+                defer { workItem = nil }
+                guard let self, !workItem.isCancelled,
                       let sheetRecorder = self.sheetRecorders[sid] else { return }
                 let sheetRecord = sheetRecorder.sheetRecord
                 let historyRecord = sheetRecorder.sheetHistoryRecord
@@ -2848,8 +2847,8 @@ final class Document: @unchecked Sendable {
                 }
             }
             sheetViewValues[shp]?.view?.node.removeFromParent()
-            sheetViewValues[shp] = .init(sheetID: sid, view: nil, workItem: item)
-            DispatchQueue.global().async(execute: item)
+            sheetViewValues[shp] = .init(sheetID: sid, view: nil, workItem: workItem)
+            DispatchQueue.global().async(execute: workItem)
         }
     }
     
