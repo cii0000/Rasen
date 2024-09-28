@@ -946,18 +946,21 @@ final class IOEditor: Editor, @unchecked Sendable {
                         try? directory.copy(name: name, from: url)
                     }
                     
-                    let nnp = document.roundedPoint(from: np)
-                    
+                    let maxBounds = document.sheetFrame(with: shp).bounds.inset(by: Sheet.textPadding)
                     var content = Content(directoryName: sheetView.id.uuidString,
-                                          name: name, origin: nnp)
+                                          name: name, origin: document.roundedPoint(from: np))
                     content.normalizeVolm()
                     if let size = content.image?.size {
                         var size = size / 2
-                        if size.width > Sheet.width || size.height > Sheet.height {
-                            size *= min(Sheet.width / size.width, Sheet.height / size.height)
+                        let maxSize = maxBounds.size
+                        if size.width > maxSize.width || size.height > maxSize.height {
+                            size *= min(maxSize.width / size.width, maxSize.height / size.height)
                         }
                         content.size = size
                     }
+                    let nnp = maxBounds.clipped(Rect(origin: document.roundedPoint(from: np),
+                                                     size: content.size)).origin
+                    content.origin = nnp
                     if content.type.hasDur {
                         let tempo = sheetView.nearestTempo(at: np) ?? Music.defaultTempo
                         let interval = document.currentBeatInterval

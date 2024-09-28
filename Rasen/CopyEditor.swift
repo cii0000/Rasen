@@ -1754,9 +1754,10 @@ final class CopyEditor: Editor {
                     if let imf = imageFrame {
                         rect = imf
                     } else {
+                        let maxSize = Sheet.defaultBounds.inset(by: Sheet.textPadding).size
                         var size = image.size / 2
-                        if size.width > Sheet.width || size.height > Sheet.height {
-                            size *= min(Sheet.width / size.width, Sheet.height / size.height)
+                        if size.width > maxSize.width || size.height > maxSize.height {
+                            size *= min(maxSize.width / size.width, maxSize.height / size.height)
                         }
                         rect = Rect(origin: -Point(size.width / 2, size.height / 2), size: size)
                     }
@@ -2494,7 +2495,7 @@ final class CopyEditor: Editor {
             }
             
             content.size = content.size * scale
-            let maxSize = document.sheetFrame(with: shp).size
+            let maxSize = document.sheetFrame(with: shp).bounds.inset(by: Sheet.textPadding).size
             if content.size.width > maxSize.width || content.size.height > maxSize.height {
                 content.size *= min(maxSize.width / content.size.width, maxSize.height / content.size.height)
             }
@@ -2519,7 +2520,7 @@ final class CopyEditor: Editor {
             
             var content = Content(directoryName: sheetView.id.uuidString, name: name, origin: nnp)
             if let size = content.image?.size {
-                let maxSize = document.sheetFrame(with: shp).size
+                let maxSize = document.sheetFrame(with: shp).bounds.inset(by: Sheet.textPadding).size
                 var size = size / 2
                 if size.width > maxSize.width || size.height > maxSize.height {
                     size *= min(maxSize.width / size.width, maxSize.height / size.height)

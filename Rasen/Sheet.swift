@@ -2194,6 +2194,7 @@ extension Sheet {
     static let defaultBounds = Rect(width: width, height: height)
     static let defalutBackgroundUUColor = UU(Color.background, id: .zero)
     static let textPadding = Size(width: 16, height: 15)
+    static let textPaddingBounds = defaultBounds.inset(by: textPadding)
     static let beatWidth = 30.0, secPadding = 16.0
     static let timelineHalfHeight = 12.0
     static let knobWidth = 2.0, knobHeight = 12.0, rulerHeight = 4.0
