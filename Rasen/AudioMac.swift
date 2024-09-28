@@ -1278,7 +1278,6 @@ extension AVAudioPCMBuffer {
             enumerated(channelIndex: ci) { i, v in
                 if abs(v) > amp {
                     self[ci, i] = v < amp ? -amp : amp
-                    print("clip", v)
                 }
             }
         }
@@ -1548,7 +1547,6 @@ final class ClippingAudioUnit: AUAudioUnit {
                         outputFrames[i] = inputFrames[i]
                         if outputFrames[i].isNaN {
                             outputFrames[i] = 0
-                            print("nan")
                         } else if outputFrames[i] < -headroomAmp {
                             outputFrames[i] = -headroomAmp
                         } else if outputFrames[i] > headroomAmp {

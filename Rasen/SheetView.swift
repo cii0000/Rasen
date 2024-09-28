@@ -895,6 +895,7 @@ final class AnimationView: TimelineView {
             })
         })
     }
+    var backgroundColor = Color.background
     var shownInterTypeKeyframeIndex: Int? {
         didSet {
             guard shownInterTypeKeyframeIndex != oldValue else { return }
@@ -904,7 +905,22 @@ final class AnimationView: TimelineView {
                     $0.captureColor = nil
                 }
             }
+            
             if let i = shownInterTypeKeyframeIndex, i < elementViews.count {
+                let (thresholdL, upL, downL): (Double, Double, Double)
+                if elementViews[i].model.picture.planes.isEmpty {
+                    (thresholdL, upL, downL) = backgroundColor.lightness < 70 ? (70, 20, 20) : (50, 40, 20)
+                } else {
+                    let areas = elementViews[i].planesView.elementViews.map { $0.model.topolygon.area }
+                    let allArea = areas.sum()
+                    if allArea == 0 {
+                        (thresholdL, upL, downL) = backgroundColor.lightness < 70 ? (70, 20, 20) : (50, 40, 20)
+                    } else {
+                        let l = elementViews[i].planesView.elementViews.enumerated().sum { $0.element.model.uuColor.value.lightness * areas[$0.offset] / allArea }
+                        (thresholdL, upL, downL) = l < 70 ? (70, 20, 20) : (50, 40, 20)
+                    }
+                }
+                
                 elementViews[i].linesView.elementViews.forEach {
                     let nColor: Color
                     if case .color(let color) = $0.node.lineType {
@@ -916,8 +932,11 @@ final class AnimationView: TimelineView {
                     }
                     
                     $0.node.lineType = switch $0.model.interType {
-                    case .interpolated: .color(nColor.lightness < 80 ? .init(lightness: min(nColor.lightness + 40, 80)) : .init(lightness: nColor.lightness - 20))
-                    case .key, .none: .color(nColor)
+                    case .interpolated:
+                            .color(nColor.with(lightness: nColor.lightness < thresholdL ?
+                                               nColor.lightness + upL : nColor.lightness - downL))
+                    case .key, .none:
+                        .color(nColor)
                     }
                 }
             }
@@ -1157,6 +1176,7 @@ final class SheetView: View, @unchecked Sendable {
         } else {
             node.fillType = nil
         }
+        animationView.backgroundColor = model.backgroundUUColor.value
     }
     
     var isSelectedKeyframes: Bool {

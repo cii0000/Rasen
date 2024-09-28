@@ -51,11 +51,13 @@
 "Select Version" = "バージョンを選択";
 
 "Run" = "実行";
+"Run / Close" = "実行 / 閉じる";
 "Open Menu" = "メニューを開く";
 
 "Slide" = "スライド";
 "Select Frame" = "フレームを選択";
 "Play" = "再生";
+"Move Line Point" = "線点を移動";
 "Move Line Z" = "線の高さを変更";
 
 "Insert Keyframe" = "キーフレームを追加";

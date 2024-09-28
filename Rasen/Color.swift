@@ -229,7 +229,13 @@ extension Color {
         return Color(lightness: l, unsafetyChroma: chroma, hue: hue,
                      opacity: opacity, rgbColorSpace)
     }
-    func with(opacity: Double) -> Color {
+    
+    func with(lightness: Double) -> Self {
+        var color = self
+        color.lightness = lightness
+        return color
+    }
+    func with(opacity: Double) -> Self {
         var color = self
         color.opacity = opacity
         return color

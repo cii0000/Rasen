@@ -336,7 +336,7 @@ extension Quasimode {
     static let selectFrame = Quasimode(modifier: [.control, .option], .drag)
     
     static let slide = Quasimode(modifier: [.control], .drag)
-    static let slideLine = Quasimode(modifier: [.control, .option, .command], .drag)
+    static let moveLinePoint = Quasimode(modifier: [.control, .option, .command], .drag)
     static let moveLineZ = Quasimode(modifier: [.control, .command], .drag)
     
     static let selectVersion = Quasimode(modifier: [.control, .shift], .drag)

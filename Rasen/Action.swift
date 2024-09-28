@@ -38,16 +38,19 @@ extension ActionList {
                        Action(name: "Draw Straight Line".localized,
                               quasimode: .drawStraightLine,
                               isEnableRoot: false)],
+                      
                       [Action(name: "Lasso Cut".localized,
                               quasimode: .lassoCut),
                        Action(name: "Select by Range".localized,
                               quasimode: .selectByRange)],
+                      
                       [Action(name: "Change Lightness".localized,
                               quasimode: .changeLightness,
                               isEnableRoot: false),
                        Action(name: "Change Tint".localized,
                               quasimode: .changeTint,
                               isEnableRoot: false)],
+                      
                       [Action(name: "Slide".localized,
                               quasimode: .slide,
                               isEnableRoot: false),
@@ -56,14 +59,19 @@ extension ActionList {
                        Action(name: "Select Frame".localized,
                               quasimode: .selectFrame,
                               isEnableRoot: false)],
+                      
                       [Action(name: "Move Line Z".localized,
                               quasimode: .moveLineZ,
-                              isEnableRoot: false)
+                              isEnableRoot: false),
+//                       Action(name: "Move Line Point".localized,
+//                              quasimode: .moveLinePoint,
+//                              isEnableRoot: false)
                       ],
+                      
                       [Action(name: "Play".localized,
                               quasimode: .play,
                               isEnableRoot: false),
-//                       Action(name: "Run".localized,
+//                       Action(name: "Run / Close".localized,
 //                              quasimode: .run,
 //                              isEnableRoot: false),
                        Action(name: "Open Menu".localized,
@@ -71,16 +79,19 @@ extension ActionList {
                        Action(name: "Input Character".localized,
                               quasimode: .inputCharacter,
                               isEnableRoot: false)],
+                      
                       [Action(name: "Scroll".localized,
                               quasimode: .scroll),
                        Action(name: "Zoom".localized,
                               quasimode: .zoom),
                        Action(name: "Rotate".localized,
                               quasimode: .rotate)],
+                      
                       [Action(name: "Undo".localized,
                               quasimode: .undo),
                        Action(name: "Redo".localized,
                               quasimode: .redo)],
+                      
                       [Action(name: "Cut".localized,
                               quasimode: .cut),
                        Action(name: "Copy".localized,
@@ -89,39 +100,46 @@ extension ActionList {
                               quasimode: .copyLineColor),
                        Action(name: "Paste".localized,
                               quasimode: .paste),],
+                      
                       [Action(name: "Find".localized,
                               quasimode: .find,
                               isEnableRoot: false)],
+                      
                       [Action(name: "Change to Draft".localized,
                               quasimode: .changeToDraft,
                               isEnableRoot: false),
                        Action(name: "Cut Draft".localized,
                               quasimode: .cutDraft,
                               isEnableRoot: false)],
+                      
                       [Action(name: "Make Faces".localized,
                               quasimode: .makeFaces,
                               isEnableRoot: false),
                        Action(name: "Cut Faces".localized,
                               quasimode: .cutFaces,
                               isEnableRoot: false)],
+                      
 //                      [Action(name: "Change to Superscript".localized,
 //                              quasimode: .changeToSuperscript,
 //                              isEnableRoot: false),
 //                       Action(name: "Change to Subscript".localized,
 //                              quasimode: .changeToSubscript,
 //                              isEnableRoot: false)],
+                      
                       [Action(name: "Change to Vertical Text".localized,
                               quasimode: .changeToVerticalText,
                               isEnableRoot: false),
                        Action(name: "Change to Horizontal Text".localized,
                               quasimode: .changeToHorizontalText,
                               isEnableRoot: false)],
+                      
                       [Action(name: "Insert Keyframe".localized,
                               quasimode: .insertKeyframe,
                               isEnableRoot: false),
                        Action(name: "Add Score".localized,
                               quasimode: .addScore,
                               isEnableRoot: false)],
+                      
                       [Action(name: "Interpolate".localized,
                               quasimode: .interpolate,
                               isEnableRoot: false),

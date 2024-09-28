@@ -3826,27 +3826,7 @@ final class Document: @unchecked Sendable {
         }
     }
     
-    private(set) var oldStrongDragEvent: DragEvent?, strongDragEditor: (any DragEditor)?
-    func strongDrag(_ event: DragEvent) {
-//        switch event.phase {
-//        case .began:
-//            updateLastEditedSheetpos(from: event)
-//            stopInputTextEvent()
-//            strongDragEditor = RangeSelector(self)
-//            strongDragEditor?.send(event)
-//            oldStrongDragEvent = event
-//            textCursorNode.isHidden = true
-//            textMaxTypelineWidthNode.isHidden = true
-//        case .changed:
-//            strongDragEditor?.send(event)
-//            oldStrongDragEvent = event
-//        case .ended:
-//            oldStrongDragEvent = nil
-//            strongDragEditor?.send(event)
-//            strongDragEditor = nil
-//            cursorPoint = event.screenPoint
-//        }
-    }
+    func strongDrag(_ event: DragEvent) {}
     
     private(set) var oldSubDragEvent: DragEvent?, subDragEditor: (any DragEditor)?
     func subDrag(_ event: DragEvent) {
@@ -3902,7 +3882,7 @@ final class Document: @unchecked Sendable {
         case .changeTint: TintChanger(self)
         case .slide: Slider(self)
         case .selectFrame: FrameSelecter(self)
-        case .slideLine: LineSlider(self)
+        case .moveLinePoint: LineSlider(self)
         case .moveLineZ: LineZSlider(self)
         case .selectVersion: VersionSelector(self)
         default: nil

@@ -53,14 +53,7 @@ final class KeyframePreviousMover: InputKeyEditor {
             }
             
             document.cursor = document.cursor(from: sheetView?.currentTimeString() ?? Animation.timeString(fromTime: 0, frameRate: 0))
-        case .changed:
-            if event.isRepeat, let sheetView {
-                move(from: sheetView, at: p)
-                sheetView.showOtherTimeNodeFromMainBeat()
-                sheetView.animationView.shownInterTypeKeyframeIndex = sheetView.animationView.model.index
-                
-                document.cursor = .circle(string: sheetView.currentTimeString())
-            }
+        case .changed: break
         case .ended:
             if let sheetView {
                 sheetView.hideOtherTimeNode()
@@ -114,14 +107,7 @@ final class KeyframeNextMover: InputKeyEditor {
             }
             
             document.cursor = document.cursor(from: sheetView?.currentTimeString() ?? Animation.timeString(fromTime: 0, frameRate: 0))
-        case .changed:
-            if event.isRepeat, let sheetView {
-                move(from: sheetView, at: p)
-                sheetView.showOtherTimeNodeFromMainBeat()
-                sheetView.animationView.shownInterTypeKeyframeIndex = sheetView.animationView.model.index
-                
-                document.cursor = document.cursor(from: sheetView.currentTimeString())
-            }
+        case .changed: break
         case .ended:
             if let sheetView {
                 sheetView.hideOtherTimeNode()
@@ -253,18 +239,16 @@ final class KeyframeSwiper: SwipeEditor {
         isEditingSheet = document.isEditingSheet
     }
     
-    private let indexInterval = 10.0
+    private let indexInterval = 5.0
     
     private var sheetView: SheetView?
-    private var interpolatedNode = Node(), interpolatedRootIndex: Int?
-    private var oldDeltaI: Int?
     private var beganSP = Point(),
-                beganRootBeat = Rational(0), beganRootInterIndex = 0,
-                beganRootIndex = 0, beganSelectedFrameIndexes = [Int](),
-                beganEventTime = 0.0
+                beganRootI = 0, beganBeat = Rational(0),
+                beganSelectedFrameIndexes = [Int](), beganEventTime = 0.0
     private var allDp = Point()
-    private var snapInterRootIndex: Int?, snapEventT: Double?
-    private var lastRootIs = [(sec: Double, rootI: Int)](capacity: 128)
+    private var preMoveEventTime: Double?
+    private var snapRootBeat: Rational?, snapEventTime: Double?
+    private var lastRootBeats = [(sec: Double, rootI: Int)](capacity: 128)
     private var minLastSec = 1 / 12.0
     
     func send(_ event: SwipeEvent) {
@@ -281,105 +265,81 @@ final class KeyframeSwiper: SwipeEditor {
         let p = document.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
+            document.cursor = .arrow
+            
             beganSP = event.screenPoint
             beganEventTime = event.time
             sheetView = document.sheetView(at: p)
             if let sheetView {
-                let animationView = sheetView.animationView
-                beganRootBeat = animationView.rootBeat
-                beganRootInterIndex = animationView.model.rootInterIndex
-                beganRootIndex = animationView.model.rootIndex
-                lastRootIs.append((event.time, beganRootIndex))
-                beganSelectedFrameIndexes = animationView.selectedFrameIndexes
-                animationView.shownInterTypeKeyframeIndex = animationView.model.index
-                oldDeltaI = nil
-                
-                document.cursor = document.cursor(from: sheetView.currentTimeString())
-            } else {
-                document.cursor = document.cursor(from: Animation.timeString(fromTime: 0, frameRate: 0))
+                if sheetView.model.enabledAnimation {
+                    let animationView = sheetView.animationView
+                    beganRootI = animationView.rootKeyframeIndex
+                    lastRootBeats.append((event.time, beganRootI))
+                    beganBeat = animationView.model.localBeat
+                    beganSelectedFrameIndexes = animationView.selectedFrameIndexes
+                    animationView.shownInterTypeKeyframeIndex = animationView.model.index
+                    
+                    //0.5
+                }
             }
+            document.cursor = document.cursor(from: sheetView?.currentTimeString() ?? Animation.timeString(fromTime: 0, frameRate: 0))
             
             sheetView?.showOtherTimeNodeFromMainBeat()
         case .changed:
             if let sheetView {
-                let animationView = sheetView.animationView
-                allDp += event.scrollDeltaPoint * 0.5
-                let dp = allDp
-                if event.time - beganEventTime < 0.2
-                    && abs(dp.x) < indexInterval * 3 { return }
-                let deltaI = Int((dp.x / indexInterval).rounded())
-                
-                let ni = beganRootInterIndex.addingReportingOverflow(deltaI).partialValue
-                let nRootI = animationView.model.rootIndex(atRootInter: ni)
-                
-                let ii = Double(beganRootInterIndex) + (dp.x - indexInterval / 2) / indexInterval
-                let iit = ii - ii.rounded(.down)
-                let si = nRootI
-                let ei = animationView.model.rootIndex(atRootInter: ni + 1)
-                if abs(ei - si) <= 1 {
-                    interpolatedNode.children = []
-                } else {
-                    let nni = Int.linear(si, ei, t: iit)
-                    if nni != interpolatedRootIndex {
-                        interpolatedRootIndex = nni
-                        let nnni = animationView.model.index(atRoot: nni)
-                        if !animationView.model.keyframes[nnni].isKeyWhereAllLines {
-                            let node = animationView.elementViews[nnni].linesView.node.clone
-                            node.children.forEach { $0.lineType = .color(.subInterpolated) }
-                            interpolatedNode.children = [node]
-                            if interpolatedNode.parent == nil {
-                                sheetView.node.append(child: interpolatedNode)
-                            }
-                        } else {
-                            interpolatedNode.children = []
-                        }
-                    }
-                }
-                
-                if deltaI != oldDeltaI {
-                    oldDeltaI = deltaI
+                if sheetView.model.enabledAnimation {
+                    let animationView = sheetView.animationView
                     
-                    let oldKI = animationView.model.index
+                    allDp += event.scrollDeltaPoint * 0.5
+                    let dp = allDp
+                    let deltaI = Int((dp.x / indexInterval).rounded())
                     
-                    if nRootI != animationView.model.rootIndex {
+//                    (dp.x / indexInterval + 0.5).loop(start: 0, end: 1)
+                     
+                    let nRootI = beganRootI.addingReportingOverflow(deltaI).partialValue
+                    
+                    if animationView.rootKeyframeIndex != nRootI {
                         if sheetView.isPlaying {
                             sheetView.stop()
                         }
+                        if let preMoveEventTime {
+                            if event.time - preMoveEventTime > 0.25 {
+                                snapRootBeat = animationView.rootBeat
+                                snapEventTime = event.time
+                            }
+                        }
+                        preMoveEventTime = event.time
                         sheetView.rootKeyframeIndex = nRootI
+                        document.updateEditorNode()
+                        document.updateSelects()
                         
-                        lastRootIs.append((event.time, nRootI))
-                        for (i, v) in lastRootIs.enumerated().reversed() {
+                        animationView.shownInterTypeKeyframeIndex = animationView.model.index
+                        
+                        lastRootBeats.append((event.time, nRootI))
+                        for (i, v) in lastRootBeats.enumerated().reversed() {
                             if event.time - v.sec > minLastSec {
                                 if i > 0 {
-                                    lastRootIs.removeFirst(i - 1)
+                                    lastRootBeats.removeFirst(i - 1)
                                 }
                                 break
                             }
                         }
                         
-                        sheetView.showOtherTimeNodeFromMainBeat()
-                        
-                        document.updateEditorNode()
-                        document.updateSelects()
-                        if oldKI != animationView.model.index {
-                            animationView.shownInterTypeKeyframeIndex = animationView.model.index
-                        }
-                        
                         document.cursor = document.cursor(from: sheetView.currentTimeString())
+                        sheetView.showOtherTimeNodeFromMainBeat()
                     }
                 }
             }
         case .ended:
             document.cursor = document.defaultCursor
             
-            interpolatedNode.removeFromParent()
             if let sheetView {
+                sheetView.hideOtherTimeNode()
+                    
                 let animationView = sheetView.animationView
                 animationView.shownInterTypeKeyframeIndex = nil
                 
-                sheetView.hideOtherTimeNode()
-                
-                for (sec, rootI) in lastRootIs.reversed() {
+                for (sec, rootI) in lastRootBeats.reversed() {
                     if event.time - sec > minLastSec {
                         sheetView.rootKeyframeIndex = rootI
                         document.updateEditorNode()
@@ -391,6 +351,163 @@ final class KeyframeSwiper: SwipeEditor {
         }
     }
 }
+//final class KeyframeSwiper: SwipeEditor {
+//    let document: Document
+//    let isEditingSheet: Bool
+//    
+//    init(_ document: Document) {
+//        self.document = document
+//        isEditingSheet = document.isEditingSheet
+//    }
+//    
+//    private let indexInterval = 10.0
+//    
+//    private var sheetView: SheetView?, node = Node()
+//    private var interpolatedNode = Node(), interpolatedRootIndex: Int?
+//    private var oldDeltaI: Int?
+//    private var beganSP = Point(),
+//                beganRootBeat = Rational(0), beganRootInterIndex = 0,
+//                beganRootIndex = 0, beganSelectedFrameIndexes = [Int](),
+//                beganEventTime = 0.0
+//    private var allDp = Point()
+//    private var snapInterRootIndex: Int?, snapEventT: Double?
+//    private var lastRootIs = [(sec: Double, rootI: Int)](capacity: 128)
+//    private var minLastSec = 1 / 24.0
+//    
+//    func send(_ event: SwipeEvent) {
+//        guard isEditingSheet else {
+//            document.stop(with: event)
+//            return
+//        }
+//        if document.isPlaying(with: event) {
+//            document.stopPlaying(with: event)
+//        }
+//        
+//        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+//            ?? event.screenPoint
+//        let p = document.convertScreenToWorld(sp)
+//        switch event.phase {
+//        case .began:
+//            beganSP = event.screenPoint
+//            beganEventTime = event.time
+//            sheetView = document.sheetView(at: p)
+//            if let sheetView {
+//                let animationView = sheetView.animationView
+//                beganRootBeat = animationView.rootBeat
+//                beganRootInterIndex = animationView.model.rootInterIndex
+//                beganRootIndex = animationView.model.rootIndex
+//                lastRootIs.append((event.time, beganRootIndex))
+//                beganSelectedFrameIndexes = animationView.selectedFrameIndexes
+//                animationView.shownInterTypeKeyframeIndex = animationView.model.index
+//                oldDeltaI = nil
+//                
+//                node.children = sheetView.moveTimeNodes(phase: 0.5)
+//                node.attitude.position = p
+//                node.attitude.scale = .init(square: document.screenToWorldScale)
+//                document.rootNode.append(child: node)
+//                
+//                document.cursor = document.cursor(from: sheetView.currentTimeString())
+//            } else {
+//                document.cursor = document.cursor(from: Animation.timeString(fromTime: 0, frameRate: 0))
+//            }
+//            
+//            sheetView?.showOtherTimeNodeFromMainBeat()
+//        case .changed:
+//            if let sheetView {
+//                let animationView = sheetView.animationView
+//                allDp += event.scrollDeltaPoint * 0.5
+//                let dp = allDp
+//                let deltaI = Int((dp.x / indexInterval).rounded())
+//                
+//                node.children = sheetView.moveTimeNodes(phase: (dp.x / indexInterval + 0.5).loop(start: 0, end: 1))
+//                node.attitude.position = p
+//                node.attitude.scale = .init(square: document.screenToWorldScale)
+//                
+//                let ni = beganRootInterIndex.addingReportingOverflow(deltaI).partialValue
+//                let nRootI = animationView.model.rootIndex(atRootInter: ni)
+//                
+//                let ii = Double(beganRootInterIndex) + (dp.x - indexInterval / 2) / indexInterval
+//                let iit = ii - ii.rounded(.down)
+//                let si = nRootI
+//                let ei = animationView.model.rootIndex(atRootInter: ni + 1)
+//                if abs(ei - si) <= 1 {
+//                    interpolatedNode.children = []
+//                } else {
+//                    let nni = Int.linear(si, ei, t: iit)
+//                    if nni != interpolatedRootIndex {
+//                        interpolatedRootIndex = nni
+//                        let nnni = animationView.model.index(atRoot: nni)
+//                        if !animationView.model.keyframes[nnni].isKeyWhereAllLines {
+//                            let node = animationView.elementViews[nnni].linesView.node.clone
+//                            node.children.forEach { $0.lineType = .color(.subInterpolated) }
+//                            interpolatedNode.children = [node]
+//                            if interpolatedNode.parent == nil {
+//                                sheetView.node.append(child: interpolatedNode)
+//                            }
+//                        } else {
+//                            interpolatedNode.children = []
+//                        }
+//                    }
+//                }
+//                
+//                if deltaI != oldDeltaI {
+//                    oldDeltaI = deltaI
+//                    
+//                    let oldKI = animationView.model.index
+//                    
+//                    if nRootI != animationView.model.rootIndex {
+//                        if sheetView.isPlaying {
+//                            sheetView.stop()
+//                        }
+//                        sheetView.rootKeyframeIndex = nRootI
+//                        
+//                        lastRootIs.append((event.time, nRootI))
+//                        for (i, v) in lastRootIs.enumerated().reversed() {
+//                            if event.time - v.sec > minLastSec {
+//                                if i > 0 {
+//                                    lastRootIs.removeFirst(i - 1)
+//                                }
+//                                break
+//                            }
+//                        }
+//                        
+//                        sheetView.showOtherTimeNodeFromMainBeat()
+//                        
+//                        document.updateEditorNode()
+//                        document.updateSelects()
+//                        if oldKI != animationView.model.index {
+//                            animationView.shownInterTypeKeyframeIndex = animationView.model.index
+//                        }
+//                        
+//                        Feedback.performAlignment()
+//                        
+//                        document.cursor = document.cursor(from: sheetView.currentTimeString())
+//                    }
+//                }
+//            }
+//        case .ended:
+//            document.cursor = document.defaultCursor
+//            
+//            interpolatedNode.removeFromParent()
+//            node.removeFromParent()
+//            if let sheetView {
+//                let animationView = sheetView.animationView
+//                animationView.shownInterTypeKeyframeIndex = nil
+//                
+//                sheetView.hideOtherTimeNode()
+//                
+//                for (sec, rootI) in lastRootIs.reversed() {
+//                    if event.time - sec > minLastSec {
+//                        sheetView.rootKeyframeIndex = rootI
+//                        document.updateEditorNode()
+//                        document.updateSelects()
+//                        break
+//                    }
+//                }
+//            }
+//        }
+//    }
+//}
 final class KeyframeSlider: DragEditor {
     let document: Document
     let isEditingSheet: Bool
@@ -452,8 +569,7 @@ final class KeyframeSlider: DragEditor {
             if let sheetView {
                 let animationView = sheetView.animationView
                 let dp = event.screenPoint - beganSP
-                if event.time - beganEventTime < 0.2
-                    && abs(dp.x) < indexInterval * 3 { return }
+                if event.time - beganEventTime < 0.2 && abs(dp.x) < indexInterval * 3 { return }
                 let deltaI = Int((dp.x / indexInterval).rounded())
                 
                 let ni = beganRootInterIndex.addingReportingOverflow(deltaI).partialValue
@@ -475,7 +591,7 @@ final class KeyframeSlider: DragEditor {
                             node.children.forEach { $0.lineType = .color(.subInterpolated) }
                             interpolatedNode.children = [node]
                             if interpolatedNode.parent == nil {
-                                sheetView.node.append(child: interpolatedNode)
+                                sheetView.node.insert(child: interpolatedNode, at: 0)
                             }
                         } else {
                             interpolatedNode.children = []
@@ -576,10 +692,9 @@ final class FrameEditor: Editor {
         isEditingSheet = document.isEditingSheet
     }
     
-    private let indexInterval = 2.0
-    private let snapDeltaIndex = 4, snapDeltaEventTime = 0.075
+    private let indexInterval = 5.0
     
-    private var sheetView: SheetView?, animationIndex: Int?
+    private var sheetView: SheetView?
     private var beganSP = Point(),
                 beganRootI = 0, beganBeat = Rational(0),
                 beganSelectedFrameIndexes = [Int](), beganEventTime = 0.0
@@ -2301,11 +2416,11 @@ final class Interpolater: InputKeyEditor {
                         let animationView = sheetView.animationView
                         let orki = v.rootKeyframeIndex,
                             nrki = animationView.rootKeyframeIndex
-                        if orki != nrki {
+                        let di = abs(nrki - orki)
+                        if di > 1 {
                             var filledIs = Set<Int>()
-                            var vs = [(ki: Int, pis: [Int], color: Color)]()
-                            let di = abs(nrki - orki)
-                            for dri in 0 ... di {
+                            var vs = [(ki: Int, pis: [Int], uuColor: UUColor)]()
+                            for dri in 1 ..< di {
                                 let t = Double(dri) / Double(di)
                                 let ri = orki < nrki ?
                                     orki + dri : orki - dri
@@ -2318,32 +2433,45 @@ final class Interpolater: InputKeyEditor {
                                 }
                                 
                                 if !pis.isEmpty {
-                                    vs.append((ki, pis, color))
+                                    vs.append((ki, pis, .init(color)))
                                     filledIs.insert(ki)
                                 }
                             }
                             
-                            let svs = vs.sorted(by: { $0.ki < $1.ki })
-                            let cv = ColorValue(
-                                uuColor: oUUColor,
-                                planeIndexes: [], lineIndexes: [],
-                                isBackground: false,
-                                planeAnimationIndexes: svs.map { .init(value: $0.pis, index: $0.ki) },
-                                lineAnimationIndexes: [],
-                                animationColors: svs.map { $0.color }
-                            )
-                            let ocv = ColorValue(
-                                uuColor: oUUColor,
-                                planeIndexes: [], lineIndexes: [],
-                                isBackground: false,
-                                planeAnimationIndexes: svs.map { .init(value: $0.pis, index: $0.ki) },
-                                lineAnimationIndexes: [],
-                                animationColors: svs.map {
-                                    sheetView.model.animation.keyframes[$0.ki].picture.planes[$0.pis.first!].uuColor.value
-                                }
-                            )
                             sheetView.newUndoGroup()
-                            sheetView.set(cv, oldColorValue: ocv)
+                            
+                            let svs = vs.sorted(by: { $0.ki < $1.ki })
+                            var nodes = [Node]()
+                            let scale = 1 / document.worldToScreenScale
+                            svs.forEach {
+                                let cv = ColorValue(uuColor: $0.uuColor,
+                                                    planeIndexes: [], lineIndexes: [],
+                                                    isBackground: false,
+                                                    planeAnimationIndexes: [.init(value: $0.pis,
+                                                                                  index: $0.ki)],
+                                                    lineAnimationIndexes: [],
+                                                    animationColors: [])
+                                let oldUUColor = sheetView.model.animation.keyframes[$0.ki].picture.planes[$0.pis.first!].uuColor
+                                let ocv = ColorValue(uuColor: oldUUColor,
+                                                     planeIndexes: [], lineIndexes: [],
+                                                     isBackground: false,
+                                                     planeAnimationIndexes: [.init(value: $0.pis,
+                                                                                   index: $0.ki)],
+                                                     lineAnimationIndexes: [],
+                                                     animationColors: [])
+                                sheetView.set(cv, oldColorValue: ocv)
+                                
+                                let value = sheetView.colorPathValue(with: cv, toColor: nil,
+                                                                     color: .selected,
+                                                                     subColor: .subSelected)
+                                nodes += value.paths.map {
+                                    Node(path: $0, lineWidth: Line.defaultLineWidth * 2 * scale,
+                                         lineType: value.lineType, fillType: value.fillType)
+                                }
+                            }
+                            
+                            linesNode.children = nodes
+                            document.rootNode.append(child: linesNode)
                         }
                     }
                     return
