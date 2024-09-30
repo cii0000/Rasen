@@ -170,6 +170,9 @@ message PBContent {
     oneof ContentTimeOptionOptional {
         PBContentTimeOption timeOption = 7;
     }
+    PBRational beat = 10;
+    PBRational durSec = 11;
+    PBRational frameRate = 12;
     PBUUID id = 8;
 }
 

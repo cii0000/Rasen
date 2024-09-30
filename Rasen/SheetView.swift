@@ -1286,7 +1286,7 @@ final class SheetView: View, @unchecked Sendable {
             false
         }
     }
-    func showOtherTimeNode(atBeat beat: Rational) {
+    func showOtherTimeNode(atBeat beat: Rational, isEnabledMovie: Bool = false) {
         if isHiddenOtherTimeNode {
             let ids = playingOtherTimelineIDs
             let sec = animationView.model.sec(fromBeat: beat)
@@ -1303,8 +1303,17 @@ final class SheetView: View, @unchecked Sendable {
             }
             
             for contentView in contentsView.elementViews {
+                if isEnabledMovie && contentView.model.type == .movie {
+                    contentView.timeNode?.lineType = .color(.content)
+                    contentView.updateTimeNode(atSec: sec)
+                    contentView.timeNode?.lineWidth = 2
+                    contentView.timeNode?.isHidden = false
+                    continue
+                }
+                
                 contentView.timeNode?.path = Path()
-                guard ids.isEmpty || containsPCMNoder(from: ids, in: contentView) else {
+                guard contentView.model.type != .movie,
+                      ids.isEmpty || containsPCMNoder(from: ids, in: contentView) else {
                     contentView.timeNode?.isHidden = true
                     continue
                 }
@@ -1328,17 +1337,23 @@ final class SheetView: View, @unchecked Sendable {
             }
             isHiddenOtherTimeNode = false
         } else {
-            updateOtherTimeNode(atBeat: beat)
+            updateOtherTimeNode(atBeat: beat, isEnabledMovie: isEnabledMovie)
         }
     }
-    private func updateOtherTimeNode(atBeat beat: Rational) {
+    private func updateOtherTimeNode(atBeat beat: Rational, isEnabledMovie: Bool = false) {
         let ids = playingOtherTimelineIDs
         let sec = model.animation.sec(fromBeat: beat)
         if ids.isEmpty || containsScoreNoder(from: ids) {
             scoreView.updateTimeNode(atSec: sec)
         }
         for contentView in contentsView.elementViews {
-            guard ids.isEmpty || containsPCMNoder(from: ids, in: contentView) else { continue }
+            if isEnabledMovie && contentView.model.type == .movie {
+                contentView.updateTimeNode(atSec: sec)
+                continue
+            }
+            
+            guard contentView.model.type != .movie,
+                  ids.isEmpty || containsPCMNoder(from: ids, in: contentView) else { continue }
             contentView.updateTimeNode(atSec: sec)
         }
         for textView in textsView.elementViews {
@@ -1808,6 +1823,12 @@ final class SheetView: View, @unchecked Sendable {
             playingSecRange = nil
             firstSec = nil
             
+            contentsView.elementViews.forEach {
+                if $0.model.type == .movie, let sec = $0.model.sec {
+                    $0.updateMovie(atSec: sec)
+                }
+            }
+            
             hideOtherTimeNode()
             
             updatePreviousNext()
@@ -1889,8 +1910,13 @@ final class SheetView: View, @unchecked Sendable {
                 = timeSliders + playingCaptionNodes
             }
             
+            sheetView.contentsView.elementViews.forEach {
+                $0.updateMovie(atSec: playingSec)
+            }
+            
+            
             if sheetView == self {
-                showOtherTimeNode(atBeat: playingBeat)
+                showOtherTimeNode(atBeat: playingBeat, isEnabledMovie: true)
             } else {
                 hideOtherTimeNode()
             }

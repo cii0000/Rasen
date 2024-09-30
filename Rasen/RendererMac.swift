@@ -3376,35 +3376,35 @@ struct Texture {
     init(imageData: Data,
          isMipmapped: Bool = false,
          isOpaque: Bool = true,
-         colorSpace: RGBColorSpace = .sRGB) throws {
+         colorSpace: RGBColorSpace = .sRGB, isBGR: Bool = false) throws {
         let block = try Self.block(from: imageData, isMipmapped: isMipmapped)
-        try self.init(block: block, isOpaque: isOpaque, colorSpace: colorSpace)
+        try self.init(block: block, isOpaque: isOpaque, colorSpace: colorSpace, isBGR: isBGR)
     }
 //    @MainActor
     init(image: Image,
          isMipmapped: Bool = false,
          isOpaque: Bool = true,
-         colorSpace: RGBColorSpace = .sRGB) throws {
+         colorSpace: RGBColorSpace = .sRGB, isBGR: Bool = false) throws {
         let block = try Self.block(from: image, isMipmapped: isMipmapped)
-        try self.init(block: block, isOpaque: isOpaque, colorSpace: colorSpace)
+        try self.init(block: block, isOpaque: isOpaque, colorSpace: colorSpace, isBGR: isBGR)
     }
 //    @MainActor
     init(cgImage: CGImage,
          isMipmapped: Bool = false,
          isOpaque: Bool = true,
-         colorSpace: RGBColorSpace = .sRGB) throws {
+         colorSpace: RGBColorSpace = .sRGB, isBGR: Bool = false) throws {
         let block = try Self.block(from: cgImage, isMipmapped: isMipmapped)
-        try self.init(block: block, isOpaque: isOpaque, colorSpace: colorSpace)
+        try self.init(block: block, isOpaque: isOpaque, colorSpace: colorSpace, isBGR: isBGR)
     }
 //    @MainActor
     init(block: Block,
                     isOpaque: Bool = true,
-                    colorSpace: RGBColorSpace = .sRGB) throws {
+         colorSpace: RGBColorSpace = .sRGB, isBGR: Bool = false) throws {
         guard let cgColorSpace = colorSpace.cg, !block.items.isEmpty else { throw TextureError() }
         let format = if colorSpace.isHDR {
             MTLPixelFormat.bgr10_xr_srgb
         } else {
-            Renderer.shared.imagePixelFormat
+            isBGR ? Renderer.shared.pixelFormat : Renderer.shared.imagePixelFormat
         }
         let td = MTLTextureDescriptor.texture2DDescriptor(pixelFormat: format,
                                                           width: block.items[0].width,

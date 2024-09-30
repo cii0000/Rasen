@@ -865,6 +865,33 @@ struct PBContent: @unchecked Sendable {
     set {_uniqueStorage()._contentTimeOptionOptional = .timeOption(newValue)}
   }
 
+  var beat: PBRational {
+    get {return _storage._beat ?? PBRational()}
+    set {_uniqueStorage()._beat = newValue}
+  }
+  /// Returns true if `beat` has been explicitly set.
+  var hasBeat: Bool {return _storage._beat != nil}
+  /// Clears the value of `beat`. Subsequent reads from it will return its default value.
+  mutating func clearBeat() {_uniqueStorage()._beat = nil}
+
+  var durSec: PBRational {
+    get {return _storage._durSec ?? PBRational()}
+    set {_uniqueStorage()._durSec = newValue}
+  }
+  /// Returns true if `durSec` has been explicitly set.
+  var hasDurSec: Bool {return _storage._durSec != nil}
+  /// Clears the value of `durSec`. Subsequent reads from it will return its default value.
+  mutating func clearDurSec() {_uniqueStorage()._durSec = nil}
+
+  var frameRate: PBRational {
+    get {return _storage._frameRate ?? PBRational()}
+    set {_uniqueStorage()._frameRate = newValue}
+  }
+  /// Returns true if `frameRate` has been explicitly set.
+  var hasFrameRate: Bool {return _storage._frameRate != nil}
+  /// Clears the value of `frameRate`. Subsequent reads from it will return its default value.
+  mutating func clearFrameRate() {_uniqueStorage()._frameRate = nil}
+
   var id: PBUUID {
     get {return _storage._id ?? PBUUID()}
     set {_uniqueStorage()._id = newValue}
@@ -4526,6 +4553,9 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     5: .same(proto: "origin"),
     6: .same(proto: "isShownSpectrogram"),
     7: .same(proto: "timeOption"),
+    10: .same(proto: "beat"),
+    11: .same(proto: "durSec"),
+    12: .same(proto: "frameRate"),
     8: .same(proto: "id"),
   ]
 
@@ -4537,6 +4567,9 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     var _origin: PBPoint? = nil
     var _isShownSpectrogram: Bool = false
     var _contentTimeOptionOptional: PBContent.OneOf_ContentTimeOptionOptional?
+    var _beat: PBRational? = nil
+    var _durSec: PBRational? = nil
+    var _frameRate: PBRational? = nil
     var _id: PBUUID? = nil
 
     #if swift(>=5.10)
@@ -4559,6 +4592,9 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       _origin = source._origin
       _isShownSpectrogram = source._isShownSpectrogram
       _contentTimeOptionOptional = source._contentTimeOptionOptional
+      _beat = source._beat
+      _durSec = source._durSec
+      _frameRate = source._frameRate
       _id = source._id
     }
   }
@@ -4598,6 +4634,9 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
         }()
         case 8: try { try decoder.decodeSingularMessageField(value: &_storage._id) }()
         case 9: try { try decoder.decodeSingularStringField(value: &_storage._directoryName) }()
+        case 10: try { try decoder.decodeSingularMessageField(value: &_storage._beat) }()
+        case 11: try { try decoder.decodeSingularMessageField(value: &_storage._durSec) }()
+        case 12: try { try decoder.decodeSingularMessageField(value: &_storage._frameRate) }()
         default: break
         }
       }
@@ -4634,6 +4673,15 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       if !_storage._directoryName.isEmpty {
         try visitor.visitSingularStringField(value: _storage._directoryName, fieldNumber: 9)
       }
+      try { if let v = _storage._beat {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 10)
+      } }()
+      try { if let v = _storage._durSec {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 11)
+      } }()
+      try { if let v = _storage._frameRate {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 12)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -4650,6 +4698,9 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
         if _storage._origin != rhs_storage._origin {return false}
         if _storage._isShownSpectrogram != rhs_storage._isShownSpectrogram {return false}
         if _storage._contentTimeOptionOptional != rhs_storage._contentTimeOptionOptional {return false}
+        if _storage._beat != rhs_storage._beat {return false}
+        if _storage._durSec != rhs_storage._durSec {return false}
+        if _storage._frameRate != rhs_storage._frameRate {return false}
         if _storage._id != rhs_storage._id {return false}
         return true
       }

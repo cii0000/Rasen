@@ -553,6 +553,42 @@ extension Movie {
     }
 }
 
+final class MovieImageGenerator {
+    private var generator: AVAssetImageGenerator
+    
+    init(url: URL) {
+        let asset = AVURLAsset(url: url)
+        generator = AVAssetImageGenerator(asset: asset)
+        generator.requestedTimeToleranceBefore = .zero
+        generator.requestedTimeToleranceAfter = .zero
+    }
+    func thumbnail(atSec sec: Rational = .init(0, 1)) async throws -> Image {
+        let cgImage = try await generator.image(at: .init(value: .init(sec.p),
+                                                          timescale: .init(sec.q))).image
+        return Image(cgImage: cgImage)
+    }
+}
+extension Movie {
+    static func size(from url: URL) async throws -> Size? {
+        let asset = AVAsset(url: url)
+        return try await asset.load(.tracks).first?.load(.naturalSize).my
+    }
+    static func durSec(from url: URL) async throws -> Rational {
+        let asset = AVAsset(url: url)
+        return try await asset.load(.duration).my
+    }
+    static func frameRate(from url: URL) async throws -> Float? {
+        let asset = AVAsset(url: url)
+        return try await asset.load(.tracks).first?.load(.nominalFrameRate)
+    }
+}
+
+extension CMTime {
+    var my: Rational {
+        .init(Int(value), Int(timescale))
+    }
+}
+
 extension Movie {
     static func toMP4(from url: URL, to outputURL: URL) async throws {
         let asset = AVAsset(url: url)

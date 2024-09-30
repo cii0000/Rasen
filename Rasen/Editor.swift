@@ -947,42 +947,82 @@ final class IOEditor: Editor, @unchecked Sendable {
                     }
                     
                     let maxBounds = document.sheetFrame(with: shp).bounds.inset(by: Sheet.textPadding)
-                    var content = Content(directoryName: sheetView.id.uuidString,
+                    let content = Content(directoryName: sheetView.id.uuidString,
                                           name: name, origin: document.roundedPoint(from: np))
-                    content.normalizeVolm()
-                    if let size = content.image?.size {
-                        var size = size / 2
-                        let maxSize = maxBounds.size
-                        if size.width > maxSize.width || size.height > maxSize.height {
-                            size *= min(maxSize.width / size.width, maxSize.height / size.height)
+                    if content.type == .movie {
+                        Task.detached {
+                            if let size = try? await Movie.size(from: content.url),
+                               let durSec = try? await Movie.durSec(from: content.url),
+                               let frameRate = try? await Movie.frameRate(from: content.url) {
+                                
+                                Task { @MainActor in
+                                    var content = content
+                                    var size = size / 2
+                                    let maxBounds = Sheet.defaultBounds.inset(by: Sheet.textPadding)
+                                    let maxSize = maxBounds.size
+                                    if size.width > maxSize.width || size.height > maxSize.height {
+                                        size *= min(maxSize.width / size.width, maxSize.height / size.height)
+                                    }
+                                    content.size = size
+                                    let nnp = maxBounds.clipped(Rect(origin: content.origin,
+                                                                     size: content.size)).origin
+                                    content.origin = nnp
+                                    
+                                    content.durSec = durSec
+                                    content.frameRate = Rational(Int(frameRate))
+                                    
+                                    let tempo = Music.defaultTempo
+                                    let durBeat = ContentTimeOption.beat(fromSec: durSec, tempo: tempo)
+                                    let beatRange = Range(start: 0, length: durBeat)
+                                    content.timeOption = .init(beatRange: beatRange, tempo: tempo)
+                                    
+                                    var text = Text(string: filename, origin: nnp)
+                                    text.origin.y -= (content.type.hasDur ? Sheet.timelineHalfHeight : 0) + text.size / 2 + 4
+                                    if text.origin.y < Sheet.textPadding.height {
+                                        let d = Sheet.textPadding.height - text.origin.y
+                                        text.origin.y += d
+                                        content.origin.y += d
+                                    }
+                                    sheetView.newUndoGroup()
+                                    sheetView.append(text)
+                                    sheetView.append(content)
+                                }
+                            }
                         }
-                        content.size = size
+                    } else {
+                        var content = content
+                        content.normalizeVolm()
+                        if let size = content.image?.size {
+                            var size = size / 2
+                            let maxSize = maxBounds.size
+                            if size.width > maxSize.width || size.height > maxSize.height {
+                                size *= min(maxSize.width / size.width, maxSize.height / size.height)
+                            }
+                            content.size = size
+                        }
+                        let nnp = maxBounds.clipped(Rect(origin: content.origin,
+                                                         size: content.size)).origin
+                        content.origin = nnp
+                        if content.type.hasDur {
+                            let tempo = sheetView.nearestTempo(at: np) ?? Music.defaultTempo
+                            let interval = document.currentBeatInterval
+                            let startBeat = sheetView.animationView.beat(atX: np.x, interval: interval)
+                            let durBeat = ContentTimeOption.beat(fromSec: content.durSec, tempo: tempo)
+                            let beatRange = Range(start: startBeat, length: durBeat)
+                            content.timeOption = .init(beatRange: beatRange, tempo: tempo)
+                        }
+                        
+                        var text = Text(string: filename, origin: nnp)
+                        text.origin.y -= (content.type.hasDur ? Sheet.timelineHalfHeight : 0) + text.size / 2 + 4
+                        if text.origin.y < Sheet.textPadding.height {
+                            let d = Sheet.textPadding.height - text.origin.y
+                            text.origin.y += d
+                            content.origin.y += d
+                        }
+                        sheetView.newUndoGroup()
+                        sheetView.append(text)
+                        sheetView.append(content)
                     }
-                    let nnp = maxBounds.clipped(Rect(origin: document.roundedPoint(from: np),
-                                                     size: content.size)).origin
-                    content.origin = nnp
-                    if content.type.hasDur {
-                        let tempo = sheetView.nearestTempo(at: np) ?? Music.defaultTempo
-                        let interval = document.currentBeatInterval
-                        let startBeat = sheetView.animationView.beat(atX: np.x, interval: interval)
-                        let durBeat = ContentTimeOption.beat(fromSec: content.durSec,
-                                                             tempo: tempo,
-                                                             beatRate: Keyframe.defaultFrameRate,
-                                                             rounded: .up)
-                        let beatRange = Range(start: startBeat, length: durBeat)
-                        content.timeOption = .init(beatRange: beatRange, tempo: tempo)
-                    }
-                    
-                    var text = Text(string: filename, origin: nnp)
-                    text.origin.y -= (content.type.hasDur ? Sheet.timelineHalfHeight : 0) + text.size / 2 + 4
-                    if text.origin.y < Sheet.textPadding.height {
-                        let d = Sheet.textPadding.height - text.origin.y
-                        text.origin.y += d
-                        content.origin.y += d
-                    }
-                    sheetView.newUndoGroup()
-                    sheetView.append(text)
-                    sheetView.append(content)
                 }
                 
                 dshp.x += 1

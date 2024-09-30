@@ -2530,23 +2530,6 @@ final class CopyEditor: Editor {
             content.size = content.size * scale
             content.origin -= Point(content.size.width / 2, content.size.height / 2)
             
-            if content.type.hasDur {
-                let interval = document.currentBeatInterval
-                let startBeat = sheetView.animationView.beat(atX: sheetP.x, interval: interval)
-                let tempo = sheetView.nearestTempo(at: sheetP) ?? Music.defaultTempo
-                let durBeat = if let nbr = content.timeOption?.beatRange {
-                    nbr.length
-                } else {
-                    ContentTimeOption.beat(fromSec: content.durSec,
-                                           tempo: tempo,
-                                           beatRate: Keyframe.defaultFrameRate,
-                                           rounded: .up)
-                }
-                let beatRange = Range(start: startBeat, length: durBeat)
-                
-                content.timeOption = .init(beatRange: beatRange, tempo: tempo)
-            }
-            
             sheetView.newUndoGroup()
             sheetView.append(content)
         case .beatRange(let beatRange):

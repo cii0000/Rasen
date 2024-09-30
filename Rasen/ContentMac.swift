@@ -44,6 +44,8 @@ extension ContentTimeOption: Protobuf {
 
 struct Content: Hashable, Codable {
     enum FileType: FileTypeProtocol, CaseIterable {
+        case mp4
+        case mov
         case wav
         case mp3
         case m4a
@@ -53,6 +55,8 @@ struct Content: Hashable, Codable {
         
         var name: String {
             switch self {
+            case .mp4: "MP4"
+            case .mov: "MOV"
             case .wav: "WAV"
             case .mp3: "MP3"
             case .m4a: "M4A"
@@ -63,6 +67,8 @@ struct Content: Hashable, Codable {
         }
         var utType: UTType {
             switch self {
+            case .mp4: .init(filenameExtension: "mp4")!
+            case .mov: .init(filenameExtension: "mov")!
             case .wav: .init(filenameExtension: "wav")!
             case .mp3: .init(filenameExtension: "mp3")!
             case .m4a: .init(filenameExtension: "m4a")!
@@ -77,7 +83,7 @@ struct Content: Hashable, Codable {
         case movie, sound, image, none
         
         var isAudio: Bool {
-            self == .movie || self == .sound
+            self == .sound
         }
         var hasDur: Bool {
             self == .movie || self == .sound
@@ -123,7 +129,8 @@ struct Content: Hashable, Codable {
     }
     private(set) var url: URL
     private(set) var type: ContentType
-    let durSec: Double
+    var durSec: Rational
+    var frameRate: Rational = 1
     let image: Image?
     
     var stereo = Stereo(volm: 1)
@@ -131,6 +138,10 @@ struct Content: Hashable, Codable {
     var origin = Point()
     var isShownSpectrogram = false
     var timeOption: ContentTimeOption?
+    var beat: Rational = 0
+    var sec: Rational? {
+        timeOption?.sec(fromBeat: beat)
+    }
     var id = UUID()
     
     init(directoryName: String = "", name: String = "",
@@ -146,7 +157,7 @@ struct Content: Hashable, Codable {
             .appending(component: "contents")
             .appending(component: name)
         type = Self.type(from: url)
-        durSec = type.hasDur ? Self.durSec(from: url) : 0
+        durSec = type == .sound ? Self.audioDurSec(from: url) : 0
         image = Image(url: url)
         
         self.stereo = stereo
@@ -156,17 +167,19 @@ struct Content: Hashable, Codable {
         self.timeOption = timeOption
     }
     
-    static func durSec(from url: URL) -> Double {
+    static func audioDurSec(from url: URL) -> Rational {
         if let file = try? AVAudioFile(forReading: url,
                                        commonFormat: .pcmFormatFloat32,
-                                       interleaved: false) {
-            Double(file.length) / file.fileFormat.sampleRate
+                                       interleaved: false),
+           file.fileFormat.sampleRate != 0 {
+            
+            .init(Int(file.length), Int(file.fileFormat.sampleRate))
         } else {
             0
         }
     }
     mutating func normalizeVolm() {
-        if type.hasDur, let lufs = integratedLoudness, lufs > -14 {
+        if type == .sound, let lufs = integratedLoudness, lufs > -14 {
             let gain = Loudness.normalizeLoudnessScale(inputLoudness: lufs,
                                                        targetLoudness: -14)
             stereo.volm = Volm.volm(fromAmp: Volm.amp(fromVolm: stereo.volm) * gain)
@@ -176,10 +189,7 @@ struct Content: Hashable, Codable {
 extension Content {
     var localBeatRange: Range<Rational>? {
         if let timeOption {
-            let durBeat = ContentTimeOption.beat(fromSec: durSec,
-                                                 tempo: timeOption.tempo,
-                                                 beatRate: Keyframe.defaultFrameRate,
-                                                 rounded: .up)
+            let durBeat = ContentTimeOption.beat(fromSec: durSec, tempo: timeOption.tempo)
             return Range(start: timeOption.localStartBeat, length: durBeat)
         } else {
             return nil
@@ -188,17 +198,24 @@ extension Content {
     
     var contentSecRange: Range<Double>? {
         if let timeOption {
-            let sSec = Double(timeOption.sec(fromBeat: max(-timeOption.localStartBeat, 0)))
-            let durSec = durSec
-            let eSec = min(sSec + .init(timeOption.secRange.length), durSec)
-            return sSec < eSec ? sSec ..< eSec : nil
+            let sSec = timeOption.sec(fromBeat: max(-timeOption.localStartBeat, 0))
+            let eSec = min(sSec + timeOption.secRange.length, durSec)
+            return sSec < eSec ? .init(sSec) ..< .init(eSec) : nil
         } else {
             return nil
         }
     }
     
+    var frameRateBeat: Rational? {
+        guard let frameBeat = frameBeat else { return nil }
+        return frameBeat == 0 ? 1 : 1 / frameBeat
+    }
+    var frameBeat: Rational? {
+        frameRate == 0 ? 0 : timeOption?.beat(fromSec: 1 / frameRate)
+    }
+    
     var imageFrame: Rect? {
-        if type == .image {
+        if type == .image || type == .movie {
             Rect(origin: origin, size: size)
         } else {
             nil
@@ -226,7 +243,10 @@ extension Content: Protobuf {
             .appending(component: "contents")
             .appending(component: name)
         type = Content.type(from: url)
-        durSec = type.hasDur ? Content.durSec(from: url) : 0
+        let durSec: Rational = (try? .init(pb.durSec)) ?? 0
+        let frameRate: Rational = (try? .init(pb.frameRate)) ?? 0
+        self.durSec = durSec == 0 && type == .sound ? Self.audioDurSec(from: url) : durSec
+        self.frameRate = frameRate == 0 ? 1 : frameRate
         image = type == .image ? Image(url: url) : nil
         
         stereo = (try? .init(pb.stereo)) ?? .init(volm: 1)
@@ -238,12 +258,15 @@ extension Content: Protobuf {
         } else {
             nil
         }
+        beat = (try? .init(pb.beat)) ?? 0
         id = (try? .init(pb.id)) ?? .init()
     }
     var pb: PBContent {
         .with {
             $0.directoryName = directoryName
             $0.name = name
+            $0.durSec = durSec.pb
+            $0.frameRate = frameRate.pb
             $0.stereo = stereo.pb
             $0.size = size.pb
             $0.origin = origin.pb
@@ -253,6 +276,7 @@ extension Content: Protobuf {
             } else {
                 nil
             }
+            $0.beat = beat.pb
             $0.id = id.pb
         }
     }
