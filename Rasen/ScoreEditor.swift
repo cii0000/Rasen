@@ -1507,7 +1507,7 @@ extension ScoreView {
             lyricLinePathlines = [Pathline]()
         var spectlopePathlines = [Pathline]()
         var scNodes = [Node]()
-        let knobR = 0.5, envelopeR = 0.125, toneR = 0.125, sprolR = 0.125, sprolSubR = 0.0625
+        let knobR = 0.5, envelopeR = 0.25, toneR = 0.125, sprolR = 0.125, sprolSubR = 0.0625
         
         let lyricNodes: [Node] = note.pits.enumerated().compactMap { (pitI, pit) in
             let p = pitPosition(atPit: pitI, from: note)
@@ -2213,6 +2213,11 @@ extension ScoreView {
                     minDS = ds
                     minI = noteI
                 }
+                let nds = noteOptionFrame(from: note).distanceSquared(p)
+                if nds < minDS && nds < maxDS {
+                    minDS = nds
+                    minI = noteI
+                }
             }
             if enabledRelease {
                 let rp = releasePosition(from: note)
@@ -2589,6 +2594,13 @@ extension ScoreView {
         let nw = width(atDurBeat: max(note.beatRange.length, Sheet.fullEditBeatInterval))
         return .init(x: nx, y: toneY,
                      width: nw, height: ScoreLayout.spectlopeHeight + ScoreLayout.spectlopeY)
+    }
+    func noteOptionFrame(from note: Note) -> Rect {
+        let toneY = toneY(at: .init(), from: note)
+        let nx = x(atBeat: note.beatRange.start)
+        let nw = width(atDurBeat: max(note.beatRange.length, Sheet.fullEditBeatInterval))
+        return .init(x: nx, y: toneY - ScoreLayout.envelopeY * 2,
+                     width: nw, height: ScoreLayout.envelopeY * 2)
     }
     func pitIAndSprolI(at p: Point, at noteI: Int) -> (pitI: Int, sprolI: Int)? {
         guard p.y > toneY(at: p, at: noteI) + ScoreLayout.spectlopeY else { return nil }
