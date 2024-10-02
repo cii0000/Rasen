@@ -826,7 +826,7 @@ extension Tone: MonoInterpolatable {
 }
 
 struct Pit: Codable, Hashable {
-    var beat = Rational(0), pitch = Rational(0), stereo = Stereo(volm: 0.28125), odd = 0.0, tone = Tone(), lyric = ""
+    var beat = Rational(0), pitch = Rational(0), stereo = Stereo(volm: 0.28125), tone = Tone(), lyric = ""
 }
 extension Pit: Protobuf {
     init(_ pb: PBPit) throws {
@@ -869,16 +869,98 @@ extension Pit {
     }
 }
 
+struct Reverb: Hashable, Codable {
+    var earlyRSec = 0.02
+    var earlyRVolm = 0.75
+    var lateRSec = 0.2
+    var lateRVolm = 0.5
+    var releaseSec = 0.3
+    var seedID = UUID.one
+}
+extension Reverb: Protobuf {
+    init(_ pb: PBReverb) throws {
+        earlyRSec = max(0, ((try? pb.earlyRsec.notNaN()) ?? 0))
+        earlyRVolm = ((try? pb.earlyRvolm.notNaN()) ?? 0).clipped(min: 0, max: 1)
+        lateRSec = max(0, ((try? pb.lateRsec.notNaN()) ?? 0))
+        lateRVolm = ((try? pb.lateRvolm.notNaN()) ?? 0).clipped(min: 0, max: 1)
+        releaseSec = max(0, ((try? pb.releaseSec.notNaN()) ?? 0))
+        seedID = (try? .init(pb.seedID)) ?? .init()
+    }
+    var pb: PBReverb {
+        .with {
+            $0.earlyRsec = earlyRSec
+            $0.earlyRvolm = earlyRVolm
+            $0.lateRsec = lateRSec
+            $0.lateRvolm = lateRVolm
+            $0.releaseSec = releaseSec
+            $0.seedID = seedID.pb
+        }
+    }
+}
+extension Reverb {
+    var isEmpty: Bool {
+        (earlyRSec == 0 && lateRSec == 0 && releaseSec == 0) || (earlyRVolm == 0 && lateRVolm == 0)
+    }
+    
+    var earlyAndLateRSec: Double {
+        earlyRSec + lateRSec
+    }
+    var durSec: Double {
+        earlyRSec + lateRSec + releaseSec
+    }
+    
+    func fir(sampleRate: Double, channel: Int) -> [Double] {
+        guard !isEmpty else { return [] }
+        
+        let durSec = durSec
+        let count = Int((durSec * sampleRate).rounded(.up))
+        var fir = [Double](repeating: 0, count: count)
+        fir[0] = 1
+        
+        let elRSec = earlyRSec + lateRSec
+        let rSampleRate = 1 / sampleRate
+        let si = Int(earlyRSec * sampleRate).clipped(min: 0, max: count - 1)
+        let seed = seedID.uInt64Values.value0
+        var random = Random(seed: seed)
+        let scale = 100.0
+        let siMin = Double(si).squareRoot().clipped(min: 10, max: 5000.squareRoot(), newMin: 1, newMax: scale)
+        for i in si ..< count {
+            let t0 = random.nextT()
+            let sec = Double(i) * rSampleRate
+            let nni = lateRSec == 0 ? 0 : sec.clipped(min: earlyRSec, max: elRSec, newMin: 1, newMax: 0)
+            let ni = nni.squared.clipped(min: 1, max: 0, newMin: Double(si), newMax: 1)
+            guard i == si || ni == 1 || Int(ni * t0) == 0 else { continue }
+            let volm = sec < elRSec ?
+            (1 - nni).squared.clipped(min: 0, max: 1, newMin: earlyRVolm, newMax: lateRVolm) :
+            sec.clipped(min: elRSec, max: durSec, newMin: lateRVolm, newMax: 0)
+            let t1 = random.nextT()
+            let nPan = (t1 * 2 - 1) * 0.75
+            let nVolm = if nPan < 0 {
+                channel == 0 ? volm : volm * (1 + nPan)
+            } else {
+                channel == 0 ? volm * (1 - nPan) : volm
+            }
+            let t2 = random.nextT()
+            let sign = t2 > 0.5 ? 1.0 : -1.0
+            fir[i] = sign * Volm.amp(fromVolm: nVolm)
+            * nni.clipped(min: 1, max: 0, newMin: siMin, newMax: 1) / scale
+        }
+        return fir
+    }
+}
+
 struct Envelope: Hashable, Codable {
     var attackSec = 0.01171875, decaySec = 0.0, sustainVolm = 1.0, releaseSec = 0.01171875
+    var reverb = Reverb()
     var id = UUID()
 }
 extension Envelope: Protobuf {
     init(_ pb: PBEnvelope) throws {
-        attackSec = try pb.attackSec.notNaN().clipped(min: 0, max: 1)
-        decaySec = try pb.decaySec.notNaN().clipped(min: 0, max: 1)
-        sustainVolm = try pb.sustainVolm.notNaN().clipped(min: 0, max: 1)
-        releaseSec = try pb.releaseSec.notNaN().clipped(min: 0, max: 1)
+        attackSec = max(0, ((try? pb.attackSec.notNaN()) ?? 0))
+        decaySec = max(0, ((try? pb.decaySec.notNaN()) ?? 0))
+        sustainVolm = ((try? pb.sustainVolm.notNaN()) ?? 0).clipped(min: 0, max: 1)
+        releaseSec = max(0, ((try? pb.releaseSec.notNaN()) ?? 0))
+        reverb = (try? .init(pb.reverb)) ?? .init()
         id = (try? .init(pb.id)) ?? .init()
     }
     var pb: PBEnvelope {
@@ -887,6 +969,7 @@ extension Envelope: Protobuf {
             $0.decaySec = decaySec
             $0.sustainVolm = sustainVolm
             $0.releaseSec = releaseSec
+            $0.reverb = reverb.pb
             $0.id = id.pb
         }
     }

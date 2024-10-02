@@ -459,6 +459,40 @@ final class ColorEditor: Editor {
                         beganEnvelope = score.notes[noteI].envelope
                         beganVolm = score.notes[noteI].envelope.sustainVolm
                         beganBeat = scoreView.beat(atX: scoreP.x)
+                    case .reverbEarlyRVolm:
+                        if document.isSelect(at: p) {
+                            let noteIs = sheetView.noteIndexes(from: document.selections)
+                            beganNotes = noteIs.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
+                        } else {
+                            let id = score.notes[noteI].envelope.id
+                            beganNotes = score.notes.enumerated().reduce(into: [Int: Note]()) {
+                                if id == $1.element.envelope.id {
+                                    $0[$1.offset] = $1.element
+                                }
+                            }
+                        }
+                        beganNotes[noteI] = score.notes[noteI]
+                        
+                        beganEnvelope = score.notes[noteI].envelope
+                        beganVolm = score.notes[noteI].envelope.reverb.earlyRVolm
+                        beganBeat = scoreView.beat(atX: scoreP.x)
+                    case .reverbLateRVolm:
+                        if document.isSelect(at: p) {
+                            let noteIs = sheetView.noteIndexes(from: document.selections)
+                            beganNotes = noteIs.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
+                        } else {
+                            let id = score.notes[noteI].envelope.id
+                            beganNotes = score.notes.enumerated().reduce(into: [Int: Note]()) {
+                                if id == $1.element.envelope.id {
+                                    $0[$1.offset] = $1.element
+                                }
+                            }
+                        }
+                        beganNotes[noteI] = score.notes[noteI]
+                        
+                        beganEnvelope = score.notes[noteI].envelope
+                        beganVolm = score.notes[noteI].envelope.reverb.lateRVolm
+                        beganBeat = scoreView.beat(atX: scoreP.x)
                     case .pit(let pitI):
                         beganVolm = score.notes[noteI].pits[pitI].stereo.volm
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .stereo)
@@ -531,6 +565,28 @@ final class ColorEditor: Editor {
                     for (noteI, beganNote) in beganNotes {
                         var envelope = beganNote.envelope
                         envelope.sustainVolm = sustainVolm
+                        envelope.id = beganEnvelope.id
+                        eivs.append(.init(value: envelope, index: noteI))
+                    }
+                    scoreView.replace(eivs)
+                case .reverbEarlyRVolm:
+                    let volm = newVolm(from: beganEnvelope.reverb.earlyRVolm)
+                    var eivs = [IndexValue<Envelope>](capacity: beganNotes.count)
+                    for (noteI, beganNote) in beganNotes {
+                        var envelope = beganNote.envelope
+                        envelope.reverb.earlyRVolm = volm
+                        envelope.reverb.seedID = beganEnvelope.id
+                        envelope.id = beganEnvelope.id
+                        eivs.append(.init(value: envelope, index: noteI))
+                    }
+                    scoreView.replace(eivs)
+                case .reverbLateRVolm:
+                    let volm = newVolm(from: beganEnvelope.reverb.lateRVolm)
+                    var eivs = [IndexValue<Envelope>](capacity: beganNotes.count)
+                    for (noteI, beganNote) in beganNotes {
+                        var envelope = beganNote.envelope
+                        envelope.reverb.lateRVolm = volm
+                        envelope.reverb.seedID = beganEnvelope.id
                         envelope.id = beganEnvelope.id
                         eivs.append(.init(value: envelope, index: noteI))
                     }
@@ -862,7 +918,7 @@ final class ColorEditor: Editor {
                         beganStereo = scoreView.stereo(atX: scoreP.x, at: noteI)
                         updatePitsWithSelection(noteI: noteI, pitI: nil, sprolI: nil, .stereo)
                         beganBeat = scoreView.beat(atX: scoreP.x)
-                    case .sustain: return
+                    case .sustain, .reverbEarlyRVolm, .reverbLateRVolm: return
                     case .pit(let pitI):
                         beganStereo = note.pits[pitI].stereo
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .stereo)

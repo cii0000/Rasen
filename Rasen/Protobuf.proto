@@ -208,11 +208,21 @@ message PBPitbend {
     repeated PBPit pits = 1;
 }
 
+message PBReverb {
+    double earlyRSec = 1;
+    double earlyRVolm = 2;
+    double lateRSec = 3;
+    double lateRVolm = 4;
+    double releaseSec = 5;
+    PBUUID seedID = 6;
+}
+
 message PBEnvelope {
     double attackSec = 1;
     double decaySec = 2;
     double sustainVolm = 3;
     double releaseSec = 4;
+    PBReverb reverb = 6;
     PBUUID id = 5;
 }
 

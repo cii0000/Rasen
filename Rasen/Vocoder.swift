@@ -22,34 +22,36 @@ import struct Accelerate.DSPDoubleSplitComplex
 
 /// xoshiro256**
 struct Random: Hashable, Codable {
-    static let defaultSeed: UInt64 = 88675123
+    private var s0, s1, s2, s3: UInt64
     
-    private struct State: Hashable, Codable {
-        var x: UInt64 = 123456789
-        var y: UInt64 = 362436069
-        var z: UInt64 = 521288629
-        var w = defaultSeed
-    }
-    private var state = State()
-    var seed: UInt64 { state.w }
-    
-    init(seed: UInt64 = defaultSeed) {
-        state.w = seed
+    init(seed: UInt64) {
+        func next(x: inout UInt64) -> UInt64 {
+            x &+= 0x9e3779b97f4a7c15
+            var z = x
+            z = (z ^ (z >> 30)) &* 0xbf58476d1ce4e5b9
+            z = (z ^ (z >> 27)) &* 0x94d049bb133111eb
+            return z ^ (z >> 31)
+        }
+        var seed = seed
+        s0 = next(x: &seed)
+        s1 = next(x: &seed)
+        s2 = next(x: &seed)
+        s3 = next(x: &seed)
     }
     
     private func rol(_ x: UInt64, _ k: Int) -> UInt64 {
         (x << k) | (x >> (64 - k))
     }
     mutating func next() -> UInt64 {
-        let result = rol(state.y &* 5, 7) &* 9
-        let t = state.y << 17
-        state.z ^= state.x
-        state.w ^= state.y
-        state.y ^= state.z
-        state.x ^= state.w
+        let result = rol(s1 &* 5, 7) &* 9
+        let t = s1 << 17
+        s2 ^= s0
+        s3 ^= s1
+        s1 ^= s2
+        s0 ^= s3
         
-        state.z ^= t
-        state.w = rol(state.w, 45)
+        s2 ^= t
+        s3 = rol(s3, 45)
         return result
     }
     mutating func nextT() -> Double {
@@ -58,13 +60,10 @@ struct Random: Hashable, Codable {
 }
 
 extension vDSP {
-    static func gaussianNoise(count: Int,
-                              seed: UInt64 = Random.defaultSeed) -> [Double] {
+    static func gaussianNoise(count: Int, seed: UInt64) -> [Double] {
         gaussianNoise(count: count, seed0: seed, seed1: seed << 10)
     }
-    static func gaussianNoise(count: Int,
-                              seed0: UInt64 = Random.defaultSeed,
-                              seed1: UInt64 = 100001,
+    static func gaussianNoise(count: Int, seed0: UInt64, seed1: UInt64,
                               maxAmp: Double = 3) -> [Double] {
         guard count > 0 else { return [] }
         
@@ -82,8 +81,7 @@ extension vDSP {
         }
         return vs
     }
-    static func approximateGaussianNoise(count: Int,
-                                         seed: UInt64 = Random.defaultSeed,
+    static func approximateGaussianNoise(count: Int, seed: UInt64,
                                          maxAmp: Double = 3) -> [Double] {
         guard count > 0 else { return [] }
         
@@ -102,9 +100,10 @@ extension vDSP {
     }
 }
 
-struct EnvelopeMemo {
-    let attackSec, decaySec, sustainVolm, releaseSec: Double
+struct EnvelopeMemo: Hashable, Codable {
+    let attackSec, decaySec, sustainVolm, releaseSec, maxSec: Double
     let rAttackSec, rDecaySec, rReleaseSec: Double
+    let reverb: Reverb
     
     init(_ envelope: Envelope) {
         attackSec = max(envelope.attackSec, 0)
@@ -114,6 +113,8 @@ struct EnvelopeMemo {
         rAttackSec = 1 / attackSec
         rDecaySec = 1 / decaySec
         rReleaseSec = 1 / releaseSec
+        reverb = envelope.reverb
+        maxSec = releaseSec + (envelope.reverb.isEmpty ? 0 : envelope.reverb.durSec)
     }
 }
 extension EnvelopeMemo {
@@ -362,37 +363,76 @@ extension Rendnote {
         secRange.length.isInfinite
     }
     var rendableDurSec: Double {
-        isLoop ? 1 : min(secRange.length + envelopeMemo.releaseSec, 100000)
+        min(isLoop ? fq.rounded(.up) / fq : secRange.length + envelopeMemo.releaseSec, 100000)
     }
 }
 extension Rendnote {
     func notewave(stftCount: Int = 1024, fAlpha: Double = 1, rmsSize: Int = 2048,
-                  cutFq: Double = 16384, cutStartFq: Double = 15800, sampleRate: Double,
-                  fftCount: Int = 65536) -> Notewave {
-        let notewave = aNotewave(stftCount: stftCount, fAlpha: fAlpha, rmsSize: rmsSize,
-                                 cutFq: cutFq, 
-                                 cutStartFq: cutStartFq, sampleRate: sampleRate, fftCount: fftCount)
+                  cutFq: Double = 16384, cutStartFq: Double = 15800, sampleRate: Double) -> Notewave {
+        var notewave = aNotewave(stftCount: stftCount, fAlpha: fAlpha, rmsSize: rmsSize,
+                                 cutFq: cutFq, cutStartFq: cutStartFq, sampleRate: sampleRate)
+        if !envelopeMemo.reverb.isEmpty {
+            let sampleCount = notewave.sampleCount
+            let rSampleRate = 1 / sampleRate
+            let rsSec = isLoop ? 1 : secRange.length
+            if !isLoop {
+                if envelopeMemo.decaySec == 0 || envelopeMemo.sustainVolm == 1 {
+                    let si = Int((envelopeMemo.attackSec * sampleRate).rounded(.up))
+                        .clipped(min: 0, max: sampleCount)
+                    for i in 0 ..< si {
+                        let sec = Double(i) * rSampleRate
+                        notewave.samples[0][i]
+                        *= Volm.amp(fromVolm: envelopeMemo.volm(atSec: sec, releaseStartSec: rsSec))
+                    }
+                    let ei = max(si, Int((rsSec * sampleRate).rounded(.down)))
+                        .clipped(min: 0, max: sampleCount)
+                    for i in ei ..< sampleCount {
+                        let sec = Double(i) * rSampleRate
+                        notewave.samples[0][i]
+                        *= Volm.amp(fromVolm: envelopeMemo.volm(atSec: sec, releaseStartSec: rsSec))
+                    }
+                } else {
+                    for i in 0 ..< sampleCount {
+                        let sec = Double(i) * rSampleRate
+                        notewave.samples[0][i]
+                        *= Volm.amp(fromVolm: envelopeMemo.volm(atSec: sec, releaseStartSec: rsSec))
+                    }
+                }
+                notewave.isPremultipliedEnvelope = true
+            }
+            notewave.samples = [vDSP.apply(fir: envelopeMemo.reverb.fir(sampleRate: sampleRate, channel: 0),
+                                           in: notewave.samples[0]),
+                                vDSP.apply(fir: envelopeMemo.reverb.fir(sampleRate: sampleRate, channel: 1),
+                                           in: notewave.samples[0])]
+            if isLoop && notewave.sampleCount > sampleCount {
+                let count = notewave.sampleCount - sampleCount
+                notewave.samples[0].removeLast(count)
+                notewave.samples[1].removeLast(count)
+            }
+        }
         
-        if notewave.samples.contains(where: { $0.isNaN || $0.isInfinite }) {
-            print(notewave.samples.contains(where: { $0.isInfinite }) ? "inf" : "nan")
+        notewave.samples.forEach { samples in
+            if samples.contains(where: { $0.isNaN || $0.isInfinite }) {
+                print(samples.contains(where: { $0.isInfinite }) ? "inf" : "nan")
+            }
         }
         
         return notewave
     }
     private func aNotewave(stftCount: Int, fAlpha: Double, rmsSize: Int,
-                           cutFq: Double, cutStartFq: Double, sampleRate: Double,
-                           fftCount: Int) -> Notewave {
+                           cutFq: Double, cutStartFq: Double, sampleRate: Double) -> Notewave {
         guard !pitbend.isEmpty else {
-            return .init(fqScale: 1, isLoop: isLoop, samples: [0], stereos: [.init()])
+            return .init(samples: [[0]], stereos: [.init()], isLoop: isLoop)
         }
         let isLoop = isLoop
         let isStft = isStft
         let isFullNoise = pitbend.isFullNoise
         let containsNoise = pitbend.containsNoise
         let rendableDurSec = rendableDurSec
-        let sampleCount = rendableDurSec == 1 ? fftCount : Int((rendableDurSec * sampleRate).rounded(.up))
+        
+        let sampleCount = Int((rendableDurSec * sampleRate).rounded(.up))
         guard sampleCount >= 4 else {
-            return .init(fqScale: 1, isLoop: isLoop, samples: [0], stereos: [.init()])
+            return .init(samples: [[0]], stereos: [.init()], isLoop: isLoop)
         }
         
         let stereoScale = Volm.volm(fromAmp: 1 / 2.0.squareRoot())
@@ -403,8 +443,6 @@ extension Rendnote {
         }
         
         let fq = fq.clipped(min: Score.minFq, max: cutFq)
-        let intFq = fq.rounded(.down)
-        let fqScale = fq / intFq
         let notePitch = Pitch.pitch(fromFq: fq)
         
         let rSampleRate = 1 / sampleRate
@@ -413,14 +451,14 @@ extension Rendnote {
         if isOneSin {
             let pi2rs = .pi2 * rSampleRate, rScale = Double.sqrt(2)
             if pitbend.isEqualAllPitch {
-                let a = (isLoop ? intFq : fq) * pi2rs
+                let a = fq * pi2rs
                 var samples = sampleCount.range.map { Double.sin(Double($0) * a) }
                 let pitch = Pitch.pitch(fromFq: fq)
                 let amp = Volm.amp(fromVolm: Loudness.volm40Phon(fromPitch: pitch))
                 vDSP.multiply(amp * rScale, samples, result: &samples)
                 
                 let stereos = stereos(sampleCount: samples.count)
-                return .init(fqScale: isLoop ? fqScale : 1, isLoop: isLoop, samples: samples, stereos: stereos)
+                return .init(samples: [samples], stereos: stereos, isLoop: isLoop)
             } else {
                 var phase = 0.0
                 let samples = sampleCount.range.map {
@@ -434,7 +472,7 @@ extension Rendnote {
                 }
                 
                 let stereos = stereos(sampleCount: samples.count)
-                return .init(fqScale: 1, isLoop: isLoop, samples: samples, stereos: stereos)
+                return .init(samples: [samples], stereos: stereos, isLoop: isLoop)
             }
         }
         
@@ -498,7 +536,7 @@ extension Rendnote {
                 samples = normarizedWithRMS(from: mainSamples, to: samples)
                 
                 let stereos = stereos(sampleCount: samples.count)
-                return .init(fqScale: 1, isLoop: isLoop, samples: samples, stereos: stereos)
+                return .init(samples: [samples], stereos: stereos, isLoop: isLoop)
             } else {
                 let sinCount = Int((cutFq / fq).clipped(min: 1, max: Double(Int.max)))
                 let fq = fq.clipped(min: Score.minFq, max: cutFq)
@@ -590,7 +628,7 @@ extension Rendnote {
                 }
                 
                 let stereos = stereos(sampleCount: samples.count)
-                return .init(fqScale: 1, isLoop: isLoop, samples: samples, stereos: stereos)
+                return .init(samples: [samples], stereos: stereos, isLoop: isLoop)
             }
         } else {
             func normarizedWithRMS(from sSamples: [Double], to lSamples: [Double]) -> [Double] {
@@ -668,7 +706,7 @@ extension Rendnote {
                 samples = normarizedWithRMS(from: mainSamples, to: samples)
                 
                 let stereos = stereos(sampleCount: samples.count)
-                return .init(fqScale: 1, isLoop: isLoop, samples: samples, stereos: stereos)
+                return .init(samples: [samples], stereos: stereos, isLoop: isLoop)
             } else {
                 struct Frame {
                     var sec: Double, fq: Double, sinCount: Int, sin1X: Double, cos1X: Double
@@ -829,7 +867,7 @@ extension Rendnote {
                 samples = normarizedWithRMS(from: mainSamples, to: samples)
                 
                 let stereos = stereos(sampleCount: samples.count)
-                return .init(fqScale: 1, isLoop: isLoop, samples: samples, stereos: stereos)
+                return .init(samples: [samples], stereos: stereos, isLoop: isLoop)
             }
         }
     }
@@ -896,40 +934,46 @@ extension vDSP {
 }
 
 struct Notewave {
-    let fqScale: Double
-    let isLoop: Bool
-    let samples: [Double]
-    let stereos: [Stereo]
+    var samples = [[Double]]()
+    var stereos = [Stereo]()
+    var isLoop = false
+    var isPremultipliedEnvelope = false
 }
 extension Notewave {
-    func sample(amp: Double, atPhase phase: inout Double) -> Double {
-        let count = Double(samples.count)
+    var sampleCount: Int {
+        samples.isEmpty ? 0 : samples[0].count
+    }
+    func sample(amp: Double, channel: Int, atPhase phase: Double) -> Double {
+        let sampleCount = sampleCount
+        let count = Double(sampleCount)
         if !isLoop && phase >= count { return 0 }
-        phase = phase.loop(start: 0, end: count)
         
+        let samples = samples[channel]
         let n: Double
         if phase.isInteger {
             n = samples[Int(phase)] * amp
         } else {
-            guard samples.count >= 4 else { return 0 }
+            guard sampleCount >= 4 else { return 0 }
             let sai = Int(phase)
             
-            let a0 = sai - 1 >= 0 ? samples[sai - 1] : (isLoop ? samples[samples.count - 1] : 0)
+            let a0 = sai - 1 >= 0 ? samples[sai - 1] : (isLoop ? samples[sampleCount - 1] : 0)
             let a1 = samples[sai]
-            let a2 = sai + 1 < samples.count ? samples[sai + 1] : (isLoop ? samples[0] : 0)
-            let a3 = sai + 2 < samples.count ? samples[sai + 2] : (isLoop ? samples[1] : 0)
+            let a2 = sai + 1 < sampleCount ? samples[sai + 1] : (isLoop ? samples[0] : 0)
+            let a3 = sai + 2 < sampleCount ? samples[sai + 2] : (isLoop ? samples[1] : 0)
             let t = phase - Double(sai)
             let sy = Double.spline(a0, a1, a2, a3, t: t)
             n = sy * amp
         }
         
-        phase += fqScale
-        phase = !isLoop && phase >= count ? phase : phase.loop(start: 0, end: count)
-        
         return n
     }
+    func movedPhase(from phase: Double) -> Double {
+        let count = Double(sampleCount)
+        let phase = phase + 1
+        return !isLoop && phase >= count ? phase : phase.loop(start: 0, end: count)
+    }
     
-    func stereo(atPhase phase: inout Double) -> Stereo {
+    func stereo(atPhase phase: Double) -> Stereo {
         let count = Double(stereos.count)
         if !isLoop && phase >= count { return stereos.last ?? .init() }
         

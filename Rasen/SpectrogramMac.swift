@@ -49,20 +49,45 @@ extension vDSP {
         (vDSP.sumOfSquares(vector) / 2).squareRoot()
     }
     
-    func apply(fir impulseResponse: [Double], in data: [Double]) -> [Double] {
-        guard !impulseResponse.isEmpty else { return data }
-        let fftCount = vDSP.nextPow2(max(data.count, impulseResponse.count))
-        guard let fft = try? Fft(count: fftCount),
-              let ifft = try? Ifft(count: fftCount) else { return data }
-        let nSamples = data.count == fftCount
-        ? data : data + .init(repeating: 0, count: fftCount - data.count)
-        let nIrSamples = impulseResponse.count == fftCount
-        ? impulseResponse : impulseResponse + .init(repeating: 0, count: fftCount - impulseResponse.count)
-        var compBox: CompBox = fft.transform(nSamples)
-        let irCompBox: CompBox = fft.transform(nIrSamples)
-        compBox *= irCompBox
-        let nRes = ifft.resAndImsTransform(compBox).res
-        return Array(nRes[..<(data.count + impulseResponse.count)])
+    enum FIRType {
+        case normal, conv, slow//, overlap
+    }
+    static func apply(fir h: [Double], in x: [Double], _ type: FIRType = .normal) -> [Double] {
+        switch type {
+        case .normal:
+            let nx = .init(repeating: 0, count: h.count) + x
+            let fftCount = vDSP.nextPow2(nx.count + h.count - 1)
+            let fft = try! Fft(count: fftCount), ifft = try! Ifft(count: fftCount)
+            let nnx = nx + .init(repeating: 0, count: fftCount - nx.count)
+            let nh = h + .init(repeating: 0, count: fftCount - h.count)
+            let xCompBox: CompBox = fft.mathTransform(nnx)
+            let hCompBox: CompBox = fft.mathTransform(nh)
+            let y = ifft.mathResTransform(xCompBox * hCompBox)
+            return Array(y[h.count..<(h.count + x.count + h.count - 1)])
+        case .conv:
+            let count = x.count + h.count - 1
+            var y = [Double](repeating:0.0, count: count)
+            let x = [Double](repeating: 0.0, count: count - x.count) + x
+            h.withUnsafeBufferPointer { ptr in
+                vDSP_convD(x, 1, ptr.baseAddress!.advanced(by: h.count - 1), -1,
+                           &y, 1, vDSP_Length(count), vDSP_Length(h.count))
+            }
+            return y
+        case .slow:
+            var y = [Double](repeating: 0, count: x.count + h.count - 1)
+            let x = .init(repeating: 0, count: h.count) + x + .init(repeating: 0, count: h.count)
+            for i in 0 ..< y.count {
+                y[i] = h.count.range.sum {
+                    x[h.count + i - $0] * h[$0]
+                }
+            }
+            return y
+//        case .overlap:
+//            let fftCount = vDSP.nextPow2(h.count)
+//            let fft = try! Fft(count: fftCount), ifft = try! Ifft(count: fftCount)
+//            let h = h + .init(repeating: 0, count: fftCount - h.count)
+//            let fftH: CompBox = fft.transform(h)
+        }
     }
 }
 
@@ -140,6 +165,10 @@ struct Fft {
     func mathTransform(_ x: [Double]) -> [FftComp] {
         let v = vdft.transform(real: x, imaginary: ims)
         return zip(v.real, v.imaginary).map { .init($0.0, $0.1) }
+    }
+    func mathTransform(_ x: [Double]) -> CompBox {
+        let v = vdft.transform(real: x, imaginary: ims)
+        return .init(res: v.real, ims: v.imaginary)
     }
     func transform(_ x: [Double]) -> [FftComp] {
         var v = vdft.transform(real: x, imaginary: ims)
@@ -272,6 +301,10 @@ struct Ifft {
     }
     func resTransform(_ frame: FftFrame) -> [Double] {
         resAndImsTransform(dc: frame.dc, amps: frame.amps, phases: frame.phases).res
+    }
+    func mathResTransform(_ x: CompBox) -> [Double] {
+        let v = vdft.transform(real: x.res, imaginary: x.ims)
+        return vDSP.multiply(1 / Double(count), v.real)
     }
     func resTransform(res: [Double], ims: [Double]) -> [Double] {
         resAndImsTransform(res: res, ims: ims).res

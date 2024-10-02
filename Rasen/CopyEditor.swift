@@ -916,9 +916,15 @@ final class CopyEditor: Editor {
             selectingLineNode.lineType = .color(.selected)
             selectingLineNode.lineWidth = document.worldLineWidth
             
-            if let result = scoreView.hitTestControl(scoreP, scale: document.screenToWorldScale, at: noteI) {
+            if scoreView.containsEnvelopeBox(at: scoreP, at: noteI) {
+                let envelope = score.notes[noteI].envelope
+                Pasteboard.shared.copiedObjects = [.envelope(envelope)]
+                
+                selectingLineNode.fillType = .color(.subSelected)
+                selectingLineNode.path = Path(scoreView.convertToWorld(scoreView.envelopeBoxFrame(from: scoreView.model.notes[noteI])))
+            } else if let result = scoreView.hitTestControl(scoreP, scale: document.screenToWorldScale, at: noteI) {
                 switch result {
-                case .attack, .decay, .release:
+                case .attack, .decay, .release, .reverbEarlyRSec, .reverbEarlyAndLateRSec, .reverbDurSec:
                     let envelope = score.notes[noteI].envelope
                     Pasteboard.shared.copiedObjects = [.envelope(envelope)]
                     
@@ -1226,7 +1232,7 @@ final class CopyEditor: Editor {
             let scoreP = scoreView.convertFromWorld(p)
             if let result = scoreView.hitTestControl(scoreP, scale: document.screenToWorldScale, at: noteI) {
                 switch result {
-                case .attack, .decay, .release:
+                case .attack, .decay, .release, .reverbEarlyRSec, .reverbEarlyAndLateRSec, .reverbDurSec:
                     let envelope = score.notes[noteI].envelope
                     Pasteboard.shared.copiedObjects = [.envelope(envelope)]
                     
@@ -3207,7 +3213,7 @@ final class LineColorCopier: InputKeyEditor {
                         noteNode.attitude.position = scoreView.node.convertToWorld(Point())
                         selectingLineNode.children = [noteNode]
                     }
-                case .sustain:
+                case .sustain, .reverbEarlyRVolm, .reverbLateRVolm:
                     break
                 case .pit(let pitI):
                     let stereo = score.notes[noteI].pits[pitI].stereo

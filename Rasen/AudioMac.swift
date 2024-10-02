@@ -344,7 +344,7 @@ final class PCMNoder {
 private final class NotewaveBox {
     var notewave: Notewave
     
-    init(_ notewave: Notewave = .init(fqScale: 1, isLoop: false, samples: [], stereos: [])) {
+    init(_ notewave: Notewave = .init()) {
         self.notewave = notewave
     }
 }
@@ -495,12 +495,15 @@ final class ScoreNoder {
     }
     
     struct NotewaveID: Hashable, Codable {
-        var fq: Double, noiseSeed0: UInt64, noiseSeed1: UInt64, pitbend: Pitbend, rendableDurSec: Double
+        var fq: Double, noiseSeed0: UInt64, noiseSeed1: UInt64,
+            envelopeMemo: EnvelopeMemo, pitbend: Pitbend,
+            rendableDurSec: Double
         
         init(_ rendnote: Rendnote) {
             fq = rendnote.fq
             noiseSeed0 = rendnote.noiseSeed0
             noiseSeed1 = rendnote.noiseSeed1
+            envelopeMemo = rendnote.envelopeMemo
             pitbend = rendnote.pitbend
             rendableDurSec = rendnote.rendableDurSec
         }
@@ -598,12 +601,12 @@ final class ScoreNoder {
                                                                 envelopeMemo: rendnote.envelopeMemo,
                                                                 pitbend: rendnote.pitbend,
                                                                 notewave: notewave)
-                            self.phases[rendnote.id] = .init(secI.mod(notewave.samples.count))
+                            self.phases[rendnote.id] = .init(secI.mod(notewave.sampleCount))
                         }
                     }
                 } else {
                     let dDurSec = rendnote.secRange.end + startSec - noteStartSec
-                    let noteDurSec = dDurSec + rendnote.envelopeMemo.releaseSec
+                    let noteDurSec = dDurSec + rendnote.envelopeMemo.maxSec
                     if !rendnote.secRange.start.isInfinite,
                        (frameStartSec ..< frameEndSec).intersects(noteStartSec ..< noteStartSec + noteDurSec)
                         && self.memowaves[rendnote.id] == nil {
@@ -621,7 +624,7 @@ final class ScoreNoder {
                                                                 envelopeMemo: rendnote.envelopeMemo,
                                                                 pitbend: rendnote.pitbend,
                                                                 notewave: notewave)
-                            self.phases[rendnote.id] = .init(secI.mod(notewave.samples.count))
+                            self.phases[rendnote.id] = .init(secI.mod(notewave.sampleCount))
                         }
                     } else if let memowave = self.memowaves[rendnote.id], !rendnote.secRange.end.isInfinite,
                               memowave.endSec == nil {
@@ -662,8 +665,8 @@ final class ScoreNoder {
             for (id, memowave) in memowaves {
                 var phase = phases[id]!
                 let notewave = memowave.notewave, pitbend = memowave.pitbend
-                guard notewave.samples.count >= 4 else { continue }
-                let count = Double(notewave.samples.count)
+                guard notewave.sampleCount >= 4 else { continue }
+                let count = Double(notewave.sampleCount)
                 if !notewave.isLoop && phase >= count { continue }
                 phase = phase.loop(0 ..< count)
                 
@@ -671,7 +674,7 @@ final class ScoreNoder {
                     let nSec = Double(i) * rSampleRate + frameStartSec
                     guard nSec >= memowave.startSec
                             && (memowave.endSec != nil ? nSec < memowave.endSec! : true) else { continue }
-                    let envelopeVolm = memowave.envelopeMemo
+                    let envelopeVolm = notewave.isPremultipliedEnvelope ? 1 : memowave.envelopeMemo
                         .volm(atSec: nSec - memowave.startSec,
                               releaseStartSec: memowave.releaseSec != nil ? memowave.releaseSec! - memowave.startSec : nil)
                     
@@ -680,26 +683,49 @@ final class ScoreNoder {
                         amp = Volm.amp(fromVolm: pitbend.firstStereo.volm * envelopeVolm)
                         pan = pitbend.firstStereo.pan
                     } else {
-                        let stereo = notewave.stereo(atPhase: &phase)
+                        let stereo = notewave.stereo(atPhase: phase)
                         amp = Volm.amp(fromVolm: stereo.volm * envelopeVolm)
                         pan = stereo.pan
                     }
                     
-                    let sample = notewave.sample(amp: amp, atPhase: &phase)
-                    
                     if pan == 0 || framess.count < 2 {
-                        let fSample = Float(sample)
-                        for frames in framess {
-                            frames[i] += fSample
+                        if framess.count >= 2 && notewave.samples.count >= 2 {
+                            let sample0 = notewave.sample(amp: amp, channel: 0, atPhase: phase)
+                            let sample1 = notewave.sample(amp: amp, channel: 1, atPhase: phase)
+                            phase = notewave.movedPhase(from: phase)
+                            framess[0][i] += Float(sample0)
+                            framess[1][i] += Float(sample1)
+                        } else {
+                            let sample = notewave.sample(amp: amp, channel: 0, atPhase: phase)
+                            phase = notewave.movedPhase(from: phase)
+                            let fSample = Float(sample)
+                            for frames in framess {
+                                frames[i] += fSample
+                            }
                         }
                     } else {
                         let nPan = pan.clipped(min: -1, max: 1) * 0.75
-                        if nPan < 0 {
-                            framess[0][i] += Float(sample)
-                            framess[1][i] += Float(sample * Volm.amp(fromVolm: 1 + nPan))
+                        if notewave.samples.count >= 2 {
+                            let sample0 = notewave.sample(amp: amp, channel: 0, atPhase: phase)
+                            let sample1 = notewave.sample(amp: amp, channel: 1, atPhase: phase)
+                            phase = notewave.movedPhase(from: phase)
+                            if nPan < 0 {
+                                framess[0][i] += Float(sample0)
+                                framess[1][i] += Float(sample1 * Volm.amp(fromVolm: 1 + nPan))
+                            } else {
+                                framess[0][i] += Float(sample0 * Volm.amp(fromVolm: 1 - nPan))
+                                framess[1][i] += Float(sample1)
+                            }
                         } else {
-                            framess[0][i] += Float(sample * Volm.amp(fromVolm: 1 - nPan))
-                            framess[1][i] += Float(sample)
+                            let sample = notewave.sample(amp: amp, channel: 0, atPhase: phase)
+                            phase = notewave.movedPhase(from: phase)
+                            if nPan < 0 {
+                                framess[0][i] += Float(sample)
+                                framess[1][i] += Float(sample * Volm.amp(fromVolm: 1 + nPan))
+                            } else {
+                                framess[0][i] += Float(sample * Volm.amp(fromVolm: 1 - nPan))
+                                framess[1][i] += Float(sample)
+                            }
                         }
                     }
                 }
