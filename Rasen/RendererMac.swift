@@ -1601,6 +1601,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(SubNSMenuItem(title: "Export as Movie...".localized, closure: { [weak self] in
             guard let self else { return }
             let editor = MovieExporter(self.document)

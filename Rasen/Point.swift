@@ -41,9 +41,6 @@ extension IntPoint: Codable {
     }
 }
 extension IntPoint {
-    func double() -> Point {
-        Point(x, y)
-    }
     func cross(_ other: IntPoint) -> Int {
         x * other.y - y * other.x
     }
@@ -190,6 +187,9 @@ extension Point: MonoInterpolatable {
 extension Point {
     init(_ x: Int, _ y: Int) {
         self.init(Double(x), Double(y))
+    }
+    init(_ v: IntPoint) {
+        self.init(Double(v.x), Double(v.y))
     }
     init(_ double3: Double3) {
         self.init(double3.x, double3.y)

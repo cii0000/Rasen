@@ -159,6 +159,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
                          action: #selector(SubMTKView.exportAsPDF(_:)))
         fileMenu.addItem(withTitle: "Export as GIF...".localized,
                          action: #selector(SubMTKView.exportAsGIF(_:)))
+        fileMenu.addItem(NSMenuItem.separator())
         fileMenu.addItem(withTitle: "Export as Movie...".localized,
                          action: #selector(SubMTKView.exportAsMovie(_:)))
         fileMenu.addItem(withTitle: "Export as 4K Movie...".localized,
