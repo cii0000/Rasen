@@ -424,7 +424,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
 }
 private extension NSMenu {
     @discardableResult
-    func addItem(withTitle string: String, 
+    func addItem(withTitle string: String,
                  action selector: AppKit.Selector?,
                  keyEquivalent charCode: String = "",
                  modifierFlags: NSEvent.ModifierFlags = []) -> NSMenuItem {
@@ -1555,7 +1555,7 @@ final class ProgressPanel: @unchecked Sendable {
     fileprivate var cancelButton = ProgressButton(frame: NSRect(x: 278, y: 8, width: 110, height: 40),
                                                   title: "Cancel".localized, closure: {})
     private let isIndeterminate: Bool
-    init(message: String, isCancel: Bool = true, isIndeterminate: Bool = false, 
+    init(message: String, isCancel: Bool = true, isIndeterminate: Bool = false,
          cancelHandler: @escaping () -> () = {}) {
         self.message = message
         titleField = NSTextField(labelWithString: message)
@@ -1813,16 +1813,16 @@ struct Image {
                                           CGImageAlphaInfo.noneSkipLast.rawValue : CGImageAlphaInfo.premultipliedLast.rawValue)
             guard let data = cgImage.dataProvider,
                   let colorSpace = cgImage.colorSpace,
-                  let nCGImage = CGImage(width: cgImage.width, 
+                  let nCGImage = CGImage(width: cgImage.width,
                                        height: cgImage.height,
                                        bitsPerComponent: cgImage.bitsPerComponent,
                                        bitsPerPixel: cgImage.bitsPerPixel,
                                        bytesPerRow: cgImage.bytesPerRow,
                                        space: colorSpace,
                                        bitmapInfo: cgImage.bitmapInfo,
-                                       provider: data, 
+                                       provider: data,
                                        decode: nil,
-                                       shouldInterpolate: false, 
+                                       shouldInterpolate: false,
                                        intent: .absoluteColorimetric),
                   let ctx = CGContext(data: nil,
                                       width: cgImage.width,

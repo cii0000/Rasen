@@ -784,7 +784,7 @@ final class Sequencer {
         }
     }
     
-    convenience init?(audiotracks: [Audiotrack], clipHandler: ((Float) -> ())? = nil,
+    convenience init?(audiotracks: [Audiotrack], clipHandler: (@Sendable (Float) -> ())? = nil,
                       sampleRate: Double = Audio.defaultSampleRate) {
         let audiotracks = audiotracks.filter { !$0.isEmpty }
         
@@ -810,7 +810,7 @@ final class Sequencer {
         self.init(tracks: tracks, clipHandler: clipHandler)
     }
     
-    init?(tracks: [Track], clipHandler: ((Float) -> ())? = nil) {
+    init?(tracks: [Track], clipHandler: (@Sendable (Float) -> ())? = nil) {
         let engine = AVAudioEngine()
         
         let mixerNode = AVAudioMixerNode()

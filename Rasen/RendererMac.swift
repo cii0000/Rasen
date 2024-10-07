@@ -844,7 +844,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                                                 fileTypes: [Document.FileType.rasendata,
                                                             Document.FileType.sksdata])
                 switch loadResult {
-                case .complete(let ioResults): 
+                case .complete(let ioResults):
                     replacingDatabase(from: ioResults[0].url)
                 case .cancel: break
                 }
@@ -948,7 +948,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 let task = Task.detached {
                     do {
                         try reset(in: url) { (progress, isStop) in
-                            if progressPanel.isCancel {
+                            if Task.isCancelled {
                                 isStop = true
                                 return
                             }
@@ -1404,7 +1404,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             isOneFlag = true
             oneFlagTime = nsEvent.timestamp
         } else if let oneKey = oldModifierKeys.oneInputKeyTYpe,
-                  document.modifierKeys.isEmpty && isOneFlag, 
+                  document.modifierKeys.isEmpty && isOneFlag,
             let oneFlagTime, nsEvent.timestamp - oneFlagTime < 0.175 {
             document.inputKey(inputKeyEventWith(nsEvent, oneKey, .began))
             document.inputKey(inputKeyEventWith(nsEvent, oneKey, .ended))

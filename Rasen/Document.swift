@@ -153,7 +153,7 @@ extension Road {
         } else {
             var points = [Point]()
             let isReversed = shp0.y > shp1.y
-            let sSHP = isReversed ? shp1 : shp0, 
+            let sSHP = isReversed ? shp1 : shp0,
                 eSHP = isReversed ? shp0 : shp1
             let sx = sSHP.x, sy = sSHP.y
             let ex = eSHP.x, ey = eSHP.y
@@ -398,7 +398,7 @@ extension World {
             return leftShp
         } else {
             let rightShp = Sheetpos(x: p.x, y: p.y, isRight: true)
-            return Sheetpos(x: p.x, y: p.y, 
+            return Sheetpos(x: p.x, y: p.y,
                             isRight: sheetIDs[rightShp] != nil)
         }
     }
@@ -1279,7 +1279,7 @@ final class Document: @unchecked Sendable {
         }
     }
     func updateSelects() {
-        guard !selections.isEmpty else { 
+        guard !selections.isEmpty else {
             for key in selectedLineNodes.keys {
                 selectedLineNodes[key]?.removeFromParent()
                 selectedLineNodes[key] = nil
@@ -1351,7 +1351,7 @@ final class Document: @unchecked Sendable {
 //                            lineView.intersects(rectInSheet) {
 //                            if case .line(let line) =  lineView.node.path.pathlines.first?.elements.first,
 //                               case .color(let color) = lineView.node.lineType {//
-//                                
+//
 //                                var nLine = sheetView.convertToWorld(line)
 //                                nLine.uuColor.value = color//
 //                                sLines.append(nLine)
@@ -2066,8 +2066,26 @@ final class Document: @unchecked Sendable {
     }
     
     func closePanel(at p: Point) -> Bool {
-        if let i = selections.firstIndex(where: { $0.rect.contains(p) }) {
+        if let i = selections.enumerated().reversed().first(where: { $0.element.rect.contains(p) })?.offset {
+            let oldSelection = selections[i]
             selections.remove(at: i)
+            
+            if let sheetView = sheetView(at: p) {
+                let scoreView = sheetView.scoreView
+                if sheetView.scoreView.model.enabled,
+                   !scoreView.containsNote(scoreView.convertFromWorld(p), scale: screenToWorldScale) {
+                    let scoreView = sheetView.scoreView
+                    
+                    let toneIs = sheetView.noteIndexes(from: [oldSelection]).filter {
+                        scoreView.model.notes[$0].isShownTone
+                    }
+                    if !toneIs.isEmpty {
+                        sheetView.newUndoGroup()
+                        sheetView.setIsShownTones(toneIs.map { .init(value: false, index: $0) })
+                    }
+                }
+            }
+            
             return true
         } else {
             return false
@@ -2087,11 +2105,27 @@ final class Document: @unchecked Sendable {
             selections = []
         }
         
-        if let sheetView = sheetView(at: p), sheetView.isSelectedKeyframes {
+        if let sheetView = sheetView(at: p) {
             sheetView.unselectKeyframes()
         }
         
+        closeAllTonePanel(at: p)
+        
         finding = Finding()
+    }
+    
+    func closeAllTonePanel(at p: Point) {
+        guard let sheetView = sheetView(at: p) else { return }
+        let scoreView = sheetView.scoreView
+        guard sheetView.scoreView.model.enabled,
+              !scoreView.containsNote(scoreView.convertFromWorld(p), scale: screenToWorldScale) else { return }
+        let toneIs = scoreView.model.notes.enumerated().compactMap {
+            $0.element.isShownTone ? $0.offset : nil
+        }
+        if !toneIs.isEmpty {
+            sheetView.newUndoGroup()
+            sheetView.setIsShownTones(toneIs.map { .init(value: false, index: $0) })
+        }
     }
     
     private var menuNode: Node?
@@ -3430,7 +3464,7 @@ final class Document: @unchecked Sendable {
                         color: Color, subColor: Color) -> ColorPathValue {
         if let sheetView = sheetView(at: p) {
             let inP = sheetView.convertFromWorld(p)
-            return sheetView.sheetColorOwner(at: inP, 
+            return sheetView.sheetColorOwner(at: inP,
                                              scale: screenToWorldScale).value
                 .colorPathValue(toColor: toColor, color: color, subColor: subColor)
         } else {
@@ -3443,7 +3477,7 @@ final class Document: @unchecked Sendable {
     func uuColor(at p: Point) -> UUColor {
         if let sheetView = sheetView(at: p) {
             let inP = sheetView.convertFromWorld(p)
-            return sheetView.sheetColorOwner(at: inP, 
+            return sheetView.sheetColorOwner(at: inP,
                                              scale: screenToWorldScale).value.uuColor
         } else {
             return Sheet.defalutBackgroundUUColor

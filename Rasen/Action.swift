@@ -63,9 +63,9 @@ extension ActionList {
                       [Action(name: "Move Line Z".localized,
                               quasimode: .moveLineZ,
                               isEnableRoot: false),
-//                       Action(name: "Move Line Point".localized,
-//                              quasimode: .moveLinePoint,
-//                              isEnableRoot: false)
+                       Action(name: "Move Line Point".localized,
+                              quasimode: .moveLinePoint,
+                              isEnableRoot: false)
                       ],
                       
                       [Action(name: "Play".localized,
@@ -74,6 +74,8 @@ extension ActionList {
 //                       Action(name: "Run / Close".localized,
 //                              quasimode: .run,
 //                              isEnableRoot: false),
+                       Action(name: "Show Note Tone".localized,
+                              quasimode: .showTone),
                        Action(name: "Open Menu".localized,
                               quasimode: .openMenu),
                        Action(name: "Input Character".localized,
@@ -98,6 +100,8 @@ extension ActionList {
                               quasimode: .copy),
                        Action(name: "Copy Line Color".localized,
                               quasimode: .copyLineColor),
+//                       Action(name: "Copy Note Tone".localized,
+//                              quasimode: .copyTone),
                        Action(name: "Paste".localized,
                               quasimode: .paste),],
                       

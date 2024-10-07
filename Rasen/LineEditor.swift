@@ -1229,7 +1229,7 @@ final class LineEditor: Editor, @unchecked Sendable {
                 .model.picture.lines ?? []
             
             drawLineEvents.append(.init(p: p - centerOrigin,
-                                        sp: event.screenPoint, pressure: event.pressure, 
+                                        sp: event.screenPoint, pressure: event.pressure,
                                         time: event.time,
                                         worldToScreenScale: document.worldToScreenScale,
                                         screenToWorldScale: document.screenToWorldScale,
@@ -1286,7 +1286,7 @@ final class LineEditor: Editor, @unchecked Sendable {
             drawLineTimer?.cancel()
             
             drawLineEvents.append(.init(p: p - centerOrigin,
-                                        sp: event.screenPoint, pressure: event.pressure, 
+                                        sp: event.screenPoint, pressure: event.pressure,
                                         time: event.time,
                                         worldToScreenScale: document.worldToScreenScale,
                                         screenToWorldScale: document.screenToWorldScale,
@@ -1402,11 +1402,11 @@ final class LineEditor: Editor, @unchecked Sendable {
             }
             
             drawLineEvents.append(.init(p: p - centerOrigin,
-                                        sp: event.screenPoint, 
+                                        sp: event.screenPoint,
                                         pressure: event.pressure,
                                         time: event.time,
                                         isClip: isEditingSheet,
-                                        isSnap: false, 
+                                        isSnap: false,
                                         worldToScreenScale: document.worldToScreenScale,
                                         screenToWorldScale: document.screenToWorldScale,
                                         phase: .began))
@@ -1449,11 +1449,11 @@ final class LineEditor: Editor, @unchecked Sendable {
             }
         case .changed:
             drawLineEvents.append(.init(p: p - centerOrigin,
-                                        sp: event.screenPoint, 
+                                        sp: event.screenPoint,
                                         pressure: event.pressure,
                                         time: event.time,
                                         isClip: isEditingSheet,
-                                        isSnap: false, 
+                                        isSnap: false,
                                         worldToScreenScale: document.worldToScreenScale,
                                         screenToWorldScale: document.screenToWorldScale,
                                         phase: .changed))
@@ -1492,7 +1492,7 @@ final class LineEditor: Editor, @unchecked Sendable {
                 }
             case .copy:
                 if isEditingSheet {
-                    lassoCopy(isRemove: false, distance: lassoDistance, 
+                    lassoCopy(isRemove: false, distance: lassoDistance,
                               at: document.roundedPoint(from: p))
                 } else {
                     copySheets(at: p)

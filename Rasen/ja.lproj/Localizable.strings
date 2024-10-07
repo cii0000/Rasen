@@ -45,6 +45,7 @@
 "Copy" = "コピー";
 "Paste" = "ペースト";
 "Copy Line Color" = "線色をコピー";
+"Copy Note Tone" = "音符トーンをコピー";
 
 "Undo" = "取り消す";
 "Redo" = "やり直す";
@@ -59,6 +60,8 @@
 "Play" = "再生";
 "Move Line Point" = "線点を移動";
 "Move Line Z" = "線の高さを変更";
+
+"Show Note Tone" = "音符トーンを表示";
 
 "Insert Keyframe" = "キーフレームを追加";
 "Cut Keyframe" = "キーフレームをカット";

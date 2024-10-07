@@ -252,7 +252,7 @@ extension RunEditor {
         let printOrigin = nodePoint(from: text)
         self.worldPrintOrigin = sheetView.convertToWorld(printOrigin)
         
-        var oDic = O.defaultDictionary(with: sheetView.model, 
+        var oDic = O.defaultDictionary(with: sheetView.model,
                                        bounds: sf.bounds,
                                        ssDic: ssDic,
                                        cursorP: currentP, printP: printOrigin)

@@ -73,7 +73,7 @@ final class OneshotTimer {
 
 extension DispatchSource {
     static func scheduledTimer(withTimeInterval t: Double,
-                               block: @escaping () -> ()) -> any DispatchSourceTimer {
+                               block: @escaping @Sendable () -> ()) -> any DispatchSourceTimer {
         let dsTimer = DispatchSource.makeTimerSource()
         dsTimer.schedule(deadline: .now() + t, repeating: t)
         dsTimer.setEventHandler(handler: block)

@@ -1717,7 +1717,7 @@ final class IOEditor: Editor, @unchecked Sendable {
                                                                frameRate: frameRate)
                         
                         movie.writeMovie(frameCount: frameCount,
-                                         duration: duration, 
+                                         duration: duration,
                                          frameRate: frameRate) { (sec) -> (Image?) in
                             //tempo -> startTime
                             let beat = sheet.animation.beat(fromSec: sec)
@@ -1732,7 +1732,7 @@ final class IOEditor: Editor, @unchecked Sendable {
                                 }
                                 children.append(sheet.node(isBorder: false, atRootBeat: beat,
                                                            renderingCaptionFrame: b,
-                                                           isBackground: false, 
+                                                           isBackground: false,
                                                            in: sheetBounds))
                                 for (topSheet, sheetBounds) in topSheets {
                                     children.append(topSheet.node(isBorder: false, atRootBeat: beat,

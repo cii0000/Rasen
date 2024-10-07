@@ -1201,7 +1201,9 @@ final class SheetView: View, @unchecked Sendable {
         !animationView.selectedFrameIndexes.isEmpty
     }
     func unselectKeyframes() {
-        animationView.selectedFrameIndexes = []
+        if isSelectedKeyframes {
+            animationView.selectedFrameIndexes = []
+        }
     }
     
     func timeSliderRect(atSec sec: Rational) -> Rect {
@@ -1710,7 +1712,7 @@ final class SheetView: View, @unchecked Sendable {
                 }
                 if playingOtherTimelineIDs.isEmpty {
                     seqTrack.scoreNoders.append(.init(rendnotes: [], startSec: 0,
-                                                      durSec: sheetView.model.animationDurSec, 
+                                                      durSec: sheetView.model.animationDurSec,
                                                       sampleRate: Audio.defaultSampleRate))
                 }
                 seqTracks.append(seqTrack)
@@ -6961,7 +6963,7 @@ final class SheetView: View, @unchecked Sendable {
                                      animationColors: [])
                 let ocv = ColorValue(uuColor: model.backgroundUUColor,
                                      planeIndexes: [], lineIndexes: [],
-                                     isBackground: true, 
+                                     isBackground: true,
                                      planeAnimationIndexes: [],
                                      lineAnimationIndexes: [],
                                      animationColors: [])

@@ -928,7 +928,8 @@ final class CopyEditor: Editor {
                     let envelope = score.notes[noteI].envelope
                     Pasteboard.shared.copiedObjects = [.envelope(envelope)]
                     
-                    //
+                    selectingLineNode.fillType = .color(.subSelected)
+                    selectingLineNode.path = Path(scoreView.convertToWorld(scoreView.envelopeBoxFrame(from: scoreView.model.notes[noteI])))
                 case .sprol(let pitI, _):
                     let tone = score.notes[noteI].pits[pitI].tone
                     Pasteboard.shared.copiedObjects = [.tone(tone)]

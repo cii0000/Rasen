@@ -452,7 +452,7 @@ extension Spectlope {
         guard pitch >= prePitch else { return isClippedPitch ? sprols.first! : .init(pitch: pitch, volm: sprols.first!.volm, noise: sprols.first!.noise) }
         for sprol in sprols {
             let nextPitch = sprol.pitch, nextSprol = sprol
-            let (nPrePitch, nNextPitch) = prePitch < nextPitch ? 
+            let (nPrePitch, nNextPitch) = prePitch < nextPitch ?
             (prePitch, nextPitch) : (nextPitch, prePitch)
             if pitch >= nPrePitch && pitch < nNextPitch {
                 let t = (pitch - nPrePitch) / (nNextPitch - nPrePitch)
@@ -479,7 +479,7 @@ extension Spectlope {
         guard pitch >= prePitch else { return sprols.first!.volm }
         for sprol in sprols {
             let nextPitch = sprol.pitch, nextVolm = sprol.volm
-            let (nPrePitch, nNextPitch) = prePitch < nextPitch ? 
+            let (nPrePitch, nNextPitch) = prePitch < nextPitch ?
             (prePitch, nextPitch) : (nextPitch, prePitch)
             if pitch >= nPrePitch && pitch < nNextPitch {
                 let t = (pitch - nPrePitch) / (nNextPitch - nPrePitch)

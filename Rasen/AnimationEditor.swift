@@ -2182,6 +2182,8 @@ final class Slider: DragEditor {
                 } else {
                     type = .keyframe(KeyframeSlider(document))
                 }
+            } else {
+                type = .keyframe(KeyframeSlider(document))
             }
         }
         
@@ -2227,7 +2229,7 @@ final class KeyframeInserter: InputKeyEditor {
         let p = document.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
-            document.cursor = .arrow            
+            document.cursor = .arrow
             
             if let sheetView = document.madeSheetView(at: p) {
                 let inP = sheetView.convertFromWorld(p)

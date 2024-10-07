@@ -189,14 +189,12 @@ final class ToneShower: InputKeyEditor {
                
                 if document.isSelectSelectedNoneCursor(at: p), !document.isSelectedText {
                     let scoreView = sheetView.scoreView
-                    let nIsShownTone = scoreView.containsNote(scoreView.convertFromWorld(p),
-                                                              scale: document.screenToWorldScale)
                     let toneIs = sheetView.noteIndexes(from: document.selections).filter {
-                        scoreView.model.notes[$0].isShownTone != nIsShownTone
+                        !scoreView.model.notes[$0].isShownTone
                     }
                     if !toneIs.isEmpty {
                         sheetView.newUndoGroup()
-                        sheetView.setIsShownTones(toneIs.map { .init(value: nIsShownTone, index: $0) })
+                        sheetView.setIsShownTones(toneIs.map { .init(value: true, index: $0) })
                     }
                 } else {
                     if let (noteI, pitI) = sheetView.scoreView.noteAndPitIEnabledNote(at: inP, scale: document.screenToWorldScale) {
@@ -207,14 +205,6 @@ final class ToneShower: InputKeyEditor {
                         if !toneIs.isEmpty {
                             sheetView.newUndoGroup()
                             sheetView.setIsShownTones(toneIs.map { .init(value: true, index: $0) })
-                        }
-                    } else {
-                        let toneIs = sheetView.scoreView.model.notes.enumerated().compactMap {
-                            $0.element.isShownTone ? $0.offset : nil
-                        }
-                        if !toneIs.isEmpty {
-                            sheetView.newUndoGroup()
-                            sheetView.setIsShownTones(toneIs.map { .init(value: false, index: $0) })
                         }
                     }
                 }
@@ -2341,7 +2331,7 @@ extension ScoreView {
     func noteIndex(at p: Point, scale: Double, enabledRelease: Bool = false) -> Int? {
         let hnh = pitchHeight / 2
         var minDS = Double.infinity, minI: Int?
-        for (noteI, note) in model.notes.enumerated() {
+        for (noteI, note) in model.notes.enumerated().reversed() {
             let maxD = Sheet.knobEditDistance * scale + noteH(from: note) / 2
             let maxDS = maxD * maxD
             let nf = noteFrame(at: noteI).outset(by: hnh)
@@ -2356,13 +2346,11 @@ extension ScoreView {
             if note.isShownTone {
                 let ds = toneFrame(from: note).distanceSquared(p)
                 if ds < minDS && ds < maxDS {
-                    minDS = ds
-                    minI = noteI
+                    return noteI
                 }
                 let nds = envelopeBoxFrame(from: note).distanceSquared(p)
                 if nds < minDS && nds < maxDS {
-                    minDS = nds
-                    minI = noteI
+                    return noteI
                 }
             }
             if enabledRelease {
@@ -2833,7 +2821,8 @@ extension ScoreView {
         return false
     }
     func containsEnvelopeBox(at p: Point, at noteI: Int) -> Bool {
-        if envelopeBoxFrame(from: model.notes[noteI]).contains(p) {
+        let note = model.notes[noteI]
+        if note.isShownTone && envelopeBoxFrame(from: note).contains(p) {
             return true
         }
         return false

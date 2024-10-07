@@ -173,7 +173,7 @@ extension KeyframeOption: Protobuf {
 extension KeyframeOption: Hashable, Codable {}
 
 struct SheetValue {
-    var lines = [Line](), planes = [Plane](), 
+    var lines = [Line](), planes = [Plane](),
         texts = [Text](), origin = Point()
     var id = SheetID(), rootKeyframeIndex = 0
     var keyframes = [Keyframe]()
@@ -189,7 +189,7 @@ extension SheetValue {
     }
     var allTextsString: String {
         let strings = texts
-            .sorted { $0.origin.y == $1.origin.y ? 
+            .sorted { $0.origin.y == $1.origin.y ?
                 $0.origin.x < $1.origin.x : $0.origin.y > $1.origin.y }
             .map { $0.string }
         var str = ""
@@ -2404,7 +2404,7 @@ extension Sheet {
     }
     func node(isBorder: Bool, atRootBeat rootBeat: Rational,
               renderingCaptionFrame: Rect? = nil,
-              isBackground: Bool = true, 
+              isBackground: Bool = true,
               in bounds: Rect) -> Node {
         let captionNodes: [Node]
         if let renderingCaptionFrame = renderingCaptionFrame,
