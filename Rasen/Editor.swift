@@ -670,6 +670,20 @@ final class ImageExporter: InputKeyEditor, @unchecked Sendable {
         editor.updateNode()
     }
 }
+final class HighQualityImageExporter: InputKeyEditor, @unchecked Sendable {
+    let editor: IOEditor
+    
+    init(_ document: Document) {
+        editor = IOEditor(document)
+    }
+    
+    func send(_ event: InputKeyEvent) {
+        editor.exportFile(with: event, .highQualityImage)
+    }
+    func updateNode() {
+        editor.updateNode()
+    }
+}
 final class PDFExporter: InputKeyEditor, @unchecked Sendable {
     let editor: IOEditor
     
@@ -1140,7 +1154,7 @@ final class IOEditor: Editor, @unchecked Sendable {
     }
     
     enum ExportType {
-        case image, pdf, gif, movie, highQualityMovie,
+        case image, highQualityImage, pdf, gif, movie, highQualityMovie,
              sound, caption, documentWithHistory, document
         var isDocument: Bool {
             self == .document || self == .documentWithHistory
@@ -1294,6 +1308,7 @@ final class IOEditor: Editor, @unchecked Sendable {
         
         let fType: any FileTypeProtocol = switch type {
         case .image: nvs.count > 1 && unionFrame == nil ? Image.FileType.pngs : Image.FileType.png
+        case .highQualityImage: nvs.count > 1 && unionFrame == nil ? Image.FileType.pngs : Image.FileType.png
         case .gif: Image.FileType.gif
         case .pdf: PDF.FileType.pdf
         case .movie, .highQualityMovie: Movie.FileType.mp4
@@ -1308,15 +1323,34 @@ final class IOEditor: Editor, @unchecked Sendable {
             switch type {
             case .image:
                 if nvs.count == 1 {
+                    let nSize = size * 4
                     let v = nvs[0]
                     if let sid = self.document.sheetID(at: v.shp),
                        let node = self.document.renderableSheetNode(at: sid) {
-                        let image = node.renderedAntialiasFillImage(in: v.bounds, to: size * 4, backgroundColor: .background)
+                        let image = node.renderedAntialiasFillImage(in: v.bounds, to: nSize, backgroundColor: .background)
                         return image?.data(.png)?.count ?? 0
                     } else {
                         let node = Node(path: Path(v.bounds),
                                         fillType: .color(.background))
-                        let image = node.image(in: v.bounds, size: size, backgroundColor: .background, colorSpace: .sRGB)
+                        let image = node.image(in: v.bounds, size: nSize, backgroundColor: .background, colorSpace: .sRGB)
+                        return image?.data(.png)?.count ?? 0
+                    }
+                }
+            case .highQualityImage:
+                if nvs.count == 1 {
+                    let nSize = size.width > size.height ?
+                    size.snapped(Size(width: 3840, height: 2160)).rounded() :
+                    size.snapped(Size(width: 2160, height: 3840)).rounded()
+                    let v = nvs[0]
+                    if let sid = self.document.sheetID(at: v.shp),
+                       let node = self.document.renderableSheetNode(at: sid) {
+                        let image = node.renderedAntialiasFillImage(in: v.bounds, to: nSize,
+                                                                    backgroundColor: .background)
+                        return image?.data(.png)?.count ?? 0
+                    } else {
+                        let node = Node(path: Path(v.bounds), fillType: .color(.background))
+                        let image = node.image(in: v.bounds, size: nSize, backgroundColor: .background,
+                                               colorSpace: .sRGB)
                         return image?.data(.png)?.count ?? 0
                     }
                 }
@@ -1381,23 +1415,31 @@ final class IOEditor: Editor, @unchecked Sendable {
                 
                 switch type {
                 case .image:
-                    exportImage(from: nvs, unionFrame: unionFrame,
-                                size: size, scale: Picture.renderingScale, at: ioResult)
+                    let nSize = size * 4
+                    exportImage(from: nvs, unionFrame: unionFrame, size: nSize, at: ioResult)
+                case .highQualityImage:
+                    let nSize = size.width > size.height ?
+                    size.snapped(Size(width: 3840, height: 2160)).rounded() :
+                    size.snapped(Size(width: 2160, height: 3840)).rounded()
+                    exportImage(from: nvs, unionFrame: unionFrame, size: nSize, at: ioResult)
                 case .pdf:
                     exportPDF(from: nvs, unionFrame: unionFrame, size: size, at: ioResult)
                 case .gif:
                     let nSize = size.snapped(Size(width: 800, height: 1200)).rounded()
                     exportGIF(from: nvs, size: nSize, at: ioResult)
                 case .movie:
-                    let nSize = size.snapped(size.width > size.height ?
-                                             Size(width: 1920, height: 1080) : Size(width: 1200, height: 1920)).rounded()
+                    let nSize = size.width > size.height ?
+                    size.snapped(Size(width: 1920, height: 1080).rounded()) :
+                    size.snapped(Size(width: 1200, height: 1920).rounded())
                     exportMovie(from: nvs, isHighQuality: false, size: nSize, at: ioResult)
                 case .sound:
                     exportSound(from: nvs, at: ioResult)
                 case .caption:
                     exportCaption(from: nvs, at: ioResult)
                 case .highQualityMovie:
-                    let nSize = size.snapped(Size(width: 3840, height: 2160)).rounded()
+                    let nSize = size.width > size.height ?
+                    size.snapped(Size(width: 3840, height: 2160)).rounded() :
+                    size.snapped(Size(width: 2160, height: 3840)).rounded()
                     exportMovie(from: nvs, isHighQuality: true, size: nSize, at: ioResult)
                 case .document:
                     exportDocument(from: nvs, isHistory: false, at: ioResult)
@@ -1411,9 +1453,7 @@ final class IOEditor: Editor, @unchecked Sendable {
         }
     }
     
-    func exportImage(from vs: [SelectingValue], unionFrame: Rect?,
-                     size: Size, scale: Double, at ioResult: IOResult) {
-        let size = size * scale
+    func exportImage(from vs: [SelectingValue], unionFrame: Rect?, size: Size, at ioResult: IOResult) {
         if vs.isEmpty {
             return
         } else if vs.count == 1 || unionFrame != nil {
@@ -1421,22 +1461,23 @@ final class IOEditor: Editor, @unchecked Sendable {
                 try ioResult.remove()
                 
                 let colorSpace = document.colorSpace
-                if let unionFrame = unionFrame {
-                    var nImage = Image(size: unionFrame.size * scale,
-                                       color: .background)
+                if let unionFrame {
+                    let scaleX = size.width / unionFrame.width
+                    let scaleY = size.height / unionFrame.height
+                    var nImage = Image(size: size, color: .background)
                     for v in vs {
                         let origin = document.sheetFrame(with: v.shp).origin - unionFrame.origin
                         
                         if let sid = document.sheetID(at: v.shp),
                            let node = document.renderableSheetNode(at: sid) {
                             if let image = node.renderedAntialiasFillImage(in: v.bounds, to: size, backgroundColor: .background) {
-                                nImage = nImage?.drawn(image, in: (v.bounds + origin) * Transform(scale: scale))
+                                nImage = nImage?.drawn(image, in: (v.bounds + origin) * Transform(scaleX: scaleX, y: scaleY))
                             }
                         } else {
                             let node = Node(path: Path(v.bounds),
                                             fillType: .color(.background))
                             if let image = node.image(in: v.bounds, size: size, backgroundColor: .background, colorSpace: colorSpace) {
-                                nImage = nImage?.drawn(image, in: (v.bounds + origin) * Transform(scale: scale))
+                                nImage = nImage?.drawn(image, in: (v.bounds + origin) * Transform(scaleX: scaleX, y: scaleY))
                             }
                         }
                     }

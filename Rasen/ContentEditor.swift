@@ -171,7 +171,9 @@ final class ContentSlider: DragEditor {
                             
                             contentView.model.beat = nBeat
                             contentView.updateTimeline()
-                            contentView.updateMovie(atSec: contentView.sec(fromBeat: nBeat))
+                            if let sec = contentView.model.rootSec {
+                                contentView.updateMovie(atSec: sec)
+                            }
                             
                             document.cursor = .circle(string: contentView.currentTimeString(isInter: true))
                         }
@@ -279,7 +281,7 @@ final class ContentView<T: BinderProtocol>: SpectrgramView, @unchecked Sendable 
         updateTimeline()
         updateSpectrogram()
         
-        if model.type == .movie, let sec = model.sec {
+        if model.type == .movie, let sec = model.rootSec {
             updateMovie(atSec: sec)
         }
     }
@@ -347,48 +349,52 @@ extension ContentView {
     
     func movePreviousInterKeyframe() {
         guard let timeOption else { return }
-        let beat = model.beat, durBeat = timeOption.beatRange.length, tempo = timeOption.tempo
+        let beat = model.beat, durBeat = timeOption.beatRange.length
         let frameBeat = Rational(1, 12)
         let nBeat = (beat - frameBeat < 0 ? durBeat - frameBeat : beat - frameBeat)
             .interval(scale: frameBeat)
-        let nSec = ContentTimeOption.sec(fromBeat: nBeat, tempo: tempo)
         
         binder[keyPath: keyPath].beat = nBeat
         updateTimeline()
-        updateMovie(atSec: nSec)
+        if model.type == .movie, let sec = model.rootSec {
+            updateMovie(atSec: sec)
+        }
     }
     func movePreviousKeyframe() {
         guard let timeOption, let frameBeat = model.frameBeat else { return }
-        let beat = model.beat, durBeat = timeOption.beatRange.length, tempo = timeOption.tempo
+        let beat = model.beat, durBeat = timeOption.beatRange.length
         let nBeat = (beat - frameBeat < 0 ? durBeat - frameBeat : beat - frameBeat)
             .interval(scale: frameBeat)
-        let nSec = ContentTimeOption.sec(fromBeat: nBeat, tempo: tempo)
         
         binder[keyPath: keyPath].beat = nBeat
         updateTimeline()
-        updateMovie(atSec: nSec)
+        if model.type == .movie, let sec = model.rootSec {
+            updateMovie(atSec: sec)
+        }
     }
     
     func moveNextInterKeyframe() {
         guard let timeOption else { return }
-        let beat = model.beat, durBeat = timeOption.beatRange.length, tempo = timeOption.tempo
+        let beat = model.beat, durBeat = timeOption.beatRange.length
         let frameBeat = Rational(1, 12)
         let nBeat = (beat + frameBeat >= durBeat ? 0 : beat + frameBeat).interval(scale: frameBeat)
-        let nSec = ContentTimeOption.sec(fromBeat: nBeat, tempo: tempo)
         
         binder[keyPath: keyPath].beat = nBeat
         updateTimeline()
-        updateMovie(atSec: nSec)
+        if model.type == .movie, let sec = model.rootSec {
+            updateMovie(atSec: sec)
+        }
     }
     func moveNextKeyframe() {
         guard let timeOption, let frameBeat = model.frameBeat else { return }
-        let beat = model.beat, durBeat = timeOption.beatRange.length, tempo = timeOption.tempo
+        let beat = model.beat, durBeat = timeOption.beatRange.length
         let nBeat = (beat + frameBeat >= durBeat ? 0 : beat + frameBeat).interval(scale: frameBeat)
-        let nSec = ContentTimeOption.sec(fromBeat: nBeat, tempo: tempo)
         
         binder[keyPath: keyPath].beat = nBeat
         updateTimeline()
-        updateMovie(atSec: nSec)
+        if model.type == .movie, let sec = model.rootSec {
+            updateMovie(atSec: sec)
+        }
     }
     
     var beat: Rational {
@@ -396,7 +402,10 @@ extension ContentView {
         set {
             binder[keyPath: keyPath].beat = newValue
             updateTimeline()
-            updateMovie(atSec: sec(fromBeat: newValue))
+            
+            if model.type == .movie, let sec = model.rootSec {
+                updateMovie(atSec: sec)
+            }
         }
     }
     func updateMovie(atSec sec: Rational) {
@@ -642,7 +651,7 @@ extension ContentView {
         }
         
         if model.type == .movie {
-            let mainBeatX = self.x(atBeat: model.beat)
+            let mainBeatX = self.x(atBeat: model.beat + timeOption.beatRange.start)
             let d = model.beat == 0 ? knobH / 2 : lw / 2
             contentPathlines.append(.init(Rect(x: mainBeatX - lw / 2,
                                                y: sy,

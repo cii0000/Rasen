@@ -44,6 +44,12 @@ extension Edge: AppliableTransform {
         Edge(lhs.p0 * rhs, lhs.p1 * rhs)
     }
 }
+extension Edge: Rectable {
+    var bounds: Rect {
+        AABB(minX: min(p0.x, p1.x), maxX: max(p0.x, p1.x),
+             minY: min(p0.y, p1.y), maxY: max(p0.y, p1.y)).rect
+    }
+}
 extension Edge {
     var midPoint: Point {
         p0.mid(p1)
@@ -122,10 +128,6 @@ extension Edge {
             return r.clipped(min: 0, max: 1)
         }
     }
-    var bounds: Rect {
-        AABB(minX: min(p0.x, p1.x), maxX: max(p0.x, p1.x),
-             minY: min(p0.y, p1.y), maxY: max(p0.y, p1.y)).rect
-    }
     func position(atT t: Double) -> Point {
         Point.linear(p0, p1, t: t)
     }
@@ -182,8 +184,7 @@ extension Edge {
         let t = absA / (absA + abs(b))
         return p0 + vector * t
     }
-    func intersectionPointAndT(_ other: Edge) -> (p: Point,
-                                                  t0: Double, t1: Double)? {
+    func intersectionT(_ other: Edge) -> (t0: Double, t1: Double)? {
         let v0 = vector, v1 = other.vector
         let a = v1.cross(p0 - other.p0)
         let b = v1.cross(p1 - other.p0)
@@ -194,17 +195,21 @@ extension Edge {
         let t0 = absA / (absA + abs(b))
         let absC = abs(c)
         let t1 = absC / (absC + abs(d))
-        let p: Point
-        if t0 == 0 {
-            p = p0
+        return (t0, t1)
+    }
+    func intersectionPointAndT(_ other: Edge) -> (p: Point,
+                                                  t0: Double, t1: Double)? {
+        guard let (t0, t1) = intersectionT(other) else { return nil }
+        let p = if t0 == 0 {
+            p0
         } else if t0 == 1 {
-            p = p1
+            p1
         } else if t1 == 0 {
-            p = other.p0
+            other.p0
         } else if t1 == 1 {
-            p = other.p1
+            other.p1
         } else {
-            p = p0 + vector * t0
+            p0 + vector * t0
         }
         return (p, t0, t1)
     }
@@ -266,6 +271,16 @@ extension Edge {
     }
     func minDistanceSquared(_ other: Edge) -> Double {
         nearest(other).lengthSquared
+    }
+    
+    static func edges(from ps: [Point]) -> [Edge] {
+        guard ps.count >= 2 else { return [] }
+        var preP = ps[0]
+        return (1 ..< ps.count).compactMap {
+            let edge = Edge(preP, ps[$0])
+            preP = ps[$0]
+            return edge.isEmpty ? nil : edge
+        }
     }
 }
 extension Edge: CustomStringConvertible {

@@ -737,9 +737,6 @@ extension Bezier {
         return ts
     }
     
-    // pを原点とし
-    // f(t) = sqrt(x(t)^2 + y(t)^2) の微分値が0になるt
-    // またはt=0またはt=1のうち最小の距離となる解
     func nearest(at p: Point) -> (t: Double, distanceSquared: Double) {
         guard !isLineaer else {
             let edge = Edge(p0, p1)

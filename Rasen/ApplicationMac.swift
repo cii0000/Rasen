@@ -153,6 +153,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         fileMenu.addItem(NSMenuItem.separator())
         fileMenu.addItem(withTitle: "Export as Image...".localized,
                          action: #selector(SubMTKView.exportAsImage(_:)))
+        fileMenu.addItem(withTitle: "Export as 4K Image...".localized,
+                         action: #selector(SubMTKView.exportAsHighQualityImage(_:)))
         fileMenu.addItem(withTitle: "Export as PDF...".localized,
                          action: #selector(SubMTKView.exportAsPDF(_:)))
         fileMenu.addItem(withTitle: "Export as GIF...".localized,
@@ -2154,16 +2156,19 @@ final class Bitmap<Value: FixedWidthInteger & UnsignedInteger> {
         }
     }
     private let ctx: CGContext
-    private let data: UnsafeMutablePointer<Value>
-    private let offsetPerRow: Int, offsetPerPixel: Int
+    let data: UnsafeMutablePointer<Value>
+    let offsetPerRow: Int, offsetPerPixel: Int
     let width: Int, height: Int
     
-    init?(width: Int, height: Int, colorSpace: ColorSpace) {
+    convenience init?(width: Int, height: Int, colorSpace: ColorSpace) {
         let bitmapInfo = colorSpace == .grayscale ? CGImageAlphaInfo.none.rawValue : CGImageAlphaInfo.premultipliedLast.rawValue
         guard let ctx = CGContext(data: nil, width: width, height: height,
                                   bitsPerComponent: MemoryLayout<Value>.size * 8,
                                   bytesPerRow: 0, space: colorSpace.cg,
                                   bitmapInfo: bitmapInfo) else { return nil }
+        self.init(ctx)
+    }
+    init?(_ ctx: CGContext) {
         guard let data = ctx.data?.assumingMemoryBound(to: Value.self) else { return nil }
         self.ctx = ctx
         self.data = data
@@ -2172,12 +2177,13 @@ final class Bitmap<Value: FixedWidthInteger & UnsignedInteger> {
         self.width = ctx.width
         self.height = ctx.height
     }
+    
     subscript(_ x: Int, _ y: Int) -> Value {
         get {
-            data[offsetPerRow * y + offsetPerPixel * x]
+            data[offsetPerRow * y + x]
         }
         set {
-            data[offsetPerRow * y + offsetPerPixel * x] = newValue
+            data[offsetPerRow * y + x] = newValue
         }
     }
     subscript(_ x: Int, _ y: Int, _ row: Int) -> Value {
@@ -2196,9 +2202,56 @@ final class Bitmap<Value: FixedWidthInteger & UnsignedInteger> {
     func draw(_ image: Image, in rect: Rect) {
         ctx.draw(image.cg, in: rect.cg)
     }
+    
+    func set(isAntialias: Bool) {
+        ctx.setShouldAntialias(isAntialias)
+    }
+    func set(_ transform: Transform) {
+        ctx.concatenate(transform.cg)
+    }
+    func set(fillColor: Color) {
+        ctx.setFillColor(fillColor.cg)
+    }
+    func set(lineCap: LineCap) {
+        ctx.setLineCap(lineCap.cg)
+    }
+    func set(lineWidth: Double) {
+        ctx.setLineWidth(.init(lineWidth))
+    }
+    func set(lineColor: Color) {
+        ctx.setStrokeColor(lineColor.cg)
+    }
+    
+    func fill(_ rect: Rect) {
+        ctx.addRect(rect.cg)
+        ctx.fillPath()
+    }
+    func fill(_ ps: [Point]) {
+        ctx.addLines(between: ps.map { $0.cg })
+        ctx.closePath()
+        ctx.fillPath()
+    }
+    func stroke(_ edge: Edge) {
+        ctx.move(to: edge.p0.cg)
+        ctx.addLine(to: edge.p1.cg)
+        ctx.strokePath()
+    }
+    
     var image: Image? {
         guard let cgImage = ctx.makeImage() else { return nil }
         return Image(cgImage: cgImage)
+    }
+}
+
+enum LineCap {
+    case round, square
+}
+extension LineCap {
+    var cg: CGLineCap {
+        switch self {
+        case .round: .round
+        case .square: .square
+        }
     }
 }
 

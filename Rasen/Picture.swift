@@ -20,8 +20,8 @@ struct Picture {
 }
 extension Picture: Protobuf {
     init(_ pb: PBPicture) throws {
-        lines = pb.lines.compactMap { try? Line($0) }
-        planes = pb.planes.compactMap { try? Plane($0) }
+        lines = pb.lines.compactMap { try? .init($0) }
+        planes = pb.planes.compactMap { try? .init($0) }
     }
     var pb: PBPicture {
         .with {
@@ -32,9 +32,9 @@ extension Picture: Protobuf {
 }
 extension Picture: Hashable, Codable {}
 extension Picture: AppliableTransform {
-    static func * (lhs: Picture, rhs: Transform) -> Picture {
-        Self(lines: lhs.lines.map { $0 * rhs },
-             planes: lhs.planes.map { $0 * rhs })
+    static func * (lhs: Self, rhs: Transform) -> Self {
+        .init(lines: lhs.lines.map { $0 * rhs },
+              planes: lhs.planes.map { $0 * rhs })
     }
 }
 extension Picture {
@@ -51,17 +51,8 @@ extension Picture {
     }
 }
 extension Picture {
-    static let renderingScale = 4.0
-    private typealias LineUInt = UInt8
-    private typealias FilledUInt = UInt16
-    private static let backgroundColor = Color(red: 0.0, green: 0, blue: 0)
-    private static let lineColor = Color(red: 1.0, green: 1, blue: 1)
-    private static func planesRenderingNode(with bounds: Rect,
-                                            from lines: [Line]) -> Node {
-        let lineNodes = lines
-            .compactMap { $0.autoFillNode(lineColor: Picture.lineColor) }
-        return Node(children: lineNodes, path: Path(bounds))
-    }
+    static let defaultRenderingScale = 16.0
+    
     enum AutoFillResult {
         case planes(_ planes: [Plane])
         case planeValue(_ planeValue: PlaneValue)
@@ -71,10 +62,11 @@ extension Picture {
     func autoFill(fromOther otherPlanes: [Plane]? = nil,
                   inFrame bounds: Rect,
                   clipingPath: Path?,
-                  scale: Double = Picture.renderingScale,
+                  renderingScale: Double = Self.defaultRenderingScale,
                   borders: [Border] = [],
                   isSelection: Bool) -> AutoFillResult {
         let nPolys = makePolygons(inFrame: bounds, clipingPath: clipingPath,
+                                  renderingScale: renderingScale,
                                   isSelection: isSelection)
         return Self.autoFill(fromOther: otherPlanes, from: nPolys,
                              from: planes,
@@ -83,21 +75,19 @@ extension Picture {
     }
     func makePolygons(inFrame bounds: Rect,
                       clipingPath: Path?,
-                      scale: Double = Picture.renderingScale,
+                      renderingScale: Double = Self.defaultRenderingScale,
                       borders: [Border] = [],
                       isSelection: Bool) -> [Topolygon] {
-        let bounds = (isSelection ?
-                        bounds :
-                        (clipingPath?.bounds ?? bounds)).integral
+        let bounds = (isSelection ? bounds : (clipingPath?.bounds ?? bounds)).integral
         return Self.topolygons(with: bounds, from: lines,
-                               scale: scale, borders: borders)
+                               renderingScale: renderingScale, borders: borders)
     }
     static func autoFill(fromOther otherPlanes: [Plane]? = nil,
                          from nPolys: [Topolygon],
                          from planes: [Plane],
                          inFrame bounds: Rect,
                          clipingPath: Path?,
-                         scale: Double = Picture.renderingScale,
+                         renderingScale: Double = Self.defaultRenderingScale,
                          borders: [Border] = [],
                          isSelection: Bool) -> AutoFillResult {
         if nPolys.isEmpty {
@@ -231,244 +221,554 @@ extension Picture {
         return .planeValue(PlaneValue(planes: newPlanes.map { $0.plane },
                                       moveIndexValues: indexValues))
     }
+    enum RenderingType {
+        case vector, raster
+    }
     private static func topolygons(with bounds: Rect,
                                    from lines: [Line],
-                                   scale: Double,
-                                   borders: [Border]) -> [Topolygon] {
-        let size = bounds.size * scale
-        let node = planesRenderingNode(with: bounds, from: lines)
-        if !borders.isEmpty {
-            node.children += borders.map {
-                Node(path: $0.path(with: bounds),
-                     lineWidth: 2, lineType: .color(Picture.lineColor))
+                                   renderingScale: Double,
+                                   borders: [Border],
+                                   type: RenderingType = .raster) -> [Topolygon] {
+        switch type {
+        case .vector:
+            topolygonsWithVector(with: bounds, from: lines, borders: borders)
+        case .raster:
+            topolygonsWithRaster(with: bounds, from: lines, renderingScale: renderingScale, borders: borders)
+        }
+    }
+    private static func topolygonsWithVector(with bounds: Rect,
+                                             from lines: [Line],
+                                             maxDistance: Double = 1.0,
+                                             borders: [Border]) -> [Topolygon] {
+        let fClock = SuspendingClock.now
+        
+        struct DLine {
+            var edges: [DistanceEdge]
+            var bounds: Rect
+            
+            init?(_ edges: [DistanceEdge]) {
+                guard !edges.isEmpty else { return nil }
+                self.edges = edges
+                bounds = (1 ..< edges.count).reduce(into: edges.first!.edge.bounds) {
+                    $0 += edges[$1].edge.bounds
+                }.outset(by: edges.maxValue({ max($0.p0.distance, $0.p1.distance) })!)
+            }
+            var firstP: DistancePoint {
+                edges.first!.p0
+            }
+            var lastP: DistancePoint {
+                edges.last!.p1
             }
         }
-        guard let texture
-                = node.imageInBounds(size: size,
-                                     backgroundColor: Picture.backgroundColor,
-                                     colorSpace: .sRGB,
-                                     isAntialias: false) else { return [] }
+        var dLines: [DLine] = borders.compactMap { DLine([.init($0.edge(with: bounds))]) }
+        + [DLine(bounds.edges.map { .init($0) })].compactMap { $0 }
+        + lines.compactMap { .init($0.pathDistanceEdges()) }
         
-        let w = Int(size.width), h = Int(size.height)
-        guard let lineBitmap
-                = Bitmap<LineUInt>(width: w, height: h,
-                                   colorSpace: .grayscale) else { return [] }
-        guard let filledBitmap
-                = Bitmap<FilledUInt>(width: w, height: h,
-                                     colorSpace: .grayscale) else { return [] }
+        print("Setup", dLines.sum({ $0.edges.count }),
+              "Lines:", dLines.count, fClock.duration(to: .now).sec)
+        let clock0 = SuspendingClock.now
         
-        lineBitmap.draw(texture, in: Rect(size: size))
         
-        let mPolys = Picture.makePlanesByFillAll(in: filledBitmap, from: lineBitmap,
-                                         scale: scale)
+//        for (i, edge0) in nEdges.enumerated() {
+//            for j in i + 1 ..< nEdges.count {
+//                let edge1 = edges[j]
+//                if edge0.edge.angle().isApproximatelyEqual(edge1.edge.angle(), tolerance: 0.0000001) {
+//                    let ds = min(edge0.edge.distanceSquared(from: edge1.edge.p0),
+//                                 edge0.edge.distanceSquared(from: edge1.edge.p1))
+//                    if ds < 0.00000001 {
+//                        nEdges.append(.init(.init, <#T##p1: Line.DistancePoint##Line.DistancePoint#>))
+//                    }
+//                }
+//            }
+//        }
         
-        let position = Point(x: -bounds.centerPoint.x * scale + size.width / 2,
-                             y: -bounds.centerPoint.y * scale + size.height / 2)
-        let invertedTransform
-            = Attitude(position: position,
-                       scale: Size(square: scale)).transform.inverted()
-        return mPolys.map { $0 * invertedTransform }
+        let lineScale = 1.5
+        let maxDistance = Line.defaultLineWidth * lineScale
+        var unionDEdges = [DistanceEdge](), unionDEdgeSet = Set<Edge>()
+        for dli0 in 0 ..< dLines.count {
+            let dLine0 = dLines[dli0]
+            let fdp = dLine0.firstP, ldp = dLine0.lastP
+            
+            func update(at ndp: DistancePoint, _ fol: FirstOrLast) {
+                for di1 in 0 ..< dLines.count {
+                    guard dLines[di1].bounds.distanceSquared(ndp.point)
+                            < (ndp.distance + maxDistance).squared else { continue }
+                    var minD = Double.infinity, mi: Int?, mdp: DistancePoint?, mDEdge: DistanceEdge?
+                    
+                    for ei in (0 ..< dLines[di1].edges.count).reversed() {
+                        guard dli0 != di1 || (fol == .first ? ei >= 10 : ei <= dLines[di1].edges.count - 11) else { continue }
+                        let dEdge = dLines[di1].edges[ei]
+                        guard dEdge.p0.point != ndp.point
+                                && dEdge.p1.point != ndp.point else { continue }
+                        let dp = dEdge.nearestPosition(at: ndp)
+                        let d = dp.point.distance(ndp.point)
+                        if d < min((dp.distance + ndp.distance) * lineScale, maxDistance) && d < minD {
+                            minD = d
+                            mi = ei
+                            mdp = dp
+                            mDEdge = dEdge
+                        }
+                    }
+                    
+                    if let i = mi, let dp = mdp, let dEdge = mDEdge {
+                        let edge = Edge(ndp.point, dp.point)
+                        if !unionDEdgeSet.contains(edge) && !unionDEdges.contains(where: { $0.edge.intersects(edge) }) {
+                            unionDEdges.append(.init(edge, distance: 0))
+                            unionDEdgeSet.insert(edge)
+                            unionDEdgeSet.insert(edge.reversed())
+                        }
+                        
+                        dLines[di1].edges[i] = .init(dEdge.p0, dp)
+                        dLines[di1].edges.insert(.init(dp, dEdge.p1), at: i + 1)
+                    }
+                }
+            }
+            update(at: fdp, .first)
+            update(at: ldp, .last)
+        }
+        dLines += unionDEdges.compactMap { .init([$0]) }
+        print("Union", dLines.sum({ $0.edges.count }), clock0.duration(to: .now).sec)
+        let clock1 = SuspendingClock.now
+        
+        struct SEdge {
+            var edge: Edge
+            var tPs = [Double: Point]()
+        }
+        struct SLine {
+            var edges: [SEdge]
+            var bounds: Rect
+            
+            func splitEdges() -> [Edge] {
+                edges.flatMap {
+                    if $0.tPs.isEmpty {
+                        return [$0.edge]
+                    }
+                    let ps = $0.tPs.sorted { $0.key < $1.key }.map { $0.value }
+                    var p0 = $0.edge.p0
+                    var edges = [Edge](capacity: ps.count + 1)
+                    for p1 in ps {
+                        if p0 != p1 {
+                            edges.append(Edge(p0, p1))
+                        }
+                        p0 = p1
+                    }
+                    if p0 != $0.edge.p1 {
+                        edges.append(Edge(p0, $0.edge.p1))
+                    }
+                    return edges
+                }
+            }
+        }
+        var sLines = dLines.map { SLine(edges: $0.edges.map { .init(edge: $0.edge) },
+                                        bounds: $0.bounds) }
+        for si0 in 0 ..< sLines.count {
+            let sl0 = sLines[si0]
+            for si1 in si0 ..< sLines.count {
+                let sl1 = sLines[si1]
+                guard sl0.bounds.intersects(sl1.bounds) else { continue }
+                for ei0 in 0 ..< sl0.edges.count {
+                    let sEdge0 = sl0.edges[ei0]
+                    if si0 == si1 {
+                        for ei1 in ei0 + 1 ..< sl1.edges.count {
+                            let sEdge1 = sl1.edges[ei1]
+                            if let (p, t0, t1) = sEdge0.edge.intersectionPointAndT(sEdge1.edge) {
+                                sLines[si0].edges[ei0].tPs[t0] = p
+                                sLines[si1].edges[ei1].tPs[t1] = p
+                            }
+                        }
+                    } else {
+                        for ei1 in 0 ..< sl1.edges.count {
+                            let sEdge1 = sl1.edges[ei1]
+                            if let (p, t0, t1) = sEdge0.edge.intersectionPointAndT(sEdge1.edge) {
+                                sLines[si0].edges[ei0].tPs[t0] = p
+                                sLines[si1].edges[ei1].tPs[t1] = p
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let nEdges: [Edge] = sLines.flatMap { $0.splitEdges() }
+        print("Split", nEdges.count, clock1.duration(to: .now).sec)
+        
+        func removeOne(from edges: [Edge]) -> [Edge] {
+            var vs = [Point: Set<Int>]()
+            for (i, edge) in edges.enumerated() {
+                if vs[edge.p0] == nil {
+                    vs[edge.p0] = [i]
+                } else {
+                    vs[edge.p0]?.insert(i)
+                }
+                if vs[edge.p1] == nil {
+                    vs[edge.p1] = [i]
+                } else {
+                    vs[edge.p1]?.insert(i)
+                }
+            }
+            
+            var removeIs = Set<Int>()
+            while true {
+                var isOne = false
+                for p in vs.keys {
+                    var v = vs[p]!
+                    while v.count == 1 {
+                        isOne = true
+                        let edgeI = v.first!
+                        vs[p] = []
+                        removeIs.insert(edgeI)
+                        let edge = edges[edgeI]
+                        let nextP = edge.p0 == p ? edge.p1 : edge.p0
+                        v = vs[nextP]!
+                        vs[nextP]?.remove(edgeI)
+                    }
+                }
+                if !isOne { break }
+            }
+            var nEdges = edges
+            nEdges.remove(at: removeIs.sorted())
+            return nEdges
+        }
+        
+        let nnEdges = removeOne(from: nEdges)
+        
+        let edgeCount = nnEdges.count
+        let nnnEdges = nnEdges + nnEdges.map { $0.reversed() }
+        func reversedEdgeI(from i: Int) -> Int {
+            i < edgeCount ? i + edgeCount : i - edgeCount
+        }
+        
+        struct Vertex: CustomStringConvertible {
+            var edgeIs: [Int]
+            
+            func next(from i: Int) -> Int {
+                for (ni, j) in edgeIs.enumerated() {
+                    if i == j {
+                        return edgeIs[ni - 1 >= 0 ? ni - 1 : edgeIs.count - 1]
+                    }
+                }
+                fatalError()
+            }
+            var description: String {
+                "\(edgeIs)"
+            }
+        }
+        
+        var filldIs = Set<Int>()
+        var vs = [Point: Vertex]()
+        for (i, edge) in nnnEdges.enumerated() {
+            if vs[edge.p0] == nil {
+                vs[edge.p0] = .init(edgeIs: [i])
+            } else {
+                vs[edge.p0]?.edgeIs.append(i)
+            }
+        }
+        
+        print(vs.isEmpty ? "" : vs.max { $0.value.edgeIs.count < $1.value.edgeIs.count }!.value.edgeIs.count)
+        
+        for (p, v) in vs {
+            vs[p]?.edgeIs = v.edgeIs
+                .map { ($0, p.angle(nnnEdges[$0].p1)) }
+                .sorted { $0.1 < $1.1 }
+                .map { $0.0 }
+        }
+        
+        var topolygons = [Topolygon]()
+        for (fi, edge) in nnnEdges.enumerated() {
+            guard !filldIs.contains(fi) else { continue }
+            let fp = edge.p0
+            var ps = [fp], psSet = Set([fp])
+            var nextP = edge.p1
+            var j = vs[nextP]!.next(from: reversedEdgeI(from: fi))
+            var polyFilledIs: Set = [fi]
+            while fi != j {
+                if polyFilledIs.contains(j) || polyFilledIs.contains(reversedEdgeI(from: j)) { break }
+                polyFilledIs.insert(j)
+                ps.append(nextP)
+                psSet.insert(nextP)
+                nextP = nnnEdges[j].p1
+                let v = vs[nextP]!
+                j = v.next(from: reversedEdgeI(from: j))
+            }
+            guard fi == j,
+                  Polygon(points: ps).orientation == .counterClockwise else { continue }
+            filldIs.formUnion(polyFilledIs)
+            topolygons.append(.init(points: ps))
+        }
+        
+        print("end", topolygons.count, fClock.duration(to: .now).sec)
+        
+        return topolygons
     }
-    private static func makePlanesByFillAll(in filledBitmap: Bitmap<FilledUInt>,
-                                     from lineBitmap: Bitmap<LineUInt>,
-                                     scale: Double,
-                                     threshold: Double = 0.85) -> [Topolygon] {
-        let t = LineUInt(threshold * Double(LineUInt.max))
-        let w = lineBitmap.width, h = lineBitmap.height
+    
+    private static func topolygonsWithRaster(with bounds: Rect,
+                                             from lines: [Line],
+                                             connectableScale cd: Double = 3.0,
+                                             straightConnectableScale scd: Double = 6.0,
+                                             renderingScale: Double,
+                                             borders: [Border]) -> [Topolygon] {
+        guard !lines.isEmpty else { return [] }
         
-        let nearestR = Int(scale)
-        let nearestRSq = nearestR * nearestR
-        let maxNearestR = nearestR * 4
-        let maxNearestRSq = maxNearestR * maxNearestR
+        let clock = SuspendingClock.now
         
-        func floodFill(_ value: FilledUInt, atX fx: Int, y fy: Int) {
-            let inValue = filledBitmap[fx, fy]
+        let size = bounds.size * renderingScale
+        
+        guard let bitmap = Bitmap<UInt16>(width: Int(size.width), height: Int(size.height),
+                                              colorSpace: .grayscale) else { return [] }
+        bitmap.set(isAntialias: false)
+        let transform = Transform(translation: -bounds.origin)
+            * Transform(scaleX: size.width / bounds.width, y: size.height / bounds.height)
+        bitmap.set(transform)
+        bitmap.set(fillColor: .init(red: 1.0, green: 1, blue: 1))
+        bitmap.set(lineCap: .round)
+        bitmap.set(lineWidth: 2 / renderingScale)
+        bitmap.set(lineColor: .init(red: 1.0, green: 1, blue: 1))
+        
+        struct EdgeLine: Rectable {
+            var edges: [Edge]
+            var edgeSearchTree: RectSearchTree<Edge>
+            var bounds: Rect
+            var i: Int?
             
-            struct Scan {
-                var minX, maxX, y: Int
-                var isTop: Bool
+            init(edges: [Edge], bounds: Rect, i: Int? = nil) {
+                self.edges = edges
+                self.edgeSearchTree = .init(edges)!
+                self.bounds = bounds
+                self.i = i
             }
-            
-            var stack = Stack<Scan>()
-            stack.push(Scan(minX: fx, maxX: fx, y: fy, isTop: false))
-            
-            func isFill(_ x: Int, _ y: Int) -> Bool {
-                filledBitmap[x, y] == inValue
+        }
+        let edgeLines: [EdgeLine] = lines.enumerated().compactMap { (i, line) in
+            let lineWidth = max(2 / renderingScale, line.size - 2 / renderingScale)
+            let path = Path(line)
+            guard let pathBounds = path.bounds else { return nil }
+            let ops = path.outlinePointsWith(lineWidth: lineWidth)
+            for ps in ops {
+                bitmap.fill(ps)
             }
-            func pushScans(minX: Int, maxX: Int, y: Int, isTop: Bool) {
-                var mx = minX
-                while mx < maxX {
-                    while mx < maxX && !isFill(mx, y) {
-                        mx += 1
-                    }
-                    let nMinX = mx
-                    while mx < maxX && isFill(mx, y) {
-                        filledBitmap[mx, y] = value
-                        mx += 1
-                    }
-                    stack.push(Scan(minX: nMinX, maxX: mx,
-                                    y: y, isTop: isTop))
+            let edges = Edge.edges(from: ops.flatMap { $0 })
+            return edges.isEmpty ? nil : .init(edges: edges, bounds: pathBounds, i: i)
+        } + borders.compactMap {
+            let lineWidth = 2 / renderingScale
+            let borderBounds: Rect
+            switch $0.orientation {
+            case .horizontal:
+                if $0.location == bounds.minY || $0.location == bounds.maxY {
+                    return nil
+                }
+                borderBounds = Rect(x: bounds.minX, y: $0.location - lineWidth / 2,
+                                    width: bounds.width, height: lineWidth)
+            case .vertical:
+                if $0.location == bounds.minX || $0.location == bounds.maxX {
+                    return nil
+                }
+                borderBounds = Rect(x: $0.location - lineWidth / 2, y: bounds.minY,
+                                    width: lineWidth, height: bounds.height)
+            }
+            bitmap.fill(borderBounds)
+            let edge = $0.edge(with: bounds)
+            return .init(edges: [edge], bounds: edge.bounds)
+        } + bounds.edges.map {
+            .init(edges: [$0], bounds: $0.bounds)
+        }
+        
+        struct LinePoint: Rectable {
+            var p: Point, distance: Double, vector: Point, i: Int, fol: FirstOrLast, bounds: Rect
+        }
+        
+        let edgeLineSearchTree = RectSearchTree(edgeLines)
+        
+        var lps = [LinePoint](capacity: lines.count * 2)
+        for (li, line) in lines.enumerated() {
+            let fp = line.firstPoint, fd = line.firstDistance
+            lps.append(.init(p: fp, distance: fd, vector: -line.firstVector,
+                             i: li, fol: .first, bounds: .init(fp, distance: scd * fd)))
+            let lp = line.lastPoint, ld = line.lastDistance
+            lps.append(.init(p: lp, distance: ld, vector: line.lastVector,
+                             i: li, fol: .last, bounds: .init(lp, distance: scd * ld)))
+        }
+        let lpSearchTree = RectSearchTree(lps)!
+        
+        for lp0 in lps {
+            let minDSq = (lp0.distance / 2).squared
+            let maxD = cd * lp0.distance
+            let maxDSq = maxD * maxD
+            
+            lpSearchTree.intersects(from: lp0.bounds) { lp1i in
+                let lp1 = lps[lp1i]
+                guard lp0.p != lp1.p else { return }
+                let dSq = lp0.p.distanceSquared(lp1.p)
+                let maxD0 = maxD + cd * lp1.distance
+                guard dSq >= maxD0 * maxD0 else { return }
+                let maxD1 = scd * (lp0.distance + lp1.distance)
+                let v0 = lp0.vector, v1 = lp1.vector, v2 = lp1.p - lp0.p
+                let angle = abs(Point.differenceAngle(v0, v2)) + abs(Point.differenceAngle(v2, -v1))
+                guard angle < .pi / 8 else { return }
+                let maxND = angle.clipped(min: .pi / 8, max: 0, newMin: maxD0, newMax: maxD1)
+                if dSq < maxND * maxND {
+                    bitmap.stroke(Edge(lp0.p, lp1.p))
                 }
             }
             
-            while let scan = stack.pop() {
-                let y = scan.y
-                var minX = scan.minX - 1
-                while minX >= 0 && isFill(minX, y) {
-                    filledBitmap[minX, y] = value
-                    minX -= 1
-                }
-                minX += 1
-                var maxX = scan.maxX
-                while maxX < w && isFill(maxX, y) {
-                    filledBitmap[maxX, y] = value
-                    maxX += 1
-                }
-                let by = y - 1, ty = y + 1
-                if scan.isTop {
-                    if by >= 0 {
-                        pushScans(minX: minX, maxX: scan.minX, y: by, isTop: false)
-                        pushScans(minX: scan.maxX, maxX: maxX, y: by, isTop: false)
+            let pBounds = Rect(lp0.p, distance: maxD)
+            edgeLineSearchTree?.intersects(from: pBounds) { eli in
+                let edgeLine = edgeLines[eli]
+                if edgeLine.i != lp0.i {
+                    var vMinDSq = Double.infinity, vMinNP: Point?
+                    edgeLine.edgeSearchTree.intersects(from: pBounds) {
+                        let edge = edgeLine.edges[$0]
+                        let np = edge.nearestPoint(from: lp0.p)
+                        let dSq = np.distanceSquared(lp0.p)
+                        if dSq < vMinDSq && dSq > minDSq && dSq < maxDSq {
+                            vMinDSq = dSq
+                            vMinNP = np
+                        }
                     }
-                    if ty < h {
-                        pushScans(minX: minX, maxX: maxX, y: ty, isTop: true)
+                    if let vMinNP {
+                        bitmap.stroke(Edge(lp0.p, vMinNP))
+                    }
+                }
+            }
+        }
+        
+        let mPolys = Picture.makePlanesByFillAll(from: bitmap, renderingScale: renderingScale)
+        
+        let position = Point(x: -bounds.centerPoint.x * renderingScale + size.width / 2,
+                             y: -bounds.centerPoint.y * renderingScale + size.height / 2)
+        let invertedTransform = Attitude(position: position,
+                                         scale: Size(square: renderingScale)).transform.inverted()
+        let nPolys = mPolys.map { $0 * invertedTransform }
+        
+        print("end", mPolys.count, clock.duration(to: .now).sec)
+        
+        return nPolys
+    }
+    private static func makePlanesByFillAll(from bitmap: Bitmap<UInt16>,
+                                            renderingScale: Double) -> [Topolygon] {
+        let w = bitmap.width, h = bitmap.height
+        let lineValue: UInt16 = .max
+        
+        var clock = SuspendingClock.now
+        
+        func containsAt(_ x: Int, _ y: Int, _ fillValue: UInt16) -> Bool {
+            !(x >= 0 && x < w && y >= 0 && y < h) || bitmap[x, y] != fillValue
+        }
+        var fillValue: UInt16 = 1
+        for y in 0 ..< h {
+            for x in 0 ..< w {
+                if bitmap[x, y] == 0 {
+                    bitmap.floodFill(fillValue, atX: x, y: y)
+                    
+                    if containsAt(x - 1, y, fillValue) && containsAt(x + 1, y, fillValue)
+                        && containsAt(x, y - 1, fillValue) && containsAt(x, y + 1, fillValue) {
+                        
+                        bitmap[x, y] = lineValue
+                    } else {
+                        fillValue = fillValue < .max - 1 ? fillValue + 1 : 1
+                    }
+                }
+            }
+        }
+        
+        print("F0", clock.duration(to: .now).sec)
+        clock = .now
+        
+        func aroundFilledValue(x: Int, y: Int) -> UInt16? {
+            if x > 0 && bitmap[x - 1, y] != lineValue {
+                return bitmap[x - 1, y]
+            }
+            if x + 1 < w && bitmap[x + 1, y] != lineValue {
+                return bitmap[x + 1, y]
+            }
+            if y > 0 && bitmap[x, y - 1] != lineValue {
+                return bitmap[x, y - 1]
+            }
+            if y + 1 < h && bitmap[x, y + 1] != lineValue {
+                return bitmap[x, y + 1]
+            }
+            return nil
+        }
+        
+        var nes = [IntPoint](capacity: w * h), fvs = [(IntPoint, UInt16)](capacity: w * h)
+        for y in 0 ..< h {
+            for x in 0 ..< w {
+                if bitmap[x, y] == lineValue {
+                    if let filledValue = aroundFilledValue(x: x, y: y) {
+                        fvs.append((.init(x, y), filledValue))
+                    } else {
+                        nes.append(.init(x, y))
+                    }
+                }
+            }
+        }
+        var nnes = [IntPoint](capacity: nes.count)
+        repeat {
+            for fv in fvs {
+                bitmap[fv.0.x, fv.0.y] = fv.1
+            }
+            fvs.removeAll(keepingCapacity: true)
+            for ne in nes {
+                if let filledValue = aroundFilledValue(x: ne.x, y: ne.y) {
+                    fvs.append((ne, filledValue))
+                } else {
+                    nnes.append(ne)
+                }
+            }
+            nes = nnes
+            nnes.removeAll(keepingCapacity: true)
+        } while !nes.isEmpty
+        
+        print("F1", clock.duration(to: .now).sec)
+        clock = .now
+        
+        struct IntTopolygon {
+            var points: [IntPoint]
+            var holePoints: [[IntPoint]]
+        }
+        var iPolys = [IntTopolygon](), iis = [UInt16: Int](minimumCapacity: Int(fillValue) - 2)
+        var aroundValues = [UInt16: Set<IntPoint>](), oldV: UInt16 = 0
+        for y in 0 ..< h {
+            for x in 0 ..< w {
+                var v = bitmap[x, y]
+                guard x == 0 || v != oldV else { continue }
+                if let points = aroundValues[v] {
+                    if !points.contains(IntPoint(x, y)) {
+                        let nPoints = bitmap.aroundPoints(with: v, atX: x, y: y)
+                        if IntPoint.orientation(from: nPoints) == .counterClockwise {
+                            aroundValues[v]?.formUnion(Set(nPoints))
+                            if let i = iis[v] {
+                                iPolys[i].holePoints.append(nPoints)
+                            }
+                        } else {
+                            fillValue = fillValue < .max - 1 ? fillValue + 1 : 1
+                            v = fillValue
+                            bitmap.floodFill(v, atX: x, y: y)
+                            
+                            aroundValues[v] = Set(nPoints)
+                            iis[v] = iPolys.count
+                            iPolys.append(.init(points: nPoints, holePoints: []))
+                        }
                     }
                 } else {
-                    if ty < h {
-                        pushScans(minX: minX, maxX: scan.minX, y: ty, isTop: true)
-                        pushScans(minX: scan.maxX, maxX: maxX, y: ty, isTop: true)
-                    }
-                    if by >= 0 {
-                        pushScans(minX: minX, maxX: maxX, y: by, isTop: false)
-                    }
+                    let nPoints = bitmap.aroundPoints(with: v, atX: x, y: y)
+                    aroundValues[v] = Set(nPoints)
+                    iis[v] = iPolys.count
+                    iPolys.append(.init(points: nPoints, holePoints: []))
                 }
+                oldV = v
             }
         }
         
-        func isLine(x: Int, y: Int) -> Bool {
-            lineBitmap[x, y] >= t
-        }
-        
-        func nearestValueAt(x: Int, y: Int,
-                            r: Int, rSquared: Int) -> FilledUInt? {
-            let minX = max(x - r, 0), maxX = min(x + r, w - 1)
-            let minY = max(y - r, 0), maxY = min(y + r, h - 1)
-            guard minX <= maxX && minY <= maxY else {
-                return nil
-            }
-            var minValue: FilledUInt?, minDSquared = Int.max
-            for iy in minY ... maxY {
-                for ix in minX ... maxX {
-                    if !isLine(x: ix, y: iy) {
-                        let dx = ix - x, dy = iy - y
-                        let dSquared = dx * dx + dy * dy
-                        if dSquared < rSquared && dSquared < minDSquared {
-                            minDSquared = dSquared
-                            minValue = filledBitmap[ix, iy]
-                        }
-                    }
-                }
-            }
-            return minValue
-        }
-        
-        func orientation<T: BidirectionalCollection>(from points: T) -> CircularOrientation? where T.Element == IntPoint {
-            guard var p0 = points.last else {
-                return nil
-            }
-            var area = 0
-            for p1 in points {
-                area += p0.cross(p1)
-                p0 = p1
-            }
-            if area > 0 {
-                return .counterClockwise
-            } else if area < 0 {
-                return .clockwise
-            } else {
-                return nil
-            }
-        }
-        
-        func aroundPoints(with value: FilledUInt,
-                          atX fx: Int, y fy: Int) -> [IntPoint] {
-            enum Direction {
-                case left, top, right, bottom
-                
-                mutating func next() {
-                    switch self {
-                    case .left: self = .top
-                    case .top: self = .right
-                    case .right: self = .bottom
-                    case .bottom: self = .left
-                    }
-                }
-                mutating func inverted() {
-                    switch self {
-                    case .left: self = .right
-                    case .top: self = .bottom
-                    case .right: self = .left
-                    case .bottom: self = .top
-                    }
-                }
-                func movedPoint(from p: IntPoint) -> IntPoint {
-                    switch self {
-                    case .left: IntPoint(p.x - 1, p.y)
-                    case .top: IntPoint(p.x, p.y + 1)
-                    case .right: IntPoint(p.x + 1, p.y)
-                    case .bottom: IntPoint(p.x, p.y - 1)
-                    }
-                }
-                func aroundPoint(from p: IntPoint) -> IntPoint {
-                    switch self {
-                    case .left: p
-                    case .top: IntPoint(p.x, p.y + 1)
-                    case .right: IntPoint(p.x + 1, p.y + 1)
-                    case .bottom: IntPoint(p.x + 1, p.y)
-                    }
-                }
-            }
-            
-            func isAround(_ p: IntPoint) -> Bool {
-                p.x >= 0 && p.x < w && p.y >= 0 && p.y < h
-                    && filledBitmap[p.x, p.y] == value
-            }
-            
-            var points = [IntPoint]()
-            let fp = IntPoint(fx, fy)
-            points.append(fp)
-            var p = fp, direction = Direction.left, isEnd = false
-            while true {
-                for _ in 0 ..< 4 {
-                    direction.next()
-                    let np = direction.movedPoint(from: p)
-                    if isAround(np) {
-                        p = np
-                        direction.inverted()
-                        break
-                    } else {
-                        let mp = direction.aroundPoint(from: p)
-                        if mp == fp {
-                            isEnd = true
-                            break
-                        }
-                        points.append(mp)
-                    }
-                }
-                if isEnd { break }
-            }
-            return points
-        }
+        print("F2", clock.duration(to: .now).sec)
+        clock = .now
         
         var pDic = [[IntPoint]: [Point]]()
         
         func smoothPoints(with points: [IntPoint]) -> [Point] {
             func isVertex(at p: IntPoint) -> Bool {
                 let x = p.x, y = p.y
-                var vSet = Set<FilledUInt>(), outCount = 0
+                var vSet = Set<UInt16>(minimumCapacity: 4), outCount = 0
                 func insert(_ x: Int, _ y: Int) {
                     if x >= 0 && x < w && y >= 0 && y < h {
-                        vSet.insert(filledBitmap[x, y])
+                        vSet.insert(bitmap[x, y])
                     } else {
                         outCount += 1
                     }
@@ -477,12 +777,12 @@ extension Picture {
                 insert(x, y - 1)
                 insert(x - 1, y)
                 insert(x, y)
-                if outCount == 0 {
-                    return vSet.count >= 3
+                return if outCount == 0 {
+                    vSet.count >= 3
                 } else if outCount == 2 {
-                    return vSet.count >= 2
+                    vSet.count >= 2
                 } else {
-                    return true
+                    true
                 }
             }
             func minVertexIndex() -> Int? {
@@ -493,23 +793,21 @@ extension Picture {
                 }
                 return nil
             }
+            
             func appendEdgeWith(start si: Int, end ei: Int,
                                 from mPoints: [IntPoint],
                                 in nPoints: inout [Point],
                                 isReverse: Bool,
                                 maxD: Double = 0.5 - .ulpOfOne) {
-                let maxDSquared = maxD * maxD
+                let maxDSq = maxD * maxD
                 
-                func append<T: RandomAccessCollection>(_ rPoints: T,
-                                                       in lPoints: inout [Point])
+                func append<T: RandomAccessCollection>(_ rPoints: T, in lPoints: inout [Point])
                 where T.Index == Int, T.Element == IntPoint {
-                
                     var rrPoints = [Point]()
                     rrPoints.reserveCapacity(rPoints.endIndex - rPoints.startIndex)
                     rrPoints.append(rPoints[rPoints.startIndex].double())
                     for i in (rPoints.startIndex + 1) ..< rPoints.endIndex {
-                        rrPoints.append(rPoints[i - 1].double()
-                                            .mid(rPoints[i].double()))
+                        rrPoints.append(rPoints[i - 1].double().mid(rPoints[i].double()))
                     }
                     rrPoints.append(rPoints[rPoints.endIndex - 1].double())
                     
@@ -517,9 +815,9 @@ extension Picture {
                     for j in 2 ..< rrPoints.count {
                         let ep = rrPoints[j]
                         for k in oldJ ..< j {
-                            let dSquared = LinearLine(sp, ep)
+                            let dSq = LinearLine(sp, ep)
                                 .distanceSquared(from: rrPoints[k])
-                            if dSquared >= maxDSquared {
+                            if dSq >= maxDSq {
                                 lPoints.append(Point(preP.x, Double(h) - preP.y))
                                 sp = preP
                                 oldJ = j
@@ -557,13 +855,11 @@ extension Picture {
             }
             
             if let firstI = minVertexIndex() {
-                var newPoints = [Point]()
-                newPoints.reserveCapacity(points.count)
-                let fPoints: [IntPoint]
-                if firstI == 0 {
-                    fPoints = points + [points[0]]
+                var newPoints = [Point](capacity: points.count)
+                let fPoints = if firstI == 0 {
+                    points + [points[0]]
                 } else {
-                    fPoints = Array(points[firstI...] + points[...firstI])
+                    Array(points[firstI...] + points[...firstI])
                 }
                 var si = 0
                 for ei in 1 ..< fPoints.count {
@@ -571,7 +867,7 @@ extension Picture {
                     if !isVertex(at: ep) { continue }
                     let sp = fPoints[si]
                     let isReverse = ep == sp ?
-                        orientation(from: fPoints[si ... ei]) != .counterClockwise :
+                        IntPoint.orientation(from: fPoints[si ... ei]) != .counterClockwise :
                         (ep.x == sp.x ? ep.y < sp.y : ep.x < sp.x)
                     appendEdgeWith(start: si, end: ei,
                                    from: fPoints, in: &newPoints,
@@ -585,17 +881,16 @@ extension Picture {
                     let y = ps.min { $0.y < $1.y }!.y
                     let i = ps.enumerated().filter { $0.element.y == y }
                         .min { $0.element.x < $1.element.x }!.offset
-                    if i == 0 {
-                        return ps
+                    return if i == 0 {
+                        ps
                     } else {
-                        return Array(ps[i...] + ps[..<i])
+                        Array(ps[i...] + ps[..<i])
                     }
                 }
                 var points = leftDownSort(points)
                 points.append(points[0])
-                var newPoints = [Point]()
-                newPoints.reserveCapacity(points.count)
-                let isReverse = orientation(from: points) != .counterClockwise
+                var newPoints = [Point](capacity: points.count)
+                let isReverse = IntPoint.orientation(from: points) != .counterClockwise
                 appendEdgeWith(start: 0, end: points.count - 1,
                                from: points, in: &newPoints,
                                isReverse: isReverse)
@@ -603,113 +898,156 @@ extension Picture {
             }
         }
         
-        func containsAt(_ x: Int, _ y: Int) -> Bool {
-            !(x >= 0 && x < w && y >= 0 && y < h) || isLine(x: x, y: y)
-        }
-        for y in 0 ..< h {
-            for x in 0 ..< w {
-                if !isLine(x: x, y: y) &&
-                    (containsAt(x - 1, y) && containsAt(x + 1, y)
-                        && containsAt(x, y - 1) && containsAt(x, y + 1)) {
-                    
-                    lineBitmap[x, y] = t
-                }
-            }
-        }
-        
-        let lineValue: FilledUInt = 1
-        for y in 0 ..< h {
-            for x in 0 ..< w {
-                if isLine(x: x, y: y) {
-                    filledBitmap[x, y] = lineValue
-                }
-            }
-        }
-        
-        var fillValue: FilledUInt = 2
-        for y in 0 ..< h {
-            for x in 0 ..< w {
-                if filledBitmap[x, y] == 0 {
-                    floodFill(fillValue, atX: x, y: y)
-                    fillValue = fillValue + 1 <= FilledUInt.max ?
-                        fillValue + 1 :
-                        2
-                }
-            }
-        }
-        
-        for y in 0 ..< h {
-            for x in 0 ..< w {
-                if isLine(x: x, y: y) {
-                    if let v = nearestValueAt(x: x, y: y, r: nearestR,
-                                              rSquared: nearestRSq) {
-                        filledBitmap[x, y] = v
-                    } else if let v = nearestValueAt(x: x, y: y, r: maxNearestR,
-                                                     rSquared: maxNearestRSq) {
-                        filledBitmap[x, y] = v
-                    }
-                }
-            }
-        }
-        
-        struct IntTopolygon {
-            var points: [IntPoint]
-            var holePoints: [[IntPoint]]
-        }
-        var ipolys = [IntTopolygon](), iis = [FilledUInt: Int]()
-        ipolys.reserveCapacity(Int(fillValue) - 2)
-        var aroundValues = [FilledUInt: Set<IntPoint>](), oldV: FilledUInt = 0
-        for y in 0 ..< h {
-            for x in 0 ..< w {
-                var v = filledBitmap[x, y]
-                guard x == 0 || v != oldV else { continue }
-                if let points = aroundValues[v] {
-                    if !points.contains(IntPoint(x, y)) {
-                        let nPoints = aroundPoints(with: v, atX: x, y: y)
-                        if orientation(from: nPoints) == .counterClockwise {
-                            aroundValues[v]?.formUnion(Set(nPoints))
-                            if let i = iis[v] {
-                                ipolys[i].holePoints.append(nPoints)
-                            }
-                        } else {
-                            fillValue = fillValue + 1 <= FilledUInt.max ?
-                                fillValue + 1 : 2
-                            v = fillValue
-                            floodFill(v, atX: x, y: y)
-                            
-                            aroundValues[v] = Set(nPoints)
-                            iis[v] = ipolys.count
-                            ipolys.append(IntTopolygon(points:  nPoints,
-                                                       holePoints: []))
-                        }
-                    }
+        let n: [Topolygon] = iPolys.compactMap {
+            let nps = smoothPoints(with: $0.points)//$0.points.map { Point($0.x, h - $0.y) }
+            guard !nps.isEmpty else { return nil }
+            let holePolygons: [Polygon] = $0.holePoints.compactMap {
+                let nps = smoothPoints(with: $0)//$0.map { Point($0.x, h - $0.y) }
+                return if !nps.isEmpty {
+                    .init(points: nps)
                 } else {
-                    let nPoints = aroundPoints(with: v, atX: x, y: y)
-                    aroundValues[v] = Set(nPoints)
-                    iis[v] = ipolys.count
-                    ipolys.append(IntTopolygon(points: nPoints,
-                                               holePoints: []))
+                    nil
                 }
-                oldV = v
+            }
+            return .init(polygon: .init(points: nps), holePolygons: holePolygons)
+        }
+        
+        print("F3", clock.duration(to: .now).sec)
+        clock = .now
+        
+        return n
+    }
+}
+
+private struct BitmapScan {
+    var minX, maxX, y: Int
+    var isTop: Bool
+}
+extension Bitmap {
+    func floodFill(_ value: Value, atX fx: Int, y fy: Int) {
+        let inValue = self[fx, fy]
+        
+        var stack = Stack<BitmapScan>()
+        stack.push(.init(minX: fx, maxX: fx, y: fy, isTop: false))
+        
+        func isFill(_ x: Int, _ y: Int) -> Bool {
+            self[x, y] == inValue
+        }
+        func pushScans(minX: Int, maxX: Int, y: Int, isTop: Bool) {
+            var mx = minX
+            while mx < maxX {
+                while mx < maxX && !isFill(mx, y) {
+                    mx += 1
+                }
+                let nMinX = mx
+                while mx < maxX && isFill(mx, y) {
+                    self[mx, y] = value
+                    mx += 1
+                }
+                stack.push(.init(minX: nMinX, maxX: mx, y: y, isTop: isTop))
             }
         }
         
-        return ipolys.compactMap {
-            let nps = smoothPoints(with: $0.points)
-            if !nps.isEmpty {
-                let holePolygons: [Polygon] = $0.holePoints.compactMap {
-                    let nps = smoothPoints(with: $0)
-                    if !nps.isEmpty {
-                        return Polygon(points: nps)
-                    } else {
-                        return nil
-                    }
+        while let scan = stack.pop() {
+            let y = scan.y
+            var minX = scan.minX - 1
+            while minX >= 0 && isFill(minX, y) {
+                self[minX, y] = value
+                minX -= 1
+            }
+            minX += 1
+            var maxX = scan.maxX
+            while maxX < width && isFill(maxX, y) {
+                self[maxX, y] = value
+                maxX += 1
+            }
+            let by = y - 1, ty = y + 1
+            if scan.isTop {
+                if by >= 0 {
+                    pushScans(minX: minX, maxX: scan.minX, y: by, isTop: false)
+                    pushScans(minX: scan.maxX, maxX: maxX, y: by, isTop: false)
                 }
-                return Topolygon(polygon: Polygon(points: nps),
-                                 holePolygons: holePolygons)
+                if ty < height {
+                    pushScans(minX: minX, maxX: maxX, y: ty, isTop: true)
+                }
             } else {
-                return nil
+                if ty < height {
+                    pushScans(minX: minX, maxX: scan.minX, y: ty, isTop: true)
+                    pushScans(minX: scan.maxX, maxX: maxX, y: ty, isTop: true)
+                }
+                if by >= 0 {
+                    pushScans(minX: minX, maxX: maxX, y: by, isTop: false)
+                }
             }
         }
+    }
+}
+
+private enum AroundDirection {
+    case left, top, right, bottom
+    
+    mutating func next() {
+        self = switch self {
+        case .left: .top
+        case .top: .right
+        case .right: .bottom
+        case .bottom: .left
+        }
+    }
+    mutating func inverted() {
+        self = switch self {
+        case .left: .right
+        case .top: .bottom
+        case .right: .left
+        case .bottom: .top
+        }
+    }
+    func movedPoint(from p: IntPoint) -> IntPoint {
+        switch self {
+        case .left: IntPoint(p.x - 1, p.y)
+        case .top: IntPoint(p.x, p.y + 1)
+        case .right: IntPoint(p.x + 1, p.y)
+        case .bottom: IntPoint(p.x, p.y - 1)
+        }
+    }
+    func aroundPoint(from p: IntPoint) -> IntPoint {
+        switch self {
+        case .left: p
+        case .top: IntPoint(p.x, p.y + 1)
+        case .right: IntPoint(p.x + 1, p.y + 1)
+        case .bottom: IntPoint(p.x + 1, p.y)
+        }
+    }
+}
+extension Bitmap {
+    func aroundPoints(with value: Value, atX fx: Int, y fy: Int) -> [IntPoint] {
+        func isAround(_ p: IntPoint) -> Bool {
+            p.x >= 0 && p.x < width && p.y >= 0 && p.y < height && self[p.x, p.y] == value
+        }
+        
+        var points = [IntPoint]()
+        let fp = IntPoint(fx, fy)
+        points.append(fp)
+        var p = fp, direction = AroundDirection.left, isEnd = false
+        while true {
+            for _ in 0 ..< 4 {
+                direction.next()
+                let np = direction.movedPoint(from: p)
+                if isAround(np) {
+                    p = np
+                    direction.inverted()
+                    break
+                } else {
+                    let mp = direction.aroundPoint(from: p)
+                    if mp == fp {
+                        isEnd = true
+                        break
+                    }
+                    points.append(mp)
+                }
+            }
+            if isEnd { break }
+        }
+        return points
     }
 }

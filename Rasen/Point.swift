@@ -57,6 +57,21 @@ extension IntPoint {
         let x = self.x - other.x, y = self.y - other.y
         return x * x + y * y
     }
+    static func orientation<T: BidirectionalCollection>(from points: T) -> CircularOrientation? where T.Element == Self {
+        guard var p0 = points.last else { return nil }
+        var area = 0
+        for p1 in points {
+            area += p0.cross(p1)
+            p0 = p1
+        }
+        return if area > 0 {
+            .counterClockwise
+        } else if area < 0 {
+            .clockwise
+        } else {
+            nil
+        }
+    }
 }
 
 struct PolarPoint {
@@ -268,6 +283,8 @@ extension Point {
                                 _ p2: Point) -> Double {
         differenceAngle(p1 - p0, p2 - p1)
     }
+    
+    /// Result: -pi ... pi
     static func differenceAngle(_ a: Point, _ b: Point) -> Double {
         .atan2(y: a.cross(b), x: a.dot(b))
     }

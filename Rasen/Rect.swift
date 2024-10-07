@@ -562,6 +562,9 @@ extension Rect {
     var bottomEdge: Edge {
         Edge(minXMinYPoint, maxXMinYPoint)
     }
+    var edges: [Edge] {
+        [topEdge, leftEdge, bottomEdge, rightEdge]
+    }
     
     func lrtb(at p: Point) -> LRTB? {
         guard width != 0 && height != 0 else { return nil }
@@ -686,6 +689,82 @@ extension Array where Element == Rect {
     }
     func union() -> Rect? {
         reduce(into: Rect?.none) { $0 += $1 }
+    }
+}
+
+protocol Rectable {
+    var bounds: Rect { get }
+}
+private final class RectSearchElement {
+    var i: Int?, bounds: Rect
+    var left, right: RectSearchElement?
+    
+    init(i: Int?, bounds: Rect, left: RectSearchElement?, right: RectSearchElement?) {
+        self.i = i
+        self.bounds = bounds
+        self.left = left
+        self.right = right
+    }
+    
+    func containsIndexes(at p: Point, handler: (Int) -> ()) {
+        guard bounds.contains(p) else { return }
+        if let i {
+            handler(i)
+        } else {
+            left?.containsIndexes(at: p, handler: handler)
+            right?.containsIndexes(at: p, handler: handler)
+        }
+    }
+    func intersectsIndexes(from rect: Rect, handler: (Int) -> ()) {
+        guard bounds.intersects(rect) else { return }
+        if let i {
+            handler(i)
+        } else {
+            left?.intersectsIndexes(from: rect, handler: handler)
+            right?.intersectsIndexes(from: rect, handler: handler)
+        }
+    }
+}
+struct RectSearchTree<Value: Rectable> {
+    private var root: RectSearchElement
+    private var count: Int
+    
+    init?(_ vs: [Value]) {
+        guard !vs.isEmpty else { return nil }
+        
+        func element(_ vs: Array<Value>.SubSequence, si: Int) -> RectSearchElement {
+            if vs.count == 1 {
+                return .init(i: si, bounds: vs.first!.bounds, left: nil, right: nil)
+            } else {
+                let midCount = vs.count / 2
+                let e0 = element(vs[..<(vs.startIndex + midCount)], si: si)
+                let e1 = element(vs[(vs.startIndex + midCount)...], si: si + midCount)
+                return .init(i: nil, bounds: e0.bounds.union(e1.bounds), left: e0, right: e1)
+            }
+        }
+        root = element(vs[...], si: 0)
+        count = vs.count
+    }
+    
+    func contains(at p: Point, handler: (Int) -> ()) {
+        root.containsIndexes(at: p, handler: handler)
+    }
+    func containsIndexes(at p: Point) -> [Int] {
+        var idxs = [Int](capacity: count)
+        root.containsIndexes(at: p) {
+            idxs.append($0)
+        }
+        return idxs
+    }
+    func intersects(from rect: Rect, handler: (Int) -> ()) {
+        root.intersectsIndexes(from: rect, handler: handler)
+    }
+    func intersectsIndexes(from rect: Rect) -> [Int] {
+        var idxs = [Int](capacity: count)
+        root.intersectsIndexes(from: rect) {
+            idxs.append($0)
+        }
+        return idxs
     }
 }
 

@@ -1206,8 +1206,14 @@ extension Line {
     var firstPoint: Point {
         controls[0].point
     }
+    var firstDistance: Double {
+        size / 2 * controls[0].pressure
+    }
     var lastPoint: Point {
         controls[controls.count - 1].point
+    }
+    var lastDistance: Double {
+        size / 2 * controls[controls.count - 1].pressure
     }
     func connectingPoint(at i: Int) -> Point {
         Point.linear(controls[i].point, controls[i + 1].point,
@@ -1438,6 +1444,25 @@ extension Line {
                 minDSquared = min(minDSquared, b.minDistanceSquared(from: p))
             }
             return minDSquared
+        }
+    }
+    func containsPressure(at p: Point) -> Bool {
+        if controls.count == 1 {
+            return controls[0].point.distanceSquared(p) < (size / 2 * controls[0].pressure).squared
+        } else if controls.count == 2 {
+            let edge = Edge(controls[0].point, controls[1].point)
+            let t = edge.nearestT(from: p)
+            let pressure = Double.linear(controls[0].pressure, controls[1].pressure, t: t)
+            return edge.position(atT: t).distanceSquared(p) < (size / 2 * pressure).squared
+        } else {
+            for (bi, b) in bezierSequence.enumerated() {
+                let v = b.nearest(at: p)
+                let pressure = pressureInterpolation(at: bi).position(withT: v.t)
+                if v.distanceSquared < (size / 2 * pressure).squared {
+                    return true
+                }
+            }
+            return false
         }
     }
     func nearestIndexValue(at p: Point) -> LineIndexValue {
@@ -1913,8 +1938,7 @@ extension Line {
                                     angle: lastAngle)
         return Edge(lc.point, ep)
     }
-}
-extension Line {
+    
     func straightDistance() -> Double {
         let edge = Edge(firstPoint, lastPoint)
         return mainPointSequence.map { edge.distance(from: $0) }.max() ?? 0
@@ -1938,37 +1962,7 @@ extension Line {
         line.controls[line.controls.count - 3].weight = 1
         return line
     }
-    func autoFillLineWith(extensionLength l: Double = Line.defaultLineWidth,
-                          lineWidth: Double,
-                          minLineWidth: Double
-                            = Line.defaultLineWidth / 2) -> Line {
-        guard controls.count > 1 else {
-            return self
-        }
-        let minPressure = minLineWidth / lineWidth
-        var line = self
-        line.controls = line.controls.map {
-            Line.Control(point: $0.point, weight: $0.weight,
-                         pressure: max($0.pressure, minPressure))
-        }
-        let fpr = line.controls[0].pressure
-        let fp = line.firstPoint.movedWith(distance: l,
-                                           angle: line.firstAngle - .pi)
-        line.controls.insert(Line.Control(point: fp, weight: 0.5, pressure: fpr),
-                             at: 0)
-        line.controls[1].weight = 0
-        let lpr = line.controls[.last].pressure
-        let lp = line.lastPoint.movedWith(distance: l,
-                                          angle: line.lastAngle)
-        line.controls.append(Line.Control(point: lp, weight: 0.5, pressure: lpr))
-        line.controls[line.controls.count - 3].weight = 1
-        return line
-    }
-    func autoFillNode(lineWidth: Double = Line.defaultLineWidth * 1.05,
-                      lineColor: Color) -> Node {
-        Node(path: Path(autoFillLineWith(lineWidth: lineWidth)),
-             lineWidth: lineWidth, lineType: .color(lineColor))
-    }
+    
     func path(isClosed: Bool, isPolygon: Bool = true) -> Path {
         guard let elementsTuple = bezierCurveElementsTuple else {
             return Path()
@@ -2122,6 +2116,261 @@ extension Array where Element == Line {
         } else {
             return nil
         }
+    }
+}
+
+struct DistancePoint {
+    var point = Point(), distance = 0.0
+    
+    init(_ p: Point = .init(), _ distance: Double = 0) {
+        self.point = p
+        self.distance = distance
+    }
+    
+    func contains(_ other: Self, distance: Double) -> Bool {
+        point.distanceSquared(other.point) < (distance + (self.distance + other.distance)).squared
+    }
+}
+
+struct DistanceEdge {
+    var p0 = DistancePoint(), p1 = DistancePoint()
+    
+    init() {}
+    init(_ p0: DistancePoint, _ p1: DistancePoint) {
+        self.p0 = p0
+        self.p1 = p1
+    }
+    init(_ edge: Edge, distance: Double = 0) {
+        p0 = .init(edge.p0, distance)
+        p1 = .init(edge.p1, distance)
+    }
+}
+extension DistanceEdge {
+    var isEmpty: Bool {
+        p0.point == p1.point
+    }
+    var points: [DistancePoint] {
+        [p0, p1]
+    }
+    func reversed() -> Self {
+        .init(p1, p0)
+    }
+    var edge: Edge {
+        .init(p0.point, p1.point)
+    }
+    func intersection(_ other: Self) -> (DistancePoint, DistancePoint)? {
+        guard let (t0, t1) = edge.intersectionT(other.edge) else { return nil }
+        let p0 = position(atT: t0)
+        var p1 = other.position(atT: t1)
+        p1.point = p0.point
+        return (p0, p1)
+    }
+    func intersectionPointAndT(_ other: Self) -> (p0: DistancePoint, p1: DistancePoint,
+                                                  t0: Double, t1: Double)? {
+        guard let (p, t0, t1) = edge.intersectionPointAndT(other.edge) else { return nil }
+        var p0 = position(atT: t0)
+        p0.point = p
+        var p1 = other.position(atT: t1)
+        p1.point = p
+        return (p0, p1, t0, t1)
+    }
+    func nearestT(from p: Point) -> Double {
+        edge.nearestT(from: p)
+    }
+    func position(atT t: Double) -> DistancePoint {
+        .init(edge.position(atT: t), .linear(p0.distance, p1.distance, t: t))
+    }
+    func nearestPosition(at p: DistancePoint) -> DistancePoint {
+        position(atT: nearestT(from: p.point))
+    }
+    
+    static func distanceEdges(from ps: [DistancePoint]) -> [DistanceEdge] {
+        guard ps.count >= 2 else { return [] }
+        var preP = ps[0]
+        return (1 ..< ps.count).compactMap {
+            let edge = DistanceEdge(preP, ps[$0])
+            preP = ps[$0]
+            return edge.isEmpty ? nil : edge
+        }
+    }
+}
+
+extension Line {
+    func pathDistancePoints(quality: Double = 1) -> [DistancePoint] {
+        var ps = [DistancePoint]()
+        let s = size / 2, rlw = Line.defaultLineWidth / size
+        
+        guard controls.count >= 3 else {
+            let p0 = firstPoint, p1 = lastPoint
+            guard p0 != p1 else { return [] }
+            let fs = s * controls[.first].pressure
+            let ls = s * controls[.last].pressure
+            ps.append(.init(p0, fs))
+            ps.append(.init(p1, ls))
+            return ps
+        }
+        
+        var oldB = Bezier(), oldBI = BezierInterpolation()
+        for (i, bezier) in bezierSequence.enumerated() {
+            let preb = pressureInterpolation(at: i)
+            
+            let isFirstEqual = bezier.p0 == bezier.cp
+            let isLastEqual = bezier.cp == bezier.p1
+            let isPreEqual = oldB.cp == oldB.p1
+            if i > 0 && (isPreEqual || isFirstEqual) {
+                let lp = oldB.p1, lpr = oldBI.x1
+                let ls = s * lpr
+                ps.append(.init(lp, ls))
+                
+                let fp = bezier.p0, fpr = preb.x0
+                let fs = s * fpr
+                ps.append(.init(fp, fs))
+            }
+            oldB = bezier
+            oldBI = preb
+            
+            if isFirstEqual || isLastEqual {
+                let ns = s * preb.x0
+                let p = bezier.p0
+                ps.append(.init(p, ns))
+                continue
+            }
+            
+            func appendB(_ bezier: Bezier, _ preb: BezierInterpolation) {
+                let da = abs(Point.differenceAngle(bezier.cp - bezier.p0,
+                                                   bezier.p1 - bezier.cp))
+                func isMiniCross() -> Bool {
+                    if da > .pi * 0.6 {
+                        let d0 = bezier.p0.distanceSquared(bezier.cp)
+                        let d1 = bezier.cp.distanceSquared(bezier.p1)
+                        return (d0 / s * s < 4 * 4 || d1 / s * s < 4 * 4)
+                    } else {
+                        return false
+                    }
+                }
+                if da > .pi * 0.9 || isMiniCross() {
+                    let ns0 = s * preb.x0, ncs = s * preb.cx
+                    let p0 = bezier.p0, cp = bezier.position(withT: 0.5)
+                    ps.append(.init(p0, ns0))
+                    ps.append(.init(cp, ncs))
+                } else {
+                    let l = bezier.length(withFlatness: 4)
+                    let ct = da < .pi * 0.1 ?
+                        da.clipped(min: 0, max: .pi * 0.3, newMin: 0, newMax: 1.5) :
+                        da.clipped(min: .pi * 0.3, max: .pi * 0.9, newMin: 1.5, newMax: 16)
+                    let c = l * ct * rlw * quality
+                    let count = c.isNaN ? 2 : Int(c.clipped(min: 2, max: 32))
+                    let rCount = 1 / Double(count)
+                    for i in 0 ..< count {
+                        let t = Double(i) * rCount
+                        let ns = s * preb.position(withT: t)
+                        let p = bezier.position(withT: t)
+                        ps.append(.init(p, ns))
+                    }
+                }
+            }
+            let d0 = bezier.p0.distance(bezier.cp)
+            let d1 = bezier.cp.distance(bezier.p1)
+            let t0 = d0 < d1 ? d0 / d1 : d1 / d0
+            if t0 < 0.35 {
+                let t = (d0 < d1 ? d0 / d1 : (d0 - d1) / d0).mid(0.5)
+                let (b0, b1) = bezier.split(withT: t)
+                let (preb0, preb1) = preb.split(withT: t)
+                appendB(b0, preb0)
+                appendB(b1, preb1)
+            } else {
+                appendB(bezier, preb)
+            }
+        }
+        let lp = lastPoint
+        let lpr = controls[.last].pressure
+        ps.append(.init(lp, s * lpr))
+        
+        return ps
+    }
+    func pathDistanceEdges(quality: Double = 1) -> [DistanceEdge] {
+        DistanceEdge.distanceEdges(from: pathDistancePoints(quality: quality))
+    }
+    
+    func pathPoints(quality: Double = 1) -> [Point] {
+        var ps = [Point]()
+        let s = size / 2, rlw = Line.defaultLineWidth / size
+        
+        guard controls.count >= 3 else {
+            let p0 = firstPoint, p1 = lastPoint
+            guard p0 != p1 else { return [] }
+            ps.append(p0)
+            ps.append(p1)
+            return ps
+        }
+        
+        var oldB = Bezier()
+        for (i, bezier) in bezierSequence.enumerated() {
+            let preb = pressureInterpolation(at: i)
+            
+            let isFirstEqual = bezier.p0 == bezier.cp
+            let isLastEqual = bezier.cp == bezier.p1
+            let isPreEqual = oldB.cp == oldB.p1
+            if i > 0 && (isPreEqual || isFirstEqual) {
+                ps.append(oldB.p1)
+                ps.append(bezier.p0)
+            }
+            oldB = bezier
+            
+            if isFirstEqual || isLastEqual {
+                ps.append(bezier.p0)
+                continue
+            }
+            
+            func appendB(_ bezier: Bezier, _ preb: BezierInterpolation) {
+                let da = abs(Point.differenceAngle(bezier.cp - bezier.p0,
+                                                   bezier.p1 - bezier.cp))
+                func isMiniCross() -> Bool {
+                    if da > .pi * 0.6 {
+                        let d0 = bezier.p0.distanceSquared(bezier.cp)
+                        let d1 = bezier.cp.distanceSquared(bezier.p1)
+                        return (d0 / s * s < 4 * 4 || d1 / s * s < 4 * 4)
+                    } else {
+                        return false
+                    }
+                }
+                if da > .pi * 0.9 || isMiniCross() {
+                    let p0 = bezier.p0, cp = bezier.position(withT: 0.5)
+                    ps.append(p0)
+                    ps.append(cp)
+                } else {
+                    let l = bezier.length(withFlatness: 4)
+                    let ct = da < .pi * 0.1 ?
+                        da.clipped(min: 0, max: .pi * 0.3, newMin: 0, newMax: 1.5) :
+                        da.clipped(min: .pi * 0.3, max: .pi * 0.9, newMin: 1.5, newMax: 16)
+                    let c = l * ct * rlw * quality
+                    let count = c.isNaN ? 2 : Int(c.clipped(min: 2, max: 32))
+                    let rCount = 1 / Double(count)
+                    for i in 0 ..< count {
+                        let t = Double(i) * rCount
+                        ps.append(bezier.position(withT: t))
+                    }
+                }
+            }
+            let d0 = bezier.p0.distance(bezier.cp)
+            let d1 = bezier.cp.distance(bezier.p1)
+            let t0 = d0 < d1 ? d0 / d1 : d1 / d0
+            if t0 < 0.35 {
+                let t = (d0 < d1 ? d0 / d1 : (d0 - d1) / d0).mid(0.5)
+                let (b0, b1) = bezier.split(withT: t)
+                let (preb0, preb1) = preb.split(withT: t)
+                appendB(b0, preb0)
+                appendB(b1, preb1)
+            } else {
+                appendB(bezier, preb)
+            }
+        }
+        ps.append(lastPoint)
+        
+        return ps
+    }
+    func pathEdges(quality: Double = 1) -> [Edge] {
+        Edge.edges(from: pathPoints(quality: quality))
     }
 }
 

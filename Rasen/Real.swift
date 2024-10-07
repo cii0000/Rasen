@@ -297,7 +297,7 @@ extension Double {
     
     func isApproximatelyEqual(_ other: Double,
                               tolerance: Double = .ulpOfOne) -> Bool {
-        abs(self - other) < tolerance
+        abs(self - other) <= tolerance
     }
     
     func ease(_ easing: Easing) -> Double {

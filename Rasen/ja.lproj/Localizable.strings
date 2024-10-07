@@ -123,6 +123,7 @@
 "No selection" = "選択なし";
 
 "Export as Image..." = "画像として書き出す...";
+"Export as 4K Image..." = "4K画像として書き出す...";
 "Export as PDF..." = "PDFとして書き出す...";
 "Export as GIF..." = "GIFとして書き出す...";
 "Export as Movie..." = "動画として書き出す...";

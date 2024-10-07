@@ -142,6 +142,13 @@ struct Content: Hashable, Codable {
     var sec: Rational? {
         timeOption?.sec(fromBeat: beat)
     }
+    var rootSec: Rational? {
+        if let timeOption {
+            timeOption.sec(fromBeat: beat - timeOption.localStartBeat)
+        } else {
+            nil
+        }
+    }
     var id = UUID()
     
     init(directoryName: String = "", name: String = "",

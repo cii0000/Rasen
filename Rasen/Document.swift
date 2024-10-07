@@ -1156,7 +1156,7 @@ final class Document: @unchecked Sendable {
         updateGrid(with: screenToWorldTransform, in: screenBounds)
         updateEditorNode()
         updateRunnerNodesPosition()
-        updateWithIsFullEdit()
+        updateSheetViewsWithCamera()
 //        updateCursorNode()
     }
     let editableMapScale = 2.0 ** -4
@@ -1181,10 +1181,11 @@ final class Document: @unchecked Sendable {
         return p.rounded(decimalPlaces: decimalPlaces)
     }
     
-    func updateWithIsFullEdit() {
+    func updateSheetViewsWithCamera() {
         sheetViewValues.forEach {
             if let view = $0.value.view {
                 updateWithIsFullEdit(in: view)
+                view.screenToWorldScale = screenToWorldScale
             }
         }
     }
@@ -2799,6 +2800,7 @@ final class Document: @unchecked Sendable {
                 let sheet = sheetRecord.decodedValue ?? Sheet(message: "Failed to load".localized)
                 let sheetBinder = RecordBinder(value: sheet, record: sheetRecord)
                 let sheetView = SheetView(binder: sheetBinder, keyPath: \SheetBinder.value)
+                sheetView.screenToWorldScale = self.screenToWorldScale
                 sheetView.id = sid
                 if let history = historyRecord.decodedValue {
                     sheetView.history = history
@@ -2890,6 +2892,7 @@ final class Document: @unchecked Sendable {
         guard let sheet = sheetRecord.decodedValue else { return nil }
         let sheetBinder = RecordBinder(value: sheet, record: sheetRecord)
         let sheetView = SheetView(binder: sheetBinder, keyPath: \SheetBinder.value)
+        sheetView.screenToWorldScale = screenToWorldScale
         sheetView.id = sid
         if let history = sheetHistoryRecord.decodedValue {
             sheetView.history = history
@@ -3070,6 +3073,7 @@ final class Document: @unchecked Sendable {
         
         let sheetBinder = RecordBinder(value: sheet, record: sheetRecord)
         let sheetView = SheetView(binder: sheetBinder, keyPath: \SheetBinder.value)
+        sheetView.screenToWorldScale = screenToWorldScale
         sheetView.id = sid
         if let history = history {
             sheetView.history = history

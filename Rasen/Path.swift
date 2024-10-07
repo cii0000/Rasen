@@ -1540,6 +1540,18 @@ extension Path {
         }
         return (npd, nCounts)
     }
+    func outlinePointsWith(quality: Double = 1, lineWidth lw: Double) -> [[Point]] {
+        let (pd, counts) = outlinePointsDataWith(lineWidth: lw)
+        var i = 0
+        return counts.map { count in
+            let points = (i ..< (i + count)).map {
+                Point(Double(pd[$0 * 4]),
+                      Double(pd[$0 * 4 + 1]))
+            }
+            i += count
+            return points
+        }
+    }
     
     func fillColorsDataWith(_ colors: [Color]) -> [RGBA] {
         colors.map { $0.rgba.premultipliedAlpha }

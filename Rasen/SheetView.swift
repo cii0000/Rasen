@@ -144,9 +144,19 @@ final class BorderView<T: BinderProtocol>: View {
         self.keyPath = keyPath
         
         node = Node(path: binder[keyPath: keyPath].path(with: bounds),
-                    lineWidth: 1, lineType: .color(.border))
+                    lineWidth: 1, lineType: .color(.subBorder))
     }
     
+    var screenToWorldScale = 1.0 {
+        didSet {
+            guard screenToWorldScale != oldValue else { return }
+            if screenToWorldScale < 0.5 {
+                node.lineWidth = screenToWorldScale * 2
+            } else if node.lineWidth != 1 {
+                node.lineWidth = 1
+            }
+        }
+    }
     func updateWithModel() {
         node.path = model.path(with: bounds)
     }
@@ -1151,6 +1161,14 @@ final class SheetView: View, @unchecked Sendable {
         animationView.updateTimeline()
     }
     
+    var screenToWorldScale = 1.0 {
+        didSet {
+            bordersView.elementViews.forEach {
+                $0.screenToWorldScale = screenToWorldScale
+            }
+        }
+    }
+    
     var bounds: Rect {
         get { node.bounds ?? Sheet.defaultBounds }
         set {
@@ -1824,7 +1842,7 @@ final class SheetView: View, @unchecked Sendable {
             firstSec = nil
             
             contentsView.elementViews.forEach {
-                if $0.model.type == .movie, let sec = $0.model.sec {
+                if $0.model.type == .movie, let sec = $0.model.rootSec {
                     $0.updateMovie(atSec: sec)
                 }
             }
@@ -1911,7 +1929,9 @@ final class SheetView: View, @unchecked Sendable {
             }
             
             sheetView.contentsView.elementViews.forEach {
-                $0.updateMovie(atSec: playingSec)
+                if $0.model.type == .movie, let timeOption = $0.model.timeOption {
+                    $0.updateMovie(atSec: playingSec - timeOption.secRange.start - timeOption.localStartBeat)
+                }
             }
             
             
@@ -3526,6 +3546,7 @@ final class SheetView: View, @unchecked Sendable {
         let bounds = self.bounds
         bivs.forEach {
             bordersView.elementViews[$0.index].bounds = bounds
+            bordersView.elementViews[$0.index].screenToWorldScale = screenToWorldScale
         }
     }
     private func removeBordersNode(at borderIndexes: [Int]) {
@@ -6011,17 +6032,21 @@ final class SheetView: View, @unchecked Sendable {
         let isSmall = ois ??
             (sheetColorOwnerFromPlane(at: p).uuColor != Sheet.defalutBackgroundUUColor || textTuple(at: p) != nil)
         let ds = Line.defaultLineWidth * 3 * scale
-        
         var minI: Int?, minDSquared = Double.infinity
-        for (i, line) in model.picture.lines.enumerated() {
+        for (i, line) in model.picture.lines.enumerated().reversed() {
             guard line.uuColor != removingUUColor else { continue }
-            let nd = line.uuColor != Line.defaultUUColor ?
-            line.size / 2 : (isSmall ? (line.size / 2 + ds) / 4 : line.size / 2 + ds * 5)
-            let ldSquared = nd * nd
-            let dSquared = line.minDistanceSquared(at: p)
-            if dSquared < minDSquared && dSquared < ldSquared {
-                minI = i
-                minDSquared = dSquared
+            if line.uuColor != Line.defaultUUColor && isSmall {
+                if line.containsPressure(at: p) {
+                    return (linesView.elementViews[i], i)
+                }
+            } else {
+                let nd = isSmall ? (line.size / 2 + ds) / 4 : line.size / 2 + ds * 5
+                let ldSquared = nd * nd
+                let dSquared = line.minDistanceSquared(at: p)
+                if dSquared < minDSquared && dSquared < ldSquared {
+                    minI = i
+                    minDSquared = dSquared
+                }
             }
         }
         if let i = minI {

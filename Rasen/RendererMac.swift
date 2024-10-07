@@ -1009,6 +1009,14 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         editor.send(inputKeyEventWith(.ended))
         document.isNoneCursor = false
     }
+    @objc func exportAsHighQualityImage(_ sender: Any) {
+        document.isNoneCursor = true
+        let editor = HighQualityImageExporter(document)
+        editor.send(inputKeyEventWith(.began))
+        Sleep.start()
+        editor.send(inputKeyEventWith(.ended))
+        document.isNoneCursor = false
+    }
     @objc func exportAsPDF(_ sender: Any) {
         document.isNoneCursor = true
         let editor = PDFExporter(document)
@@ -1572,6 +1580,12 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         menu.addItem(SubNSMenuItem(title: "Export as Image...".localized, closure: { [weak self] in
             guard let self else { return }
             let editor = ImageExporter(self.document)
+            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
+            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
+        }))
+        menu.addItem(SubNSMenuItem(title: "Export as 4K Image...".localized, closure: { [weak self] in
+            guard let self else { return }
+            let editor = HighQualityImageExporter(self.document)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
@@ -2975,27 +2989,52 @@ extension Node {
     func imageInBounds(size: Size? = nil,
                        backgroundColor: Color? = nil,
                        colorSpace: RGBColorSpace,
-                       isAntialias: Bool = true) -> Image? {
+                       isAntialias: Bool = true,
+                       isGray: Bool = false) -> Image? {
         guard let bounds = bounds else { return nil }
         return image(in: bounds, size: size ?? bounds.size,
                      backgroundColor: backgroundColor, colorSpace: colorSpace,
-                     isAntialias: isAntialias)
+                     isAntialias: isAntialias, isGray: isGray)
     }
     func image(in bounds: Rect,
                size: Size,
                backgroundColor: Color? = nil, colorSpace: RGBColorSpace,
-               isAntialias: Bool = true) -> Image? {
+               isAntialias: Bool = true,
+               isGray: Bool = false) -> Image? {
         let transform = Transform(translation: -bounds.origin)
             * Transform(scaleX: size.width / bounds.width,
                         y: size.height / bounds.height)
         return image(size: size, transform: transform,
                      backgroundColor: backgroundColor, colorSpace: colorSpace,
-                     isAntialias: isAntialias)
+                     isAntialias: isAntialias, isGray: isGray)
     }
     func image(size: Size, transform: Transform,
                backgroundColor: Color? = nil, colorSpace: RGBColorSpace,
-               isAntialias: Bool = true) -> Image? {
-        guard let space = colorSpace.cg else { return nil }
+               isAntialias: Bool = true,
+               isGray: Bool = false) -> Image? {
+        let ctx = context(size: size, transform: transform, backgroundColor: backgroundColor,
+                          colorSpace: colorSpace, isAntialias: isAntialias, isGray: isGray)
+        guard let cgImage = ctx?.makeImage() else { return nil }
+        return Image(cgImage: cgImage)
+    }
+    func bitmap<Value: FixedWidthInteger & UnsignedInteger>(size: Size,
+                backgroundColor: Color? = nil, colorSpace: RGBColorSpace,
+                isAntialias: Bool = true,
+                isGray: Bool = false) -> Bitmap<Value>? {
+        guard let bounds = bounds else { return nil }
+        let transform = Transform(translation: -bounds.origin)
+            * Transform(scaleX: size.width / bounds.width,
+                        y: size.height / bounds.height)
+        guard let ctx = context(size: size, transform: transform, backgroundColor: backgroundColor,
+                                colorSpace: colorSpace,
+                                isAntialias: isAntialias, isGray: isGray) else { return nil }
+        return .init(ctx)
+    }
+    private func context(size: Size, transform: Transform,
+                         backgroundColor: Color? = nil, colorSpace: RGBColorSpace,
+                         isAntialias: Bool = true,
+                         isGray: Bool = false) -> CGContext? {
+        guard let space = isGray ? CGColorSpaceCreateDeviceGray() : colorSpace.cg else { return nil }
         let ctx: CGContext
         if colorSpace.isHDR {
             let bitmapInfo = CGBitmapInfo(rawValue: (CGBitmapInfo.floatComponents.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue))
@@ -3005,8 +3044,8 @@ extension Node {
                                       bitmapInfo: bitmapInfo.rawValue) else { return nil }
             ctx = actx
         } else {
-            let bitmapInfo = CGBitmapInfo(rawValue: backgroundColor?.opacity == 1 ?
-                                            CGImageAlphaInfo.noneSkipLast.rawValue : CGImageAlphaInfo.premultipliedLast.rawValue)
+            let bitmapInfo = CGBitmapInfo(rawValue: isGray ? CGImageAlphaInfo.none.rawValue : (backgroundColor?.opacity == 1 ?
+                                            CGImageAlphaInfo.noneSkipLast.rawValue : CGImageAlphaInfo.premultipliedLast.rawValue))
             guard let actx = CGContext(data: nil,
                                       width: Int(size.width), height: Int(size.height),
                                       bitsPerComponent: 8, bytesPerRow: 0, space: space,
@@ -3027,26 +3066,7 @@ extension Node {
         ctx.concatenate(nt.cg)
         render(in: ctx)
         ctx.restoreGState()
-        guard let cgImage = ctx.makeImage() else { return nil }
-        
-//        //
-//        if appearance == .dark {
-//            let filters = SubMTKView.darkFilters()
-//            var ciImage = CIImage(cgImage: cgImage)
-//            for filter in filters {
-//                filter.setValue(ciImage, forKey: kCIInputImageKey)
-//                if let nCiImage = filter.outputImage {
-//                    ciImage = nCiImage
-//                }
-//            }
-//            let cictx = CIContext()
-//            let rect = CGRect(x: 0, y: 0, width: ctx.width, height: ctx.height)
-//            if let nImage = cictx.createCGImage(ciImage, from: rect) {
-//                return Image(cgImage: nImage)
-//            }
-//        }
-        
-        return Image(cgImage: cgImage)
+        return ctx
     }
     func renderInBounds(size: Size? = nil, in ctx: CGContext) {
         guard let bounds = bounds else { return }
