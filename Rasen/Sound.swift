@@ -409,7 +409,7 @@ struct Spectlope: Hashable, Codable {
     var sprols = [Sprol(pitch: 12 * 1, volm: 0.75, noise: 0),
                   Sprol(pitch: 12 * 2 + 5, volm: 1, noise: 0),
                   Sprol(pitch: 12 * 7 + 5, volm: 0.5, noise: 0),
-                  Sprol(pitch: 12 * 10, volm: 0.1875, noise: 0)]
+                  Sprol(pitch: 12 * 10, volm: 0, noise: 0)]
 }
 extension Spectlope: Protobuf {
     init(_ pb: PBSpectlope) throws {

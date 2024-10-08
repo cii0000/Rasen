@@ -3178,7 +3178,7 @@ final class LineColorCopier: InputKeyEditor {
                 
                 func showPit(pitI: Int, isTone: Bool = false) {
                     let pitP = scoreView.pitPosition(atPit: pitI, at: noteI)
-                    let nPitP = (isTone ? Point(pitP.x, scoreView.toneY(at: pitP, at: noteI)) : pitP)
+                    let nPitP = (isTone ? Point(pitP.x, scoreView.toneY(at: noteI)) : pitP)
                     let scale = 1 / document.worldToScreenScale
                     let lw = Line.defaultLineWidth
                     let nlw = max(lw * 1.5, lw * 2.5 * scale, 1 * scale)
@@ -3310,7 +3310,7 @@ final class ToneCopier: InputKeyEditor {
                 
                 func showPit(pitI: Int, isTone: Bool = false) {
                     let pitP = scoreView.pitPosition(atPit: pitI, at: noteI)
-                    let nPitP = (isTone ? Point(pitP.x, scoreView.toneY(at: pitP, at: noteI)) : pitP)
+                    let nPitP = (isTone ? Point(pitP.x, scoreView.toneY(at: noteI)) : pitP)
                     let scale = 1 / document.worldToScreenScale
                     let lw = Line.defaultLineWidth
                     let nlw = max(lw * 1.5, lw * 2.5 * scale, 1 * scale)

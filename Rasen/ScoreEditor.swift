@@ -983,13 +983,13 @@ struct ScoreLayout {
     static let noteHeight = 2.0
     static let evenY = 1.0
     static let oddY = 2.0
-    static let spectlopeY = 3.0
     static let envelopeY = 1.0
     static let reverbY = 2.0
     static let toneColorY = 2.0
     static let envelopePadding = 3.0
     static let envelopeHeight = 3.0
     static let spectlopeHeight = 20.0
+    static let overtoneHeight = 3.0
     static let isShownSpectrogramHeight = 6.0
 }
 
@@ -1615,8 +1615,11 @@ extension ScoreView {
         let nex = nsx + nw
         
         let overtoneHalfH = 0.125
-        let evenY = ScoreLayout.evenY, oddY = ScoreLayout.oddY, spectlopeH = ScoreLayout.spectlopeHeight
-        let toneY = toneY(at: .init(), from: note)
+        let envelopeH = ScoreLayout.envelopeHeight,
+            spectlopeH = ScoreLayout.spectlopeHeight, overtoneH = ScoreLayout.overtoneHeight
+        let toneY = toneY(from: note)
+        let overtoneY = toneY + spectlopeH
+        let evenY = ScoreLayout.evenY + overtoneY, oddY = ScoreLayout.oddY + overtoneY
         
         var linePath, mainLinePath, evenLinePath, oddLinePath: Path, mainEvenLinePath: Path?,
             lyricLinePathlines = [Pathline]()
@@ -1656,7 +1659,7 @@ extension ScoreView {
         
         func tonePitchY(fromPitch pitch: Double) -> Double {
             pitch.clipped(min: Score.doubleMinPitch, max: Score.doubleMaxPitch,
-                          newMin: 0, newMax: spectlopeH) + toneY + ScoreLayout.spectlopeY
+                          newMin: 0, newMax: spectlopeH) + toneY
         }
         
         struct LinePoint {
@@ -1730,7 +1733,7 @@ extension ScoreView {
         }
 
         let boxPath = Path(Rect(x: nsx, y: toneY - ScoreLayout.envelopeHeight,
-                                width: nex - nsx, height: spectlopeH + ScoreLayout.envelopeHeight + ScoreLayout.spectlopeY + 1),
+                                width: nex - nsx, height: envelopeH + spectlopeH + overtoneH),
                            cornerRadius: 1)
         scNodes.append(.init(path: boxPath, fillType: .color(.transparentDisabled)))
         
@@ -1751,10 +1754,8 @@ extension ScoreView {
             if isEven {
                 meps.append(.init(nsx, ny, mainEvenLineHalfH, Self.color(fromVolm: note.firstTone.overtone.evenVolm)))
             }
-            eps.append(.init(nsx, self.toneY(at: .init(nsx, ny), from: note) + evenY, overtoneHalfH,
-                             Self.color(fromVolm: note.firstTone.overtone.evenVolm)))
-            ops.append(.init(nsx, self.toneY(at: .init(nsx, ny), from: note) + oddY, overtoneHalfH,
-                             Self.color(fromVolm: note.firstTone.overtone.oddVolm)))
+            eps.append(.init(nsx, evenY, overtoneHalfH, Self.color(fromVolm: note.firstTone.overtone.evenVolm)))
+            ops.append(.init(nsx, oddY, overtoneHalfH, Self.color(fromVolm: note.firstTone.overtone.oddVolm)))
             
             var ns = [(beat: Rational, result: Note.PitResult, sumTone: Double)](capacity: Int(note.beatRange.length / .init(1, 48)))
             beat += .init(1, 48)
@@ -1775,19 +1776,17 @@ extension ScoreView {
                 if isEven {
                     meps.append(.init(noteX, noteY, mainEvenLineHalfH, Self.color(fromVolm: n.result.tone.overtone.evenVolm)))
                 }
-                eps.append(.init(noteX, self.toneY(at: .init(noteX, noteY), from: note) + evenY, overtoneHalfH,
-                                 Self.color(fromVolm: n.result.tone.overtone.evenVolm)))
-                ops.append(.init(noteX, self.toneY(at: .init(noteX, noteY), from: note) + oddY, overtoneHalfH,
-                                 Self.color(fromVolm: n.result.tone.overtone.oddVolm)))
+                eps.append(.init(noteX, evenY, overtoneHalfH, Self.color(fromVolm: n.result.tone.overtone.evenVolm)))
+                ops.append(.init(noteX, oddY, overtoneHalfH, Self.color(fromVolm: n.result.tone.overtone.oddVolm)))
             }
             if beat < note.beatRange.end {
                 let lastPit = note.pits.last!
                 let lastTone = lastPit.tone
                 ps.append(.init(nsx + nw, noteY(atBeat: note.beatRange.end, from: note), 0,
                                 ps.last?.color ?? .content))
-                eps.append(.init(nsx + nw, self.toneY(at: ps.last!.point, from: note), 0,
+                eps.append(.init(nsx + nw, evenY, 0,
                                  Self.color(fromVolm: lastTone.overtone.evenVolm)))
-                ops.append(.init(nsx + nw, self.toneY(at: ps.last!.point, from: note), 0,
+                ops.append(.init(nsx + nw, oddY, 0,
                                  Self.color(fromVolm: lastTone.overtone.oddVolm)))
                 mps.append(.init(nsx + nw, noteY(atBeat: note.beatRange.end, from: note), mainLineHalfH,
                                  .content))
@@ -1885,8 +1884,8 @@ extension ScoreView {
             }
             
             toneKnobPRCs = sprolKnobPAndRs
-            + knobPRCs.map { (Point($0.p.x, self.toneY(at: $0.p, from: note) + evenY), toneR, .background) }
-            + knobPRCs.map { (Point($0.p.x, self.toneY(at: $0.p, from: note) + oddY), toneR, .background) }
+            + knobPRCs.map { (Point($0.p.x, evenY), toneR, .background) }
+            + knobPRCs.map { (Point($0.p.x, oddY), toneR, .background) }
             
             struct PAndColor: Hashable {
                 var p: Point, color: Color
@@ -1991,9 +1990,9 @@ extension ScoreView {
                 }
             }
             
-            scNodes += knobPRCs.filter { $0.p.x != nsx || $0.p.x != nex }.map {
+            scNodes += knobPRCs.filter { $0.p.x != nsx && $0.p.x != nex }.map {
                 .init(path: .init(Edge(.init($0.p.x, toneY),
-                                       .init($0.p.x, toneY + spectlopeH + ScoreLayout.spectlopeY))),
+                                       .init($0.p.x, toneY + spectlopeH))),
                       lineWidth: 0.0625,
                       lineType: .color(.content))
             }
@@ -2032,11 +2031,11 @@ extension ScoreView {
                                         note.firstPitch.isInteger ? knobR : knobR / 2,
                                         note.firstTone.color) }
             
-            evenLinePath = .init(Rect(x: nsx, y: toneY + evenY - overtoneHalfH,
+            evenLinePath = .init(Rect(x: nsx, y: evenY - overtoneHalfH,
                                       width: nw, height: overtoneHalfH * 2))
             evenColors = [Self.color(fromVolm: note.firstTone.overtone.evenVolm)]
             
-            oddLinePath = .init(Rect(x: nsx, y: toneY + oddY - overtoneHalfH,
+            oddLinePath = .init(Rect(x: nsx, y: oddY - overtoneHalfH,
                                      width: nw, height: overtoneHalfH * 2))
             oddColors = [Self.color(fromVolm: note.firstTone.overtone.oddVolm)]
             
@@ -2098,6 +2097,8 @@ extension ScoreView {
         toneKnobPRCs += envelopeKnobPRCs
         
         scNodes.append(.init(path: .init(Edge(.init(nsx, toneY), .init(nex, toneY))),
+                             lineWidth: 0.125, lineType: .color(.subBorder)))
+        scNodes.append(.init(path: .init(Edge(.init(nsx, overtoneY), .init(nex, overtoneY))),
                              lineWidth: 0.125, lineType: .color(.subBorder)))
         
         scNodes.append(.init(path: .init(Rect(x: nsx, y: reverbY - 0.25, width: reverbReleaseX - nsx, height: 0.5)),
@@ -2255,7 +2256,7 @@ extension ScoreView {
     
     func releasePosition(from note: Note) -> Point {
         let nx = x(atBeat: note.beatRange.end)
-        let envelopeY = envelopeBoxY(at: .init(), from: note) + ScoreLayout.envelopeY
+        let envelopeY = envelopeBoxY(from: note) + ScoreLayout.envelopeY
         let releaseW = width(atDurSec: note.envelope.releaseSec)
         return .init(nx + releaseW, envelopeY)
     }
@@ -2332,17 +2333,19 @@ extension ScoreView {
         let hnh = pitchHeight / 2
         var minDS = Double.infinity, minI: Int?
         for (noteI, note) in model.notes.enumerated().reversed() {
-            let maxD = Sheet.knobEditDistance * scale + noteH(from: note) / 2
-            let maxDS = maxD * maxD
+            let maxPitD = Sheet.knobEditDistance * scale + noteH(from: note) / 2
+            let maxPitDS = maxPitD * maxPitD
             let nf = noteFrame(at: noteI).outset(by: hnh)
             let ods = nf.distanceSquared(p)
-            if ods < maxDS {
+            if ods < maxPitDS {
                 let ds = pointline(from: note).minDistanceSquared(at: p)
-                if ds < minDS && ds < maxDS {
+                if ds < minDS && ds < maxPitDS {
                     minDS = ds
                     minI = noteI
                 }
             }
+            let maxD = Sheet.knobEditDistance * scale
+            let maxDS = maxD * maxD
             if note.isShownTone {
                 let ds = toneFrame(from: note).distanceSquared(p)
                 if ds < minDS && ds < maxDS {
@@ -2362,7 +2365,7 @@ extension ScoreView {
                 }
                 
                 let nx = x(atBeat: note.beatRange.start)
-                let reverbY = envelopeBoxY(at: .init(), from: note) + ScoreLayout.reverbY
+                let reverbY = envelopeBoxY(from: note) + ScoreLayout.reverbY
                 let erp = Point(nx + width(atDurSec: note.envelope.reverb.earlyRSec), reverbY)
                 let elrp = Point(nx + width(atDurSec: note.envelope.reverb.earlyAndLateRSec), reverbY)
                 let drp = Point(nx + width(atDurSec: note.envelope.reverb.durSec), reverbY)
@@ -2405,7 +2408,7 @@ extension ScoreView {
         
         var minDS = Double.infinity
         if note.isShownTone {
-            let envelopeY = envelopeBoxY(at: .init(), from: note) + ScoreLayout.envelopeY
+            let envelopeY = envelopeBoxY(from: note) + ScoreLayout.envelopeY
             let attackBeat = Double(note.beatRange.start) + score.beat(fromSec: note.envelope.attackSec)
             let ax = x(atBeat: attackBeat)
             let ap = Point(ax, envelopeY)
@@ -2437,7 +2440,7 @@ extension ScoreView {
             }
             
             let nx = x(atBeat: note.beatRange.start)
-            let reverbY = envelopeBoxY(at: .init(), from: note) + ScoreLayout.reverbY
+            let reverbY = envelopeBoxY(from: note) + ScoreLayout.reverbY
             let erp = Point(nx + width(atDurSec: note.envelope.reverb.earlyRSec), reverbY)
             let elrp = Point(nx + width(atDurSec: note.envelope.reverb.earlyAndLateRSec), reverbY)
             let drp = Point(nx + width(atDurSec: note.envelope.reverb.durSec), reverbY)
@@ -2505,10 +2508,11 @@ extension ScoreView {
         let score = model
         for (noteI, note) in score.notes.enumerated() {
             guard note.isShownTone else { continue }
+            let toneY = toneY(from: note)
             if note.pits.count == 1 {
                 let pitP = Point(x(atBeat: note.beatRange.start), y(fromPitch: note.firstPitch))
                 
-                let evenY = toneY(at: pitP, from: note) + ScoreLayout.evenY
+                let evenY = toneY + ScoreLayout.spectlopeHeight + ScoreLayout.evenY
                 var ds = p.y.distanceSquared(evenY)
                 if p.x >= pitP.x - maxD && p.x < x(atBeat: note.beatRange.end) + maxD
                     && ds < minDS && ds < maxDS {
@@ -2518,7 +2522,7 @@ extension ScoreView {
                     minResult = .evenVolm(pitI: 0)
                 }
                 
-                let oddY = toneY(at: pitP, from: note) + ScoreLayout.oddY
+                let oddY = toneY + ScoreLayout.spectlopeHeight + ScoreLayout.oddY
                 ds = p.y.distanceSquared(oddY)
                 if p.x >= pitP.x - maxD && p.x < x(atBeat: note.beatRange.end) + maxD
                     && ds < minDS && ds < maxDS {
@@ -2534,7 +2538,7 @@ extension ScoreView {
                     if minODS > noteH / 2 {
                         let pitP = pitPosition(atPit: pitI, from: note)
                         
-                        let evenP = Point(pitP.x, toneY(at: pitP, from: note) + ScoreLayout.evenY)
+                        let evenP = Point(pitP.x, toneY + ScoreLayout.spectlopeHeight + ScoreLayout.evenY)
                         let evenDsd = evenP.distanceSquared(p)
                         if evenDsd < minDS && evenDsd < maxDS {
                             minDS = evenDsd
@@ -2542,7 +2546,7 @@ extension ScoreView {
                             minResult = .evenVolm(pitI: pitI)
                         }
                         
-                        let oddP = Point(pitP.x, toneY(at: pitP, from: note) + ScoreLayout.oddY)
+                        let oddP = Point(pitP.x, toneY + ScoreLayout.spectlopeHeight + ScoreLayout.oddY)
                         let oddDsd = oddP.distanceSquared(p)
                         if oddDsd < minDS && oddDsd < maxDS {
                             minDS = oddDsd
@@ -2565,7 +2569,7 @@ extension ScoreView {
                 }
             }
             
-            let envelopeY = envelopeBoxY(at: .init(), from: note) + ScoreLayout.envelopeY
+            let envelopeY = envelopeBoxY(from: note) + ScoreLayout.envelopeY
             let decayBeat = Double(note.beatRange.start) + score.beat(fromSec: note.envelope.attackSec + note.envelope.decaySec)
             let dx = x(atBeat: decayBeat)
             let dp = Point(dx, envelopeY)
@@ -2577,7 +2581,7 @@ extension ScoreView {
             }
             
             let nx = x(atBeat: note.beatRange.start)
-            let reverbY = envelopeBoxY(at: .init(), from: note) + ScoreLayout.reverbY
+            let reverbY = envelopeBoxY(from: note) + ScoreLayout.reverbY
             let erp = Point(nx + width(atDurSec: note.envelope.reverb.earlyRSec), reverbY)
             let elrp = Point(nx + width(atDurSec: note.envelope.reverb.earlyAndLateRSec), reverbY)
             ds = erp.distanceSquared(p)
@@ -2777,16 +2781,16 @@ extension ScoreView {
         }
         return minPitI
     }
-    func toneY(at p: Point, from note: Note) -> Double {
+    func toneY(from note: Note) -> Double {
         y(fromPitch: (note.pits.maxValue { $0.pitch } ?? 0) + note.pitch)
         + ScoreLayout.envelopePadding + ScoreLayout.envelopeHeight
     }
-    func envelopeBoxY(at p: Point, from note: Note) -> Double {
+    func toneY(at noteI: Int) -> Double {
+        toneY(from: model.notes[noteI])
+    }
+    func envelopeBoxY(from note: Note) -> Double {
         y(fromPitch: (note.pits.maxValue { $0.pitch } ?? 0) + note.pitch)
         + ScoreLayout.envelopePadding
-    }
-    func toneY(at p: Point, at noteI: Int) -> Double {
-        toneY(at: p, from: model.notes[noteI])
     }
     func toneFrame(at noteI: Int) -> Rect {
         toneFrame(from: model.notes[noteI])
@@ -2806,11 +2810,11 @@ extension ScoreView {
         return false
     }
     func toneFrame(from note: Note) -> Rect {
-        let toneY = toneY(at: .init(), from: note)
+        let toneY = toneY(from: note)
         let nx = x(atBeat: note.beatRange.start)
         let nw = width(atDurBeat: max(note.beatRange.length, Sheet.fullEditBeatInterval))
         return .init(x: nx, y: toneY,
-                     width: nw, height: ScoreLayout.spectlopeHeight + ScoreLayout.spectlopeY)
+                     width: nw, height: ScoreLayout.spectlopeHeight + ScoreLayout.overtoneHeight)
     }
     func containsEnvelopeBox(at p: Point) -> Bool {
         for note in model.notes {
@@ -2828,14 +2832,15 @@ extension ScoreView {
         return false
     }
     func envelopeBoxFrame(from note: Note) -> Rect {
-        let toneY = toneY(at: .init(), from: note)
+        let toneY = toneY(from: note)
         let nx = x(atBeat: note.beatRange.start)
         let nw = width(atDurBeat: max(note.beatRange.length, Sheet.fullEditBeatInterval))
         return .init(x: nx, y: toneY - ScoreLayout.envelopeHeight,
                      width: nw, height: ScoreLayout.envelopeHeight)
     }
     func pitIAndSprolI(at p: Point, at noteI: Int) -> (pitI: Int, sprolI: Int)? {
-        guard p.y > toneY(at: p, at: noteI) + ScoreLayout.spectlopeY else { return nil }
+        let toneY = toneY(at: noteI)
+        guard p.y > toneY && p.y <= toneY + ScoreLayout.spectlopeHeight else { return nil }
         
         let score = model
         let note = score.notes[noteI]
@@ -2864,19 +2869,19 @@ extension ScoreView {
                                      max: Score.doubleMaxPitch,
                                      newMin: 0, newMax: ScoreLayout.spectlopeHeight)
         let pitP = pitPosition(atPit: pitI, from: note)
-        return .init(pitP.x, ny + toneY(at: pitP, from: note) + ScoreLayout.spectlopeY)
+        return .init(pitP.x, ny + toneY(from: note))
     }
     func sprolPosition(atSprol sprolI: Int, atPit pitI: Int, at noteI: Int) -> Point {
         sprolPosition(atSprol: sprolI, atPit: pitI, from: model.notes[noteI])
     }
     func spectlopePitch(at p: Point, at noteI: Int) -> Double {
-        let spectlopeY = toneY(at: p, at: noteI) + ScoreLayout.spectlopeY
+        let spectlopeY = toneY(at: noteI)
         return p.y.clipped(min: spectlopeY, max: spectlopeY + ScoreLayout.spectlopeHeight,
                            newMin: Score.doubleMinPitch, newMax: Score.doubleMaxPitch)
     }
     func nearestSprol(at p: Point, at noteI: Int) -> Sprol {
         let note = model.notes[noteI]
-        let spectlopeY = toneY(at: p, from: note) + ScoreLayout.spectlopeY
+        let spectlopeY = toneY(from: note)
         let tone = note.pitResult(atBeat: beat(atX: p.x) - .init(note.beatRange.start)).tone
         let pitch = p.y.clipped(min: spectlopeY, max: spectlopeY + ScoreLayout.spectlopeHeight,
                                 newMin: Score.doubleMinPitch, newMax: Score.doubleMaxPitch)
