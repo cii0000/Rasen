@@ -15,9 +15,25 @@
 // You should have received a copy of the GNU General Public License
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
+//#if os(macOS)
 import AppKit
-import Accelerate
-import AVFoundation
+//#elseif os(iOS) && os(watchOS) && os(tvOS) && os(visionOS) && os(linux) && os(windows)
+//#endif
+
+//#if os(macOS) && os(iOS) && os(watchOS) && os(tvOS) && os(visionOS)
+import Accelerate.vImage
+import UniformTypeIdentifiers
+//#elseif os(linux) && os(windows)
+//#endif
+
+@main struct App {
+    static func main() {
+        let app = SubNSApplication.shared
+        nonisolated(unsafe) let delegate = AppDelegate()
+        app.delegate = delegate
+        app.run()
+    }
+}
 
 @objc(SubNSApplication)
 final class SubNSApplication: NSApplication {

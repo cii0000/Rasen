@@ -15,8 +15,8 @@
 // You should have received a copy of the GNU General Public License
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
-import AVFAudio
-import AVFoundation
+import struct Foundation.URL
+import struct Foundation.UUID
 
 struct ContentTimeOption: Codable, Hashable, BeatRangeType {
     var beatRange = 0 ..< Rational(0)
@@ -164,7 +164,7 @@ struct Content: Hashable, Codable {
             .appending(component: "contents")
             .appending(component: name)
         type = Self.type(from: url)
-        durSec = type == .sound ? Self.audioDurSec(from: url) : 0
+        durSec = type == .sound ? PCMBuffer.durSec(from: url) : 0
         image = Image(url: url)
         
         self.stereo = stereo
@@ -174,17 +174,6 @@ struct Content: Hashable, Codable {
         self.timeOption = timeOption
     }
     
-    static func audioDurSec(from url: URL) -> Rational {
-        if let file = try? AVAudioFile(forReading: url,
-                                       commonFormat: .pcmFormatFloat32,
-                                       interleaved: false),
-           file.fileFormat.sampleRate != 0 {
-            
-            .init(Int(file.length), Int(file.fileFormat.sampleRate))
-        } else {
-            0
-        }
-    }
     mutating func normalizeVolm() {
         if type == .sound, let lufs = integratedLoudness, lufs > -14 {
             let gain = Loudness.normalizeLoudnessScale(inputLoudness: lufs,
@@ -230,7 +219,7 @@ extension Content {
     }
     
     var pcmBuffer: PCMBuffer? {
-        try? AVAudioPCMBuffer.from(url: url)
+        try? .from(url: url)
     }
     var integratedLoudness: Double? {
         pcmBuffer?.integratedLoudness
@@ -252,7 +241,7 @@ extension Content: Protobuf {
         type = Content.type(from: url)
         let durSec: Rational = (try? .init(pb.durSec)) ?? 0
         let frameRate: Rational = (try? .init(pb.frameRate)) ?? 0
-        self.durSec = durSec == 0 && type == .sound ? Self.audioDurSec(from: url) : durSec
+        self.durSec = durSec == 0 && type == .sound ? PCMBuffer.durSec(from: url) : durSec
         self.frameRate = frameRate == 0 ? 1 : frameRate
         image = type == .image ? Image(url: url) : nil
         

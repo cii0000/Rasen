@@ -950,7 +950,7 @@ extension Reverb {
 }
 
 struct Envelope: Hashable, Codable {
-    var attackSec = 0.01171875, decaySec = 0.0, sustainVolm = 1.0, releaseSec = 0.01171875
+    var attackSec = 0.015625, decaySec = 0.0, sustainVolm = 1.0, releaseSec = 0.015625
     var reverb = Reverb()
     var id = UUID()
 }

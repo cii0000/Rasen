@@ -26,8 +26,7 @@
 		236855F32295106000958469 /* Sheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 236855F22295106000958469 /* Sheet.swift */; };
 		237AEFA62214285E004EE702 /* Picture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 237AEFA52214285E004EE702 /* Picture.swift */; };
 		237EC77822467E9500AA634F /* CopyEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 237EC77722467E9500AA634F /* CopyEditor.swift */; };
-		238BFA832C91772A00D7FB14 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 238BFA822C91772A00D7FB14 /* main.swift */; };
-		23910BA32BA1D7750064CB62 /* SpectrogramMac.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23910BA22BA1D7750064CB62 /* SpectrogramMac.swift */; };
+		23910BA32BA1D7750064CB62 /* Spectrogram.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23910BA22BA1D7750064CB62 /* Spectrogram.swift */; };
 		239757A92513666D00BCA7E8 /* Numerics in Frameworks */ = {isa = PBXBuildFile; productRef = 239757A82513666D00BCA7E8 /* Numerics */; };
 		2399F01626E11B81005CD031 /* AnimationEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2399F01526E11B81005CD031 /* AnimationEditor.swift */; };
 		239A799B22D99A9800876D43 /* TextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 239A799A22D99A9800876D43 /* TextEditor.swift */; };
@@ -57,7 +56,7 @@
 		23A728D8216CF26A000A7350 /* Color.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23A728AD216CF269000A7350 /* Color.swift */; };
 		23A728DA216CF26A000A7350 /* Transform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23A728AF216CF269000A7350 /* Transform.swift */; };
 		23A728DC216CF26A000A7350 /* Document.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23A728B1216CF269000A7350 /* Document.swift */; };
-		23B4D2E225E33D090054773C /* RendererMac.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23B4D2E125E33D090054773C /* RendererMac.swift */; };
+		23B4D2E225E33D090054773C /* Renderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23B4D2E125E33D090054773C /* Renderer.swift */; };
 		23B50CFE2997C21E002CA640 /* Loudness.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23B50CFD2997C21E002CA640 /* Loudness.swift */; };
 		23B9940B24E8F214000D544F /* Acknowledgments.txt in Resources */ = {isa = PBXBuildFile; fileRef = 23B9940A24E8F214000D544F /* Acknowledgments.txt */; };
 		23BD590924BBEB5B00C948D0 /* SwiftProtobuf in Frameworks */ = {isa = PBXBuildFile; productRef = 23BD590824BBEB5B00C948D0 /* SwiftProtobuf */; };
@@ -69,17 +68,17 @@
 		23C5B4172B903EB60081127C /* GensenJP-Medium.otf in Resources */ = {isa = PBXBuildFile; fileRef = 23C5B4122B903EB60081127C /* GensenJP-Medium.otf */; };
 		23C5B4182B903EB60081127C /* GensenTW-Medium.otf in Resources */ = {isa = PBXBuildFile; fileRef = 23C5B4132B903EB60081127C /* GensenTW-Medium.otf */; };
 		23C8C6D225E21C1B009FEA85 /* Typesetter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23C8C6D125E21C1B009FEA85 /* Typesetter.swift */; };
-		23C8C6D525E21CCB009FEA85 /* TypelineMac.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23C8C6D425E21CCB009FEA85 /* TypelineMac.swift */; };
+		23C8C6D525E21CCB009FEA85 /* Typeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23C8C6D425E21CCB009FEA85 /* Typeline.swift */; };
 		23D75E0125F0AA5900583878 /* Double2x2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23D75E0025F0AA5900583878 /* Double2x2.swift */; };
 		23D9971523A627D4006CBDD7 /* Object.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23D9971423A627D4006CBDD7 /* Object.swift */; };
-		23DBF642256F3BE500343022 /* ApplicationMac.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23DBF641256F3BE500343022 /* ApplicationMac.swift */; };
-		23DFEC6529AB6F98008D8B64 /* AudioMac.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23DFEC6429AB6F98008D8B64 /* AudioMac.swift */; };
-		23DFEC6729AB7395008D8B64 /* ContentMac.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23DFEC6629AB7395008D8B64 /* ContentMac.swift */; };
+		23DBF642256F3BE500343022 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23DBF641256F3BE500343022 /* App.swift */; };
+		23DFEC6529AB6F98008D8B64 /* Audio.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23DFEC6429AB6F98008D8B64 /* Audio.swift */; };
+		23DFEC6729AB7395008D8B64 /* Content.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23DFEC6629AB7395008D8B64 /* Content.swift */; };
 		23E242942A63FAEC001C1A59 /* Vocoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23E242932A63FAEC001C1A59 /* Vocoder.swift */; };
 		23E2B2A8241490000028F44E /* RunEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23E2B2A7241490000028F44E /* RunEditor.swift */; };
 		23EABA1A2206FF7E00C2A1C0 /* Tree.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23EABA192206FF7E00C2A1C0 /* Tree.swift */; };
 		23EABA1C2209AF1600C2A1C0 /* Line.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23EABA1B2209AF1600C2A1C0 /* Line.swift */; };
-		23F0B2E625ECC336003AFE2A /* EncoderMac.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23F0B2E525ECC336003AFE2A /* EncoderMac.swift */; };
+		23F0B2E625ECC336003AFE2A /* Encoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23F0B2E525ECC336003AFE2A /* Encoder.swift */; };
 		23F9FC0D2590922500662CD0 /* ObjectEx2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23F9FC0C2590922500662CD0 /* ObjectEx2.swift */; };
 		23FB0F83258E5A740096AD23 /* ObjectEx1.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23FB0F82258E5A740096AD23 /* ObjectEx1.swift */; };
 /* End PBXBuildFile section */
@@ -108,9 +107,8 @@
 		2379E032219C54910092892E /* License.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = License.md; sourceTree = "<group>"; };
 		237AEFA52214285E004EE702 /* Picture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Picture.swift; sourceTree = "<group>"; };
 		237EC77722467E9500AA634F /* CopyEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyEditor.swift; sourceTree = "<group>"; };
-		238BFA822C91772A00D7FB14 /* main.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		238DA81D21F443EF00691A3A /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
-		23910BA22BA1D7750064CB62 /* SpectrogramMac.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpectrogramMac.swift; sourceTree = "<group>"; };
+		23910BA22BA1D7750064CB62 /* Spectrogram.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Spectrogram.swift; sourceTree = "<group>"; };
 		2399F01526E11B81005CD031 /* AnimationEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationEditor.swift; sourceTree = "<group>"; };
 		239A799A22D99A9800876D43 /* TextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextEditor.swift; sourceTree = "<group>"; };
 		23A72873216CF1B5000A7350 /* Rasen.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Rasen.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -142,7 +140,7 @@
 		23A728AF216CF269000A7350 /* Transform.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Transform.swift; sourceTree = "<group>"; };
 		23A728B1216CF269000A7350 /* Document.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Document.swift; sourceTree = "<group>"; };
 		23A728DE216CF481000A7350 /* Readme.md */ = {isa = PBXFileReference; lastKnownFileType = net.daringfireball.markdown; path = Readme.md; sourceTree = "<group>"; };
-		23B4D2E125E33D090054773C /* RendererMac.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RendererMac.swift; sourceTree = "<group>"; };
+		23B4D2E125E33D090054773C /* Renderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Renderer.swift; sourceTree = "<group>"; };
 		23B50CFD2997C21E002CA640 /* Loudness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Loudness.swift; sourceTree = "<group>"; };
 		23B9940A24E8F214000D544F /* Acknowledgments.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = Acknowledgments.txt; sourceTree = "<group>"; };
 		23C0A9C1237ED0010054ECCC /* Editor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Editor.swift; sourceTree = "<group>"; };
@@ -153,18 +151,17 @@
 		23C5B4122B903EB60081127C /* GensenJP-Medium.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "GensenJP-Medium.otf"; sourceTree = "<group>"; };
 		23C5B4132B903EB60081127C /* GensenTW-Medium.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "GensenTW-Medium.otf"; sourceTree = "<group>"; };
 		23C8C6D125E21C1B009FEA85 /* Typesetter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typesetter.swift; sourceTree = "<group>"; };
-		23C8C6D425E21CCB009FEA85 /* TypelineMac.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TypelineMac.swift; sourceTree = "<group>"; };
+		23C8C6D425E21CCB009FEA85 /* Typeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typeline.swift; sourceTree = "<group>"; };
 		23D75E0025F0AA5900583878 /* Double2x2.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Double2x2.swift; sourceTree = "<group>"; };
 		23D9971423A627D4006CBDD7 /* Object.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Object.swift; sourceTree = "<group>"; };
-		23DBF641256F3BE500343022 /* ApplicationMac.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ApplicationMac.swift; sourceTree = "<group>"; };
-		23DFEC6429AB6F98008D8B64 /* AudioMac.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioMac.swift; sourceTree = "<group>"; };
-		23DFEC6629AB7395008D8B64 /* ContentMac.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentMac.swift; sourceTree = "<group>"; };
+		23DBF641256F3BE500343022 /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
+		23DFEC6429AB6F98008D8B64 /* Audio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Audio.swift; sourceTree = "<group>"; };
+		23DFEC6629AB7395008D8B64 /* Content.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Content.swift; sourceTree = "<group>"; };
 		23E242932A63FAEC001C1A59 /* Vocoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Vocoder.swift; sourceTree = "<group>"; };
 		23E2B2A7241490000028F44E /* RunEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RunEditor.swift; sourceTree = "<group>"; };
-		23E5CB9F29F25C7E0060A3DE /* swift-protobuf-config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = "swift-protobuf-config.json"; sourceTree = "<group>"; };
 		23EABA192206FF7E00C2A1C0 /* Tree.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Tree.swift; sourceTree = "<group>"; };
 		23EABA1B2209AF1600C2A1C0 /* Line.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Line.swift; sourceTree = "<group>"; };
-		23F0B2E525ECC336003AFE2A /* EncoderMac.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = EncoderMac.swift; sourceTree = "<group>"; };
+		23F0B2E525ECC336003AFE2A /* Encoder.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Encoder.swift; sourceTree = "<group>"; };
 		23F9FC0C2590922500662CD0 /* ObjectEx2.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectEx2.swift; sourceTree = "<group>"; };
 		23FB0F82258E5A740096AD23 /* ObjectEx1.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObjectEx1.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -240,18 +237,17 @@
 				234ED98722AB80D30012B057 /* History.swift */,
 				237AEFA52214285E004EE702 /* Picture.swift */,
 				23A728A7216CF267000A7350 /* Node.swift */,
-				23B4D2E125E33D090054773C /* RendererMac.swift */,
-				23DBF641256F3BE500343022 /* ApplicationMac.swift */,
-				238BFA822C91772A00D7FB14 /* main.swift */,
+				23B4D2E125E33D090054773C /* Renderer.swift */,
+				23DBF641256F3BE500343022 /* App.swift */,
+				23DFEC6629AB7395008D8B64 /* Content.swift */,
 				2313746826BA7EF5000C4953 /* Sound.swift */,
 				23B50CFD2997C21E002CA640 /* Loudness.swift */,
 				23C4BC0928F9344500DEF37E /* Voice.swift */,
 				23E242932A63FAEC001C1A59 /* Vocoder.swift */,
-				23DFEC6429AB6F98008D8B64 /* AudioMac.swift */,
-				23910BA22BA1D7750064CB62 /* SpectrogramMac.swift */,
-				23DFEC6629AB7395008D8B64 /* ContentMac.swift */,
-				23F0B2E525ECC336003AFE2A /* EncoderMac.swift */,
-				23C8C6D425E21CCB009FEA85 /* TypelineMac.swift */,
+				23DFEC6429AB6F98008D8B64 /* Audio.swift */,
+				23910BA22BA1D7750064CB62 /* Spectrogram.swift */,
+				23F0B2E525ECC336003AFE2A /* Encoder.swift */,
+				23C8C6D425E21CCB009FEA85 /* Typeline.swift */,
 				23C8C6D125E21C1B009FEA85 /* Typesetter.swift */,
 				233160D3223AAFF400FCAFEF /* Text.swift */,
 				23A728AA216CF268000A7350 /* Plane.swift */,
@@ -280,7 +276,6 @@
 				23A72897216CF264000A7350 /* Precedence.swift */,
 				234ED98B22AE484E0012B057 /* Protobuf.pb.swift */,
 				234ED98922AE2BB10012B057 /* Protobuf.proto */,
-				23E5CB9F29F25C7E0060A3DE /* swift-protobuf-config.json */,
 				235BF0CB21771B0F00EEFABE /* Shaders.metal */,
 				2340EF7A2AAE14D200FD874F /* Fonts */,
 				23B9940A24E8F214000D544F /* Acknowledgments.txt */,
@@ -396,26 +391,25 @@
 				23A728C0216CF269000A7350 /* Orientation.swift in Sources */,
 				237EC77822467E9500AA634F /* CopyEditor.swift in Sources */,
 				23B50CFE2997C21E002CA640 /* Loudness.swift in Sources */,
-				23910BA32BA1D7750064CB62 /* SpectrogramMac.swift in Sources */,
-				23C8C6D525E21CCB009FEA85 /* TypelineMac.swift in Sources */,
+				23910BA32BA1D7750064CB62 /* Spectrogram.swift in Sources */,
+				23C8C6D525E21CCB009FEA85 /* Typeline.swift in Sources */,
 				23C0A9C2237ED0010054ECCC /* Editor.swift in Sources */,
 				23A728BB216CF269000A7350 /* Real.swift in Sources */,
 				23A728C2216CF26A000A7350 /* Precedence.swift in Sources */,
 				239A799B22D99A9800876D43 /* TextEditor.swift in Sources */,
 				234F2A522382798A00107A1D /* UndoEditor.swift in Sources */,
-				238BFA832C91772A00D7FB14 /* main.swift in Sources */,
 				23A728CF216CF26A000A7350 /* Interpolation.swift in Sources */,
 				23A728DC216CF26A000A7350 /* Document.swift in Sources */,
 				2309F28A216F9FBD00A6ACF0 /* ColorEditor.swift in Sources */,
-				23DBF642256F3BE500343022 /* ApplicationMac.swift in Sources */,
+				23DBF642256F3BE500343022 /* App.swift in Sources */,
 				237AEFA62214285E004EE702 /* Picture.swift in Sources */,
 				235BF0CC21771B0F00EEFABE /* Shaders.metal in Sources */,
 				23A728B7216CF269000A7350 /* Comparable.swift in Sources */,
-				23DFEC6729AB7395008D8B64 /* ContentMac.swift in Sources */,
+				23DFEC6729AB7395008D8B64 /* Content.swift in Sources */,
 				23A728C3216CF26A000A7350 /* Int.swift in Sources */,
 				23C4BC0A28F9344500DEF37E /* Voice.swift in Sources */,
 				23D9971523A627D4006CBDD7 /* Object.swift in Sources */,
-				23DFEC6529AB6F98008D8B64 /* AudioMac.swift in Sources */,
+				23DFEC6529AB6F98008D8B64 /* Audio.swift in Sources */,
 				236195A62B7C7EC500CF0B2F /* ContentEditor.swift in Sources */,
 				23E242942A63FAEC001C1A59 /* Vocoder.swift in Sources */,
 				23A728B3216CF269000A7350 /* Bezier.swift in Sources */,
@@ -446,8 +440,8 @@
 				23A728DA216CF26A000A7350 /* Transform.swift in Sources */,
 				23F9FC0D2590922500662CD0 /* ObjectEx2.swift in Sources */,
 				234ED98C22AE484E0012B057 /* Protobuf.pb.swift in Sources */,
-				23F0B2E625ECC336003AFE2A /* EncoderMac.swift in Sources */,
-				23B4D2E225E33D090054773C /* RendererMac.swift in Sources */,
+				23F0B2E625ECC336003AFE2A /* Encoder.swift in Sources */,
+				23B4D2E225E33D090054773C /* Renderer.swift in Sources */,
 				2313746926BA7EF5000C4953 /* Sound.swift in Sources */,
 				23A728CB216CF26A000A7350 /* Action.swift in Sources */,
 				2399F01626E11B81005CD031 /* AnimationEditor.swift in Sources */,

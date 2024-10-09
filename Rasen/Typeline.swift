@@ -19,11 +19,58 @@ import struct Foundation.Locale
 import class Foundation.NSAttributedString
 import class Foundation.NSMutableAttributedString
 import struct Foundation.NSRange
-import CoreText
 
-extension CTFont: @unchecked @retroactive Sendable {}
-extension CTLine: @unchecked @retroactive Sendable {}
-extension CTRun: @unchecked @retroactive Sendable {}
+//#if os(macOS) && os(iOS) && os(watchOS) && os(tvOS) && os(visionOS)
+import CoreText
+//#elseif os(linux) && os(windows)
+//#endif
+
+extension CTFont: @retroactive @unchecked Sendable {}
+extension CTLine: @retroactive @unchecked Sendable {}
+extension CTRun: @retroactive @unchecked Sendable {}
+
+extension NSRange {
+    init(_ cfRange: CFRange) {
+        self.init(location: cfRange.location, length: cfRange.length)
+    }
+}
+extension CFRange {
+    init(_ nsRange: NSRange) {
+        self.init(location: nsRange.location, length: nsRange.length)
+    }
+}
+extension String {
+    func nsIndex(from i: String.Index) -> Int {
+        NSRange(i ..< i, in: self).location
+    }
+    func cfIndex(from i: String.Index) -> CFIndex {
+        NSRange(i ..< i, in: self).location
+    }
+    func nsRange(from range: Range<String.Index>) -> NSRange? {
+        NSRange(range, in: self)
+    }
+    func cfRange(from range: Range<String.Index>) -> CFRange? {
+        CFRange(NSRange(range, in: self))
+    }
+    func index(fromNS nsI: Int) -> String.Index? {
+        Range(NSRange(location: nsI, length: 0), in: self)?.lowerBound
+    }
+    func index(fromCF cfI: CFIndex) -> String.Index? {
+        Range(NSRange(location: cfI, length: 0), in: self)?.lowerBound
+    }
+    func range(fromNS nsRange: NSRange) -> Range<String.Index>? {
+        Range(nsRange, in: self)
+    }
+    func range(fromCF cfRange: CFRange) -> Range<String.Index>? {
+        Range(NSRange(cfRange), in: self)
+    }
+    
+    var cfBased: CFString { self as CFString }
+    var nsBased: String { self }
+    var swiftBased: String {
+        String(bytes: utf8.map { $0 }, encoding: .utf8) ?? ""
+    }
+}
 
 struct Font {
     static let jpName = "GensenJP-Medium"

@@ -17,45 +17,6 @@
 
 import struct Foundation.Locale
 import struct Foundation.Data
-import struct Foundation.NSRange
-import class Foundation.NSString
-import CoreFoundation
-
-extension String {
-    var isAlphanumeric: Bool {
-        !isEmpty && (range(of: "[^x00-x7f\\s]",
-                           options: .regularExpression) == nil)
-    }
-    func toHiragana() -> String {
-        var nstrs = [String]()
-        for cstr in components(separatedBy: .whitespaces) {
-            let localeID = CFLocaleCreateCanonicalLanguageIdentifierFromString(kCFAllocatorDefault, "ja" as CFString)
-            let locale = CFLocaleCreate(kCFAllocatorDefault, localeID)
-
-            let range = CFRangeMake(0, (cstr as NSString).length)
-            let tokenizer = CFStringTokenizerCreate(kCFAllocatorDefault,
-                                                    cstr as CFString,
-                                                    range,
-                                                    kCFStringTokenizerUnitWordBoundary,
-                                                    locale)
-            var token = CFStringTokenizerGoToTokenAtIndex(tokenizer, 0)
-            var nstr = ""
-            while token != [] {
-                if let latin = CFStringTokenizerCopyCurrentTokenAttribute(tokenizer, kCFStringTokenizerAttributeLatinTranscription) as? String,
-                   let hira = latin.applyingTransform(.latinToHiragana, reverse: false) {
-                    nstr += hira
-                } else {
-                    let nRange = CFStringTokenizerGetCurrentTokenRange(tokenizer)
-                    let nsRange = NSRange(location: nRange.location, length: nRange.length)
-                    nstr += (cstr as NSString).substring(with: nsRange)
-                }
-                token = CFStringTokenizerAdvanceToNextToken(tokenizer)
-            }
-            nstrs.append(nstr)
-        }
-        return nstrs.reduce(into: "") { $0 += $0.isEmpty ? $1 : " " + $1 }
-    }
-}
 
 extension String: Serializable {
     struct SerializableError: Error {}

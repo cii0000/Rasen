@@ -15,9 +15,12 @@
 // You should have received a copy of the GNU General Public License
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
+//#if os(macOS) && os(iOS) && os(watchOS) && os(tvOS) && os(visionOS)
 import AVFoundation
 import VideoToolbox
 import CoreImage
+//#elseif os(linux) && os(windows)
+//#endif
 
 struct Caption: Hashable, Codable {
     var string = ""

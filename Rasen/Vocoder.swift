@@ -17,8 +17,11 @@
 
 import struct Foundation.UUID
 import RealModule
-import enum Accelerate.vDSP
-import struct Accelerate.DSPDoubleSplitComplex
+
+//#if os(macOS) && os(iOS) && os(watchOS) && os(tvOS) && os(visionOS)
+import Accelerate.vecLib.vDSP
+//#elseif os(linux) && os(windows)
+//#endif
 
 /// xoshiro256**
 struct Random: Hashable, Codable {

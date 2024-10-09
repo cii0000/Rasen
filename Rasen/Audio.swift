@@ -15,8 +15,11 @@
 // You should have received a copy of the GNU General Public License
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
+//#if os(macOS) && os(iOS) && os(watchOS) && os(tvOS) && os(visionOS)
+import Accelerate.vecLib.vDSP
 import AVFAudio
-import Accelerate
+//#elseif os(linux) && os(windows)
+//#endif
 
 struct Biquad {
     private var filter: vDSP.Biquad<Double>
@@ -32,8 +35,6 @@ struct Biquad {
         filter.apply(input: data)
     }
 }
-
-
 
 final class NotePlayer {
     private var aNotes: [Note.PitResult]
@@ -1230,6 +1231,18 @@ extension AVAudioPCMBuffer {
         guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: afCount) else { throw AVAudioPCMBufferError() }
         try file.read(into: buffer)
         return buffer
+    }
+    
+    static func durSec(from url: URL) -> Rational {
+        if let file = try? AVAudioFile(forReading: url,
+                                       commonFormat: .pcmFormatFloat32,
+                                       interleaved: false),
+           file.fileFormat.sampleRate != 0 {
+            
+            .init(Int(file.length), Int(file.fileFormat.sampleRate))
+        } else {
+            0
+        }
     }
     
     func append(_ buffer: AVAudioPCMBuffer) {
