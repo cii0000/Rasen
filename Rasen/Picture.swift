@@ -336,7 +336,10 @@ extension Picture {
                         let edge = edgeLine.edges[$0]
                         let np = edge.nearestPoint(from: lp0.p)
                         let dSq = np.distanceSquared(lp0.p)
-                        if dSq < vMinDSq && dSq > minDSq && dSq < maxDSq {
+                        let vector0 = lp0.vector, vector1 = np - lp0.p
+                        let s = abs(Point.differenceAngle(vector0, vector1))
+                            .clipped(min: 0, max: .pi, newMin: 1, newMax: 0.5)
+                        if dSq < vMinDSq && dSq > minDSq && dSq < maxDSq * s * s {
                             vMinDSq = dSq
                             vMinNP = np
                         }
@@ -425,6 +428,9 @@ extension Picture {
             nes = nnes
             nnes.removeAll(keepingCapacity: true)
         } while !nes.isEmpty
+        for fv in fvs {
+            bitmap[fv.0.x, fv.0.y] = fv.1
+        }
         
         struct IntTopolygon {
             var points: [IntPoint]
@@ -470,19 +476,26 @@ extension Picture {
             func isVertex(at p: IntPoint) -> Bool {
                 let x = p.x, y = p.y
                 var vSet = Set<UInt16>(minimumCapacity: 4), outCount = 0
-                func insert(_ x: Int, _ y: Int) {
+                func insert(_ x: Int, _ y: Int) -> UInt16? {
                     if x >= 0 && x < w && y >= 0 && y < h {
-                        vSet.insert(bitmap[x, y])
+                        let v = bitmap[x, y]
+                        vSet.insert(v)
+                        return v
                     } else {
                         outCount += 1
+                        return nil
                     }
                 }
-                insert(x - 1, y - 1)
-                insert(x, y - 1)
-                insert(x - 1, y)
-                insert(x, y)
+                let v0 = insert(x - 1, y - 1)
+                let v1 = insert(x, y - 1)
+                let v2 = insert(x - 1, y)
+                let v3 = insert(x, y)
                 return if outCount == 0 {
-                    vSet.count >= 3
+                    if vSet.count == 2 {
+                        v0 == v3 && v1 == v2
+                    } else {
+                        vSet.count >= 3
+                    }
                 } else if outCount == 2 {
                     vSet.count >= 2
                 } else {
@@ -521,7 +534,12 @@ extension Picture {
                         for k in oldJ ..< j {
                             let dSq = LinearLine(sp, ep).distanceSquared(from: rrPoints[k])
                             if dSq >= maxDSq {
-                                lPoints.append(Point(preP.x, Double(h) - preP.y))
+                                let nlp = Point(preP.x, Double(h) - preP.y)
+                                if lPoints.count >= 2 && lPoints[lPoints.count - 2] == nlp {
+                                    lPoints.removeLast()
+                                } else {
+                                    lPoints.append(nlp)
+                                }
                                 sp = preP
                                 oldJ = j
                                 break
@@ -603,10 +621,10 @@ extension Picture {
         
         return iPolys.compactMap {
             let nps = smoothPoints(with: $0.points)
-            guard !nps.isEmpty else { return nil }
+            guard nps.count >= 3 else { return nil }
             let holePolygons: [Polygon] = $0.holePoints.compactMap {
                 let nps = smoothPoints(with: $0)
-                return if !nps.isEmpty {
+                return if nps.count >= 3 {
                     .init(points: nps)
                 } else {
                     nil

@@ -35,7 +35,6 @@ import UniformTypeIdentifiers
     }
 }
 
-@objc(SubNSApplication)
 final class SubNSApplication: NSApplication {
     override func sendEvent(_ event: NSEvent) {
         if event.type == .gesture {
@@ -825,7 +824,7 @@ extension URL {
                                   directoryURL: URL? = nil,
                                   fileType: any FileTypeProtocol,
                                   fileTypeOptionName: String? = nil,
-                                  fileSizeHandler: @Sendable @escaping () -> (Int?)) async -> ExportedResult {
+                                  fileSizeHandler: @Sendable @escaping () async -> (Int?)) async -> ExportedResult {
         guard let window = SubNSApplication.shared.mainWindow else { return .cancel }
         
         let savePanel = NSSavePanel()
@@ -897,16 +896,14 @@ extension URL {
         
         savePanel.allowedContentTypes = [fileType.utType.uti]
         
-        Task.detached {
-            let string = if let fileSize = fileSizeHandler() {
+        Task {
+            let string = if let fileSize = await fileSizeHandler() {
                 IOResult.fileSizeNameFrom(fileSize: fileSize)
             } else {
                 "--"
             }
-            Task { @MainActor in
-                fileSizeValueView.stringValue = string
-                fileSizeValueView.sizeToFit()
-            }
+            fileSizeValueView.stringValue = string
+            fileSizeValueView.sizeToFit()
         }
         
         savePanel.canSelectHiddenExtension = true

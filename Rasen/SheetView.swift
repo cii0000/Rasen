@@ -6783,30 +6783,26 @@ final class SheetView: View, @unchecked Sendable {
         node.root.show(progressPanel)
         let task = Task.detached {
             let progress = ActorProgress(total: indexes.count)
-            let nPolyss = await withTaskGroup(of: (Int, [Topolygon]).self,
-                                              returning: [[Topolygon]]?.self) { group in
+            let nPolyss = try? await withThrowingTaskGroup(of: (i: Int, polys: [Topolygon]).self,
+                                                          returning: [[Topolygon]]?.self) { group in
                 for i in indexes.count.range {
-                    group.addTask {
-                        (i, pictures[i].makePolygons(inFrame: b, clipingPath: path,
-                                                     borders: borders, isSelection: isSelection))
+                    group.addTask(priority: .high) {
+                        try Task.checkCancellation()
+                        let v = pictures[i].makePolygons(inFrame: b, clipingPath: path,
+                                                         borders: borders, isSelection: isSelection)
+                        await progress.addCount()
+                        Task(priority: .high) { @MainActor in
+                            progressPanel.progress = await progress.fractionCompleted
+                        }
+                        return (i, v)
                     }
                 }
                 
-                guard !Task.isCancelled else { return nil }
-                
-                var nPolyss = [[Topolygon]](repeating: [], count: indexes.count)
-                for await (i, nPolys) in group {
-                    guard !Task.isCancelled else { return nil }
-                    
-                    nPolyss[i] = nPolys
-                    await progress.addCount()
-                    Task { @MainActor in
-                        progressPanel.progress = await progress.fractionCompleted * 0.75
-                    }
+                return try await group.reduce(into: .init(repeating: [], count: indexes.count)) {
+                    $0[$1.i] = $1.polys
                 }
-                return nPolyss
             }
-            let mainTask = Task { @MainActor in
+            Task { @MainActor in
                 defer { progressPanel.closePanel() }
                 guard let nPolyss, nPolyss.count == indexes.count else { return }
                 self.newUndoGroup()
@@ -6819,10 +6815,8 @@ final class SheetView: View, @unchecked Sendable {
                                                         isNewUndoGroup: false)
                         self.setRootKeyframeIndex(rootKeyframeIndex: i)
                     }
-                    progressPanel.progress = Double(j) / Double(indexes.count) * 0.25 + 0.75
                 }
             }
-            await mainTask.value
         }
         progressPanel.cancelHandler = { task.cancel() }
     }

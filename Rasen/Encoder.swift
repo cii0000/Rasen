@@ -660,13 +660,11 @@ final class ToMP4MovieEditor: InputKeyEditor, @unchecked Sendable {
                 case .complete(let ioResult1):
                     let fromURL = ioResult0s[0].url
                     let toURL = ioResult1.url
-                    Task.detached {
+                    Task {
                         do {
                             try await Movie.toMP4(from: fromURL, to: toURL)
                         } catch {
-                            Task { @MainActor in
-                                self.document.rootNode.show(error)
-                            }
+                            document.rootNode.show(error)
                         }
                     }
                 case .cancel: break
