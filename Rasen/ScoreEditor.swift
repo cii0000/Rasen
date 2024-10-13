@@ -297,6 +297,7 @@ final class ScoreSlider: DragEditor {
                 if scoreView.containsIsShownSpectrogram(scoreP, scale: document.screenToWorldScale) {
                     type = .isShownSpectrogram
                     beganScoreOption = scoreView.model.option
+                    scoreView.updateSpectrogram()
                 } else if let noteI = scoreView.noteIndex(at: scoreP, scale: document.screenToWorldScale,
                                                    enabledRelease: true) {
                     let note = score.notes[noteI]

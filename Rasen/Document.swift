@@ -3580,7 +3580,7 @@ final class Document: @unchecked Sendable {
     }
     
     var isFullEditNote: Bool {
-        camera.logScale < -4
+        camera.logScale < -3
     }
     var currentBeatInterval: Rational {
         isFullEditNote ? Sheet.fullEditBeatInterval : Sheet.beatInterval

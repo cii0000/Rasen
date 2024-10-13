@@ -1905,7 +1905,7 @@ final class IOEditor: Editor, @unchecked Sendable {
                     if let sequencer = Sequencer(audiotracks: audiotracks, type: .normal) {
                         try sequencer.export(url: ioResult.url,
                                              sampleRate: Audio.defaultSampleRate) { (t, stop) in
-                            progressHandler(t * 0.8 + 0.2, &isStop)
+                            progressHandler(t * 0.2 + 0.8, &isStop)
                             if isStop {
                                 stop = true
                             }
