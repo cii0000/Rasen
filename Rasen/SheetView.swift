@@ -1710,10 +1710,11 @@ final class SheetView: View, @unchecked Sendable {
                 if let aSeqTrack = sheetView.topSheetView?.sequencerTrack {
                     seqTrack += aSeqTrack
                 }
-                if playingOtherTimelineIDs.isEmpty {
+                if sheetView.model.enabledAnimation {
                     seqTrack.scoreNoders.append(.init(rendnotes: [], startSec: 0,
                                                       durSec: sheetView.model.animationDurSec,
-                                                      sampleRate: Audio.defaultSampleRate))
+                                                      sampleRate: Audio.defaultSampleRate,
+                                                      type: .loop))
                 }
                 seqTracks.append(seqTrack)
                 deltaSec += seqTrack.durSec
@@ -1731,10 +1732,11 @@ final class SheetView: View, @unchecked Sendable {
                 if let aSeqTrack = topSheetView?.sequencerTrack {
                     seqTrack += aSeqTrack
                 }
-                if playingOtherTimelineIDs.isEmpty {
+                if model.enabledAnimation {
                     seqTrack.scoreNoders.append(.init(rendnotes: [], startSec: 0,
                                                       durSec: model.animationDurSec,
-                                                      sampleRate: Audio.defaultSampleRate))
+                                                      sampleRate: Audio.defaultSampleRate,
+                                                      type: .loop))
                 }
                 seqTracks.append(seqTrack)
             }
@@ -1752,10 +1754,11 @@ final class SheetView: View, @unchecked Sendable {
                 if let aSeqTrack = sheetView.topSheetView?.sequencerTrack {
                     seqTrack += aSeqTrack
                 }
-                if playingOtherTimelineIDs.isEmpty {
+                if sheetView.model.enabledAnimation {
                     seqTrack.scoreNoders.append(.init(rendnotes: [], startSec: 0,
                                                       durSec: sheetView.model.animationDurSec,
-                                                      sampleRate: Audio.defaultSampleRate))
+                                                      sampleRate: Audio.defaultSampleRate,
+                                                      type: .loop))
                 }
                 seqTracks.append(seqTrack)
                 nextPlayingTempo = sheetView.model.animation.tempo
@@ -1994,7 +1997,7 @@ final class SheetView: View, @unchecked Sendable {
             let fi = previousSheetView != nil && playingSecRange == nil ? -1 : 0
             if playingSheetIndex == fi {
                 let sSec = playingSecRange?.start ?? 0
-                sequencer?.currentPositionInSec = Double(sSec + (fi == -1 ? 0 : firstDeltaSec))
+//                sequencer?.currentPositionInSec = Double(sSec + (fi == -1 ? 0 : firstDeltaSec))
                 self.willPlaySec = sSec
                 playingSec = sSec
             } else {

@@ -65,24 +65,20 @@ final class NotePlayer {
 //            noder.replaceStereo(notes.enumerated().map { .init(value: $0.element, index: $0.offset) })
 //        }
     }
-    var stereo: Stereo {
-        get { noder.stereo }
-        set { noder.stereo = newValue }
-    }
     var sequencer: Sequencer
     var noder: ScoreNoder
     var noteIDs = Set<UUID>()
     
     struct NotePlayerError: Error {}
     
-    init(notes: [Note.PitResult], stereo: Stereo = .init(volm: 1)) throws {
-        guard let sequencer = Sequencer(audiotracks: []) else {
+    init(notes: [Note.PitResult]) throws {
+        guard let sequencer = Sequencer(audiotracks: [], type: .note) else {
             throw NotePlayerError()
         }
         self.aNotes = notes
         self.sequencer = sequencer
         noder = .init(rendnotes: [], startSec: 0, durSec: 0, sampleRate: Audio.defaultSampleRate,
-                      stereo: stereo)
+                      type: .note)
         sequencer.append(noder, id: UUID())
     }
     deinit {
@@ -101,6 +97,7 @@ final class NotePlayer {
             sequencer.play()
         } else {
             sequencer.startEngine()
+            sequencer.play()
         }
         playNote()
         
@@ -127,16 +124,15 @@ final class NotePlayer {
         noder.updateRendnotes()
     }
     private func stopNote() {
-        let releaseStartSec = sequencer.currentPositionInSec + 0.05
         for (i, rendnote) in noder.rendnotes.enumerated() {
             if noteIDs.contains(rendnote.id) {
-                noder.rendnotes[i].secRange.end = releaseStartSec
+                noder.rendnotes[i].isRelease = true
             }
         }
         noteIDs = []
     }
     
-    static let stopEngineSec = 30.0
+    static let stopEngineSec = 10.0
     private var timer = OneshotTimer()
     func stop() {
         stopNote()
@@ -144,13 +140,15 @@ final class NotePlayer {
         isPlaying = false
         
         timer.start(afterTime: max(NotePlayer.stopEngineSec, 
-                                   (notes.maxValue { $0.envelope.releaseSec }) ?? 0),
+                                   (notes.maxValue { $0.envelope.releaseSec + $0.envelope.reverb.durSec }) ?? 0),
                     dispatchQueue: .main) {
         } waitClosure: {
         } cancelClosure: {
         } endClosure: { [weak self] in
             self?.sequencer.stopEngine()
             self?.noder.rendnotes = []
+            self?.noder.updateRendnotes()
+            self?.noder.reset()
         }
     }
 }
@@ -161,7 +159,27 @@ final class PCMNoder {
     let pcmBuffer: PCMBuffer
     
     private struct TimeOption {
-        var csSampleSec: Double, cst: Int, frameLength: Int, sampleFrameLength: Double, clsSec: Double
+        var contentLocalStartI: Int, contentCount: Int, contentStartSec: Double
+        
+        init(pcmBuffer: PCMBuffer,
+             contentStartSec: Rational, contentLocalStartSec: Rational, contentDurSec: Rational,
+             lengthSec: Rational) {
+            self.init(pcmBuffer: pcmBuffer,
+                      contentStartSec: .init(contentStartSec),
+                      contentLocalStartSec: .init(contentLocalStartSec),
+                      contentDurSec: .init(contentDurSec),
+                      lengthSec: .init(lengthSec))
+        }
+        init(pcmBuffer: PCMBuffer,
+             contentStartSec: Double, contentLocalStartSec: Double, contentDurSec: Double, lengthSec: Double) {
+            
+            let sampleRate = pcmBuffer.format.sampleRate
+            let frameCount = pcmBuffer.frameCount
+            let clsI = Int(contentLocalStartSec * sampleRate)
+            contentLocalStartI = min(-min(clsI, 0), frameCount)
+            self.contentCount = Int(lengthSec * sampleRate)
+            self.contentStartSec = contentStartSec + max(contentLocalStartSec, 0)
+        }
     }
     
     var stereo: Stereo {
@@ -185,22 +203,6 @@ final class PCMNoder {
     
     private var timeOption: TimeOption
     
-    private static func timeOption(from pcmBuffer: PCMBuffer,
-                                   contentStartSec: Double, contentLocalStartSec: Double, 
-                                   contentDurSec: Double) -> TimeOption {
-        let sampleRate = pcmBuffer.format.sampleRate
-        
-        let csSampleSec = -min(contentLocalStartSec, 0) * sampleRate
-        let cst = Int(csSampleSec)
-        let frameLength = min(Int(pcmBuffer.frameLength),
-                              Int((contentDurSec - min(contentLocalStartSec, 0)) * sampleRate))
-        let sampleFrameLength = min(Double(pcmBuffer.frameLength),
-                                    (contentDurSec - min(contentLocalStartSec, 0)) * sampleRate)
-        let clsSec = contentStartSec + contentLocalStartSec
-        return .init(csSampleSec: csSampleSec, cst: cst, frameLength: frameLength,
-                     sampleFrameLength: sampleFrameLength, clsSec: clsSec)
-    }
-    
     func change(from timeOption: ContentTimeOption) {
         guard pcmBuffer.sampleRate > 0 else { return }
         let durSec = Double(pcmBuffer.frameLength) / pcmBuffer.sampleRate
@@ -214,14 +216,18 @@ final class PCMNoder {
         let sBeat = beatRange.start + max(localBeatRange.start, 0)
         let inSBeat = min(localBeatRange.start, 0)
         let eBeat = beatRange.start + min(localBeatRange.end, beatRange.length)
-        let contentStartSec = Double(timeOption.sec(fromBeat: sBeat))
-        let contentLocalStartSec = Double(timeOption.sec(fromBeat: inSBeat))
-        let contentDurSec = Double(timeOption.sec(fromBeat: max(eBeat - sBeat, 0)))
-        
-        self.timeOption = Self.timeOption(from: pcmBuffer,
-                                          contentStartSec: contentStartSec,
-                                          contentLocalStartSec: contentLocalStartSec,
-                                          contentDurSec: contentDurSec)
+        let contentStartSec = timeOption.sec(fromBeat: sBeat)
+        let contentLocalStartSec = timeOption.sec(fromBeat: inSBeat)
+        let contentDurSec = timeOption.sec(fromBeat: max(eBeat - sBeat, 0))
+        let lengthBeat = min(durBeat + min(timeOption.localStartBeat, 0),
+                             timeOption.beatRange.length - max(timeOption.localStartBeat, 0))
+        let lengthSec = timeOption.sec(fromBeat: lengthBeat)
+        self.timeOption = .init(pcmBuffer: pcmBuffer,
+                                contentStartSec: contentStartSec,
+                                contentLocalStartSec: contentLocalStartSec,
+                                contentDurSec: contentDurSec,
+                                lengthSec: lengthSec)
+        self.durSec = timeOption.secRange.end
     }
     
     var startSec = 0.0
@@ -230,53 +236,56 @@ final class PCMNoder {
     
     convenience init?(content: Content, startSec: Double = 0) {
         guard content.type.isAudio,
-                let timeOption = content.timeOption,
-                let localBeatRange = content.localBeatRange,
-                let pcmBuffer = content.pcmBuffer else { return nil }
+              let timeOption = content.timeOption,
+              let localBeatRange = content.localBeatRange,
+              let pcmBuffer = content.pcmBuffer,
+              let durBeat = content.durBeat else { return nil }
         let beatRange = timeOption.beatRange
         let sBeat = beatRange.start + max(localBeatRange.start, 0)
         let inSBeat = min(localBeatRange.start, 0)
         let eBeat = beatRange.start + min(localBeatRange.end, beatRange.length)
-        let contentStartSec = Double(timeOption.sec(fromBeat: sBeat))
-        let contentLocalStartSec = Double(timeOption.sec(fromBeat: inSBeat))
-        let contentDurSec = Double(timeOption.sec(fromBeat: max(eBeat - sBeat, 0)))
+        let contentStartSec = timeOption.sec(fromBeat: sBeat)
+        let contentLocalStartSec = timeOption.sec(fromBeat: inSBeat)
+        let contentDurSec = timeOption.sec(fromBeat: max(eBeat - sBeat, 0))
+        let lengthBeat = min(durBeat + min(timeOption.localStartBeat, 0),
+                             timeOption.beatRange.length - max(timeOption.localStartBeat, 0))
+        let lengthSec = timeOption.sec(fromBeat: lengthBeat)
         self.init(pcmBuffer: pcmBuffer,
                   startSec: startSec,
                   durSec: timeOption.secRange.end,
                   contentStartSec: contentStartSec,
                   contentLocalStartSec: contentLocalStartSec,
                   contentDurSec: contentDurSec,
+                  lengthSec: lengthSec,
                   stereo: content.stereo,
                   id: content.id)
     }
     init(pcmBuffer: PCMBuffer, 
          startSec: Double, durSec: Rational,
-         contentStartSec: Double, contentLocalStartSec: Double, contentDurSec: Double,
+         contentStartSec: Rational, contentLocalStartSec: Rational, contentDurSec: Rational, lengthSec: Rational,
          stereo: Stereo, id: UUID) {
         
         let sampleRate = pcmBuffer.format.sampleRate
         
-        self.timeOption = Self.timeOption(from: pcmBuffer,
-                                          contentStartSec: contentStartSec,
-                                          contentLocalStartSec: contentLocalStartSec,
-                                          contentDurSec: contentDurSec)
+        timeOption = .init(pcmBuffer: pcmBuffer,
+                           contentStartSec: contentStartSec,
+                           contentLocalStartSec: contentLocalStartSec,
+                           contentDurSec: contentDurSec,
+                           lengthSec: lengthSec)
         self.startSec = startSec
         self.durSec = durSec
         self.id = id
         self.pcmBuffer = pcmBuffer
         let format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2)!
-        node = AVAudioSourceNode(format: format) {
-            [weak self]
+        node = .init(format: format) { [weak self]
             isSilence, timestamp, frameCount, outputData in
-
+            
             guard let self, let seq = self.sequencer else { return kAudioUnitErr_NoConnection }
-            let to = self.timeOption
             
             guard seq.isPlaying else {
                 isSilence.pointee = true
                 return noErr
             }
-            guard let data = pcmBuffer.floatChannelData else { return kAudioUnitErr_NoConnection }
             
             let frameCount = Int(frameCount)
             let outputBLP = UnsafeMutableAudioBufferListPointer(outputData)
@@ -287,52 +296,40 @@ final class PCMNoder {
                 }
             }
             
-            if timestamp.pointee.mFlags.contains(.hostTimeValid) {
-                let sec = AVAudioTime.seconds(forHostTime: timestamp.pointee.mHostTime - seq.startHostTime) + seq.startSec
-                let scst = self.startSec + to.clsSec
-                let sampleSec = (sec - scst) * sampleRate
-                
-                guard sampleSec < to.sampleFrameLength - 1 && sampleSec + Double(frameCount) >= to.csSampleSec else {
-                    isSilence.pointee = true
-                    return noErr
-                }
-                
-                for i in 0 ..< outputBLP.count {
-                    let oFrames = data[i < pcmBuffer.channelCount ? i : pcmBuffer.channelCount - 1]
-                    let nFrames = outputBLP[i].mData!.assumingMemoryBound(to: Float.self)
-                    for j in 0 ..< frameCount {
-                        let ni = sampleSec + Double(j)
-                        if ni >= to.csSampleSec && ni < to.sampleFrameLength - 1 {
-                            let rni = ni.rounded(.down)
-                            let nii = Int(rni)
-                            nFrames[j] = .linear(oFrames[nii * pcmBuffer.stride],
-                                                 oFrames[(nii + 1) * pcmBuffer.stride],
-                                                 t: ni - rni)
-                            
-                        }
+            guard timestamp.pointee.mFlags.contains(.sampleHostTimeValid)
+                    || timestamp.pointee.mFlags.contains(.sampleTimeValid),
+                  let data = pcmBuffer.floatChannelData else { return kAudioUnitErr_NoConnection }
+            
+            let frameStartI = Int(seq.startSec * sampleRate)
+            let maxCount = Int(max(1, (seq.durSec * sampleRate).rounded(.up)))
+            let loopedFrameStartI = (Int(timestamp.pointee.mSampleTime) + frameStartI) % maxCount
+            let loopedFrameRange = loopedFrameStartI ..< loopedFrameStartI + frameCount
+            let preLoopedFrameRange = loopedFrameRange - maxCount
+            
+            let timeOption = self.timeOption
+            let contentStartSec = self.startSec + timeOption.contentStartSec
+            let contentStartI = Int(contentStartSec * sampleRate)
+            let contentRange = contentStartI ..< contentStartI + timeOption.contentCount
+            guard loopedFrameRange.intersects(contentRange)
+                    || preLoopedFrameRange.intersects(contentRange) else {
+                isSilence.pointee = true
+                return noErr
+            }
+            
+            for ci in 0 ..< min(outputBLP.count, pcmBuffer.channelCount) {
+                let oFrames = data[ci], nFrames = outputBLP[ci].mData!.assumingMemoryBound(to: Float.self)
+                var i = loopedFrameStartI
+                for ni in 0 ..< frameCount {
+                    if contentRange.contains(i) {
+                        let oi = i - contentRange.start + timeOption.contentLocalStartI
+                        nFrames[ni] = oFrames[oi * pcmBuffer.stride]
+                    }
+                    
+                    i += 1
+                    if i >= maxCount {
+                        i -= maxCount
                     }
                 }
-            } else if timestamp.pointee.mFlags.contains(.sampleTimeValid) {
-                let scst = self.startSec + to.clsSec
-                let secI = Int(timestamp.pointee.mSampleTime - scst * sampleRate)
-                
-                guard secI < to.frameLength && secI + frameCount >= to.cst else {
-                    isSilence.pointee = true
-                    return noErr
-                }
-                
-                for i in 0 ..< outputBLP.count {
-                    let oFrames = data[i]
-                    let nFrames = outputBLP[i].mData!.assumingMemoryBound(to: Float.self)
-                    for j in 0 ..< frameCount {
-                        let ni = secI + j
-                        if ni >= to.cst && ni < to.frameLength {
-                            nFrames[j] = oFrames[ni * pcmBuffer.stride]
-                        }
-                    }
-                }
-            } else {
-                return kAudioUnitErr_NoConnection
             }
             
             return noErr
@@ -358,28 +355,8 @@ final class ScoreNoder {
     private let rendnotesSemaphore = DispatchSemaphore(value: 1)
     private let notewaveDicSemaphore = DispatchSemaphore(value: 1)
     
-    var stereo: Stereo {
-        get {
-            .init(volm: Volm.volm(fromAmp: Double(node.volume)), pan: Double(node.pan))
-        }
-        set {
-            let oldValue = stereo
-            if newValue.volm != oldValue.volm {
-                node.volume = Float(Volm.amp(fromVolm: newValue.volm))
-            }
-            if newValue.pan != oldValue.pan {
-                node.pan = Float(newValue.pan)//
-            }
-        }
-    }
-    
     var startSec = 0.0
-    var durSec = Rational(0) {
-        didSet {
-            dDurSec = .init(durSec)
-        }
-    }
-    private var dDurSec = 0.0
+    var durSec = Rational(0)
     let id = UUID()
     
     var rendnotes = [Rendnote]()
@@ -487,15 +464,13 @@ final class ScoreNoder {
                 }
             }
         }
-        
     }
     
     func reset() {
-        memowaves = [:]
-        phases = [:]
+        loopMemos = [:]
     }
     
-    struct NotewaveID: Hashable, Codable {
+    struct NotewaveID: Hashable {
         var fq: Double, noiseSeed0: UInt64, noiseSeed1: UInt64,
             envelopeMemo: EnvelopeMemo, pitbend: Pitbend,
             rendableDurSec: Double
@@ -511,44 +486,30 @@ final class ScoreNoder {
     }
     fileprivate(set) var notewaveDic = [NotewaveID: Notewave]()
     
-    struct Memowave {
-        var startSec: Double, releaseSec: Double?, endSec: Double?,
-            envelopeMemo: EnvelopeMemo, pitbend: Pitbend
-        var notewave: Notewave
-        
-        func contains(sec: Double) -> Bool {
-            if let endSec {
-                sec > startSec && sec < endSec
-            } else {
-                sec > startSec
-            }
-        }
+    private var loopMemos = [UUID: (startI: Int, releaseI: Int?)]()
+    
+    enum RenderType {
+        case normal, loop, note
     }
-    private var memowaves = [UUID: Memowave]()
-    private var phases = [UUID: Double]()
     
     convenience init(score: Score, startSec: Double = 0, sampleRate: Double,
-                     stereo: Stereo = .init(volm: 1)) {
-        self.init(rendnotes: score.notes.map { Rendnote(note: $0, score: score) },
-                  startSec: startSec, durSec: score.secRange.end, sampleRate: sampleRate,
-                  stereo: stereo)
+                     type: RenderType) {
+        self.init(rendnotes: score.notes.map { .init(note: $0, score: score) },
+                  startSec: startSec, durSec: score.secRange.end, sampleRate: sampleRate, type: type)
     }
     init(rendnotes: [Rendnote], startSec: Double, durSec: Rational, sampleRate: Double,
-         stereo: Stereo = .init(volm: 1)) {
-        
+         type: RenderType) {
         self.rendnotes = rendnotes
         self.startSec = startSec
         self.durSec = durSec
-        self.dDurSec = .init(durSec)
-        format = AVAudioFormat(standardFormatWithSampleRate: sampleRate, channels: 2)!
+        format = .init(standardFormatWithSampleRate: sampleRate, channels: 2)!
         
         let sampleRate = format.sampleRate
         let rSampleRate = 1 / sampleRate
-        node = AVAudioSourceNode(format: format) { [weak self]
+        node = .init(format: format) { [weak self]
             isSilence, timestamp, frameCount, outputData in
             
             guard let self, let seq = self.sequencer else { return kAudioUnitErr_NoConnection }
-            let startSec = self.startSec
             
             guard seq.isPlaying else {
                 isSilence.pointee = true
@@ -564,181 +525,194 @@ final class ScoreNoder {
                 }
             }
             
-            let frameStartSec: Double
-            if timestamp.pointee.mFlags.contains(.hostTimeValid) {
-                let dHostTime = timestamp.pointee.mHostTime > seq.startHostTime ?
-                    timestamp.pointee.mHostTime - seq.startHostTime : 0
-                frameStartSec = AVAudioTime.seconds(forHostTime: dHostTime) + seq.startSec
-            } else if timestamp.pointee.mFlags.contains(.sampleTimeValid) {
-                frameStartSec = timestamp.pointee.mSampleTime * rSampleRate
-            } else {
-                return kAudioUnitErr_NoConnection
-            }
-            
-            let frameEndSec = Double(frameCount) * rSampleRate + frameStartSec
+            guard timestamp.pointee.mFlags.contains(.sampleHostTimeValid)
+                    || timestamp.pointee.mFlags.contains(.sampleTimeValid) else { return kAudioUnitErr_NoConnection }
             
             self.rendnotesSemaphore.wait()
             let rendnotes = self.rendnotes
             self.rendnotesSemaphore.signal()
             
-            for rendnote in rendnotes {
-                let noteStartSec = rendnote.secRange.start.isInfinite ?
-                frameStartSec : rendnote.secRange.start + startSec
-                let dNoteStartSecI = Int((frameStartSec - noteStartSec) * sampleRate)
-                let secI = frameStartSec - noteStartSec < 0 ? 
-                0 : Int((frameStartSec - noteStartSec) * sampleRate)
-                if rendnote.secRange.end.isInfinite {
-                    if dNoteStartSecI + frameCount >= 0 && self.memowaves[rendnote.id] == nil {
-                        let nwid = NotewaveID(rendnote)
-                        
-                        self.notewaveDicSemaphore.wait()
-                        let notewave = self.notewaveDic[nwid]
-                        self.notewaveDicSemaphore.signal()
-                        
-                        if let notewave {
-                            self.memowaves[rendnote.id] = .init(startSec: seq.startSec >= noteStartSec ? frameStartSec : noteStartSec,
-                                                                releaseSec: nil,
-                                                                endSec: nil,
-                                                                envelopeMemo: rendnote.envelopeMemo,
-                                                                pitbend: rendnote.pitbend,
-                                                                notewave: notewave)
-                            self.phases[rendnote.id] = .init(secI.mod(notewave.sampleCount))
-                        }
-                    }
-                } else {
-                    let dDurSec = rendnote.secRange.end + startSec - noteStartSec
-                    let noteDurSec = dDurSec + rendnote.envelopeMemo.maxSec
-                    if !rendnote.secRange.start.isInfinite,
-                       (frameStartSec ..< frameEndSec).intersects(noteStartSec ..< noteStartSec + noteDurSec)
-                        && self.memowaves[rendnote.id] == nil {
-                        
-                        let nwid = NotewaveID(rendnote)
-                        
-                        self.notewaveDicSemaphore.wait()
-                        let notewave = self.notewaveDic[nwid]
-                        self.notewaveDicSemaphore.signal()
-                        
-                        if let notewave {
-                            self.memowaves[rendnote.id] = .init(startSec: seq.startSec >= noteStartSec && seq.startSec < noteStartSec + noteDurSec ? frameStartSec : noteStartSec,
-                                                                releaseSec: noteStartSec + dDurSec,
-                                                                endSec: noteStartSec + noteDurSec,
-                                                                envelopeMemo: rendnote.envelopeMemo,
-                                                                pitbend: rendnote.pitbend,
-                                                                notewave: notewave)
-                            self.phases[rendnote.id] = .init(secI.mod(notewave.sampleCount))
-                        }
-                    } else if let memowave = self.memowaves[rendnote.id], !rendnote.secRange.end.isInfinite,
-                              memowave.endSec == nil {
-                        
-                        self.memowaves[rendnote.id]?.releaseSec = noteStartSec + dDurSec
-                        self.memowaves[rendnote.id]?.endSec = noteStartSec + noteDurSec
-                    }
-                }
-            }
-            
-            for (id, memowave) in self.memowaves {
-                if let endSec = memowave.endSec,
-                   !(frameStartSec ..< frameEndSec).intersects(memowave.startSec ..< endSec) {
-                    if frameStartSec < memowave.startSec {
-                        self.memowaves[id]?.startSec -= dDurSec
-                        if let releaseSec = self.memowaves[id]?.releaseSec {
-                            self.memowaves[id]?.releaseSec = releaseSec - dDurSec
-                        }
-                        self.memowaves[id]?.endSec = endSec - dDurSec
-                    } else {
-                        self.memowaves[id] = nil
-                        self.phases[id] = nil
-                    }
-                }
-            }
-            
-            guard !self.memowaves.isEmpty else {
-                isSilence.pointee = true
-                return noErr
-            }
-            
-            let framess = outputBLP.count.range.map {
+            let nFramess = outputBLP.count.range.map {
                 outputBLP[$0].mData!.assumingMemoryBound(to: Float.self)
             }
             
-            let memowaves = self.memowaves
-            var phases = self.phases
-            for (id, memowave) in memowaves {
-                var phase = phases[id]!
-                let notewave = memowave.notewave, pitbend = memowave.pitbend
-                guard notewave.sampleCount >= 4 else { continue }
-                let count = Double(notewave.sampleCount)
-                if !notewave.isLoop && phase >= count { continue }
-                phase = phase.loop(0 ..< count)
+            func updateF(i: Int, mi: Int, ni: Int, samples: [[Double]], stereos: [Stereo],
+                         isPremultipliedEnvelope: Bool,
+                         envelopeMemo: EnvelopeMemo, startSec: Double, releaseSec: Double?) {
+                let envelopeVolm = isPremultipliedEnvelope ?
+                1 :
+                envelopeMemo.volm(atSec: Double(i) * rSampleRate - startSec,
+                                  releaseStartSec: releaseSec != nil ? releaseSec! - startSec : nil)
+                let stereo = stereos.count == 1 ? stereos[0] : stereos[mi]
+                let amp = Volm.amp(fromVolm: stereo.volm * envelopeVolm)
+                let pan = stereo.pan
                 
-                for i in 0 ..< Int(frameCount) {
-                    let nSec = Double(i) * rSampleRate + frameStartSec
-                    guard nSec >= memowave.startSec
-                            && (memowave.endSec != nil ? nSec < memowave.endSec! : true) else { continue }
-                    let envelopeVolm = notewave.isPremultipliedEnvelope ? 1 : memowave.envelopeMemo
-                        .volm(atSec: nSec - memowave.startSec,
-                              releaseStartSec: memowave.releaseSec != nil ? memowave.releaseSec! - memowave.startSec : nil)
-                    
-                    let amp, pan: Double
-                    if pitbend.isEqualAllStereo {
-                        amp = Volm.amp(fromVolm: pitbend.firstStereo.volm * envelopeVolm)
-                        pan = pitbend.firstStereo.pan
+                if pan == 0 || nFramess.count < 2 {
+                    if nFramess.count >= 2 && samples.count >= 2 {
+                        nFramess[0][ni] += Float(samples[0][mi] * amp)
+                        nFramess[1][ni] += Float(samples[1][mi] * amp)
                     } else {
-                        let stereo = notewave.stereo(atPhase: phase)
-                        amp = Volm.amp(fromVolm: stereo.volm * envelopeVolm)
-                        pan = stereo.pan
+                        let sample = Float(samples[0][mi] * amp)
+                        for frames in nFramess {
+                            frames[ni] += sample
+                        }
                     }
-                    
-                    if pan == 0 || framess.count < 2 {
-                        if framess.count >= 2 && notewave.samples.count >= 2 {
-                            let sample0 = notewave.sample(amp: amp, channel: 0, atPhase: phase)
-                            let sample1 = notewave.sample(amp: amp, channel: 1, atPhase: phase)
-                            phase = notewave.movedPhase(from: phase)
-                            framess[0][i] += Float(sample0)
-                            framess[1][i] += Float(sample1)
+                } else {
+                    let nPan = pan.clipped(min: -1, max: 1) * 0.75
+                    if samples.count >= 2 {
+                        let sample0 = samples[0][mi] * amp
+                        let sample1 = samples[1][mi] * amp
+                        if nPan < 0 {
+                            nFramess[0][ni] += Float(sample0)
+                            nFramess[1][ni] += Float(sample1 * Volm.amp(fromVolm: 1 + nPan))
                         } else {
-                            let sample = notewave.sample(amp: amp, channel: 0, atPhase: phase)
-                            phase = notewave.movedPhase(from: phase)
-                            let fSample = Float(sample)
-                            for frames in framess {
-                                frames[i] += fSample
-                            }
+                            nFramess[0][ni] += Float(sample0 * Volm.amp(fromVolm: 1 - nPan))
+                            nFramess[1][ni] += Float(sample1)
                         }
                     } else {
-                        let nPan = pan.clipped(min: -1, max: 1) * 0.75
-                        if notewave.samples.count >= 2 {
-                            let sample0 = notewave.sample(amp: amp, channel: 0, atPhase: phase)
-                            let sample1 = notewave.sample(amp: amp, channel: 1, atPhase: phase)
-                            phase = notewave.movedPhase(from: phase)
-                            if nPan < 0 {
-                                framess[0][i] += Float(sample0)
-                                framess[1][i] += Float(sample1 * Volm.amp(fromVolm: 1 + nPan))
-                            } else {
-                                framess[0][i] += Float(sample0 * Volm.amp(fromVolm: 1 - nPan))
-                                framess[1][i] += Float(sample1)
-                            }
+                        let sample = samples[0][mi] * amp
+                        if nPan < 0 {
+                            nFramess[0][ni] += Float(sample)
+                            nFramess[1][ni] += Float(sample * Volm.amp(fromVolm: 1 + nPan))
                         } else {
-                            let sample = notewave.sample(amp: amp, channel: 0, atPhase: phase)
-                            phase = notewave.movedPhase(from: phase)
-                            if nPan < 0 {
-                                framess[0][i] += Float(sample)
-                                framess[1][i] += Float(sample * Volm.amp(fromVolm: 1 + nPan))
-                            } else {
-                                framess[0][i] += Float(sample * Volm.amp(fromVolm: 1 - nPan))
-                                framess[1][i] += Float(sample)
-                            }
+                            nFramess[0][ni] += Float(sample * Volm.amp(fromVolm: 1 - nPan))
+                            nFramess[1][ni] += Float(sample)
                         }
                     }
                 }
-                
-                phases[id] = phase
             }
-            self.phases = phases
+            
+            let startSec = self.startSec
+            let frameStartI = Int(seq.startSec * sampleRate)
+            let unloopedFrameStartI = Int(timestamp.pointee.mSampleTime) + frameStartI
+            var contains = false
+            if type == .note {
+                for rendnote in rendnotes {
+                    let ei: Int?
+                    if rendnote.isRelease {
+                        guard loopMemos[rendnote.id] != nil else { continue }
+                        if let oei = loopMemos[rendnote.id]?.releaseI {
+                            ei = oei
+                        } else {
+                            loopMemos[rendnote.id]?.releaseI = unloopedFrameStartI
+                            ei = unloopedFrameStartI
+                        }
+                        let releaseCount = rendnote.releaseCount(sampleRate: sampleRate)
+                        if unloopedFrameStartI >= ei! + releaseCount {
+                            loopMemos[rendnote.id] = nil
+                            continue
+                        }
+                    } else {
+                        ei = nil
+                    }
+                    
+                    contains = true
+                    let nwid = NotewaveID(rendnote)
+                    
+                    self.notewaveDicSemaphore.wait()
+                    let notewave = self.notewaveDic[nwid]
+                    self.notewaveDicSemaphore.signal()
+                    
+                    guard let notewave else { continue }
+                    
+                    var si: Int
+                    if let i = loopMemos[rendnote.id]?.startI {
+                        si = i
+                    } else {
+                        loopMemos[rendnote.id] = (unloopedFrameStartI, ei)
+                        si = unloopedFrameStartI
+                    }
+                    
+                    let nStartSec = startSec + .init(si) * rSampleRate
+                    let releaseSec = ei != nil ? startSec + .init(ei!) * rSampleRate : nil
+                    var mi = (unloopedFrameStartI - si) % notewave.sampleCount
+                    for ni in 0 ..< Int(frameCount) {
+                        updateF(i: ni + unloopedFrameStartI, mi: mi, ni: ni,
+                                samples: notewave.samples, stereos: notewave.stereos,
+                                isPremultipliedEnvelope: notewave.isPremultipliedEnvelope,
+                                envelopeMemo: rendnote.envelopeMemo,
+                                startSec: nStartSec, releaseSec: releaseSec)
+                        mi += 1
+                        if mi >= notewave.sampleCount {
+                            mi -= notewave.sampleCount
+                        }
+                    }
+                    //fir
+                }
+            } else {
+                let maxCount = Int(max(1, (seq.durSec * sampleRate).rounded(.up)))
+                let loopedFrameStartI = type == .loop ?
+                unloopedFrameStartI % maxCount : unloopedFrameStartI
+                let loopedFrameRange = loopedFrameStartI ..< loopedFrameStartI + frameCount
+                let preLoopedFrameRange = loopedFrameRange - maxCount
+                let isLooped = type == .loop && unloopedFrameStartI >= maxCount
+                
+                for rendnote in rendnotes {
+                    let range = rendnote.releasedRange(sampleRate: sampleRate, startSec: startSec)
+                    let preRange = range - maxCount
+                    let cRange = range.clamped(to: 0 ..< maxCount)
+                    let cPreRange = preRange.clamped(to: 0 ..< maxCount)
+                    
+                    guard loopedFrameRange.intersects(cRange)
+                            || (type == .loop && preLoopedFrameRange.intersects(cRange))
+                            || (isLooped && loopedFrameRange.intersects(cPreRange))
+                            || (isLooped && preLoopedFrameRange.intersects(cPreRange)) else { continue }
+                    contains = true
+                    
+                    let nwid = NotewaveID(rendnote)
+                    
+                    self.notewaveDicSemaphore.wait()
+                    let notewave = self.notewaveDic[nwid]
+                    self.notewaveDicSemaphore.signal()
+                    
+                    guard let notewave else { continue }
+                    
+                    func update(notewave: Notewave,
+                                envelopeMemo: EnvelopeMemo, startSec: Double, releaseSec: Double?,
+                                range: Range<Int>, startI: Int) {
+                        var i = loopedFrameStartI
+                        for ni in 0 ..< Int(frameCount) {
+                            if range.contains(i) {
+                                let mi = i - startI
+                                updateF(i: i, mi: mi, ni: ni,
+                                        samples: notewave.samples, stereos: notewave.stereos,
+                                        isPremultipliedEnvelope: notewave.isPremultipliedEnvelope,
+                                        envelopeMemo: envelopeMemo,
+                                        startSec: startSec, releaseSec: releaseSec)
+                            }
+                            i += 1
+                            if i >= maxCount {
+                                i -= maxCount
+                            }
+                        }
+                    }
+                    
+                    if cRange.intersects(loopedFrameRange)
+                        || cRange.intersects(preLoopedFrameRange) {
+                        update(notewave: notewave,
+                               envelopeMemo: rendnote.envelopeMemo,
+                               startSec: startSec + rendnote.secRange.start,
+                               releaseSec: startSec + rendnote.secRange.end,
+                               range: cRange, startI: range.start)
+                    }
+                    if type == .loop,
+                       cPreRange.intersects(loopedFrameRange)
+                        || cPreRange.intersects(preLoopedFrameRange) {
+                        update(notewave: notewave,
+                               envelopeMemo: rendnote.envelopeMemo,
+                               startSec: startSec + rendnote.secRange.start - seq.durSec,
+                               releaseSec: startSec + rendnote.secRange.end - seq.durSec,
+                               range: cPreRange, startI: preRange.start)
+                    }
+                }
+            }
+            
+            if !contains {
+                isSilence.pointee = true
+            }
             
             return noErr
         }
-        
-        self.stereo = stereo
         
         updateRendnotes()
     }
@@ -786,6 +760,7 @@ final class Sequencer {
     }
     
     convenience init?(audiotracks: [Audiotrack], clipHandler: (@Sendable (Float) -> ())? = nil,
+                      type: ScoreNoder.RenderType,
                       sampleRate: Double = Audio.defaultSampleRate) {
         let audiotracks = audiotracks.filter { !$0.isEmpty }
         
@@ -799,7 +774,7 @@ final class Sequencer {
                 guard value.beatRange.length > 0 && value.beatRange.end > 0 else { continue }
                 switch value {
                 case .score(let score):
-                    track.scoreNoders.append(.init(score: score, sampleRate: sampleRate))
+                    track.scoreNoders.append(.init(score: score, sampleRate: sampleRate, type: type))
                 case .sound(let content):
                     guard let noder = PCMNoder(content: content) else { continue }
                     track.pcmNoders.append(noder)
@@ -1510,6 +1485,7 @@ final class ClippingAudioUnit: AUAudioUnit {
     private var pcmBuffer: AVAudioPCMBuffer?
 
     var headroomAmp: Float? = Float(Audio.floatHeadroomAmp)
+    var enabledAttak = true
     
     struct SError: Error {}
 
@@ -1549,17 +1525,17 @@ final class ClippingAudioUnit: AUAudioUnit {
     override var internalRenderBlock: AUInternalRenderBlock {
         return { [weak self] (actionFlags, timestamp, frameCount, outputBusNumber,
                               outputData, realtimeEventListHead, pullInputBlock) in
-            guard let au = self else { return kAudioUnitErr_NoConnection }
-            guard frameCount <= au.maximumFramesToRender else {
+            guard let self else { return kAudioUnitErr_NoConnection }
+            guard frameCount <= self.maximumFramesToRender else {
                 return kAudioUnitErr_TooManyFramesToProcess
             }
             guard pullInputBlock != nil else {
                 return kAudioUnitErr_NoConnection
             }
             
-            guard let inputData = au.pcmBuffer?.mutableAudioBufferList else { return kAudioUnitErr_NoConnection }
+            guard let inputData = self.pcmBuffer?.mutableAudioBufferList else { return kAudioUnitErr_NoConnection }
             let inputBLP = UnsafeMutableAudioBufferListPointer(inputData)
-            let byteSize = Int(min(frameCount, au.maxFramesToRender)) * MemoryLayout<Float>.size
+            let byteSize = Int(min(frameCount, self.maxFramesToRender)) * MemoryLayout<Float>.size
             for i in 0 ..< inputBLP.count {
                 inputBLP[i].mDataByteSize = UInt32(byteSize)
             }
@@ -1578,10 +1554,10 @@ final class ClippingAudioUnit: AUAudioUnit {
             }
             guard !outputBLP.isEmpty else { return noErr }
             
-            if let headroomAmp = au.headroomAmp {
-                for i in 0 ..< outputBLP.count {
-                    let inputFrames = inputBLP[i].mData!.assumingMemoryBound(to: Float.self)
-                    let outputFrames = outputBLP[i].mData!.assumingMemoryBound(to: Float.self)
+            if let headroomAmp = self.headroomAmp {
+                for ci in 0 ..< outputBLP.count {
+                    let inputFrames = inputBLP[ci].mData!.assumingMemoryBound(to: Float.self)
+                    let outputFrames = outputBLP[ci].mData!.assumingMemoryBound(to: Float.self)
                     for i in 0 ..< Int(frameCount) {
                         outputFrames[i] = inputFrames[i]
                         if outputFrames[i].isNaN {
@@ -1594,11 +1570,26 @@ final class ClippingAudioUnit: AUAudioUnit {
                     }
                 }
             } else {
-                for i in 0 ..< outputBLP.count {
-                    let inputFrames = inputBLP[i].mData!.assumingMemoryBound(to: Float.self)
-                    let outputFrames = outputBLP[i].mData!.assumingMemoryBound(to: Float.self)
+                for ci in 0 ..< outputBLP.count {
+                    let inputFrames = inputBLP[ci].mData!.assumingMemoryBound(to: Float.self)
+                    let outputFrames = outputBLP[ci].mData!.assumingMemoryBound(to: Float.self)
                     for i in 0 ..< Int(frameCount) {
                         outputFrames[i] = inputFrames[i]
+                    }
+                }
+            }
+            
+            if self.enabledAttak,
+               (timestamp.pointee.mFlags.contains(.sampleTimeValid)
+                || timestamp.pointee.mFlags.contains(.sampleHostTimeValid))
+                && timestamp.pointee.mSampleTime == 0 {
+                
+                for ci in 0 ..< outputBLP.count {
+                    let outputFrames = outputBLP[ci].mData!.assumingMemoryBound(to: Float.self)
+                    if outputFrames[0] != 0 {
+                        for i in 0 ..< Int(frameCount) {
+                            outputFrames[i] *= .init(i) / .init(frameCount)
+                        }
                     }
                 }
             }

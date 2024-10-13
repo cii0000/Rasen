@@ -344,6 +344,7 @@ struct Rendnote {
     var pitbend: Pitbend
     var secRange: Range<Double>
     var envelopeMemo: EnvelopeMemo
+    var isRelease = false
     var id = UUID()
 }
 extension Rendnote {
@@ -367,6 +368,26 @@ extension Rendnote {
     }
     var rendableDurSec: Double {
         min(isLoop ? fq.rounded(.up) / fq : secRange.length + envelopeMemo.releaseSec, 100000)
+    }
+    
+    func sampleCount(sampleRate: Double) -> Int {
+        guard !pitbend.isEmpty else { return 1 }
+        let rendableDurSec = min(secRange.length + envelopeMemo.releaseSec, 100000)
+        let sampleCount = max(1, Int((rendableDurSec * sampleRate).rounded(.up)))
+        return envelopeMemo.reverb.isEmpty ?
+        sampleCount :
+        sampleCount + envelopeMemo.reverb.count(sampleRate: sampleRate) - 1
+    }
+    func releaseCount(sampleRate: Double) -> Int {
+        let rendableDurSec = min(envelopeMemo.releaseSec, 100000)
+        let sampleCount = max(1, Int((rendableDurSec * sampleRate).rounded(.up)))
+        return envelopeMemo.reverb.isEmpty ?
+        sampleCount :
+        sampleCount + envelopeMemo.reverb.count(sampleRate: sampleRate) - 1
+    }
+    func releasedRange(sampleRate: Double, startSec: Double) -> Range<Int> {
+        .init(start: Int(((secRange.lowerBound + startSec) * sampleRate).rounded(.down)),
+              length: sampleCount(sampleRate: sampleRate))
     }
 }
 extension Rendnote {
@@ -407,10 +428,13 @@ extension Rendnote {
                                            in: notewave.samples[0]),
                                 vDSP.apply(fir: envelopeMemo.reverb.fir(sampleRate: sampleRate, channel: 1),
                                            in: notewave.samples[0])]
+            notewave.stereos += .init(repeating: notewave.stereos.last!,
+                                      count: notewave.sampleCount - notewave.stereos.count)
             if isLoop && notewave.sampleCount > sampleCount {
                 let count = notewave.sampleCount - sampleCount
                 notewave.samples[0].removeLast(count)
                 notewave.samples[1].removeLast(count)
+                notewave.stereos.removeLast(count)
             }
         }
         
@@ -433,8 +457,8 @@ extension Rendnote {
         let containsNoise = pitbend.containsNoise
         let rendableDurSec = rendableDurSec
         
-        let sampleCount = Int((rendableDurSec * sampleRate).rounded(.up))
-        guard sampleCount >= 4 else {
+        let sampleCount = Int((rendableDurSec * sampleRate).rounded(isLoop ? .down : .up))
+        guard sampleCount >= 1 else {
             return .init(samples: [[0]], stereos: [.init()], isLoop: isLoop)
         }
         
@@ -945,51 +969,5 @@ struct Notewave {
 extension Notewave {
     var sampleCount: Int {
         samples.isEmpty ? 0 : samples[0].count
-    }
-    func sample(amp: Double, channel: Int, atPhase phase: Double) -> Double {
-        let sampleCount = sampleCount
-        let count = Double(sampleCount)
-        if !isLoop && phase >= count { return 0 }
-        
-        let samples = samples[channel]
-        let n: Double
-        if phase.isInteger {
-            n = samples[Int(phase)] * amp
-        } else {
-            guard sampleCount >= 4 else { return 0 }
-            let sai = Int(phase)
-            
-            let a0 = sai - 1 >= 0 ? samples[sai - 1] : (isLoop ? samples[sampleCount - 1] : 0)
-            let a1 = samples[sai]
-            let a2 = sai + 1 < sampleCount ? samples[sai + 1] : (isLoop ? samples[0] : 0)
-            let a3 = sai + 2 < sampleCount ? samples[sai + 2] : (isLoop ? samples[1] : 0)
-            let t = phase - Double(sai)
-            let sy = Double.spline(a0, a1, a2, a3, t: t)
-            n = sy * amp
-        }
-        
-        return n
-    }
-    func movedPhase(from phase: Double) -> Double {
-        let count = Double(sampleCount)
-        let phase = phase + 1
-        return !isLoop && phase >= count ? phase : phase.loop(start: 0, end: count)
-    }
-    
-    func stereo(atPhase phase: Double) -> Stereo {
-        let count = Double(stereos.count)
-        if !isLoop && phase >= count { return stereos.last ?? .init() }
-        
-        if phase.isInteger {
-            return stereos[Int(phase)]
-        } else {
-            guard stereos.count >= 2 else { return stereos.last ?? .init() }
-            let sai = Int(phase)
-            
-            let s0 = stereos[sai]
-            let s1 = sai + 1 < stereos.count ? stereos[sai + 1] : (isLoop ? stereos[0] : .init())
-            let t = phase - Double(sai)
-            return Stereo.linear(s0, s1, t: t)
-        }
     }
 }

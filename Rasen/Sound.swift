@@ -908,6 +908,9 @@ extension Reverb {
     var durSec: Double {
         earlyRSec + lateRSec + releaseSec
     }
+    func count(sampleRate: Double) -> Int {
+        Int((durSec * sampleRate).rounded(.up))
+    }
     
     func fir(sampleRate: Double, channel: Int) -> [Double] {
         guard !isEmpty else { return [] }
@@ -1660,7 +1663,7 @@ extension Score {
         }
     }
     var renderedPCMBuffer: PCMBuffer? {
-        let seq = Sequencer(audiotracks: [.init(values: [.score(self)])])
+        let seq = Sequencer(audiotracks: [.init(values: [.score(self)])], type: .normal)
         return try? seq?.buffer(sampleRate: Audio.defaultSampleRate,
                                 progressHandler: { _, _ in })
     }

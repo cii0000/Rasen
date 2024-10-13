@@ -2508,12 +2508,12 @@ extension Sheet {
         !audiotrack.values.isEmpty
     }
     var audiotrack: Audiotrack {
-        .init(values: [.score(score)] + contents.compactMap { $0.type.isAudio ? .sound($0) : nil })
+        .init(values: (score.enabled ? [.score(score)] : []) + contents.compactMap { $0.type.isAudio ? .sound($0) : nil })
     }
     var pcmBuffer: PCMBuffer? {
         let audiotrack = audiotrack
         if !audiotrack.isEmpty,
-           let sequencer = Sequencer(audiotracks: [audiotrack]) {
+           let sequencer = Sequencer(audiotracks: [audiotrack], type: .normal) {
             return try? sequencer.buffer(sampleRate: Audio.defaultSampleRate,
                                          headroomAmp: nil) { _, _ in }
         }

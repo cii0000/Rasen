@@ -1087,7 +1087,7 @@ final class ScoreView: TimelineView {
         updateDraftNotes()
         
         if model.enabled {
-            scoreNoder = .init(score: model, sampleRate: Audio.defaultSampleRate)
+            scoreNoder = .init(score: model, sampleRate: Audio.defaultSampleRate, type: .loop)
         }
     }
 }
@@ -1221,10 +1221,13 @@ extension ScoreView {
             
             if oldValue.enabled != newValue.enabled {
                 scoreNoder = newValue.enabled ? .init(score: model,
-                                                      sampleRate: Audio.defaultSampleRate) : nil
-            } else if oldValue.tempo != newValue.tempo {
+                                                      sampleRate: Audio.defaultSampleRate,
+                                                      type: .loop) : nil
+            }
+            if oldValue.tempo != newValue.tempo {
                 scoreNoder?.changeTempo(with: model)
-            } else if oldValue.durBeat != newValue.durBeat {
+            }
+            if oldValue.durBeat != newValue.durBeat {
                 scoreNoder?.durSec = model.secRange.end
             }
         }
@@ -1779,14 +1782,14 @@ extension ScoreView {
                 eps.append(.init(noteX, evenY, overtoneHalfH, Self.color(fromVolm: n.result.tone.overtone.evenVolm)))
                 ops.append(.init(noteX, oddY, overtoneHalfH, Self.color(fromVolm: n.result.tone.overtone.oddVolm)))
             }
-            if beat < note.beatRange.end {
+            if beat != note.beatRange.end {
                 let lastPit = note.pits.last!
                 let lastTone = lastPit.tone
                 ps.append(.init(nsx + nw, noteY(atBeat: note.beatRange.end, from: note), 0,
                                 ps.last?.color ?? .content))
-                eps.append(.init(nsx + nw, evenY, 0,
+                eps.append(.init(nsx + nw, evenY, overtoneHalfH,
                                  Self.color(fromVolm: lastTone.overtone.evenVolm)))
-                ops.append(.init(nsx + nw, oddY, 0,
+                ops.append(.init(nsx + nw, oddY, overtoneHalfH,
                                  Self.color(fromVolm: lastTone.overtone.oddVolm)))
                 mps.append(.init(nsx + nw, noteY(atBeat: note.beatRange.end, from: note), mainLineHalfH,
                                  .content))
@@ -1943,7 +1946,12 @@ extension ScoreView {
                 lastV = v
                 nBeat += .init(1, 48)
             }
-            if !isLastAppned, let v = lastV {
+            if nBeat != note.beatRange.end {
+                let x = self.x(atBeat: note.beatRange.end)
+                let sprols = pitbend.spectlope(atSec: Double(sec(fromBeat: note.beatRange.end - note.beatRange.start))).sprols
+                let psPitch = pitch(atBeat: note.beatRange.end, from: note)
+                let noteY = y(fromPitch: psPitch)
+                let v = pAndColors(x: x, pitch: psPitch, noteY: noteY, sprols: sprols)
                 vs.append(v)
             }
             
@@ -1965,7 +1973,10 @@ extension ScoreView {
                     lastFqLineP = fqLineP
                     nBeat += .init(1, 48)
                 }
-                if !isLastAppned, let fqLineP = lastFqLineP {
+                if nBeat != note.beatRange.end {
+                    let x = self.x(atBeat: note.beatRange.end)
+                    let psPitch = pitch(atBeat: note.beatRange.end, from: note)
+                    let fqLineP = Point(x, tonePitchY(fromPitch: psPitch))
                     fqLinePs.append(fqLineP)
                 }
             }

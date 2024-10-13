@@ -82,6 +82,7 @@ final class ContentSlider: DragEditor {
                 if contentView.containsIsShownSpectrogram(contentP, scale: document.screenToWorldScale) {
                     type = .isShownSpectrogram
                     beganIsShownSpectrogram = contentView.model.isShownSpectrogram
+                    contentView.updateSpectrogram()
                 } else if let timeOption = content.timeOption {
                     if !contentView.containsTimeline(contentP, scale: document.screenToWorldScale)
                         && contentView.model.type == .movie {
@@ -226,7 +227,7 @@ final class ContentView<T: BinderProtocol>: SpectrgramView, @unchecked Sendable 
                             lineWidth: 4, lineType: .color(.warning))
     
     let timelineNode = Node()
-    var spectrogramNode: Node?
+    var spectrogramNode: Node?, spectrogramDeltaX = 0.0
     var spectrogramFqType: Spectrogram.FqType?
     var timeNode: Node?, currentPeakVolmNode: Node?
     var peakVolm = 0.0 {
@@ -446,6 +447,9 @@ extension ContentView {
         updateClippingNode()
         if let timeOption = model.timeOption {
             pcmNoder?.change(from: timeOption)
+            
+            spectrogramNode?.attitude.position.x
+            = x(atBeat: timeOption.beatRange.start + timeOption.localStartBeat) + spectrogramDeltaX
         }
     }
     var timeOption: ContentTimeOption? {
@@ -456,6 +460,9 @@ extension ContentView {
             updateClippingNode()
             if let timeOption = model.timeOption {
                 pcmNoder?.change(from: timeOption)
+                
+                spectrogramNode?.attitude.position.x
+                = x(atBeat: timeOption.beatRange.start + timeOption.localStartBeat) + spectrogramDeltaX
             }
         }
     }
@@ -727,6 +734,7 @@ extension ContentView {
               let sm = pcmNoder?.spectrogram(fromSecRange: .init(contentSecRange)) else { return }
         
         let firstX = x(atBeat: timeOption.beatRange.start + max(timeOption.localStartBeat, 0))
+        spectrogramDeltaX = width(atDurBeat: -min(timeOption.localStartBeat, 0))
         let y = timeLineCenterY + Sheet.timelineHalfHeight + ContentLayout.isShownSpectrogramHeight
         let allW = width(atDurSec: contentSecRange.length)
         var nodes = [Node](), maxH = 0.0

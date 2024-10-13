@@ -183,19 +183,28 @@ struct Content: Hashable, Codable {
     }
 }
 extension Content {
-    var localBeatRange: Range<Rational>? {
+    var durBeat: Rational? {
         if let timeOption {
-            let durBeat = ContentTimeOption.beat(fromSec: durSec, tempo: timeOption.tempo)
-            return Range(start: timeOption.localStartBeat, length: durBeat)
+            ContentTimeOption.beat(fromSec: durSec, tempo: timeOption.tempo)
         } else {
-            return nil
+            nil
+        }
+    }
+    var localBeatRange: Range<Rational>? {
+        if let timeOption, let durBeat {
+            Range(start: timeOption.localStartBeat, length: durBeat)
+        } else {
+            nil
         }
     }
     
     var contentSecRange: Range<Double>? {
-        if let timeOption {
-            let sSec = timeOption.sec(fromBeat: max(-timeOption.localStartBeat, 0))
-            let eSec = min(sSec + timeOption.secRange.length, durSec)
+        if let timeOption, let durBeat {
+            let sBeat = -min(timeOption.localStartBeat, 0)
+            let lengthBeat = min(durBeat + min(timeOption.localStartBeat, 0),
+                                 timeOption.beatRange.length - max(timeOption.localStartBeat, 0))
+            let sSec = timeOption.sec(fromBeat: sBeat)
+            let eSec = timeOption.sec(fromBeat: sBeat + lengthBeat)
             return sSec < eSec ? .init(sSec) ..< .init(eSec) : nil
         } else {
             return nil
