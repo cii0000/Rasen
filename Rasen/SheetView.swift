@@ -560,16 +560,16 @@ final class AnimationView: TimelineView {
     
     func updateTimeline() {
         if model.enabled {
-            timelineNode.children = timelineNodes() + [clippingNode]
-            timelineNode.path = .init(paddingTimelineBounds ?? .init())
-            timelineNode.fillType = .color(.background)
-            timelineNode.attitude.position.y = model.timelineY
-            
             let btsx = x(atBeat: model.beatRange.lowerBound) - paddingWidth
             let btex = x(atBeat: model.beatRange.upperBound) + paddingWidth
             paddingTimelineBounds = Rect(x: btsx, y: -paddingTimelineHeight / 2,
                                          width: btex - btsx,
                                          height: paddingTimelineHeight)
+            
+            timelineNode.children = timelineNodes() + [clippingNode]
+            timelineNode.path = .init(paddingTimelineBounds ?? .init())
+            timelineNode.fillType = .color(.background)
+            timelineNode.attitude.position.y = model.timelineY
             
             updateClippingNode()
         } else {
@@ -586,7 +586,7 @@ final class AnimationView: TimelineView {
     func updateTimelineAtCurrentKeyframe() {
         updateTimelime(atKeyframe: model.index)
     }
-    let paddingTimelineHeight = Animation.timelineY * 2, interpolatedKnobHeight = 4.0, paddingWidth = 5.0
+    let paddingTimelineHeight = Sheet.timelineY * 2, interpolatedKnobHeight = 4.0, paddingWidth = 5.0
     func timelineNodes() -> [Node] {
         let beatRange = model.beatRange
         let sBeat = max(beatRange.start, -10000),
@@ -1031,7 +1031,7 @@ final class AnimationView: TimelineView {
     }
     
     var origin: Point { .init(0, timelineY) }
-    var timeLineCenterY: Double { 0 }
+    var timelineCenterY: Double { 0 }
     var beatRange: Range<Rational>? {
         get { model.beatRange }
         set {

@@ -118,7 +118,9 @@ final class ContentSlider: DragEditor {
                                    sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval) - (content.timeOption?.beatRange.length ?? 0))
                     var timeOption = content.timeOption
                     timeOption?.beatRange.start = beat
-                    contentView.set(timeOption, origin: Point(sheetView.animationView.x(atBeat: beat), np.y))
+                    let timelineY = np.y
+                        .clipped(min: Sheet.timelineY, max: sheetView.bounds.height - Sheet.timelineY)
+                    contentView.set(timeOption, origin: Point(sheetView.animationView.x(atBeat: beat), timelineY))
                     document.updateSelects()
                 case .startBeat:
                     if var timeOption = content.timeOption {
@@ -508,7 +510,7 @@ extension ContentView {
         }
     }
     
-    var timeLineCenterY: Double {
+    var timelineCenterY: Double {
         model.type.hasDur ? 0 : -Sheet.timelineHalfHeight
     }
     var beatRange: Range<Rational>? {
@@ -735,7 +737,7 @@ extension ContentView {
         
         let firstX = x(atBeat: timeOption.beatRange.start + max(timeOption.localStartBeat, 0))
         spectrogramDeltaX = width(atDurBeat: -min(timeOption.localStartBeat, 0))
-        let y = timeLineCenterY + Sheet.timelineHalfHeight + ContentLayout.isShownSpectrogramHeight
+        let y = timelineCenterY + Sheet.timelineHalfHeight + ContentLayout.isShownSpectrogramHeight
         let allW = width(atDurSec: contentSecRange.length)
         var nodes = [Node](), maxH = 0.0
         func spNode(width: Int, at xi: Int) -> Node? {

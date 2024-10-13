@@ -1367,7 +1367,7 @@ final class Document: @unchecked Sendable {
                         if !nis.isEmpty {
                             for ni in nis {
                                 var nLine = scoreView.pointline(from: score.notes[ni])
-                                nLine = sheetView.convertToWorld(nLine)
+                                nLine = scoreView.convertToWorld(nLine)
                                 sPointlines.append(nLine)
                             }
                         }

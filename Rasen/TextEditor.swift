@@ -1673,7 +1673,7 @@ extension TextView {
         }
     }
     
-    var timeLineCenterY: Double {
+    var timelineCenterY: Double {
         (typesetter.firstReturnBounds?.minY ?? 0) + Sheet.timelineHalfHeight
     }
     var beatRange: Range<Rational>? {

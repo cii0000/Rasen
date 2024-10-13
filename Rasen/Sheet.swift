@@ -1576,14 +1576,14 @@ extension Keyframe: Protobuf {
 }
 
 struct AnimationOption {
-    var beatRange = Animation.defaultBeatRange
+    var beatRange = Music.defaultBeatRange
     var tempo = Music.defaultTempo
-    var timelineY = Animation.timelineY
+    var timelineY = Sheet.timelineY
     var enabled = false
 }
 extension AnimationOption: Protobuf {
     init(_ pb: PBAnimationOption) throws {
-        beatRange = (try? RationalRange(pb.beatRange).value) ?? Animation.defaultBeatRange
+        beatRange = (try? RationalRange(pb.beatRange).value) ?? Music.defaultBeatRange
         tempo = (try? Rational(pb.tempo))?.clipped(Music.tempoRange) ?? Music.defaultTempo
         timelineY = pb.timelineY
         enabled = pb.enabled
@@ -1650,10 +1650,6 @@ extension AnimationZipper: Protobuf {
 }
 
 struct Animation {
-    static let defaultDurBeat = Music.defaultDurBeat
-    static let defaultBeatRange = 0 ..< defaultDurBeat
-    static let timelineY = 16.0
-    
     var keyframes = [Keyframe]()
 
     var rootBeat = Rational(0) {
@@ -1663,16 +1659,16 @@ struct Animation {
     }
     private(set) var index = 0
     
-    var beatRange = defaultBeatRange
+    var beatRange = Music.defaultBeatRange
     var tempo = Music.defaultTempo
-    var timelineY = timelineY
+    var timelineY = Sheet.timelineY
     var enabled = false
     
     init(keyframes: [Keyframe] = [],
          rootBeat: Rational = 0,
-         beatRange: Range<Rational> = Animation.defaultBeatRange,
+         beatRange: Range<Rational> = Music.defaultBeatRange,
          tempo: Rational = Music.defaultTempo,
-         timelineY: Double = timelineY,
+         timelineY: Double = Sheet.timelineY,
          enabled: Bool = false) {
         
         self.keyframes = keyframes
@@ -1720,10 +1716,10 @@ extension Animation: Protobuf {
         }
         
         rootBeat = (try? Rational(pb.rootBeat)) ?? 0
-        beatRange = (try? RationalRange(pb.beatRange).value) ?? Animation.defaultBeatRange
+        beatRange = (try? RationalRange(pb.beatRange).value) ?? Music.defaultBeatRange
         tempo = (try? Rational(pb.tempo))?.clipped(Music.tempoRange) ?? Music.defaultTempo
-        timelineY = pb.timelineY.clipped(min: Animation.timelineY,
-                                         max: Sheet.height - Animation.timelineY)
+        timelineY = pb.timelineY.clipped(min: Sheet.timelineY,
+                                         max: Sheet.height - Sheet.timelineY)
         enabled = pb.enabled
         index = keyframes.isEmpty ?
             0 : index(atRootBeat: rootBeat)
@@ -2199,6 +2195,7 @@ extension Sheet {
     static let timelineHalfHeight = 12.0
     static let knobWidth = 2.0, knobHeight = 12.0, rulerHeight = 4.0
     static let knobEditDistance = 15.0
+    static let timelineY = 18.0
     static let fullEditPitchInterval = Rational(1, 12), pitchInterval = Rational(1)
     static let fullEditBeatInterval = Rational(1, 144), beatInterval = Rational(1, 12)
 }

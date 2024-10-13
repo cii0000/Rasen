@@ -236,8 +236,9 @@ message PBNote {
 }
 
 message PBScoreOption {
-    PBRational durBeat = 1;
+    PBRationalRange beatRange = 6;
     PBRational tempo = 2;
+    double timelineY = 7;
     repeated PBRational keyBeats = 4;
     bool enabled = 3;
     bool isShownSpectrogram = 5;
@@ -245,8 +246,9 @@ message PBScoreOption {
 message PBScore {
     repeated PBNote notes = 1;
     repeated PBNote draftNotes = 6;
-    PBRational durBeat = 2;
+    PBRationalRange beatRange = 9;
     PBRational tempo = 3;
+    double timelineY = 10;
     repeated PBRational keyBeats = 7;
     bool enabled = 4;
     bool isShownSpectrogram = 8;

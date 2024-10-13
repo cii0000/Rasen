@@ -1812,7 +1812,8 @@ final class CopyEditor: Editor {
                 let octaveNode = scoreView.octaveNode(fromPitch: pitch,
                                                       noteIs: Array(count - notes.count ..< count),
                                                       .octave)
-                octaveNode.attitude.position = sheetView.node.attitude.position
+                octaveNode.attitude.position
+                = sheetView.convertToWorld(scoreView.node.attitude.position)
                 self.octaveNode = octaveNode
                 document.rootNode.append(child: octaveNode)
             }

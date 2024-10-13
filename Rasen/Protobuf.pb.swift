@@ -1204,14 +1204,14 @@ struct PBScoreOption: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var durBeat: PBRational {
-    get {return _durBeat ?? PBRational()}
-    set {_durBeat = newValue}
+  var beatRange: PBRationalRange {
+    get {return _beatRange ?? PBRationalRange()}
+    set {_beatRange = newValue}
   }
-  /// Returns true if `durBeat` has been explicitly set.
-  var hasDurBeat: Bool {return self._durBeat != nil}
-  /// Clears the value of `durBeat`. Subsequent reads from it will return its default value.
-  mutating func clearDurBeat() {self._durBeat = nil}
+  /// Returns true if `beatRange` has been explicitly set.
+  var hasBeatRange: Bool {return self._beatRange != nil}
+  /// Clears the value of `beatRange`. Subsequent reads from it will return its default value.
+  mutating func clearBeatRange() {self._beatRange = nil}
 
   var tempo: PBRational {
     get {return _tempo ?? PBRational()}
@@ -1221,6 +1221,8 @@ struct PBScoreOption: Sendable {
   var hasTempo: Bool {return self._tempo != nil}
   /// Clears the value of `tempo`. Subsequent reads from it will return its default value.
   mutating func clearTempo() {self._tempo = nil}
+
+  var timelineY: Double = 0
 
   var keyBeats: [PBRational] = []
 
@@ -1232,7 +1234,7 @@ struct PBScoreOption: Sendable {
 
   init() {}
 
-  fileprivate var _durBeat: PBRational? = nil
+  fileprivate var _beatRange: PBRationalRange? = nil
   fileprivate var _tempo: PBRational? = nil
 }
 
@@ -1245,14 +1247,14 @@ struct PBScore: Sendable {
 
   var draftNotes: [PBNote] = []
 
-  var durBeat: PBRational {
-    get {return _durBeat ?? PBRational()}
-    set {_durBeat = newValue}
+  var beatRange: PBRationalRange {
+    get {return _beatRange ?? PBRationalRange()}
+    set {_beatRange = newValue}
   }
-  /// Returns true if `durBeat` has been explicitly set.
-  var hasDurBeat: Bool {return self._durBeat != nil}
-  /// Clears the value of `durBeat`. Subsequent reads from it will return its default value.
-  mutating func clearDurBeat() {self._durBeat = nil}
+  /// Returns true if `beatRange` has been explicitly set.
+  var hasBeatRange: Bool {return self._beatRange != nil}
+  /// Clears the value of `beatRange`. Subsequent reads from it will return its default value.
+  mutating func clearBeatRange() {self._beatRange = nil}
 
   var tempo: PBRational {
     get {return _tempo ?? PBRational()}
@@ -1262,6 +1264,8 @@ struct PBScore: Sendable {
   var hasTempo: Bool {return self._tempo != nil}
   /// Clears the value of `tempo`. Subsequent reads from it will return its default value.
   mutating func clearTempo() {self._tempo = nil}
+
+  var timelineY: Double = 0
 
   var keyBeats: [PBRational] = []
 
@@ -1282,7 +1286,7 @@ struct PBScore: Sendable {
 
   init() {}
 
-  fileprivate var _durBeat: PBRational? = nil
+  fileprivate var _beatRange: PBRationalRange? = nil
   fileprivate var _tempo: PBRational? = nil
   fileprivate var _id: PBUUID? = nil
 }
@@ -5311,8 +5315,9 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
 extension PBScoreOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBScoreOption"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "durBeat"),
+    6: .same(proto: "beatRange"),
     2: .same(proto: "tempo"),
+    7: .same(proto: "timelineY"),
     4: .same(proto: "keyBeats"),
     3: .same(proto: "enabled"),
     5: .same(proto: "isShownSpectrogram"),
@@ -5324,11 +5329,12 @@ extension PBScoreOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularMessageField(value: &self._durBeat) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._tempo) }()
       case 3: try { try decoder.decodeSingularBoolField(value: &self.enabled) }()
       case 4: try { try decoder.decodeRepeatedMessageField(value: &self.keyBeats) }()
       case 5: try { try decoder.decodeSingularBoolField(value: &self.isShownSpectrogram) }()
+      case 6: try { try decoder.decodeSingularMessageField(value: &self._beatRange) }()
+      case 7: try { try decoder.decodeSingularDoubleField(value: &self.timelineY) }()
       default: break
       }
     }
@@ -5339,9 +5345,6 @@ extension PBScoreOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
     // allocates stack space for every if/case branch local when no optimizations
     // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
     // https://github.com/apple/swift-protobuf/issues/1182
-    try { if let v = self._durBeat {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
-    } }()
     try { if let v = self._tempo {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     } }()
@@ -5354,12 +5357,19 @@ extension PBScoreOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
     if self.isShownSpectrogram != false {
       try visitor.visitSingularBoolField(value: self.isShownSpectrogram, fieldNumber: 5)
     }
+    try { if let v = self._beatRange {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+    } }()
+    if self.timelineY.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.timelineY, fieldNumber: 7)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: PBScoreOption, rhs: PBScoreOption) -> Bool {
-    if lhs._durBeat != rhs._durBeat {return false}
+    if lhs._beatRange != rhs._beatRange {return false}
     if lhs._tempo != rhs._tempo {return false}
+    if lhs.timelineY != rhs.timelineY {return false}
     if lhs.keyBeats != rhs.keyBeats {return false}
     if lhs.enabled != rhs.enabled {return false}
     if lhs.isShownSpectrogram != rhs.isShownSpectrogram {return false}
@@ -5373,8 +5383,9 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "notes"),
     6: .same(proto: "draftNotes"),
-    2: .same(proto: "durBeat"),
+    9: .same(proto: "beatRange"),
     3: .same(proto: "tempo"),
+    10: .same(proto: "timelineY"),
     7: .same(proto: "keyBeats"),
     4: .same(proto: "enabled"),
     8: .same(proto: "isShownSpectrogram"),
@@ -5388,13 +5399,14 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeRepeatedMessageField(value: &self.notes) }()
-      case 2: try { try decoder.decodeSingularMessageField(value: &self._durBeat) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._tempo) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self.enabled) }()
       case 5: try { try decoder.decodeSingularMessageField(value: &self._id) }()
       case 6: try { try decoder.decodeRepeatedMessageField(value: &self.draftNotes) }()
       case 7: try { try decoder.decodeRepeatedMessageField(value: &self.keyBeats) }()
       case 8: try { try decoder.decodeSingularBoolField(value: &self.isShownSpectrogram) }()
+      case 9: try { try decoder.decodeSingularMessageField(value: &self._beatRange) }()
+      case 10: try { try decoder.decodeSingularDoubleField(value: &self.timelineY) }()
       default: break
       }
     }
@@ -5408,9 +5420,6 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
     if !self.notes.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.notes, fieldNumber: 1)
     }
-    try { if let v = self._durBeat {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
-    } }()
     try { if let v = self._tempo {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
     } }()
@@ -5429,14 +5438,21 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
     if self.isShownSpectrogram != false {
       try visitor.visitSingularBoolField(value: self.isShownSpectrogram, fieldNumber: 8)
     }
+    try { if let v = self._beatRange {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+    } }()
+    if self.timelineY.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.timelineY, fieldNumber: 10)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: PBScore, rhs: PBScore) -> Bool {
     if lhs.notes != rhs.notes {return false}
     if lhs.draftNotes != rhs.draftNotes {return false}
-    if lhs._durBeat != rhs._durBeat {return false}
+    if lhs._beatRange != rhs._beatRange {return false}
     if lhs._tempo != rhs._tempo {return false}
+    if lhs.timelineY != rhs.timelineY {return false}
     if lhs.keyBeats != rhs.keyBeats {return false}
     if lhs.enabled != rhs.enabled {return false}
     if lhs.isShownSpectrogram != rhs.isShownSpectrogram {return false}

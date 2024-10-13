@@ -1575,30 +1575,31 @@ extension Chord: CustomStringConvertible {
 }
 
 struct ScoreOption {
-    var durBeat = Rational(16)
+    var beatRange = Music.defaultBeatRange
     var keyBeats: [Rational] = [4, 8, 12]
     var tempo = Music.defaultTempo
+    var timelineY = Sheet.timelineY
     var enabled = false
     var isShownSpectrogram = false
 }
 extension ScoreOption: Protobuf {
     init(_ pb: PBScoreOption) throws {
-        durBeat = (try? Rational(pb.durBeat)) ?? 16
-        if durBeat < 0 {
-            durBeat = 0
-        }
+        beatRange = (try? RationalRange(pb.beatRange).value) ?? Music.defaultBeatRange
         keyBeats = pb.keyBeats.compactMap { try? Rational($0) }
         tempo = (try? Rational(pb.tempo))?.clipped(Music.tempoRange) ?? Music.defaultTempo
+        timelineY = pb.timelineY.clipped(min: Sheet.timelineY,
+                                         max: Sheet.height - Sheet.timelineY)
         enabled = pb.enabled
         isShownSpectrogram = pb.isShownSpectrogram
     }
     var pb: PBScoreOption {
         .with {
-            $0.durBeat = durBeat.pb
+            $0.beatRange = RationalRange(value: beatRange).pb
             $0.keyBeats = keyBeats.map { $0.pb }
             if tempo != Music.defaultTempo {
                 $0.tempo = tempo.pb
             }
+            $0.timelineY = timelineY
             $0.enabled = enabled
             $0.isShownSpectrogram = isShownSpectrogram
         }
@@ -1616,8 +1617,9 @@ struct Score: BeatRangeType {
     
     var notes = [Note]()
     var draftNotes = [Note]()
-    var durBeat = Rational(16)
+    var beatRange = Music.defaultBeatRange
     var tempo = Music.defaultTempo
+    var timelineY = Sheet.timelineY
     var keyBeats: [Rational] = [4, 8, 12]
     var enabled = false
     var isShownSpectrogram = false
@@ -1627,12 +1629,11 @@ extension Score: Protobuf {
     init(_ pb: PBScore) throws {
         notes = pb.notes.compactMap { try? Note($0) }
         draftNotes = pb.draftNotes.compactMap { try? Note($0) }
-        durBeat = (try? Rational(pb.durBeat)) ?? 16
-        if durBeat < 0 {
-            durBeat = 0
-        }
+        beatRange = (try? RationalRange(pb.beatRange).value) ?? Music.defaultBeatRange
         keyBeats = pb.keyBeats.compactMap { try? Rational($0) }
         tempo = (try? Rational(pb.tempo))?.clipped(Music.tempoRange) ?? Music.defaultTempo
+        timelineY = pb.timelineY.clipped(min: Sheet.timelineY,
+                                         max: Sheet.height - Sheet.timelineY)
         enabled = pb.enabled
         isShownSpectrogram = pb.isShownSpectrogram
         id = (try? .init(pb.id)) ?? .init()
@@ -1641,9 +1642,10 @@ extension Score: Protobuf {
         .with {
             $0.notes = notes.map { $0.pb }
             $0.draftNotes = draftNotes.map { $0.pb }
-            $0.durBeat = durBeat.pb
+            $0.beatRange = RationalRange(value: beatRange).pb
             $0.keyBeats = keyBeats.map { $0.pb }
             $0.tempo = tempo.pb
+            $0.timelineY = timelineY
             $0.enabled = enabled
             $0.isShownSpectrogram = isShownSpectrogram
             $0.id = id.pb
@@ -1652,9 +1654,6 @@ extension Score: Protobuf {
 }
 extension Score: Hashable, Codable {}
 extension Score {
-    var beatRange: Range<Rational> {
-        0 ..< durBeat
-    }
     var spectrogram: Spectrogram? {
         if let renderedPCMBuffer {
             .init(renderedPCMBuffer)
@@ -1719,13 +1718,15 @@ extension Score {
 extension Score {
     var option: ScoreOption {
         get {
-            .init(durBeat: durBeat, keyBeats: keyBeats, tempo: tempo, enabled: enabled,
+            .init(beatRange: beatRange, keyBeats: keyBeats, tempo: tempo, timelineY: timelineY,
+                  enabled: enabled,
                   isShownSpectrogram: isShownSpectrogram)
         }
         set {
-            durBeat = newValue.durBeat
+            beatRange = newValue.beatRange
             keyBeats = newValue.keyBeats
             tempo = newValue.tempo
+            timelineY = newValue.timelineY
             enabled = newValue.enabled
             isShownSpectrogram = newValue.isShownSpectrogram
         }

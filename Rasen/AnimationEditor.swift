@@ -1572,6 +1572,7 @@ final class AnimationSlider: DragEditor {
                     let nh = ScoreLayout.pitchHeight
                     let np = beganTimelineX + sheetP - beganSheetP
                     let py = ((beganAnimationOption?.timelineY ?? 0) + sheetP.y - beganSheetP.y).interval(scale: nh)
+                        .clipped(min: Sheet.timelineY, max: sheetView.bounds.height - Sheet.timelineY)
                     let interval = document.currentBeatInterval
                     let beat = max(min(sheetView.animationView.beat(atX: np.x, interval: interval),
                                    sheetView.animationView.beat(atX: sheetView.animationView.bounds.width - Sheet.textPadding.width, interval: interval)),

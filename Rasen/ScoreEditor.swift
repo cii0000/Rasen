@@ -35,7 +35,7 @@ protocol TimelineView: View, TempoType {
     var origin: Point { get }
     var frameRate: Int { get }
     func containsTimeline(_ p: Point, scale: Double) -> Bool
-    var timeLineCenterY: Double { get }
+    var timelineCenterY: Double { get }
     var beatRange: Range<Rational>? { get }
     var localBeatRange: Range<Rational>? { get }
 }
@@ -92,7 +92,7 @@ extension TimelineView {
     func containsSec(_ p: Point, maxDistance: Double) -> Bool {
         guard let beatRange else { return false }
         let secRange = secRange(fromBeat: beatRange)
-        let sy = timeLineCenterY - Sheet.timelineHalfHeight + origin.y
+        let sy = timelineCenterY - Sheet.timelineHalfHeight + origin.y
         for sec in Int(secRange.start.rounded(.up)) ..< Int(secRange.end.rounded(.up)) {
             let sec = Rational(sec)
             guard secRange.contains(sec) else { continue }
@@ -105,7 +105,7 @@ extension TimelineView {
     }
     
     func mainLineDistance(_ p: Point) -> Double {
-        abs(p.y - timeLineCenterY)
+        abs(p.y - timelineCenterY)
     }
     func containsMainLine(_ p: Point, scale: Double) -> Bool {
         guard containsTimeline(p, scale: scale) else { return false }
@@ -185,8 +185,6 @@ final class ToneShower: InputKeyEditor {
             document.cursor = .arrow
             
             if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
-                let inP = sheetView.convertFromWorld(p)
-               
                 if document.isSelectSelectedNoneCursor(at: p), !document.isSelectedText {
                     let scoreView = sheetView.scoreView
                     let toneIs = sheetView.noteIndexes(from: document.selections).filter {
@@ -197,6 +195,7 @@ final class ToneShower: InputKeyEditor {
                         sheetView.setIsShownTones(toneIs.map { .init(value: true, index: $0) })
                     }
                 } else {
+                    let inP = sheetView.scoreView.convertFromWorld(p)
                     if let (noteI, pitI) = sheetView.scoreView.noteAndPitIEnabledNote(at: inP, scale: document.screenToWorldScale) {
                         let id = sheetView.scoreView.model.notes[noteI].pits[pitI].tone.id
                         let toneIs = sheetView.scoreView.model.notes.enumerated().compactMap {
@@ -231,7 +230,7 @@ final class ScoreSlider: DragEditor {
         case startNoteBeat, endNoteBeat, note,
              attack, decay, release, reverbEarlyRSec, reverbEarlyAndLateRSec, reverbDurSec,
              sprol,
-             keyBeats, endBeat, isShownSpectrogram
+             keyBeats, allBeat, endBeat, isShownSpectrogram
     }
     
     private let editableInterval = 5.0
@@ -528,7 +527,8 @@ final class ScoreSlider: DragEditor {
                         let octaveNode = scoreView.octaveNode(fromPitch: note.pitch,
                                                               noteIs: beganNotes.keys.sorted(),
                                                               .octave)
-                        octaveNode.attitude.position = sheetView.node.attitude.position
+                        octaveNode.attitude.position
+                        = sheetView.convertToWorld(scoreView.node.attitude.position)
                         self.octaveNode = octaveNode
                         document.rootNode.append(child: octaveNode)
                         
@@ -546,12 +546,17 @@ final class ScoreSlider: DragEditor {
                     self.keyBeatI = keyBeatI
                     beganScoreOption = score.option
                     beganBeatX = scoreView.x(atBeat: score.keyBeats[keyBeatI])
-                } else if abs(scoreP.x - scoreView.x(atBeat: score.durBeat)) < document.worldKnobEditDistance {
+                } else if abs(scoreP.x - scoreView.x(atBeat: score.beatRange.end)) < document.worldKnobEditDistance {
                     
                     type = .endBeat
                     
                     beganScoreOption = sheetView.model.score.option
-                    beganBeatX = scoreView.x(atBeat: score.durBeat)
+                    beganBeatX = scoreView.x(atBeat: score.beatRange.end)
+                } else {
+                    type = .allBeat
+                    
+                    beganScoreOption = sheetView.model.score.option
+                    beganBeatX = scoreView.x(atBeat: score.beatRange.start)
                 }
             }
         case .changed:
@@ -882,18 +887,36 @@ final class ScoreSlider: DragEditor {
                             document.updateSelects()
                         }
                     }
+                case .allBeat:
+                    let nh = ScoreLayout.pitchHeight
+                    let np = beganBeatX + sheetP - beganSheetP
+                    let py = ((beganScoreOption?.timelineY ?? 0) + sheetP.y - beganSheetP.y).interval(scale: nh)
+                        .clipped(min: Sheet.timelineY, max: sheetView.bounds.height - Sheet.timelineY)
+                    let interval = document.currentBeatInterval
+                    let beat = max(min(scoreView.beat(atX: np.x, interval: interval),
+                                   scoreView.beat(atX: scoreView.bounds.width - Sheet.textPadding.width, interval: interval)),
+                                   scoreView.beat(atX: Sheet.textPadding.width, interval: interval) - scoreView.model.beatRange.length)
+                    if py != scoreView.timelineY
+                        || beat != scoreView.model.beatRange.start {
+                        
+                        var option = scoreView.option
+                        option.beatRange.start = beat
+                        option.timelineY = py
+                        scoreView.option = option
+                        document.updateSelects()
+                    }
                 case .endBeat:
                     if let beganScoreOption {
                         let interval = document.currentBeatInterval
                         let nBeat = scoreView.beat(atX: beganBeatX + sheetP.x - beganSheetP.x,
                                                    interval: interval)
                         if nBeat != oldBeat {
-                            let dBeat = nBeat - beganScoreOption.durBeat
+                            let dBeat = nBeat - beganScoreOption.beatRange.end
                             let startBeat = sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval)
-                            let nkBeat = max(beganScoreOption.durBeat + dBeat, startBeat)
+                            let nkBeat = max(beganScoreOption.beatRange.end + dBeat, startBeat)
                             
                             oldBeat = nkBeat
-                            scoreView.option.durBeat = nkBeat
+                            scoreView.option.beatRange.end = nkBeat
                             document.updateSelects()
                         }
                     }
@@ -1090,6 +1113,7 @@ final class ScoreView: TimelineView {
         if model.enabled {
             scoreNoder = .init(score: model, sampleRate: Audio.defaultSampleRate, type: .loop)
         }
+        node.attitude.position.y = binder[keyPath: keyPath].timelineY
     }
 }
 extension ScoreView {
@@ -1130,6 +1154,7 @@ extension ScoreView {
             timelineSubBorderNode.path = .init(subBorderPathlines)
             timelineBorderNode.path = .init(borderPathlines)
             timelineFullEditBorderNode.path = .init(fullEditBorderPathlines)
+            node.attitude.position.y = model.timelineY
         } else {
             timelineContentNode.path = .init()
             timelineSubBorderNode.path = .init()
@@ -1169,6 +1194,14 @@ extension ScoreView {
     
     var frameRate: Int { Keyframe.defaultFrameRate }
     
+    var timelineY: Double {
+        get { model.timelineY }
+        set {
+            binder[keyPath: keyPath].timelineY = newValue
+            updateTimeline()
+        }
+    }
+    
     var tempo: Rational {
         get { model.tempo }
         set {
@@ -1178,8 +1211,8 @@ extension ScoreView {
         }
     }
     
-    var origin: Point { .init() }
-    var timeLineCenterY: Double { Animation.timelineY }
+    var origin: Point { .init(0, timelineY) }
+    var timelineCenterY: Double { 0 }
     var beatRange: Range<Rational>? {
         model.beatRange
     }
@@ -1188,7 +1221,7 @@ extension ScoreView {
     }
     
     var pitchStartY: Double {
-        timeLineCenterY + Sheet.timelineHalfHeight + ScoreLayout.isShownSpectrogramHeight
+        timelineCenterY + Sheet.timelineHalfHeight + ScoreLayout.isShownSpectrogramHeight
     }
     func pitch(atY y: Double, interval: Rational) -> Rational {
         Rational((y - pitchStartY) / pitchHeight, intervalScale: interval)
@@ -1218,7 +1251,10 @@ extension ScoreView {
             unupdateModel.option = newValue
             updateTimeline()
             updateChord()
-            updateSpectrogram()
+            updateClippingNode()
+            if oldValue.isShownSpectrogram != newValue.isShownSpectrogram {
+                updateSpectrogram()
+            }
             
             if oldValue.enabled != newValue.enabled {
                 scoreNoder = newValue.enabled ? .init(score: model,
@@ -1228,7 +1264,7 @@ extension ScoreView {
             if oldValue.tempo != newValue.tempo {
                 scoreNoder?.changeTempo(with: model)
             }
-            if oldValue.durBeat != newValue.durBeat {
+            if oldValue.beatRange != newValue.beatRange {
                 scoreNoder?.durSec = model.secRange.end
             }
         }
@@ -1356,7 +1392,7 @@ extension ScoreView {
         let knobW = Sheet.knobWidth, knobH = Sheet.knobHeight
         let rulerH = Sheet.rulerHeight
         let pitchRange = Score.pitchRange
-        let y = timeLineCenterY, timelineHalfHeight = Sheet.timelineHalfHeight
+        let y = timelineCenterY, timelineHalfHeight = Sheet.timelineHalfHeight
         let sy = y - timelineHalfHeight
         let ey = y + timelineHalfHeight
         
@@ -1488,7 +1524,8 @@ extension ScoreView {
             let pitchs = pitchs.sorted()
             guard let chord = Chord(pitchs: pitchs) else { continue }
             
-            let nsx = x(atBeat: tr.start), nex = x(atBeat: tr.end)
+            let nsx = x(atBeat: tr.start + score.beatRange.start),
+                nex = x(atBeat: tr.end + score.beatRange.start)
             let maxTyperCount = min(chord.typers.count, Int((nex - nsx) / 5))
             let d = 1.5, maxW = 6.0, nw = maxW * Double(maxTyperCount - 1)
             let centerX = nsx.mid(nex)
@@ -2292,7 +2329,7 @@ extension ScoreView {
     }
     
     var clippableBounds: Rect? {
-        mainFrame
+        mainFrame + timelineFrame
     }
     var transformedClippableBounds: Rect? {
         if let bounds = clippableBounds {
@@ -2316,7 +2353,7 @@ extension ScoreView {
     var timelineFrame: Rect {
         let sx = self.x(atBeat: model.beatRange.start)
         let ex = self.x(atBeat: model.beatRange.end)
-        return Rect(x: sx, y: timeLineCenterY - Sheet.timelineHalfHeight,
+        return Rect(x: sx, y: timelineCenterY - Sheet.timelineHalfHeight,
                     width: ex - sx, height: Sheet.timelineHalfHeight * 2)
     }
     var transformedTimelineFrame: Rect? {
@@ -2945,9 +2982,9 @@ extension ScoreView {
         let score = model
         guard score.isShownSpectrogram, let sm = score.spectrogram else { return }
         
-        let firstX = x(atBeat: score.beatRange.start)
+        let firstX = x(atBeat: Rational(0))
         let y = mainFrame.minY
-        let allBeat = score.beatRange.length
+        let allBeat = score.beatRange.end
         let allW = width(atDurBeat: allBeat)
         var nodes = [Node](), maxH = 0.0
         func spNode(width: Int, at xi: Int) -> Node? {
@@ -3006,7 +3043,7 @@ extension ScoreView {
     
     func containsIsShownSpectrogram(_ p: Point, scale: Double) -> Bool {
         Rect(x: x(atBeat: model.beatRange.start) + ContentLayout.spectrogramX - Sheet.knobHeight / 2,
-                 y: timeLineCenterY + Sheet.timelineHalfHeight,
+                 y: timelineCenterY + Sheet.timelineHalfHeight,
                  width: Sheet.knobHeight,
                  height: ContentLayout.isShownSpectrogramHeight)
             .outset(by: scale * 3)
@@ -3014,7 +3051,7 @@ extension ScoreView {
     }
     
     func isShownSpectrogram(at p :Point) -> Bool {
-        p.y > timeLineCenterY + Sheet.timelineHalfHeight + ContentLayout.isShownSpectrogramHeight / 2
+        p.y > timelineCenterY + Sheet.timelineHalfHeight + ContentLayout.isShownSpectrogramHeight / 2
     }
     var isShownSpectrogram: Bool {
         get {
