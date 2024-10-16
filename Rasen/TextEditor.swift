@@ -328,7 +328,13 @@ final class Looker: InputKeyEditor {
             let pitchInterval = document.currentPitchInterval
             let pitch = Pitch(value: scoreView.pitch(atY: scoreView.convertFromWorld(p).y, interval: pitchInterval))
             let fqStr = "\(pitch.octaveString()) (\(pitch.fq.string(digitsCount: 2)) Hz)".localized
-            document.show(fqStr, at: p)
+            let typers = scoreView.chordTypers(at: scoreView.convertFromWorld(p), scale: document.screenToWorldScale)
+            if !typers.isEmpty {
+                let str = typers.reduce(into: "") { $0 += (!$0.isEmpty ? " " : "") + $1.type.description }
+                document.show(fqStr + " " + str, at: p)
+            } else {
+                document.show(fqStr, at: p)
+            }
         } else if let sheetView = document.sheetView(at: p),
                   let (node, contentView) = sheetView.spectrogramNode(at: sheetView.convertFromWorld(p)) {
             let y = node.convertFromWorld(p).y

@@ -1034,7 +1034,8 @@ final class LineEditor: Editor, @unchecked Sendable {
                 
                 let octaveNode = scoreView.octaveNode(fromPitch: pitch, scoreView.notesNode.children.last!.children[0].clone,
                                                   .subInterpolated)
-                octaveNode.attitude.position = sheetView.node.attitude.position
+                octaveNode.attitude.position
+                = sheetView.convertToWorld(scoreView.node.attitude.position)
                 self.octaveNode = octaveNode
                 document.rootNode.append(child: octaveNode)
                 

@@ -3080,8 +3080,10 @@ extension Node {
                     for pathline in path.pathlines {
                         let polygon = pathline.polygon()
                         let points = polygon.points.map { $0.cg }
-                        cgPath.addLines(between: points)
-                        cgPath.closeSubpath()
+                        if !points.isEmpty {
+                            cgPath.addLines(between: points)
+                            cgPath.closeSubpath()
+                        }
                     }
                     ctx.addPath(cgPath)
                     let cgColor = color.cg
@@ -3153,8 +3155,10 @@ extension Node {
                             Point(Double(pd[$0 * 4]),
                                   Double(pd[$0 * 4 + 1])).cg
                         }
-                        cgPath.addLines(between: points)
-                        cgPath.closeSubpath()
+                        if !points.isEmpty {
+                            cgPath.addLines(between: points)
+                            cgPath.closeSubpath()
+                        }
                         i += count
                     }
                     ctx.addPath(cgPath)

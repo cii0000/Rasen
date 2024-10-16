@@ -86,7 +86,7 @@ final class RunEditor: InputKeyEditor, @unchecked Sendable {
                 
                 if URL(webString: text.string)?.openInBrowser() ?? false { return }
                 
-                if text.string == "Waveform draw =" {
+                if text.string == "drawWaveform =" {
                     var view: SheetContentView?, minD = Double.infinity
                     for contentView in sheetView.contentsView.elementViews {
                         if contentView.model.timeOption != nil {
@@ -152,7 +152,7 @@ final class RunEditor: InputKeyEditor, @unchecked Sendable {
                         view.node.append(child: sNode)
                         return
                     }
-                } else if text.string == "Loudness get =" {
+                } else if text.string == "getLoudness =" {
                     if let sheetView = document.sheetView(at: p) {
                         let maxD = document.worldKnobEditDistance
                         var minD = Double.infinity, minContentView: SheetContentView?

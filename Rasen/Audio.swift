@@ -539,12 +539,18 @@ final class ScoreNoder {
             func updateF(i: Int, mi: Int, ni: Int, samples: [[Double]], stereos: [Stereo],
                          isPremultipliedEnvelope: Bool,
                          envelopeMemo: EnvelopeMemo, startSec: Double, releaseSec: Double?) {
+                let waveclipAmp = isPremultipliedEnvelope ?
+                1 :
+                Waveclip.amp(atSec: Double(i) * rSampleRate - startSec,
+                             releaseStartSec: releaseSec != nil ? releaseSec! - startSec : nil)
+                
                 let envelopeVolm = isPremultipliedEnvelope ?
                 1 :
                 envelopeMemo.volm(atSec: Double(i) * rSampleRate - startSec,
                                   releaseStartSec: releaseSec != nil ? releaseSec! - startSec : nil)
+                
                 let stereo = stereos.count == 1 ? stereos[0] : stereos[mi]
-                let amp = Volm.amp(fromVolm: stereo.volm * envelopeVolm)
+                let amp = Volm.amp(fromVolm: stereo.volm * envelopeVolm) * waveclipAmp
                 let pan = stereo.pan
                 
                 if pan == 0 || nFramess.count < 2 {
@@ -666,7 +672,7 @@ final class ScoreNoder {
                     self.notewaveDicSemaphore.signal()
                     
                     guard let notewave else { continue }
-                    
+                    let sampleCount = notewave.sampleCount
                     func update(notewave: Notewave,
                                 envelopeMemo: EnvelopeMemo, startSec: Double, releaseSec: Double?,
                                 range: Range<Int>, startI: Int) {
@@ -674,11 +680,13 @@ final class ScoreNoder {
                         for ni in 0 ..< Int(frameCount) {
                             if range.contains(i) {
                                 let mi = i - startI
-                                updateF(i: i, mi: mi, ni: ni,
-                                        samples: notewave.samples, stereos: notewave.stereos,
-                                        isPremultipliedEnvelope: notewave.isPremultipliedEnvelope,
-                                        envelopeMemo: envelopeMemo,
-                                        startSec: startSec, releaseSec: releaseSec)
+                                if mi < sampleCount {
+                                    updateF(i: i, mi: mi, ni: ni,
+                                            samples: notewave.samples, stereos: notewave.stereos,
+                                            isPremultipliedEnvelope: notewave.isPremultipliedEnvelope,
+                                            envelopeMemo: envelopeMemo,
+                                            startSec: startSec, releaseSec: releaseSec)
+                                }
                             }
                             i += 1
                             if i >= maxCount {
@@ -930,19 +938,25 @@ extension Sequencer {
     struct ExportError: Error {}
     
     func audio(sampleRate: Double,
-               headroomAmp: Float? = Audio.floatHeadroomAmp,
+               headroomAmp: Float? = Audio.floatHeadroomAmp, enabledUseWaveclip: Bool = true,
                progressHandler: (Double, inout Bool) -> ()) throws -> Audio? {
         guard let buffer = try buffer(sampleRate: sampleRate,
                                       headroomAmp: headroomAmp,
+                                      enabledUseWaveclip: enabledUseWaveclip,
                                       progressHandler: progressHandler) else { return nil }
         return Audio(pcmData: buffer.pcmData)
     }
     func buffer(sampleRate: Double,
-                headroomAmp: Float? = Audio.floatHeadroomAmp,
+                headroomAmp: Float? = Audio.floatHeadroomAmp, enabledUseWaveclip: Bool = true,
                 progressHandler: (Double, inout Bool) -> ()) throws -> AVAudioPCMBuffer? {
         let oldHeadroomAmp = clippingAudioUnit.headroomAmp
+        let oldEnabledAttack = clippingAudioUnit.enabledAttack
         clippingAudioUnit.headroomAmp = headroomAmp
-        defer { clippingAudioUnit.headroomAmp = oldHeadroomAmp }
+        clippingAudioUnit.enabledAttack = false
+        defer {
+            clippingAudioUnit.headroomAmp = oldHeadroomAmp
+            clippingAudioUnit.enabledAttack = oldEnabledAttack
+        }
         
         guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32,
                                          sampleRate: sampleRate,
@@ -1003,6 +1017,10 @@ extension Sequencer {
         
         isPlaying = false
         endEngine()
+        
+        if enabledUseWaveclip {
+            allBuffer.useWaveclip()
+        }
         
         return allBuffer
     }
@@ -1287,6 +1305,27 @@ extension AVAudioPCMBuffer {
         }
         return false
     }
+    func useWaveclip() {
+        let rSampleRate = 1 / sampleRate
+        let frameCount = frameCount
+        for ci in 0 ..< channelCount {
+            let enabledAttack = abs(self[ci, 0]) > Waveclip.minAmp
+            let enabledRelease = abs(self[ci, frameCount - 1]) > Waveclip.minAmp
+            if enabledAttack || enabledRelease {
+                print("attack", enabledAttack, "release", enabledRelease)
+                enumerated(channelIndex: ci) { i, v in
+                    let aSec = Double(i) * rSampleRate
+                    if enabledAttack && aSec < Waveclip.attackSec {
+                        self[ci, i] *= Float(aSec * Waveclip.rAttackSec)
+                    }
+                    let rSec = Double(frameCount - 1 - i) * rSampleRate
+                    if enabledRelease && rSec < Waveclip.releaseSec {
+                        self[ci, i] *= Float(rSec * Waveclip.rReleaseSec)
+                    }
+                }
+            }
+        }
+    }
     func clip(amp: Float) {
         for ci in 0 ..< channelCount {
             enumerated(channelIndex: ci) { i, v in
@@ -1485,7 +1524,7 @@ final class ClippingAudioUnit: AUAudioUnit {
     private var pcmBuffer: AVAudioPCMBuffer?
 
     var headroomAmp: Float? = Float(Audio.floatHeadroomAmp)
-    var enabledAttak = true
+    var enabledAttack = true
     
     struct SError: Error {}
 
@@ -1579,14 +1618,14 @@ final class ClippingAudioUnit: AUAudioUnit {
                 }
             }
             
-            if self.enabledAttak,
+            if self.enabledAttack,
                (timestamp.pointee.mFlags.contains(.sampleTimeValid)
                 || timestamp.pointee.mFlags.contains(.sampleHostTimeValid))
                 && timestamp.pointee.mSampleTime == 0 {
                 
                 for ci in 0 ..< outputBLP.count {
                     let outputFrames = outputBLP[ci].mData!.assumingMemoryBound(to: Float.self)
-                    if outputFrames[0] != 0 {
+                    if abs(outputFrames[0]) > Waveclip.minAmp {
                         for i in 0 ..< Int(frameCount) {
                             outputFrames[i] *= .init(i) / .init(frameCount)
                         }

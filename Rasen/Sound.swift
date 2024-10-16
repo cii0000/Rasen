@@ -407,8 +407,8 @@ extension Sprol {
 
 struct Spectlope: Hashable, Codable {
     var sprols = [Sprol(pitch: 12 * 1, volm: 0.75, noise: 0),
-                  Sprol(pitch: 12 * 2 + 5, volm: 1, noise: 0),
-                  Sprol(pitch: 12 * 7 + 5, volm: 0.5, noise: 0),
+                  Sprol(pitch: 12 * 2, volm: 1, noise: 0),
+                  Sprol(pitch: 12 * 7, volm: 0.5, noise: 0),
                   Sprol(pitch: 12 * 10, volm: 0, noise: 0)]
 }
 extension Spectlope: Protobuf {
@@ -434,7 +434,7 @@ extension Spectlope {
         sprols.isEmpty
     }
     var isEmptyVolm: Bool {
-        sprols.allSatisfy { $0.volm == 0 }
+        isEmpty || sprols.allSatisfy { $0.volm == 0 }
     }
     var count: Int {
         sprols.count
@@ -744,24 +744,18 @@ extension Spectlope: MonoInterpolatable {
 struct Tone: Hashable, Codable {
     var overtone = Overtone()
     var spectlope = Spectlope()
-    var color = Color.background
     var id = UUID()
 }
 extension Tone: Protobuf {
     init(_ pb: PBTone) throws {
         overtone = (try? .init(pb.overtone)) ?? .init()
         spectlope = (try? .init(pb.spectlope)) ?? .init()
-        color = (try? .init(pb.color)) ?? .content
-        if color.opacity != 1 {
-            color = .background
-        }
         id = (try? .init(pb.id)) ?? .init()
     }
     var pb: PBTone {
         .with {
             $0.overtone = overtone.pb
             $0.spectlope = spectlope.pb
-            $0.color = color.pb
             $0.id = id.pb
         }
     }
@@ -784,8 +778,37 @@ extension Tone {
         overtone == .init() && spectlope == .init()
     }
     
-    static func randomColor() -> Color {
-        .randomLightnessAndHue(60 ... 80)
+    func baseColor(lightness: Double = 85) -> Color {
+        guard spectlope != .init(), !spectlope.sprols.isEmpty, !overtone.isOne else { return .background }
+        let minV = spectlope.sprols.min { $0.volm < $1.volm }!
+        let maxV = spectlope.sprols.max { $0.volm < $1.volm }!
+        let t = maxV.volm == 0 ? 0 : (maxV.volm - minV.volm) / maxV.volm
+        let chroma = Double.linear(0, 60, t: t)
+        let maxPitch = maxV.pitch
+        let greenaPitch = Score.doubleMinPitch,
+            bluePitch = 12.0 * 2, purplePitch = 12.0 * 4, redPitch = 12.0 * 6, orangePitch = 12.0 * 8,
+            yellowPitch = Score.doubleMaxPitch
+        return if maxPitch < bluePitch {
+            .init(lightness: lightness, nearestChroma: chroma,
+                  hue: maxPitch.clipped(min: greenaPitch, max: bluePitch,
+                                        newMin: .pi2 * 0.625, newMax: .pi2 * 0.75))
+        } else if maxPitch < purplePitch {
+            .init(lightness: lightness, nearestChroma: chroma,
+                  hue: maxPitch.clipped(min: bluePitch, max: purplePitch,
+                                        newMin: .pi2 * 0.75, newMax: .pi2 * 0.875))
+        } else if maxPitch < redPitch {
+            .init(lightness: lightness, nearestChroma: chroma,
+                  hue: maxPitch.clipped(min: purplePitch, max: redPitch,
+                                        newMin: -.pi2 * 0.125, newMax: 0))
+        } else if maxPitch < orangePitch {
+            .init(lightness: lightness, nearestChroma: chroma,
+                  hue: maxPitch.clipped(min: redPitch, max: orangePitch,
+                                        newMin: 0, newMax: .pi2 * 0.125))
+        } else {
+            .init(lightness: lightness, nearestChroma: chroma,
+                  hue: maxPitch.clipped(min: orangePitch, max: yellowPitch,
+                                        newMin: .pi2 * 0.125, newMax: .pi2 * 0.25))
+        }
     }
 }
 extension Tone: MonoInterpolatable {
@@ -927,12 +950,13 @@ extension Reverb {
         var random = Random(seed: seed)
         let scale = 100.0
         let siMin = Double(si).squareRoot().clipped(min: 10, max: 5000.squareRoot(), newMin: 1, newMax: scale)
+        var preI = si
         for i in si ..< count {
-            let t0 = random.nextT()
             let sec = Double(i) * rSampleRate
             let nni = lateRSec == 0 ? 0 : sec.clipped(min: earlyRSec, max: elRSec, newMin: 1, newMax: 0)
             let ni = nni.squared.clipped(min: 1, max: 0, newMin: Double(si), newMax: 1)
-            guard i == si || ni == 1 || Int(ni * t0) == 0 else { continue }
+            guard i == si || ni == 1 || i - preI >= Int(ni) else { continue }
+            preI = i
             let volm = sec < elRSec ?
             (1 - nni).squared.clipped(min: 0, max: 1, newMin: earlyRVolm, newMax: lateRVolm) :
             sec.clipped(min: elRSec, max: durSec, newMin: lateRVolm, newMax: 0)
@@ -953,7 +977,7 @@ extension Reverb {
 }
 
 struct Envelope: Hashable, Codable {
-    var attackSec = 0.015625, decaySec = 0.0, sustainVolm = 1.0, releaseSec = 0.015625
+    var attackSec = 0.0, decaySec = 0.0, sustainVolm = 1.0, releaseSec = 0.0
     var reverb = Reverb()
     var id = UUID()
 }

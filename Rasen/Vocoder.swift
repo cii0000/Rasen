@@ -103,6 +103,34 @@ extension vDSP {
     }
 }
 
+struct Waveclip {
+    static let minAmp: Float = 0.00001
+    static let attackSec = 0.015625, releaseSec = 0.015625
+    static let rAttackSec = 1 / attackSec, rReleaseSec = 1 / releaseSec
+}
+extension Waveclip {
+    static func amp(atSec sec: Double, releaseStartSec: Double?, enabledAttack: Bool = true) -> Double {
+        if sec <= 0 {
+            return 0
+        }
+        let aAmp = if enabledAttack && attackSec > 0 && sec < attackSec {
+            sec * rAttackSec
+        } else {
+            1.0
+        }
+        if let releaseStartSec, sec >= releaseStartSec {
+            let nSec = sec - releaseStartSec
+            return if releaseSec > 0 && nSec < releaseSec {
+                .linear(aAmp, 0, t: nSec * rReleaseSec)
+            } else {
+                0
+            }
+        } else {
+            return aAmp
+        }
+    }
+}
+
 struct EnvelopeMemo: Hashable, Codable {
     let attackSec, decaySec, sustainVolm, releaseSec, maxSec: Double
     let rAttackSec, rDecaySec, rReleaseSec: Double
@@ -122,30 +150,31 @@ struct EnvelopeMemo: Hashable, Codable {
 }
 extension EnvelopeMemo {
     func volm(atSec sec: Double, releaseStartSec: Double?) -> Double {
-        if sec < 0 {
-            return 0
-        }
-        let adVolm: Double
-        if attackSec > 0 && sec < attackSec {
-            adVolm = sec * rAttackSec
-        } else {
-            let nSec = sec - attackSec
-            adVolm = if decaySec > 0 && nSec < decaySec {
-                .linear(1, sustainVolm, t: nSec * rDecaySec)
-            } else {
-                sustainVolm
-            }
-        }
-        if let releaseStartSec, sec >= releaseStartSec {
-            let nSec = sec - releaseStartSec
-            return if releaseSec > 0 && nSec < releaseSec {
-                .linear(adVolm, 0, t: nSec * rReleaseSec)
-            } else {
-                0
-            }
-        } else {
-            return adVolm
-        }
+        1
+//        if sec < 0 {
+//            return 0
+//        }
+//        let adVolm: Double
+//        if attackSec > 0 && sec < attackSec {
+//            adVolm = sec * rAttackSec
+//        } else {
+//            let nSec = sec - attackSec
+//            adVolm = if decaySec > 0 && nSec < decaySec {
+//                .linear(1, sustainVolm, t: nSec * rDecaySec)
+//            } else {
+//                sustainVolm
+//            }
+//        }
+//        if let releaseStartSec, sec >= releaseStartSec {
+//            let nSec = sec - releaseStartSec
+//            return if releaseSec > 0 && nSec < releaseSec {
+//                .linear(adVolm, 0, t: nSec * rReleaseSec)
+//            } else {
+//                0
+//            }
+//        } else {
+//            return adVolm
+//        }
     }
 }
 
@@ -367,19 +396,20 @@ extension Rendnote {
         secRange.length.isInfinite
     }
     var rendableDurSec: Double {
-        min(isLoop ? fq.rounded(.up) / fq : secRange.length + envelopeMemo.releaseSec, 100000)
+        min(isLoop ? fq.rounded(.up) / fq : secRange.length + max(Waveclip.releaseSec, envelopeMemo.releaseSec),
+            100000)
     }
     
     func sampleCount(sampleRate: Double) -> Int {
         guard !pitbend.isEmpty else { return 1 }
-        let rendableDurSec = min(secRange.length + envelopeMemo.releaseSec, 100000)
+        let rendableDurSec = min(secRange.length + max(Waveclip.releaseSec, envelopeMemo.releaseSec), 100000)
         let sampleCount = max(1, Int((rendableDurSec * sampleRate).rounded(.up)))
         return envelopeMemo.reverb.isEmpty ?
         sampleCount :
         sampleCount + envelopeMemo.reverb.count(sampleRate: sampleRate) - 1
     }
     func releaseCount(sampleRate: Double) -> Int {
-        let rendableDurSec = min(envelopeMemo.releaseSec, 100000)
+        let rendableDurSec = min(max(Waveclip.releaseSec, envelopeMemo.releaseSec), 100000)
         let sampleCount = max(1, Int((rendableDurSec * sampleRate).rounded(.up)))
         return envelopeMemo.reverb.isEmpty ?
         sampleCount :
@@ -395,35 +425,45 @@ extension Rendnote {
                   cutFq: Double = 16384, cutStartFq: Double = 15800, sampleRate: Double) -> Notewave {
         var notewave = aNotewave(stftCount: stftCount, fAlpha: fAlpha, rmsSize: rmsSize,
                                  cutFq: cutFq, cutStartFq: cutStartFq, sampleRate: sampleRate)
-        if !envelopeMemo.reverb.isEmpty {
+        if !isLoop {
             let sampleCount = notewave.sampleCount
             let rSampleRate = 1 / sampleRate
-            let rsSec = isLoop ? 1 : secRange.length
-            if !isLoop {
-                if envelopeMemo.decaySec == 0 || envelopeMemo.sustainVolm == 1 {
-                    let si = Int((envelopeMemo.attackSec * sampleRate).rounded(.up))
-                        .clipped(min: 0, max: sampleCount)
-                    for i in 0 ..< si {
-                        let sec = Double(i) * rSampleRate
-                        notewave.samples[0][i]
-                        *= Volm.amp(fromVolm: envelopeMemo.volm(atSec: sec, releaseStartSec: rsSec))
-                    }
-                    let ei = max(si, Int((rsSec * sampleRate).rounded(.down)))
-                        .clipped(min: 0, max: sampleCount)
-                    for i in ei ..< sampleCount {
-                        let sec = Double(i) * rSampleRate
-                        notewave.samples[0][i]
-                        *= Volm.amp(fromVolm: envelopeMemo.volm(atSec: sec, releaseStartSec: rsSec))
-                    }
-                } else {
-                    for i in 0 ..< sampleCount {
-                        let sec = Double(i) * rSampleRate
-                        notewave.samples[0][i]
-                        *= Volm.amp(fromVolm: envelopeMemo.volm(atSec: sec, releaseStartSec: rsSec))
-                    }
-                }
-                notewave.isPremultipliedEnvelope = true
+            let rsSec = secRange.length
+            let enabledAttack = !pitbend.firstStereo.isEmpty && !pitbend.firstSpectlope.isEmptyVolm
+            for i in 0 ..< sampleCount {
+                let sec = Double(i) * rSampleRate
+                notewave.samples[0][i] *= Waveclip.amp(atSec: sec, releaseStartSec: rsSec,
+                                                       enabledAttack: enabledAttack)
             }
+            
+            if envelopeMemo.decaySec == 0 || envelopeMemo.sustainVolm == 1 {
+                let si = Int((envelopeMemo.attackSec * sampleRate).rounded(.up))
+                    .clipped(min: 0, max: sampleCount)
+                for i in 0 ..< si {
+                    let sec = Double(i) * rSampleRate
+                    notewave.samples[0][i]
+                    *= Volm.amp(fromVolm: envelopeMemo.volm(atSec: sec, releaseStartSec: rsSec))
+                }
+                let ei = max(si, Int((rsSec * sampleRate).rounded(.down)))
+                    .clipped(min: 0, max: sampleCount)
+                for i in ei ..< sampleCount {
+                    let sec = Double(i) * rSampleRate
+                    notewave.samples[0][i]
+                    *= Volm.amp(fromVolm: envelopeMemo.volm(atSec: sec, releaseStartSec: rsSec))
+                }
+            } else {
+                for i in 0 ..< sampleCount {
+                    let sec = Double(i) * rSampleRate
+                    notewave.samples[0][i]
+                    *= Volm.amp(fromVolm: envelopeMemo.volm(atSec: sec, releaseStartSec: rsSec))
+                }
+            }
+            
+            notewave.isPremultipliedEnvelope = true
+        }
+        
+        if !envelopeMemo.reverb.isEmpty {
+            let sampleCount = notewave.sampleCount
             notewave.samples = [vDSP.apply(fir: envelopeMemo.reverb.fir(sampleRate: sampleRate, channel: 0),
                                            in: notewave.samples[0]),
                                 vDSP.apply(fir: envelopeMemo.reverb.fir(sampleRate: sampleRate, channel: 1),

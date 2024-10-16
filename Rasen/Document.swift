@@ -2099,9 +2099,11 @@ final class Document: @unchecked Sendable {
             closeLookingUp()
         }
         
+        var isRemoveSelection = false
         if let i = selections.firstIndex(where: { $0.rect.contains(p) }) {
             selections.remove(at: i)
         } else {
+            isRemoveSelection = !selections.isEmpty
             selections = []
         }
         
@@ -2109,7 +2111,9 @@ final class Document: @unchecked Sendable {
             sheetView.unselectKeyframes()
         }
         
-        closeAllTonePanel(at: p)
+        if !isRemoveSelection {
+            closeAllTonePanel(at: p)
+        }
         
         finding = Finding()
     }
@@ -2118,7 +2122,7 @@ final class Document: @unchecked Sendable {
         guard let sheetView = sheetView(at: p) else { return }
         let scoreView = sheetView.scoreView
         guard sheetView.scoreView.model.enabled,
-              !scoreView.containsNote(scoreView.convertFromWorld(p), scale: screenToWorldScale) else { return }
+              !scoreView.containsShownToneNote(scoreView.convertFromWorld(p), scale: screenToWorldScale) else { return }
         let toneIs = scoreView.model.notes.enumerated().compactMap {
             $0.element.isShownTone ? $0.offset : nil
         }
@@ -3580,7 +3584,7 @@ final class Document: @unchecked Sendable {
     }
     
     var isFullEditNote: Bool {
-        camera.logScale < -3
+        camera.logScale < -3.5
     }
     var currentBeatInterval: Rational {
         isFullEditNote ? Sheet.fullEditBeatInterval : Sheet.beatInterval
@@ -4035,7 +4039,6 @@ final class Document: @unchecked Sendable {
         case .cut: Cutter(self)
         case .copy: Copier(self)
         case .copyLineColor: LineColorCopier(self)
-        case .copyTone: ToneCopier(self)
         case .paste: Paster(self)
         case .undo: Undoer(self)
         case .redo: Redoer(self)

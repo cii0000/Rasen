@@ -212,6 +212,7 @@ extension Color {
                      opacity: opacity, rgbColorSpace)
     }
     static func randomLightnessAndHue(_ range: ClosedRange<Double>,
+                                      unsafetyChroma: Double = Color.maxChroma,
                                       interval: Double = 0.0,
                                       opacity: Double = 1.0,
                                       rgbColorSpace: RGBColorSpace = defaultColorSpace) -> Color {
@@ -219,7 +220,7 @@ extension Color {
             Double.random(in: range) :
             Double(Int.random(in: 0 ... Int(1 / interval))) * interval
         let hue = Double.random(in: -.pi ..< .pi)
-        return Color(lightness: l, unsafetyChroma: Color.maxChroma, hue: hue,
+        return Color(lightness: l, unsafetyChroma: unsafetyChroma, hue: hue,
                      opacity: opacity, rgbColorSpace)
     }
     func randomLightness(length: Double = 5) -> Color {
@@ -292,8 +293,18 @@ extension Color: Hashable {
 }
 extension Color: Interpolatable {
     static func rgbLinear(_ f0: Color, _ f1: Color, t: Double) -> Color {
-        Color(RGBA.linear(f0.rgba, f1.rgba, t: t), f0.rgbColorSpace)
+        .init(RGBA.linear(f0.rgba, f1.rgba, t: t), f0.rgbColorSpace)
     }
+    static func rgbFirstSpline(_ f1: Color, _ f2: Color, _ f3: Color, t: Double) -> Color {
+        .init(RGBA.firstSpline(f1.rgba, f2.rgba, f3.rgba, t: t), f1.rgbColorSpace)
+    }
+    static func rgbSpline(_ f0: Color, _ f1: Color, _ f2: Color, _ f3: Color, t: Double) -> Color {
+        .init(RGBA.spline(f0.rgba, f1.rgba, f2.rgba, f3.rgba, t: t), f1.rgbColorSpace)
+    }
+    static func rgbLastSpline(_ f0: Color, _ f1: Color, _ f2: Color, t: Double) -> Color {
+        .init(RGBA.lastSpline(f0.rgba, f1.rgba, f2.rgba, t: t), f1.rgbColorSpace)
+    }
+    
     static func linear(_ f0: Color, _ f1: Color, t: Double) -> Color {
         let lightness = Double.linear(f0.lightness, f1.lightness, t: t)
         let a = Double.linear(f0.a, f1.a, t: t)

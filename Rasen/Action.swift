@@ -100,8 +100,6 @@ extension ActionList {
                               quasimode: .copy),
                        Action(name: "Copy Line Color".localized,
                               quasimode: .copyLineColor),
-//                       Action(name: "Copy Note Tone".localized,
-//                              quasimode: .copyTone),
                        Action(name: "Paste".localized,
                               quasimode: .paste),],
                       

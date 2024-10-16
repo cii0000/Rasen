@@ -299,7 +299,7 @@ final class ColorEditor: Editor {
     private var sheetView: SheetView?
     private var scoreResult: ScoreView.ColorHitResult?
     private var beganEnvelope = Envelope(), beganNotes = [Int: Note]()
-    private var beganNotePits = [UUID: (nid: UUID, nColor: Color, dic: [Int: (note: Note, pits: [Int: (pit: Pit, sprolIs: Set<Int>)])])]()
+    private var beganNotePits = [UUID: (nid: UUID, dic: [Int: (note: Note, pits: [Int: (pit: Pit, sprolIs: Set<Int>)])])]()
     private var beganContents = [Int: Content]()
     private var beganSP = Point(), beganVolm = 0.0
     private var notePlayer: NotePlayer?, playerBeatNoteIndexes = [Int](), beganBeat = Rational(0)
@@ -420,7 +420,7 @@ final class ColorEditor: Editor {
                                     $0[id]!.dic[$1.key] = (score.notes[$1.key], [pitI: (pit, sprolIs)])
                                 }
                             } else {
-                                $0[id] = (UUID(), Tone.randomColor(), [$1.key: (score.notes[$1.key], [pitI: (pit, sprolIs)])])
+                                $0[id] = (UUID(), [$1.key: (score.notes[$1.key], [pitI: (pit, sprolIs)])])
                             }
                         }
                     }
@@ -441,23 +441,6 @@ final class ColorEditor: Editor {
                     case .note:
                         beganVolm = scoreView.volm(atX: scoreP.x, at: noteI)
                         updatePitsWithSelection(noteI: noteI, pitI: nil, sprolI: nil, .stereo)
-                        beganBeat = scoreView.beat(atX: scoreP.x)
-                    case .sustain:
-                        if document.isSelect(at: p) {
-                            let noteIs = sheetView.noteIndexes(from: document.selections)
-                            beganNotes = noteIs.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
-                        } else {
-                            let id = score.notes[noteI].envelope.id
-                            beganNotes = score.notes.enumerated().reduce(into: [Int: Note]()) {
-                                if id == $1.element.envelope.id {
-                                    $0[$1.offset] = $1.element
-                                }
-                            }
-                        }
-                        beganNotes[noteI] = score.notes[noteI]
-                        
-                        beganEnvelope = score.notes[noteI].envelope
-                        beganVolm = score.notes[noteI].envelope.sustainVolm
                         beganBeat = scoreView.beat(atX: scoreP.x)
                     case .reverbEarlyRVolm:
                         if document.isSelect(at: p) {
@@ -505,10 +488,18 @@ final class ColorEditor: Editor {
                         beganVolm = score.notes[noteI].pits[pitI].tone.overtone.oddVolm
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .tone)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
+                    case .allEven:
+                        beganVolm = scoreView.evenVolm(atX: scoreP.x, from: score.notes[noteI])
+                        updatePitsWithSelection(noteI: noteI, pitI: nil, sprolI: nil, .tone)
+                        beganBeat = scoreView.beat(atX: scoreP.x)
                     case .sprol(let pitI, let sprolI):
                         beganVolm = score.notes[noteI].pits[pitI].tone.spectlope.sprols[sprolI].volm
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: sprolI, .tone)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
+                    case .allSprol(let sprolI, let sprol):
+                        beganVolm = sprol.volm
+                        updatePitsWithSelection(noteI: noteI, pitI: nil, sprolI: sprolI, .tone)
+                        beganBeat = scoreView.beat(atX: scoreP.x)
                     }
                     
                     let noteIsSet = Set(beganNotePits.values.flatMap { $0.dic.keys }).sorted()
@@ -525,9 +516,7 @@ final class ColorEditor: Editor {
                     beganContents[ci] = content
                 }
                 
-                let (minV, maxV) = scoreResult != nil && (scoreResult!.isTone || scoreResult!.isEnvelpse)
-                ? (0, 1) : (Volm.minVolm, Volm.maxVolm)
-                
+                let (minV, maxV) = scoreResult != nil && scoreResult!.isTone ? (0, 1) : (Volm.minVolm, Volm.maxVolm)
                 updateNode()
                 fp = event.screenPoint
                 isReversedLightness = true
@@ -559,16 +548,6 @@ final class ColorEditor: Editor {
             
             if let scoreResult {
                 switch scoreResult {
-                case .sustain:
-                    let sustainVolm = newVolm(from: beganEnvelope.sustainVolm)
-                    var eivs = [IndexValue<Envelope>](capacity: beganNotes.count)
-                    for (noteI, beganNote) in beganNotes {
-                        var envelope = beganNote.envelope
-                        envelope.sustainVolm = sustainVolm
-                        envelope.id = beganEnvelope.id
-                        eivs.append(.init(value: envelope, index: noteI))
-                    }
-                    scoreView.replace(eivs)
                 case .reverbEarlyRVolm:
                     let volm = newVolm(from: beganEnvelope.reverb.earlyRVolm)
                     var eivs = [IndexValue<Envelope>](capacity: beganNotes.count)
@@ -606,7 +585,7 @@ final class ColorEditor: Editor {
                     }
                     let nivs = nvs.map { IndexValue(value: $0.value, index: $0.key) }
                     scoreView.replace(nivs)
-                case .evenVolm:
+                case .evenVolm, .allEven:
                     var nvs = [Int: Note]()
                     for (_, v) in beganNotePits {
                         for (noteI, nv) in v.dic {
@@ -638,7 +617,7 @@ final class ColorEditor: Editor {
                     }
                     let nivs = nvs.map { IndexValue(value: $0.value, index: $0.key) }
                     scoreView.replace(nivs)
-                case .sprol:
+                case .sprol, .allSprol:
                     var nvs = [Int: Note]()
                     for (_, v) in beganNotePits {
                         for (noteI, nv) in v.dic {
@@ -649,11 +628,6 @@ final class ColorEditor: Editor {
                                 for sprolI in beganPit.sprolIs {
                                     let nVolm = newVolm(from: beganPit.pit.tone.spectlope.sprols[sprolI].volm)
                                     nvs[noteI]?.pits[pitI].tone.spectlope.sprols[sprolI].volm = nVolm
-                                }
-                                
-                                if let tone = nvs[noteI]?.pits[pitI].tone,
-                                   !tone.isDefault && tone.color == .background {
-                                    nvs[noteI]?.pits[pitI].tone.color = v.nColor
                                 }
                                 nvs[noteI]?.pits[pitI].tone.id = v.nid
                             }
@@ -895,7 +869,7 @@ final class ColorEditor: Editor {
                                     $0[id]!.dic[$1.key] = (score.notes[$1.key], [pitI: (pit, sprolIs)])
                                 }
                             } else {
-                                $0[id] = (UUID(), Tone.randomColor(), [$1.key: (score.notes[$1.key], [pitI: (pit, sprolIs)])])
+                                $0[id] = (UUID(), [$1.key: (score.notes[$1.key], [pitI: (pit, sprolIs)])])
                             }
                         }
                     }
@@ -918,12 +892,34 @@ final class ColorEditor: Editor {
                         beganStereo = scoreView.stereo(atX: scoreP.x, at: noteI)
                         updatePitsWithSelection(noteI: noteI, pitI: nil, sprolI: nil, .stereo)
                         beganBeat = scoreView.beat(atX: scoreP.x)
-                    case .sustain, .reverbEarlyRVolm, .reverbLateRVolm: return
+                    case .reverbEarlyRVolm, .reverbLateRVolm: return
                     case .pit(let pitI):
                         beganStereo = note.pits[pitI].stereo
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .stereo)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
-                    case .evenVolm, .oddVolm: return
+                    case .evenVolm, .oddVolm, .allEven: return
+                    case .allSprol(let sprolI, let sprol):
+                        let volm = sprol.volm
+                        beganNoise = sprol.noise
+                        updatePitsWithSelection(noteI: noteI, pitI: nil, sprolI: sprolI, .tone)
+                        beganBeat = scoreView.beat(atX: scoreP.x)
+                        
+                        let outlineColor: Color = volm < 0.5 ? .content : .background
+                        let outlineGradientNode = Node(path: .init([.init(0, 0),
+                                                                    .init(panWidth, 0)]),
+                                                       lineWidth: 5, lineType: .color(outlineColor))
+                        let gradient = noiseGradientWith(volm: volm)
+                        let gradientNode = Node(path: .init([.init(noisePointsWith(splitCount: .init(panWidth),
+                                                                                   width: panWidth))]),
+                                                lineWidth: 3, lineType: .gradient(gradient))
+                        colorPointNode.attitude.position = .init(panWidth * beganNoise, 0)
+                        panNode.append(child: outlineGradientNode)
+                        panNode.append(child: gradientNode)
+                        panNode.append(child: colorPointNode)
+                        let attitude = Attitude(document.screenToWorldTransform)
+                        panNode.attitude = attitude.with(position: noiseWorldPosition)
+                        
+                        document.rootNode.append(child: panNode)
                     case .sprol(let pitI, let sprolI):
                         let volm = score.notes[noteI].pits[pitI].tone.spectlope.sprols[sprolI].volm
                         beganNoise = score.notes[noteI].pits[pitI].tone.spectlope.sprols[sprolI].noise
@@ -988,7 +984,7 @@ final class ColorEditor: Editor {
         case .changed:
             guard let sheetView else { return }
             
-            if case .sprol = scoreResult {
+            if scoreResult?.isSprol ?? false {
                 let noise = (beganNoise + (sp.x - document.convertWorldToScreen(beganWorldP).x) / panWidth).clipped(min: 0, max: 1)
                 let noiseScale = beganNoise == 0 ? 0 : noise / beganNoise
                 func newNoise(from otherNoise: Double) -> Double {
@@ -1011,10 +1007,6 @@ final class ColorEditor: Editor {
                             for sprolI in beganPit.sprolIs {
                                 let nNoise = newNoise(from: beganPit.pit.tone.spectlope.sprols[sprolI].noise)
                                 nvs[noteI]?.pits[pitI].tone.spectlope.sprols[sprolI].noise = nNoise
-                            }
-                            if let tone = nvs[noteI]?.pits[pitI].tone,
-                                !tone.isDefault && tone.color == .background {
-                                nvs[noteI]?.pits[pitI].tone.color = v.nColor
                             }
                             nvs[noteI]?.pits[pitI].tone.id = v.nid
                         }

@@ -502,12 +502,13 @@ final class FaceEditor: Editor, @unchecked Sendable {
                                     .init(pitch: 36, volm: .random(in: 0 ..< 1), noise: 0),
                                     .init(pitch: 48, volm: .random(in: 0 ..< 1), noise: 0),
                                     .init(pitch: 60, volm: .random(in: 0 ..< 1), noise: 0),
-                                    .init(pitch: 72, volm: .random(in: 0 ..< 1), noise: 0),
-                                    .init(pitch: 84, volm: .random(in: 0 ..< 1), noise: 0),
-                                    .init(pitch: 96, volm: .random(in: 0 ..< 0.125), noise: 0)
-                                ])
-                                var tone = Tone(spectlope: spectlope)
-                                tone.color = Tone.randomColor()
+                                    .init(pitch: 72, volm: .random(in: 0 ..< 0.75), noise: 0),
+                                    .init(pitch: 84, volm: .random(in: 0 ..< 0.5), noise: 0),
+                                    .init(pitch: 96, volm: .random(in: 0 ..< 0.25), noise: 0),
+                                    .init(pitch: 108, volm: .random(in: 0 ..< 0.125), noise: 0),
+                                    .init(pitch: 120, volm: 0, noise: 0)
+                                ].filter { $0.pitch > .init(pit.pitch + note.pitch - 12) })
+                                let tone = Tone(spectlope: spectlope)
                                 tones[pit.tone.id] = tone
                                 note.pits[pi].tone = tone
                             }

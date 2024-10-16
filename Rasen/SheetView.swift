@@ -1865,6 +1865,20 @@ final class SheetView: View, @unchecked Sendable {
             guard playingSec != oldValue, let playingSec else { return }
             let sheetView = playingSheetView
             
+            let playingBeat = sheetView.model.animation
+                .beat(fromSec: Double(playingSec), beatRate: 60)
+            let timeSliders = playingSheetIndex == 0 && !sheetView.model.enabledAnimation ?
+                [] :
+                [Node(path: Path(timeSliderRect(atSec: playingSec,
+                                                at: playingSheetIndex)),
+                      fillType: .color(.content))]
+            
+            if sheetView == self {
+                showOtherTimeNode(atBeat: playingBeat, isEnabledMovie: true)
+            } else {
+                hideOtherTimeNode()
+            }
+            
             var children = [Node]()
             
             if let bottomSheetView = sheetView.bottomSheetView {
@@ -1908,14 +1922,6 @@ final class SheetView: View, @unchecked Sendable {
                 animationView.node.children = children
             }
             
-            let playingBeat = sheetView.model.animation
-                .beat(fromSec: Double(playingSec), beatRate: 60)
-            let timeSliders = playingSheetIndex == 0 && !sheetView.model.enabledAnimation ?
-                [] :
-                [Node(path: Path(timeSliderRect(atSec: playingSec,
-                                                at: playingSheetIndex)),
-                      fillType: .color(.content))]
-            
             let caption = sheetView.model.caption(atBeat: playingBeat)
             if caption != playingCaption {
                 playingCaption = caption
@@ -1937,13 +1943,6 @@ final class SheetView: View, @unchecked Sendable {
                 if $0.model.type == .movie, let timeOption = $0.model.timeOption {
                     $0.updateMovie(atSec: playingSec - timeOption.secRange.start - timeOption.localStartBeat)
                 }
-            }
-            
-            
-            if sheetView == self {
-                showOtherTimeNode(atBeat: playingBeat, isEnabledMovie: true)
-            } else {
-                hideOtherTimeNode()
             }
         }
     }
@@ -6113,7 +6112,7 @@ final class SheetView: View, @unchecked Sendable {
             n[noteI] = note.pits.enumerated().reduce(into: .init()) { (v, ip) in
                 let pitI = ip.offset, pit = ip.element
                 for sprolI in pit.tone.spectlope.sprols.count.range {
-                    if fs.contains(where: { $0.contains(scoreView.sprolPosition(atSprol: sprolI, atPit: pitI, from: note)) }) {
+                    if fs.contains(where: { $0.contains(scoreView.sprolPosition(atSprol: sprolI, atPit: pitI, at: noteI)) }) {
                         if v[pitI] != nil {
                             v[pitI]?.insert(sprolI)
                         } else {

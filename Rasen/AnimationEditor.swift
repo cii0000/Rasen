@@ -1698,7 +1698,13 @@ final class LineSlider: DragEditor {
         isEditingSheet = document.isEditingSheet
     }
 
-    private var isPit = false, noteI: Int?, pitI: Int?,
+    enum SlideType {
+        case pit, reverbEarlyRSec, reverbEarlyAndLateRSec, reverbDurSec, even, sprol
+    }
+    private var isLine = false
+    private var type = SlideType.pit
+    
+    private var noteI: Int?, pitI: Int?,
                 beganNote: Note?, beganPit: Pit?, beganSP = Point()
     
     private var sheetView: SheetView?,
@@ -1711,7 +1717,13 @@ final class LineSlider: DragEditor {
     private var beganBeatX = 0.0, beganPitchY = 0.0
     private var beganPitch = Rational(0), beganBeat = Rational(0), oldBeat = Rational(0), oldPitch = Rational(0)
     private var beganNotePits = [Int: (note: Note, pit: Pit, pits: [Int: Pit])]()
-    private var playerBeatNoteIndexes = [Int]()
+    private var beganStartBeat = Rational(0)
+    private var beganTone = Tone(), beganOvertone = Overtone(), beganEnvelope = Envelope()
+    private var sprolI: Int?, beganSprol = Sprol()
+    private var beganNotes = [Int: Note]()
+    private var beganNoteSprols = [UUID: (nid: UUID, dic: [Int: (note: Note, pits: [Int: (pit: Pit, sprolIs: Set<Int>)])])]()
+    
+    private var playerBeatNoteIndexes = [Int](), node = Node()
     
     func send(_ event: DragEvent) {
         guard isEditingSheet else {
@@ -1745,63 +1757,224 @@ final class LineSlider: DragEditor {
                 let sheetP = sheetView.convertFromWorld(p)
                 let scoreView = sheetView.scoreView
                 let scoreP = scoreView.convertFromWorld(p)
+                
+                isLine = false
                 if scoreView.model.enabled,
-                   let (noteI, pitI) = scoreView.noteAndPitI(at: scoreP,
-                                                           scale: document.screenToWorldScale) {
+                   let noteI = scoreView.noteIndex(at: scoreP, scale: document.screenToWorldScale,
+                                                   enabledRelease: true) {
                     
-                    isPit = true
+                    self.sheetView = sheetView
+                    self.noteI = noteI
                     
                     let score = scoreView.model
                     let note = score.notes[noteI]
-                    let pit = note.pits[pitI]
-                    self.sheetView = sheetView
-                    self.noteI = noteI
-                    self.pitI = pitI
+                    
+                    let interval = document.currentBeatInterval
+                    let nsBeat = scoreView.beat(atX: sheetP.x, interval: interval)
+                    beganStartBeat = nsBeat
+                    beganSheetP = sheetP
                     beganSP = sp
                     beganNote = note
-                    beganPit = pit
+                    self.noteI = noteI
                     
-                    beganSheetP = sheetP
+                    let result = scoreView.hitTestPoint(scoreP, scale: document.screenToWorldScale,
+                                                        at: noteI)
+                    switch result {
+                    case .pit(let pitI):
+                        let pit = note.pits[pitI]
                     
-                    beganPitch = note.pitch + pit.pitch
-                    oldPitch = beganPitch
-                    beganBeat = note.beatRange.start + pit.beat
-                    oldBeat = beganBeat
-                    beganBeatX = scoreView.x(atBeat: note.beatRange.start + pit.beat)
-                    beganPitchY = scoreView.y(fromPitch: note.pitch + pit.pitch)
-                    
-                    var noteAndPitIs: [Int: [Int]]
-                    if document.isSelect(at: p) {
-                        noteAndPitIs = sheetView.noteAndPitIndexes(from: document.selections,
-                                                                   enabledAll: false)
-                        if noteAndPitIs[noteI] != nil {
-                            if !noteAndPitIs[noteI]!.contains(pitI) {
-                                noteAndPitIs[noteI]?.append(pitI)
+                        self.pitI = pitI
+                        beganPit = pit
+                        
+                        beganPitch = note.pitch + pit.pitch
+                        oldPitch = beganPitch
+                        beganBeat = note.beatRange.start + pit.beat
+                        oldBeat = beganBeat
+                        beganBeatX = scoreView.x(atBeat: note.beatRange.start + pit.beat)
+                        beganPitchY = scoreView.y(fromPitch: note.pitch + pit.pitch)
+                        
+                        var noteAndPitIs: [Int: [Int]]
+                        if document.isSelect(at: p) {
+                            noteAndPitIs = sheetView.noteAndPitIndexes(from: document.selections,
+                                                                       enabledAll: false)
+                            if noteAndPitIs[noteI] != nil {
+                                if !noteAndPitIs[noteI]!.contains(pitI) {
+                                    noteAndPitIs[noteI]?.append(pitI)
+                                }
+                            } else {
+                                noteAndPitIs[noteI] = [pitI]
                             }
                         } else {
-                            noteAndPitIs[noteI] = [pitI]
+                            noteAndPitIs = [noteI: [pitI]]
                         }
-                    } else {
-                        noteAndPitIs = [noteI: [pitI]]
-                    }
-                    
-                    beganNotePits = noteAndPitIs.reduce(into: .init()) { (nv, nap) in
-                        let pitDic = nap.value.reduce(into: [Int: Pit]()) { (v, pitI) in
-                            v[pitI] = score.notes[nap.key].pits[pitI]
+                        
+                        beganNotePits = noteAndPitIs.reduce(into: .init()) { (nv, nap) in
+                            let pitDic = nap.value.reduce(into: [Int: Pit]()) { (v, pitI) in
+                                v[pitI] = score.notes[nap.key].pits[pitI]
+                            }
+                            nv[nap.key] = (score.notes[nap.key], pit, pitDic)
                         }
-                        nv[nap.key] = (score.notes[nap.key], pit, pitDic)
+                        
+                        let vs = score.noteIAndPits(atBeat: pit.beat + note.beatRange.start,
+                                                    in: Set(beganNotePits.keys).sorted())
+                        playerBeatNoteIndexes = vs.map { $0.noteI }
+                        
+                        updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
+                        
+                        document.cursor = .circle(string: Pitch(value: beganPitch).octaveString())
+                        
+                    case .reverbEarlyRSec:
+                        type = .reverbEarlyRSec
+                        
+                        if document.isSelect(at: p) {
+                            let noteIs = sheetView.noteIndexes(from: document.selections)
+                            beganNotes = noteIs.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
+                        } else {
+                            let id = score.notes[noteI].envelope.id
+                            beganNotes = score.notes.enumerated().reduce(into: [Int: Note]()) {
+                                if id == $1.element.envelope.id {
+                                    $0[$1.offset] = $1.element
+                                }
+                            }
+                        }
+                        beganNotes[noteI] = score.notes[noteI]
+                        
+                        beganEnvelope = score.notes[noteI].envelope
+                        
+                        document.cursor = .circle(string: String(format: "%.3f s", beganEnvelope.reverb.earlyRSec))
+                    case .reverbEarlyAndLateRSec:
+                        type = .reverbEarlyAndLateRSec
+                        
+                        if document.isSelect(at: p) {
+                            let noteIs = sheetView.noteIndexes(from: document.selections)
+                            beganNotes = noteIs.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
+                        } else {
+                            let id = score.notes[noteI].envelope.id
+                            beganNotes = score.notes.enumerated().reduce(into: [Int: Note]()) {
+                                if id == $1.element.envelope.id {
+                                    $0[$1.offset] = $1.element
+                                }
+                            }
+                        }
+                        beganNotes[noteI] = score.notes[noteI]
+                        
+                        beganEnvelope = score.notes[noteI].envelope
+                        
+                        document.cursor = .circle(string: String(format: "%.3f s", beganEnvelope.reverb.earlyAndLateRSec))
+                    case .reverbDurSec:
+                        type = .reverbDurSec
+                        
+                        if document.isSelect(at: p) {
+                            let noteIs = sheetView.noteIndexes(from: document.selections)
+                            beganNotes = noteIs.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
+                        } else {
+                            let id = score.notes[noteI].envelope.id
+                            beganNotes = score.notes.enumerated().reduce(into: [Int: Note]()) {
+                                if id == $1.element.envelope.id {
+                                    $0[$1.offset] = $1.element
+                                }
+                            }
+                        }
+                        beganNotes[noteI] = score.notes[noteI]
+                        
+                        beganEnvelope = score.notes[noteI].envelope
+                        
+                        document.cursor = .circle(string: String(format: "%.3f s", beganEnvelope.reverb.durSec))
+                    case .even(let pitI):
+                        type = .even
+                        
+                        let pit = note.pits[pitI]
+                    
+                        self.pitI = pitI
+                        beganPit = pit
+                        
+                        beganBeat = note.beatRange.start + pit.beat
+                        oldBeat = beganBeat
+                        beganBeatX = scoreView.x(atBeat: note.beatRange.start + pit.beat)
+                        
+                        var noteAndPitIs: [Int: [Int]]
+                        if document.isSelect(at: p) {
+                            noteAndPitIs = sheetView.noteAndPitIndexes(from: document.selections,
+                                                                       enabledAll: false)
+                            if noteAndPitIs[noteI] != nil {
+                                if !noteAndPitIs[noteI]!.contains(pitI) {
+                                    noteAndPitIs[noteI]?.append(pitI)
+                                }
+                            } else {
+                                noteAndPitIs[noteI] = [pitI]
+                            }
+                        } else {
+                            noteAndPitIs = [noteI: [pitI]]
+                        }
+                        
+                        beganNotePits = noteAndPitIs.reduce(into: .init()) { (nv, nap) in
+                            let pitDic = nap.value.reduce(into: [Int: Pit]()) { (v, pitI) in
+                                v[pitI] = score.notes[nap.key].pits[pitI]
+                            }
+                            nv[nap.key] = (score.notes[nap.key], pit, pitDic)
+                        }
+                    case .sprol(let pitI, let sprolI):
+                        type = .sprol
+                        
+                        beganTone = score.notes[noteI].pits[pitI].tone
+                        self.sprolI = sprolI
+                        self.beganSprol = scoreView.nearestSprol(at: scoreP, at: noteI)
+                        self.noteI = noteI
+                        self.pitI = pitI
+                        
+                        func updatePitsWithSelection() {
+                            var noteAndPitIs: [Int: [Int: Set<Int>]]
+                            if document.isSelect(at: p) {
+                                noteAndPitIs = sheetView.noteAndPitAndSprolIs(from: document.selections)
+                            } else {
+                                let id = score.notes[noteI].pits[pitI][.tone]
+                                noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) {
+                                    $0[$1.offset] = $1.element.pits.enumerated().reduce(into: [Int: Set<Int>]()) { (v, ip) in
+                                        if ip.element[.tone] == id {
+                                            v[ip.offset] = sprolI < ip.element.tone.spectlope.count ? [sprolI] : []
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            beganNoteSprols = noteAndPitIs.reduce(into: .init()) {
+                                for (pitI, sprolIs) in $1.value {
+                                    let pit = score.notes[$1.key].pits[pitI]
+                                    let id = pit[.tone]
+                                    if $0[id] != nil {
+                                        if $0[id]!.dic[$1.key] != nil {
+                                            $0[id]!.dic[$1.key]!.pits[pitI] = (pit, sprolIs)
+                                        } else {
+                                            $0[id]!.dic[$1.key] = (score.notes[$1.key], [pitI: (pit, sprolIs)])
+                                        }
+                                    } else {
+                                        $0[id] = (UUID(), [$1.key: (score.notes[$1.key], [pitI: (pit, sprolIs)])])
+                                    }
+                                }
+                            }
+                        }
+                        
+                        updatePitsWithSelection()
+                        
+                        let noteIsSet = Set(beganNoteSprols.values.flatMap { $0.dic.keys }).sorted()
+                        let vs = score.noteIAndNormarizedPits(atBeat: note.pits[pitI].beat + note.beatRange.start,
+                                                              in: noteIsSet)
+                        playerBeatNoteIndexes = vs.map { $0.noteI }
+                        
+                        updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
+                        
+                        document.cursor = .circle(string: Pitch(value: .init(beganTone.spectlope.sprols[sprolI].pitch, intervalScale: Sheet.fullEditPitchInterval)).octaveString(hidableDecimal: false))
+                    default:
+                        isLine = true
                     }
-                    
-                    let vs = score.noteIAndPits(atBeat: pit.beat + note.beatRange.start,
-                                                in: Set(beganNotePits.keys).sorted())
-                    playerBeatNoteIndexes = vs.map { $0.noteI }
-                    
-                    updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
-                    
-                    document.cursor = .circle(string: Pitch(value: beganPitch).octaveString())
-                } else if let (lineView, li) = sheetView.lineTuple(at: sheetP,
-                                                                   isSmall: false,
-                                                                   scale: document.screenToWorldScale),
+                } else {
+                    isLine = true
+                }
+                
+                if isLine,
+                   let (lineView, li) = sheetView.lineTuple(at: sheetP,
+                                                            isSmall: false,
+                                                            scale: document.screenToWorldScale),
                    let pi = lineView.model.mainPointSequence.nearestIndex(at: sheetP) {
                     
                     self.sheetView = sheetView
@@ -1813,73 +1986,20 @@ final class LineSlider: DragEditor {
                     let pressure = event.pressure
                         .clipped(min: 0.4, max: 1, newMin: 0, newMax: 1)
                     pressures.append((event.time, pressure))
+                    
+                    node.children = beganLine.mainPointSequence.flatMap {
+                        let p = sheetView.convertToWorld($0)
+                        return [Node(path: .init(circleRadius: 0.25 * 1.5 * beganLine.size, position: p),
+                                     fillType: .color(.content)),
+                                Node(path: .init(circleRadius: 0.25 * beganLine.size, position: p),
+                                     fillType: .color(.background))]
+                    }
+                    document.rootNode.append(child: node)
                 }
             }
         case .changed:
             if let sheetView {
-                if isPit {
-                    let scoreView = sheetView.scoreView
-                    let score = scoreView.model
-                    if let noteI, noteI < score.notes.count, let pitI {
-                        let sheetP = sheetView.convertFromWorld(p)
-                        
-                        let note = score.notes[noteI]
-                        let preBeat = pitI > 0 ? note.pits[pitI - 1].beat + note.beatRange.start : .min
-                        let nextBeat = pitI + 1 < note.pits.count ? note.pits[pitI + 1].beat + note.beatRange.start : .max
-                        let beatInterval = document.currentBeatInterval
-                        let pitchInterval = document.currentPitchInterval
-                        let pitch = scoreView.pitch(atY: beganPitchY + sheetP.y - beganSheetP.y,
-                                                    interval: pitchInterval)
-                        let nsBeat = scoreView.beat(atX: beganBeatX + sheetP.x - beganSheetP.x,
-                                                    interval: beatInterval)
-                            .clipped(min: preBeat, max: nextBeat)
-                        if pitch != oldPitch || nsBeat != oldBeat {
-                            let dBeat = nsBeat - beganBeat
-                            let dPitch = pitch - beganPitch
-                            
-                            for (noteI, nv) in beganNotePits {
-                                guard noteI < score.notes.count else { continue }
-                                var note = nv.note
-                                for (pitI, beganPit) in nv.pits {
-                                    guard pitI < score.notes[noteI].pits.count else { continue }
-                                    note.pits[pitI].beat = dBeat + beganPit.beat
-                                    note.pits[pitI].pitch = dPitch + beganPit.pitch
-                                }
-                                if note.pits.first!.beat < 0 {
-                                    let dBeat = note.pits.first!.beat
-                                    note.beatRange.start = nv.note.beatRange.start + dBeat
-                                    note.beatRange.length = nv.note.beatRange.length - dBeat
-                                    for i in note.pits.count.range {
-                                        note.pits[i].beat -= dBeat
-                                    }
-                                } else {
-                                    if note.pits.last!.beat > note.beatRange.length {
-                                        note.beatRange.length = note.pits.last!.beat
-                                    } else {
-                                        note.beatRange.length = nv.note.beatRange.length
-                                    }
-                                }
-                                
-                                scoreView[noteI] = note
-                            }
-                            
-                            oldBeat = nsBeat
-                            
-                            if pitch != oldPitch {
-                                let note = scoreView[noteI]
-                                let pBeat = note.pits[pitI].beat + note.beatRange.start
-                                notePlayer?.notes = playerBeatNoteIndexes.map {
-                                    scoreView.pitResult(atBeat: pBeat, at: $0)
-                                }
-                                
-                                oldPitch = pitch
-                                
-                                document.cursor = .circle(string: Pitch(value: pitch).octaveString())
-                            }
-                            document.updateSelects()
-                        }
-                    }
-                } else {
+                if isLine {
                     if lineIndex < sheetView.linesView.elementViews.count {
                         let lineView = sheetView.linesView.elementViews[lineIndex]
                         
@@ -1905,13 +2025,218 @@ final class LineSlider: DragEditor {
                             }
                             
                             lineView.model = line
+                            
+                            node.children = line.mainPointSequence.flatMap {
+                                let p = sheetView.convertToWorld($0)
+                                return [Node(path: .init(circleRadius: 0.25 * 1.5 * line.size, position: p),
+                                             fillType: .color(.content)),
+                                        Node(path: .init(circleRadius: 0.25 * line.size, position: p),
+                                             fillType: .color(.background))]
+                            }
+                        }
+                    }
+                } else {
+                    let sheetP = sheetView.convertFromWorld(p)
+                    let scoreView = sheetView.scoreView
+                    let score = scoreView.model
+                    let scoreP = scoreView.convertFromWorld(p)
+                    switch type {
+                    case .pit:
+                        if let noteI, noteI < score.notes.count, let pitI {
+                            let note = score.notes[noteI]
+                            let preBeat = pitI > 0 ? note.pits[pitI - 1].beat + note.beatRange.start : .min
+                            let nextBeat = pitI + 1 < note.pits.count ? note.pits[pitI + 1].beat + note.beatRange.start : .max
+                            let beatInterval = document.currentBeatInterval
+                            let pitchInterval = document.currentPitchInterval
+                            let pitch = scoreView.pitch(atY: beganPitchY + sheetP.y - beganSheetP.y,
+                                                        interval: pitchInterval)
+                            let nsBeat = scoreView.beat(atX: beganBeatX + sheetP.x - beganSheetP.x,
+                                                        interval: beatInterval)
+                                .clipped(min: preBeat, max: nextBeat)
+                            if pitch != oldPitch || nsBeat != oldBeat {
+                                let dBeat = nsBeat - beganBeat
+                                let dPitch = pitch - beganPitch
+                                
+                                for (noteI, nv) in beganNotePits {
+                                    guard noteI < score.notes.count else { continue }
+                                    var note = nv.note
+                                    for (pitI, beganPit) in nv.pits {
+                                        guard pitI < score.notes[noteI].pits.count else { continue }
+                                        note.pits[pitI].beat = dBeat + beganPit.beat
+                                        note.pits[pitI].pitch = dPitch + beganPit.pitch
+                                    }
+                                    if note.pits.first!.beat < 0 {
+                                        let dBeat = note.pits.first!.beat
+                                        note.beatRange.start = nv.note.beatRange.start + dBeat
+                                        note.beatRange.length = nv.note.beatRange.length - dBeat
+                                        for i in note.pits.count.range {
+                                            note.pits[i].beat -= dBeat
+                                        }
+                                    } else {
+                                        if note.pits.last!.beat > note.beatRange.length {
+                                            note.beatRange.length = note.pits.last!.beat
+                                        } else {
+                                            note.beatRange.length = nv.note.beatRange.length
+                                        }
+                                    }
+                                    
+                                    scoreView[noteI] = note
+                                }
+                                
+                                oldBeat = nsBeat
+                                
+                                if pitch != oldPitch {
+                                    let note = scoreView[noteI]
+                                    let pBeat = note.pits[pitI].beat + note.beatRange.start
+                                    notePlayer?.notes = playerBeatNoteIndexes.map {
+                                        scoreView.pitResult(atBeat: pBeat, at: $0)
+                                    }
+                                    
+                                    oldPitch = pitch
+                                    
+                                    document.cursor = .circle(string: Pitch(value: pitch).octaveString())
+                                }
+                                document.updateSelects()
+                            }
+                        }
+                    case .reverbEarlyRSec:
+                        let dBeat = scoreView.durBeat(atWidth: sheetP.x - beganSheetP.x)
+                        let sec = (beganEnvelope.reverb.earlyRSec + score.sec(fromBeat: dBeat))
+                            .clipped(min: 0, max: 10)
+                        
+                        let nid = UUID()
+                        var eivs = [IndexValue<Envelope>](capacity: beganNotes.count)
+                        for noteI in beganNotes.keys {
+                            guard noteI < score.notes.count else { continue }
+                            var envelope = scoreView.model.notes[noteI].envelope
+                            envelope.reverb.earlyRSec = sec
+                            envelope.reverb.seedID = nid
+                            envelope.id = nid
+                            eivs.append(.init(value: envelope, index: noteI))
+                        }
+                        scoreView.replace(eivs)
+                        
+                        document.cursor = .circle(string: String(format: "%.3f s", sec))
+                    case .reverbEarlyAndLateRSec:
+                        let dBeat = scoreView.durBeat(atWidth: sheetP.x - beganSheetP.x)
+                        let sec = (beganEnvelope.reverb.lateRSec + score.sec(fromBeat: dBeat))
+                            .clipped(min: 0, max: 10)
+                        
+                        let nid = UUID()
+                        var eivs = [IndexValue<Envelope>](capacity: beganNotes.count)
+                        for noteI in beganNotes.keys {
+                            guard noteI < score.notes.count else { continue }
+                            var envelope = scoreView.model.notes[noteI].envelope
+                            envelope.reverb.lateRSec = sec
+                            envelope.reverb.seedID = nid
+                            envelope.id = nid
+                            eivs.append(.init(value: envelope, index: noteI))
+                        }
+                        scoreView.replace(eivs)
+                        
+                        document.cursor = .circle(string: String(format: "%.3f s", beganEnvelope.reverb.earlyRSec + sec))
+                    case .reverbDurSec:
+                        let dBeat = scoreView.durBeat(atWidth: sheetP.x - beganSheetP.x)
+                        let sec = (beganEnvelope.reverb.releaseSec + score.sec(fromBeat: dBeat))
+                            .clipped(min: 0, max: 10)
+                        
+                        let nid = UUID()
+                        var eivs = [IndexValue<Envelope>](capacity: beganNotes.count)
+                        for noteI in beganNotes.keys {
+                            guard noteI < score.notes.count else { continue }
+                            var envelope = scoreView.model.notes[noteI].envelope
+                            envelope.reverb.releaseSec = sec
+                            envelope.reverb.seedID = nid
+                            envelope.id = nid
+                            eivs.append(.init(value: envelope, index: noteI))
+                        }
+                        scoreView.replace(eivs)
+                        
+                        document.cursor = .circle(string: String(format: "%.3f s", beganEnvelope.reverb.earlyAndLateRSec + sec))
+                    case .even:
+                        if let noteI, noteI < score.notes.count, let pitI {
+                            let note = score.notes[noteI]
+                            let preBeat = pitI > 0 ? note.pits[pitI - 1].beat + note.beatRange.start : .min
+                            let nextBeat = pitI + 1 < note.pits.count ? note.pits[pitI + 1].beat + note.beatRange.start : .max
+                            let beatInterval = document.currentBeatInterval
+                            let nsBeat = scoreView.beat(atX: beganBeatX + sheetP.x - beganSheetP.x,
+                                                        interval: beatInterval)
+                                .clipped(min: preBeat, max: nextBeat)
+                            if nsBeat != oldBeat {
+                                let dBeat = nsBeat - beganBeat
+                                
+                                for (noteI, nv) in beganNotePits {
+                                    guard noteI < score.notes.count else { continue }
+                                    var note = nv.note
+                                    for (pitI, beganPit) in nv.pits {
+                                        guard pitI < score.notes[noteI].pits.count else { continue }
+                                        note.pits[pitI].beat = dBeat + beganPit.beat
+                                    }
+                                    if note.pits.first!.beat < 0 {
+                                        let dBeat = note.pits.first!.beat
+                                        note.beatRange.start = nv.note.beatRange.start + dBeat
+                                        note.beatRange.length = nv.note.beatRange.length - dBeat
+                                        for i in note.pits.count.range {
+                                            note.pits[i].beat -= dBeat
+                                        }
+                                    } else {
+                                        if note.pits.last!.beat > note.beatRange.length {
+                                            note.beatRange.length = note.pits.last!.beat
+                                        } else {
+                                            note.beatRange.length = nv.note.beatRange.length
+                                        }
+                                    }
+                                    
+                                    scoreView[noteI] = note
+                                }
+                                
+                                oldBeat = nsBeat
+                                
+                                document.updateSelects()
+                            }
+                        }
+                    case .sprol:
+                        if let noteI, noteI < score.notes.count,
+                           let pitI, pitI < score.notes[noteI].pits.count,
+                           let sprolI, sprolI < score.notes[noteI].pits[pitI].tone.spectlope.count {
+                           
+                            let pitch = scoreView.spectlopePitch(at: scoreP, at: noteI)
+                            let dPitch = pitch - beganSprol.pitch
+                            let nPitch = (beganTone.spectlope.sprols[sprolI].pitch + dPitch)
+                                .clipped(min: Score.doubleMinPitch, max: Score.doubleMaxPitch)
+                            
+                            var nvs = [Int: Note]()
+                            for (_, v) in beganNoteSprols {
+                                for (noteI, nv) in v.dic {
+                                    if nvs[noteI] == nil {
+                                        nvs[noteI] = nv.note
+                                    }
+                                    nv.pits.forEach { (pitI, beganPit) in
+                                        for sprolI in beganPit.sprolIs {
+                                            let pitch = (beganPit.pit.tone.spectlope.sprols[sprolI].pitch + dPitch)
+                                                .clipped(min: Score.doubleMinPitch, max: Score.doubleMaxPitch)
+                                            nvs[noteI]?.pits[pitI].tone.spectlope.sprols[sprolI].pitch = pitch
+                                        }
+                                        nvs[noteI]?.pits[pitI].tone.id = v.nid
+                                    }
+                                }
+                            }
+                            let nivs = nvs.map { IndexValue(value: $0.value, index: $0.key) }
+                            scoreView.replace(nivs)
+                            
+                            notePlayer?.notes = playerBeatNoteIndexes.map {
+                                scoreView.normarizedPitResult(atBeat: beganStartBeat, at: $0)
+                            }
+                            
+                            document.cursor = .circle(string: Pitch(value: .init(nPitch, intervalScale: Sheet.fullEditPitchInterval)).octaveString(hidableDecimal: false))
                         }
                     }
                 }
             }
         case .ended:
+            node.removeFromParent()
             if let sheetView {
-                if isPit {
+                if !isLine {
                     notePlayer?.stop()
                     
                     var isNewUndoGroup = false
@@ -1922,6 +2247,22 @@ final class LineSlider: DragEditor {
                         }
                     }
                     
+                    let scoreView = sheetView.scoreView
+                    let score = scoreView.model
+                    var noteIVs = [IndexValue<Note>](), oldNoteIVs = [IndexValue<Note>]()
+                    for (noteI, beganNote) in beganNotes.sorted(by: { $0.key < $1.key }) {
+                        guard noteI < score.notes.count else { continue }
+                        let note = score.notes[noteI]
+                        if beganNote != note {
+                            noteIVs.append(.init(value: note, index: noteI))
+                            oldNoteIVs.append(.init(value: beganNote, index: noteI))
+                        }
+                    }
+                    if !noteIVs.isEmpty {
+                        updateUndoGroup()
+                        sheetView.capture(noteIVs, old: oldNoteIVs)
+                    }
+                    
                     if !beganNotePits.isEmpty {
                         let scoreView = sheetView.scoreView
                         let score = scoreView.model
@@ -1929,6 +2270,30 @@ final class LineSlider: DragEditor {
                         
                         let beganNoteIAndNotes = beganNotePits.reduce(into: [Int: Note]()) {
                             $0[$1.key] = $1.value.note
+                        }
+                        for (noteI, beganNote) in beganNoteIAndNotes {
+                            guard noteI < score.notes.count else { continue }
+                            let note = scoreView.model.notes[noteI]
+                            if beganNote != note {
+                                noteIVs.append(.init(value: note, index: noteI))
+                                oldNoteIVs.append(.init(value: beganNote, index: noteI))
+                            }
+                        }
+                        if !noteIVs.isEmpty {
+                            updateUndoGroup()
+                            sheetView.capture(noteIVs, old: oldNoteIVs)
+                        }
+                    }
+                    
+                    if !beganNoteSprols.isEmpty {
+                        let scoreView = sheetView.scoreView
+                        let score = scoreView.model
+                        var noteIVs = [IndexValue<Note>](), oldNoteIVs = [IndexValue<Note>]()
+                        
+                        let beganNoteIAndNotes = beganNoteSprols.reduce(into: [Int: Note]()) {
+                            for (noteI, v) in $1.value.dic {
+                                $0[noteI] = v.note
+                            }
                         }
                         for (noteI, beganNote) in beganNoteIAndNotes {
                             guard noteI < score.notes.count else { continue }
@@ -2027,7 +2392,7 @@ final class LineZSlider: DragEditor {
                     lineNode.lineWidth = lineView.node.lineWidth
                     sheetView.linesView.node.children.insert(lineNode, at: li)
                 } else if sheetView.scoreView.model.enabled,
-                          let li = sheetView.scoreView.noteIndex(at: inP,
+                          let li = sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
                                                                  scale: document.screenToWorldScale) {
                     self.sheetView = sheetView
                     lineIndex = li
@@ -2038,6 +2403,7 @@ final class LineZSlider: DragEditor {
                     let line = sheetView.scoreView.pointline(from: sheetView.scoreView.model.notes[li])
                     let noteH = sheetView.scoreView.noteH(from: sheetView.scoreView.model.notes[li])
                     if let lb = noteNode.path.bounds?.outset(by: noteH / 2) {
+                        let toneFrame = sheetView.scoreView.toneFrame(at: li)
                         crossIndexes = sheetView.scoreView.model.notes.enumerated().compactMap {
                             let nNoteH = sheetView.scoreView.noteH(from: sheetView.scoreView.model.notes[$0.offset])
                             let nLine = sheetView.scoreView.pointline(from: $0.element)
@@ -2047,6 +2413,10 @@ final class LineZSlider: DragEditor {
                                       nb.outset(by: noteH / 2).intersects(lb) {
                                 nLine.minDistanceSquared(line) < (noteH / 2 + nNoteH / 2).squared ?
                                 $0.offset : nil
+                            } else if let toneFrame,
+                                      let otherToneFrame = sheetView.scoreView.toneFrame(at: $0.offset),
+                                      toneFrame.intersects(otherToneFrame) {
+                                $0.offset
                             } else {
                                 nil
                             }

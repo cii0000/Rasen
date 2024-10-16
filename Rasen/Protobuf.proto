@@ -193,7 +193,6 @@ message PBSpectlope {
 message PBTone {
     PBOvertone overtone = 1;
     PBSpectlope spectlope = 2;
-    PBColor color = 4;
     PBUUID id = 3;
 }
 

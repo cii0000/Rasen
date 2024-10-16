@@ -301,6 +301,7 @@ extension ContentView {
         updateTimeline()
         if let timeOption = model.timeOption {
             pcmNoder?.change(from: timeOption)
+            updateSpectrogram()
         }
     }
     func updateClippingNode() {
