@@ -32,10 +32,6 @@ extension vDSP {
         }
     }
     
-    static func nextPow2(_ x: Int) -> Int {
-        Int(.exp2(.log2(Double(x)).rounded(.up)))
-    }
-    
     static func fftfreq(_ n: Int, _ d: Double) -> [Double] {
         let v = 1 / (Double(n) * d)
         var results = [Int](capacityUninitialized: n)
@@ -60,7 +56,7 @@ extension vDSP {
         switch type {
         case .normal:
             let nx = .init(repeating: 0, count: h.count) + x
-            let fftCount = vDSP.nextPow2(nx.count + h.count - 1)
+            let fftCount = (nx.count + h.count - 1).nextPow2()
             let fft = try! Fft(count: fftCount), ifft = try! Ifft(count: fftCount)
             let nnx = nx + .init(repeating: 0, count: fftCount - nx.count)
             let nh = h + .init(repeating: 0, count: fftCount - h.count)
@@ -453,7 +449,7 @@ struct Spectrogram {
          isNormalized: Bool = false,
          type: FqType = .pitch) {
         
-        let fftCount = vDSP.nextPow2(fftCount)
+        let fftCount = fftCount.nextPow2()
         
         let buffer: PCMBuffer
         if oBuffer.sampleRate != Audio.defaultSampleRate {

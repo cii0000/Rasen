@@ -2511,8 +2511,7 @@ extension Sheet {
         let audiotrack = audiotrack
         if !audiotrack.isEmpty,
            let sequencer = Sequencer(audiotracks: [audiotrack], type: .normal) {
-            return try? sequencer.buffer(sampleRate: Audio.defaultSampleRate,
-                                         headroomAmp: nil) { _, _ in }
+            return try? sequencer.buffer(sampleRate: Audio.defaultSampleRate) { _, _ in }
         }
         return nil
     }

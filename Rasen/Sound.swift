@@ -893,28 +893,28 @@ extension Pit {
 }
 
 struct Reverb: Hashable, Codable {
-    var earlyRSec = 0.02
-    var earlyRVolm = 0.75
-    var lateRSec = 0.2
-    var lateRVolm = 0.5
+    var earlySec = 0.02
+    var earlyVolm = 0.75
+    var lateSec = 0.2
+    var lateVolm = 0.5
     var releaseSec = 0.3
-    var seedID = UUID.one
+    var seedID = UUID()
 }
 extension Reverb: Protobuf {
     init(_ pb: PBReverb) throws {
-        earlyRSec = max(0, ((try? pb.earlyRsec.notNaN()) ?? 0))
-        earlyRVolm = ((try? pb.earlyRvolm.notNaN()) ?? 0).clipped(min: 0, max: 1)
-        lateRSec = max(0, ((try? pb.lateRsec.notNaN()) ?? 0))
-        lateRVolm = ((try? pb.lateRvolm.notNaN()) ?? 0).clipped(min: 0, max: 1)
+        earlySec = max(0, ((try? pb.earlyRsec.notNaN()) ?? 0))
+        earlyVolm = ((try? pb.earlyRvolm.notNaN()) ?? 0).clipped(min: 0, max: 1)
+        lateSec = max(0, ((try? pb.lateRsec.notNaN()) ?? 0))
+        lateVolm = ((try? pb.lateRvolm.notNaN()) ?? 0).clipped(min: 0, max: 1)
         releaseSec = max(0, ((try? pb.releaseSec.notNaN()) ?? 0))
         seedID = (try? .init(pb.seedID)) ?? .init()
     }
     var pb: PBReverb {
         .with {
-            $0.earlyRsec = earlyRSec
-            $0.earlyRvolm = earlyRVolm
-            $0.lateRsec = lateRSec
-            $0.lateRvolm = lateRVolm
+            $0.earlyRsec = earlySec
+            $0.earlyRvolm = earlyVolm
+            $0.lateRsec = lateSec
+            $0.lateRvolm = lateVolm
             $0.releaseSec = releaseSec
             $0.seedID = seedID.pb
         }
@@ -922,14 +922,14 @@ extension Reverb: Protobuf {
 }
 extension Reverb {
     var isEmpty: Bool {
-        (earlyRSec == 0 && lateRSec == 0 && releaseSec == 0) || (earlyRVolm == 0 && lateRVolm == 0)
+        (earlySec == 0 && lateSec == 0 && releaseSec == 0) || (earlyVolm == 0 && lateVolm == 0)
     }
     
-    var earlyAndLateRSec: Double {
-        earlyRSec + lateRSec
+    var earlyLateSec: Double {
+        earlySec + lateSec
     }
     var durSec: Double {
-        earlyRSec + lateRSec + releaseSec
+        earlySec + lateSec + releaseSec
     }
     func count(sampleRate: Double) -> Int {
         Int((durSec * sampleRate).rounded(.up))
@@ -943,9 +943,9 @@ extension Reverb {
         var fir = [Double](repeating: 0, count: count)
         fir[0] = 1
         
-        let elRSec = earlyRSec + lateRSec
+        let elRSec = earlySec + lateSec
         let rSampleRate = 1 / sampleRate
-        let si = Int(earlyRSec * sampleRate).clipped(min: 0, max: count - 1)
+        let si = Int(earlySec * sampleRate).clipped(min: 0, max: count - 1)
         let seed = seedID.uInt64Values.value0
         var random = Random(seed: seed)
         let scale = 100.0
@@ -953,13 +953,13 @@ extension Reverb {
         var preI = si
         for i in si ..< count {
             let sec = Double(i) * rSampleRate
-            let nni = lateRSec == 0 ? 0 : sec.clipped(min: earlyRSec, max: elRSec, newMin: 1, newMax: 0)
+            let nni = lateSec == 0 ? 0 : sec.clipped(min: earlySec, max: elRSec, newMin: 1, newMax: 0)
             let ni = nni.squared.clipped(min: 1, max: 0, newMin: Double(si), newMax: 1)
             guard i == si || ni == 1 || i - preI >= Int(ni) else { continue }
             preI = i
             let volm = sec < elRSec ?
-            (1 - nni).squared.clipped(min: 0, max: 1, newMin: earlyRVolm, newMax: lateRVolm) :
-            sec.clipped(min: elRSec, max: durSec, newMin: lateRVolm, newMax: 0)
+            (1 - nni).squared.clipped(min: 0, max: 1, newMin: earlyVolm, newMax: lateVolm) :
+            sec.clipped(min: elRSec, max: durSec, newMin: lateVolm, newMax: 0)
             let t1 = random.nextT()
             let nPan = (t1 * 2 - 1) * 0.75
             let nVolm = if nPan < 0 {

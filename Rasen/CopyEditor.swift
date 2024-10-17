@@ -907,15 +907,11 @@ final class CopyEditor: Editor {
 //        } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
 //            
         } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
-                  let noteI = sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
-                                                            scale: document.screenToWorldScale,
-                                                            enabledRelease: true) {
+                  let (noteI, result) = sheetView.scoreView
+            .hitTestPoint(sheetView.scoreView.convertFromWorld(p), scale: document.screenToWorldScale / 2) {
+            
             let scoreView = sheetView.scoreView
             let score = scoreView.model
-            let scoreP = scoreView.convertFromWorld(p)
-            
-            selectingLineNode.lineType = .color(.selected)
-            selectingLineNode.lineWidth = document.worldLineWidth
             
             func show(_ ps: [Point]) {
                 let scale = 1 / document.worldToScreenScale
@@ -928,93 +924,98 @@ final class CopyEditor: Editor {
                 selectingLineNode.children = [node]
             }
             
-            if let result = scoreView.hitTestPoint(scoreP, scale: document.screenToWorldScale / 2, at: noteI) {
-                switch result {
-                case .pit(let pitI):
-                    let stereo = score.notes[noteI].pits[pitI].stereo
-                    if isSendPasteboard {
-                        Pasteboard.shared.copiedObjects = [.stereo(stereo)]
-                    }
-                    let ps = score.notes.flatMap { note in
-                        note.pits.enumerated().compactMap {
-                            $0.element.stereo.id == stereo.id ?
-                            scoreView.pitPosition(atPit: $0.offset, from: note) : nil
-                        }
-                    }
-                    show(ps)
-                case .reverbEarlyRSec:
-                    let envelope = score.notes[noteI].envelope
-                    if isSendPasteboard {
-                        Pasteboard.shared.copiedObjects = [.envelope(envelope)]
-                    }
-                    let ps = score.notes.compactMap {
-                        $0.envelope.id == envelope.id ? scoreView.reverbEarlyRSecPosition(from: $0) : nil
-                    }
-                    show(ps)
-                case .reverbEarlyAndLateRSec:
-                    let envelope = score.notes[noteI].envelope
-                    if isSendPasteboard {
-                        Pasteboard.shared.copiedObjects = [.envelope(envelope)]
-                    }
-                    let ps = score.notes.compactMap {
-                        $0.envelope.id == envelope.id ? scoreView.reverbEarlyAndLateRSecPosition(from: $0) : nil
-                    }
-                    show(ps)
-                case .reverbDurSec:
-                    let envelope = score.notes[noteI].envelope
-                    if isSendPasteboard {
-                        Pasteboard.shared.copiedObjects = [.envelope(envelope)]
-                    }
-                    let ps = score.notes.compactMap {
-                        $0.envelope.id == envelope.id ? scoreView.reverbDurSecPosition(from: $0) : nil
-                    }
-                    show(ps)
-                case .even(let pitI):
-                    let note = score.notes[noteI]
-                    let tone = note.pits[pitI].tone
-                    let volm = tone.overtone.evenVolm
-                    if isSendPasteboard {
-                        Pasteboard.shared.copiedObjects = [.normalizationValue(volm)]
-                    }
-                    let ps = score.notes.flatMap { note in
-                        note.pits.enumerated().compactMap {
-                            $0.element.tone.id == tone.id ?
-                            scoreView.evenPosition(atPit: $0.offset, from: note) : nil
-                        }
-                    }
-                    show(ps)
-                case .sprol(let pitI, _):
-                    let tone = score.notes[noteI].pits[pitI].tone
-                    if isSendPasteboard {
-                        Pasteboard.shared.copiedObjects = [.tone(tone)]
-                    }
-                    let ps = score.notes.flatMap { note in
-                        note.pits.enumerated().compactMap {
-                            $0.element.tone.id == tone.id ?
-                            scoreView.evenPosition(atPit: $0.offset, from: note) : nil
-                        }
-                    }
-                    show(ps)
-                }
-            } else {
-                let pitchInterval = document.currentPitchInterval
-                let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
-                let beatInterval = document.currentBeatInterval
-                let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
-                var note = score.notes[noteI]
-                note.pitch -= pitch
-                note.beatRange.start -= beat
-                
+            switch result {
+            case .pit(let pitI):
+                let stereo = score.notes[noteI].pits[pitI].stereo
                 if isSendPasteboard {
-                    Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [note]))]
+                    Pasteboard.shared.copiedObjects = [.stereo(stereo)]
                 }
-                let lines = [scoreView.pointline(from: score.notes[noteI])]
-                    .map { scoreView.convertToWorld($0) }
-                selectingLineNode.children = lines.map {
-                    Node(path: Path($0.controls.map { $0.point }),
-                         lineWidth: document.worldLineWidth * 1.5,
-                         lineType: .color(.selected))
+                let ps = score.notes.flatMap { note in
+                    note.pits.enumerated().compactMap {
+                        $0.element.stereo.id == stereo.id ?
+                        scoreView.pitPosition(atPit: $0.offset, from: note) : nil
+                    }
                 }
+                show(ps)
+            case .reverbEarlyRSec:
+                let envelope = score.notes[noteI].envelope
+                if isSendPasteboard {
+                    Pasteboard.shared.copiedObjects = [.envelope(envelope)]
+                }
+                let ps = score.notes.compactMap {
+                    $0.envelope.id == envelope.id ? scoreView.earlyReverbPosition(from: $0) : nil
+                }
+                show(ps)
+            case .reverbEarlyAndLateRSec:
+                let envelope = score.notes[noteI].envelope
+                if isSendPasteboard {
+                    Pasteboard.shared.copiedObjects = [.envelope(envelope)]
+                }
+                let ps = score.notes.compactMap {
+                    $0.envelope.id == envelope.id ? scoreView.lateReverbPosition(from: $0) : nil
+                }
+                show(ps)
+            case .reverbDurSec:
+                let envelope = score.notes[noteI].envelope
+                if isSendPasteboard {
+                    Pasteboard.shared.copiedObjects = [.envelope(envelope)]
+                }
+                let ps = score.notes.compactMap {
+                    $0.envelope.id == envelope.id ? scoreView.durReverbPosition(from: $0) : nil
+                }
+                show(ps)
+            case .even(let pitI):
+                let note = score.notes[noteI]
+                let tone = note.pits[pitI].tone
+                let volm = tone.overtone.evenVolm
+                if isSendPasteboard {
+                    Pasteboard.shared.copiedObjects = [.normalizationValue(volm)]
+                }
+                let ps = score.notes.flatMap { note in
+                    note.pits.enumerated().compactMap {
+                        $0.element.tone.id == tone.id ?
+                        scoreView.evenPosition(atPit: $0.offset, from: note) : nil
+                    }
+                }
+                show(ps)
+            case .sprol(let pitI, _):
+                let tone = score.notes[noteI].pits[pitI].tone
+                if isSendPasteboard {
+                    Pasteboard.shared.copiedObjects = [.tone(tone)]
+                }
+                let ps = score.notes.flatMap { note in
+                    note.pits.enumerated().compactMap {
+                        $0.element.tone.id == tone.id ?
+                        scoreView.evenPosition(atPit: $0.offset, from: note) : nil
+                    }
+                }
+                show(ps)
+            }
+            return true
+        } else if let sheetView = document.sheetView(at: p),
+                    let noteI = sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
+                                                              scale: document.screenToWorldScale) {
+            let scoreView = sheetView.scoreView
+            let score = scoreView.model
+            let scoreP = scoreView.convertFromWorld(p)
+            
+            let pitchInterval = document.currentPitchInterval
+            let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
+            let beatInterval = document.currentBeatInterval
+            let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
+            var note = score.notes[noteI]
+            note.pitch -= pitch
+            note.beatRange.start -= beat
+            
+            if isSendPasteboard {
+                Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [note]))]
+            }
+            let lines = [scoreView.pointline(from: score.notes[noteI])]
+                .map { scoreView.convertToWorld($0) }
+            selectingLineNode.children = lines.map {
+                Node(path: Path($0.controls.map { $0.point }),
+                     lineWidth: document.worldLineWidth * 1.5,
+                     lineType: .color(.selected))
             }
             return true
         } else if let (sBorder, edge) = document.worldBorder(at: p, distance: d) {
@@ -1288,110 +1289,107 @@ final class CopyEditor: Editor {
                 return true
             }
         } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
+                  let (noteI, result) = sheetView.scoreView
+            .hitTestPoint(sheetView.scoreView.convertFromWorld(p), scale: document.screenToWorldScale) {
+            
+            let scoreView = sheetView.scoreView
+            let score = scoreView.model
+            switch result {
+            case .pit(let pitI):
+                if !scoreView.model.notes[noteI].isEmpty {
+                    var pits = score.notes[noteI].pits
+                    pits.remove(at: pitI)
+                    var note = score.notes[noteI]
+                    if pits.isEmpty {
+                        note.pits = [.init()]
+                    } else {
+                        note.pits = pits
+                    }
+                    
+                    sheetView.newUndoGroup()
+                    sheetView.replace(note, at: noteI)
+                    
+                    sheetView.updatePlaying()
+                    return true
+                }
+            case .even(let pitI):
+                if !scoreView.model.notes[noteI].isEmpty {
+                    var pits = score.notes[noteI].pits
+                    pits.remove(at: pitI)
+                    var note = score.notes[noteI]
+                    if pits.isEmpty {
+                        note.pits = [.init()]
+                    } else {
+                        note.pits = pits
+                    }
+                    
+                    sheetView.newUndoGroup()
+                    sheetView.replace(note, at: noteI)
+                    
+                    sheetView.updatePlaying()
+                    return true
+                }
+            case .reverbEarlyRSec, .reverbEarlyAndLateRSec, .reverbDurSec:
+                let envelope = score.notes[noteI].envelope
+                Pasteboard.shared.copiedObjects = [.envelope(envelope)]
+                
+                sheetView.newUndoGroup()
+                sheetView.replace(Envelope(), at: noteI)
+                
+                sheetView.updatePlaying()
+                return true
+            case .sprol(let pitI, let sprolI):
+                let oldTone = score.notes[noteI].pits[pitI].tone
+                var tone = oldTone
+                if tone.spectlope.count <= 1 {
+                    tone = .init()
+                } else {
+                    tone.spectlope.sprols.remove(at: sprolI)
+                }
+                tone.id = .init()
+                
+                let nis = (0 ..< score.notes.count).filter { score.notes[$0].pits.contains { $0.tone.id == oldTone.id } }
+                
+                let nivs = nis.map {
+                    var note = score.notes[$0]
+                    note.pits = note.pits.map {
+                        if $0.tone.id == oldTone.id {
+                            var pit = $0
+                            pit.tone = tone
+                            return pit
+                        } else {
+                            return $0
+                        }
+                    }
+                    return IndexValue(value: note, index: $0)
+                }
+                
+                sheetView.newUndoGroup()
+                sheetView.replace(nivs)
+                return true
+            }
+        } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
                   let noteI = sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
                                                             scale: document.screenToWorldScale) {
             let scoreView = sheetView.scoreView
             let score = scoreView.model
             let scoreP = scoreView.convertFromWorld(p)
-            if let result = scoreView.hitTestPoint(scoreP, scale: document.screenToWorldScale, at: noteI) {
-                switch result {
-                case .pit(let pitI):
-                    if !scoreView.model.notes[noteI].isEmpty {
-                        var pits = score.notes[noteI].pits
-                        pits.remove(at: pitI)
-                        var note = score.notes[noteI]
-                        if pits.isEmpty {
-                            note.pits = [.init()]
-                        } else {
-                            note.pits = pits
-                        }
-                        
-                        sheetView.newUndoGroup()
-                        sheetView.replace(note, at: noteI)
-                        
-                        sheetView.updatePlaying()
-                        return true
-                    }
-                case .even(let pitI):
-                    if !scoreView.model.notes[noteI].isEmpty {
-                        var pits = score.notes[noteI].pits
-                        pits.remove(at: pitI)
-                        var note = score.notes[noteI]
-                        if pits.isEmpty {
-                            note.pits = [.init()]
-                        } else {
-                            note.pits = pits
-                        }
-                        
-                        sheetView.newUndoGroup()
-                        sheetView.replace(note, at: noteI)
-                        
-                        sheetView.updatePlaying()
-                        return true
-                    }
-                case .reverbEarlyRSec, .reverbEarlyAndLateRSec, .reverbDurSec:
-                    let envelope = score.notes[noteI].envelope
-                    Pasteboard.shared.copiedObjects = [.envelope(envelope)]
-                    
-                    sheetView.newUndoGroup()
-                    sheetView.replace(Envelope(), at: noteI)
-                    
-                    sheetView.updatePlaying()
-                    return true
-                case .sprol(let pitI, let sprolI):
-                    let oldTone = score.notes[noteI].pits[pitI].tone
-                    var tone = oldTone
-                    if tone.spectlope.count <= 1 {
-                        tone = .init()
-                    } else {
-                        tone.spectlope.sprols.remove(at: sprolI)
-                    }
-                    tone.id = .init()
-                    
-                    let nis = (0 ..< score.notes.count).filter { score.notes[$0].pits.contains { $0.tone.id == oldTone.id } }
-                    
-                    let nivs = nis.map {
-                        var note = score.notes[$0]
-                        note.pits = note.pits.map {
-                            if $0.tone.id == oldTone.id {
-                                var pit = $0
-                                pit.tone = tone
-                                return pit
-                            } else {
-                                return $0
-                            }
-                        }
-                        return IndexValue(value: note, index: $0)
-                    }
-                    
-                    sheetView.newUndoGroup()
-                    sheetView.replace(nivs)
-                        
-//                    var tone = score.notes[noteI].pits[pitI].tone
-//                    tone.spectlope.controls.remove(at: controlI)
-                    
-    //                Pasteboard.shared.copiedObjects = [.formant(formant)]
-//                    sheetView.newUndoGroup()
-//                    sheetView.replace(tone, at: noteI)
-                    return true
-                }
-            } else {
-                let pitchInterval = document.currentPitchInterval
-                let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
-                let beatInterval = document.currentBeatInterval
-                let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
-                var note = score.notes[noteI]
-                note.pitch -= pitch
-                note.beatRange.start -= beat
-                
-                Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [note]))]
-                
-                sheetView.newUndoGroup()
-                sheetView.removeNote(at: noteI)
-                
-                sheetView.updatePlaying()
-                return true
-            }
+            
+            let pitchInterval = document.currentPitchInterval
+            let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
+            let beatInterval = document.currentBeatInterval
+            let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
+            var note = score.notes[noteI]
+            note.pitch -= pitch
+            note.beatRange.start -= beat
+            
+            Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [note]))]
+            
+            sheetView.newUndoGroup()
+            sheetView.removeNote(at: noteI)
+            
+            sheetView.updatePlaying()
+            return true
         } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
                     let keyBeatI = sheetView.scoreView.keyBeatIndex(at: sheetView.scoreView.convertFromWorld(p),
                                                                     scale: document.screenToWorldScale) {

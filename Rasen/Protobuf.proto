@@ -208,10 +208,10 @@ message PBPitbend {
 }
 
 message PBReverb {
-    double earlyRSec = 1;
-    double earlyRVolm = 2;
-    double lateRSec = 3;
-    double lateRVolm = 4;
+    double earlySec = 1;
+    double earlyVolm = 2;
+    double lateSec = 3;
+    double lateVolm = 4;
     double releaseSec = 5;
     PBUUID seedID = 6;
 }

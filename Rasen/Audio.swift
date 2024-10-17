@@ -538,19 +538,22 @@ final class ScoreNoder {
             
             func updateF(i: Int, mi: Int, ni: Int, samples: [[Double]], stereos: [Stereo],
                          isPremultipliedEnvelope: Bool,
+                         allAttackStartSec: Double?, allReleaseStartSec: Double?,
                          envelopeMemo: EnvelopeMemo, startSec: Double, releaseSec: Double?) {
+                let sec = Double(i) * rSampleRate
                 let waveclipAmp = isPremultipliedEnvelope ?
-                1 :
-                Waveclip.amp(atSec: Double(i) * rSampleRate - startSec,
-                             releaseStartSec: releaseSec != nil ? releaseSec! - startSec : nil)
+                1 : Waveclip.amp(atSec: sec, attackStartSec: startSec, releaseStartSec: releaseSec)
+                
+                let allWaveclipAmp = Waveclip
+                    .amp(atSec: sec, attackStartSec: allAttackStartSec, releaseStartSec: allReleaseStartSec)
                 
                 let envelopeVolm = isPremultipliedEnvelope ?
                 1 :
-                envelopeMemo.volm(atSec: Double(i) * rSampleRate - startSec,
+                envelopeMemo.volm(atSec: sec - startSec,
                                   releaseStartSec: releaseSec != nil ? releaseSec! - startSec : nil)
                 
                 let stereo = stereos.count == 1 ? stereos[0] : stereos[mi]
-                let amp = Volm.amp(fromVolm: stereo.volm * envelopeVolm) * waveclipAmp
+                let amp = Volm.amp(fromVolm: stereo.volm * envelopeVolm) * waveclipAmp * allWaveclipAmp
                 let pan = stereo.pan
                 
                 if pan == 0 || nFramess.count < 2 {
@@ -636,6 +639,7 @@ final class ScoreNoder {
                         updateF(i: ni + unloopedFrameStartI, mi: mi, ni: ni,
                                 samples: notewave.samples, stereos: notewave.stereos,
                                 isPremultipliedEnvelope: notewave.isPremultipliedEnvelope,
+                                allAttackStartSec: nil, allReleaseStartSec: nil,
                                 envelopeMemo: rendnote.envelopeMemo,
                                 startSec: nStartSec, releaseSec: releaseSec)
                         mi += 1
@@ -646,7 +650,8 @@ final class ScoreNoder {
                     //fir
                 }
             } else {
-                let maxCount = Int(max(1, (seq.durSec * sampleRate).rounded(.up)))
+                let seqDurSec = seq.durSec
+                let maxCount = Int(max(1, (seqDurSec * sampleRate).rounded(.up)))
                 let loopedFrameStartI = type == .loop ?
                 unloopedFrameStartI % maxCount : unloopedFrameStartI
                 let loopedFrameRange = loopedFrameStartI ..< loopedFrameStartI + frameCount
@@ -671,6 +676,11 @@ final class ScoreNoder {
                     let notewave = self.notewaveDic[nwid]
                     self.notewaveDicSemaphore.signal()
                     
+                    let isFirstCross = range.lowerBound < 0
+                    let isLastCross = range.upperBound > maxCount
+                    let allAttackStartSec = type != .note && isFirstCross ? 0.0 : nil
+                    let allReleaseStartSec = type == .normal && isLastCross ? seqDurSec - Waveclip.releaseSec : nil
+                    
                     guard let notewave else { continue }
                     let sampleCount = notewave.sampleCount
                     func update(notewave: Notewave,
@@ -684,6 +694,8 @@ final class ScoreNoder {
                                     updateF(i: i, mi: mi, ni: ni,
                                             samples: notewave.samples, stereos: notewave.stereos,
                                             isPremultipliedEnvelope: notewave.isPremultipliedEnvelope,
+                                            allAttackStartSec: allAttackStartSec,
+                                            allReleaseStartSec: allReleaseStartSec,
                                             envelopeMemo: envelopeMemo,
                                             startSec: startSec, releaseSec: releaseSec)
                                 }
@@ -937,21 +949,42 @@ extension Sequencer {
     
     struct ExportError: Error {}
     
+    func export(url: URL,
+                sampleRate: Double,
+                headroomAmp: Double = Audio.headroomAmp,
+                enabledUseWaveclip: Bool = true,
+                isCompress: Bool = true,
+                progressHandler: (Double, inout Bool) -> ()) throws {
+        guard let buffer = try buffer(sampleRate: sampleRate,
+                                      headroomAmp: headroomAmp,
+                                      isCompress: isCompress,
+                                      progressHandler: progressHandler) else { return }
+        let file = try AVAudioFile(forWriting: url,
+                                   settings: buffer.format.settings,
+                                   commonFormat: buffer.format.commonFormat,
+                                   interleaved: buffer.format.isInterleaved)
+        try file.write(from: buffer)
+    }
     func audio(sampleRate: Double,
-               headroomAmp: Float? = Audio.floatHeadroomAmp, enabledUseWaveclip: Bool = true,
+               headroomAmp: Double = Audio.headroomAmp,
+               enabledUseWaveclip: Bool = true,
+               isCompress: Bool = true,
                progressHandler: (Double, inout Bool) -> ()) throws -> Audio? {
         guard let buffer = try buffer(sampleRate: sampleRate,
                                       headroomAmp: headroomAmp,
                                       enabledUseWaveclip: enabledUseWaveclip,
+                                      isCompress: isCompress,
                                       progressHandler: progressHandler) else { return nil }
         return Audio(pcmData: buffer.pcmData)
     }
     func buffer(sampleRate: Double,
-                headroomAmp: Float? = Audio.floatHeadroomAmp, enabledUseWaveclip: Bool = true,
+                headroomAmp: Double = Audio.headroomAmp,
+                enabledUseWaveclip: Bool = true,
+                isCompress: Bool = true,
                 progressHandler: (Double, inout Bool) -> ()) throws -> AVAudioPCMBuffer? {
         let oldHeadroomAmp = clippingAudioUnit.headroomAmp
         let oldEnabledAttack = clippingAudioUnit.enabledAttack
-        clippingAudioUnit.headroomAmp = headroomAmp
+        clippingAudioUnit.headroomAmp = isCompress ? nil : .init(headroomAmp)
         clippingAudioUnit.enabledAttack = false
         defer {
             clippingAudioUnit.headroomAmp = oldHeadroomAmp
@@ -976,7 +1009,7 @@ extension Sequencer {
             throw ExportError()
         }
         
-        let length = AVAudioFramePosition(durSec * sampleRate)
+        let length = AVAudioFramePosition((durSec * sampleRate).rounded(.up))
         
         guard let allBuffer = AVAudioPCMBuffer(pcmFormat: engine.manualRenderingFormat,
                                                frameCapacity: AVAudioFrameCount(length)) else {
@@ -992,10 +1025,6 @@ extension Sequencer {
                 let status = try engine.renderOffline(framesToRender, to: buffer)
                 switch status {
                 case .success:
-                    if let ca = headroomAmp {
-                        buffer.clip(amp: Float(ca))
-                    }
-                    
                     allBuffer.append(buffer)
                     progressHandler(Double(mrst) / Double(length), &stop)
                     if stop { return nil }
@@ -1021,84 +1050,16 @@ extension Sequencer {
         if enabledUseWaveclip {
             allBuffer.useWaveclip()
         }
+        if isCompress {
+            allBuffer.compress(targetAmp: Float(headroomAmp))
+        } else {
+            allBuffer.clip(amp: Float(headroomAmp))
+        }
+        
+        progressHandler(1, &stop)
+        if stop { return nil }
         
         return allBuffer
-    }
-    
-    func export(url: URL,
-                sampleRate: Double,
-                isCompress: Bool = true,
-                progressHandler: (Double, inout Bool) -> ()) throws {
-        if isCompress {
-            guard let oBuffer = try buffer(sampleRate: sampleRate,
-                                           headroomAmp: nil,
-                                           progressHandler: progressHandler) else { return }
-            let file = try AVAudioFile(forWriting: url,
-                                       settings: oBuffer.format.settings,
-                                       commonFormat: oBuffer.format.commonFormat,
-                                       interleaved: oBuffer.format.isInterleaved)
-            oBuffer.compress(targetDb: -Audio.headroomDb)
-            try file.write(from: oBuffer)
-            return
-        }
-        
-        guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32,
-                                         sampleRate: sampleRate,
-                                         channels: 2,
-                                         interleaved: true) else { throw ExportError() }
-
-        try engine.enableManualRenderingMode(.offline,
-                                             format: format,
-                                             maximumFrameCount: 512)
-        try engine.start()
-        isPlaying = true
-        
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: engine.manualRenderingFormat,
-                                            frameCapacity: engine.manualRenderingMaximumFrameCount) else {
-
-            isPlaying = false
-            endEngine()
-            throw ExportError()
-        }
-
-        let file = try AVAudioFile(forWriting: url,
-                                   settings: engine.manualRenderingFormat.settings,
-                                   commonFormat: engine.manualRenderingFormat.commonFormat,
-                                   interleaved: engine.manualRenderingFormat.isInterleaved)
-        
-        var stop = false
-        let length = AVAudioFramePosition(durSec * sampleRate)
-        while engine.manualRenderingSampleTime < length {
-            do {
-                let mrst = engine.manualRenderingSampleTime
-                let frameCount = length - mrst
-                let framesToRender = min(AVAudioFrameCount(frameCount), buffer.frameCapacity)
-                let status = try engine.renderOffline(framesToRender, to: buffer)
-                switch status {
-                case .success:
-                    buffer.clip(amp: Float(Audio.floatHeadroomAmp))
-                    
-                    try file.write(from: buffer)
-                    progressHandler(Double(mrst) / Double(length), &stop)
-                    if stop { return }
-                case .insufficientDataFromInputNode:
-                    throw ExportError()
-                case .cannotDoInCurrentContext:
-                    progressHandler(Double(mrst) / Double(length), &stop)
-                    if stop { return }
-                    Thread.sleep(forTimeInterval: 0.1)
-                case .error: throw ExportError()
-                @unknown default: throw ExportError()
-                }
-            } catch {
-                isPlaying = false
-                endEngine()
-                throw error
-            }
-        }
-        
-        isPlaying = false
-        endEngine()
     }
 }
 
@@ -1407,12 +1368,13 @@ extension AVAudioPCMBuffer {
         }
     }
     
-    func compress(targetDb: Double,
-                  attack: Double = 0.02, release: Double = 0.02) {
+    func compress(targetDb: Double, attackSec: Double = 0.02, releaseSec: Double = 0.02) {
+        compress(targetAmp: .init(Volm.amp(fromDb: targetDb)), attackSec: attackSec, releaseSec: releaseSec)
+    }
+    func compress(targetAmp: Float, attackSec: Double = 0.02, releaseSec: Double = 0.02) {
         struct P {
             var minI, maxI: Int, scale: Float
         }
-        let targetAmp = Float(Volm.amp(fromDb: targetDb))
         
         var minI: Int?, maxDAmp: Float = 0.0, ps = [P]()
         for i in 0 ..< frameCount {
@@ -1434,8 +1396,8 @@ extension AVAudioPCMBuffer {
                 }
             }
         }
-        let attackCount = Int(attack * sampleRate)
-        let releaseCount = Int(release * sampleRate)
+        let attackCount = Int(attackSec * sampleRate)
+        let releaseCount = Int(releaseSec * sampleRate)
         var scales = [Float](repeating: 1, count: frameCount)
         for p in ps {
             let minI = max(0, p.minI - attackCount)

@@ -292,92 +292,17 @@ final class Movie {
     }
     
     func writeAudio(from seq: Sequencer,
+                    headroomAmp: Double = Audio.headroomAmp,
+                    enabledUseWaveclip: Bool = true,
                     isCompress: Bool = true,
                     progressHandler: (Double, inout Bool) -> ()) throws {
-        if isCompress {
-            guard let oBuffer = try seq.buffer(sampleRate: sampleRate,
-                                               headroomAmp: nil,
-                                               progressHandler: progressHandler) else { return }
-            oBuffer.compress(targetDb: -Audio.headroomDb)
-            guard let buffer = oBuffer.cmSampleBuffer else { return }
-            audioInput.append(buffer)
-            
-            var stop = false
-            let length = AVAudioFramePosition(seq.durSec * sampleRate)
-            
-            progressHandler(Double(seq.engine.manualRenderingSampleTime) / Double(length), &stop)
-            if stop { return }
-            
-            return
-        }
-        
-        guard let format = AVAudioFormat(commonFormat: .pcmFormatFloat32,
-                                         sampleRate: Double(sampleRate),
-                                         channels: AVAudioChannelCount(audioChannelCount),
-                                         interleaved: true) else { throw Self.exportError }
-        
-        try seq.engine.enableManualRenderingMode(.offline,
-                                             format: format,
-                                             maximumFrameCount: 512)
-        try seq.engine.start()
-//        seq.playerNodes.forEach { $0.schedule(inTime: 0) }
-//        try seq.avSequencer?.start()
-//        seq.playerNodes.forEach { $0.play() }
-        seq.isPlaying = true
-        
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: seq.engine.manualRenderingFormat, frameCapacity: seq.engine.manualRenderingMaximumFrameCount) else {
-            
-            seq.isPlaying = false
-//            seq.avSequencer?.stop()
-//            seq.playerNodes.forEach { $0.stop() }
-            seq.endEngine()
-            throw Self.exportError
-        }
-        
-        var stop = false
-        let length = AVAudioFramePosition(seq.durSec * sampleRate)
-        while seq.engine.manualRenderingSampleTime < length {
-            while !audioInput.isReadyForMoreMediaData {
-                progressHandler(Double(seq.engine.manualRenderingSampleTime) / Double(length), &stop)
-                if stop { return }
-                Thread.sleep(forTimeInterval: 0.1)
-            }
-            do {
-                let frameCount = length - seq.engine.manualRenderingSampleTime
-                let framesToRender = min(AVAudioFrameCount(frameCount), buffer.frameCapacity)
-                let status = try seq.engine.renderOffline(framesToRender, to: buffer)
-                switch status {
-                case .success:
-                    autoreleasepool {
-                        buffer.clip(amp: Float(Audio.floatHeadroomAmp))
-                        
-                        guard let buffer = buffer.cmSampleBuffer else { return }
-                        audioInput.append(buffer)
-                    }
-                    progressHandler(Double(seq.engine.manualRenderingSampleTime) / Double(length), &stop)
-                    if stop { return }
-                case .insufficientDataFromInputNode:
-                    throw Self.exportError
-                case .cannotDoInCurrentContext:
-                    progressHandler(Double(seq.engine.manualRenderingSampleTime) / Double(length), &stop)
-                    if stop { return }
-                    Thread.sleep(forTimeInterval: 0.1)
-                case .error: throw Self.exportError
-                @unknown default: throw Self.exportError
-                }
-            } catch {
-                seq.isPlaying = false
-//                seq.avSequencer?.stop()
-//                seq.playerNodes.forEach { $0.stop() }
-                seq.endEngine()
-                throw error
-            }
-        }
-        
-        seq.isPlaying = false
-//        seq.avSequencer?.stop()
-//        seq.playerNodes.forEach { $0.stop() }
-        seq.endEngine()
+        guard let buffer = try seq.buffer(sampleRate: sampleRate,
+                                          headroomAmp: headroomAmp,
+                                          enabledUseWaveclip: enabledUseWaveclip,
+                                          isCompress: isCompress,
+                                          progressHandler: progressHandler) else { return }
+        guard let cmBuffer = buffer.cmSampleBuffer else { return }
+        audioInput.append(cmBuffer)
     }
     
     func finish(completionHandler handler: @escaping (Bool, (any Error)?) -> ()) {

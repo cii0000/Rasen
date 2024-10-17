@@ -5003,10 +5003,10 @@ extension PBPitbend: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
 extension PBReverb: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBReverb"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "earlyRSec"),
-    2: .same(proto: "earlyRVolm"),
-    3: .same(proto: "lateRSec"),
-    4: .same(proto: "lateRVolm"),
+    1: .same(proto: "earlySec"),
+    2: .same(proto: "earlyVolm"),
+    3: .same(proto: "lateSec"),
+    4: .same(proto: "lateVolm"),
     5: .same(proto: "releaseSec"),
     6: .same(proto: "seedID"),
   ]

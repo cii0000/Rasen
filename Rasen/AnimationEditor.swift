@@ -1758,11 +1758,10 @@ final class LineSlider: DragEditor {
                 let scoreView = sheetView.scoreView
                 let scoreP = scoreView.convertFromWorld(p)
                 
-                isLine = false
                 if scoreView.model.enabled,
-                   let noteI = scoreView.noteIndex(at: scoreP, scale: document.screenToWorldScale,
-                                                   enabledRelease: true) {
+                   let (noteI, result) = scoreView.hitTestPoint(scoreP, scale: document.screenToWorldScale) {
                     
+                    isLine = false
                     self.sheetView = sheetView
                     self.noteI = noteI
                     
@@ -1777,8 +1776,7 @@ final class LineSlider: DragEditor {
                     beganNote = note
                     self.noteI = noteI
                     
-                    let result = scoreView.hitTestPoint(scoreP, scale: document.screenToWorldScale,
-                                                        at: noteI)
+                    
                     switch result {
                     case .pit(let pitI):
                         let pit = note.pits[pitI]
@@ -1841,7 +1839,7 @@ final class LineSlider: DragEditor {
                         
                         beganEnvelope = score.notes[noteI].envelope
                         
-                        document.cursor = .circle(string: String(format: "%.3f s", beganEnvelope.reverb.earlyRSec))
+                        document.cursor = .circle(string: String(format: "%.3f s", beganEnvelope.reverb.earlySec))
                     case .reverbEarlyAndLateRSec:
                         type = .reverbEarlyAndLateRSec
                         
@@ -1860,7 +1858,7 @@ final class LineSlider: DragEditor {
                         
                         beganEnvelope = score.notes[noteI].envelope
                         
-                        document.cursor = .circle(string: String(format: "%.3f s", beganEnvelope.reverb.earlyAndLateRSec))
+                        document.cursor = .circle(string: String(format: "%.3f s", beganEnvelope.reverb.earlyLateSec))
                     case .reverbDurSec:
                         type = .reverbDurSec
                         
@@ -1964,19 +1962,13 @@ final class LineSlider: DragEditor {
                         updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
                         
                         document.cursor = .circle(string: Pitch(value: .init(beganTone.spectlope.sprols[sprolI].pitch, intervalScale: Sheet.fullEditPitchInterval)).octaveString(hidableDecimal: false))
-                    default:
-                        isLine = true
                     }
-                } else {
-                    isLine = true
-                }
-                
-                if isLine,
-                   let (lineView, li) = sheetView.lineTuple(at: sheetP,
-                                                            isSmall: false,
-                                                            scale: document.screenToWorldScale),
-                   let pi = lineView.model.mainPointSequence.nearestIndex(at: sheetP) {
+                } else if let (lineView, li) = sheetView.lineTuple(at: sheetP,
+                                                                   isSmall: false,
+                                                                   scale: document.screenToWorldScale),
+                          let pi = lineView.model.mainPointSequence.nearestIndex(at: sheetP) {
                     
+                    isLine = true
                     self.sheetView = sheetView
                     beganLine = lineView.model
                     lineIndex = li
@@ -2101,7 +2093,7 @@ final class LineSlider: DragEditor {
                         }
                     case .reverbEarlyRSec:
                         let dBeat = scoreView.durBeat(atWidth: sheetP.x - beganSheetP.x)
-                        let sec = (beganEnvelope.reverb.earlyRSec + score.sec(fromBeat: dBeat))
+                        let sec = (beganEnvelope.reverb.earlySec + score.sec(fromBeat: dBeat))
                             .clipped(min: 0, max: 10)
                         
                         let nid = UUID()
@@ -2109,7 +2101,7 @@ final class LineSlider: DragEditor {
                         for noteI in beganNotes.keys {
                             guard noteI < score.notes.count else { continue }
                             var envelope = scoreView.model.notes[noteI].envelope
-                            envelope.reverb.earlyRSec = sec
+                            envelope.reverb.earlySec = sec
                             envelope.reverb.seedID = nid
                             envelope.id = nid
                             eivs.append(.init(value: envelope, index: noteI))
@@ -2119,7 +2111,7 @@ final class LineSlider: DragEditor {
                         document.cursor = .circle(string: String(format: "%.3f s", sec))
                     case .reverbEarlyAndLateRSec:
                         let dBeat = scoreView.durBeat(atWidth: sheetP.x - beganSheetP.x)
-                        let sec = (beganEnvelope.reverb.lateRSec + score.sec(fromBeat: dBeat))
+                        let sec = (beganEnvelope.reverb.lateSec + score.sec(fromBeat: dBeat))
                             .clipped(min: 0, max: 10)
                         
                         let nid = UUID()
@@ -2127,14 +2119,14 @@ final class LineSlider: DragEditor {
                         for noteI in beganNotes.keys {
                             guard noteI < score.notes.count else { continue }
                             var envelope = scoreView.model.notes[noteI].envelope
-                            envelope.reverb.lateRSec = sec
+                            envelope.reverb.lateSec = sec
                             envelope.reverb.seedID = nid
                             envelope.id = nid
                             eivs.append(.init(value: envelope, index: noteI))
                         }
                         scoreView.replace(eivs)
                         
-                        document.cursor = .circle(string: String(format: "%.3f s", beganEnvelope.reverb.earlyRSec + sec))
+                        document.cursor = .circle(string: String(format: "%.3f s", beganEnvelope.reverb.earlySec + sec))
                     case .reverbDurSec:
                         let dBeat = scoreView.durBeat(atWidth: sheetP.x - beganSheetP.x)
                         let sec = (beganEnvelope.reverb.releaseSec + score.sec(fromBeat: dBeat))
@@ -2152,7 +2144,7 @@ final class LineSlider: DragEditor {
                         }
                         scoreView.replace(eivs)
                         
-                        document.cursor = .circle(string: String(format: "%.3f s", beganEnvelope.reverb.earlyAndLateRSec + sec))
+                        document.cursor = .circle(string: String(format: "%.3f s", beganEnvelope.reverb.earlyLateSec + sec))
                     case .even:
                         if let noteI, noteI < score.notes.count, let pitI {
                             let note = score.notes[noteI]

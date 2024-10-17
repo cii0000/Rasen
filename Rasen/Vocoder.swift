@@ -109,14 +109,17 @@ struct Waveclip {
     static let rAttackSec = 1 / attackSec, rReleaseSec = 1 / releaseSec
 }
 extension Waveclip {
-    static func amp(atSec sec: Double, releaseStartSec: Double?, enabledAttack: Bool = true) -> Double {
-        if sec <= 0 {
-            return 0
-        }
-        let aAmp = if enabledAttack && attackSec > 0 && sec < attackSec {
-            sec * rAttackSec
+    static func amp(atSec sec: Double, attackStartSec: Double?, releaseStartSec: Double?) -> Double {
+        guard attackStartSec != nil || releaseStartSec != nil else { return 1 }
+        let aAmp: Double
+        if let attackStartSec {
+            if sec <= attackStartSec {
+                return 0
+            }
+            let nSec = sec - attackStartSec
+            aAmp = nSec < attackSec ? nSec * rAttackSec : 1
         } else {
-            1.0
+            aAmp = 1
         }
         if let releaseStartSec, sec >= releaseStartSec {
             let nSec = sec - releaseStartSec
@@ -428,12 +431,12 @@ extension Rendnote {
         if !isLoop {
             let sampleCount = notewave.sampleCount
             let rSampleRate = 1 / sampleRate
-            let rsSec = secRange.length
-            let enabledAttack = !pitbend.firstStereo.isEmpty && !pitbend.firstSpectlope.isEmptyVolm
+            let attackStartSec = !pitbend.firstStereo.isEmpty && !pitbend.firstSpectlope.isEmptyVolm ? 0.0 : nil
+            let releaseStartSec = secRange.length
             for i in 0 ..< sampleCount {
-                let sec = Double(i) * rSampleRate
-                notewave.samples[0][i] *= Waveclip.amp(atSec: sec, releaseStartSec: rsSec,
-                                                       enabledAttack: enabledAttack)
+                notewave.samples[0][i] *= Waveclip.amp(atSec: Double(i) * rSampleRate,
+                                                       attackStartSec: attackStartSec,
+                                                       releaseStartSec: releaseStartSec)
             }
             
             if envelopeMemo.decaySec == 0 || envelopeMemo.sustainVolm == 1 {
@@ -442,20 +445,20 @@ extension Rendnote {
                 for i in 0 ..< si {
                     let sec = Double(i) * rSampleRate
                     notewave.samples[0][i]
-                    *= Volm.amp(fromVolm: envelopeMemo.volm(atSec: sec, releaseStartSec: rsSec))
+                    *= Volm.amp(fromVolm: envelopeMemo.volm(atSec: sec, releaseStartSec: releaseStartSec))
                 }
-                let ei = max(si, Int((rsSec * sampleRate).rounded(.down)))
+                let ei = max(si, Int((releaseStartSec * sampleRate).rounded(.down)))
                     .clipped(min: 0, max: sampleCount)
                 for i in ei ..< sampleCount {
                     let sec = Double(i) * rSampleRate
                     notewave.samples[0][i]
-                    *= Volm.amp(fromVolm: envelopeMemo.volm(atSec: sec, releaseStartSec: rsSec))
+                    *= Volm.amp(fromVolm: envelopeMemo.volm(atSec: sec, releaseStartSec: releaseStartSec))
                 }
             } else {
                 for i in 0 ..< sampleCount {
                     let sec = Double(i) * rSampleRate
                     notewave.samples[0][i]
-                    *= Volm.amp(fromVolm: envelopeMemo.volm(atSec: sec, releaseStartSec: rsSec))
+                    *= Volm.amp(fromVolm: envelopeMemo.volm(atSec: sec, releaseStartSec: releaseStartSec))
                 }
             }
             

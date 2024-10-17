@@ -457,7 +457,7 @@ final class ColorEditor: Editor {
                         beganNotes[noteI] = score.notes[noteI]
                         
                         beganEnvelope = score.notes[noteI].envelope
-                        beganVolm = score.notes[noteI].envelope.reverb.earlyRVolm
+                        beganVolm = score.notes[noteI].envelope.reverb.earlyVolm
                         beganBeat = scoreView.beat(atX: scoreP.x)
                     case .reverbLateRVolm:
                         if document.isSelect(at: p) {
@@ -474,7 +474,7 @@ final class ColorEditor: Editor {
                         beganNotes[noteI] = score.notes[noteI]
                         
                         beganEnvelope = score.notes[noteI].envelope
-                        beganVolm = score.notes[noteI].envelope.reverb.lateRVolm
+                        beganVolm = score.notes[noteI].envelope.reverb.lateVolm
                         beganBeat = scoreView.beat(atX: scoreP.x)
                     case .pit(let pitI):
                         beganVolm = score.notes[noteI].pits[pitI].stereo.volm
@@ -549,22 +549,22 @@ final class ColorEditor: Editor {
             if let scoreResult {
                 switch scoreResult {
                 case .reverbEarlyRVolm:
-                    let volm = newVolm(from: beganEnvelope.reverb.earlyRVolm)
+                    let volm = newVolm(from: beganEnvelope.reverb.earlyVolm)
                     var eivs = [IndexValue<Envelope>](capacity: beganNotes.count)
                     for (noteI, beganNote) in beganNotes {
                         var envelope = beganNote.envelope
-                        envelope.reverb.earlyRVolm = volm
+                        envelope.reverb.earlyVolm = volm
                         envelope.reverb.seedID = beganEnvelope.id
                         envelope.id = beganEnvelope.id
                         eivs.append(.init(value: envelope, index: noteI))
                     }
                     scoreView.replace(eivs)
                 case .reverbLateRVolm:
-                    let volm = newVolm(from: beganEnvelope.reverb.lateRVolm)
+                    let volm = newVolm(from: beganEnvelope.reverb.lateVolm)
                     var eivs = [IndexValue<Envelope>](capacity: beganNotes.count)
                     for (noteI, beganNote) in beganNotes {
                         var envelope = beganNote.envelope
-                        envelope.reverb.lateRVolm = volm
+                        envelope.reverb.lateVolm = volm
                         envelope.reverb.seedID = beganEnvelope.id
                         envelope.id = beganEnvelope.id
                         eivs.append(.init(value: envelope, index: noteI))

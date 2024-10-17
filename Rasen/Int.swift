@@ -78,6 +78,10 @@ extension Int {
         self = x.integralPart
     }
     
+    func nextPow2() -> Self {
+        .init(.exp2(.log2(Double(self)).rounded(.up)))
+    }
+    
     func mod(_ other: Self) -> Self {
         ((self % other) + other) % other
     }
