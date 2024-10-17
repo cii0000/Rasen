@@ -169,7 +169,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         fileMenu.addItem(withTitle: "Export as Image...".localized,
                          action: #selector(SubMTKView.exportAsImage(_:)))
         fileMenu.addItem(withTitle: "Export as 4K Image...".localized,
-                         action: #selector(SubMTKView.exportAsHighQualityImage(_:)))
+                         action: #selector(SubMTKView.exportAsImage4K(_:)))
         fileMenu.addItem(withTitle: "Export as PDF...".localized,
                          action: #selector(SubMTKView.exportAsPDF(_:)))
         fileMenu.addItem(withTitle: "Export as GIF...".localized,
@@ -178,11 +178,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         fileMenu.addItem(withTitle: "Export as Movie...".localized,
                          action: #selector(SubMTKView.exportAsMovie(_:)))
         fileMenu.addItem(withTitle: "Export as 4K Movie...".localized,
-                         action: #selector(SubMTKView.exportAsHighQualityMovie(_:)))
+                         action: #selector(SubMTKView.exportAsMovie4K(_:)))
         fileMenu.addItem(withTitle: "Export as Sound...".localized,
                          action: #selector(SubMTKView.exportAsSound(_:)))
-        fileMenu.addItem(withTitle: "Export as Caption...".localized,
-                         action: #selector(SubMTKView.exportAsCaption(_:)))
+        fileMenu.addItem(withTitle: "Export as Linear PCM...".localized,
+                         action: #selector(SubMTKView.exportAsLinearPCM(_:)))
         
         fileMenu.addItem(NSMenuItem.separator())
         fileMenu.addItem(withTitle: "Export as Document...".localized,

@@ -671,7 +671,7 @@ final class ImageExporter: InputKeyEditor, @unchecked Sendable {
         editor.updateNode()
     }
 }
-final class HighQualityImageExporter: InputKeyEditor, @unchecked Sendable {
+final class Image4KExporter: InputKeyEditor, @unchecked Sendable {
     let editor: IOEditor
     
     init(_ document: Document) {
@@ -679,7 +679,7 @@ final class HighQualityImageExporter: InputKeyEditor, @unchecked Sendable {
     }
     
     func send(_ event: InputKeyEvent) {
-        editor.exportFile(with: event, .highQualityImage)
+        editor.exportFile(with: event, .image4K)
     }
     func updateNode() {
         editor.updateNode()
@@ -728,7 +728,7 @@ final class MovieExporter: InputKeyEditor, @unchecked Sendable {
         editor.updateNode()
     }
 }
-final class HighQualityMovieExporter: InputKeyEditor, @unchecked Sendable {
+final class Movie4KExporter: InputKeyEditor, @unchecked Sendable {
     let editor: IOEditor
     
     init(_ document: Document) {
@@ -736,7 +736,7 @@ final class HighQualityMovieExporter: InputKeyEditor, @unchecked Sendable {
     }
     
     func send(_ event: InputKeyEvent) {
-        editor.exportFile(with: event, .highQualityMovie)
+        editor.exportFile(with: event, .movie4K)
     }
     func updateNode() {
         editor.updateNode()
@@ -756,7 +756,7 @@ final class SoundExporter: InputKeyEditor, @unchecked Sendable {
         editor.updateNode()
     }
 }
-final class CaptionExporter: InputKeyEditor, @unchecked Sendable {
+final class LinearPCMExporter: InputKeyEditor, @unchecked Sendable {
     let editor: IOEditor
     
     init(_ document: Document) {
@@ -764,7 +764,7 @@ final class CaptionExporter: InputKeyEditor, @unchecked Sendable {
     }
     
     func send(_ event: InputKeyEvent) {
-        editor.exportFile(with: event, .caption)
+        editor.exportFile(with: event, .linearPCM)
     }
     func updateNode() {
         editor.updateNode()
@@ -1155,8 +1155,8 @@ final class IOEditor: Editor, @unchecked Sendable {
     }
     
     enum ExportType {
-        case image, highQualityImage, pdf, gif, movie, highQualityMovie,
-             sound, caption, documentWithHistory, document
+        case image, image4K, pdf, gif, movie, movie4K,
+             sound, linearPCM, document, documentWithHistory
         var isDocument: Bool {
             self == .document || self == .documentWithHistory
         }
@@ -1309,12 +1309,12 @@ final class IOEditor: Editor, @unchecked Sendable {
         
         let fType: any FileTypeProtocol = switch type {
         case .image: nvs.count > 1 && unionFrame == nil ? Image.FileType.pngs : Image.FileType.png
-        case .highQualityImage: nvs.count > 1 && unionFrame == nil ? Image.FileType.pngs : Image.FileType.png
+        case .image4K: nvs.count > 1 && unionFrame == nil ? Image.FileType.pngs : Image.FileType.png
         case .gif: Image.FileType.gif
         case .pdf: PDF.FileType.pdf
-        case .movie, .highQualityMovie: Movie.FileType.mp4
-        case .sound: Content.FileType.wav
-        case .caption: Caption.FileType.scc
+        case .movie, .movie4K: Movie.FileType.mp4
+        case .sound: Content.FileType.m4a
+        case .linearPCM: Content.FileType.wav
         case .document: Document.FileType.rasendoc
         case .documentWithHistory: Document.FileType.rasendoch
         }
@@ -1337,7 +1337,7 @@ final class IOEditor: Editor, @unchecked Sendable {
                         return image?.data(.png)?.count ?? 0
                     }
                 }
-            case .highQualityImage:
+            case .image4K:
                 if nvs.count == 1 {
                     let nSize = size.width > size.height ?
                     size.snapped(Size(width: 3840, height: 2160)).rounded() :
@@ -1374,7 +1374,7 @@ final class IOEditor: Editor, @unchecked Sendable {
                         return pdf.dataSize
                     }
                 }
-            case .gif, .movie, .highQualityMovie, .caption: break
+            case .gif, .movie, .movie4K: break
             case .document:
                 let sids = nvs.reduce(into: [Sheetpos: SheetID]()) {
                     $0[$1.shp] = self.document.sheetID(at: $1.shp)
@@ -1388,7 +1388,7 @@ final class IOEditor: Editor, @unchecked Sendable {
                     }
                 }
                 return fileSize
-            case .sound: break
+            case .sound, .linearPCM: break
             case .documentWithHistory:
                 let sids = nvs.reduce(into: [Sheetpos: SheetID]()) {
                     $0[$1.shp] = self.document.sheetID(at: $1.shp)
@@ -1406,8 +1406,22 @@ final class IOEditor: Editor, @unchecked Sendable {
             return nil
         }
         
+        let message = switch type {
+        case .image: "Export as Image".localized
+        case .image4K: "Export as 4K Image".localized
+        case .pdf: "Export as PDF".localized
+        case .gif: "Export as GIF".localized
+        case .movie: "Export as Movie".localized
+        case .movie4K: "Export as 4K Movie".localized
+        case .sound: "Export as Sound".localized
+        case .linearPCM: "Export as Linear PCM".localized
+        case .document: "Export as Document".localized
+        case .documentWithHistory: "Export as Document with History".localized
+        }
+        
         Task { @MainActor in
-            let result = await URL.export(name: name(from: nvs.map { $0.shp }),
+            let result = await URL.export(message: message,
+                                          name: name(from: nvs.map { $0.shp }),
                                           fileType: fType,
                                           fileSizeHandler: fileSize)
             switch result {
@@ -1417,12 +1431,12 @@ final class IOEditor: Editor, @unchecked Sendable {
                 switch type {
                 case .image:
                     let nSize = size * 4
-                    exportImage(from: nvs, unionFrame: unionFrame, size: nSize, at: ioResult)
-                case .highQualityImage:
+                    exportImage(from: nvs, unionFrame: unionFrame, is4K: false, size: nSize, at: ioResult)
+                case .image4K:
                     let nSize = size.width > size.height ?
                     size.snapped(Size(width: 3840, height: 2160)).rounded() :
                     size.snapped(Size(width: 2160, height: 3840)).rounded()
-                    exportImage(from: nvs, unionFrame: unionFrame, size: nSize, at: ioResult)
+                    exportImage(from: nvs, unionFrame: unionFrame, is4K: true, size: nSize, at: ioResult)
                 case .pdf:
                     exportPDF(from: nvs, unionFrame: unionFrame, size: size, at: ioResult)
                 case .gif:
@@ -1432,16 +1446,16 @@ final class IOEditor: Editor, @unchecked Sendable {
                     let nSize = size.width > size.height ?
                     size.snapped(Size(width: 1920, height: 1080).rounded()) :
                     size.snapped(Size(width: 1200, height: 1920).rounded())
-                    exportMovie(from: nvs, isHighQuality: false, size: nSize, at: ioResult)
+                    exportMovie(from: nvs, is4K: false, size: nSize, at: ioResult)
                 case .sound:
-                    exportSound(from: nvs, at: ioResult)
-                case .caption:
-                    exportCaption(from: nvs, at: ioResult)
-                case .highQualityMovie:
+                    exportSound(from: nvs, isLinearPCM: false, at: ioResult)
+                case .linearPCM:
+                    exportSound(from: nvs, isLinearPCM: true, at: ioResult)
+                case .movie4K:
                     let nSize = size.width > size.height ?
                     size.snapped(Size(width: 3840, height: 2160)).rounded() :
                     size.snapped(Size(width: 2160, height: 3840)).rounded()
-                    exportMovie(from: nvs, isHighQuality: true, size: nSize, at: ioResult)
+                    exportMovie(from: nvs, is4K: true, size: nSize, at: ioResult)
                 case .document:
                     exportDocument(from: nvs, isHistory: false, at: ioResult)
                 case .documentWithHistory:
@@ -1454,7 +1468,8 @@ final class IOEditor: Editor, @unchecked Sendable {
         }
     }
     
-    func exportImage(from vs: [SelectingValue], unionFrame: Rect?, size: Size, at ioResult: IOResult) {
+    func exportImage(from vs: [SelectingValue], unionFrame: Rect?, is4K: Bool,
+                     size: Size, at ioResult: IOResult) {
         if vs.isEmpty {
             return
         } else if vs.count == 1 || unionFrame != nil {
@@ -1503,7 +1518,8 @@ final class IOEditor: Editor, @unchecked Sendable {
                 document.rootNode.show(error)
             }
         } else {
-            let progressPanel = ProgressPanel(message: "Exporting Images".localized)
+            let progressPanel = ProgressPanel(message: is4K ?
+                                              "Exporting 4K Images".localized : "Exporting Images".localized)
             document.rootNode.show(progressPanel)
             do {
                 try ioResult.remove()
@@ -1660,14 +1676,14 @@ final class IOEditor: Editor, @unchecked Sendable {
         }
     }
     
-    func exportMovie(from vs: [SelectingValue], isHighQuality: Bool,
+    func exportMovie(from vs: [SelectingValue], is4K: Bool,
                      size: Size, at ioResult: IOResult) {
         @Sendable func export(progressHandler: (Double, inout Bool) -> (),
                     completionHandler handler: @escaping (Bool, (any Error)?) -> ()) {
             do {
                 let colorSpace = self.document.colorSpace
                 let movie = try Movie(url: ioResult.url, renderSize: size,
-                                      isLinearPCM: isHighQuality,
+                                      isLinearPCM: is4K,
                                       colorSpace: colorSpace)
                 var isStop = false, t = 0.0
                 let isMainFrame = !self.document.isEditingSheet
@@ -1846,7 +1862,8 @@ final class IOEditor: Editor, @unchecked Sendable {
             }
         }
         
-        let progressPanel = ProgressPanel(message: "Exporting Movie".localized)
+        let progressPanel = ProgressPanel(message: is4K ?
+                                          "Exporting 4K Movie".localized : "Exporting Movie".localized)
         document.rootNode.show(progressPanel)
         do {
             try ioResult.remove()
@@ -1886,7 +1903,7 @@ final class IOEditor: Editor, @unchecked Sendable {
         }
     }
     
-    func exportSound(from vs: [SelectingValue], at ioResult: IOResult) {
+    func exportSound(from vs: [SelectingValue], isLinearPCM: Bool, at ioResult: IOResult) {
         @Sendable func export(progressHandler: (Double, inout Bool) -> (),
                     completionHandler handler: @escaping ((any Error)?) -> ()) {
             do {
@@ -1898,15 +1915,16 @@ final class IOEditor: Editor, @unchecked Sendable {
                        let sheet = self.document.renderableSheet(at: sid) {
                         audiotracks.append(sheet.audiotrack)
                     }
-                    let t = 0.2 * Double(i) / Double(vs.count - 1)
+                    let t = 0.2 * Double(i) / Double(vs.count)
                     progressHandler(t, &isStop)
                     if isStop { break }
                 }
                 if !isStop {
                     if let sequencer = Sequencer(audiotracks: audiotracks, type: .normal) {
                         try sequencer.export(url: ioResult.url,
-                                             sampleRate: Audio.defaultSampleRate) { (t, stop) in
-                            progressHandler(t * 0.2 + 0.8, &isStop)
+                                             sampleRate: Audio.defaultSampleRate,
+                                             isLinearPCM: isLinearPCM) { (t, stop) in
+                            progressHandler(t * 0.8 + 0.2, &isStop)
                             if isStop {
                                 stop = true
                             }
@@ -1920,7 +1938,8 @@ final class IOEditor: Editor, @unchecked Sendable {
             }
         }
         
-        let progressPanel = ProgressPanel(message: "Exporting Sound".localized)
+        let progressPanel = ProgressPanel(message: isLinearPCM ?
+                                          "Exporting Linear PCM".localized : "Exporting Sound".localized)
         document.rootNode.show(progressPanel)
         do {
             try ioResult.remove()
@@ -1955,77 +1974,6 @@ final class IOEditor: Editor, @unchecked Sendable {
             document.rootNode.show(error)
             progressPanel.closePanel()
             end()
-        }
-    }
-    
-    func exportCaption(from vs: [SelectingValue], at ioResult: IOResult) {
-        @Sendable func export(progressHandler: (Double, inout Bool) -> (),
-                              completionHandler handler: @escaping ((any Error)?) -> ()) {
-            do {
-                let cce = try CaptionRenderer(url: ioResult.url)
-                
-                var isStop = false, t = 0.0
-                for v in vs {
-                    if let sid = self.document.sheetID(at: v.shp),
-                       let sheet = self.document.renderableSheet(at: sid) {
-                        let tl = sheet.animation.localDurBeat
-                        let ot = t
-                        let captions = sheet.captions
-                        cce.write(captions: captions, duration: tl,
-                                  frameRate: sheet.mainFrameRate) { (d, stop) in
-                            t = ot + d / Double(vs.count)
-                            progressHandler(t, &isStop)
-                            if isStop {
-                                stop = true
-                            }
-                        }
-                    }
-                    
-                    if isStop { break }
-                }
-                cce.finish { error in
-                    handler(error)
-                }
-            } catch {
-                handler(error)
-            }
-        }
-        
-        let progressPanel = ProgressPanel(message: "Exporting Caption".localized)
-        self.document.rootNode.show(progressPanel)
-        do {
-            try ioResult.remove()
-            
-            let task = Task.detached {
-                export(progressHandler: { (progress, isStop) in
-                    if Task.isCancelled {
-                        isStop = true
-                        return
-                    }
-                    Task { @MainActor in
-                        progressPanel.progress = progress
-                    }
-                }, completionHandler: { error in
-                    Task { @MainActor in
-                        if let error {
-                            self.document.rootNode.show(error)
-                        } else {
-                            do {
-                                try ioResult.setAttributes()
-                            } catch {
-                                self.document.rootNode.show(error)
-                            }
-                        }
-                        progressPanel.closePanel()
-                        self.end()
-                    }
-                })
-            }
-            progressPanel.cancelHandler = { task.cancel() }
-        } catch {
-            self.document.rootNode.show(error)
-            progressPanel.closePanel()
-            self.end()
         }
     }
     
@@ -2075,7 +2023,7 @@ final class IOEditor: Editor, @unchecked Sendable {
             try ioResult.setAttributes()
         }
         
-        let progressPanel = ProgressPanel(message: "Exporting Movie".localized)
+        let progressPanel = ProgressPanel(message: "Exporting GIF".localized)
         document.rootNode.show(progressPanel)
         do {
             try ioResult.remove()

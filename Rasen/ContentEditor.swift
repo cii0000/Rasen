@@ -111,6 +111,7 @@ final class ContentSlider: DragEditor {
                 
                 switch type {
                 case .all:
+                    let nh = ScoreLayout.pitchHeight
                     let np = beganContent.origin + sheetP - beganInP
                     let interval = document.currentBeatInterval
                     let beat = max(min(sheetView.animationView.beat(atX: np.x, interval: interval),
@@ -118,7 +119,7 @@ final class ContentSlider: DragEditor {
                                    sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval) - (content.timeOption?.beatRange.length ?? 0))
                     var timeOption = content.timeOption
                     timeOption?.beatRange.start = beat
-                    let timelineY = np.y
+                    let timelineY = np.y.interval(scale: nh)
                         .clipped(min: Sheet.timelineY, max: sheetView.bounds.height - Sheet.timelineY)
                     contentView.set(timeOption, origin: Point(sheetView.animationView.x(atBeat: beat), timelineY))
                     document.updateSelects()
@@ -850,7 +851,7 @@ extension ContentView {
     }
     
     func containsTimeline(_ p : Point, scale: Double) -> Bool {
-        timelineFrame?.outset(by: 3 * scale).contains(p) ?? false
+        timelineFrame?.outsetBy(dx: 5 * scale, dy: 3 * scale).contains(p) ?? false
     }
     var timelineFrame: Rect? {
         guard let timeOption = model.timeOption else { return nil }

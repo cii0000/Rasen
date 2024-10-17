@@ -1848,21 +1848,16 @@ extension ScoreView {
         
         var earlyReverbStereo = lastStereo
         earlyReverbStereo.volm *= note.envelope.reverb.earlyVolm
-        let earlySecW = width(atDurSec: note.envelope.reverb.earlySec)
         let earlyReverbColor = Self.color(from: earlyReverbStereo)
         
         var lateReverbStereo = lastStereo
         lateReverbStereo.volm *= note.envelope.reverb.lateVolm
-        let lateSecW = width(atDurSec: note.envelope.reverb.lateSec)
         let lateReverbColor = Self.color(from: lateReverbStereo)
         
         var zeroReverbStereo = lastStereo
         zeroReverbStereo.volm = 0
         let zeroReverbColor = Self.color(from: zeroReverbStereo)
         
-        let reverbReleaseW = width(atDurSec: note.envelope.reverb.releaseSec)
-        let earlySecX = nsx + earlySecW
-        let lateSecX = earlySecX + lateSecW
         var reverbNodes = [Node]()
         let earlyReverbP = earlyReverbPosition(from: note)
         let lateReverbP = lateReverbPosition(from: note)
@@ -2089,7 +2084,7 @@ extension ScoreView {
         model.enabled ? mainFrame.contains(p) : false
     }
     func containsTimeline(_ p : Point, scale: Double) -> Bool {
-        model.enabled ? timelineFrame.outset(by: 3 * scale).contains(p) : false
+        model.enabled ? timelineFrame.outsetBy(dx: 5 * scale, dy: 3 * scale).contains(p) : false
     }
     var timelineFrame: Rect {
         let sx = self.x(atBeat: model.beatRange.start)
@@ -2315,7 +2310,6 @@ extension ScoreView {
                             minResult = (noteI, .evenVolm(pitI: 0))
                         }
                     } else {
-                        let noteH = noteH(from: note)
                         var nMinResult: (noteI: Int, result: ColorHitResult)?
                         for pitI in note.pits.count.range {
                             let evenP = evenPosition(atPit: pitI, from: note)

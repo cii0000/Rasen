@@ -18,6 +18,7 @@
 //#if os(macOS) && os(iOS) && os(watchOS) && os(tvOS) && os(visionOS)
 import Accelerate.vecLib.vDSP
 import AVFAudio
+import AVFoundation
 //#elseif os(linux) && os(windows)
 //#endif
 
@@ -949,20 +950,39 @@ extension Sequencer {
     
     struct ExportError: Error {}
     
+    static func audioSettings(isLinearPCM: Bool, channelCount: Int,
+                              sampleRate: Double) -> [String: Any] {
+        isLinearPCM ?
+        [AVFormatIDKey: kAudioFormatLinearPCM,
+             AVLinearPCMBitDepthKey: 24,
+             AVLinearPCMIsFloatKey: false,
+             AVLinearPCMIsBigEndianKey: false,
+             AVLinearPCMIsNonInterleaved: false,
+             AVNumberOfChannelsKey: channelCount,
+             AVSampleRateKey: Float(sampleRate)] :
+            [AVFormatIDKey: kAudioFormatMPEG4AAC,
+             AVNumberOfChannelsKey: channelCount,
+             AVSampleRateKey: Float(sampleRate),
+             AVEncoderBitRateKey: 320000]
+    }
+    
     func export(url: URL,
                 sampleRate: Double,
                 headroomAmp: Double = Audio.headroomAmp,
                 enabledUseWaveclip: Bool = true,
                 isCompress: Bool = true,
+                isLinearPCM: Bool,
                 progressHandler: (Double, inout Bool) -> ()) throws {
         guard let buffer = try buffer(sampleRate: sampleRate,
                                       headroomAmp: headroomAmp,
                                       isCompress: isCompress,
                                       progressHandler: progressHandler) else { return }
-        let file = try AVAudioFile(forWriting: url,
-                                   settings: buffer.format.settings,
-                                   commonFormat: buffer.format.commonFormat,
-                                   interleaved: buffer.format.isInterleaved)
+        
+        let settings = Self.audioSettings(isLinearPCM: isLinearPCM,
+                                          channelCount: buffer.channelCount,
+                                          sampleRate: sampleRate)
+        let file = try AVAudioFile(forWriting: url, settings: settings, commonFormat: .pcmFormatFloat32,
+                                   interleaved: true)
         try file.write(from: buffer)
     }
     func audio(sampleRate: Double,
@@ -1269,6 +1289,7 @@ extension AVAudioPCMBuffer {
     func useWaveclip() {
         let rSampleRate = 1 / sampleRate
         let frameCount = frameCount
+        guard frameCount > 0 else { return }
         for ci in 0 ..< channelCount {
             let enabledAttack = abs(self[ci, 0]) > Waveclip.minAmp
             let enabledRelease = abs(self[ci, frameCount - 1]) > Waveclip.minAmp

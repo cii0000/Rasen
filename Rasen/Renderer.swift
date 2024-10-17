@@ -594,26 +594,32 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
+        case #selector(SubMTKView.importDocument(_:)):
+            return document.isSelectedNoneCursor
+            
         case #selector(SubMTKView.exportAsImage(_:)):
+            return document.isSelectedNoneCursor
+        case #selector(SubMTKView.exportAsImage4K(_:)):
             return document.isSelectedNoneCursor
         case #selector(SubMTKView.exportAsPDF(_:)):
             return document.isSelectedNoneCursor
         case #selector(SubMTKView.exportAsGIF(_:)):
             return document.isSelectedNoneCursor
+            
         case #selector(SubMTKView.exportAsMovie(_:)):
             return document.isSelectedNoneCursor
-        case #selector(SubMTKView.exportAsHighQualityMovie(_:)):
+        case #selector(SubMTKView.exportAsMovie4K(_:)):
             return document.isSelectedNoneCursor
         case #selector(SubMTKView.exportAsSound(_:)):
             return document.isSelectedNoneCursor
-        case #selector(SubMTKView.exportAsCaption(_:)):
+        case #selector(SubMTKView.exportAsLinearPCM(_:)):
             return document.isSelectedNoneCursor
+            
         case #selector(SubMTKView.exportAsDocument(_:)):
             return document.isSelectedNoneCursor
         case #selector(SubMTKView.exportAsDocumentWithHistory(_:)):
             return document.isSelectedNoneCursor
-        case #selector(SubMTKView.importDocument(_:)):
-            return document.isSelectedNoneCursor
+            
         case #selector(SubMTKView.clearHistory(_:)):
             return document.isSelectedNoneCursor
             
@@ -969,9 +975,9 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         editor.send(inputKeyEventWith(.ended))
         document.isNoneCursor = false
     }
-    @objc func exportAsHighQualityImage(_ sender: Any) {
+    @objc func exportAsImage4K(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = HighQualityImageExporter(document)
+        let editor = Image4KExporter(document)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1001,9 +1007,9 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         editor.send(inputKeyEventWith(.ended))
         document.isNoneCursor = false
     }
-    @objc func exportAsHighQualityMovie(_ sender: Any) {
+    @objc func exportAsMovie4K(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = HighQualityMovieExporter(document)
+        let editor = Movie4KExporter(document)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1017,9 +1023,9 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         editor.send(inputKeyEventWith(.ended))
         document.isNoneCursor = false
     }
-    @objc func exportAsCaption(_ sender: Any) {
+    @objc func exportAsLinearPCM(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = CaptionExporter(document)
+        let editor = LinearPCMExporter(document)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1545,7 +1551,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         }))
         menu.addItem(SubNSMenuItem(title: "Export as 4K Image...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = HighQualityImageExporter(self.document)
+            let editor = Image4KExporter(self.document)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
@@ -1570,7 +1576,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         }))
         menu.addItem(SubNSMenuItem(title: "Export as 4K Movie...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = HighQualityMovieExporter(self.document)
+            let editor = Movie4KExporter(self.document)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
@@ -1580,9 +1586,9 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
-        menu.addItem(SubNSMenuItem(title: "Export as Caption...".localized, closure: { [weak self] in
+        menu.addItem(SubNSMenuItem(title: "Export as Linear PCM...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = CaptionExporter(self.document)
+            let editor = LinearPCMExporter(self.document)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))

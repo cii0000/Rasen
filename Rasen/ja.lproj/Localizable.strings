@@ -125,22 +125,37 @@
 "Background" = "背景";
 "No selection" = "選択なし";
 
+"Import..." = "読み込む...";
+
 "Export as Image..." = "画像として書き出す...";
 "Export as 4K Image..." = "4K画像として書き出す...";
 "Export as PDF..." = "PDFとして書き出す...";
 "Export as GIF..." = "GIFとして書き出す...";
+
 "Export as Movie..." = "動画として書き出す...";
 "Export as 4K Movie..." = "4K動画として書き出す...";
-"Export as High Quality Movie..." = "高品質動画として書き出す...";
 "Export as Sound..." = "サウンドとして書き出す...";
-"Export as Lyrics..." = "歌詞として書き出す...";
-"Export as CC Movie..." = "CC動画として書き出す...";
-"Export as Caption..." = "キャプションとして書き出す...";
+"Export as Linear PCM..." = "リニアPCMとして書き出す...";
+
 "Export as Document..." = "書類として書き出す...";
 "Export as Document with History..." = "履歴付き書類として書き出す...";
-"Import..." = "読み込む...";
+
 "Clear History..." = "履歴を消去...";
+
 "Show About Run" = "実行について表示";
+
+"Export as Image" = "画像として書き出す";
+"Export as 4K Image" = "4K画像として書き出す";
+"Export as PDF" = "PDFとして書き出す";
+"Export as GIF" = "GIFとして書き出す";
+
+"Export as Movie" = "動画として書き出す";
+"Export as 4K Movie" = "4K動画として書き出す";
+"Export as Sound" = "サウンドとして書き出す";
+"Export as Linear PCM" = "リニアPCMとして書き出す";
+
+"Export as Document" = "書類として書き出す";
+"Export as Document with History" = "履歴付き書類として書き出す";
 
 "Do you want to replace the \"%2$@\" written on the %1$d sheets with the \"%3$@\"?" = "%1$d枚のシートに書き込まれた「%2$@」を「%3$@」に置換えますか？";
 "This operation can be undone for each sheet, but not for all sheets at once." = "この操作はそれぞれのシートでは取り消せますが、一括では取り消せません。";
@@ -157,12 +172,12 @@
 "File Size" = "ファイルサイズ";
 "Calculating Size" = "サイズを計算中";
 "Exporting Images" = "画像を書き出し中";
+"Exporting 4K Images" = "4K画像を書き出し中";
 "Exporting PDF" = "PDFを書き出し中";
 "Exporting Movie" = "動画を書き出し中";
+"Exporting 4K Movie" = "4K動画を書き出し中";
 "Exporting Sound" = "サウンドを書き出し中";
-"Exporting Lyrics" = "歌詞を書き出し中";
-"Exporting CC Movie" = "CC動画を書き出し中";
-"Exporting Caption" = "キャプションを書き出し中";
+"Exporting Linear PCM" = "リニアPCMを書き出し中";
 "Exporting Document" = "書類を書き出し中";
 "Exporting Document with History" = "履歴付き書類を書き出し中";
 

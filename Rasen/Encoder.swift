@@ -192,18 +192,12 @@ final class Movie {
         videoInput.expectsMediaDataInRealTime = true
         writer.add(videoInput)
         
-        let audioSetting: [String: Any] = isLinearPCM ?
-            [AVFormatIDKey: kAudioFormatFLAC,
-             AVNumberOfChannelsKey: audioChannelCount,
-             AVSampleRateKey: Float(sampleRate)] :
-            [AVFormatIDKey: kAudioFormatMPEG4AAC,
-             AVNumberOfChannelsKey: audioChannelCount,
-             AVSampleRateKey: Float(sampleRate),
-             AVEncoderBitRateKey: 320000]
-        audioInput = AVAssetWriterInput(mediaType: .audio,
-                                        outputSettings: audioSetting)
+        let audioSettings = Sequencer.audioSettings(isLinearPCM: isLinearPCM,
+                                                    channelCount: audioChannelCount,
+                                                    sampleRate: sampleRate)
+        audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
         audioInput.expectsMediaDataInRealTime = true
-        audioInput.languageCode = Locale.current.language.languageCode?.identifier
+        audioInput.languageCode = nil
         writer.add(audioInput)
         
         let attributes: [String: Any] = isHDR ?
