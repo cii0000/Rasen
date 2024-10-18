@@ -1135,6 +1135,9 @@ final class SheetView: View, @unchecked Sendable {
     deinit {
         playingTimer?.cancel()
         playingTimer = nil
+        
+        sequencer?.endEngine()
+        sequencer = nil
     }
     
     func updateWithModel() {

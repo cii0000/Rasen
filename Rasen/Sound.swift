@@ -943,23 +943,23 @@ extension Reverb {
         var fir = [Double](repeating: 0, count: count)
         fir[0] = 1
         
-        let elRSec = earlySec + lateSec
-        let rSampleRate = 1 / sampleRate
-        let si = Int(earlySec * sampleRate).clipped(min: 0, max: count - 1)
         let seed = seedID.uInt64Values.value0
         var random = Random(seed: seed)
+        
+        let earlyLateSec = earlyLateSec
+        let rSampleRate = 1 / sampleRate
+        
+        let xi = Int(earlySec * sampleRate).clipped(min: 0, max: count - 1)
         let scale = 100.0
-        let siMin = Double(si).squareRoot().clipped(min: 10, max: 5000.squareRoot(), newMin: 1, newMax: scale)
-        var preI = si
-        for i in si ..< count {
+        let siMin = Double(xi).squareRoot().clipped(min: 10, max: 5000.squareRoot(), newMin: 1, newMax: scale)
+        
+        func update(i: Int) {
             let sec = Double(i) * rSampleRate
-            let nni = lateSec == 0 ? 0 : sec.clipped(min: earlySec, max: elRSec, newMin: 1, newMax: 0)
-            let ni = nni.squared.clipped(min: 1, max: 0, newMin: Double(si), newMax: 1)
-            guard i == si || ni == 1 || i - preI >= Int(ni) else { continue }
-            preI = i
-            let volm = sec < elRSec ?
-            (1 - nni).squared.clipped(min: 0, max: 1, newMin: earlyVolm, newMax: lateVolm) :
-            sec.clipped(min: elRSec, max: durSec, newMin: lateVolm, newMax: 0)
+            let nScale = lateSec == 0 ? 0 : sec.clipped(min: earlySec, max: earlyLateSec, newMin: 1, newMax: 0)
+            
+            let volm = sec < earlyLateSec ? (1 - nScale).squared.clipped(min: earlySec, max: earlyLateSec, newMin: earlyVolm, newMax: lateVolm) :
+            sec.clipped(min: earlyLateSec, max: durSec, newMin: lateVolm, newMax: 0)
+            
             let t1 = random.nextT()
             let nPan = (t1 * 2 - 1) * 0.75
             let nVolm = if nPan < 0 {
@@ -967,10 +967,27 @@ extension Reverb {
             } else {
                 channel == 0 ? volm * (1 - nPan) : volm
             }
+            
             let t2 = random.nextT()
             let sign = t2 > 0.5 ? 1.0 : -1.0
             fir[i] = sign * Volm.amp(fromVolm: nVolm)
-            * nni.clipped(min: 1, max: 0, newMin: siMin, newMax: 1) / scale
+            * nScale.clipped(min: 1, max: 0, newMin: siMin, newMax: 1) / scale
+        }
+        
+        let x = earlySec * sampleRate
+        let y = earlyLateSec * sampleRate
+        let a = x < 1 || y < 1 ? 1 : (y - x) / (y - 1)
+        var na = 1.0, nx = x
+        while nx < y && x * na > 1 {
+            let i = Int(nx).clipped(min: 0, max: count - 1)
+            update(i: i)
+            
+            na *= a
+            nx += x * na
+        }
+        let nxi = Int(nx).clipped(min: 0, max: count)
+        for i in nxi ..< count {
+            update(i: i)
         }
         return fir
     }

@@ -352,14 +352,14 @@ final class ColorEditor: Editor {
                 
                 func updatePitsWithSelection(noteI: Int, pitI: Int?, sprolI: Int?, _ type: PitIDType) {
                     var noteAndPitIs: [Int: [Int: Set<Int>]]
-                    if let pitI, let sprolI {
+                    if let sprolI {
                         if document.isSelect(at: p) {
                             noteAndPitIs = sheetView.noteAndPitAndSprolIs(from: document.selections)
                         } else {
-                            let id = score.notes[noteI].pits[pitI][type]
+                            let id = pitI != nil ? score.notes[noteI].pits[pitI!][type] : nil
                             noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) {
                                 $0[$1.offset] = $1.element.pits.enumerated().reduce(into: [Int: Set<Int>]()) { (v, ip) in
-                                    if ip.element[type] == id {
+                                    if id == nil || ip.element[type] == id {
                                         v[ip.offset] = sprolI < ip.element.tone.spectlope.count ? [sprolI] : []
                                     }
                                 }
@@ -801,14 +801,14 @@ final class ColorEditor: Editor {
                 
                 func updatePitsWithSelection(noteI: Int, pitI: Int?, sprolI: Int?, _ type: PitIDType) {
                     var noteAndPitIs: [Int: [Int: Set<Int>]]
-                    if let pitI, let sprolI {
+                    if let sprolI {
                         if document.isSelect(at: p) {
                             noteAndPitIs = sheetView.noteAndPitAndSprolIs(from: document.selections)
                         } else {
-                            let id = score.notes[noteI].pits[pitI][type]
+                            let id = pitI != nil ? score.notes[noteI].pits[pitI!][type] : nil
                             noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) {
                                 $0[$1.offset] = $1.element.pits.enumerated().reduce(into: [Int: Set<Int>]()) { (v, ip) in
-                                    if ip.element[type] == id {
+                                    if id == nil || ip.element[type] == id {
                                         v[ip.offset] = sprolI < ip.element.tone.spectlope.count ? [sprolI] : []
                                     }
                                 }

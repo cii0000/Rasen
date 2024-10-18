@@ -1389,7 +1389,6 @@ extension ScoreView {
         let releaseW = 0.0
         let attackX = nsx + attackW, decayX = nsx + attackW + decayW, releaseX = nsx + nw + releaseW
         let nex = nsx + nw
-        let reverbHalfH = ScoreLayout.reverbHeight / 2
         
         let toneY = toneY(from: note)
         let overtoneHalfH = 0.25
@@ -1862,34 +1861,36 @@ extension ScoreView {
         let earlyReverbP = earlyReverbPosition(from: note)
         let lateReverbP = lateReverbPosition(from: note)
         let durReverbP = durReverbPosition(from: note)
-        
+        let reverbLineHalfH = 0.25, reverbHalfH = reverbLineHalfH / 2, reverbKnobhalfW = 0.0625
+        reverbNodes.append(.init(path: .init(Rect(x: lastP.x, y: lastP.y - reverbLineHalfH,
+                                                  width: durReverbP.x - lastP.x, height: reverbLineHalfH * 2)),
+                                 fillType: .color(.content)))
         reverbNodes.append(.init(path: .init(Rect(x: lastP.x, y: lastP.y - reverbHalfH,
-                                                  width: durReverbP.x - lastP.x, height: reverbHalfH * 2)),
-                                 fillType: .color(zeroReverbColor)))
-        reverbNodes.append(.init(path: .init([lateReverbP + .init(0, reverbHalfH),
-                                              lateReverbP - .init(0, reverbHalfH),
-                                              durReverbP - .init(0, reverbHalfH),
-                                              durReverbP + .init(0, reverbHalfH)]),
+                                                  width: earlyReverbP.x - lastP.x, height: reverbHalfH * 2)),
+                                 fillType: .color(earlyReverbColor)))
+        reverbNodes.append(.init(path: .init([.init(earlyReverbP.x, lastP.y + reverbHalfH),
+                                              .init(earlyReverbP.x, lastP.y - reverbHalfH),
+                                              .init(lateReverbP.x, lastP.y - reverbHalfH),
+                                              .init(lateReverbP.x, lastP.y + reverbHalfH)]),
+                                 fillType: .gradient([earlyReverbColor, earlyReverbColor,
+                                                      lateReverbColor, lateReverbColor])))
+        reverbNodes.append(.init(path: .init([.init(lateReverbP.x, lastP.y + reverbHalfH),
+                                              .init(lateReverbP.x, lastP.y - reverbHalfH),
+                                              .init(durReverbP.x, lastP.y - reverbHalfH),
+                                              .init(durReverbP.x, lastP.y + reverbHalfH)]),
                                  fillType: .gradient([lateReverbColor, lateReverbColor,
                                                       zeroReverbColor, zeroReverbColor])))
-        let rrCount = Int(abs(lateReverbP.x - earlyReverbP.x)).nextPow2()
-        for i in 0 ..< rrCount {
-            let t = 1 - (Double(i) / Double(rrCount)).squared.squared
-            let color = Color.linear(earlyReverbColor, lateReverbColor, t: t)
-            let p = Point.linear(earlyReverbP, lateReverbP, t: t)
-            reverbNodes.append(.init(path: .init(Rect(x: p.x, y: lastP.y - reverbHalfH,
-                                                      width: 0.5, height: reverbHalfH * 2)),
-                                     fillType: .color(color)))
-        }
-        reverbNodes.append(.init(path: .init(Rect(x: earlyReverbP.x, y: lastP.y - reverbHalfH,
-                                                  width: 0.5, height: reverbHalfH * 2)),
-                                 fillType: .color(earlyReverbColor)))
-        
-        reverbNodes.append(.init(path: .init(Rect(x: lastP.x, y: lastP.y - 0.125 / 2,
-                                                  width: durReverbP.x - lastP.x, height: 0.125)),
+        reverbNodes.append(.init(path: .init(Rect(x: earlyReverbP.x - reverbKnobhalfW, y: lastP.y - reverbLineHalfH,
+                                                  width: reverbKnobhalfW * 2, height: reverbLineHalfH * 2)),
+                                 fillType: .color(.content)))
+        reverbNodes.append(.init(path: .init(Rect(x: lateReverbP.x - reverbKnobhalfW, y: lastP.y - reverbLineHalfH,
+                                                  width: reverbKnobhalfW * 2, height: reverbLineHalfH * 2)),
                                  fillType: .color(.content)))
         
         var toneNodes = [Node]()
+        toneNodes.append(.init(path: .init(Rect(x: lastP.x, y: lastP.y - reverbHalfH,
+                                                  width: durReverbP.x - lastP.x, height: reverbHalfH * 2)),
+                               fillType: .color(.background)))
         toneNodes += reverbNodes.map { $0.clone }
         
         let boxPath = Path(Rect(x: nsx, y: toneY, width: nex - nsx, height: overtoneH + spectlopeH))

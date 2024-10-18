@@ -329,17 +329,17 @@ extension Quasimode {
     static let changeLightness = Quasimode(modifier: [.option], .drag)
     static let changeTint = Quasimode(modifier: [.shift, .option], .drag)
     
+    static let slide = Quasimode(modifier: [.control], .drag)
+    static let selectVersion = Quasimode(modifier: [.control, .shift], .drag)
+    
     static let movePreviousKeyframe = Quasimode(modifier: [.control], .z)
     static let moveNextKeyframe = Quasimode(modifier: [.control], .x)
     static let movePreviousFrame = Quasimode(modifier: [.control, .option], .z)
     static let moveNextFrame = Quasimode(modifier: [.control, .option], .x)
     static let selectFrame = Quasimode(modifier: [.control, .option], .drag)
     
-    static let slide = Quasimode(modifier: [.control], .drag)
-    static let moveLinePoint = Quasimode(modifier: [.control, .option, .command], .drag)
+    static let moveLinePoint = Quasimode(modifier: [.option, .command], .drag)
     static let moveLineZ = Quasimode(modifier: [.control, .command], .drag)
-    
-    static let selectVersion = Quasimode(modifier: [.control, .shift], .drag)
     
     static let play = Quasimode(modifier: [.control], .click)
     static let sPlay = Quasimode(modifier: [.control], .s)
