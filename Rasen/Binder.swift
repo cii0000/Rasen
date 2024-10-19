@@ -55,7 +55,7 @@ final class RecordBinder<Value: Codable & Serializable>: BinderProtocol {
     }
 }
 
-protocol View: AnyObject, Hashable {
+protocol View: ObjectHashable {
     associatedtype Binder: BinderProtocol
     associatedtype Model
     var model: Model { get set }
@@ -92,7 +92,9 @@ extension View {
         node.convert(value, to: toNode)
     }
 }
-extension View {
+
+protocol ObjectHashable: AnyObject, Hashable {}
+extension ObjectHashable {
     static func == (lhs: Self, rhs: Self) -> Bool {
         lhs === rhs
     }

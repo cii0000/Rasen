@@ -1136,8 +1136,7 @@ final class SheetView: View, @unchecked Sendable {
         playingTimer?.cancel()
         playingTimer = nil
         
-        sequencer?.endEngine()
-        sequencer = nil
+        audioPauseTimer.cancel()
     }
     
     func updateWithModel() {
@@ -1296,15 +1295,15 @@ final class SheetView: View, @unchecked Sendable {
         showOtherTimeNode(atBeat: animationView.model.mainBeat)
     }
     func containsScoreNoder(from ids: Set<UUID>) -> Bool {
-        if let scoreNoder = scoreView.scoreNoder {
-            ids.contains(scoreNoder.id)
+        if let scoreTrackItem = scoreView.scoreTrackItem {
+            ids.contains(scoreTrackItem.id)
         } else {
             false
         }
     }
-    func containsPCMNoder(from ids: Set<UUID>, in contentView: SheetContentView) -> Bool {
-        if let pcmNoder = contentView.pcmNoder {
-            ids.contains(pcmNoder.id)
+    func containsPCMTrackItem(from ids: Set<UUID>, in contentView: SheetContentView) -> Bool {
+        if let pcmTrackItem = contentView.pcmTrackItem {
+            ids.contains(pcmTrackItem.id)
         } else {
             false
         }
@@ -1336,7 +1335,7 @@ final class SheetView: View, @unchecked Sendable {
                 
                 contentView.timeNode?.path = Path()
                 guard contentView.model.type != .movie,
-                      ids.isEmpty || containsPCMNoder(from: ids, in: contentView) else {
+                      ids.isEmpty || containsPCMTrackItem(from: ids, in: contentView) else {
                     contentView.timeNode?.isHidden = true
                     continue
                 }
@@ -1376,7 +1375,7 @@ final class SheetView: View, @unchecked Sendable {
             }
             
             guard contentView.model.type != .movie,
-                  ids.isEmpty || containsPCMNoder(from: ids, in: contentView) else { continue }
+                  ids.isEmpty || containsPCMTrackItem(from: ids, in: contentView) else { continue }
             contentView.updateTimeNode(atSec: sec)
         }
         for textView in textsView.elementViews {
@@ -1641,6 +1640,7 @@ final class SheetView: View, @unchecked Sendable {
     private var willPlaySec: Rational?, playingOtherTimelineIDs = Set<UUID>()
     private var playingFrameRate: Rational = 24, firstDeltaSec: Rational = 0
     private var waringClock: SuspendingClock.Instant?
+    private var audioPauseTimer = OneshotTimer()
     let frameRate = Keyframe.defaultFrameRate
     var isPlaying = false {
         didSet {
@@ -1649,6 +1649,7 @@ final class SheetView: View, @unchecked Sendable {
         }
     }
     private func updateWithIsPlaying() {
+        audioPauseTimer.cancel()
         playingTimer?.cancel()
         playingTimer = nil
         animationView.isPlaying = isPlaying
@@ -1714,10 +1715,9 @@ final class SheetView: View, @unchecked Sendable {
                     seqTrack += aSeqTrack
                 }
                 if sheetView.model.enabledAnimation {
-                    seqTrack.scoreNoders.append(.init(rendnotes: [], startSec: 0,
-                                                      durSec: sheetView.model.animationDurSec,
-                                                      sampleRate: Audio.defaultSampleRate,
-                                                      type: .loop))
+                    seqTrack.scoreTrackItems.append(.init(rendnotes: [], sampleRate: Audio.defaultSampleRate,
+                                                          startSec: 0,
+                                                          durSec: sheetView.model.animationDurSec))
                 }
                 seqTracks.append(seqTrack)
                 deltaSec += seqTrack.durSec
@@ -1736,10 +1736,9 @@ final class SheetView: View, @unchecked Sendable {
                     seqTrack += aSeqTrack
                 }
                 if model.enabledAnimation {
-                    seqTrack.scoreNoders.append(.init(rendnotes: [], startSec: 0,
-                                                      durSec: model.animationDurSec,
-                                                      sampleRate: Audio.defaultSampleRate,
-                                                      type: .loop))
+                    seqTrack.scoreTrackItems.append(.init(rendnotes: [], sampleRate: Audio.defaultSampleRate,
+                                                          startSec: 0,
+                                                          durSec: model.animationDurSec))
                 }
                 seqTracks.append(seqTrack)
             }
@@ -1758,10 +1757,9 @@ final class SheetView: View, @unchecked Sendable {
                     seqTrack += aSeqTrack
                 }
                 if sheetView.model.enabledAnimation {
-                    seqTrack.scoreNoders.append(.init(rendnotes: [], startSec: 0,
-                                                      durSec: sheetView.model.animationDurSec,
-                                                      sampleRate: Audio.defaultSampleRate,
-                                                      type: .loop))
+                    seqTrack.scoreTrackItems.append(.init(rendnotes: [], sampleRate: Audio.defaultSampleRate,
+                                                          startSec: 0,
+                                                          durSec: sheetView.model.animationDurSec))
                 }
                 seqTracks.append(seqTrack)
                 nextPlayingTempo = sheetView.model.animation.tempo
@@ -1771,39 +1769,44 @@ final class SheetView: View, @unchecked Sendable {
             
             if !playingOtherTimelineIDs.isEmpty {
                 for i in 0 ..< seqTracks.count {
-                    seqTracks[i].scoreNoders.removeAll {
+                    seqTracks[i].scoreTrackItems.removeAll {
                         !playingOtherTimelineIDs.contains($0.id)
                     }
-                    seqTracks[i].pcmNoders.removeAll {
+                    seqTracks[i].pcmTrackItems.removeAll {
                         !playingOtherTimelineIDs.contains($0.id)
                     }
                 }
             }
             
             if seqTracks.contains(where: { !$0.isEmpty }) {
-                let sequencer = Sequencer(tracks: seqTracks) { [weak self] (peak) in
-                    DispatchQueue.main.async { [weak self] in
-                        guard let self else { return }
-                        if (self.waringClock == nil || self.waringClock!.duration(to: .now).sec > 1 / 10)
-                            && !self.isHiddenOtherTimeNode {
-                            
-                            let peakVolm = Volm.volm(fromAmp: Double(peak))
-                            for textView in self.textsView.elementViews {
-                                textView.peakVolm = peakVolm
+                if sequencer != nil {
+                    sequencer?.update(seqTracks)
+                } else {
+                    let sequencer = Sequencer(tracks: seqTracks, type: .loop) { [weak self] (peak) in
+                        DispatchQueue.main.async { [weak self] in
+                            guard let self else { return }
+                            if (self.waringClock == nil || self.waringClock!.duration(to: .now).sec > 1 / 10)
+                                && !self.isHiddenOtherTimeNode {
+                                
+                                let peakVolm = Volm.volm(fromAmp: Double(peak))
+                                for textView in self.textsView.elementViews {
+                                    textView.peakVolm = peakVolm
+                                }
+                                for contentView in self.contentsView.elementViews {
+                                    contentView.peakVolm = peakVolm
+                                }
+                                self.scoreView.peakVolm = peakVolm
+                                self.waringClock = .now
                             }
-                            for contentView in self.contentsView.elementViews {
-                                contentView.peakVolm = peakVolm
-                            }
-                            self.scoreView.peakVolm = peakVolm
-                            self.waringClock = .now
                         }
                     }
+                    self.sequencer = sequencer
                 }
-                self.sequencer = sequencer
+            } else {
+                sequencer?.update([])
             }
             
-            sequencer?.startEngine()
-            sequencer?.currentPositionInSec = Double(deltaSec)
+            sequencer?.startSec = Double(deltaSec)
             sequencer?.play()
             
 //            playingCaptions = model.captions
@@ -1858,9 +1861,17 @@ final class SheetView: View, @unchecked Sendable {
             hideOtherTimeNode()
             
             updatePreviousNext()
+        
+            sequencer?.beginPause()
+            audioPauseTimer.start(afterTime: Waveclip.releaseSec + 0.01, dispatchQueue: .main) {
+            } waitClosure: {
+            } cancelClosure: {
+            } endClosure: { [weak self] in
+                self?.sequencer?.pause()
+            }
             
-            sequencer?.endEngine()
-            sequencer = nil
+//            sequencer?.endEngine()
+//            sequencer = nil
         }
     }
     var playingSec: Rational? {
@@ -1999,7 +2010,6 @@ final class SheetView: View, @unchecked Sendable {
             let fi = previousSheetView != nil && playingSecRange == nil ? -1 : 0
             if playingSheetIndex == fi {
                 let sSec = playingSecRange?.start ?? 0
-//                sequencer?.currentPositionInSec = Double(sSec + (fi == -1 ? 0 : firstDeltaSec))
                 self.willPlaySec = sSec
                 playingSec = sSec
             } else {
@@ -2017,6 +2027,7 @@ final class SheetView: View, @unchecked Sendable {
               otherTimelineIDs: Set<UUID> = []) {
         if isPlaying {
             isPlaying = false
+            Sleep.start(atTime: Waveclip.releaseSec + 0.01)
         }
         if let sec {
             firstSec = sec
@@ -2039,6 +2050,11 @@ final class SheetView: View, @unchecked Sendable {
             playingSecRange = secRange
             isPlaying = true
         }
+    }
+    
+    func endSeqencer() {
+        guard !(sequencer?.isPlaying ?? true) else { return }
+        sequencer = nil
     }
     
     func updateCaption() {
@@ -2078,8 +2094,9 @@ final class SheetView: View, @unchecked Sendable {
     }
     
     var sequencerTrack: Sequencer.Track {
-        .init(scoreNoders: scoreView.scoreNoder != nil ? [scoreView.scoreNoder!] : [],
-              pcmNoders: contentsView.elementViews.compactMap { $0.pcmNoder })
+        scoreView.scoreTrackItem?.updateNotewaveDic()
+        return .init(scoreTrackItems: scoreView.scoreTrackItem != nil ? [scoreView.scoreTrackItem!] : [],
+                     pcmTrackItems: contentsView.elementViews.compactMap { $0.pcmTrackItem })
     }
     
     func spectrogramNode(at p: Point) -> (node: Node, contentView: SheetContentView)? {

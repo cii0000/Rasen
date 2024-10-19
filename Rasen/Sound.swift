@@ -849,7 +849,7 @@ extension Tone: MonoInterpolatable {
 }
 
 struct Pit: Codable, Hashable {
-    var beat = Rational(0), pitch = Rational(0), stereo = Stereo(volm: 0.28125), tone = Tone(), lyric = ""
+    var beat = Rational(0), pitch = Rational(0), stereo = Stereo(volm: 0.375), tone = Tone(), lyric = ""
 }
 extension Pit: Protobuf {
     init(_ pb: PBPit) throws {
@@ -961,7 +961,7 @@ extension Reverb {
             sec.clipped(min: earlyLateSec, max: durSec, newMin: lateVolm, newMax: 0)
             
             let t1 = random.nextT()
-            let nPan = (t1 * 2 - 1) * 0.75
+            let nPan = (t1 * 2 - 1) * (1 - sec.clipped(min: 0, max: earlyLateSec, newMin: 1, newMax: 0).squared) * 0.75
             let nVolm = if nPan < 0 {
                 channel == 0 ? volm : volm * (1 + nPan)
             } else {
@@ -1901,7 +1901,7 @@ extension Audiotrack {
 }
 
 struct Volm: Hashable, Codable {
-    static let minVolm = 0.0, maxVolm = 1.0, volmRange = minVolm ... maxVolm
+    static let minVolm = 0.0, maxVolm = 0.75, volmRange = minVolm ... maxVolm
 }
 extension Volm {
     /// cutDb = -40, a = -cutDb, amp = (.exp(a * volm / 8.7) - 1) / (.exp(a / 8.7) - 1)

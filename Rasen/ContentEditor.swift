@@ -59,6 +59,10 @@ final class ContentSlider: DragEditor {
         case .began:
             var cursor = Cursor.arrow
             
+            if document.isPlaying(with: event) {
+                document.stopPlaying(with: event)
+            }
+            
             if let sheetView = document.sheetView(at: p),
                 let ci = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
                                                 scale: document.screenToWorldScale) {
@@ -251,7 +255,7 @@ final class ContentView<T: BinderProtocol>: SpectrgramView, @unchecked Sendable 
         }
     }
     
-    var pcmNoder: PCMNoder?
+    var pcmTrackItem: PCMTrackItem?
     var volms = [Double]()
     
     init(binder: Binder, keyPath: BinderKeyPath) {
@@ -277,8 +281,8 @@ final class ContentView<T: BinderProtocol>: SpectrgramView, @unchecked Sendable 
         }
         
         if model.type == .sound {
-            pcmNoder = .init(content: model)
-            volms = pcmNoder?.pcmBuffer.volms() ?? []
+            pcmTrackItem = .init(content: model)
+            volms = pcmTrackItem?.pcmBuffer.volms() ?? []
         }
         
         updateClippingNode()
@@ -301,7 +305,7 @@ extension ContentView {
         updateClippingNode()
         updateTimeline()
         if let timeOption = model.timeOption {
-            pcmNoder?.change(from: timeOption)
+            pcmTrackItem?.change(from: timeOption)
             updateSpectrogram()
         }
     }
@@ -450,7 +454,7 @@ extension ContentView {
         updateTimeline()
         updateClippingNode()
         if let timeOption = model.timeOption {
-            pcmNoder?.change(from: timeOption)
+            pcmTrackItem?.change(from: timeOption)
             
             spectrogramNode?.attitude.position.x
             = x(atBeat: timeOption.beatRange.start + timeOption.localStartBeat) + spectrogramDeltaX
@@ -463,7 +467,7 @@ extension ContentView {
             updateTimeline()
             updateClippingNode()
             if let timeOption = model.timeOption {
-                pcmNoder?.change(from: timeOption)
+                pcmTrackItem?.change(from: timeOption)
                 
                 spectrogramNode?.attitude.position.x
                 = x(atBeat: timeOption.beatRange.start + timeOption.localStartBeat) + spectrogramDeltaX
@@ -483,7 +487,7 @@ extension ContentView {
         set {
             binder[keyPath: keyPath].stereo = newValue
             updateTimeline()
-            pcmNoder?.stereo = newValue
+            pcmTrackItem?.stereo = newValue
         }
     }
     
@@ -527,7 +531,7 @@ extension ContentView {
     }
     
     var pcmBuffer: PCMBuffer? {
-        pcmNoder?.pcmBuffer
+        pcmTrackItem?.pcmBuffer
     }
     
     func timelineNode(with content: Content) -> [Node] {
@@ -604,8 +608,7 @@ extension ContentView {
             let ei = Int((eSec * PCMBuffer.volmFrameRate).rounded())
                 .clipped(min: 0, max: volms.count - 1)
             let vt = content.stereo.volm
-                .clipped(min: Volm.minVolm, max: Volm.maxVolm,
-                         newMin: lw / noteHeight, newMax: 1)
+                .clipped(min: 0, max: 1, newMin: lw / noteHeight, newMax: 1)
             if si < ei {
                 let line = Line(controls: (si ... ei).map { i in
                     let sec = Rational(i + msi) / PCMBuffer.volmFrameRate + csSec
@@ -735,8 +738,8 @@ extension ContentView {
         let content = model
         guard content.isShownSpectrogram, let timeOption = content.timeOption,
               let contentSecRange = content.contentSecRange,
-              let sm = pcmNoder?.spectrogram(fromSecRange: .init(contentSecRange)) else { return }
-        
+              let pcmBuffer = pcmBuffer else { return }
+        let sm = Spectrogram(pcmBuffer, secRange: .init(contentSecRange))
         let firstX = x(atBeat: timeOption.beatRange.start + max(timeOption.localStartBeat, 0))
         spectrogramDeltaX = width(atDurBeat: -min(timeOption.localStartBeat, 0))
         let y = timelineCenterY + Sheet.timelineHalfHeight + ContentLayout.isShownSpectrogramHeight

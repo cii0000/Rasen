@@ -2132,6 +2132,10 @@ final class Document: @unchecked Sendable {
         }
     }
     
+    func endSeqencer() {
+        sheetViewValues.forEach { $0.value.view?.endSeqencer() }
+    }
+    
     private var menuNode: Node?
     
     var textMaxTypelineWidthNode = Node(lineWidth: 0.5, lineType: .color(.border))

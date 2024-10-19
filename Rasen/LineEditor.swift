@@ -1030,8 +1030,6 @@ final class LineEditor: Editor, @unchecked Sendable {
 //                    document.rootNode.insert(child: noteNode,
 //                                             at: document.accessoryNodeIndex)
                 
-//                stoppedSeqSec = sheetView.sequencer?.currentPositionInSec
-                
                 let octaveNode = scoreView.octaveNode(fromPitch: pitch, scoreView.notesNode.children.last!.children[0].clone,
                                                   .subInterpolated)
                 octaveNode.attitude.position

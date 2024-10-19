@@ -291,7 +291,7 @@ final class ColorEditor: Editor {
     private func noiseGradientWith(splitCount count: Int = 140, volm: Double) -> [Color] {
         let rCount = 1 / Double(count)
         return (0 ... count).map {
-            ScoreView.color(fromVolm: volm, noise: Double($0) * rCount)
+            ScoreView.color(fromScale: volm, noise: Double($0) * rCount)
         }
     }
     
@@ -516,7 +516,7 @@ final class ColorEditor: Editor {
                     beganContents[ci] = content
                 }
                 
-                let (minV, maxV) = scoreResult != nil && scoreResult!.isTone ? (0, 1) : (Volm.minVolm, Volm.maxVolm)
+                let (minV, maxV) = scoreResult?.isStereo ?? false ? (Volm.minVolm, Volm.maxVolm) : (0, 1)
                 updateNode()
                 fp = event.screenPoint
                 isReversedLightness = true
@@ -534,7 +534,8 @@ final class ColorEditor: Editor {
             let wp = document.convertScreenToWorld(event.screenPoint)
             let p = lightnessNode.convertFromWorld(wp)
             let t = (p.y / maxLightnessHeight).clipped(min: 0, max: 1)
-            let volm = Double.linear(Volm.minVolm, Volm.maxVolm, t: t)
+            let volm = (scoreResult?.isStereo ?? false) ?
+            Double.linear(Volm.minVolm, Volm.maxVolm, t: t) : Double.linear(0, 1, t: t)
             let volmScale = beganVolm == 0 ? 0 : volm / beganVolm
             func newVolm(from otherVolm: Double) -> Double {
                 if beganVolm == otherVolm {
@@ -638,7 +639,7 @@ final class ColorEditor: Editor {
                 }
                 
                 switch scoreResult {
-                case .sprol:
+                case .sprol, .allSprol, .oddVolm, .evenVolm, .allEven:
                     notePlayer?.notes = playerBeatNoteIndexes.map {
                         scoreView.normarizedPitResult(atBeat: beganBeat, at: $0)
                     }
@@ -656,7 +657,9 @@ final class ColorEditor: Editor {
                 }
             }
             
-            editingLightness = volm.clipped(min: Volm.minVolm, max: Volm.maxVolm, newMin: 0, newMax: 100)
+            editingLightness = scoreResult?.isStereo ?? false ?
+            volm.clipped(min: Volm.minVolm, max: Volm.maxVolm, newMin: 0, newMax: 100) :
+            volm.clipped(min: 0, max: 1, newMin: 0, newMax: 100)
         case .ended:
             notePlayer?.stop()
             
@@ -1072,6 +1075,7 @@ final class ColorEditor: Editor {
                         let contentView = sheetView.contentsView.elementViews[ci]
                         contentView.stereo = .init(volm: contentView.stereo.volm,
                                                    pan: newPan(from: beganContent.stereo.pan))
+//                        sheetView.sequencer?.pcmNoders
                     }
                 }
                 

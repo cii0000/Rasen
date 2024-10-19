@@ -373,6 +373,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
     func windowDidResignKey(_ notification: Notification) {
         view.document.stopAllEvents(isEnableText: false)
+        view.document.endSeqencer()
     }
     func updateDocumentFromWindow() {
         view.document.stopAllEvents(isEnableText: false)

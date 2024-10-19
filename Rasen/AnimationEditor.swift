@@ -1129,7 +1129,7 @@ final class Player: InputKeyEditor {
                     var secRange: Range<Rational>?
                     var sec: Rational = cSheetView.animationView.sec(atX: sheetP.x)
                     let scoreView = cSheetView.scoreView
-                    if scoreView.model.enabled, let scoreNoder = scoreView.scoreNoder {
+                    if scoreView.model.enabled, let scoreTrackItem = scoreView.scoreTrackItem {
                         let scoreP = scoreView.convertFromWorld(p)
                         let score = scoreView.model
                         if let (noteI, pitI) = scoreView.noteAndPitI(at: scoreP, scale: document.screenToWorldScale) {
@@ -1137,14 +1137,14 @@ final class Player: InputKeyEditor {
                             + score.notes[noteI].beatRange.start + score.beatRange.start
                             sec = score.sec(fromBeat: beat)
                             secRange = score.secRange
-                            ids.insert(scoreNoder.id)
+                            ids.insert(scoreTrackItem.id)
                         } else if let noteI = scoreView.noteIndex(at: scoreP, scale: document.screenToWorldScale) {
                             let beat = score.notes[noteI].beatRange.start + score.beatRange.start
                             sec = score.sec(fromBeat: beat)
                             secRange = score.secRange
-                            ids.insert(scoreNoder.id)
+                            ids.insert(scoreTrackItem.id)
                         } else if scoreView.containsMainLine(scoreP, scale: document.screenToWorldScale) {
-                            ids.insert(scoreNoder.id)
+                            ids.insert(scoreTrackItem.id)
                         }
                         if secRange != nil {
                             cSheetView.previousSheetView = nil
