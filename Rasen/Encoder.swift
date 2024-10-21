@@ -152,13 +152,11 @@ final class Movie {
     private var deltaTime = Rational(0)
     private var settings = [Setting]()
     
-    init(url: URL, renderSize: Size,
-         isLinearPCM: Bool,
-         colorSpace rgbColorSpace: RGBColorSpace) throws {
+    init(url: URL, renderSize: Size, isLinearPCM: Bool, _ colorSpace: ColorSpace) throws {
         self.url = url
         self.renderSize = renderSize
         
-        isHDR = rgbColorSpace.isHDR
+        isHDR = colorSpace.isHDR
         codec = isHDR ? AVVideoCodecType.hevc : AVVideoCodecType.h264
         guard let colorSpace = isHDR ?
                 CGColorSpace.itur2020HLGColorSpace : CGColorSpace.sRGBColorSpace,

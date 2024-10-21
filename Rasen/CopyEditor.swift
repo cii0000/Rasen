@@ -1834,7 +1834,7 @@ final class CopyEditor: Editor {
         }
         func updateImage(_ image: Image, imageFrame: Rect? = nil) {
             if phase == .began {
-                if let texture = try? Texture(image: image, isOpaque: false, colorSpace: .sRGB) {
+                if let texture = try? Texture(image: image, isOpaque: false, .sRGB) {
                     let rect: Rect
                     if let imf = imageFrame {
                         rect = imf

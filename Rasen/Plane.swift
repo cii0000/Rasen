@@ -47,9 +47,6 @@ extension Plane: Protobuf {
         }
         
         uuColor = (try? UUColor(pb.uuColor)) ?? UU(Color())
-        if uuColor.value.rgbColorSpace != Color.defaultColorSpace {
-            uuColor.value.rgbColorSpace = Color.defaultColorSpace
-        }
     }
     var pb: PBPlane {
         .with {

@@ -19,6 +19,34 @@ import Dispatch
 import struct Foundation.UUID
 import struct Foundation.URL
 
+final class Stopper: InputKeyEditor {
+    let document: Document
+    let isEditingSheet: Bool
+    
+    init(_ document: Document) {
+        self.document = document
+        isEditingSheet = document.isEditingSheet
+    }
+    
+    func send(_ event: InputKeyEvent) {
+        switch event.phase {
+        case .began:
+            document.cursor = .arrow
+            
+            let p = document.convertScreenToWorld(event.screenPoint)
+            document.closeAllPanels(at: p)
+            
+            if document.isPlaying(with: event) {
+                document.stopPlaying(with: event)
+                return
+            }
+        case .changed: break
+        case .ended:
+            document.cursor = document.defaultCursor
+        }
+    }
+}
+
 final class Runner: InputKeyEditor, @unchecked Sendable {
     let editor: RunEditor
     
@@ -60,7 +88,7 @@ final class RunEditor: InputKeyEditor, @unchecked Sendable {
         let p = document.convertScreenToWorld(sp)
         if event.phase == .began && document.closePanel(at: p) { return }
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             
             if event.phase == .began {
                 document.closeAllPanels(at: p)

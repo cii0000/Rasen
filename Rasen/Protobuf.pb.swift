@@ -37,7 +37,7 @@ fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAP
   typealias Version = _2
 }
 
-enum PBRGBColorSpace: SwiftProtobuf.Enum, Swift.CaseIterable {
+enum PBColorSpace: SwiftProtobuf.Enum, Swift.CaseIterable {
   typealias RawValue = Int
   case sRgb // = 0
   case sRgblinear // = 4
@@ -82,7 +82,7 @@ enum PBRGBColorSpace: SwiftProtobuf.Enum, Swift.CaseIterable {
   }
 
   // The compiler won't synthesize support with the UNRECOGNIZED case.
-  static let allCases: [PBRGBColorSpace] = [
+  static let allCases: [PBColorSpace] = [
     .sRgb,
     .sRgblinear,
     .sRgbhdr,
@@ -461,7 +461,7 @@ struct PBColor: Sendable {
   /// Clears the value of `rgba`. Subsequent reads from it will return its default value.
   mutating func clearRgba() {self._rgba = nil}
 
-  var rgbColorSpace: PBRGBColorSpace = .sRgb
+  var colorSpace: PBColorSpace = .sRgb
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -3476,7 +3476,7 @@ struct PBPastableObject: Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-extension PBRGBColorSpace: SwiftProtobuf._ProtoNameProviding {
+extension PBColorSpace: SwiftProtobuf._ProtoNameProviding {
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     0: .same(proto: "sRGB"),
     1: .same(proto: "sRGBHDR"),
@@ -3911,7 +3911,7 @@ extension PBColor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "lcha"),
     2: .same(proto: "rgba"),
-    3: .same(proto: "rgbColorSpace"),
+    3: .same(proto: "colorSpace"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -3922,7 +3922,7 @@ extension PBColor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularMessageField(value: &self._lcha) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._rgba) }()
-      case 3: try { try decoder.decodeSingularEnumField(value: &self.rgbColorSpace) }()
+      case 3: try { try decoder.decodeSingularEnumField(value: &self.colorSpace) }()
       default: break
       }
     }
@@ -3939,8 +3939,8 @@ extension PBColor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
     try { if let v = self._rgba {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
     } }()
-    if self.rgbColorSpace != .sRgb {
-      try visitor.visitSingularEnumField(value: self.rgbColorSpace, fieldNumber: 3)
+    if self.colorSpace != .sRgb {
+      try visitor.visitSingularEnumField(value: self.colorSpace, fieldNumber: 3)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -3948,7 +3948,7 @@ extension PBColor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
   static func ==(lhs: PBColor, rhs: PBColor) -> Bool {
     if lhs._lcha != rhs._lcha {return false}
     if lhs._rgba != rhs._rgba {return false}
-    if lhs.rgbColorSpace != rhs.rgbColorSpace {return false}
+    if lhs.colorSpace != rhs.colorSpace {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

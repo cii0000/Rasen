@@ -50,7 +50,7 @@ protocol InputKeyEditor: Editor {
     func send(_ event: InputKeyEvent)
 }
 
-final class Zoomer: PinchEditor, @unchecked Sendable {
+final class Zoomer: PinchEditor {
     let document: Document
     
     init(_ document: Document) {
@@ -87,7 +87,7 @@ final class Zoomer: PinchEditor, @unchecked Sendable {
     }
 }
 
-final class Rotater: RotateEditor, @unchecked Sendable {
+final class Rotater: RotateEditor {
     let document: Document
     
     init(_ document: Document) {
@@ -136,7 +136,7 @@ final class Rotater: RotateEditor, @unchecked Sendable {
     }
 }
 
-final class Scroller: ScrollEditor, @unchecked Sendable {
+final class Scroller: ScrollEditor {
     let document: Document
     
     init(_ document: Document) {
@@ -199,7 +199,7 @@ final class Scroller: ScrollEditor, @unchecked Sendable {
     }
 }
 
-final class DraftChanger: InputKeyEditor, @unchecked Sendable {
+final class DraftChanger: InputKeyEditor {
     let editor: DraftEditor
     
     init(_ document: Document) {
@@ -213,7 +213,7 @@ final class DraftChanger: InputKeyEditor, @unchecked Sendable {
         editor.updateNode()
     }
 }
-final class DraftCutter: InputKeyEditor, @unchecked Sendable {
+final class DraftCutter: InputKeyEditor {
     let editor: DraftEditor
     
     init(_ document: Document) {
@@ -227,7 +227,7 @@ final class DraftCutter: InputKeyEditor, @unchecked Sendable {
         editor.updateNode()
     }
 }
-final class DraftEditor: Editor, @unchecked Sendable {
+final class DraftEditor: Editor {
     let document: Document
     let isEditingSheet: Bool
     
@@ -238,7 +238,7 @@ final class DraftEditor: Editor, @unchecked Sendable {
     
     func changeToDraft(with event: InputKeyEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         if document.isPlaying(with: event) {
@@ -316,7 +316,7 @@ final class DraftEditor: Editor, @unchecked Sendable {
     }
     func cutDraft(with event: InputKeyEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         if document.isPlaying(with: event) {
@@ -468,7 +468,7 @@ final class FaceEditor: Editor, @unchecked Sendable {
     
     func makeFaces(with event: InputKeyEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         if document.isPlaying(with: event) {
@@ -553,7 +553,7 @@ final class FaceEditor: Editor, @unchecked Sendable {
     }
     func cutFaces(with event: InputKeyEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         if document.isPlaying(with: event) {
@@ -1319,6 +1319,8 @@ final class IOEditor: Editor, @unchecked Sendable {
         case .documentWithHistory: Document.FileType.rasendoch
         }
         
+        let colorSpace = ColorSpace.export
+        
         let fileSize: @Sendable () -> (Int?) = { [nvs, weak self] in
             guard let self else { return nil }
             switch type {
@@ -1328,12 +1330,16 @@ final class IOEditor: Editor, @unchecked Sendable {
                     let v = nvs[0]
                     if let sid = self.document.sheetID(at: v.shp),
                        let node = self.document.renderableSheetNode(at: sid) {
-                        let image = node.renderedAntialiasFillImage(in: v.bounds, to: nSize, backgroundColor: .background)
+                        let image = node.renderedAntialiasFillImage(in: v.bounds, to: nSize,
+                                                                    backgroundColor: .background,
+                                                                    colorSpace)
                         return image?.data(.png)?.count ?? 0
                     } else {
                         let node = Node(path: Path(v.bounds),
                                         fillType: .color(.background))
-                        let image = node.image(in: v.bounds, size: nSize, backgroundColor: .background, colorSpace: .sRGB)
+                        let image = node.image(in: v.bounds, size: nSize,
+                                               backgroundColor: .background,
+                                               colorSpace)
                         return image?.data(.png)?.count ?? 0
                     }
                 }
@@ -1346,12 +1352,13 @@ final class IOEditor: Editor, @unchecked Sendable {
                     if let sid = self.document.sheetID(at: v.shp),
                        let node = self.document.renderableSheetNode(at: sid) {
                         let image = node.renderedAntialiasFillImage(in: v.bounds, to: nSize,
-                                                                    backgroundColor: .background)
+                                                                    backgroundColor: .background,
+                                                                    colorSpace)
                         return image?.data(.png)?.count ?? 0
                     } else {
                         let node = Node(path: Path(v.bounds), fillType: .color(.background))
                         let image = node.image(in: v.bounds, size: nSize, backgroundColor: .background,
-                                               colorSpace: .sRGB)
+                                               colorSpace)
                         return image?.data(.png)?.count ?? 0
                     }
                 }
@@ -1431,22 +1438,24 @@ final class IOEditor: Editor, @unchecked Sendable {
                 switch type {
                 case .image:
                     let nSize = size * 4
-                    exportImage(from: nvs, unionFrame: unionFrame, is4K: false, size: nSize, at: ioResult)
+                    exportImage(from: nvs, unionFrame: unionFrame, is4K: false, colorSpace,
+                                size: nSize, at: ioResult)
                 case .image4K:
                     let nSize = size.width > size.height ?
                     size.snapped(Size(width: 3840, height: 2160)).rounded() :
                     size.snapped(Size(width: 2160, height: 3840)).rounded()
-                    exportImage(from: nvs, unionFrame: unionFrame, is4K: true, size: nSize, at: ioResult)
+                    exportImage(from: nvs, unionFrame: unionFrame, is4K: true, colorSpace,
+                                size: nSize, at: ioResult)
                 case .pdf:
                     exportPDF(from: nvs, unionFrame: unionFrame, size: size, at: ioResult)
                 case .gif:
                     let nSize = size.snapped(Size(width: 800, height: 1200)).rounded()
-                    exportGIF(from: nvs, size: nSize, at: ioResult)
+                    exportGIF(from: nvs, colorSpace, size: nSize, at: ioResult)
                 case .movie:
                     let nSize = size.width > size.height ?
                     size.snapped(Size(width: 1920, height: 1080).rounded()) :
                     size.snapped(Size(width: 1200, height: 1920).rounded())
-                    exportMovie(from: nvs, is4K: false, size: nSize, at: ioResult)
+                    exportMovie(from: nvs, is4K: false, colorSpace, size: nSize, at: ioResult)
                 case .sound:
                     exportSound(from: nvs, isLinearPCM: false, at: ioResult)
                 case .linearPCM:
@@ -1455,7 +1464,7 @@ final class IOEditor: Editor, @unchecked Sendable {
                     let nSize = size.width > size.height ?
                     size.snapped(Size(width: 3840, height: 2160)).rounded() :
                     size.snapped(Size(width: 2160, height: 3840)).rounded()
-                    exportMovie(from: nvs, is4K: true, size: nSize, at: ioResult)
+                    exportMovie(from: nvs, is4K: true, colorSpace, size: nSize, at: ioResult)
                 case .document:
                     exportDocument(from: nvs, isHistory: false, at: ioResult)
                 case .documentWithHistory:
@@ -1469,6 +1478,7 @@ final class IOEditor: Editor, @unchecked Sendable {
     }
     
     func exportImage(from vs: [SelectingValue], unionFrame: Rect?, is4K: Bool,
+                     _ colorSpace: ColorSpace,
                      size: Size, at ioResult: IOResult) {
         if vs.isEmpty {
             return
@@ -1476,23 +1486,26 @@ final class IOEditor: Editor, @unchecked Sendable {
             do {
                 try ioResult.remove()
                 
-                let colorSpace = document.colorSpace
                 if let unionFrame {
                     let scaleX = size.width / unionFrame.width
                     let scaleY = size.height / unionFrame.height
-                    var nImage = Image(size: size, color: .background)
+                    var nImage = Image(size: size, color: .background.with(colorSpace))
                     for v in vs {
                         let origin = document.sheetFrame(with: v.shp).origin - unionFrame.origin
                         
                         if let sid = document.sheetID(at: v.shp),
                            let node = document.renderableSheetNode(at: sid) {
-                            if let image = node.renderedAntialiasFillImage(in: v.bounds, to: size, backgroundColor: .background) {
+                            if let image = node.renderedAntialiasFillImage(in: v.bounds, to: size,
+                                                                           backgroundColor: .background,
+                                                                           colorSpace) {
                                 nImage = nImage?.drawn(image, in: (v.bounds + origin) * Transform(scaleX: scaleX, y: scaleY))
                             }
                         } else {
                             let node = Node(path: Path(v.bounds),
                                             fillType: .color(.background))
-                            if let image = node.image(in: v.bounds, size: size, backgroundColor: .background, colorSpace: colorSpace) {
+                            if let image = node.image(in: v.bounds, size: size,
+                                                      backgroundColor: .background,
+                                                      colorSpace) {
                                 nImage = nImage?.drawn(image, in: (v.bounds + origin) * Transform(scaleX: scaleX, y: scaleY))
                             }
                         }
@@ -1502,13 +1515,15 @@ final class IOEditor: Editor, @unchecked Sendable {
                     let v = vs[0]
                     if let sid = document.sheetID(at: v.shp),
                        let node = document.renderableSheetNode(at: sid) {
-                        let image = node.renderedAntialiasFillImage(in: v.bounds, to: size, backgroundColor: .background)
+                        let image = node.renderedAntialiasFillImage(in: v.bounds, to: size,
+                                                                    backgroundColor: .background,
+                                                                    colorSpace)
                         try image?.write(.png, to: ioResult.url)
                     } else {
                         let node = Node(path: Path(v.bounds),
                                         fillType: .color(.background))
                         let image = node.image(in: v.bounds, size: size, backgroundColor: .background,
-                                               colorSpace: colorSpace)
+                                               colorSpace)
                         try image?.write(.png, to: ioResult.url)
                     }
                 }
@@ -1526,12 +1541,13 @@ final class IOEditor: Editor, @unchecked Sendable {
                 try ioResult.makeDirectory()
                 
                 @Sendable func export(progressHandler: (Double, inout Bool) -> ()) throws {
-                    let colorSpace = self.document.colorSpace
                     var isStop = false
                     for (j, v) in vs.enumerated() {
                         if let sid = self.document.sheetID(at: v.shp),
                            let node = self.document.renderableSheetNode(at: sid) {
-                            let image = node.renderedAntialiasFillImage(in: v.bounds, to: size, backgroundColor: .background)
+                            let image = node.renderedAntialiasFillImage(in: v.bounds, to: size,
+                                                                        backgroundColor: .background,
+                                                                        colorSpace)
                             let subIOResult = ioResult.sub(name: "\(j).png")
                             try image?.write(.png, to: subIOResult.url)
                             
@@ -1540,7 +1556,7 @@ final class IOEditor: Editor, @unchecked Sendable {
                             let node = Node(path: Path(v.bounds),
                                             fillType: .color(.background))
                             let image = node.image(in: v.bounds, size: size,
-                                                   backgroundColor: .background, colorSpace: colorSpace)
+                                                   backgroundColor: .background, colorSpace)
                             let subIOResult = ioResult.sub(name: "\(j).png")
                             try image?.write(.png, to: subIOResult.url)
                             
@@ -1677,14 +1693,13 @@ final class IOEditor: Editor, @unchecked Sendable {
     }
     
     func exportMovie(from vs: [SelectingValue], is4K: Bool,
+                     _ colorSpace: ColorSpace,
                      size: Size, at ioResult: IOResult) {
         @Sendable func export(progressHandler: (Double, inout Bool) -> (),
                     completionHandler handler: @escaping (Bool, (any Error)?) -> ()) {
             do {
-                let colorSpace = self.document.colorSpace
                 let movie = try Movie(url: ioResult.url, renderSize: size,
-                                      isLinearPCM: is4K,
-                                      colorSpace: colorSpace)
+                                      isLinearPCM: is4K, colorSpace)
                 var isStop = false, t = 0.0
                 let isMainFrame = !self.document.isEditingSheet
                 var filledShps = Set<Sheetpos>()
@@ -1765,7 +1780,9 @@ final class IOEditor: Editor, @unchecked Sendable {
                             }
                             node.attitude.position = origin
                            
-                            if let image = node.renderedAntialiasFillImage(in: b, to: size, backgroundColor: .background) {
+                            if let image = node.renderedAntialiasFillImage(in: b, to: size,
+                                                                           backgroundColor: .background,
+                                                                           colorSpace) {
                                 return image
                             } else {
                                 return nil
@@ -1782,7 +1799,7 @@ final class IOEditor: Editor, @unchecked Sendable {
                         let node = Node(path: Path(v.bounds),
                                         fillType: .color(.background))
                         if let image = node.image(in: v.bounds, size: size,
-                                                  backgroundColor: .background, colorSpace: colorSpace) {
+                                                  backgroundColor: .background, colorSpace) {
                             let duration = Animation.sec(fromBeat: Keyframe.defaultDurBeat,
                                                         tempo: Music.defaultTempo)
                             let frameCount = Animation.count(fromBeat: Keyframe.defaultDurBeat,
@@ -1978,6 +1995,7 @@ final class IOEditor: Editor, @unchecked Sendable {
     }
     
     func exportGIF(from vs: [SelectingValue],
+                   _ colorSpace: ColorSpace,
                    size: Size, at ioResult: IOResult) {
         @Sendable func export(progressHandler: (Double, inout Bool) -> ()) throws {
             var images = [(image: Image, time: Rational)]()
@@ -1995,7 +2013,7 @@ final class IOEditor: Editor, @unchecked Sendable {
                         node.attitude.position = sheetBounds.origin
                         let durBeat = sheet.animation.rendableKeyframeDurBeat(at: i)
                         if let image = node.image(in: v.bounds, size: size,
-                                                  backgroundColor: .background, colorSpace: .sRGB) {
+                                                  backgroundColor: .background, colorSpace) {
                             images.append((image, sheet.animation.sec(fromBeat: durBeat)))
                         }
                         time += durBeat
@@ -2008,7 +2026,7 @@ final class IOEditor: Editor, @unchecked Sendable {
                     let node = Node(path: Path(v.bounds),
                                     fillType: .color(.background))
                     if let image = node.image(in: v.bounds, size: size,
-                                              backgroundColor: .background, colorSpace: .sRGB) {
+                                              backgroundColor: .background, colorSpace) {
                         images.append((image, Keyframe.defaultDurBeat))
                         t = ot + 1 / Double(allC)
                         progressHandler(t, &isStop)

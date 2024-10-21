@@ -415,7 +415,7 @@ private final class NotewaveBox {
         self.notewave = notewave
     }
 }
-extension UnsafeMutableBufferPointer: @unchecked @retroactive Sendable where Element: NotewaveBox {}
+extension UnsafeMutableBufferPointer: @retroactive @unchecked Sendable where Element: NotewaveBox {}
 
 struct ScoreTrackItem {
     var rendnotes = [Rendnote]()

@@ -1197,8 +1197,6 @@ final class Document: @unchecked Sendable {
         sheetView.animationView.isFullEdit = isFullEdit
     }
     
-    var colorSpace = Color.defaultColorSpace
-    
     var sheetLineWidth: Double { Line.defaultLineWidth }
     var sheetTextSize: Double { camera.logScale > 2 ? 100.0 : Font.defaultSize }
     
@@ -2512,7 +2510,7 @@ final class Document: @unchecked Sendable {
         var size = sheetView.bounds.size * (2.0 ** 1)
         let bColor = sheetView.model.backgroundUUColor.value
         let baseImage = sheetView.node.imageInBounds(size: size, backgroundColor: bColor,
-                                                     colorSpace: colorSpace.noHDR)
+                                                     ColorSpace.export)
         guard let thumbnail1024 = baseImage else { return nil }
         size = size / 4
         let thumbnail256 = thumbnail1024.resize(with: size)
@@ -4067,6 +4065,7 @@ final class Document: @unchecked Sendable {
         case .interpolate: Interpolater(self)
         case .crossErase: CrossEraser(self)
         case .showTone: ToneShower(self)
+        case .stop: Stopper(self)
         default: nil
         }
     }
@@ -4106,7 +4105,7 @@ final class Document: @unchecked Sendable {
         }
     }
     
-    func stop(with event: any Event) {
+    func keepOut(with event: any Event) {
         switch event.phase {
         case .began:
             cursor = .block

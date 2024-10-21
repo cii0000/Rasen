@@ -16,8 +16,6 @@
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
 struct Color {
-    static let defaultColorSpace = RGBColorSpace.sRGB
-    
     var lcha: LCHA {
         didSet {
             if lcha != oldValue {
@@ -26,105 +24,105 @@ struct Color {
         }
     }
     private(set) var rgba: RGBA
-    var rgbColorSpace: RGBColorSpace {
+    var colorSpace: ColorSpace {
         didSet {
-            if rgbColorSpace != oldValue {
+            if colorSpace != oldValue {
                 updateRGBA()
             }
         }
     }
     private mutating func updateRGBA() {
-        rgba = lcha.safetyRGBAAndChroma(with: rgbColorSpace).rgba
+        rgba = lcha.safetyRGBAAndChroma(with: colorSpace).rgba
     }
     
     init() {
         lcha = LCHA()
         rgba = RGBA()
-        rgbColorSpace = .sRGB
+        colorSpace = .default
     }
     init?(lightness: Double, chroma: Double, hue: Double,
           opacity: Double = 1,
-          _ rgbColorSpace: RGBColorSpace = defaultColorSpace) {
+          _ colorSpace: ColorSpace = .default) {
         
         let lcha = LCHA(lightness, chroma, hue, opacity)
-        guard let rgba = RGBA(lcha, rgbColorSpace).clipped(from: rgbColorSpace) else {
+        guard let rgba = RGBA(lcha, colorSpace).clipped(from: colorSpace) else {
             return nil
         }
         self.lcha = lcha
         self.rgba = rgba
-        self.rgbColorSpace = rgbColorSpace
+        self.colorSpace = colorSpace
     }
     init(lightness: Double, a: Double, b: Double, opacity: Double = 1,
-         _ rgbColorSpace: RGBColorSpace = defaultColorSpace) {
+         _ colorSpace: ColorSpace = .default) {
         
         let tint = Point(a, b).polar
         let lcha = LCHA(lightness, tint.r, tint.theta, opacity)
         self.lcha = lcha
-        self.rgba = lcha.safetyRGBAAndChroma(with: rgbColorSpace).rgba
-        self.rgbColorSpace = rgbColorSpace
+        self.rgba = lcha.safetyRGBAAndChroma(with: colorSpace).rgba
+        self.colorSpace = colorSpace
     }
     init(lightness: Double, nearestChroma: Double, hue: Double,
          opacity: Double = 1,
-         _ rgbColorSpace: RGBColorSpace = defaultColorSpace) {
+         _ colorSpace: ColorSpace = .default) {
         
         let lcha = LCHA(lightness, nearestChroma, hue, opacity)
         self.lcha = lcha
-        self.rgba = lcha.safetyRGBAAndChroma(with: rgbColorSpace).rgba
-        self.rgbColorSpace = rgbColorSpace
+        self.rgba = lcha.safetyRGBAAndChroma(with: colorSpace).rgba
+        self.colorSpace = colorSpace
     }
     init(lightness: Double, unsafetyChroma: Double, hue: Double,
          opacity: Double = 1,
-         _ rgbColorSpace: RGBColorSpace = defaultColorSpace) {
+         _ colorSpace: ColorSpace = .default) {
         
         var lcha = LCHA(lightness, unsafetyChroma, hue, opacity)
-        let (rgba, chroma) = lcha.safetyRGBAAndChroma(with: rgbColorSpace)
+        let (rgba, chroma) = lcha.safetyRGBAAndChroma(with: colorSpace)
         lcha.c = chroma
         self.lcha = lcha
         self.rgba = rgba
-        self.rgbColorSpace = rgbColorSpace
+        self.colorSpace = colorSpace
     }
     init(lightness: Double, opacity: Double = 1,
-         _ rgbColorSpace: RGBColorSpace = defaultColorSpace) {
+         _ colorSpace: ColorSpace = .default) {
         
         self.init(lightness: lightness, unsafetyChroma: 0, hue: 0,
-                  opacity: opacity)
+                  opacity: opacity, colorSpace)
     }
     init(white: Double, opacity: Double = 1,
-         _ rgbColorSpace: RGBColorSpace = defaultColorSpace) {
+         _ colorSpace: ColorSpace = .default) {
         
         let lightness = Double.linear(Color.minLightness, Color.whiteLightness,
                                       t: white)
         self.init(lightness: lightness,
                   unsafetyChroma: 0, hue: 0,
-                  opacity: opacity)
+                  opacity: opacity, colorSpace)
     }
     init(red r: Double, green g: Double, blue b: Double, opacity: Double = 1,
-         _ rgbColorSpace: RGBColorSpace = defaultColorSpace) {
+         _ colorSpace: ColorSpace = .default) {
         self.init(red: Float(r), green: Float(g), blue: Float(b),
-                  opacity: opacity, rgbColorSpace)
+                  opacity: opacity, colorSpace)
     }
     init(red r: Float, green g: Float, blue b: Float, opacity: Double = 1,
-         _ rgbColorSpace: RGBColorSpace = defaultColorSpace) {
+         _ colorSpace: ColorSpace = .default) {
         
-        self.init(RGBA(r, g, b, Float(opacity)), rgbColorSpace)
+        self.init(RGBA(r, g, b, Float(opacity)), colorSpace)
     }
-    init(_ rgba: RGBA, _ rgbColorSpace: RGBColorSpace = defaultColorSpace) {
-        self.lcha = LCHA(rgba, rgbColorSpace)
+    init(_ rgba: RGBA, _ colorSpace: ColorSpace = .default) {
+        self.lcha = LCHA(rgba, colorSpace)
         self.rgba = rgba
-        self.rgbColorSpace = rgbColorSpace
+        self.colorSpace = colorSpace
     }
 }
 extension Color: Protobuf {
     init(_ pb: PBColor) throws {
-        lcha = try LCHA(pb.lcha)
-        rgba = try RGBA(pb.rgba)
-        rgbColorSpace = try RGBColorSpace(pb.rgbColorSpace)
+        lcha = try .init(pb.lcha)
+        rgba = try .init(pb.rgba)
+        colorSpace = try .init(pb.colorSpace)
     }
     var pb: PBColor {
         .with {
             $0.lcha = lcha.pb
             $0.rgba = rgba.pb
-            $0.rgbColorSpace = rgbColorSpace.pb
+            $0.colorSpace = colorSpace.pb
         }
     }
 }
@@ -204,31 +202,31 @@ extension Color {
     static func randomLightness(_ range: ClosedRange<Double>,
                                 interval: Double = 0.0,
                                 opacity: Double = 1.0,
-                                rgbColorSpace: RGBColorSpace = defaultColorSpace) -> Color {
+                                _ colorSpace: ColorSpace = .default) -> Color {
         let l = interval == 0 ?
             Double.random(in: range) :
             Double(Int.random(in: 0 ... Int(1 / interval))) * interval
         return Color(lightness: l, unsafetyChroma: 0, hue: 0,
-                     opacity: opacity, rgbColorSpace)
+                     opacity: opacity, colorSpace)
     }
     static func randomLightnessAndHue(_ range: ClosedRange<Double>,
                                       unsafetyChroma: Double = Color.maxChroma,
                                       interval: Double = 0.0,
                                       opacity: Double = 1.0,
-                                      rgbColorSpace: RGBColorSpace = defaultColorSpace) -> Color {
+                                      _ colorSpace: ColorSpace = .default) -> Color {
         let l = interval == 0 ?
             Double.random(in: range) :
             Double(Int.random(in: 0 ... Int(1 / interval))) * interval
         let hue = Double.random(in: -.pi ..< .pi)
         return Color(lightness: l, unsafetyChroma: unsafetyChroma, hue: hue,
-                     opacity: opacity, rgbColorSpace)
+                     opacity: opacity, colorSpace)
     }
     func randomLightness(length: Double = 5) -> Color {
         let minL = max(Color.minLightness, lightness - length)
         let maxL = min(Color.whiteLightness, lightness + length)
         let l = Double.random(in: minL ... maxL)
         return Color(lightness: l, unsafetyChroma: chroma, hue: hue,
-                     opacity: opacity, rgbColorSpace)
+                     opacity: opacity, colorSpace)
     }
     
     func with(lightness: Double) -> Self {
@@ -240,6 +238,15 @@ extension Color {
         var color = self
         color.opacity = opacity
         return color
+    }
+    func with(_ nColorSpace: ColorSpace) -> Self {
+        if self.colorSpace != nColorSpace {
+            var n = self
+            n.colorSpace = nColorSpace
+            return n
+        } else {
+            return self
+        }
     }
     
     func alphaBlend(_ other: Self) -> Self {
@@ -254,7 +261,7 @@ extension Color {
                 (src.rgb * src.a + dst.rgb * dst.a * (1 - src.a)) / outA
             out = RGBA(outRGB.x, outRGB.y, outRGB.z, outA)
         }
-        return Color(out, rgbColorSpace)
+        return Color(out, colorSpace)
     }
     func minLightnessBlend(_ other: Self) -> Self {
         var n = self + other
@@ -262,7 +269,7 @@ extension Color {
         return n
     }
     func rgbaBlend(_ other: Self) -> Self {
-        .init(.linear(rgba, other.rgba, t: 0.5), rgbColorSpace)
+        .init(.linear(rgba, other.rgba, t: 0.5), colorSpace)
     }
 }
 extension Color {
@@ -276,33 +283,33 @@ extension Color {
         let nChroma = tint.r, nHue = tint.theta
         let opacity = (lhs.opacity + rhs.opacity) / 2
         return Color(lightness: nLightness, unsafetyChroma: nChroma, hue: nHue,
-                     opacity: opacity)
+                     opacity: opacity, lhs.colorSpace)
     }
 }
 extension Color: Equatable {
     static func == (lhs: Color, rhs: Color) -> Bool {
         lhs.lcha == rhs.lcha
-            && lhs.rgbColorSpace == rhs.rgbColorSpace
+            && lhs.colorSpace == rhs.colorSpace
     }
 }
 extension Color: Hashable {
     func hash(into hasher: inout Hasher) {
         hasher.combine(lcha)
-        hasher.combine(rgbColorSpace)
+        hasher.combine(colorSpace)
     }
 }
 extension Color: Interpolatable {
     static func rgbLinear(_ f0: Color, _ f1: Color, t: Double) -> Color {
-        .init(RGBA.linear(f0.rgba, f1.rgba, t: t), f0.rgbColorSpace)
+        .init(RGBA.linear(f0.rgba, f1.rgba, t: t), f0.colorSpace)
     }
     static func rgbFirstSpline(_ f1: Color, _ f2: Color, _ f3: Color, t: Double) -> Color {
-        .init(RGBA.firstSpline(f1.rgba, f2.rgba, f3.rgba, t: t), f1.rgbColorSpace)
+        .init(RGBA.firstSpline(f1.rgba, f2.rgba, f3.rgba, t: t), f1.colorSpace)
     }
     static func rgbSpline(_ f0: Color, _ f1: Color, _ f2: Color, _ f3: Color, t: Double) -> Color {
-        .init(RGBA.spline(f0.rgba, f1.rgba, f2.rgba, f3.rgba, t: t), f1.rgbColorSpace)
+        .init(RGBA.spline(f0.rgba, f1.rgba, f2.rgba, f3.rgba, t: t), f1.colorSpace)
     }
     static func rgbLastSpline(_ f0: Color, _ f1: Color, _ f2: Color, t: Double) -> Color {
-        .init(RGBA.lastSpline(f0.rgba, f1.rgba, f2.rgba, t: t), f1.rgbColorSpace)
+        .init(RGBA.lastSpline(f0.rgba, f1.rgba, f2.rgba, t: t), f1.colorSpace)
     }
     
     static func linear(_ f0: Color, _ f1: Color, t: Double) -> Color {
@@ -311,7 +318,7 @@ extension Color: Interpolatable {
         let b = Double.linear(f0.b, f1.b, t: t)
         let opacity = Double.linear(f0.opacity, f1.opacity, t: t)
         return Color(lightness: lightness, a: a, b: b, opacity: opacity,
-                     f0.rgbColorSpace)
+                     f0.colorSpace)
     }
     static func firstSpline(_ f1: Color, _ f2: Color, _ f3: Color,
                             t: Double) -> Color {
@@ -322,7 +329,7 @@ extension Color: Interpolatable {
         let opacity = Double.firstSpline(f1.opacity,
                                          f2.opacity, f3.opacity, t: t)
         return Color(lightness: lightness, a: a, b: b, opacity: opacity,
-                     f1.rgbColorSpace)
+                     f1.colorSpace)
     }
     static func spline(_ f0: Color, _ f1: Color, _ f2: Color, _ f3: Color,
                        t: Double) -> Color {
@@ -333,7 +340,7 @@ extension Color: Interpolatable {
         let opacity = Double.spline(f0.opacity, f1.opacity,
                                     f2.opacity, f3.opacity, t: t)
         return Color(lightness: lightness, a: a, b: b, opacity: opacity,
-                     f1.rgbColorSpace)
+                     f1.colorSpace)
     }
     static func lastSpline(_ f0: Color, _ f1: Color, _ f2: Color,
                            t: Double) -> Color {
@@ -344,7 +351,7 @@ extension Color: Interpolatable {
         let opacity = Double.lastSpline(f0.opacity, f1.opacity,
                                         f2.opacity, t: t)
         return Color(lightness: lightness, a: a, b: b, opacity: opacity,
-                     f1.rgbColorSpace)
+                     f1.colorSpace)
     }
 }
 extension Color: MonoInterpolatable {
@@ -357,7 +364,7 @@ extension Color: MonoInterpolatable {
         let opacity = Double.firstMonospline(f1.opacity,
                                          f2.opacity, f3.opacity, with: ms)
         return Color(lightness: lightness, a: a, b: b, opacity: opacity,
-                     f1.rgbColorSpace)
+                     f1.colorSpace)
     }
     static func monospline(_ f0: Color, _ f1: Color, _ f2: Color, _ f3: Color,
                            with ms: Monospline) -> Color {
@@ -368,7 +375,7 @@ extension Color: MonoInterpolatable {
         let opacity = Double.monospline(f0.opacity, f1.opacity,
                                     f2.opacity, f3.opacity, with: ms)
         return Color(lightness: lightness, a: a, b: b, opacity: opacity,
-                     f1.rgbColorSpace)
+                     f1.colorSpace)
     }
     static func lastMonospline(_ f0: Color, _ f1: Color, _ f2: Color,
                            with ms: Monospline) -> Color {
@@ -379,12 +386,12 @@ extension Color: MonoInterpolatable {
         let opacity = Double.lastMonospline(f0.opacity, f1.opacity,
                                         f2.opacity, with: ms)
         return Color(lightness: lightness, a: a, b: b, opacity: opacity,
-                     f1.rgbColorSpace)
+                     f1.colorSpace)
     }
 }
 extension Color: Codable {
     enum CodingKeys: String, CodingKey {
-        case lcha, rgba, rgbColorSpace = "cs"
+        case lcha, rgba, colorSpace = "cs"
     }
 }
 
@@ -446,9 +453,9 @@ extension LCHA: Codable {
     }
 }
 extension LCHA {
-    init(_ rgba: RGBA, _ rgbColorSpace: RGBColorSpace = .sRGB) {
+    init(_ rgba: RGBA, _ colorSpace: ColorSpace = .default) {
         let rgb = Double3(Double(rgba.r), Double(rgba.g), Double(rgba.b))
-        let lab = rgbColorSpace.rgbToLAB(rgb)
+        let lab = colorSpace.rgbToLAB(rgb)
         
         let tint = Point(lab.a, lab.b).polar
         self.l = lab.l
@@ -457,7 +464,7 @@ extension LCHA {
         self.a = Double(rgba.a)
     }
     
-    func safetyRGBAAndChroma(with cs: RGBColorSpace)
+    func safetyRGBAAndChroma(with cs: ColorSpace)
     -> (rgba: RGBA, chroma: Double) {
         if l >= cs.maxLightness {
             return (RGBA(white: cs.maxValue, opacity: Float(a)), 0)
@@ -530,8 +537,8 @@ extension RGBA: Protobuf {
     }
 }
 extension RGBA {
-    init(_ lcha: LCHA, _ rgbColorSpace: RGBColorSpace) {
-        let rgb = rgbColorSpace.labToRGB(LAB(lcha))
+    init(_ lcha: LCHA, _ colorSpace: ColorSpace) {
+        let rgb = colorSpace.labToRGB(LAB(lcha))
         if lcha.c == 0 {
             r = Float(rgb[0])
             g = Float(rgb[0])
@@ -554,7 +561,7 @@ extension RGBA {
         .init(r, g, b)
     }
     
-    func clipped(from cs: RGBColorSpace) -> RGBA? {
+    func clipped(from cs: ColorSpace) -> RGBA? {
         let range: ClosedRange<Float> = 0.0 ... cs.maxValue
         if range.contains(r) && range.contains(g) && range.contains(b) {
             return self
@@ -614,7 +621,7 @@ extension RGBA: Interpolatable {
     }
 }
 
-enum RGBColorSpace: Int8, Codable, Hashable {
+enum ColorSpace: Int8, Codable, Hashable {
     // Referenced definition:
     // International Color Consortium.
     // "How to interpret the sRGB color space
@@ -627,14 +634,17 @@ enum RGBColorSpace: Int8, Codable, Hashable {
     case p3, p3Linear
     case p3HDR, p3HDRLinear
 }
-extension RGBColorSpace {
+extension ColorSpace {
+    static let `default` = sRGB
+    static let export = sRGB
+    
     var isHDR: Bool {
         switch self {
         case .sRGB, .sRGBLinear, .p3, .p3Linear: false
         case .sRGBHDR, .sRGBHDRLinear, .p3HDR, .p3HDRLinear: true
         }
     }
-    var noHDR: RGBColorSpace {
+    var noHDR: ColorSpace {
         switch self {
         case .sRGBHDR: .sRGB
         case .sRGBHDRLinear: .sRGBLinear
@@ -706,8 +716,8 @@ extension RGBColorSpace {
     
     var linearRGBToXYZICCD50Matrix: Double3x3 {
         switch self {
-        case .sRGB, .sRGBLinear, .sRGBHDR, .sRGBHDRLinear: RGBColorSpace.linearSRGBToXYZICCD50Matrix
-        case .p3, .p3Linear, .p3HDR, .p3HDRLinear: RGBColorSpace.linearDisplayP3ToXYZICCD50Matrix
+        case .sRGB, .sRGBLinear, .sRGBHDR, .sRGBHDRLinear: ColorSpace.linearSRGBToXYZICCD50Matrix
+        case .p3, .p3Linear, .p3HDR, .p3HDRLinear: ColorSpace.linearDisplayP3ToXYZICCD50Matrix
         }
     }
     func linearRGBToXYZICCD50(_ linearRGB: Double3) -> Double3 {
@@ -715,8 +725,8 @@ extension RGBColorSpace {
     }
     var xyzICCD50ToLinearRGBMatrix: Double3x3 {
         switch self {
-        case .sRGB, .sRGBLinear, .sRGBHDR, .sRGBHDRLinear: RGBColorSpace.xyzICCD50ToLinearSRGBMatrix
-        case .p3, .p3Linear, .p3HDR, .p3HDRLinear: RGBColorSpace.xyzICCD50ToLinearDisplayP3Matrix
+        case .sRGB, .sRGBLinear, .sRGBHDR, .sRGBHDRLinear: ColorSpace.xyzICCD50ToLinearSRGBMatrix
+        case .p3, .p3Linear, .p3HDR, .p3HDRLinear: ColorSpace.xyzICCD50ToLinearDisplayP3Matrix
         }
     }
     func xyzICCD50ToLinearRGB(_ xyzICCD50: Double3) -> Double3 {
@@ -724,18 +734,18 @@ extension RGBColorSpace {
     }
     
     func labToRGB(_ lab: LAB) -> Double3 {
-        let xyzICCD50 = lab.xyz(withWhitePoint: RGBColorSpace.xyzICCD50WhitePoint)
+        let xyzICCD50 = lab.xyz(withWhitePoint: ColorSpace.xyzICCD50WhitePoint)
         let linearRGB = xyzICCD50ToLinearRGB(xyzICCD50)
         return linearRGBToRGB(linearRGB)
     }
     func rgbToLAB(_ rgb: Double3) -> LAB {
         let linearRGB = rgbToLinearRGB(rgb)
         let xyzICCD50 = linearRGBToXYZICCD50(linearRGB)
-        return LAB(xyzICCD50, whitePoint: RGBColorSpace.xyzICCD50WhitePoint)
+        return LAB(xyzICCD50, whitePoint: ColorSpace.xyzICCD50WhitePoint)
     }
 }
-extension RGBColorSpace: Protobuf {
-    init(_ pb: PBRGBColorSpace) throws {
+extension ColorSpace: Protobuf {
+    init(_ pb: PBColorSpace) throws {
         switch pb {
         case .sRgb: self = .sRGB
         case .sRgblinear: self = .sRGBLinear
@@ -748,7 +758,7 @@ extension RGBColorSpace: Protobuf {
         case .UNRECOGNIZED: self = .sRGB
         }
     }
-    var pb: PBRGBColorSpace {
+    var pb: PBColorSpace {
         switch self {
         case .sRGB: .sRgb
         case .sRGBLinear: .sRgblinear
@@ -761,7 +771,7 @@ extension RGBColorSpace: Protobuf {
         }
     }
 }
-extension RGBColorSpace: CustomStringConvertible {
+extension ColorSpace: CustomStringConvertible {
     var description: String {
         switch self {
         case .sRGB: "sRGB"

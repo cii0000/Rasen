@@ -128,7 +128,7 @@ final class ScoreAdder: InputKeyEditor {
     
     func send(_ event: InputKeyEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         if document.isPlaying(with: event) {
@@ -171,7 +171,7 @@ final class ToneShower: InputKeyEditor {
     
     func send(_ event: InputKeyEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         if document.isPlaying(with: event) {
@@ -251,7 +251,7 @@ final class ScoreSlider: DragEditor {
     
     func send(_ event: DragEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         
@@ -2809,7 +2809,7 @@ extension ScoreView {
         var nodes = [Node](), maxH = 0.0
         func spNode(width: Int, at xi: Int) -> Node? {
             guard let image = sm.image(width: width, at: xi),
-                  let texture = try? Texture(image: image, isOpaque: false, colorSpace: .sRGB) else { return nil }
+                  let texture = try? Texture(image: image, isOpaque: false, .sRGB) else { return nil }
             let w = allW * Double(width) / Double(sm.frames.count)
             let h = Self.spectrogramHeight
             maxH = max(maxH, h)

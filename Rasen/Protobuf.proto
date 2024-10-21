@@ -53,7 +53,7 @@ message PBAttitude {
     double rotation = 3;
 }
 
-enum PBRGBColorSpace {
+enum PBColorSpace {
     sRGB = 0;
     sRGBLinear = 4;
     sRGBHDR = 1;
@@ -78,7 +78,7 @@ message PBRGBA {
 message PBColor {
     PBLCHA lcha = 1;
     PBRGBA rgba = 2;
-    PBRGBColorSpace rgbColorSpace = 3;
+    PBColorSpace colorSpace = 3;
 }
 
 message PBUUID {

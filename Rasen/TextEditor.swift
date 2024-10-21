@@ -36,7 +36,7 @@ final class TextSlider: DragEditor {
     
     func send(_ event: DragEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
@@ -590,7 +590,7 @@ final class TextScriptEditor: Editor {
     
     func changeScripst(_ isSuper: Bool, with event: InputKeyEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         func moveCharacter(isSuper: Bool, from c: Character) -> Character? {
@@ -794,7 +794,7 @@ final class TextEditor: Editor {
     }
     func beginInputKey(_ event: InputTextEvent) {
         guard document.isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         

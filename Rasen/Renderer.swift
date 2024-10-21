@@ -25,9 +25,9 @@ final class Renderer {
     let device: any MTLDevice
     let library: any MTLLibrary
     let commandQueue: any MTLCommandQueue
-    let colorSpace = CGColorSpace.sRGBColorSpace!
+    let colorSpace = ColorSpace.default.cg!
     let pixelFormat = MTLPixelFormat.bgra8Unorm
-    let imageColorSpace = CGColorSpace.sRGBColorSpace!
+    let imageColorSpace = ColorSpace.export.cg!
     let imagePixelFormat = MTLPixelFormat.rgba8Unorm
     let hdrColorSpace = CGColorSpace.sRGBHDRColorSpace!
     let hdrPixelFormat = MTLPixelFormat.rgba16Float
@@ -55,7 +55,7 @@ final class Renderer {
         
         var n = [RGBA: Buffer]()
         func append(_ color: Color) {
-            let rgba = color.rgba.premultipliedAlpha
+            let rgba = color.with(ColorSpace.default).rgba.premultipliedAlpha
             n[rgba] = device.makeBuffer(rgba)
         }
         append(.background)
@@ -75,13 +75,13 @@ final class Renderer {
         defaultColorBuffers = n
     }
     func appendColorBuffer(with color: Color) {
-        let rgba = color.rgba.premultipliedAlpha
+        let rgba = color.with(ColorSpace.default).rgba.premultipliedAlpha
         if defaultColorBuffers[rgba] == nil {
             defaultColorBuffers[rgba] = device.makeBuffer(rgba)
         }
     }
     func colorBuffer(with color: Color) -> Buffer? {
-        let rgba = color.rgba.premultipliedAlpha
+        let rgba = color.with(ColorSpace.default).rgba.premultipliedAlpha
         if let buffer = defaultColorBuffers[rgba] {
             return buffer
         }
@@ -92,7 +92,6 @@ final class Renderer {
 final class Renderstate {
     let sampleCount: Int
     let opaqueColorRenderPipelineState: any MTLRenderPipelineState
-    let minColorRenderPipelineState: any MTLRenderPipelineState
     let alphaColorRenderPipelineState: any MTLRenderPipelineState
     let colorsRenderPipelineState: any MTLRenderPipelineState
     let maxColorsRenderPipelineState: any MTLRenderPipelineState
@@ -116,57 +115,43 @@ final class Renderstate {
         
         self.sampleCount = sampleCount
         
-        let basicD = MTLRenderPipelineDescriptor()
-        basicD.vertexFunction = library.makeFunction(name: "basicVertex")
-        basicD.fragmentFunction = library.makeFunction(name: "basicFragment")
-        basicD.colorAttachments[0].pixelFormat = pixelFormat
-        basicD.stencilAttachmentPixelFormat = .stencil8
-        basicD.rasterSampleCount = sampleCount
-        opaqueColorRenderPipelineState = try device.makeRenderPipelineState(descriptor: basicD)
+        let opaqueColorD = MTLRenderPipelineDescriptor()
+        opaqueColorD.vertexFunction = library.makeFunction(name: "basicVertex")
+        opaqueColorD.fragmentFunction = library.makeFunction(name: "basicFragment")
+        opaqueColorD.colorAttachments[0].pixelFormat = pixelFormat
+        opaqueColorD.stencilAttachmentPixelFormat = .stencil8
+        opaqueColorD.rasterSampleCount = sampleCount
+        opaqueColorRenderPipelineState = try device.makeRenderPipelineState(descriptor: opaqueColorD)
         
-        let minD = MTLRenderPipelineDescriptor()
-        minD.vertexFunction = library.makeFunction(name: "basicVertex")
-        minD.fragmentFunction = library.makeFunction(name: "basicFragment")
-        minD.colorAttachments[0].isBlendingEnabled = true
-        minD.colorAttachments[0].rgbBlendOperation = .min
-        minD.colorAttachments[0].sourceRGBBlendFactor = .one
-        minD.colorAttachments[0].sourceAlphaBlendFactor = .zero
-        minD.colorAttachments[0].destinationRGBBlendFactor = .one
-        minD.colorAttachments[0].destinationAlphaBlendFactor = .one
-        minD.colorAttachments[0].pixelFormat = pixelFormat
-        minD.stencilAttachmentPixelFormat = .stencil8
-        minD.rasterSampleCount = sampleCount
-        minColorRenderPipelineState = try device.makeRenderPipelineState(descriptor: minD)
+        let alphaColorD = MTLRenderPipelineDescriptor()
+        alphaColorD.vertexFunction = library.makeFunction(name: "basicVertex")
+        alphaColorD.fragmentFunction = library.makeFunction(name: "basicFragment")
+        alphaColorD.colorAttachments[0].isBlendingEnabled = true
+        alphaColorD.colorAttachments[0].rgbBlendOperation = .add
+        alphaColorD.colorAttachments[0].alphaBlendOperation = .add
+        alphaColorD.colorAttachments[0].sourceRGBBlendFactor = .one
+        alphaColorD.colorAttachments[0].sourceAlphaBlendFactor = .one
+        alphaColorD.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+        alphaColorD.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
+        alphaColorD.colorAttachments[0].pixelFormat = pixelFormat
+        alphaColorD.stencilAttachmentPixelFormat = .stencil8
+        alphaColorD.rasterSampleCount = sampleCount
+        alphaColorRenderPipelineState = try device.makeRenderPipelineState(descriptor: alphaColorD)
         
-        let alphaD = MTLRenderPipelineDescriptor()
-        alphaD.vertexFunction = library.makeFunction(name: "basicVertex")
-        alphaD.fragmentFunction = library.makeFunction(name: "basicFragment")
-        alphaD.colorAttachments[0].isBlendingEnabled = true
-        alphaD.colorAttachments[0].rgbBlendOperation = .add
-        alphaD.colorAttachments[0].alphaBlendOperation = .add
-        alphaD.colorAttachments[0].sourceRGBBlendFactor = .one
-        alphaD.colorAttachments[0].sourceAlphaBlendFactor = .one
-        alphaD.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-        alphaD.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
-        alphaD.colorAttachments[0].pixelFormat = pixelFormat
-        alphaD.stencilAttachmentPixelFormat = .stencil8
-        alphaD.rasterSampleCount = sampleCount
-        alphaColorRenderPipelineState = try device.makeRenderPipelineState(descriptor: alphaD)
-        
-        let colorsD = MTLRenderPipelineDescriptor()
-        colorsD.vertexFunction = library.makeFunction(name: "colorsVertex")
-        colorsD.fragmentFunction = library.makeFunction(name: "basicFragment")
-        colorsD.colorAttachments[0].isBlendingEnabled = true
-        colorsD.colorAttachments[0].rgbBlendOperation = .add
-        colorsD.colorAttachments[0].alphaBlendOperation = .add
-        colorsD.colorAttachments[0].sourceRGBBlendFactor = .one
-        colorsD.colorAttachments[0].sourceAlphaBlendFactor = .one
-        colorsD.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-        colorsD.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
-        colorsD.colorAttachments[0].pixelFormat = pixelFormat
-        colorsD.stencilAttachmentPixelFormat = .stencil8
-        colorsD.rasterSampleCount = sampleCount
-        colorsRenderPipelineState = try device.makeRenderPipelineState(descriptor: colorsD)
+        let alphaColorsD = MTLRenderPipelineDescriptor()
+        alphaColorsD.vertexFunction = library.makeFunction(name: "colorsVertex")
+        alphaColorsD.fragmentFunction = library.makeFunction(name: "basicFragment")
+        alphaColorsD.colorAttachments[0].isBlendingEnabled = true
+        alphaColorsD.colorAttachments[0].rgbBlendOperation = .add
+        alphaColorsD.colorAttachments[0].alphaBlendOperation = .add
+        alphaColorsD.colorAttachments[0].sourceRGBBlendFactor = .one
+        alphaColorsD.colorAttachments[0].sourceAlphaBlendFactor = .one
+        alphaColorsD.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+        alphaColorsD.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
+        alphaColorsD.colorAttachments[0].pixelFormat = pixelFormat
+        alphaColorsD.stencilAttachmentPixelFormat = .stencil8
+        alphaColorsD.rasterSampleCount = sampleCount
+        colorsRenderPipelineState = try device.makeRenderPipelineState(descriptor: alphaColorsD)
         
         let maxColorsD = MTLRenderPipelineDescriptor()
         maxColorsD.vertexFunction = library.makeFunction(name: "colorsVertex")
@@ -183,86 +168,82 @@ final class Renderstate {
         maxColorsD.rasterSampleCount = sampleCount
         maxColorsRenderPipelineState = try device.makeRenderPipelineState(descriptor: maxColorsD)
         
-        let textureD = MTLRenderPipelineDescriptor()
-        textureD.vertexFunction = library.makeFunction(name: "textureVertex")
-        textureD.fragmentFunction = library.makeFunction(name: "textureFragment")
-        textureD.colorAttachments[0].pixelFormat = pixelFormat
-        textureD.stencilAttachmentPixelFormat = .stencil8
-        textureD.rasterSampleCount = sampleCount
-        opaqueTextureRenderPipelineState
-            = try device.makeRenderPipelineState(descriptor: textureD)
+        let opaqueTextureD = MTLRenderPipelineDescriptor()
+        opaqueTextureD.vertexFunction = library.makeFunction(name: "textureVertex")
+        opaqueTextureD.fragmentFunction = library.makeFunction(name: "textureFragment")
+        opaqueTextureD.colorAttachments[0].pixelFormat = pixelFormat
+        opaqueTextureD.stencilAttachmentPixelFormat = .stencil8
+        opaqueTextureD.rasterSampleCount = sampleCount
+        opaqueTextureRenderPipelineState = try device.makeRenderPipelineState(descriptor: opaqueTextureD)
         
-        let aTextureD = MTLRenderPipelineDescriptor()
-        aTextureD.vertexFunction = library.makeFunction(name: "textureVertex")
-        aTextureD.fragmentFunction = library.makeFunction(name: "textureFragment")
-        aTextureD.colorAttachments[0].isBlendingEnabled = true
-        aTextureD.colorAttachments[0].rgbBlendOperation = .add
-        aTextureD.colorAttachments[0].alphaBlendOperation = .add
-        aTextureD.colorAttachments[0].sourceRGBBlendFactor = .one
-        aTextureD.colorAttachments[0].sourceAlphaBlendFactor = .one
-        aTextureD.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-        aTextureD.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
-        aTextureD.colorAttachments[0].pixelFormat = pixelFormat
-        aTextureD.stencilAttachmentPixelFormat = .stencil8
-        aTextureD.rasterSampleCount = sampleCount
-        alphaTextureRenderPipelineState
-            = try device.makeRenderPipelineState(descriptor: aTextureD)
+        let alphaTextureD = MTLRenderPipelineDescriptor()
+        alphaTextureD.vertexFunction = library.makeFunction(name: "textureVertex")
+        alphaTextureD.fragmentFunction = library.makeFunction(name: "textureFragment")
+        alphaTextureD.colorAttachments[0].isBlendingEnabled = true
+        alphaTextureD.colorAttachments[0].rgbBlendOperation = .add
+        alphaTextureD.colorAttachments[0].alphaBlendOperation = .add
+        alphaTextureD.colorAttachments[0].sourceRGBBlendFactor = .one
+        alphaTextureD.colorAttachments[0].sourceAlphaBlendFactor = .one
+        alphaTextureD.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
+        alphaTextureD.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
+        alphaTextureD.colorAttachments[0].pixelFormat = pixelFormat
+        alphaTextureD.stencilAttachmentPixelFormat = .stencil8
+        alphaTextureD.rasterSampleCount = sampleCount
+        alphaTextureRenderPipelineState = try device.makeRenderPipelineState(descriptor: alphaTextureD)
         
-        let stencilPD = MTLRenderPipelineDescriptor()
-        stencilPD.isAlphaToCoverageEnabled = true
-        stencilPD.vertexFunction = library.makeFunction(name: "stencilVertex")
-        stencilPD.fragmentFunction = nil
-        stencilPD.colorAttachments[0].pixelFormat = pixelFormat
-        stencilPD.colorAttachments[0].writeMask = []
-        stencilPD.stencilAttachmentPixelFormat = .stencil8
-        stencilPD.rasterSampleCount = sampleCount
-        stencilRenderPipelineState
-            = try device.makeRenderPipelineState(descriptor: stencilPD)
+        let stencilD = MTLRenderPipelineDescriptor()
+        stencilD.isAlphaToCoverageEnabled = true
+        stencilD.vertexFunction = library.makeFunction(name: "stencilVertex")
+        stencilD.fragmentFunction = nil
+        stencilD.colorAttachments[0].pixelFormat = pixelFormat
+        stencilD.colorAttachments[0].writeMask = []
+        stencilD.stencilAttachmentPixelFormat = .stencil8
+        stencilD.rasterSampleCount = sampleCount
+        stencilRenderPipelineState = try device.makeRenderPipelineState(descriptor: stencilD)
         
-        let stencilBPD = MTLRenderPipelineDescriptor()
-        stencilBPD.isAlphaToCoverageEnabled = true
-        stencilBPD.vertexFunction = library.makeFunction(name: "stencilBVertex")
-        stencilBPD.fragmentFunction = library.makeFunction(name: "stencilBFragment")
-        stencilBPD.colorAttachments[0].pixelFormat = pixelFormat
-        stencilBPD.colorAttachments[0].writeMask = []
-        stencilBPD.stencilAttachmentPixelFormat = .stencil8
-        stencilBPD.rasterSampleCount = sampleCount
-        stencilBezierRenderPipelineState
-            = try device.makeRenderPipelineState(descriptor: stencilBPD)
+        let stencilBezierD = MTLRenderPipelineDescriptor()
+        stencilBezierD.isAlphaToCoverageEnabled = true
+        stencilBezierD.vertexFunction = library.makeFunction(name: "stencilBVertex")
+        stencilBezierD.fragmentFunction = library.makeFunction(name: "stencilBFragment")
+        stencilBezierD.colorAttachments[0].pixelFormat = pixelFormat
+        stencilBezierD.colorAttachments[0].writeMask = []
+        stencilBezierD.stencilAttachmentPixelFormat = .stencil8
+        stencilBezierD.rasterSampleCount = sampleCount
+        stencilBezierRenderPipelineState = try device.makeRenderPipelineState(descriptor: stencilBezierD)
         
-        let stencil = MTLStencilDescriptor()
-        stencil.stencilFailureOperation = .invert
-        stencil.depthStencilPassOperation = .invert
-        let stencilD = MTLDepthStencilDescriptor()
-        stencilD.backFaceStencil = stencil
-        stencilD.frontFaceStencil = stencil
-        guard let ss = device.makeDepthStencilState(descriptor: stencilD) else {
+        let invertStencilD = MTLStencilDescriptor()
+        invertStencilD.stencilFailureOperation = .invert
+        invertStencilD.depthStencilPassOperation = .invert
+        let invertDepthStencilD = MTLDepthStencilDescriptor()
+        invertDepthStencilD.backFaceStencil = invertStencilD
+        invertDepthStencilD.frontFaceStencil = invertStencilD
+        guard let ss = device.makeDepthStencilState(descriptor: invertDepthStencilD) else {
             throw Renderer.metalError
         }
         invertDepthStencilState = ss
         
-        let clipping = MTLStencilDescriptor()
-        clipping.stencilCompareFunction = .notEqual
-        clipping.stencilFailureOperation = .keep
-        clipping.depthStencilPassOperation = .zero
-        let clippingDescriptor = MTLDepthStencilDescriptor()
-        clippingDescriptor.backFaceStencil = clipping
-        clippingDescriptor.frontFaceStencil = clipping
-        guard let cs = device.makeDepthStencilState(descriptor: clippingDescriptor) else {
+        let clippingStencilD = MTLStencilDescriptor()
+        clippingStencilD.stencilCompareFunction = .notEqual
+        clippingStencilD.stencilFailureOperation = .keep
+        clippingStencilD.depthStencilPassOperation = .zero
+        let clippingDepthStecilD = MTLDepthStencilDescriptor()
+        clippingDepthStecilD.backFaceStencil = clippingStencilD
+        clippingDepthStecilD.frontFaceStencil = clippingStencilD
+        guard let cs = device.makeDepthStencilState(descriptor: clippingDepthStecilD) else {
             throw Renderer.metalError
         }
         clippingDepthStencilState = cs
         
-        let nclippingDescriptor = MTLDepthStencilDescriptor()
-        guard let ncs = device.makeDepthStencilState(descriptor: nclippingDescriptor) else {
+        let normalDepthStencilD = MTLDepthStencilDescriptor()
+        guard let ncs = device.makeDepthStencilState(descriptor: normalDepthStencilD) else {
             throw Renderer.metalError
         }
         normalDepthStencilState = ncs
         
-        let cSamplerDescriptor = MTLSamplerDescriptor()
-        cSamplerDescriptor.minFilter = .nearest
-        cSamplerDescriptor.magFilter = .linear
-        guard let ncss = device.makeSamplerState(descriptor: cSamplerDescriptor) else {
+        let cacheSamplerD = MTLSamplerDescriptor()
+        cacheSamplerD.minFilter = .nearest
+        cacheSamplerD.magFilter = .linear
+        guard let ncss = device.makeSamplerState(descriptor: cacheSamplerD) else {
             throw Renderer.metalError
         }
         cacheSamplerState = ncss
@@ -352,7 +333,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         depthStencilPixelFormat = .stencil8
         clearColor = document.backgroundColor.mtl
         
-        if document.colorSpace.isHDR {
+        if ColorSpace.default.isHDR {
             colorPixelFormat = Renderer.shared.hdrPixelFormat
             colorspace = Renderer.shared.hdrColorSpace
             (layer as? CAMetalLayer)?.wantsExtendedDynamicRangeContent = true
@@ -2482,9 +2463,7 @@ extension SubMTKView {
         renderPassDescriptor.colorAttachments[0].resolveTexture = drawable.texture
         renderPassDescriptor.stencilAttachment.texture = depthStencilTexture
         
-        if let encoder = commandBuffer
-            .makeRenderCommandEncoder(descriptor: renderPassDescriptor) {
-            
+        if let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor) {
             let ctx = Context(encoder, renderstate)
             let wtvTransform = document.worldToViewportTransform
             let wtsScale = document.worldToScreenScale
@@ -2572,9 +2551,6 @@ final class Context {
     
     func setOpaqueColorPipeline() {
         encoder.setRenderPipelineState(rs.opaqueColorRenderPipelineState)
-    }
-    func setMinColorPipeline() {
-        encoder.setRenderPipelineState(rs.minColorRenderPipelineState)
     }
     func setAlphaColorPipeline() {
         encoder.setRenderPipelineState(rs.alphaColorRenderPipelineState)
@@ -2714,12 +2690,9 @@ extension Node {
                                sampleCount: sampleCount, mipmapped: mipmapped)
     }
     func renderedAntialiasFillImage(in bounds: Rect, to size: Size,
-                                    backgroundColor: Color) -> Image? {
+                                    backgroundColor: Color, _ colorSpace: ColorSpace) -> Image? {
         guard children.contains(where: { $0.fillType != nil }) else {
-            return image(in: bounds,
-                         size: size,
-                         backgroundColor: backgroundColor,
-                         colorSpace: .sRGB)
+            return image(in: bounds, size: size, backgroundColor: backgroundColor, .sRGB)
         }
         
         children.forEach {
@@ -2727,7 +2700,8 @@ extension Node {
                 $0.isHidden = true
             }
         }
-        guard let oImage = image(in: bounds, size: size * 2, backgroundColor: backgroundColor, colorSpace: .sRGB, isAntialias: false)?
+        guard let oImage = image(in: bounds, size: size * 2, backgroundColor: backgroundColor,
+                                 colorSpace, isAntialias: false)?
             .resize(with: size) else { return nil }
         children.forEach {
             if $0.lineType != nil {
@@ -2738,10 +2712,7 @@ extension Node {
             }
         }
         fillType = nil
-        guard let nImage = image(in: bounds,
-                                 size: size,
-                                 backgroundColor: nil,
-                                 colorSpace: .sRGB) else { return nil }
+        guard let nImage = image(in: bounds, size: size, backgroundColor: nil, colorSpace) else { return nil }
         return oImage.drawn(nImage, in: Rect(size: size))
     }
     func renderedTexture(in bounds: Rect, to size: Size,
@@ -2841,10 +2812,8 @@ extension Node {
         guard let stencilMTLTexture = renderer.device.makeTexture(descriptor: stencilD) else { return nil }
         rpd.stencilAttachment.texture = stencilMTLTexture
         
-        guard let commandBuffer
-                = renderer.commandQueue.makeCommandBuffer() else { return nil }
-        guard let encoder
-                = commandBuffer.makeRenderCommandEncoder(descriptor: rpd) else { return nil }
+        guard let commandBuffer = renderer.commandQueue.makeCommandBuffer() else { return nil }
+        guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: rpd) else { return nil }
         
         isRenderCache = false
         let ctx = Context(encoder, renderstate)
@@ -2955,50 +2924,51 @@ extension Node {
     
     func imageInBounds(size: Size? = nil,
                        backgroundColor: Color? = nil,
-                       colorSpace: RGBColorSpace,
+                       _ colorSpace: ColorSpace,
                        isAntialias: Bool = true,
                        isGray: Bool = false) -> Image? {
         guard let bounds = bounds else { return nil }
         return image(in: bounds, size: size ?? bounds.size,
-                     backgroundColor: backgroundColor, colorSpace: colorSpace,
+                     backgroundColor: backgroundColor, colorSpace,
                      isAntialias: isAntialias, isGray: isGray)
     }
     func image(in bounds: Rect,
                size: Size,
-               backgroundColor: Color? = nil, colorSpace: RGBColorSpace,
+               backgroundColor: Color? = nil, _ colorSpace: ColorSpace,
                isAntialias: Bool = true,
                isGray: Bool = false) -> Image? {
         let transform = Transform(translation: -bounds.origin)
             * Transform(scaleX: size.width / bounds.width,
                         y: size.height / bounds.height)
         return image(size: size, transform: transform,
-                     backgroundColor: backgroundColor, colorSpace: colorSpace,
+                     backgroundColor: backgroundColor, colorSpace,
                      isAntialias: isAntialias, isGray: isGray)
     }
     func image(size: Size, transform: Transform,
-               backgroundColor: Color? = nil, colorSpace: RGBColorSpace,
+               backgroundColor: Color? = nil, _ colorSpace: ColorSpace,
                isAntialias: Bool = true,
                isGray: Bool = false) -> Image? {
         let ctx = context(size: size, transform: transform, backgroundColor: backgroundColor,
-                          colorSpace: colorSpace, isAntialias: isAntialias, isGray: isGray)
+                          colorSpace, isAntialias: isAntialias, isGray: isGray)
         guard let cgImage = ctx?.makeImage() else { return nil }
         return Image(cgImage: cgImage)
     }
     func bitmap<Value: FixedWidthInteger & UnsignedInteger>(size: Size,
-                backgroundColor: Color? = nil, colorSpace: RGBColorSpace,
-                isAntialias: Bool = true,
-                isGray: Bool = false) -> Bitmap<Value>? {
+                                                            backgroundColor: Color? = nil,
+                                                            _ colorSpace: ColorSpace,
+                                                            isAntialias: Bool = true,
+                                                            isGray: Bool = false) -> Bitmap<Value>? {
         guard let bounds = bounds else { return nil }
         let transform = Transform(translation: -bounds.origin)
             * Transform(scaleX: size.width / bounds.width,
                         y: size.height / bounds.height)
-        guard let ctx = context(size: size, transform: transform, backgroundColor: backgroundColor,
-                                colorSpace: colorSpace,
+        guard let ctx = context(size: size, transform: transform,
+                                backgroundColor: backgroundColor, colorSpace,
                                 isAntialias: isAntialias, isGray: isGray) else { return nil }
         return .init(ctx)
     }
     private func context(size: Size, transform: Transform,
-                         backgroundColor: Color? = nil, colorSpace: RGBColorSpace,
+                         backgroundColor: Color? = nil, _ colorSpace: ColorSpace,
                          isAntialias: Bool = true,
                          isGray: Bool = false) -> CGContext? {
         guard let space = isGray ? CGColorSpaceCreateDeviceGray() : colorSpace.cg else { return nil }
@@ -3367,30 +3337,30 @@ struct Texture {
     init(imageData: Data,
          isMipmapped: Bool = false,
          isOpaque: Bool = true,
-         colorSpace: RGBColorSpace = .sRGB, isBGR: Bool = false) throws {
+         _ colorSpace: ColorSpace = .sRGB, isBGR: Bool = false) throws {
         let block = try Self.block(from: imageData, isMipmapped: isMipmapped)
-        try self.init(block: block, isOpaque: isOpaque, colorSpace: colorSpace, isBGR: isBGR)
+        try self.init(block: block, isOpaque: isOpaque, colorSpace, isBGR: isBGR)
     }
 //    @MainActor
     init(image: Image,
          isMipmapped: Bool = false,
          isOpaque: Bool = true,
-         colorSpace: RGBColorSpace = .sRGB, isBGR: Bool = false) throws {
+         _ colorSpace: ColorSpace = .sRGB, isBGR: Bool = false) throws {
         let block = try Self.block(from: image, isMipmapped: isMipmapped)
-        try self.init(block: block, isOpaque: isOpaque, colorSpace: colorSpace, isBGR: isBGR)
+        try self.init(block: block, isOpaque: isOpaque, colorSpace, isBGR: isBGR)
     }
 //    @MainActor
     init(cgImage: CGImage,
          isMipmapped: Bool = false,
          isOpaque: Bool = true,
-         colorSpace: RGBColorSpace = .sRGB, isBGR: Bool = false) throws {
+         _ colorSpace: ColorSpace = .sRGB, isBGR: Bool = false) throws {
         let block = try Self.block(from: cgImage, isMipmapped: isMipmapped)
-        try self.init(block: block, isOpaque: isOpaque, colorSpace: colorSpace, isBGR: isBGR)
+        try self.init(block: block, isOpaque: isOpaque, colorSpace, isBGR: isBGR)
     }
 //    @MainActor
     init(block: Block,
                     isOpaque: Bool = true,
-         colorSpace: RGBColorSpace = .sRGB, isBGR: Bool = false) throws {
+         _ colorSpace: ColorSpace = .sRGB, isBGR: Bool = false) throws {
         guard let cgColorSpace = colorSpace.cg, !block.items.isEmpty else { throw TextureError() }
         let format = if colorSpace.isHDR {
             MTLPixelFormat.bgr10_xr_srgb
@@ -3415,7 +3385,7 @@ struct Texture {
     
     @MainActor static func withGPU(block: Block,
                                    isOpaque: Bool,
-                                   colorSpace: RGBColorSpace = .sRGB,
+                                   _ colorSpace: ColorSpace = .sRGB,
                                    completionHandler: @escaping (Texture) -> ()) throws {
         guard let cgColorSpace = colorSpace.cg, !block.items.isEmpty else { throw TextureError() }
         let format = if colorSpace.isHDR {

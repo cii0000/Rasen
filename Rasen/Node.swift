@@ -657,6 +657,7 @@ extension Node {
             fillColorBufferUpdateType = .update
         }
     }
+    
     func draw(with t: Transform, scale: Double, in ctx: Context) {
         draw(currentTransform: t,
              currentTransformBytes: nil,

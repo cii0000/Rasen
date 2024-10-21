@@ -37,7 +37,7 @@ final class KeyframePreviousMover: InputKeyEditor {
     
     func send(_ event: InputKeyEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         if document.isPlaying(with: event) {
@@ -119,7 +119,7 @@ final class KeyframeNextMover: InputKeyEditor {
     
     func send(_ event: InputKeyEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         if document.isPlaying(with: event) {
@@ -202,7 +202,7 @@ final class FramePreviousMover: InputKeyEditor {
     
     func send(_ event: InputKeyEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         if document.isPlaying(with: event) {
@@ -284,7 +284,7 @@ final class FrameNextMover: InputKeyEditor {
     
     func send(_ event: InputKeyEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         if document.isPlaying(with: event) {
@@ -380,7 +380,7 @@ final class KeyframeSwiper: SwipeEditor {
     
     func send(_ event: SwipeEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         if document.isPlaying(with: event) {
@@ -562,7 +562,7 @@ final class KeyframeSlider: DragEditor {
     
     func send(_ event: DragEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         if document.isPlaying(with: event) {
@@ -770,7 +770,7 @@ final class FrameEditor: Editor {
     
     func selectFrame(with event: DragEvent, isMultiple: Bool) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         if document.isPlaying(with: event) {
@@ -934,7 +934,7 @@ final class TimeEditor: Editor {
     
     func selectFrame(with event: DragEvent, isMultiple: Bool) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         if document.isPlaying(with: event) {
@@ -1052,7 +1052,7 @@ final class Player: InputKeyEditor {
     
     func send(_ event: InputKeyEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
@@ -1237,7 +1237,7 @@ final class FrameSlideEditor: Editor {
     
     func slideFrame(with event: DragEvent, isMultiple: Bool) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         if document.isPlaying(with: event) {
@@ -1363,7 +1363,7 @@ final class TempoSlider: DragEditor {
     
     func send(_ event: DragEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         if document.isPlaying(with: event) {
@@ -1506,7 +1506,7 @@ final class AnimationSlider: DragEditor {
     
     func send(_ event: DragEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         if document.isPlaying(with: event) {
@@ -1727,7 +1727,7 @@ final class LineSlider: DragEditor {
     
     func send(_ event: DragEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         if document.isPlaying(with: event) {
@@ -2332,7 +2332,7 @@ final class LineZSlider: DragEditor {
     
     func send(_ event: DragEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         if document.isPlaying(with: event) {
@@ -2581,7 +2581,7 @@ final class KeyframeInserter: InputKeyEditor {
     
     func send(_ event: InputKeyEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         if document.isPlaying(with: event) {
@@ -2827,7 +2827,7 @@ final class Interpolater: InputKeyEditor {
     
     func send(_ event: InputKeyEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         if document.isPlaying(with: event) {
@@ -3455,7 +3455,7 @@ final class CrossEraser: InputKeyEditor {
     
     func send(_ event: InputKeyEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         if document.isPlaying(with: event) {

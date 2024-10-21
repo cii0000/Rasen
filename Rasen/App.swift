@@ -561,8 +561,7 @@ private extension NSImage {
                                     path: Path(rect))
                     
                     let image = node.imageInBounds(size: rect.size,
-                                                   backgroundColor: Color(lightness: 0, opacity: 0),
-                                                   colorSpace: .p3)
+                                                   backgroundColor: Color(lightness: 0, opacity: 0), .p3)
                     image?.render(in: ctx)
                     
                     return true
@@ -643,8 +642,7 @@ private extension NSImage {
                     let node = Node(children: nNodes,
                                     path: Path(rect))
                     let image = node.imageInBounds(size: rect.size,
-                                                   backgroundColor: Color(lightness: 0, opacity: 0),
-                                                   colorSpace: .p3)
+                                                   backgroundColor: Color(lightness: 0, opacity: 0), .p3)
                     image?.render(in: ctx)
                     
                     ctx.setFillColor(Color.content.cg)
@@ -1734,7 +1732,7 @@ extension Color {
     }
     var cg: CGColor {
         CGColor.with(rgb: rgba, alpha: opacity,
-                     colorSpace: rgbColorSpace.cg ?? .default)
+                     colorSpace: colorSpace.cg ?? .default)
     }
 }
 extension CGColor {
@@ -1776,7 +1774,7 @@ extension CGColorSpace {
     }
     static let `default` = sRGBColorSpace ?? CGColorSpaceCreateDeviceRGB()
 }
-extension RGBColorSpace {
+extension ColorSpace {
     var cg: CGColorSpace? {
         switch self {
         case .sRGB: .sRGBColorSpace
@@ -1858,7 +1856,7 @@ struct Image {
         guard let ctx = CGContext(data: nil,
                                   width: Int(size.width), height: Int(size.height),
                                   bitsPerComponent: 8, bytesPerRow: 0,
-                                  space: color.rgbColorSpace.cg ?? .default,
+                                  space: color.colorSpace.cg ?? .default,
                                   bitmapInfo: bitmapInfo.rawValue) else { return nil }
         ctx.setFillColor(color.cg)
         ctx.fill(CGRect(x: 0, y: 0, width: size.width, height: size.height))

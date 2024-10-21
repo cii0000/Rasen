@@ -59,12 +59,9 @@ final class ColorEditor: Editor {
     var firstUUColor = UU(Color())
     var editingUUColor = UU(Color())
     
-    var isEditableMaxLightness: Bool {
-        document.colorSpace.isHDR
-    }
-    var maxLightness: Double {
-        document.colorSpace.maxLightness
-    }
+    let isEditableMaxLightness = ColorSpace.default.isHDR
+    let maxLightness = ColorSpace.default.maxLightness
+    
     var isEditableOpacity = false
     
     func updateNode() {
@@ -110,8 +107,7 @@ final class ColorEditor: Editor {
             let t = Double.linear(isReversed ? maxLightness : Color.minLightness,
                                   isReversed ? Color.minLightness : maxLightness,
                                   t: Double($0) * rCount)
-            return Color(lightness: t, unsafetyChroma: chroma, hue: hue,
-                         document.colorSpace)
+            return Color(lightness: t, unsafetyChroma: chroma, hue: hue)
         }
     }
     private func opacityPointsWith(splitCount count: Int = 100) -> [Point] {
@@ -125,8 +121,7 @@ final class ColorEditor: Editor {
                                      splitCount count: Int = 100) -> [Color] {
         let rCount = 1 / Double(count)
         return (0 ... count).map {
-            var color0 = color
-            color0.opacity = 1 - Double($0) * rCount
+            let color0 = color.with(opacity: 1 - Double($0) * rCount)
             let color1 = $0 % 2 == 0 ? Color(white: 0.4) : Color(white: 0.6)
             return color1.alphaBlend(color0)
         }
@@ -306,7 +301,7 @@ final class ColorEditor: Editor {
     
     func changeVolm(with event: DragEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         
@@ -757,7 +752,7 @@ final class ColorEditor: Editor {
     private var beganNoise = 0.0, oldNoise = 0.0
     func changePan(with event: DragEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         
@@ -1137,7 +1132,7 @@ final class ColorEditor: Editor {
     
     func changeLightness(with event: DragEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         if document.isPlaying(with: event) {
@@ -1195,7 +1190,6 @@ final class ColorEditor: Editor {
                               t: t)
             
             var uuColor = firstUUColor
-            uuColor.value.rgbColorSpace = document.colorSpace
             uuColor.value.lightness = lightness
             if isEditableOpacity {
                 uuColor.value.opacity = opacity(atX: p.x)
@@ -1277,9 +1271,7 @@ final class ColorEditor: Editor {
         var points = [Point](), colors = [Color]()
         for i in 0 ..< splitCount {
             let hue = Double(i) * rsc * .pi2
-            let color = Color(lightness: tintLightness,
-                              unsafetyChroma: r, hue: hue,
-                              document.colorSpace)
+            let color = Color(lightness: tintLightness, unsafetyChroma: r, hue: hue)
             let p = color.tint.rectangular
             colors.append(color)
             points.append(p)
@@ -1325,7 +1317,7 @@ final class ColorEditor: Editor {
     var lastTintSnapTime: Double?
     func changeTint(with event: DragEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         if document.isPlaying(with: event) {
@@ -1376,7 +1368,6 @@ final class ColorEditor: Editor {
                 lastTintSnapTime = nil
                 isSnappedTint = false
             }
-            uuColor.value.rgbColorSpace = document.colorSpace
             uuColor.value.chroma = isSnappedTint ? 0 : r
             uuColor.value.hue = theta
             let polarPoint = Point(uuColor.value.a, uuColor.value.b).polar

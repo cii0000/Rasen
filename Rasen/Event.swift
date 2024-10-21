@@ -347,6 +347,7 @@ extension Quasimode {
     static let run = Quasimode(.click)
     static let openMenu = Quasimode(.subClick)
     static let lookUp = Quasimode(.lookUpTap)
+    static let stop = Quasimode(.escape)
     
     static let inputCharacter = Quasimode(.keyInput)
     static let newWrap = Quasimode(modifier: [.shift], .enter)

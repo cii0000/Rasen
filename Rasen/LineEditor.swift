@@ -17,7 +17,7 @@
 
 import Dispatch
 
-final class RangeSelector: DragEditor, @unchecked Sendable {
+final class RangeSelector: DragEditor {
     let document: Document
     
     init(_ document: Document) {
@@ -84,7 +84,7 @@ final class RangeSelector: DragEditor, @unchecked Sendable {
         }
     }
 }
-final class Unselector: InputKeyEditor, @unchecked Sendable {
+final class Unselector: InputKeyEditor {
     let document: Document
     
     init(_ document: Document) {
@@ -977,7 +977,7 @@ final class LineEditor: Editor, @unchecked Sendable {
                 noteI: Int?, noteStartBeat: Rational?, notePlayer: NotePlayer?
     func drawNote(with event: DragEvent, isStraight: Bool = false) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         switch event.phase {
@@ -1145,7 +1145,7 @@ final class LineEditor: Editor, @unchecked Sendable {
     
     func drawLine(with event: DragEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         
@@ -1171,7 +1171,7 @@ final class LineEditor: Editor, @unchecked Sendable {
     }
     func drawStraightLine(with event: DragEvent) {
         guard isEditingSheet else {
-            document.stop(with: event)
+            document.keepOut(with: event)
             return
         }
         
