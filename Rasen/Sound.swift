@@ -895,9 +895,9 @@ extension Pit {
 struct Reverb: Hashable, Codable {
     var earlySec = 0.02
     var earlyVolm = 0.75
-    var lateSec = 0.2
+    var lateSec = 0.1
     var lateVolm = 0.5
-    var releaseSec = 0.3
+    var releaseSec = 0.2
     var seedID = UUID()
 }
 extension Reverb: Protobuf {

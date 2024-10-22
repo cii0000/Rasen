@@ -1641,12 +1641,13 @@ extension ScoreView {
             evenColors = colors(eps)
             
             let sprolKnobPAndRs: [(Point, Double, Color)] = note.pits.flatMap { pit in
+                let baseColor = pit.tone.baseColor()
                 let p = Point(x(atBeat: note.beatRange.start + pit.beat),
                               y(fromPitch: note.pitch + pit.pitch))
                 return pit.tone.spectlope.sprols.enumerated().map {
                     (Point(p.x, tonePitchY(fromPitch: $0.element.pitch)),
                      $0.offset > 0 && pit.tone.spectlope.sprols[$0.offset - 1].pitch > $0.element.pitch ? sprolSubR : sprolR,
-                     $0.element.volm == 0 ? Color.subBorder : Color.background)
+                     $0.element.volm == 0 ? baseColor.with(lightness: 50) : baseColor)
                 }
             }
             
@@ -1807,10 +1808,11 @@ extension ScoreView {
             evenColors = [Self.color(fromScale: note.firstTone.overtone.evenVolm)]
             
             let fPitNx = x(atBeat: note.beatRange.start + note.firstPit.beat)
+            let baseColor = note.firstTone.baseColor()
             let sprolKnobPRCs = note.firstTone.spectlope.sprols.enumerated().map {
                 (Point(fPitNx, tonePitchY(fromPitch: $0.element.pitch)),
                  $0.offset > 0 && note.firstTone.spectlope.sprols[$0.offset - 1].pitch > $0.element.pitch ? sprolSubR : sprolR,
-                 $0.element.volm == 0 ? Color.subBorder : Color.background)
+                 $0.element.volm == 0 ? baseColor.with(lightness: 50) : baseColor)
             }
             
             toneKnobPRCs = sprolKnobPRCs + knobPRCs.map { (Point($0.p.x, evenY), evenR, .background) }
