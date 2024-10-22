@@ -1717,7 +1717,7 @@ final class LineSlider: DragEditor {
     private var beganBeatX = 0.0, beganPitchY = 0.0
     private var beganPitch = Rational(0), beganBeat = Rational(0), oldBeat = Rational(0), oldPitch = Rational(0)
     private var beganNotePits = [Int: (note: Note, pit: Pit, pits: [Int: Pit])]()
-    private var beganStartBeat = Rational(0)
+    private var beganStartBeat = Rational(0), octaveNode: Node?
     private var beganTone = Tone(), beganOvertone = Overtone(), beganEnvelope = Envelope()
     private var sprolI: Int?, beganSprol = Sprol()
     private var beganNotes = [Int: Note]()
@@ -1819,6 +1819,14 @@ final class LineSlider: DragEditor {
                         
                         updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
                         
+                        let octaveNode = scoreView.octaveNode(fromPitch: note.pitch,
+                                                              noteIs: [noteI],
+                                                              .octave)
+                        octaveNode.attitude.position
+                        = sheetView.convertToWorld(scoreView.node.attitude.position)
+                        self.octaveNode = octaveNode
+                        document.rootNode.append(child: octaveNode)
+                                                 
                         document.cursor = .circle(string: Pitch(value: beganPitch).octaveString())
                         
                     case .reverbEarlyRSec:
@@ -2077,6 +2085,10 @@ final class LineSlider: DragEditor {
                                 
                                 oldBeat = nsBeat
                                 
+                                octaveNode?.children = scoreView.octaveNode(fromPitch: pitch,
+                                                                            noteIs: [noteI],
+                                                                            .octave).children
+                                
                                 if pitch != oldPitch {
                                     let note = scoreView[noteI]
                                     let pBeat = note.pits[pitI].beat + note.beatRange.start
@@ -2227,6 +2239,9 @@ final class LineSlider: DragEditor {
             }
         case .ended:
             node.removeFromParent()
+            octaveNode?.removeFromParent()
+            octaveNode = nil
+            
             if let sheetView {
                 if !isLine {
                     notePlayer?.stop()

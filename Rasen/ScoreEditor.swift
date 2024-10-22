@@ -2038,7 +2038,9 @@ extension ScoreView {
         color(fromPan: stereo.pan, volm: stereo.volm)
     }
     static func color(fromPan pan: Double, volm: Double) -> Color {
-        let l = Double(Color(lightness: lightness(fromVolm: volm)).rgba.r)
+        let lightness = volm.clipped(min: Volm.minVolm, max: Volm.safeVolm,
+                                     newMin: 100, newMax: Color.content.lightness)
+        let l = Double(Color(lightness: lightness).rgba.r)
         return if pan == 0 {
             Color(red: l, green: l, blue: l)
         } else if pan > 0 {

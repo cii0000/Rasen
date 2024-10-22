@@ -3926,7 +3926,8 @@ final class Document: @unchecked Sendable {
         case .changeTint: TintChanger(self)
         case .slide: Slider(self)
         case .selectFrame: FrameSelecter(self)
-        case .moveLinePoint: LineSlider(self)
+            
+        case .moveLinePoint, .fnMoveLinePoint: LineSlider(self)
         case .moveLineZ: LineZSlider(self)
         case .selectVersion: VersionSelector(self)
         default: nil

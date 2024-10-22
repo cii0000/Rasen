@@ -1901,7 +1901,7 @@ extension Audiotrack {
 }
 
 struct Volm: Hashable, Codable {
-    static let minVolm = 0.0, maxVolm = 0.75, volmRange = minVolm ... maxVolm
+    static let minVolm = 0.0, safeVolm = 0.75, maxVolm = 1.0, volmRange = minVolm ... maxVolm
 }
 extension Volm {
     /// cutDb = -40, a = -cutDb, amp = (.exp(a * volm / 8.7) - 1) / (.exp(a / 8.7) - 1)

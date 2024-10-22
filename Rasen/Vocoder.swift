@@ -399,7 +399,9 @@ extension Rendnote {
         secRange.length.isInfinite
     }
     var rendableDurSec: Double {
-        min(isLoop ? fq.rounded(.up) / fq : secRange.length + max(Waveclip.releaseSec, envelopeMemo.releaseSec),
+        min(isLoop ?
+            fq.rounded(.up) / fq :
+            secRange.length + max(Waveclip.releaseSec, envelopeMemo.releaseSec),
             100000)
     }
     
@@ -432,7 +434,7 @@ extension Rendnote {
             let sampleCount = notewave.sampleCount
             let rSampleRate = 1 / sampleRate
             let attackStartSec = !pitbend.firstStereo.isEmpty && !pitbend.firstSpectlope.isEmptyVolm ? 0.0 : nil
-            let releaseStartSec = secRange.length
+            let releaseStartSec = Double(sampleCount - 1) * rSampleRate - Waveclip.releaseSec
             for i in 0 ..< sampleCount {
                 notewave.samples[0][i] *= Waveclip.amp(atSec: Double(i) * rSampleRate,
                                                        attackStartSec: attackStartSec,

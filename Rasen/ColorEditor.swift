@@ -511,7 +511,7 @@ final class ColorEditor: Editor {
                     beganContents[ci] = content
                 }
                 
-                let (minV, maxV) = scoreResult?.isStereo ?? false ? (Volm.minVolm, Volm.maxVolm) : (0, 1)
+                let (minV, maxV) = scoreResult?.isStereo ?? false ? (Volm.minVolm, Volm.safeVolm) : (0, 1)
                 updateNode()
                 fp = event.screenPoint
                 isReversedLightness = true
@@ -530,7 +530,7 @@ final class ColorEditor: Editor {
             let p = lightnessNode.convertFromWorld(wp)
             let t = (p.y / maxLightnessHeight).clipped(min: 0, max: 1)
             let volm = (scoreResult?.isStereo ?? false) ?
-            Double.linear(Volm.minVolm, Volm.maxVolm, t: t) : Double.linear(0, 1, t: t)
+            Double.linear(Volm.minVolm, Volm.safeVolm, t: t) : Double.linear(0, 1, t: t)
             let volmScale = beganVolm == 0 ? 0 : volm / beganVolm
             func newVolm(from otherVolm: Double) -> Double {
                 if beganVolm == otherVolm {
@@ -653,7 +653,7 @@ final class ColorEditor: Editor {
             }
             
             editingLightness = scoreResult?.isStereo ?? false ?
-            volm.clipped(min: Volm.minVolm, max: Volm.maxVolm, newMin: 0, newMax: 100) :
+            volm.clipped(min: Volm.minVolm, max: Volm.safeVolm, newMin: 0, newMax: 100) :
             volm.clipped(min: 0, max: 1, newMin: 0, newMax: 100)
         case .ended:
             notePlayer?.stop()
