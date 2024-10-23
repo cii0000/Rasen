@@ -271,7 +271,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         let windowMenu = NSMenu(title: windowString)
         windowMenu.addItem(withTitle: "Close".localized,
                            action: #selector(NSWindow.performClose(_:)),
-                           keyEquivalent: "w", modifierFlags: [.command])
+                           keyEquivalent: "w", modifierFlags: [.command, .shift])
         windowMenu.addItem(withTitle: "Minimize".localized,
                            action: #selector(NSWindow.performMiniaturize(_:)),
                            keyEquivalent: "m", modifierFlags: [.command])

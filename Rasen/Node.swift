@@ -55,6 +55,7 @@ final class Node: @unchecked Sendable {
         }
     }
     func append(child: Node) {
+        guard self != child else { return }
         child.removeFromParent()
         backingChildren.append(child)
         child.parent = self
@@ -66,6 +67,7 @@ final class Node: @unchecked Sendable {
         child.setNeedsDisplay()
     }
     func insert(child: Node, at index: Array<Node>.Index) {
+        guard self != child else { return }
         var index = index
         if child.parent != nil {
             if let oldIndex = children.firstIndex(of: child), index > oldIndex {

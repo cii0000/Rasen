@@ -406,9 +406,7 @@ extension Sprol {
 }
 
 struct Spectlope: Hashable, Codable {
-    var sprols = [Sprol(pitch: 12 * 1, volm: 0.75, noise: 0),
-                  Sprol(pitch: 12 * 2, volm: 1, noise: 0),
-                  Sprol(pitch: 12 * 7, volm: 0.5, noise: 0),
+    var sprols = [Sprol(pitch: 12 * 0, volm: 1, noise: 0),
                   Sprol(pitch: 12 * 10, volm: 0, noise: 0)]
 }
 extension Spectlope: Protobuf {
@@ -444,6 +442,22 @@ extension Spectlope {
     }
     var containsNoise: Bool {
         sprols.contains { $0.noise > 0 }
+    }
+    
+    var maxFq: Double {
+        let maxV = sprols.sorted { $0.pitch < $1.pitch }.last
+        guard let maxV, maxV.volm == 0 else { return Score.maxFq }
+        return Pitch.fq(fromPitch: maxV.pitch)
+    }
+    
+    func normarized() -> Self {
+        let maxVolm = sprols.maxValue { $0.volm } ?? 0
+        let rMaxVolm = maxVolm == 0 ? 1 : 1 / maxVolm
+        return .init(sprols: sprols.map {
+            var n = $0
+            n.volm *= rMaxVolm
+            return n
+        })
     }
     
     func sprol(atPitch pitch: Double, isClippedPitch: Bool = false) -> Sprol {

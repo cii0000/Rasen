@@ -610,10 +610,9 @@ extension Rendnote {
                 let stereos = stereos(sampleCount: samples.count)
                 return .init(samples: [samples], stereos: stereos, isLoop: isLoop)
             } else {
-                let sinCount = Int((cutFq / fq).clipped(min: 1, max: Double(Int.max)))
-                let fq = fq.clipped(min: Score.minFq, max: cutFq)
-                
                 let spectlope = pitbend.firstSpectlope
+                let sinCount = Int((min(spectlope.maxFq, cutFq) / fq).clipped(min: 1, max: Double(Int.max)))
+                let fq = fq.clipped(min: Score.minFq, max: cutFq)
                 
                 var sign = true, mainSpectrum = [Double](capacity: sinCount)
                 let spectrum = (1 ... sinCount).map { n in
@@ -780,6 +779,9 @@ extension Rendnote {
                 let stereos = stereos(sampleCount: samples.count)
                 return .init(samples: [samples], stereos: stereos, isLoop: isLoop)
             } else {
+                let maxSpectlopeFq = pitbend.spectlopeInterpolation.keys
+                    .maxValue { $0.value.maxFq } ?? Score.maxFq
+                
                 struct Frame {
                     var sec: Double, fq: Double, sinCount: Int, sin1X: Double, cos1X: Double
                 }
@@ -788,7 +790,7 @@ extension Rendnote {
                 let frames: [Frame] = sampleCount.range.map { i in
                     let sec = Double(i) * rSampleRate
                     let fq = (fq * pitbend.fqScale(atSec: sec)).clipped(min: Score.minFq, max: cutFq)
-                    let sinCount = Int((cutFq / fq).clipped(min: 1, max: Double(Int.max)))
+                    let sinCount = Int((min(maxSpectlopeFq, cutFq) / fq).clipped(min: 1, max: Double(Int.max)))
                     let sin1X = Double.sin(x), cos1X = Double.cos(x)
                     x += fq * pi2rs
                     x = x.mod(.pi2)
