@@ -600,6 +600,39 @@ extension Spectlope {
     var formantCount: Int {
         sprols.count / 4
     }
+    
+    func baseColor(lightness: Double = 85) -> Color {
+        guard self != .init(), !sprols.isEmpty else { return .background }
+        let minV = sprols.min { $0.volm < $1.volm }!
+        let maxV = sprols.max { $0.volm < $1.volm }!
+        let t = maxV.volm == 0 ? 0 : (maxV.volm - minV.volm) / maxV.volm
+        let chroma = Double.linear(0, 60, t: t)
+        let maxPitch = maxV.pitch
+        let greenaPitch = Score.doubleMinPitch,
+            bluePitch = 12.0 * 2, purplePitch = 12.0 * 4, redPitch = 12.0 * 6, orangePitch = 12.0 * 8,
+            yellowPitch = Score.doubleMaxPitch
+        return if maxPitch < bluePitch {
+            .init(lightness: lightness, nearestChroma: chroma,
+                  hue: maxPitch.clipped(min: greenaPitch, max: bluePitch,
+                                        newMin: .pi2 * 0.625, newMax: .pi2 * 0.75))
+        } else if maxPitch < purplePitch {
+            .init(lightness: lightness, nearestChroma: chroma,
+                  hue: maxPitch.clipped(min: bluePitch, max: purplePitch,
+                                        newMin: .pi2 * 0.75, newMax: .pi2 * 0.875))
+        } else if maxPitch < redPitch {
+            .init(lightness: lightness, nearestChroma: chroma,
+                  hue: maxPitch.clipped(min: purplePitch, max: redPitch,
+                                        newMin: -.pi2 * 0.125, newMax: 0))
+        } else if maxPitch < orangePitch {
+            .init(lightness: lightness, nearestChroma: chroma,
+                  hue: maxPitch.clipped(min: redPitch, max: orangePitch,
+                                        newMin: 0, newMax: .pi2 * 0.125))
+        } else {
+            .init(lightness: lightness, nearestChroma: chroma,
+                  hue: maxPitch.clipped(min: orangePitch, max: yellowPitch,
+                                        newMin: .pi2 * 0.125, newMax: .pi2 * 0.25))
+        }
+    }
 }
 extension Sprol: MonoInterpolatable {
     static func linear(_ f0: Self, _ f1: Self, t: Double) -> Self {
@@ -793,36 +826,7 @@ extension Tone {
     }
     
     func baseColor(lightness: Double = 85) -> Color {
-        guard spectlope != .init(), !spectlope.sprols.isEmpty, !overtone.isOne else { return .background }
-        let minV = spectlope.sprols.min { $0.volm < $1.volm }!
-        let maxV = spectlope.sprols.max { $0.volm < $1.volm }!
-        let t = maxV.volm == 0 ? 0 : (maxV.volm - minV.volm) / maxV.volm
-        let chroma = Double.linear(0, 60, t: t)
-        let maxPitch = maxV.pitch
-        let greenaPitch = Score.doubleMinPitch,
-            bluePitch = 12.0 * 2, purplePitch = 12.0 * 4, redPitch = 12.0 * 6, orangePitch = 12.0 * 8,
-            yellowPitch = Score.doubleMaxPitch
-        return if maxPitch < bluePitch {
-            .init(lightness: lightness, nearestChroma: chroma,
-                  hue: maxPitch.clipped(min: greenaPitch, max: bluePitch,
-                                        newMin: .pi2 * 0.625, newMax: .pi2 * 0.75))
-        } else if maxPitch < purplePitch {
-            .init(lightness: lightness, nearestChroma: chroma,
-                  hue: maxPitch.clipped(min: bluePitch, max: purplePitch,
-                                        newMin: .pi2 * 0.75, newMax: .pi2 * 0.875))
-        } else if maxPitch < redPitch {
-            .init(lightness: lightness, nearestChroma: chroma,
-                  hue: maxPitch.clipped(min: purplePitch, max: redPitch,
-                                        newMin: -.pi2 * 0.125, newMax: 0))
-        } else if maxPitch < orangePitch {
-            .init(lightness: lightness, nearestChroma: chroma,
-                  hue: maxPitch.clipped(min: redPitch, max: orangePitch,
-                                        newMin: 0, newMax: .pi2 * 0.125))
-        } else {
-            .init(lightness: lightness, nearestChroma: chroma,
-                  hue: maxPitch.clipped(min: orangePitch, max: yellowPitch,
-                                        newMin: .pi2 * 0.125, newMax: .pi2 * 0.25))
-        }
+        spectlope.baseColor(lightness: lightness)
     }
 }
 extension Tone: MonoInterpolatable {

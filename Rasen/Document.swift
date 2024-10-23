@@ -2065,25 +2065,7 @@ final class Document: @unchecked Sendable {
     
     func closePanel(at p: Point) -> Bool {
         if let i = selections.enumerated().reversed().first(where: { $0.element.rect.contains(p) })?.offset {
-            let oldSelection = selections[i]
             selections.remove(at: i)
-            
-            if let sheetView = sheetView(at: p) {
-                let scoreView = sheetView.scoreView
-                if sheetView.scoreView.model.enabled,
-                   !scoreView.containsNote(scoreView.convertFromWorld(p), scale: screenToWorldScale) {
-                    let scoreView = sheetView.scoreView
-                    
-                    let toneIs = sheetView.noteIndexes(from: [oldSelection]).filter {
-                        scoreView.model.notes[$0].isShownTone
-                    }
-                    if !toneIs.isEmpty {
-                        sheetView.newUndoGroup()
-                        sheetView.setIsShownTones(toneIs.map { .init(value: false, index: $0) })
-                    }
-                }
-            }
-            
             return true
         } else {
             return false
@@ -2097,11 +2079,9 @@ final class Document: @unchecked Sendable {
             closeLookingUp()
         }
         
-        var isRemoveSelection = false
         if let i = selections.firstIndex(where: { $0.rect.contains(p) }) {
             selections.remove(at: i)
         } else {
-            isRemoveSelection = !selections.isEmpty
             selections = []
         }
         
@@ -2109,9 +2089,7 @@ final class Document: @unchecked Sendable {
             sheetView.unselectKeyframes()
         }
         
-        if !isRemoveSelection {
-            closeAllTonePanel(at: p)
-        }
+        closeAllTonePanel(at: p)
         
         finding = Finding()
     }

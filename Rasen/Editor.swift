@@ -496,20 +496,16 @@ final class FaceEditor: Editor, @unchecked Sendable {
                             if let tone = tones[pit.tone.id] {
                                 note.pits[pi].tone = tone
                             } else if pit.tone.isDefault {
+                                let pitch = Double(pit.pitch + note.pitch)
                                 var spectlope = Spectlope(sprols: [
-                                    .init(pitch: 12, volm: .random(in: 0 ..< 1), noise: 0),
-                                    .init(pitch: 24, volm: .random(in: 0 ..< 1), noise: 0),
-                                    .init(pitch: 36, volm: .random(in: 0 ..< 1), noise: 0),
-                                    .init(pitch: 48, volm: .random(in: 0 ..< 1), noise: 0),
-                                    .init(pitch: 60, volm: .random(in: 0 ..< 1), noise: 0),
-                                    .init(pitch: 72, volm: .random(in: 0 ..< 0.75), noise: 0),
-                                    .init(pitch: 84, volm: .random(in: 0 ..< 0.5), noise: 0),
-                                    .init(pitch: 96, volm: .random(in: 0 ..< 0.25), noise: 0),
-                                    .init(pitch: 108, volm: .random(in: 0 ..< 0.125), noise: 0),
-                                    .init(pitch: 120, volm: 0, noise: 0)
-                                ].filter { $0.pitch > .init(pit.pitch + note.pitch - 24)
-                                    && $0.pitch < .init(pit.pitch + note.pitch + 48) }).normarized()
-                                if !spectlope.sprols.isEmpty {
+                                    .init(pitch: pitch - 12, volm: .random(in: 0 ..< 1), noise: 0),
+                                    .init(pitch: pitch, volm: .random(in: 0 ..< 1), noise: 0),
+                                    .init(pitch: pitch + 12, volm: .random(in: 0 ..< 1), noise: 0),
+                                    .init(pitch: pitch + 24, volm: .random(in: 0 ..< 1), noise: 0),
+                                    .init(pitch: pitch + 36, volm: .random(in: 0 ..< 0.5), noise: 0),
+                                    .init(pitch: pitch + 48, volm: .random(in: 0 ..< 0.25), noise: 0)
+                                ].filter { Score.doublePitchRange.contains($0.pitch) }).normarized()
+                                if spectlope.sprols.count > 2 {
                                     spectlope.sprols[.first].volm = 0
                                     spectlope.sprols[.last].volm = 0
                                 }
