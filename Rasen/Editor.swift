@@ -1717,11 +1717,13 @@ final class IOEditor: Editor, @unchecked Sendable {
                               let sheet = self.document.renderableSheet(at: sid),
                               sheet.enabledAnimation {
                             
-                            guard filledShps.contains(shp) else { continue }
-                            filledShps.insert(shp)
-                            let sheetBounds = self.document.sheetFrame(with: shp).bounds
-                            bottomSheets.append((sheet, sheetBounds))
-                            frameRate = max(frameRate, sheet.mainFrameRate)
+                            if !filledShps.contains(shp) {
+                                filledShps.insert(shp)
+                                
+                                let sheetBounds = self.document.sheetFrame(with: shp).bounds
+                                bottomSheets.append((sheet, sheetBounds))
+                                frameRate = max(frameRate, sheet.mainFrameRate)
+                            }
                             shp.y -= 1
                         }
                         
@@ -1732,11 +1734,14 @@ final class IOEditor: Editor, @unchecked Sendable {
                               let sheet = self.document.renderableSheet(at: sid),
                            sheet.enabledAnimation {
                             
-                            guard filledShps.contains(shp) else { continue }
-                            filledShps.insert(shp)
-                            let sheetBounds = self.document.sheetFrame(with: shp).bounds
-                            topSheets.append((sheet, sheetBounds))
-                            frameRate = max(frameRate, sheet.mainFrameRate)
+                            if !filledShps.contains(shp) {
+                                filledShps.insert(shp)
+                                
+                                let sheetBounds = self.document.sheetFrame(with: shp).bounds
+                                topSheets.append((sheet, sheetBounds))
+                                frameRate = max(frameRate, sheet.mainFrameRate)
+                            }
+                            
                             shp.y += 1
                         }
                         
@@ -1826,6 +1831,7 @@ final class IOEditor: Editor, @unchecked Sendable {
                 var audiotracks = [Audiotrack]()
                 
                 if !isStop {
+                    filledShps = []
                     for (i, v) in vs.enumerated() {
                         var audiotrack: Audiotrack?
                         if let sid = self.document.sheetID(at: v.shp),
@@ -1839,7 +1845,12 @@ final class IOEditor: Editor, @unchecked Sendable {
                               let sheet = self.document.renderableSheet(at: sid),
                               sheet.enabledTimeline {
                             
-                            audiotrack += sheet.audiotrack
+                            if !filledShps.contains(shp) {
+                                filledShps.insert(shp)
+                                
+                                audiotrack += sheet.audiotrack
+                            }
+                            
                             shp.y -= 1
                         }
                         shp = v.shp
@@ -1848,11 +1859,16 @@ final class IOEditor: Editor, @unchecked Sendable {
                               let sheet = self.document.renderableSheet(at: sid),
                               sheet.enabledTimeline {
                             
-                            audiotrack += sheet.audiotrack
+                            if !filledShps.contains(shp) {
+                                filledShps.insert(shp)
+                                
+                                audiotrack += sheet.audiotrack
+                            }
+                            
                             shp.y += 1
                         }
                         
-                        if let audiotrack = audiotrack {
+                        if let audiotrack {
                             audiotracks.append(audiotrack)
                         }
                         
@@ -1928,11 +1944,47 @@ final class IOEditor: Editor, @unchecked Sendable {
                 var audiotracks = [Audiotrack]()
                 
                 var isStop = false
+                var filledShps = Set<Sheetpos>()
                 for (i, v) in vs.enumerated() {
+                    var audiotrack: Audiotrack?
                     if let sid = self.document.sheetID(at: v.shp),
                        let sheet = self.document.renderableSheet(at: sid) {
-                        audiotracks.append(sheet.audiotrack)
+                        
+                        audiotrack += sheet.audiotrack
                     }
+                    var shp = v.shp
+                    shp.y -= 1
+                    while let sid = self.document.sheetID(at: shp),
+                          let sheet = self.document.renderableSheet(at: sid),
+                          sheet.enabledTimeline {
+                        
+                        if !filledShps.contains(shp) {
+                            filledShps.insert(shp)
+                            
+                            audiotrack += sheet.audiotrack
+                        }
+                        
+                        shp.y -= 1
+                    }
+                    shp = v.shp
+                    shp.y += 1
+                    while let sid = self.document.sheetID(at: shp),
+                          let sheet = self.document.renderableSheet(at: sid),
+                          sheet.enabledTimeline {
+                        
+                        if !filledShps.contains(shp) {
+                            filledShps.insert(shp)
+                            
+                            audiotrack += sheet.audiotrack
+                        }
+                        
+                        shp.y += 1
+                    }
+                    
+                    if let audiotrack {
+                        audiotracks.append(audiotrack)
+                    }
+                    
                     let t = 0.2 * Double(i) / Double(vs.count)
                     progressHandler(t, &isStop)
                     if isStop { break }

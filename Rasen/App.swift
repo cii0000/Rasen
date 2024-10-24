@@ -29,7 +29,7 @@ import UniformTypeIdentifiers
 @main struct App {
     static func main() {
         let app = SubNSApplication.shared
-        nonisolated(unsafe) let delegate = AppDelegate()
+        let delegate = AppDelegate()
         app.delegate = delegate
         app.run()
     }
@@ -47,7 +47,7 @@ final class SubNSApplication: NSApplication {
     }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuDelegate {
+@MainActor final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuDelegate {
     static let isFullscreenKey = "isFullscreen"
     static let defaultViewSize = NSSize(width: 900, height: 700)
     var window: NSWindow!
@@ -105,9 +105,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         SubNSApplication.shared.servicesMenu = NSMenu()
         SubNSApplication.shared.mainMenu = mainMenu()
         
-        NotificationCenter.default.addObserver(forName: NSColor.systemColorsDidChangeNotification,
-                                               object: nil, queue: nil) { [weak self] (_) in
-            self?.updateSelectedColor()
+        Task { [weak self] in
+            let notifications = NotificationCenter.default
+                .notifications(named: NSColor.systemColorsDidChangeNotification)
+            for await _ in notifications.map({ _ in }) {
+                self?.updateSelectedColor()
+            }
         }
     }
     private func mainMenu() -> NSMenu {

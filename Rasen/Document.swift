@@ -1772,45 +1772,69 @@ final class Document: @unchecked Sendable {
                         oldString: String? = nil,
                         oldTextView: SheetTextView? = nil) {
         let fromStr = finding.string
-        @Sendable func make(isRecord: Bool = false) {
-            @Sendable func make(_ sheetView: SheetView) -> Bool {
-                var isNewUndoGroup = true
-                func updateUndoGroup() {
-                    if isNewUndoGroup {
-                        sheetView.newUndoGroup()
-                        isNewUndoGroup = false
-                    }
+        func make(_ sheetView: SheetView) -> Bool {
+            var isNewUndoGroup = true
+            func updateUndoGroup() {
+                if isNewUndoGroup {
+                    sheetView.newUndoGroup()
+                    isNewUndoGroup = false
                 }
-                let sb = sheetView.bounds.inset(by: Sheet.textPadding)
-                for (i, textView) in sheetView.textsView.elementViews.enumerated() {
-                    var text = textView.model
-                    if text.string.contains(fromStr) {
-                        let rRange = 0 ..< text.string.count
-                        var ns = text.string
-                        if let oldString = oldString, let oldTextView = oldTextView,
-                           oldTextView == textView {
-                            ns = oldString
-                        }
-                        ns = ns.replacingOccurrences(of: fromStr, with: toStr)
-                        text.replaceSubrange(ns, from: rRange, clipFrame: sb)
-                        let origin = textView.model.origin != text.origin ?
-                            text.origin : nil
-                        let size = textView.model.size != text.size ?
-                            text.size : nil
-                        let widthCount = textView.model.widthCount != text.widthCount ?
-                            text.widthCount : nil
-                        let tv = TextValue(string: ns,
-                                           replacedRange: rRange,
-                                           origin: origin, size: size,
-                                           widthCount: widthCount)
-                        updateUndoGroup()
-                        sheetView.replace(IndexValue(value: tv, index: i))
-                    }
-                }
-                return !isNewUndoGroup
             }
+            let sb = sheetView.bounds.inset(by: Sheet.textPadding)
+            for (i, textView) in sheetView.textsView.elementViews.enumerated() {
+                var text = textView.model
+                if text.string.contains(fromStr) {
+                    let rRange = 0 ..< text.string.count
+                    var ns = text.string
+                    if let oldString = oldString, let oldTextView = oldTextView,
+                       oldTextView == textView {
+                        ns = oldString
+                    }
+                    ns = ns.replacingOccurrences(of: fromStr, with: toStr)
+                    text.replaceSubrange(ns, from: rRange, clipFrame: sb)
+                    let origin = textView.model.origin != text.origin ?
+                        text.origin : nil
+                    let size = textView.model.size != text.size ?
+                        text.size : nil
+                    let widthCount = textView.model.widthCount != text.widthCount ?
+                        text.widthCount : nil
+                    let tv = TextValue(string: ns,
+                                       replacedRange: rRange,
+                                       origin: origin, size: size,
+                                       widthCount: widthCount)
+                    updateUndoGroup()
+                    sheetView.replace(IndexValue(value: tv, index: i))
+                }
+            }
+            return !isNewUndoGroup
+        }
+        
+        var recordCount = 0
+        for (shp, _) in findingNodes {
+            if sheetViewValues[shp]?.view == nil,
+               let sid = sheetID(at: shp),
+               sheetRecorders[sid] != nil {
+                recordCount += 1
+            }
+        }
+        if recordCount > 0 {
+            for (shp, _) in findingNodes {
+                if sheetViewValues[shp]?.view != nil,
+                   let sid = sheetID(at: shp),
+                   sheetRecorders[sid] != nil {
+                    recordCount += 1
+                }
+            }
+            let nRecordCount = recordCount
             
-            if isRecord {
+            Task { @MainActor in
+                let result = await rootNode
+                    .show(message: String(format: "Do you want to replace the \"%2$@\" written on the %1$d sheets with the \"%3$@\"?".localized, nRecordCount, fromStr.omit(count: 12), toStr.omit(count: 12)),
+                              infomation: "This operation can be undone for each sheet, but not for all sheets at once.".localized,
+                              okTitle: "Replace".localized,
+                              isDefaultButton: true)
+                guard result == .ok else { return }
+                
                 syncSave()
                 
                 let progressPanel = ProgressPanel(message: "Replacing sheets".localized)
@@ -1876,47 +1900,14 @@ final class Document: @unchecked Sendable {
                     }
                 }
                 progressPanel.cancelHandler = { task.cancel() }
-            } else {
-                for (shp, _) in findingNodes {
-                    if let sheetView = sheetViewValues[shp]?.view {
-                        _ = make(sheetView)
-                    }
-                }
-                finding.string = toStr
-            }
-        }
-        
-        var recordCount = 0
-        for (shp, _) in findingNodes {
-            if sheetViewValues[shp]?.view == nil,
-               let sid = sheetID(at: shp),
-               sheetRecorders[sid] != nil {
-                recordCount += 1
-            }
-        }
-        if recordCount > 0 {
-            for (shp, _) in findingNodes {
-                if sheetViewValues[shp]?.view != nil,
-                   let sid = sheetID(at: shp),
-                   sheetRecorders[sid] != nil {
-                    recordCount += 1
-                }
-            }
-            let nRecordCount = recordCount
-            
-            Task { @MainActor in
-                let result = await rootNode
-                    .show(message: String(format: "Do you want to replace the \"%2$@\" written on the %1$d sheets with the \"%3$@\"?".localized, nRecordCount, fromStr.omit(count: 12), toStr.omit(count: 12)),
-                              infomation: "This operation can be undone for each sheet, but not for all sheets at once.".localized,
-                              okTitle: "Replace".localized,
-                              isDefaultButton: true)
-                switch result {
-                case .ok: make(isRecord: true)
-                case .cancel: break
-                }
             }
         } else {
-            make()
+            for (shp, _) in findingNodes {
+                if let sheetView = sheetViewValues[shp]?.view {
+                    _ = make(sheetView)
+                }
+            }
+            finding.string = toStr
         }
     }
     
