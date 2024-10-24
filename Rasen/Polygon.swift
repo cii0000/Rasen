@@ -82,6 +82,16 @@ extension Triangle {
     func subs(form p: Point) -> [Self] {
         [.init(p, p0, p1), .init(p, p1, p2), .init(p, p2, p0)]
     }
+    
+    var edge0: Edge {
+        .init(p0, p1)
+    }
+    var edge1: Edge {
+        .init(p1, p2)
+    }
+    var edge2: Edge {
+        .init(p2, p0)
+    }
 }
 
 struct Polygon: Hashable, Codable {

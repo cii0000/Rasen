@@ -527,7 +527,7 @@ struct Path {
         didSet { updateBounds() }
     }
     var isPolygon = true, isCap = true, isTopolygon = false
-    private(set) var bounds: Rect?, typesetter: Typesetter?, triangleStrip: TriangleStrip?
+    private(set) var bounds: Rect?, typesetter: Typesetter?, triangleStrips = [TriangleStrip]()
     
     init() {}
     init(_ rect: Rect) {
@@ -603,8 +603,14 @@ struct Path {
         updateBounds()
     }
     init(_ triangleStrip: TriangleStrip) {
-        self.triangleStrip = triangleStrip
+        self.triangleStrips = [triangleStrip]
         self.pathlines = [.init(triangleStrip.outlinePoints, isClosed: true)]
+        isCap = false
+        updateBounds()
+    }
+    init(_ triangleStrips: [TriangleStrip]) {
+        self.triangleStrips = triangleStrips
+        self.pathlines = triangleStrips.map { .init($0.outlinePoints, isClosed: true) }
         isCap = false
         updateBounds()
     }
@@ -614,24 +620,24 @@ struct Path {
     }
     
     private init(pathlines: [Pathline], isPolygon: Bool, isCap: Bool, isTopolygon: Bool,
-                 bounds: Rect?, typesetter: Typesetter?, triangleStrip: TriangleStrip?) {
+                 bounds: Rect?, typesetter: Typesetter?, triangleStrips: [TriangleStrip]) {
         self.pathlines = pathlines
         self.isPolygon = isPolygon
         self.isCap = isCap
         self.isTopolygon = isTopolygon
         self.bounds = bounds
         self.typesetter = typesetter
-        self.triangleStrip = triangleStrip
+        self.triangleStrips = triangleStrips
     }
 }
 extension Path: AppliableTransform {
     static func * (lhs: Path, rhs: Transform) -> Path {
         let nPathlines = lhs.pathlines.map { $0 * rhs }
         let bounds = nPathlines.reduce(into: Rect?.none) { $0 += $1.bounds }
-        let nTriangleStrip = lhs.triangleStrip != nil ? lhs.triangleStrip! * rhs : nil
+        let nTriangleStrips = lhs.triangleStrips.map { $0 * rhs }
         return .init(pathlines: nPathlines,
                      isPolygon: lhs.isPolygon, isCap: lhs.isCap, isTopolygon: lhs.isTopolygon,
-                     bounds: bounds, typesetter: lhs.typesetter, triangleStrip: nTriangleStrip)
+                     bounds: bounds, typesetter: lhs.typesetter, triangleStrips: nTriangleStrips)
     }
 }
 extension Path {
@@ -1058,13 +1064,15 @@ extension Path {
     }
     func fillPointsData(withQuality quality: Double = 1) -> (pointsData: [Float],
                                                              counts: [Int]) {
-        if let triangleStrip {
-            return (triangleStrip.points.reduce(into: [Float](capacity: triangleStrip.points.count * 4)) {
-                $0.append(Float($1.x))
-                $0.append(Float($1.y))
-                $0.append(0)
-                $0.append(1)
-            }, [triangleStrip.points.count])
+        if !triangleStrips.isEmpty {
+            return (triangleStrips.flatMap {
+                $0.points.reduce(into: [Float](capacity: $0.points.count * 4)) {
+                    $0.append(Float($1.x))
+                    $0.append(Float($1.y))
+                    $0.append(0)
+                    $0.append(1)
+                }
+            }, triangleStrips.map { $0.points.count })
         }
         if isTopolygon {
             let topoly = topolygon(withQuality: quality)

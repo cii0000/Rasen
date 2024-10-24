@@ -3073,7 +3073,7 @@ extension Node {
                         ctx.setShouldAntialias(true)
                     }
                 case .gradient(let colors):
-                    if let ts = path.triangleStrip {
+                    for ts in path.triangleStrips {
                         let rgbas = colors.map { $0.rgba.premultipliedAlpha }
                         let minCount = min(ts.points.count, rgbas.count)
                         if minCount >= 3 {
@@ -3094,7 +3094,7 @@ extension Node {
                     ctx.saveGState()
                     ctx.setBlendMode(.darken)
                     
-                    if let ts = path.triangleStrip {
+                    for ts in path.triangleStrips {
                         let rgbas = colors.map { $0.rgba.premultipliedAlpha }
                         let minCount = min(ts.points.count, rgbas.count)
                         if minCount >= 3 {
