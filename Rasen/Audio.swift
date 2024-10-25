@@ -283,6 +283,8 @@ final class PCMNoder: ObjectHashable {
         }
     }
     
+    var enabledWaveclip = false
+    
     convenience init?(content: Content, startSec: Double = 0) {
         guard let pcmTrackItem = PCMTrackItem(content: content, startSec: startSec) else { return nil }
         self.init(pcmTrackItem: pcmTrackItem)
@@ -374,6 +376,7 @@ final class PCMNoder: ObjectHashable {
                 return noErr
             }
             
+            let enabledWaveclip = self.enabledWaveclip
             let rSampleRate = 1 / sampleRate
             for ci in 0 ..< min(outputBLP.count, pcmBuffer.channelCount) {
                 let oFrames = data[ci], nFrames = outputBLP[ci].mData!.assumingMemoryBound(to: Float.self)
@@ -383,9 +386,10 @@ final class PCMNoder: ObjectHashable {
                         let oi = i - loopedContentRange.start + timeOption.contentLocalStartI
                         
                         let sec = Double(i) * rSampleRate
-                        let amp = Waveclip.amp(atSec: sec,
-                                               attackStartSec: loopedContentStartSec,
-                                               releaseStartSec: loopedContentEndSec - Waveclip.releaseSec)
+                        let amp = enabledWaveclip ?
+                        Waveclip.amp(atSec: sec,
+                                     attackStartSec: loopedContentStartSec,
+                                     releaseStartSec: loopedContentEndSec - Waveclip.releaseSec) : 1
                         
                         let playingWaveclipAmp = Waveclip
                             .amp(atSec: Double(ni + frameStartI) * rSampleRate,

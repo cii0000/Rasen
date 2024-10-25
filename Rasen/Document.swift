@@ -126,8 +126,6 @@ extension Finding: Protobuf {
 }
 extension Finding: Codable {}
 
-
-
 private struct Road {
     var shp0: IntPoint, shp1: IntPoint
 }
