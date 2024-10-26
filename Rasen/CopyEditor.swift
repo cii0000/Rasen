@@ -2458,7 +2458,8 @@ final class CopyEditor: Editor {
                 return
             }
             
-            guard let (_, owners) = document.madeColorOwnersWithSelection(at: p) else { return }
+            guard let (_, owners) = document.madeColorOwnersWithSelection(at: p,
+                                                                          removingUUColor: uuColor) else { return }
             let ownerDic = owners.reduce(into: [SheetView: [SheetColorOwner]]()) {
                 if $0[$1.sheetView] == nil {
                     $0[$1.sheetView] = [$1]

@@ -3466,14 +3466,16 @@ final class Document: @unchecked Sendable {
                                           removingUUColor: removingUUColor,
                                           scale: screenToWorldScale).value]
     }
-    func madeColorOwnersWithSelection(at p: Point) -> (firstUUColor: UUColor,
-                                                       owners: [SheetColorOwner])? {
+    func madeColorOwnersWithSelection(at p: Point,
+                                      removingUUColor: UUColor? = Line.defaultUUColor) -> (firstUUColor: UUColor,
+                                                                                           owners: [SheetColorOwner])? {
         guard let sheetView = madeSheetView(at: p) else {
             return nil
         }
         
         let inP = sheetView.convertFromWorld(p)
         let (isLine, topOwner) = sheetView.sheetColorOwner(at: inP,
+                                                           removingUUColor: removingUUColor,
                                                            scale: screenToWorldScale)
         let uuColor = topOwner.uuColor
         
