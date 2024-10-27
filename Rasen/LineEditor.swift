@@ -18,10 +18,11 @@
 import Dispatch
 
 final class RangeSelector: DragEditor {
-    let document: Document
+    let root: RootEditor, document: Document
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
     }
     
     private var firstP = Point(), multiFrameSlider: MultiFrameSlider?
@@ -35,7 +36,7 @@ final class RangeSelector: DragEditor {
                sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p),
                                                         scale: document.screenToWorldScale) {
                 
-                multiFrameSlider = MultiFrameSlider(document)
+                multiFrameSlider = MultiFrameSlider(root)
                 multiFrameSlider?.send(event)
                 return
             }
@@ -85,10 +86,11 @@ final class RangeSelector: DragEditor {
     }
 }
 final class Unselector: InputKeyEditor {
-    let document: Document
+    let root: RootEditor, document: Document
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
     }
     
     func send(_ event: InputKeyEvent) {
@@ -106,11 +108,11 @@ final class Unselector: InputKeyEditor {
     }
 }
 
-final class LineDrawer: DragEditor, @unchecked Sendable {
+final class LineDrawer: DragEditor {
     let editor: LineEditor
     
-    init(_ document: Document) {
-        editor = LineEditor(document)
+    init(_ root: RootEditor) {
+        editor = LineEditor(root)
     }
     
     func send(_ event: DragEvent) {
@@ -120,11 +122,11 @@ final class LineDrawer: DragEditor, @unchecked Sendable {
         editor.updateNode()
     }
 }
-final class StraightLineDrawer: DragEditor, @unchecked Sendable {
+final class StraightLineDrawer: DragEditor {
     let editor: LineEditor
     
-    init(_ document: Document) {
-        editor = LineEditor(document)
+    init(_ root: RootEditor) {
+        editor = LineEditor(root)
     }
     
     func send(_ event: DragEvent) {
@@ -134,11 +136,11 @@ final class StraightLineDrawer: DragEditor, @unchecked Sendable {
         editor.updateNode()
     }
 }
-final class LassoCutter: DragEditor, @unchecked Sendable {
+final class LassoCutter: DragEditor {
     let editor: LineEditor
     
-    init(_ document: Document) {
-        editor = LineEditor(document)
+    init(_ root: RootEditor) {
+        editor = LineEditor(root)
     }
     
     func send(_ event: DragEvent) {
@@ -148,11 +150,11 @@ final class LassoCutter: DragEditor, @unchecked Sendable {
         editor.updateNode()
     }
 }
-final class LassoCopier: DragEditor, @unchecked Sendable {
+final class LassoCopier: DragEditor {
     let editor: LineEditor
     
-    init(_ document: Document) {
-        editor = LineEditor(document)
+    init(_ root: RootEditor) {
+        editor = LineEditor(root)
     }
     
     func send(_ event: DragEvent) {
@@ -165,12 +167,13 @@ final class LassoCopier: DragEditor, @unchecked Sendable {
 enum LassoType {
     case cut, copy, makeFaces, cutFaces, changeDraft, cutDraft
 }
-final class LineEditor: Editor, @unchecked Sendable {
-    let document: Document
+final class LineEditor: Editor {
+    let root: RootEditor, document: Document
     let isEditingSheet: Bool
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
         isEditingSheet = document.isEditingSheet
     }
     
@@ -255,6 +258,7 @@ final class LineEditor: Editor, @unchecked Sendable {
         }
     }
     
+    nonisolated
     private static func joinControlWith(_ line: Line,
                                         lastControl lc: Line.Control,
                                         lowAngle: Double = 0.8 * (.pi / 2),
@@ -277,6 +281,7 @@ final class LineEditor: Editor, @unchecked Sendable {
         }
     }
     
+    nonisolated
     private static func speed(from temps: [Temp], at i: Int, delta: Int = 2) -> Double {
         var allSpeed = 0.0, count = 0
         for temp in temps[max(0, i - delta) ..< i] {
@@ -298,6 +303,7 @@ final class LineEditor: Editor, @unchecked Sendable {
         }
     }
     
+    nonisolated
     private static func isAppendPointWith(distance: Double, deltaTime: Double,
                                           _ temps: [Temp], lastBezier lb: Bezier,
                                           scale: Double,
@@ -358,6 +364,7 @@ final class LineEditor: Editor, @unchecked Sendable {
         }
     }
     
+    nonisolated
     private static func revision(pressure: Double,
                                  minPressure: Double = 0.3,
                                  revisonMinPressure: Double = 0.125) -> Double {
@@ -371,16 +378,7 @@ final class LineEditor: Editor, @unchecked Sendable {
         }
     }
     
-    private static func clipPoint(_ op: Point, old oldP: Point?, from node: Node) -> Point {
-        let cp = node.convertFromWorld(op)
-        let sBounds = node.bounds ?? Rect()
-        if let oldP = oldP, let np = sBounds.intersection(Edge(oldP, cp)).first {
-            return np
-        } else {
-            return sBounds.clipped(cp)
-        }
-    }
-    
+    nonisolated
     private static func snap(_ fol: FirstOrLast, _ line: Line,
                              isSnapSelf: Bool = true,
                              worldToScreenScale: Double,
@@ -392,6 +390,7 @@ final class LineEditor: Editor, @unchecked Sendable {
              worldToScreenScale: worldToScreenScale,
              screenToWorldScale: screenToWorldScale, from: lines)?.control
     }
+    nonisolated
     private static func snap(_ c: Line.Control, _ nc: Line.Control?,
                              size: Double,
                              worldToScreenScale: Double,
@@ -432,6 +431,7 @@ final class LineEditor: Editor, @unchecked Sendable {
         }
     }
     
+    nonisolated
     static func line(from events: [DrawLineEvent],
                      isClip: Bool = true,
                      isSnap: Bool = true,
@@ -447,6 +447,7 @@ final class LineEditor: Editor, @unchecked Sendable {
              lastSnapLines: lastSnapLines,
              clipBounds: clipBounds), false)
     }
+    nonisolated
     static func line(from events: [DrawLineEvent],
                      isClip: Bool = true,
                      isSnap: Bool = true,
@@ -733,6 +734,7 @@ final class LineEditor: Editor, @unchecked Sendable {
         return nLine
     }
     
+    nonisolated
     static func straightLine(from events: [DrawLineEvent],
                              isClip: Bool = true,
                              isSnap: Bool = true,
@@ -946,6 +948,7 @@ final class LineEditor: Editor, @unchecked Sendable {
         return (nLine, isSnapStraight)
     }
     
+    nonisolated
     static func snapStraightLine(with line: Line,
                                  fp: Point, lp: Point) -> Line? {
         let ol = line.pointsLength
@@ -977,13 +980,13 @@ final class LineEditor: Editor, @unchecked Sendable {
                 noteI: Int?, noteStartBeat: Rational?, notePlayer: NotePlayer?
     func drawNote(with event: DragEvent, isStraight: Bool = false) {
         guard isEditingSheet else {
-            document.keepOut(with: event)
+            root.keepOut(with: event)
             return
         }
         switch event.phase {
         case .began:
-            if document.isPlaying(with: event) {
-                document.stopPlaying(with: event)
+            if root.isPlaying(with: event) {
+                root.stopPlaying(with: event)
             }
             
             let p = document.convertScreenToWorld(event.screenPoint)
@@ -1119,8 +1122,8 @@ final class LineEditor: Editor, @unchecked Sendable {
                 lasso.intersects(scoreView.pointline(from: scoreView.model.notes[i])) ? i : nil
             }
             if !nis.isEmpty {
-                if document.isPlaying(with: event) {
-                    document.stopPlaying(with: event)
+                if root.isPlaying(with: event) {
+                    root.stopPlaying(with: event)
                 }
                 
                 let pitch = scoreView.pitch(atY: scoreP.y, interval: document.currentPitchInterval)
@@ -1145,7 +1148,7 @@ final class LineEditor: Editor, @unchecked Sendable {
     
     func drawLine(with event: DragEvent) {
         guard isEditingSheet else {
-            document.keepOut(with: event)
+            root.keepOut(with: event)
             return
         }
         
@@ -1162,8 +1165,8 @@ final class LineEditor: Editor, @unchecked Sendable {
             }
         }
         
-        if isStopPlaying || document.isPlaying(with: event) {
-            document.stopPlaying(with: event)
+        if isStopPlaying || root.isPlaying(with: event) {
+            root.stopPlaying(with: event)
             isStopPlaying = true
             return
         }
@@ -1171,7 +1174,7 @@ final class LineEditor: Editor, @unchecked Sendable {
     }
     func drawStraightLine(with event: DragEvent) {
         guard isEditingSheet else {
-            document.keepOut(with: event)
+            root.keepOut(with: event)
             return
         }
         
@@ -1188,8 +1191,8 @@ final class LineEditor: Editor, @unchecked Sendable {
             }
         }
         
-        if isStopPlaying || document.isPlaying(with: event) {
-            document.stopPlaying(with: event)
+        if isStopPlaying || root.isPlaying(with: event) {
+            root.stopPlaying(with: event)
             isStopPlaying = true
             return
         }
@@ -1251,7 +1254,6 @@ final class LineEditor: Editor, @unchecked Sendable {
                     self.oldDrawLineEventsCount = events.count
                     let snapLines = self.snapLines, clipBounds = self.clipBounds
                     DispatchQueue.global().async { [weak self] in
-                        guard let self, !(self.drawLineTimer?.isCancelled ?? true) else { return }
                         let (tempLine, isSnapStraight) = Self.line(from: events,
                                                                    firstSnapLines: snapLines,
                                                                    lastSnapLines: snapLines,
@@ -1365,8 +1367,8 @@ final class LineEditor: Editor, @unchecked Sendable {
             
             let isScore = document.sheetView(at: p)?.model.score.enabled ?? false
             
-            if !isScore && document.isPlaying(with: event) {
-                document.stopPlaying(with: event)
+            if !isScore && root.isPlaying(with: event) {
+                root.stopPlaying(with: event)
                 return
             }
             if isEditingSheet {
@@ -1421,7 +1423,6 @@ final class LineEditor: Editor, @unchecked Sendable {
                     self.oldDrawLineEventsCount = events.count
                     let snapLines = self.snapLines, clipBounds = self.clipBounds
                     DispatchQueue.global().async { [weak self] in
-                        guard let self, !(self.drawLineTimer?.isCancelled ?? true) else { return }
                         let (tempLine, _) = Self.line(from: events,
                                                       firstSnapLines: snapLines,
                                                       lastSnapLines: snapLines,

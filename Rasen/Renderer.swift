@@ -272,10 +272,11 @@ final class DynamicBuffer {
 }
 
 final class SubMTKView: MTKView, MTKViewDelegate,
-                        NSTextInputClient, NSMenuItemValidation, NSMenuDelegate {
+                        @preconcurrency NSTextInputClient, NSMenuItemValidation, NSMenuDelegate {
     static let enabledAnimationKey = "enabledAnimation"
     static let isHiddenActionListKey = "isHiddenActionList"
     static let isShownTrackpadAlternativeKey = "isShownTrackpadAlternative"
+    private(set) var rootEditor: RootEditor
     private(set) var document: Document
     let renderstate = Renderstate.sampleCount4!
     
@@ -325,7 +326,9 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     
     required init(url: URL, frame: NSRect = NSRect()) {
-        self.document = Document(url: url)
+        let document = Document(url: url)
+        self.document = document
+        self.rootEditor = .init(document)
         
         super.init(frame: frame, device: Renderer.shared.device)
         delegate = self
@@ -369,6 +372,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         scrollTimer = nil
         pinchTimer?.cancel()
         pinchTimer = nil
+        rootEditor.cancelTasks()
     }
     
     override func viewDidChangeEffectiveAppearance() {
@@ -468,8 +472,8 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     
                     let p = r.centerPoint
                     let sp = self.document.convertWorldToScreen(p)
-                    self.document.inputKey(self.inputKeyEventWith(at: sp, .lookUpTap, .began))
-                    self.document.inputKey(self.inputKeyEventWith(at: sp, .lookUpTap, .ended))
+                    self.rootEditor.inputKey(self.inputKeyEventWith(at: sp, .lookUpTap, .began))
+                    self.rootEditor.inputKey(self.inputKeyEventWith(at: sp, .lookUpTap, .ended))
                 }
             }
             trackpadView.addSubview(lookUpButton)
@@ -484,7 +488,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                                          phase: event.phase,
                                          touchPhase: nil,
                                          momentumPhase: nil)
-                self.document.scroll(nEvent)
+                self.rootEditor.scroll(nEvent)
             }
             trackpadView.addSubview(scrollButton)
             self.scrollButton = scrollButton
@@ -496,7 +500,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                                         time: event.time,
                                         magnification: -dp.y / 100,
                                         phase: event.phase)
-                self.document.pinch(nEvent)
+                self.rootEditor.pinch(nEvent)
             }
             trackpadView.addSubview(zoomButton)
             self.zoomButton = zoomButton
@@ -508,7 +512,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                                          time: event.time,
                                          rotationQuantity: -dp.x / 10,
                                          phase: event.phase)
-                self.document.rotate(nEvent)
+                self.rootEditor.rotate(nEvent)
             }
             trackpadView.addSubview(rotateButton)
             self.rotateButton = rotateButton
@@ -941,7 +945,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     @objc func importDocument(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = Importer(document)
+        let editor = Importer(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -950,7 +954,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     @objc func exportAsImage(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = ImageExporter(document)
+        let editor = ImageExporter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -958,7 +962,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func exportAsImage4K(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = Image4KExporter(document)
+        let editor = Image4KExporter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -966,7 +970,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func exportAsPDF(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = PDFExporter(document)
+        let editor = PDFExporter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -974,7 +978,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func exportAsGIF(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = GIFExporter(document)
+        let editor = GIFExporter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -982,7 +986,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func exportAsMovie(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = MovieExporter(document)
+        let editor = MovieExporter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -990,7 +994,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func exportAsMovie4K(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = Movie4KExporter(document)
+        let editor = Movie4KExporter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -998,7 +1002,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func exportAsSound(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = SoundExporter(document)
+        let editor = SoundExporter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1006,7 +1010,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func exportAsLinearPCM(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = LinearPCMExporter(document)
+        let editor = LinearPCMExporter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1015,7 +1019,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     @objc func exportAsDocument(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = DocumentWithoutHistoryExporter(document)
+        let editor = DocumentWithoutHistoryExporter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1023,7 +1027,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func exportAsDocumentWithHistory(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = DocumentExporter(document)
+        let editor = DocumentExporter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1032,7 +1036,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     @objc func clearHistory(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = HistoryCleaner(document)
+        let editor = HistoryCleaner(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1041,7 +1045,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     @objc func undo(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = Undoer(document)
+        let editor = Undoer(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1049,7 +1053,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func redo(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = Redoer(document)
+        let editor = Redoer(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1057,7 +1061,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func cut(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = Cutter(document)
+        let editor = Cutter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1065,7 +1069,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func copy(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = Copier(document)
+        let editor = Copier(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1073,7 +1077,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func paste(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = Paster(document)
+        let editor = Paster(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1081,7 +1085,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func find(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = Finder(document)
+        let editor = Finder(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1089,7 +1093,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func changeToDraft(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = DraftChanger(document)
+        let editor = DraftChanger(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1097,7 +1101,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func cutDraft(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = DraftCutter(document)
+        let editor = DraftCutter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1105,7 +1109,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func makeFaces(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = FacesMaker(document)
+        let editor = FacesMaker(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1113,7 +1117,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func cutFaces(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = FacesCutter(document)
+        let editor = FacesCutter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1121,7 +1125,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func changeToVerticalText(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = VerticalTextChanger(document)
+        let editor = VerticalTextChanger(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1129,7 +1133,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func changeToHorizontalText(_ sender: Any) {
         document.isNoneCursor = true
-        let editor = HorizontalTextChanger(document)
+        let editor = HorizontalTextChanger(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1144,7 +1148,11 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     func updateWithURL() {
         document = Document(url: document.url)
         setupDocument()
-        document.restoreDatabase()
+        do {
+            try document.restoreDatabase()
+        } catch {
+            document.rootNode.show(error)
+        }
         document.screenBounds = bounds.my
         document.drawableSize = drawableSize.my
         clearColor = document.backgroundColor.mtl
@@ -1243,7 +1251,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     override func mouseEntered(with event: NSEvent) {}
     override func mouseExited(with event: NSEvent) {
-        document.stopScrollEvent()
+        rootEditor.stopScrollEvent()
     }
     private var trackingArea: NSTrackingArea?
     override func updateTrackingAreas() {
@@ -1343,18 +1351,18 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     private var isOneFlag = false, oneFlagTime: Double?
     override func flagsChanged(with nsEvent: NSEvent) {
-        let oldModifierKeys = document.modifierKeys
+        let oldModifierKeys = rootEditor.modifierKeys
         
-        document.modifierKeys = nsEvent.modifierKeys
+        rootEditor.modifierKeys = nsEvent.modifierKeys
         
-        if oldModifierKeys.isEmpty && document.modifierKeys.isOne {
+        if oldModifierKeys.isEmpty && rootEditor.modifierKeys.isOne {
             isOneFlag = true
             oneFlagTime = nsEvent.timestamp
         } else if let oneKey = oldModifierKeys.oneInputKeyTYpe,
-                  document.modifierKeys.isEmpty && isOneFlag,
+                  rootEditor.modifierKeys.isEmpty && isOneFlag,
             let oneFlagTime, nsEvent.timestamp - oneFlagTime < 0.175 {
-            document.inputKey(inputKeyEventWith(nsEvent, oneKey, .began))
-            document.inputKey(inputKeyEventWith(nsEvent, oneKey, .ended))
+            rootEditor.inputKey(inputKeyEventWith(nsEvent, oneKey, .began))
+            rootEditor.inputKey(inputKeyEventWith(nsEvent, oneKey, .ended))
             isOneFlag = false
         } else {
             isOneFlag = false
@@ -1362,10 +1370,10 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     
     override func mouseMoved(with nsEvent: NSEvent) {
-        document.indicate(with: dragEventWith(indicate: nsEvent))
+        rootEditor.indicate(with: dragEventWith(indicate: nsEvent))
         
-        if let oldEvent = document.oldInputKeyEvent,
-           let editor = document.inputKeyEditor {
+        if let oldEvent = rootEditor.oldInputKeyEvent,
+           let editor = rootEditor.inputKeyEditor {
             
             editor.send(inputKeyEventWith(nsEvent, oldEvent.inputKeyType, .changed))
         }
@@ -1376,14 +1384,14 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         guard let key = nsEvent.key else { return }
         let phase: Phase = nsEvent.isARepeat ? .changed : .began
         if key.isTextEdit
-            && !document.modifierKeys.contains(.command)
-            && document.modifierKeys != .control
-            && document.modifierKeys != [.control, .option]
-            && !document.modifierKeys.contains(.function) {
+            && !rootEditor.modifierKeys.contains(.command)
+            && rootEditor.modifierKeys != .control
+            && rootEditor.modifierKeys != [.control, .option]
+            && !rootEditor.modifierKeys.contains(.function) {
             
-            document.inputText(inputTextEventWith(nsEvent, key, phase))
+            rootEditor.inputText(inputTextEventWith(nsEvent, key, phase))
         } else {
-            document.inputKey(inputKeyEventWith(nsEvent, key,
+            rootEditor.inputKey(inputKeyEventWith(nsEvent, key,
                                                 isRepeat: nsEvent.isARepeat,
                                                 phase))
         }
@@ -1391,11 +1399,11 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     override func keyUp(with nsEvent: NSEvent) {
         guard let key = nsEvent.key else { return }
         let textEvent = inputTextEventWith(nsEvent, key, .ended)
-        if document.oldInputTextKeys.contains(textEvent.inputKeyType) {
-            document.inputText(textEvent)
+        if rootEditor.oldInputTextKeys.contains(textEvent.inputKeyType) {
+            rootEditor.inputText(textEvent)
         }
-        if document.oldInputKeyEvent?.inputKeyType == key {
-            document.inputKey(inputKeyEventWith(nsEvent, key, .ended))
+        if rootEditor.oldInputKeyEvent?.inputKeyType == key {
+            rootEditor.inputKey(inputKeyEventWith(nsEvent, key, .ended))
         }
     }
     
@@ -1423,25 +1431,25 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             isDrag = true
             if oldPressureStage == 2 {
                 isStrongDrag = true
-                document.strongDrag(beganDragEvent)
+                rootEditor.strongDrag(beganDragEvent)
             } else {
-                document.drag(beganDragEvent)
+                rootEditor.drag(beganDragEvent)
             }
         }
         if isStrongDrag {
-            document.strongDrag(dragEventWith(nsEvent, .changed))
+            rootEditor.strongDrag(dragEventWith(nsEvent, .changed))
         } else {
-            document.drag(dragEventWith(nsEvent, .changed))
+            rootEditor.drag(dragEventWith(nsEvent, .changed))
         }
     }
     override func mouseUp(with nsEvent: NSEvent) {
         let endedDragEvent = dragEventWith(nsEvent, .ended)
         if isDrag {
             if isStrongDrag {
-                document.strongDrag(endedDragEvent)
+                rootEditor.strongDrag(endedDragEvent)
                 isStrongDrag = false
             } else {
-                document.drag(endedDragEvent)
+                rootEditor.drag(endedDragEvent)
             }
             isDrag = false
         } else {
@@ -1450,12 +1458,12 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             } else {
                 guard let beganDragEvent = beganDragEvent else { return }
                 if isMovedDrag {
-                    document.drag(beganDragEvent)
-                    document.drag(endedDragEvent)
+                    rootEditor.drag(beganDragEvent)
+                    rootEditor.drag(endedDragEvent)
                 } else {
-                    document.inputKey(inputKeyEventWith(beganDragEvent, .began))
+                    rootEditor.inputKey(inputKeyEventWith(beganDragEvent, .began))
                     Sleep.start()
-                    document.inputKey(inputKeyEventWith(beganDragEvent, .ended))
+                    rootEditor.inputKey(inputKeyEventWith(beganDragEvent, .ended))
                 }
             }
         }
@@ -1478,20 +1486,20 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         guard let beganDragEvent = beganSubDragEvent else { return }
         if !isSubDrag {
             isSubDrag = true
-            document.subDrag(beganDragEvent)
+            rootEditor.subDrag(beganDragEvent)
         }
-        document.subDrag(dragEventWith(nsEvent, .changed))
+        rootEditor.subDrag(dragEventWith(nsEvent, .changed))
     }
     override func rightMouseUp(with nsEvent: NSEvent) {
         let endedDragEvent = dragEventWith(nsEvent, .ended)
         if isSubDrag {
-            document.subDrag(endedDragEvent)
+            rootEditor.subDrag(endedDragEvent)
             isSubDrag = false
         } else {
             guard let beganDragEvent = beganSubDragEvent else { return }
             if beganDragEvent.screenPoint != endedDragEvent.screenPoint {
-                document.subDrag(beganDragEvent)
-                document.subDrag(endedDragEvent)
+                rootEditor.subDrag(beganDragEvent)
+                rootEditor.subDrag(endedDragEvent)
             } else {
                 showMenu(nsEvent)
             }
@@ -1509,87 +1517,87 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         guard window?.isMainWindow ?? false else { return }
         
         let event = inputKeyEventWith(drag: nsEvent, .began)
-        document.updateLastEditedSheetpos(from: event)
+        rootEditor.updateLastEditedSheetpos(from: event)
         let menu = NSMenu()
         if menuEditor != nil {
             menuEditor?.editor.end()
         }
-        menuEditor = Exporter(document)
+        menuEditor = Exporter(rootEditor)
         menuEditor?.send(event)
         menu.delegate = self
         menu.addItem(SubNSMenuItem(title: "Import...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = Importer(self.document)
+            let editor = Importer(self.rootEditor)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(SubNSMenuItem(title: "Export as Image...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = ImageExporter(self.document)
+            let editor = ImageExporter(self.rootEditor)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(SubNSMenuItem(title: "Export as 4K Image...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = Image4KExporter(self.document)
+            let editor = Image4KExporter(self.rootEditor)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(SubNSMenuItem(title: "Export as PDF...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = PDFExporter(self.document)
+            let editor = PDFExporter(self.rootEditor)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(SubNSMenuItem(title: "Export as GIF...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = GIFExporter(self.document)
+            let editor = GIFExporter(self.rootEditor)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(SubNSMenuItem(title: "Export as Movie...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = MovieExporter(self.document)
+            let editor = MovieExporter(self.rootEditor)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(SubNSMenuItem(title: "Export as 4K Movie...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = Movie4KExporter(self.document)
+            let editor = Movie4KExporter(self.rootEditor)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(SubNSMenuItem(title: "Export as Sound...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = SoundExporter(self.document)
+            let editor = SoundExporter(self.rootEditor)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(SubNSMenuItem(title: "Export as Linear PCM...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = LinearPCMExporter(self.document)
+            let editor = LinearPCMExporter(self.rootEditor)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(SubNSMenuItem(title: "Export as Document...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = DocumentWithoutHistoryExporter(self.document)
+            let editor = DocumentWithoutHistoryExporter(self.rootEditor)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(SubNSMenuItem(title: "Export as Document with History...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = DocumentExporter(self.document)
+            let editor = DocumentExporter(self.rootEditor)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(SubNSMenuItem(title: "Clear History...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = HistoryCleaner(self.document)
+            let editor = HistoryCleaner(self.rootEditor)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
@@ -1601,7 +1609,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
 //            self.isEnabledRotate = !self.isEnabledRotate
 //        }))
         
-        document.stopAllEvents()
+        rootEditor.stopAllEvents()
         NSMenu.popUpContextMenu(menu, with: nsEvent, for: self)
     }
     func menuDidClose(_ menu: NSMenu) {
@@ -1620,20 +1628,20 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         guard let beganDragEvent = beganMiddleDragEvent else { return }
         if !isMiddleDrag {
             isMiddleDrag = true
-            document.middleDrag(beganDragEvent)
+            rootEditor.middleDrag(beganDragEvent)
         }
-        document.middleDrag(dragEventWith(nsEvent, .changed))
+        rootEditor.middleDrag(dragEventWith(nsEvent, .changed))
     }
     override func otherMouseUp(with nsEvent: NSEvent) {
         let endedDragEvent = dragEventWith(nsEvent, .ended)
         if isMiddleDrag {
-            document.middleDrag(endedDragEvent)
+            rootEditor.middleDrag(endedDragEvent)
             isMiddleDrag = false
         } else {
             guard let beganDragEvent = beganSubDragEvent else { return }
             if beganDragEvent.screenPoint != endedDragEvent.screenPoint {
-                document.middleDrag(beganDragEvent)
-                document.middleDrag(endedDragEvent)
+                rootEditor.middleDrag(beganDragEvent)
+                rootEditor.middleDrag(endedDragEvent)
             }
         }
         beganMiddleDragEvent = nil
@@ -1661,20 +1669,16 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 var event = scrollEventWith(nsEvent, .ended, touchPhase: nil, momentumPhase: nil)
                 event.screenPoint = screenPointFromCursor.my
                 event.time += scrollEndSec
-                document.scroll(event)
+                rootEditor.scroll(event)
                 
                 scrollTask = nil
             }
         }
         if nsEvent.phase.contains(.began) {
             allScrollPosition = .init()
-            document.scroll(scrollEventWith(nsEvent, beginEvent(),
-                                            touchPhase: .began,
-                                            momentumPhase: nil))
+            rootEditor.scroll(scrollEventWith(nsEvent, beginEvent(), touchPhase: .began, momentumPhase: nil))
         } else if nsEvent.phase.contains(.ended) {
-            document.scroll(scrollEventWith(nsEvent, .changed,
-                                            touchPhase: .ended,
-                                            momentumPhase: nil))
+            rootEditor.scroll(scrollEventWith(nsEvent, .changed, touchPhase: .ended, momentumPhase: nil))
             endEvent()
         } else if nsEvent.phase.contains(.changed) {
             var event = scrollEventWith(nsEvent, .changed,
@@ -1699,7 +1703,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             }
             event.scrollDeltaPoint = dp
             
-            document.scroll(event)
+            rootEditor.scroll(event)
         } else {
             if nsEvent.momentumPhase.contains(.began) {
                 var event = scrollEventWith(nsEvent, beginEvent(),
@@ -1712,7 +1716,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 case .none: break
                 }
                 event.scrollDeltaPoint = dp
-                document.scroll(event)
+                rootEditor.scroll(event)
             } else if nsEvent.momentumPhase.contains(.ended) {
                 var event = scrollEventWith(nsEvent, .changed,
                                             touchPhase: nil,
@@ -1724,7 +1728,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 case .none: break
                 }
                 event.scrollDeltaPoint = dp
-                document.scroll(event)
+                rootEditor.scroll(event)
                 endEvent()
             } else if nsEvent.momentumPhase.contains(.changed) {
                 var event = scrollEventWith(nsEvent, .changed,
@@ -1737,7 +1741,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 case .none: break
                 }
                 event.scrollDeltaPoint = dp
-                document.scroll(event)
+                rootEditor.scroll(event)
             }
         }
     }
@@ -1853,7 +1857,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     scrollTimer = nil
                     pinchTimer?.cancel()
                     pinchTimer = nil
-                    document.pinch(.init(screenPoint: screenPoint(with: event).my,
+                    rootEditor.pinch(.init(screenPoint: screenPoint(with: event).my,
                                          time: event.timestamp,
                                          magnification: 0,
                                          phase: .began))
@@ -1862,7 +1866,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     lastMagnification = 0
                 } else if isBeganPinch {
                     let magnification = (nPinchDistance - oldPinchDistance) * 0.0125
-                    document.pinch(.init(screenPoint: screenPoint(with: event).my,
+                    rootEditor.pinch(.init(screenPoint: screenPoint(with: event).my,
                                          time: event.timestamp,
                                          magnification: magnification.mid(lastMagnification),
                                          phase: .changed))
@@ -1880,7 +1884,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     scrollTimer = nil
                     pinchTimer?.cancel()
                     pinchTimer = nil
-                    document.scroll(.init(screenPoint: screenPoint(with: event).my,
+                    rootEditor.scroll(.init(screenPoint: screenPoint(with: event).my,
                                           time: event.timestamp,
                                           scrollDeltaPoint: .init(),
                                           phase: .began,
@@ -1920,7 +1924,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     let scrollDeltaPosition = Point()
                         .movedWith(distance: length, angle: angle)
                     
-                    document.scroll(.init(screenPoint: screenPoint(with: event).my,
+                    rootEditor.scroll(.init(screenPoint: screenPoint(with: event).my,
                                           time: event.timestamp,
                                           scrollDeltaPoint: scrollDeltaPosition.mid(lastScrollDeltaPosition),
                                           phase: .changed,
@@ -1942,7 +1946,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     scrollTimer = nil
                     pinchTimer?.cancel()
                     pinchTimer = nil
-                    document.rotate(.init(screenPoint: screenPoint(with: event).my,
+                    rootEditor.rotate(.init(screenPoint: screenPoint(with: event).my,
                                          time: event.timestamp,
                                          rotationQuantity: 0,
                                          phase: .began))
@@ -1950,7 +1954,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     lastRotationQuantity = 0
                 } else if isBeganRotate {
                     let rotationQuantity = nRotateAngle.differenceRotation(oldRotateAngle) * 80
-                    document.rotate(.init(screenPoint: screenPoint(with: event).my,
+                    rootEditor.rotate(.init(screenPoint: screenPoint(with: event).my,
                                           time: event.timestamp,
                                           rotationQuantity: rotationQuantity.mid(lastRotationQuantity),
                                           phase: .changed))
@@ -1973,13 +1977,13 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 if !isBeganSwipe && abs(deltaP.x) > abs(deltaP.y) {
                     isBeganSwipe = true
                     
-                    document.swipe(.init(screenPoint: screenPoint(with: event).my,
+                    rootEditor.swipe(.init(screenPoint: screenPoint(with: event).my,
                                          time: event.timestamp,
                                          scrollDeltaPoint: Point(),
                                          phase: .began))
                     self.swipePosition = swipePosition + deltaP
                 } else if isBeganSwipe {
-                    document.swipe(.init(screenPoint: screenPoint(with: event).my,
+                    rootEditor.swipe(.init(screenPoint: screenPoint(with: event).my,
                                          time: event.timestamp,
                                          scrollDeltaPoint: deltaP,
                                          phase: .changed))
@@ -1996,7 +2000,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             }
         } else {
             if swipePosition != nil, isBeganSwipe {
-                document.swipe(.init(screenPoint: screenPoint(with: event).my,
+                rootEditor.swipe(.init(screenPoint: screenPoint(with: event).my,
                                      time: event.timestamp,
                                      scrollDeltaPoint: Point(),
                                      phase: .ended))
@@ -2016,7 +2020,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             if isEnabledPlay && isPreparePlay {
                 var event = inputKeyEventWith(event, .click, .began)
                 event.inputKeyType = .control
-                let player = Player(document)
+                let player = Player(rootEditor)
                 player.send(event)
                 Sleep.start()
                 event.phase = .ended
@@ -2025,7 +2029,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         }
         
         if swipePosition != nil {
-            document.swipe(.init(screenPoint: screenPoint(with: event).my,
+            rootEditor.swipe(.init(screenPoint: screenPoint(with: event).my,
                                  time: event.timestamp,
                                  scrollDeltaPoint: Point(),
                                  phase: .ended))
@@ -2062,7 +2066,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         let minTV = 0.01
         let sv = tv / (tv - minTV)
         if tv.isNaN || v < 0.04 || a == 0 {
-            document.pinch(.init(screenPoint: screenPoint(with: event).my,
+            rootEditor.pinch(.init(screenPoint: screenPoint(with: event).my,
                                  time: event.timestamp,
                                  magnification: 0,
                                  phase: .ended))
@@ -2079,13 +2083,13 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                         self.pinchTimer = nil
                         self.pinchTimeValue = 0
                         
-                        self.document.pinch(.init(screenPoint: screenPoint,
+                        self.rootEditor.pinch(.init(screenPoint: screenPoint,
                                               time: time,
                                               magnification: 0,
                                               phase: .ended))
                     } else {
                         let m = timeInterval * (ntv - minTV) * sv * sign
-                        self.document.pinch(.init(screenPoint: screenPoint,
+                        self.rootEditor.pinch(.init(screenPoint: screenPoint,
                                               time: time,
                                               magnification: m,
                                               phase: .changed))
@@ -2100,7 +2104,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         isBeganRotate = false
         guard rotateVs.count >= 2 else { return }
         
-        document.rotate(.init(screenPoint: screenPoint(with: event).my,
+        rootEditor.rotate(.init(screenPoint: screenPoint(with: event).my,
                              time: event.timestamp,
                              rotationQuantity: 0,
                              phase: .ended))
@@ -2128,14 +2132,14 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         let minTV = 100.0
         let sv = tv / (tv - minTV)
         if tv.isNaN || v < 5 || a == 0 {
-            document.scroll(.init(screenPoint: screenPoint(with: event).my,
+            rootEditor.scroll(.init(screenPoint: screenPoint(with: event).my,
                                   time: event.timestamp,
                                   scrollDeltaPoint: .init(),
                                   phase: .ended,
                                   touchPhase: .ended,
                                   momentumPhase: nil))
         } else {
-            document.scroll(.init(screenPoint: screenPoint(with: event).my,
+            rootEditor.scroll(.init(screenPoint: screenPoint(with: event).my,
                                   time: event.timestamp,
                                   scrollDeltaPoint: .init(),
                                   phase: .changed,
@@ -2156,13 +2160,13 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                         self.scrollTimer = nil
                         self.scrollTimeValue = 0
                         
-                        self.document.scroll(.init(screenPoint: screenPoint,
+                        self.rootEditor.scroll(.init(screenPoint: screenPoint,
                                               time: time,
                                               scrollDeltaPoint: .init(),
                                               phase: .ended,
                                               touchPhase: nil, momentumPhase: .ended))
                     } else {
-                        self.document.scroll(.init(screenPoint: screenPoint,
+                        self.rootEditor.scroll(.init(screenPoint: screenPoint,
                                               time: time,
                                               scrollDeltaPoint: sdp,
                                               phase: .changed,
@@ -2179,7 +2183,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         
         guard isBeganScroll else { return }
         isBeganScroll = false
-        document.scroll(.init(screenPoint: screenPoint(with: event).my,
+        rootEditor.scroll(.init(screenPoint: screenPoint(with: event).my,
                               time: event.timestamp,
                               scrollDeltaPoint: .init(),
                               phase: .ended,
@@ -2193,7 +2197,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         
         guard isBeganPinch else { return }
         isBeganPinch = false
-        document.pinch(.init(screenPoint: screenPoint(with: event).my,
+        rootEditor.pinch(.init(screenPoint: screenPoint(with: event).my,
                              time: event.timestamp,
                              magnification: 0,
                              phase: .ended))
@@ -2202,7 +2206,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     func cancelRotatte(with event: NSEvent) {
         guard isBeganRotate else { return }
         isBeganRotate = false
-        document.rotate(.init(screenPoint: screenPoint(with: event).my,
+        rootEditor.rotate(.init(screenPoint: screenPoint(with: event).my,
                              time: event.timestamp,
                               rotationQuantity: 0,
                              phase: .ended))
@@ -2210,7 +2214,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     override func touchesCancelled(with event: NSEvent) {
         if swipePosition != nil {
-            document.swipe(.init(screenPoint: screenPoint(with: event).my,
+            rootEditor.swipe(.init(screenPoint: screenPoint(with: event).my,
                                  time: event.timestamp,
                                  scrollDeltaPoint: .init(),
                                  phase: .ended))
@@ -2235,14 +2239,14 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         if nsEvent.phase.contains(.began) {
             blockGesture = .pinch
             pinchVs = []
-            document.pinch(pinchEventWith(nsEvent, .began))
+            rootEditor.pinch(pinchEventWith(nsEvent, .began))
         } else if nsEvent.phase.contains(.ended) {
             blockGesture = .none
-            document.pinch(pinchEventWith(nsEvent, .ended))
+            rootEditor.pinch(pinchEventWith(nsEvent, .ended))
             pinchVs = []
         } else if nsEvent.phase.contains(.changed) {
             pinchVs.append((Double(nsEvent.magnification), nsEvent.timestamp))
-            document.pinch(pinchEventWith(nsEvent, .changed))
+            rootEditor.pinch(pinchEventWith(nsEvent, .changed))
         }
     }
     
@@ -2264,7 +2268,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             if !isBlockedRotation {
                 if !isFirstStoppedRotation {
                     isFirstStoppedRotation = true
-                    document.rotate(rotateEventWith(nsEvent, .ended))
+                    rootEditor.rotate(rotateEventWith(nsEvent, .ended))
                 }
             } else {
                 isBlockedRotation = false
@@ -2275,9 +2279,9 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 if rotatedValue > blockRotationValue {
                     if isFirstStoppedRotation {
                         isFirstStoppedRotation = false
-                        document.rotate(rotateEventWith(nsEvent, .began))
+                        rootEditor.rotate(rotateEventWith(nsEvent, .began))
                     } else {
-                        document.rotate(rotateEventWith(nsEvent, .changed))
+                        rootEditor.rotate(rotateEventWith(nsEvent, .changed))
                     }
                 }
             }
@@ -2287,9 +2291,9 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     override func quickLook(with nsEvent: NSEvent) {
         guard window?.sheets.isEmpty ?? false else { return }
         
-        document.inputKey(inputKeyEventWith(nsEvent, .lookUpTap, .began))
+        rootEditor.inputKey(inputKeyEventWith(nsEvent, .lookUpTap, .began))
         Sleep.start()
-        document.inputKey(inputKeyEventWith(nsEvent, .lookUpTap, .ended))
+        rootEditor.inputKey(inputKeyEventWith(nsEvent, .lookUpTap, .ended))
     }
     
     func windowLevel() -> Int {
@@ -2299,10 +2303,10 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         [.markedClauseSegment, .glyphInfo]
     }
     func hasMarkedText() -> Bool {
-        document.textEditor.editingTextView?.isMarked ?? false
+        rootEditor.document.editingTextView?.isMarked ?? false
     }
     func markedRange() -> NSRange {
-        if let textView = document.textEditor.editingTextView,
+        if let textView = rootEditor.document.editingTextView,
            let range = textView.markedRange {
             return textView.model.string.nsRange(from: range)
                 ?? NSRange(location: NSNotFound, length: 0)
@@ -2311,7 +2315,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         }
     }
     func selectedRange() -> NSRange {
-        if let textView = document.textEditor.editingTextView,
+        if let textView = rootEditor.document.editingTextView,
            let range = textView.selectedRange {
             return textView.model.string.nsRange(from: range)
                 ?? NSRange(location: NSNotFound, length: 0)
@@ -2320,7 +2324,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         }
     }
     func attributedString() -> NSAttributedString {
-        if let text = document.textEditor.editingTextView?.model {
+        if let text = rootEditor.document.editingTextView?.model {
             return NSAttributedString(string: text.string.nsBased,
                                       attributes: text.typobute.attributes())
         } else {
@@ -2339,13 +2343,13 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     func fractionOfDistanceThroughGlyph(for point: NSPoint) -> CGFloat {
         let p = convertFromTopScreen(point).my
-        let d = document.textEditor.characterRatio(for: p)
+        let d = rootEditor.textEditor.characterRatio(for: p)
         return CGFloat(d ?? 0)
     }
     func characterIndex(for nsP: NSPoint) -> Int {
         let p = convertFromTopScreen(nsP).my
-        if let i = document.textEditor.characterIndex(for: p),
-           let string = document.textEditor.editingTextView?.model.string {
+        if let i = rootEditor.textEditor.characterIndex(for: p),
+           let string = rootEditor.document.editingTextView?.model.string {
             
             return string.nsIndex(from: i)
         } else {
@@ -2354,18 +2358,18 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     func firstRect(forCharacterRange nsRange: NSRange,
                    actualRange: NSRangePointer?) -> NSRect {
-        if let string = document.textEditor.editingTextView?.model.string,
+        if let string = rootEditor.document.editingTextView?.model.string,
            let range = string.range(fromNS: nsRange),
-           let rect = document.textEditor.firstRect(for: range) {
+           let rect = rootEditor.textEditor.firstRect(for: range) {
             return convertToTopScreen(rect.cg)
         } else {
             return NSRect()
         }
     }
     func baselineDeltaForCharacter(at nsI: Int) -> CGFloat {
-        if let string = document.textEditor.editingTextView?.model.string,
+        if let string = rootEditor.document.editingTextView?.model.string,
            let i = string.index(fromNS: nsI),
-           let d = document.textEditor.baselineDelta(at: i) {
+           let d = rootEditor.textEditor.baselineDelta(at: i) {
             
             return CGFloat(d)
         } else {
@@ -2373,7 +2377,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         }
     }
     func drawsVerticallyForCharacter(at nsI: Int) -> Bool {
-        if let o = document.textEditor.editingTextView?.textOrientation {
+        if let o = rootEditor.document.editingTextView?.textOrientation {
             return o == .vertical
         } else {
             return false
@@ -2381,21 +2385,18 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     
     func unmarkText() {
-        document.textEditor.unmark()
+        rootEditor.textEditor.unmark()
     }
     
     func setMarkedText(_ str: Any,
                        selectedRange selectedNSRange: NSRange,
                        replacementRange replacementNSRange: NSRange) {
-        guard let string = document.textEditor
-                .editingTextView?.model.string else { return }
+        guard let string = rootEditor.document.editingTextView?.model.string else { return }
         let range = string.range(fromNS: replacementNSRange)
         
         func mark(_ mStr: String) {
             if let markingRange = mStr.range(fromNS: selectedNSRange) {
-                document.textEditor.mark(mStr,
-                                         markingRange: markingRange,
-                                         at: range)
+                rootEditor.textEditor.mark(mStr, markingRange: markingRange, at: range)
             }
         }
         if let attString = str as? NSAttributedString {
@@ -2405,16 +2406,13 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         }
     }
     func insertText(_ str: Any, replacementRange: NSRange) {
-        guard let string = document.textEditor
-                .editingTextView?.model.string else { return }
+        guard let string = rootEditor.document.editingTextView?.model.string else { return }
         let range = string.range(fromNS: replacementRange)
         
         if let attString = str as? NSAttributedString {
-            document.textEditor.insert(attString.string.swiftBased,
-                                       at: range)
+            rootEditor.textEditor.insert(attString.string.swiftBased, at: range)
         } else if let nsString = str as? NSString {
-            document.textEditor.insert((nsString as String).swiftBased,
-                                       at: range)
+            rootEditor.textEditor.insert((nsString as String).swiftBased, at: range)
         }
     }
     
@@ -2423,28 +2421,28 @@ final class SubMTKView: MTKView, MTKViewDelegate,
 //    // option return
 //    override func insertNewlineIgnoringFieldEditor(_ sender: Any?) {}
     override func insertNewline(_ sender: Any?) {
-        document.textEditor.insertNewline()
+        rootEditor.textEditor.insertNewline()
     }
     override func insertTab(_ sender: Any?) {
-        document.textEditor.insertTab()
+        rootEditor.textEditor.insertTab()
     }
     override func deleteBackward(_ sender: Any?) {
-        document.textEditor.deleteBackward()
+        rootEditor.textEditor.deleteBackward()
     }
     override func deleteForward(_ sender: Any?) {
-        document.textEditor.deleteForward()
+        rootEditor.textEditor.deleteForward()
     }
     override func moveLeft(_ sender: Any?) {
-        document.textEditor.moveLeft()
+        rootEditor.textEditor.moveLeft()
     }
     override func moveRight(_ sender: Any?) {
-        document.textEditor.moveRight()
+        rootEditor.textEditor.moveRight()
     }
     override func moveUp(_ sender: Any?) {
-        document.textEditor.moveUp()
+        rootEditor.textEditor.moveUp()
     }
     override func moveDown(_ sender: Any?) {
-        document.textEditor.moveDown()
+        rootEditor.textEditor.moveDown()
     }
 }
 extension SubMTKView {
@@ -2499,7 +2497,7 @@ extension SubMTKView {
         debugNode.draw(with: t, scale: 1, in: context)
     }
 }
-typealias NodeOwner = SubMTKView
+extension SubMTKView: @preconcurrency NodeOwner {}
 
 final class Context {
     fileprivate var encoder: any MTLRenderCommandEncoder
@@ -2585,14 +2583,14 @@ final class Context {
 }
 
 extension Node {
-    func moveCursor(to sp: Point) {
-        if let subMTKView = owner, let h = NSScreen.main?.frame.height {
+    @MainActor func moveCursor(to sp: Point) {
+        if let subMTKView = owner as? SubMTKView, let h = NSScreen.main?.frame.height {
             let np = subMTKView.convertToTopScreen(sp.cg)
             CGDisplayMoveCursorToPoint(0, CGPoint(x: np.x, y: h - np.y))
         }
     }
-    func show(definition: String, font: Font, orientation: Orientation, at p: Point) {
-        if let owner = owner {
+    @MainActor func show(definition: String, font: Font, orientation: Orientation, at p: Point) {
+        if let owner = owner as? SubMTKView {
             let attributes = Typobute(font: font,
                                       orientation: orientation).attributes()
             let attString = NSAttributedString(string: definition,
@@ -2602,14 +2600,14 @@ extension Node {
         }
     }
     
-    func show(_ error: any Error) {
-        guard let window = owner?.window else { return }
+    @MainActor func show(_ error: any Error) {
+        guard let window = (owner as? SubMTKView)?.window else { return }
         NSAlert(error: error).beginSheetModal(for: window,
                                               completionHandler: { _ in })
     }
     
-    func show(message: String = "", infomation: String = "", isCaution: Bool = false) {
-        guard let window = owner?.window else { return }
+    @MainActor func show(message: String = "", infomation: String = "", isCaution: Bool = false) {
+        guard let window = (owner as? SubMTKView)?.window else { return }
         let alert = NSAlert()
         alert.messageText = message
         alert.informativeText = infomation
@@ -2626,7 +2624,7 @@ extension Node {
     @MainActor func show(message: String, infomation: String, okTitle: String,
                          isSaftyCheck: Bool = false,
                          isDefaultButton: Bool = false) async -> AlertResult {
-        guard let window = owner?.window else { return .cancel }
+        guard let window = (owner as? SubMTKView)?.window else { return .cancel }
         let alert = NSAlert()
         let okButton = alert.addButton(withTitle: okTitle)
         alert.addButton(withTitle: "Cancel".localized)
@@ -2653,7 +2651,7 @@ extension Node {
     }
     
     @MainActor func show(message: String, infomation: String, titles: [String]) async -> Int? {
-        guard let window = owner?.window else { return nil }
+        guard let window = (owner as? SubMTKView)?.window else { return nil }
         let alert = NSAlert()
         for title in titles {
             alert.addButton(withTitle: title)
@@ -2664,7 +2662,7 @@ extension Node {
     }
     
     @MainActor func show(message: String, infomation: String) async {
-        guard let window = owner?.window else { return }
+        guard let window = (owner as? SubMTKView)?.window else { return }
         let alert = NSAlert()
         alert.addButton(withTitle: "Done".localized)
         alert.messageText = message
@@ -2673,8 +2671,8 @@ extension Node {
         _ = await alert.beginSheetModal(for: window)
     }
     
-    func show(_ progressPanel: ProgressPanel) {
-        guard let window = owner?.window else { return }
+    @MainActor func show(_ progressPanel: ProgressPanel) {
+        guard let window = (owner as? SubMTKView)?.window else { return }
         progressPanel.topWindow = window
         progressPanel.begin()
         window.beginSheet(progressPanel.window) { _ in }
@@ -2688,32 +2686,6 @@ extension Node {
         return renderedTexture(in: bounds, to: size,
                                backgroundColor: backgroundColor,
                                sampleCount: sampleCount, mipmapped: mipmapped)
-    }
-    func renderedAntialiasFillImage(in bounds: Rect, to size: Size,
-                                    backgroundColor: Color, _ colorSpace: ColorSpace) -> Image? {
-        guard children.contains(where: { $0.fillType != nil }) else {
-            return image(in: bounds, size: size, backgroundColor: backgroundColor, .sRGB)
-        }
-        
-        children.forEach {
-            if $0.lineType != nil {
-                $0.isHidden = true
-            }
-        }
-        guard let oImage = image(in: bounds, size: size * 2, backgroundColor: backgroundColor,
-                                 colorSpace, isAntialias: false)?
-            .resize(with: size) else { return nil }
-        children.forEach {
-            if $0.lineType != nil {
-                $0.isHidden = false
-            }
-            if $0.fillType != nil {
-                $0.isHidden = true
-            }
-        }
-        fillType = nil
-        guard let nImage = image(in: bounds, size: size, backgroundColor: nil, colorSpace) else { return nil }
-        return oImage.drawn(nImage, in: Rect(size: size))
     }
     func renderedTexture(in bounds: Rect, to size: Size,
                          backgroundColor: Color,
@@ -2922,6 +2894,32 @@ extension Node {
         ctx.restoreGState()
     }
     
+    func renderedAntialiasFillImage(in bounds: Rect, to size: Size,
+                                    backgroundColor: Color, _ colorSpace: ColorSpace) -> Image? {
+        guard children.contains(where: { $0.fillType != nil }) else {
+            return image(in: bounds, size: size, backgroundColor: backgroundColor, .sRGB)
+        }
+        
+        children.forEach {
+            if $0.lineType != nil {
+                $0.isHidden = true
+            }
+        }
+        guard let oImage = image(in: bounds, size: size * 2, backgroundColor: backgroundColor,
+                                 colorSpace, isAntialias: false)?
+            .resize(with: size) else { return nil }
+        children.forEach {
+            if $0.lineType != nil {
+                $0.isHidden = false
+            }
+            if $0.fillType != nil {
+                $0.isHidden = true
+            }
+        }
+        fillType = nil
+        guard let nImage = image(in: bounds, size: size, backgroundColor: nil, colorSpace) else { return nil }
+        return oImage.drawn(nImage, in: Rect(size: size))
+    }
     func imageInBounds(size: Size? = nil,
                        backgroundColor: Color? = nil,
                        _ colorSpace: ColorSpace,
@@ -3506,5 +3504,427 @@ extension CGContext {
             }
         }
         return nil
+    }
+}
+
+struct CPUNode {
+    var children = [Self]()
+    var isHidden = false
+    var attitude = Attitude() {
+        didSet {
+            localTransform = attitude.transform
+            isIdentityFromLocal = localTransform.isIdentity
+        }
+    }
+    private(set) var localTransform = Transform.identity
+    private(set) var isIdentityFromLocal = true
+    
+    var path = Path()
+    var lineWidth = 0.0
+    var lineType: Node.LineType?
+    var fillType: Node.FillType?
+    var isCPUFillAntialias = true
+    
+    init(children: [Self] = [Self](), isHidden: Bool = false, attitude: Attitude = Attitude(),
+         path: Path = Path(),
+         lineWidth: Double = 0.0, lineType: Node.LineType? = nil, fillType: Node.FillType? = nil,
+         isCPUFillAntialias: Bool = true) {
+        
+        self.children = children
+        self.isHidden = isHidden
+        self.attitude = attitude
+        let localTransform = attitude.transform
+        self.localTransform = localTransform
+        self.isIdentityFromLocal = localTransform.isIdentity
+        self.path = path
+        self.lineWidth = lineWidth
+        self.lineType = lineType
+        self.fillType = fillType
+        self.isCPUFillAntialias = isCPUFillAntialias
+    }
+    init(children: [Self] = [Self](), isHidden: Bool = false, attitude: Attitude = Attitude(),
+         localTransform: Transform = .identity, isIdentityFromLocal: Bool = true,
+         path: Path = Path(),
+         lineWidth: Double = 0.0, lineType: Node.LineType? = nil, fillType: Node.FillType? = nil,
+         isCPUFillAntialias: Bool = true) {
+        
+        self.children = children
+        self.isHidden = isHidden
+        self.attitude = attitude
+        self.localTransform = localTransform
+        self.isIdentityFromLocal = isIdentityFromLocal
+        self.path = path
+        self.lineWidth = lineWidth
+        self.lineType = lineType
+        self.fillType = fillType
+        self.isCPUFillAntialias = isCPUFillAntialias
+    }
+}
+extension Node {
+    var cpu: CPUNode {
+        .init(children: children.map { $0.cpu }, isHidden: isHidden, attitude: attitude,
+              localTransform: localTransform, isIdentityFromLocal: isIdentityFromLocal,
+              path: path, lineWidth: lineWidth, lineType: lineType, fillType: fillType,
+              isCPUFillAntialias: isCPUFillAntialias)
+    }
+}
+extension CPUNode {
+    var bounds: Rect? {
+        path.bounds
+    }
+}
+extension CPUNode {
+    func render(with size: Size, in pdf: PDF) {
+        guard let bounds = bounds else { return }
+        render(in: bounds, to: size, in: pdf)
+    }
+    func render(with size: Size, backgroundColor: Color, in pdf: PDF) {
+        guard let bounds = bounds else { return }
+        render(in: bounds, to: size,
+               backgroundColor: backgroundColor, in: pdf)
+    }
+    func render(in bounds: Rect, to size: Size, in pdf: PDF) {
+        let transform = Transform(translation: -bounds.origin)
+            * Transform(scaleX: size.width / bounds.width,
+                        y: size.height / bounds.height)
+        render(to: size, transform: transform, in: pdf)
+    }
+    func render(in bounds: Rect, to size: Size,
+                backgroundColor: Color, in pdf: PDF) {
+        let transform = Transform(translation: -bounds.origin)
+            * Transform(scaleX: size.width / bounds.width,
+                        y: size.height / bounds.height)
+        render(to: size, transform: transform,
+               backgroundColor: backgroundColor, in: pdf)
+    }
+    func render(to size: Size, transform: Transform, in pdf: PDF) {
+        let ctx = pdf.ctx
+        let nt = localTransform.inverted() * transform
+        ctx.saveGState()
+        ctx.beginPDFPage(nil)
+        
+        if case .color(let backgroundColor) = fillType {
+            ctx.setFillColor(backgroundColor.cg)
+            ctx.fill(Rect(origin: Point(), size: size).cg)
+        }
+        ctx.concatenate(nt.cg)
+        render(in: ctx)
+        
+        ctx.endPDFPage()
+        ctx.restoreGState()
+    }
+    func render(to size: Size, transform: Transform,
+                backgroundColor: Color, in pdf: PDF) {
+        let ctx = pdf.ctx
+        let nt = localTransform.inverted() * transform
+        ctx.saveGState()
+        ctx.beginPDFPage(nil)
+        
+        ctx.setFillColor(backgroundColor.cg)
+        ctx.fill(Rect(origin: Point(), size: size).cg)
+        ctx.concatenate(nt.cg)
+        render(in: ctx)
+        
+        ctx.endPDFPage()
+        ctx.restoreGState()
+    }
+    func render(in bounds: Rect, to toBounds: Rect, in pdf: PDF) {
+        let transform = Transform(translation: -bounds.origin)
+            * Transform(scaleX: toBounds.width / bounds.width,
+                        y: toBounds.height / bounds.height)
+            * Transform(translation: toBounds.origin)
+        let ctx = pdf.ctx
+        let nt = localTransform.inverted() * transform
+        ctx.saveGState()
+        if case .color(let backgroundColor) = fillType {
+            ctx.setFillColor(backgroundColor.cg)
+            ctx.fill(toBounds.cg)
+        }
+        ctx.concatenate(nt.cg)
+        render(in: ctx)
+        ctx.restoreGState()
+    }
+    func render(in bounds: Rect, to toBounds: Rect,
+                backgroundColor: Color, in pdf: PDF) {
+        let transform = Transform(translation: -bounds.origin)
+            * Transform(scaleX: toBounds.width / bounds.width,
+                        y: toBounds.height / bounds.height)
+            * Transform(translation: toBounds.origin)
+        let ctx = pdf.ctx
+        let nt = localTransform.inverted() * transform
+        ctx.saveGState()
+        ctx.setFillColor(backgroundColor.cg)
+        ctx.fill(toBounds.cg)
+        ctx.concatenate(nt.cg)
+        render(in: ctx)
+        ctx.restoreGState()
+    }
+    
+    func renderedAntialiasFillImage(in bounds: Rect, to size: Size,
+                                    backgroundColor: Color, _ colorSpace: ColorSpace) -> Image? {
+        guard children.contains(where: { $0.fillType != nil }) else {
+            return image(in: bounds, size: size, backgroundColor: backgroundColor, .sRGB)
+        }
+        guard let oImage = image(in: bounds, size: size * 2, backgroundColor: backgroundColor,
+                                 colorSpace, isAntialias: false, isDrawLine: false, isDrawFill: true)?
+            .resize(with: size) else { return nil }
+        guard let nImage = image(in: bounds, size: size, backgroundColor: nil, colorSpace,
+                                 isDrawLine: true, isDrawFill: false) else { return nil }
+        return oImage.drawn(nImage, in: Rect(size: size))
+    }
+    func imageInBounds(size: Size? = nil,
+                       backgroundColor: Color? = nil,
+                       _ colorSpace: ColorSpace,
+                       isAntialias: Bool = true,
+                       isGray: Bool = false) -> Image? {
+        guard let bounds = bounds else { return nil }
+        return image(in: bounds, size: size ?? bounds.size,
+                     backgroundColor: backgroundColor, colorSpace,
+                     isAntialias: isAntialias, isGray: isGray)
+    }
+    func image(in bounds: Rect,
+               size: Size,
+               backgroundColor: Color? = nil, _ colorSpace: ColorSpace,
+               isAntialias: Bool = true,
+               isGray: Bool = false, isDrawLine: Bool = true, isDrawFill: Bool = true) -> Image? {
+        let transform = Transform(translation: -bounds.origin)
+            * Transform(scaleX: size.width / bounds.width,
+                        y: size.height / bounds.height)
+        return image(size: size, transform: transform,
+                     backgroundColor: backgroundColor, colorSpace,
+                     isAntialias: isAntialias, isGray: isGray, isDrawLine: isDrawLine, isDrawFill: isDrawFill)
+    }
+    func image(size: Size, transform: Transform,
+               backgroundColor: Color? = nil, _ colorSpace: ColorSpace,
+               isAntialias: Bool = true,
+               isGray: Bool = false, isDrawLine: Bool = true, isDrawFill: Bool = true) -> Image? {
+        let ctx = context(size: size, transform: transform, backgroundColor: backgroundColor,
+                          colorSpace, isAntialias: isAntialias, isGray: isGray,
+                          isDrawLine: isDrawLine, isDrawFill: isDrawFill)
+        guard let cgImage = ctx?.makeImage() else { return nil }
+        return Image(cgImage: cgImage)
+    }
+    func bitmap<Value: FixedWidthInteger & UnsignedInteger>(size: Size,
+                                                            backgroundColor: Color? = nil,
+                                                            _ colorSpace: ColorSpace,
+                                                            isAntialias: Bool = true,
+                                                            isGray: Bool = false) -> Bitmap<Value>? {
+        guard let bounds = bounds else { return nil }
+        let transform = Transform(translation: -bounds.origin)
+            * Transform(scaleX: size.width / bounds.width,
+                        y: size.height / bounds.height)
+        guard let ctx = context(size: size, transform: transform,
+                                backgroundColor: backgroundColor, colorSpace,
+                                isAntialias: isAntialias, isGray: isGray) else { return nil }
+        return .init(ctx)
+    }
+    private func context(size: Size, transform: Transform,
+                         backgroundColor: Color? = nil, _ colorSpace: ColorSpace,
+                         isAntialias: Bool = true,
+                         isGray: Bool = false, isDrawLine: Bool = true, isDrawFill: Bool = true) -> CGContext? {
+        guard let space = isGray ? CGColorSpaceCreateDeviceGray() : colorSpace.cg else { return nil }
+        let ctx: CGContext
+        if colorSpace.isHDR {
+            let bitmapInfo = CGBitmapInfo(rawValue: (CGBitmapInfo.floatComponents.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue))
+            guard let actx = CGContext(data: nil,
+                                      width: Int(size.width), height: Int(size.height),
+                                      bitsPerComponent: 32, bytesPerRow: 0, space: space,
+                                      bitmapInfo: bitmapInfo.rawValue) else { return nil }
+            ctx = actx
+        } else {
+            let bitmapInfo = CGBitmapInfo(rawValue: isGray ? CGImageAlphaInfo.none.rawValue : (backgroundColor?.opacity == 1 ?
+                                            CGImageAlphaInfo.noneSkipLast.rawValue : CGImageAlphaInfo.premultipliedLast.rawValue))
+            guard let actx = CGContext(data: nil,
+                                      width: Int(size.width), height: Int(size.height),
+                                      bitsPerComponent: 8, bytesPerRow: 0, space: space,
+                                      bitmapInfo: bitmapInfo.rawValue) else { return nil }
+            ctx = actx
+        }
+        
+        let nt = localTransform.inverted() * transform
+        ctx.saveGState()
+        if let backgroundColor = backgroundColor {
+            ctx.setFillColor(backgroundColor.cg)
+            ctx.fill(Rect(origin: Point(), size: size).cg)
+        } else if isDrawFill, case .color(let backgroundColor)? = fillType {
+            ctx.setFillColor(backgroundColor.cg)
+            ctx.fill(Rect(origin: Point(), size: size).cg)
+        }
+        ctx.setShouldAntialias(isAntialias)
+        ctx.concatenate(nt.cg)
+        render(in: ctx, isDrawLine: isDrawLine, isDrawFill: isDrawFill)
+        ctx.restoreGState()
+        return ctx
+    }
+    func renderInBounds(size: Size? = nil, in ctx: CGContext) {
+        guard let bounds = bounds else { return }
+        render(in: bounds, size: size ?? bounds.size, in: ctx)
+    }
+    func render(in bounds: Rect, size: Size, in ctx: CGContext) {
+        let transform = Transform(translation: -bounds.origin)
+            * Transform(scaleX: size.width / bounds.width,
+                        y: size.height / bounds.height)
+        render(transform: transform, in: ctx)
+    }
+    func render(transform: Transform, in ctx: CGContext, isDrawLine: Bool = true, isDrawFill: Bool = true) {
+        let nt = localTransform.inverted() * transform
+        ctx.saveGState()
+        ctx.concatenate(nt.cg)
+        render(in: ctx, isDrawLine: isDrawLine, isDrawFill: isDrawFill)
+        ctx.restoreGState()
+    }
+    func render(in ctx: CGContext, isDrawLine: Bool = true, isDrawFill: Bool = true) {
+        guard !isHidden else { return }
+        if !isIdentityFromLocal {
+            ctx.saveGState()
+            ctx.concatenate(localTransform.cg)
+        }
+        if let typesetter = path.typesetter, let b = bounds {
+            if isDrawLine {
+                switch lineType {
+                case .color(let color):
+                    ctx.saveGState()
+                    ctx.setStrokeColor(color.cg)
+                    ctx.setLineWidth(lineWidth)
+                    ctx.setLineJoin(.round)
+                    typesetter.append(in: ctx)
+                    ctx.strokePath()
+                    ctx.restoreGState()
+                case .gradient, .none: break
+                }
+            }
+            if isDrawFill {
+                switch fillType {
+                case .color(let color):
+                    typesetter.draw(in: b, fillColor: color, in: ctx)
+                default:
+                    typesetter.draw(in: b, fillColor: .content, in: ctx)
+                }
+            }
+        } else if !path.isEmpty {
+            if isDrawFill, let fillType {
+                switch fillType {
+                case .color(let color):
+                    let cgPath = CGMutablePath()
+                    for pathline in path.pathlines {
+                        let polygon = pathline.polygon()
+                        let points = polygon.points.map { $0.cg }
+                        if !points.isEmpty {
+                            cgPath.addLines(between: points)
+                            cgPath.closeSubpath()
+                        }
+                    }
+                    ctx.addPath(cgPath)
+                    let cgColor = color.cg
+                    if isCPUFillAntialias {
+                        ctx.setFillColor(cgColor)
+                        ctx.drawPath(using: .fill)
+                    } else {
+                        ctx.setShouldAntialias(false)
+                        ctx.setFillColor(cgColor)
+                        ctx.drawPath(using: .fill)
+                        ctx.setShouldAntialias(true)
+                    }
+                case .gradient(let colors):
+                    for ts in path.triangleStrips {
+                        let rgbas = colors.map { $0.rgba.premultipliedAlpha }
+                        let minCount = min(ts.points.count, rgbas.count)
+                        if minCount >= 3 {
+                            for i in 2 ..< minCount {
+                                if i % 2 == 0 {
+                                    ctx.drawTriangleInData(.init(ts.points[i - 2], ts.points[i],
+                                              ts.points[i - 1]),
+                                                           rgbas[i - 2], rgbas[i], rgbas[i - 1])
+                                } else {
+                                    ctx.drawTriangleInData(.init(ts.points[i - 2], ts.points[i - 1],
+                                                                 ts.points[i]),
+                                                           rgbas[i - 2], rgbas[i - 1], rgbas[i])
+                                }
+                            }
+                        }
+                    }
+                case .maxGradient(let colors):
+                    ctx.saveGState()
+                    ctx.setBlendMode(.darken)
+                    
+                    for ts in path.triangleStrips {
+                        let rgbas = colors.map { $0.rgba.premultipliedAlpha }
+                        let minCount = min(ts.points.count, rgbas.count)
+                        if minCount >= 3 {
+                            for i in 2 ..< minCount {
+                                if i % 2 == 0 {
+                                    ctx.drawTriangleInData(.init(ts.points[i - 2], ts.points[i],
+                                              ts.points[i - 1]),
+                                                           rgbas[i - 2], rgbas[i], rgbas[i - 1])
+                                } else {
+                                    ctx.drawTriangleInData(.init(ts.points[i - 2], ts.points[i - 1],
+                                                                 ts.points[i]),
+                                                           rgbas[i - 2], rgbas[i - 1], rgbas[i])
+                                }
+                            }
+                        }
+                    }
+                    
+                    ctx.restoreGState()
+                case .texture(let texture):
+                    if let cgImage = texture.cgImage, let b = bounds {
+                        ctx.draw(cgImage, in: b.cg)
+                    }
+                }
+            }
+            if isDrawLine, let lineType {
+                switch lineType {
+                case .color(let color):
+                    ctx.setFillColor(color.cg)
+                    let (pd, counts) = path.outlinePointsDataWith(lineWidth: lineWidth)
+                    var i = 0
+                    let cgPath = CGMutablePath()
+                    for count in counts {
+                        let points = (i ..< (i + count)).map {
+                            Point(Double(pd[$0 * 4]),
+                                  Double(pd[$0 * 4 + 1])).cg
+                        }
+                        if !points.isEmpty {
+                            cgPath.addLines(between: points)
+                            cgPath.closeSubpath()
+                        }
+                        i += count
+                    }
+                    ctx.addPath(cgPath)
+                    ctx.fillPath()
+                case .gradient(let colors):
+                    let (pd, counts) = path.linePointsDataWith(lineWidth: lineWidth)
+                    let rgbas = path.lineColorsDataWith(colors, lineWidth: lineWidth)
+                    var i = 0
+                    for count in counts {
+                        let points = (i ..< (i + count)).map {
+                            Point(Double(pd[$0 * 4]),
+                                  Double(pd[$0 * 4 + 1]))
+                        }
+                        let ts = TriangleStrip(points: points)
+                        let minCount = min(ts.points.count, rgbas.count)
+                        if minCount >= 3 {
+                            for i in 2 ..< minCount {
+                                if i % 2 == 0 {
+                                    ctx.drawTriangleInData(.init(ts.points[i - 2], ts.points[i],
+                                              ts.points[i - 1]),
+                                                           rgbas[i - 2], rgbas[i], rgbas[i - 1])
+                                } else {
+                                    ctx.drawTriangleInData(.init(ts.points[i - 2], ts.points[i - 1],
+                                                                 ts.points[i]),
+                                                           rgbas[i - 2], rgbas[i - 1], rgbas[i])
+                                }
+                            }
+                        }
+                        
+                        i += count
+                    }
+                }
+            }
+        }
+        children.forEach { $0.render(in: ctx, isDrawLine: isDrawLine, isDrawFill: isDrawFill) }
+        if !isIdentityFromLocal {
+            ctx.restoreGState()
+        }
     }
 }

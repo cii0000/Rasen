@@ -20,8 +20,8 @@ import struct Foundation.Date
 final class Undoer: InputKeyEditor {
     let editor: UndoEditor
     
-    init(_ document: Document) {
-        editor = UndoEditor(document)
+    init(_ root: RootEditor) {
+        editor = UndoEditor(root)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -34,8 +34,8 @@ final class Undoer: InputKeyEditor {
 final class Redoer: InputKeyEditor {
     let editor: UndoEditor
     
-    init(_ document: Document) {
-        editor = UndoEditor(document)
+    init(_ root: RootEditor) {
+        editor = UndoEditor(root)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -48,8 +48,8 @@ final class Redoer: InputKeyEditor {
 final class VersionSelector: DragEditor {
     let editor: UndoEditor
     
-    init(_ document: Document) {
-        editor = UndoEditor(document)
+    init(_ root: RootEditor) {
+        editor = UndoEditor(root)
     }
     
     func send(_ event: DragEvent) {
@@ -60,10 +60,11 @@ final class VersionSelector: DragEditor {
     }
 }
 final class UndoEditor: Editor {
-    let document: Document
+    let root: RootEditor, document: Document
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
     }
     
     enum UndoType {
@@ -587,11 +588,12 @@ extension Document {
     }
 }
 
-final class HistoryCleaner: InputKeyEditor, @unchecked Sendable {
-    let document: Document
+final class HistoryCleaner: InputKeyEditor {
+    let root: RootEditor, document: Document
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
     }
     
     let selectingLineNode = Node(lineWidth: 1.5)

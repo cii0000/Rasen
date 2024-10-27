@@ -995,7 +995,7 @@ final class Sequencer {
         self.pcmNoders = pcmNoders
         
         if let clipHandler {
-            mixerNode.installTap(onBus: 0, bufferSize: 512, format: nil) { buffer, time in
+            mixerNode.installTap(onBus: 0, bufferSize: 512, format: nil) { @Sendable buffer, time in
                 guard !buffer.isEmpty else { return }
                 var peak: Float = 0.0
                 for i in 0 ..< buffer.channelCount {

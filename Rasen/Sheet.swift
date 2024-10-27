@@ -1446,37 +1446,56 @@ extension Border {
 
 extension Line {
     var node: Node {
-        Node(path: Path(self),
-             lineWidth: size,
-             lineType: .color(uuColor.value))
+        .init(path: .init(self),
+              lineWidth: size,
+              lineType: .color(uuColor.value))
     }
     func node(from color: Color) -> Node {
-        Node(path: Path(self),
-             lineWidth: size,
-             lineType: .color(color))
+        .init(path: .init(self),
+              lineWidth: size,
+              lineType: .color(color))
+    }
+    var cpuNode: CPUNode {
+        .init(path: .init(self),
+              lineWidth: size,
+              lineType: .color(uuColor.value))
+    }
+    func cpuNode(from color: Color) -> CPUNode {
+        .init(path: .init(self),
+              lineWidth: size,
+              lineType: .color(color))
     }
 }
 extension Plane {
     var node: Node {
-        Node(path: path,
-             fillType: .color(uuColor.value))
+        .init(path: path, fillType: .color(uuColor.value))
     }
     func node(from color: Color) -> Node {
-        Node(path: path,
-             fillType: .color(color))
+        .init(path: path, fillType: .color(color))
+    }
+    var cpuNode: CPUNode {
+        .init(path: path, fillType: .color(uuColor.value))
+    }
+    func cpuNode(from color: Color) -> CPUNode {
+        .init(path: path, fillType: .color(color))
     }
 }
 extension Text {
     var node: Node {
-        Node(attitude: Attitude(position: origin),
-             path: typesetter.path(),
-             fillType: .color(.content))
+        .init(attitude: .init(position: origin),
+              path: typesetter.path(), fillType: .color(.content))
+    }
+    var cpuNode: CPUNode {
+        .init(attitude: .init(position: origin),
+              path: typesetter.path(), fillType: .color(.content))
     }
 }
 extension Border {
     func node(with bounds: Rect) -> Node {
-        Node(path: path(with: bounds),
-             lineWidth: 1, lineType: .color(.border))
+        .init(path: path(with: bounds), lineWidth: 1, lineType: .color(.border))
+    }
+    func cpuNode(with bounds: Rect) -> CPUNode {
+        .init(path: path(with: bounds), lineWidth: 1, lineType: .color(.border))
     }
 }
 
@@ -2394,19 +2413,22 @@ extension Sheet {
     }
     
     func node(isBorder: Bool, isBackground: Bool = true,
-              in bounds: Rect) -> Node {
+              attitude: Attitude = .init(),
+              in bounds: Rect) -> CPUNode {
         node(isBorder: isBorder, picture: picture, draftPicture: draftPicture,
              isBackground: isBackground,
+             attitude: attitude,
              in: bounds)
     }
     func node(isBorder: Bool, atRootBeat rootBeat: Rational,
               renderingCaptionFrame: Rect? = nil,
               isBackground: Bool = true,
-              in bounds: Rect) -> Node {
-        let captionNodes: [Node]
+              attitude: Attitude = .init(),
+              in bounds: Rect) -> CPUNode {
+        let captionNodes: [CPUNode]
         if let renderingCaptionFrame = renderingCaptionFrame,
            let caption = captions.first(where: { $0.beatRange.contains(rootBeat) }) {
-            captionNodes = caption.nodes(in: renderingCaptionFrame)
+            captionNodes = caption.cpuNodes(in: renderingCaptionFrame)
         } else {
             captionNodes = []
         }
@@ -2415,31 +2437,32 @@ extension Sheet {
         return node(isBorder: isBorder, captionNodes: captionNodes,
                     picture: k.picture, draftPicture: k.draftPicture,
                     isBackground: isBackground,
+                    attitude: attitude,
                     in: bounds)
     }
-    func node(isBorder: Bool, captionNodes: [Node] = [],
+    func node(isBorder: Bool, captionNodes: [CPUNode] = [],
               picture: Picture, draftPicture: Picture,
               isBackground: Bool,
-              in bounds: Rect) -> Node {
-        let lineNodes = picture.lines.map { $0.node }
-        let planeNodes = picture.planes.map { $0.node }
-        let textNodes = texts.map { $0.node }
-        let borderNodes = isBorder ? borders.map { $0.node(with: bounds) } : []
+              attitude: Attitude = .init(),
+              in bounds: Rect) -> CPUNode {
+        let lineNodes = picture.lines.map { $0.cpuNode }
+        let planeNodes = picture.planes.map { $0.cpuNode }
+        let textNodes = texts.map { $0.cpuNode }
+        let borderNodes = isBorder ? borders.map { $0.cpuNode(with: bounds) } : []
         
-        let draftLineNodes: [Node]
+        let draftLineNodes: [CPUNode]
         if !draftPicture.lines.isEmpty {
             let lineColor = draftLinesColor()
-            draftLineNodes = draftPicture.lines.map { $0.node(from: lineColor) }
+            draftLineNodes = draftPicture.lines.map { $0.cpuNode(from: lineColor) }
         } else {
             draftLineNodes = []
         }
         
-        let draftPlaneNodes: [Node]
+        let draftPlaneNodes: [CPUNode]
         if !draftPicture.planes.isEmpty {
             let fillColor = backgroundUUColor.value
             draftPlaneNodes = draftPicture.planes.map {
-                $0.node(from: Sheet.draftPlaneColor(from: $0.uuColor.value,
-                                                    fillColor: fillColor))
+                $0.cpuNode(from: Sheet.draftPlaneColor(from: $0.uuColor.value, fillColor: fillColor))
             }
         } else {
             draftPlaneNodes = []
@@ -2450,12 +2473,14 @@ extension Sheet {
         
         let children2 = textNodes + borderNodes + captionNodes
         if isBackground {
-            return Node(children: children0 + children1 + children2,
-                        path: Path(bounds),
-                        fillType: .color(backgroundUUColor.value))
+            return .init(children: children0 + children1 + children2,
+                         attitude: attitude,
+                         path: Path(bounds),
+                         fillType: .color(backgroundUUColor.value))
         } else{
-            return Node(children: children0 + children1 + children2,
-                        path: Path(bounds))
+            return .init(children: children0 + children1 + children2,
+                         attitude: attitude,
+                         path: Path(bounds))
         }
     }
     

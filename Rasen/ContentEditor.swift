@@ -20,11 +20,12 @@
 }
 
 final class ContentSlider: DragEditor {
-    let document: Document
+    let root: RootEditor, document: Document
     let isEditingSheet: Bool
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
         isEditingSheet = document.isEditingSheet
     }
     
@@ -49,7 +50,7 @@ final class ContentSlider: DragEditor {
     
     func send(_ event: DragEvent) {
         guard isEditingSheet else {
-            document.keepOut(with: event)
+            root.keepOut(with: event)
             return
         }
         let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
@@ -59,8 +60,8 @@ final class ContentSlider: DragEditor {
         case .began:
             var cursor = Cursor.arrow
             
-            if document.isPlaying(with: event) {
-                document.stopPlaying(with: event)
+            if root.isPlaying(with: event) {
+                root.stopPlaying(with: event)
             }
             
             if let sheetView = document.sheetView(at: p),

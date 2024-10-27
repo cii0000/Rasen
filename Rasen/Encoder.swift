@@ -49,11 +49,13 @@ extension Caption {
         }
     }
     
-    func nodes(withFontSize fontSize: Double = 11,
-               in bounds: Rect, padding: Double = 8, outlineWidth: Double = 2) -> [Node] {
+    static let defaultFontSize = 11.0, defaultPadding = 8.0, defaultOutlineWidth = 2.0
+    func pathAndPosition(withFontSize fontSize: Double = defaultFontSize,
+                         in bounds: Rect, padding: Double = defaultPadding,
+                         outlineWidth: Double = defaultOutlineWidth) -> (path: Path, position: Point)? {
         let fontSize = isTitle ? fontSize * 1.25 : fontSize
         guard let tb = Text(string: string, size: fontSize,
-                            widthCount: bounds.width).bounds else { return [] }
+                            widthCount: bounds.width).bounds else { return nil }
         switch orientation {
         case .horizontal:
             let tp = bounds.midXMinYPoint + Point(-tb.width / 2, padding + tb.height)
@@ -66,12 +68,7 @@ extension Caption {
             typebute.spacing = typebute.font.size / 2
             typebute.alignment = .center
             let path = Typesetter(string: string, typobute: typebute).path()
-            return [Node(attitude: Attitude(position: tp),
-                         path: path,
-                         lineWidth: outlineWidth, lineType: .color(.content)),
-                    Node(attitude: Attitude(position: tp),
-                         path: path,
-                         fillType: .color(.background))]
+            return (path, tp)
         case .vertical:
             let tp = bounds.maxXMidYPoint + Point(-padding * 5, tb.width / 2)
             
@@ -81,14 +78,46 @@ extension Caption {
             typebute.maxTypelineWidth = .infinity
             typebute.spacing = typebute.font.size / 2
             let path = Typesetter(string: string, typobute: typebute).path()
-            return [Node(attitude: Attitude(position: tp),
-                         path: path,
-                         lineWidth: outlineWidth, lineType: .color(.content)),
-                    Node(attitude: Attitude(position: tp),
-                         path: path,
-                         fillType: .color(.background))]
+            return (path, tp)
         }
     }
+    func cpuNodes(withFontSize fontSize: Double = defaultFontSize,
+                  in bounds: Rect, padding: Double = defaultPadding,
+                  outlineWidth: Double = defaultOutlineWidth) -> [CPUNode] {
+        guard let (path, tp) = pathAndPosition(withFontSize: fontSize, in: bounds,
+                                               padding: padding, outlineWidth: outlineWidth) else { return [] }
+        switch orientation {
+        case .horizontal:
+            return [.init(attitude: .init(position: tp), path: path,
+                          lineWidth: outlineWidth, lineType: .color(.content)),
+                    .init(attitude: .init(position: tp), path: path,
+                          fillType: .color(.background))]
+        case .vertical:
+            return [.init(attitude: .init(position: tp), path: path,
+                          lineWidth: outlineWidth, lineType: .color(.content)),
+                    .init(attitude: .init(position: tp), path: path,
+                          fillType: .color(.background))]
+        }
+    }
+    func nodes(withFontSize fontSize: Double = defaultFontSize,
+                  in bounds: Rect, padding: Double = defaultPadding,
+                  outlineWidth: Double = defaultOutlineWidth) -> [Node] {
+        guard let (path, tp) = pathAndPosition(withFontSize: fontSize, in: bounds,
+                                               padding: padding, outlineWidth: outlineWidth) else { return [] }
+        switch orientation {
+        case .horizontal:
+            return [.init(attitude: .init(position: tp), path: path,
+                          lineWidth: outlineWidth, lineType: .color(.content)),
+                    .init(attitude: .init(position: tp), path: path,
+                          fillType: .color(.background))]
+        case .vertical:
+            return [.init(attitude: .init(position: tp), path: path,
+                          lineWidth: outlineWidth, lineType: .color(.content)),
+                    .init(attitude: .init(position: tp), path: path,
+                          fillType: .color(.background))]
+        }
+    }
+    
     static func caption(atBeat time: Rational, in captions: [Caption]) -> Caption? {
         for caption in captions {
             if caption.beatRange.contains(time) {
@@ -297,7 +326,7 @@ final class Movie {
         audioInput.append(cmBuffer)
     }
     
-    func finish(completionHandler handler: @escaping (Bool, (any Error)?) -> ()) {
+    func finish() async throws -> Bool {
         videoInput.markAsFinished()
         audioInput.markAsFinished()
         
@@ -308,21 +337,21 @@ final class Movie {
                 do {
                     try fileManager.removeItem(at: url)
                 } catch {
-                    handler(stop, error)
-                    return
+                    throw error
                 }
             }
             if !append && !stop {
-                handler(stop, Self.exportError)
+                throw Self.exportError
             } else {
-                handler(stop, nil)
+                return stop
             }
         } else {
             writer.endSession(atSourceTime: lastCMTime)
-            let writer = self.writer, stop = self.stop
-            writer.finishWriting {
-                handler(stop, writer.error)
+            await writer.finishWriting()
+            if let error = writer.error {
+                throw error
             }
+            return stop
         }
     }
 }
@@ -334,7 +363,7 @@ final class CaptionRenderer {
     private let writer: AVAssetWriter,
                 captionInput: AVAssetWriterInput,
                 cAdaptor: AVAssetWriterInputCaptionAdaptor
-    private var append = false, stop = false,
+    private var isAppend = false, isStop = false,
                 lastCMTime = CMTime(),
                 allDuration = Rational(), currentTime = Rational()
 
@@ -367,8 +396,8 @@ final class CaptionRenderer {
         for (i, caption) in captions.enumerated() {
             autoreleasepool {
                 while !captionInput.isReadyForMoreMediaData {
-                    progressHandler(Double(i) / Double(captions.count - 1), &stop)
-                    if stop { return }
+                    progressHandler(Double(i) / Double(captions.count - 1), &isStop)
+                    if isStop { return }
                     Thread.sleep(forTimeInterval: 0.1)
                 }
                 
@@ -381,40 +410,40 @@ final class CaptionRenderer {
                 let range = CMTimeRange(start: startTime,
                                         duration: duration)
                 let avCaption = AVCaption(caption.string, timeRange: range)
-                append = cAdaptor.append(avCaption)
+                isAppend = cAdaptor.append(avCaption)
                 
-                if !append { return }
-                progressHandler(Double(i) / Double(captions.count - 1), &stop)
-                if stop { return }
+                if !isAppend { return }
+                progressHandler(Double(i) / Double(captions.count - 1), &isStop)
+                if isStop { return }
             }
-            if !append || stop { break }
+            if !isAppend || isStop { break }
         }
         
         lastCMTime = duration.cm(timescale: Int32(frameRate)) + lastCMTime
         allDuration += duration
         currentTime += duration
     }
-    func finish(completionHandler handler: @escaping ((any Error)?) -> ()) {
+    func finish() async throws {
         captionInput.markAsFinished()
 
-        if !append || stop {
+        if !isAppend || isStop {
             writer.cancelWriting()
             let fileManager = FileManager.default
             if fileManager.fileExists(atPath: url.path) {
                 do {
                     try fileManager.removeItem(at: url)
                 } catch {
-                    handler(error)
+                    throw error
                 }
             }
-            if !append {
-                handler(ExportError())
+            if !isAppend {
+                throw ExportError()
             }
         } else {
             writer.endSession(atSourceTime: lastCMTime)
-            let writer = self.writer
-            writer.finishWriting {
-                handler(writer.error)
+            await writer.finishWriting()
+            if let error = writer.error {
+                throw error
             }
         }
     }
@@ -473,8 +502,8 @@ extension Movie {
     }
 }
 
-final class MovieImageGenerator {
-    private var generator: AVAssetImageGenerator
+@MovieActor final class MovieImageGenerator {
+    nonisolated(unsafe) private var generator: AVAssetImageGenerator
     
     init(url: URL) {
         let asset = AVURLAsset(url: url)
@@ -483,8 +512,7 @@ final class MovieImageGenerator {
         generator.requestedTimeToleranceAfter = .zero
     }
     func thumbnail(atSec sec: Rational = .init(0, 1)) async throws -> Image {
-        let cgImage = try await generator.image(at: .init(value: .init(sec.p),
-                                                          timescale: .init(sec.q))).image
+        let cgImage = try await generator.image(at: .init(value: .init(sec.p), timescale: .init(sec.q))).image
         return Image(cgImage: cgImage)
     }
 }
@@ -554,40 +582,6 @@ extension Movie {
                 throw error
             }
         default: break
-        }
-    }
-}
-final class ToMP4MovieEditor: InputKeyEditor, @unchecked Sendable {
-    let document: Document
-    
-    init(_ document: Document) {
-        self.document = document
-    }
-    
-    func send(_ event: InputKeyEvent) {
-        Task { @MainActor in
-            let result = await URL.load(prompt: "Import".localized,
-                                        fileTypes: [Movie.FileType.mp4, Movie.FileType.mov])
-            switch result {
-            case .complete(let ioResult0s):
-                let result = await URL.export(name: "",
-                                              fileType: Movie.FileType.mp4,
-                                              fileSizeHandler: { return nil })
-                switch result {
-                case .complete(let ioResult1):
-                    let fromURL = ioResult0s[0].url
-                    let toURL = ioResult1.url
-                    Task {
-                        do {
-                            try await Movie.toMP4(from: fromURL, to: toURL)
-                        } catch {
-                            document.rootNode.show(error)
-                        }
-                    }
-                case .cancel: break
-                }
-            case .cancel: break
-            }
         }
     }
 }

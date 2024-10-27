@@ -506,8 +506,8 @@ extension PastableObject {
 final class Cutter: InputKeyEditor {
     let editor: CopyEditor
     
-    init(_ document: Document) {
-        editor = CopyEditor(document)
+    init(_ root: RootEditor) {
+        editor = CopyEditor(root)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -520,8 +520,8 @@ final class Cutter: InputKeyEditor {
 final class Copier: InputKeyEditor {
     let editor: CopyEditor
     
-    init(_ document: Document) {
-        editor = CopyEditor(document)
+    init(_ root: RootEditor) {
+        editor = CopyEditor(root)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -534,8 +534,8 @@ final class Copier: InputKeyEditor {
 final class Paster: InputKeyEditor {
     let editor: CopyEditor
     
-    init(_ document: Document) {
-        editor = CopyEditor(document)
+    init(_ root: RootEditor) {
+        editor = CopyEditor(root)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -546,11 +546,12 @@ final class Paster: InputKeyEditor {
     }
 }
 final class CopyEditor: Editor {
-    let document: Document
+    let root: RootEditor, document: Document
     let isEditingSheet: Bool
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
         isEditingSheet = document.isEditingSheet
     }
     
@@ -733,7 +734,7 @@ final class CopyEditor: Editor {
                 }
             } else {
                 if isSendPasteboard {
-                    let se = LineEditor(document)
+                    let se = LineEditor(root)
                     se.updateClipBoundsAndIndexRange(at: p)
                     if let r = document.selections.map({ $0.rect }).union() {
                         se.tempLine = Line(r) * Transform(translation: -se.centerOrigin)
@@ -1125,7 +1126,7 @@ final class CopyEditor: Editor {
             Pasteboard.shared.copiedObjects = [.animation(Animation(keyframes: kfs))]
         } else if document.isSelectSelectedNoneCursor(at: p), !document.selections.isEmpty {
             if document.isSelectedText, document.selections.count == 1 {
-                document.textEditor.cut(from: document.selections[0], at: p)
+                root.textEditor.cut(from: document.selections[0], at: p)
             } else {
                 if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
                    sheetView.scoreView
@@ -1156,7 +1157,7 @@ final class CopyEditor: Editor {
                         sheetView.updatePlaying()
                     }
                 } else {
-                    let se = LineEditor(document)
+                    let se = LineEditor(root)
                     se.updateClipBoundsAndIndexRange(at: p)
                     if let r = document.selections.map({ $0.rect }).union() {
                         se.tempLine = Line(r) * Transform(translation: -se.centerOrigin)
@@ -1565,7 +1566,7 @@ final class CopyEditor: Editor {
             var isAppend = false
             
             var textView: SheetTextView?, sri: String.Index?
-            if let aTextView = document.textEditor.editingTextView,
+            if let aTextView = root.textEditor.editingTextView,
                !aTextView.isHiddenSelectedRange {
                 
                 if let asri = aTextView.selectedRange?.lowerBound {
@@ -2150,12 +2151,12 @@ final class CopyEditor: Editor {
             var text = text
             var isAppend = false
             
-            document.textEditor.begin(atScreen: sp)
-            if let textView = document.textEditor.editingTextView,
+            root.textEditor.begin(atScreen: sp)
+            if let textView = root.textEditor.editingTextView,
                !textView.isHiddenSelectedRange,
                let i = sheetView.textsView.elementViews.firstIndex(of: textView) {
                 
-                document.textEditor.endInputKey(isUnmarkText: true,
+                root.textEditor.endInputKey(isUnmarkText: true,
                                                 isRemoveText: false)
                 if document.findingNode(at: p) != nil,
                     document.finding.string != text.string {
@@ -2508,7 +2509,7 @@ final class CopyEditor: Editor {
             sheetView.newUndoGroup()
             sheetView.insert(kivs)
             sheetView.rootKeyframeIndex = sheetView.model.animation.keyframes.count * count + ni
-            document.updateEditorNode()
+            root.updateEditorNode()
             document.updateSelects()
         case .ids(let idv):
             let ids = idv.ids
@@ -2803,7 +2804,7 @@ final class CopyEditor: Editor {
         let sp = document.selectedScreenPositionNoneCursor
             ?? event.screenPoint
         let p = document.convertScreenToWorld(sp)
-        for runner in document.runners {
+        for runner in root.runners {
             if runner.containsCalculating(p) {
                 Pasteboard.shared.copiedObjects = [.string(runner.calculatingString)]
                 runner.cancel()
@@ -2879,9 +2880,9 @@ final class CopyEditor: Editor {
             ?? event.screenPoint
         switch event.phase {
         case .began:
-            if let textView = document.textEditor.editingTextView,
+            if let textView = root.textEditor.editingTextView,
                !textView.isHiddenSelectedRange,
-               let sheetView = document.textEditor.editingSheetView,
+               let sheetView = root.textEditor.editingSheetView,
                let i = sheetView.textsView.elementViews
                 .firstIndex(of: textView),
                let o = Pasteboard.shared.copiedObjects.first {
@@ -2893,8 +2894,7 @@ final class CopyEditor: Editor {
                 default: str = nil
                 }
                 if let str = str {
-                    document.textEditor.endInputKey(isUnmarkText: true,
-                                                    isRemoveText: false)
+                    root.textEditor.endInputKey(isUnmarkText: true, isRemoveText: false)
                     guard let ti = textView.selectedRange?.lowerBound,
                           ti >= textView.model.string.startIndex else { return }
                     let text = textView.model
@@ -3175,11 +3175,12 @@ final class CopyEditor: Editor {
 }
 
 final class LineColorCopier: InputKeyEditor {
-    let document: Document
+    let root: RootEditor, document: Document
     let isEditingSheet: Bool
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
         isEditingSheet = document.isEditingSheet
     }
     

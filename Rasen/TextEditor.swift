@@ -18,11 +18,12 @@
 import struct Foundation.UUID
 
 final class TextSlider: DragEditor {
-    let document: Document
+    let root: RootEditor, document: Document
     let isEditingSheet: Bool
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
         isEditingSheet = document.isEditingSheet
     }
     
@@ -36,7 +37,7 @@ final class TextSlider: DragEditor {
     
     func send(_ event: DragEvent) {
         guard isEditingSheet else {
-            document.keepOut(with: event)
+            root.keepOut(with: event)
             return
         }
         let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
@@ -144,10 +145,11 @@ final class TextSlider: DragEditor {
 }
 
 final class Finder: InputKeyEditor {
-    let document: Document
+    let root: RootEditor, document: Document
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
     }
     
     func send(_ event: InputKeyEvent) {
@@ -200,10 +202,11 @@ final class Finder: InputKeyEditor {
 }
 
 final class Looker: InputKeyEditor {
-    let document: Document
+    let root: RootEditor, document: Document
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
     }
     
     func send(_ event: InputKeyEvent) {
@@ -401,8 +404,8 @@ final class Looker: InputKeyEditor {
 final class VerticalTextChanger: InputKeyEditor {
     let editor: TextOrientationEditor
     
-    init(_ document: Document) {
-        editor = TextOrientationEditor(document)
+    init(_ root: RootEditor) {
+        editor = TextOrientationEditor(root)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -415,8 +418,8 @@ final class VerticalTextChanger: InputKeyEditor {
 final class HorizontalTextChanger: InputKeyEditor {
     let editor: TextOrientationEditor
     
-    init(_ document: Document) {
-        editor = TextOrientationEditor(document)
+    init(_ root: RootEditor) {
+        editor = TextOrientationEditor(root)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -427,11 +430,12 @@ final class HorizontalTextChanger: InputKeyEditor {
     }
 }
 final class TextOrientationEditor: Editor {
-    let document: Document
+    let root: RootEditor, document: Document
     let isEditingSheet: Bool
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
         isEditingSheet = document.isEditingSheet
     }
     
@@ -498,16 +502,14 @@ final class TextOrientationEditor: Editor {
                     }
                 }
             } else if !document.isNoneCursor {
-                document.textEditor.begin(atScreen: event.screenPoint)
+                root.textEditor.begin(atScreen: event.screenPoint)
                 
                 guard let sheetView = document.sheetView(at: p) else { return }
-                if let aTextView = document.textEditor.editingTextView,
+                if let aTextView = root.textEditor.editingTextView,
                    !aTextView.isHiddenSelectedRange,
-                   let i = sheetView.textsView.elementViews
-                    .firstIndex(of: aTextView) {
+                   let i = sheetView.textsView.elementViews.firstIndex(of: aTextView) {
                     
-                    document.textEditor.endInputKey(isUnmarkText: true,
-                                                    isRemoveText: false)
+                    root.textEditor.endInputKey(isUnmarkText: true, isRemoveText: false)
                     let textView = aTextView
                     var text = textView.model
                     if text.orientation != orientation {
@@ -533,11 +535,10 @@ final class TextOrientationEditor: Editor {
                     }
                 } else {
                     let inP = sheetView.convertFromWorld(p)
-                    document.textEditor
-                        .appendEmptyText(screenPoint: event.screenPoint,
-                                         at: inP,
-                                         orientation: orientation,
-                                         in: sheetView)
+                    root.textEditor.appendEmptyText(screenPoint: event.screenPoint,
+                                                    at: inP,
+                                                    orientation: orientation,
+                                                    in: sheetView)
                 }
             }
             
@@ -554,8 +555,8 @@ final class TextOrientationEditor: Editor {
 final class SuperscriptChanger: InputKeyEditor {
     let editor: TextScriptEditor
     
-    init(_ document: Document) {
-        editor = TextScriptEditor(document)
+    init(_ root: RootEditor) {
+        editor = TextScriptEditor(root)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -568,8 +569,8 @@ final class SuperscriptChanger: InputKeyEditor {
 final class SubscriptChanger: InputKeyEditor {
     let editor: TextScriptEditor
     
-    init(_ document: Document) {
-        editor = TextScriptEditor(document)
+    init(_ root: RootEditor) {
+        editor = TextScriptEditor(root)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -580,17 +581,18 @@ final class SubscriptChanger: InputKeyEditor {
     }
 }
 final class TextScriptEditor: Editor {
-    let document: Document
+    let root: RootEditor, document: Document
     let isEditingSheet: Bool
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
         isEditingSheet = document.isEditingSheet
     }
     
     func changeScripst(_ isSuper: Bool, with event: InputKeyEvent) {
         guard isEditingSheet else {
-            document.keepOut(with: event)
+            root.keepOut(with: event)
             return
         }
         func moveCharacter(isSuper: Bool, from c: Character) -> Character? {
@@ -662,15 +664,14 @@ final class TextScriptEditor: Editor {
                     }
                 }
             } else {
-                document.textEditor.begin(atScreen: event.screenPoint)
+                root.textEditor.begin(atScreen: event.screenPoint)
                 
                 guard let sheetView = document.sheetView(at: p) else { return }
-                if let aTextView = document.textEditor.editingTextView,
+                if let aTextView = root.textEditor.editingTextView,
                    !aTextView.isHiddenSelectedRange,
                    let ai = sheetView.textsView.elementViews.firstIndex(of: aTextView) {
                     
-                    document.textEditor.endInputKey(isUnmarkText: true,
-                                                    isRemoveText: true)
+                    root.textEditor.endInputKey(isUnmarkText: true, isRemoveText: true)
                     guard let ati = aTextView.selectedRange?.lowerBound,
                           ati > aTextView.model.string.startIndex else { return }
                     let textView = aTextView
@@ -706,31 +707,25 @@ final class TextScriptEditor: Editor {
 }
 
 final class TextEditor: Editor {
-    let document: Document
+    let root: RootEditor, document: Document
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
     }
-    deinit {
+    
+    func cancelTasks() {
         inputKeyTimer.cancel()
     }
     
-    weak var editingSheetView: SheetView?
-    weak var editingTextView: SheetTextView? {
-        didSet {
-            if editingTextView !== oldValue {
-                editingTextView?.editor = self
-                oldValue?.unmark()
-                TextInputContext.update()
-                oldValue?.isHiddenSelectedRange = true
-            }
-            editingTextView?.isHiddenSelectedRange = false
-            if editingTextView == nil && Cursor.isHidden {
-                Cursor.isHidden = false
-            }
-        }
+    var editingSheetView: SheetView? {
+        get { document.editingSheetView }
+        set { document.editingSheetView = newValue }
     }
-    var isIndicated = false
+    var editingTextView: SheetTextView? {
+        get { document.editingTextView }
+        set { document.editingTextView = newValue }
+    }
     
     var isMovedCursor = true
     
@@ -758,9 +753,6 @@ final class TextEditor: Editor {
             
         } else if let (textView, _, _, sri) = sheetView.textTuple(at: inP) {
             if isMovedCursor {
-                if textView.editor == nil {
-                    textView.editor = self
-                }
                 textView.selectedRange = sri ..< sri
                 textView.updateCursor()
                 textView.updateSelectedLineLocation()
@@ -783,7 +775,7 @@ final class TextEditor: Editor {
         }
     }
     func sendEnd() {
-        if document.oldInputTextKeys.isEmpty && !Cursor.isHidden {
+        if root.oldInputTextKeys.isEmpty && !Cursor.isHidden {
             document.cursor = document.defaultCursor
         }
     }
@@ -794,7 +786,7 @@ final class TextEditor: Editor {
     }
     func beginInputKey(_ event: InputTextEvent) {
         guard document.isEditingSheet else {
-            document.keepOut(with: event)
+            root.keepOut(with: event)
             return
         }
         
@@ -819,8 +811,8 @@ final class TextEditor: Editor {
                     lyric += key
                 }
                 if lyric != note.pits[pitI].lyric {
-                    if document.isPlaying(with: event) {
-                        document.stopPlaying(with: event)
+                    if root.isPlaying(with: event) {
+                        root.stopPlaying(with: event)
                     }
                     
                     note.replace(lyric: lyric, at: pitI, tempo: scoreView.model.tempo)
@@ -893,9 +885,6 @@ final class TextEditor: Editor {
             let inP = sheetView.convertFromWorld(p)
             if let (textView, _, _, sri) = sheetView.textTuple(at: inP) {
                 if isMovedCursor {
-                    if textView.editor == nil {
-                        textView.editor = self
-                    }
                     textView.selectedRange = sri ..< sri
                     textView.updateCursor()
                     textView.updateSelectedLineLocation()
@@ -1369,7 +1358,7 @@ final class TextEditor: Editor {
             inputType = .insert
         }
         
-        if document.modifierKeys == .shift {
+        if root.modifierKeys == .shift {
             if let textView = editingTextView {
                 let d = textView.selectedLineLocation
                 let count = (d / textView.model.size)
@@ -1406,7 +1395,7 @@ final class TextEditor: Editor {
             inputType = .remove
         }
         
-        if document.modifierKeys == .shift {
+        if root.modifierKeys == .shift {
             if let textView = editingTextView {
                 if textView.binder[keyPath: textView.keyPath]
                     .widthCount != Typobute.defaultWidthCount {
@@ -1421,7 +1410,9 @@ final class TextEditor: Editor {
                 }
             }
         } else {
-            editingTextView?.deleteBackward()
+            if let editingTextView {
+                deleteBackward(in: editingTextView)
+            }
         }
         
         lastInputEventType = .deleteBackward
@@ -1431,9 +1422,62 @@ final class TextEditor: Editor {
             endInputKey()
             inputType = .remove
         }
-        editingTextView?.deleteForward()
+        if let editingTextView {
+            deleteForward(in: editingTextView)
+        }
         lastInputEventType = .deleteForward
     }
+    func deleteBackward(from range: Range<String.Index>? = nil, in textView: SheetTextView) {
+        if let range = range {
+            textView.removeCharacters(in: range)
+            return
+        }
+        guard let deleteRange = textView.selectedRange else { return }
+        
+        if !document.selectedFrames.isEmpty {
+            if textView.delete(from: document.selections) {
+                document.selections = []
+                return
+            }
+        }
+        
+        if deleteRange.isEmpty {
+            let string = textView.model.string
+            guard deleteRange.lowerBound > string.startIndex else { return }
+            let nsi = textView.typesetter.index(before: deleteRange.lowerBound)
+            let nRange = nsi ..< deleteRange.lowerBound
+            let nnRange = string.rangeOfComposedCharacterSequences(for: nRange)
+            textView.removeCharacters(in: nnRange)
+        } else {
+            textView.removeCharacters(in: deleteRange)
+        }
+    }
+    func deleteForward(from range: Range<String.Index>? = nil, in textView: SheetTextView) {
+        if let range = range {
+            textView.removeCharacters(in: range)
+            return
+        }
+        guard let deleteRange = textView.selectedRange else { return }
+        
+        if !document.selectedFrames.isEmpty {
+            if textView.delete(from: document.selections) {
+                document.selections = []
+                return
+            }
+        }
+        
+        if deleteRange.isEmpty {
+            let string = textView.model.string
+            guard deleteRange.lowerBound < string.endIndex else { return }
+            let nei = textView.typesetter.index(after: deleteRange.lowerBound)
+            let nRange = deleteRange.lowerBound ..< nei
+            let nnRange = string.rangeOfComposedCharacterSequences(for: nRange)
+            textView.removeCharacters(in: nnRange)
+        } else {
+            textView.removeCharacters(in: deleteRange)
+        }
+    }
+    
     func moveLeft() {
         if inputType != .moveCursor {
             endInputKey()
@@ -1475,7 +1519,6 @@ final class TextView<T: BinderProtocol>: TimelineView, @unchecked Sendable {
     var keyPath: BinderKeyPath
     let node: Node
     
-    weak var editor: TextEditor?
     private(set) var typesetter: Typesetter
     
     var markedRange: Range<String.Index>?
@@ -2074,56 +2117,6 @@ extension TextView {
         insert("\t")
     }
     
-    func deleteBackward(from range: Range<String.Index>? = nil) {
-        if let range = range {
-            removeCharacters(in: range)
-            return
-        }
-        guard let deleteRange = selectedRange else { return }
-        
-        if let document = editor?.document, !document.selectedFrames.isEmpty {
-            if delete(from: document.selections) {
-                document.selections = []
-                return
-            }
-        }
-        
-        if deleteRange.isEmpty {
-            let string = model.string
-            guard deleteRange.lowerBound > string.startIndex else { return }
-            let nsi = typesetter.index(before: deleteRange.lowerBound)
-            let nRange = nsi ..< deleteRange.lowerBound
-            let nnRange = string.rangeOfComposedCharacterSequences(for: nRange)
-            removeCharacters(in: nnRange)
-        } else {
-            removeCharacters(in: deleteRange)
-        }
-    }
-    func deleteForward(from range: Range<String.Index>? = nil) {
-        if let range = range {
-            removeCharacters(in: range)
-            return
-        }
-        guard let deleteRange = selectedRange else { return }
-        
-        if let document = editor?.document, !document.selectedFrames.isEmpty {
-            if delete(from: document.selections) {
-                document.selections = []
-                return
-            }
-        }
-        
-        if deleteRange.isEmpty {
-            let string = model.string
-            guard deleteRange.lowerBound < string.endIndex else { return }
-            let nei = typesetter.index(after: deleteRange.lowerBound)
-            let nRange = deleteRange.lowerBound ..< nei
-            let nnRange = string.rangeOfComposedCharacterSequences(for: nRange)
-            removeCharacters(in: nnRange)
-        } else {
-            removeCharacters(in: deleteRange)
-        }
-    }
     func range(from selection: Selection) -> Range<String.Index>? {
         let nRect = convertFromWorld(selection.rect)
         let tfp = convertFromWorld(selection.firstOrigin)

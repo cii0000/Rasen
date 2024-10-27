@@ -497,15 +497,15 @@ final class Document: @unchecked Sendable {
         history = worldHistoryRecord.decodedValue ?? WorldHistory()
         
         selectionsRecord
-            = rootDirectory.makeRecord(forKey: Document.selectionsRecordKey)
+        = rootDirectory.makeRecord(forKey: Document.selectionsRecordKey)
         selections = selectionsRecord.decodedValue ?? []
         
         findingRecord
-            = rootDirectory.makeRecord(forKey: Document.findingRecordKey)
+        = rootDirectory.makeRecord(forKey: Document.findingRecordKey)
         finding = findingRecord.decodedValue ?? Finding()
         
         cameraRecord
-            = rootDirectory.makeRecord(forKey: Document.cameraRecordKey)
+        = rootDirectory.makeRecord(forKey: Document.cameraRecordKey)
         let camera = cameraRecord.decodedValue ?? Document.defaultCamera
         self.camera = Document.clippedCamera(from: camera)
         
@@ -565,22 +565,18 @@ final class Document: @unchecked Sendable {
         updateWithFinding()
         backgroundColor = isEditingSheet ? .background : .disabled
         
-//        rootNode.append(child: cursorNode)
-//        updateCursorNode()
-    }
-    deinit {
-        cancelTasks()
+        //        rootNode.append(child: cursorNode)
+        //        updateCursorNode()
     }
     
     func cancelTasks() {
         autosavingTimer.cancel()
         sheetViewValues.forEach {
-            $0.value.workItem?.cancel()
+            $0.value.task?.cancel()
         }
         thumbnailNodeValues.forEach {
-            $0.value.workItem?.cancel()
+            $0.value.task?.cancel()
         }
-        runners.forEach { $0.cancel() }
     }
     
     let queue = DispatchQueue(label: System.id + ".queue",
@@ -633,14 +629,14 @@ final class Document: @unchecked Sendable {
             do {
                 try rootDirectory.writeAll()
             } catch {
-                rootNode.show(error)
+                Task { @MainActor in
+                    rootNode.show(error)
+                }
             }
             rootDirectory.resetWriteAll()
         }
     }
     @MainActor func endSave(completionHandler: @escaping (Document?) -> ()) {
-        runners.forEach { $0.cancel() }
-        
         let progressPanel = ProgressPanel(message: "Saving".localized,
                                           isCancel : false,
                                           isIndeterminate: true)
@@ -738,8 +734,8 @@ final class Document: @unchecked Sendable {
                     let sheetFrame = self.sheetFrame(with: shp)
                     let fillType = readFillType(at: sid) ?? .color(.disabled)
                     let node = Node(path: Path(sheetFrame), fillType: fillType)
-                    thumbnailNodeValues[shp]?.workItem?.cancel()
-                    sheetViewValues[shp]?.workItem?.cancel()
+                    thumbnailNodeValues[shp]?.task?.cancel()
+                    sheetViewValues[shp]?.task?.cancel()
                     thumbnailNode(at: shp)?.removeFromParent()
                     sheetView(at: shp)?.node.removeFromParent()
                     sheetsNode.append(child: node)
@@ -772,7 +768,7 @@ final class Document: @unchecked Sendable {
                         thumbnailNode(at: shp)?.removeFromParent()
                         let tv = thumbnailNodeValues[shp]
                         thumbnailNodeValues[shp] = nil
-                        tv?.workItem?.cancel()
+                        tv?.task?.cancel()
                         
                         world.sheetPositions[sid] = nil
                     }
@@ -865,7 +861,7 @@ final class Document: @unchecked Sendable {
     }
     func loadCheck(with result: WorldHistory.UndoResult) {
         guard let uiv = history[result.version].values[result.valueIndex]
-                .undoItemValue else { return }
+            .undoItemValue else { return }
         
         let isReversed = result.type == .undo
         
@@ -886,7 +882,10 @@ final class Document: @unchecked Sendable {
         }
     }
     
-    func restoreDatabase() {
+    struct RestoreError: Error {
+        var localizedDescription = "There are sheets added in the upper right corner because the positions data is not found.".localized
+    }
+    func restoreDatabase() throws {
         var resetSIDs = Set<SheetID>()
         for sid in sheetRecorders.keys {
             if world.sheetPositions[sid] == nil {
@@ -913,6 +912,7 @@ final class Document: @unchecked Sendable {
         }
         if !resetSIDs.isEmpty {
             moveSheetsToUpperRightCorner(with: Array(resetSIDs))
+            throw RestoreError()
         }
     }
     func moveSheetsToUpperRightCorner(with sids: [SheetID],
@@ -935,7 +935,6 @@ final class Document: @unchecked Sendable {
             newUndoGroup()
         }
         append(newSIDs)
-        rootNode.show(message: "There are sheets added in the upper right corner because the positions data is not found.".localized)
     }
     
     func resetAllThumbnails(_ handler: (String) -> (Bool)) {
@@ -1103,9 +1102,8 @@ final class Document: @unchecked Sendable {
         }
         return camera
     }
-    static let defaultCamera
-        = Camera(position: Sheet.defaultBounds.centerPoint,
-                 scale: Size(width: 1.25, height: 1.25))
+    static let defaultCamera = Camera(position: Sheet.defaultBounds.centerPoint,
+                                      scale: Size(width: 1.25, height: 1.25))
     var cameraNotifications = [((Document, Camera) -> ())]()
     var camera = Document.defaultCamera {
         didSet {
@@ -1143,6 +1141,7 @@ final class Document: @unchecked Sendable {
         worldToViewportTransform = worldToScreenTransform * screenToViewportTransform
         updateNode()
     }
+    var updateNodeNotifications = [((Document) -> ())]()
     func updateNode() {
         guard !drawableSize.isEmpty else { return }
         thumbnailType = self.thumbnailType(withScale: worldToScreenScale)
@@ -1152,7 +1151,7 @@ final class Document: @unchecked Sendable {
                       camera: camera,
                       in: screenBounds)
         updateGrid(with: screenToWorldTransform, in: screenBounds)
-        updateEditorNode()
+        updateNodeNotifications.forEach { $0(self) }
         updateRunnerNodesPosition()
         updateSheetViewsWithCamera()
 //        updateCursorNode()
@@ -1197,6 +1196,55 @@ final class Document: @unchecked Sendable {
     
     var sheetLineWidth: Double { Line.defaultLineWidth }
     var sheetTextSize: Double { camera.logScale > 2 ? 100.0 : Font.defaultSize }
+    
+    var runnerNodes = [(origin: Point, node: Node)]()
+    var runnersNode: Node?
+    func updateRunners(fromWorldPrintOrigins wpos: [Point]) {
+        runnerNodes.forEach { $0.node.removeFromParent() }
+        runnerNodes = wpos.map {
+            let text = Text(string: "Calculating".localized)
+            let textNode = text.node
+            let node = Node(children: [textNode], isHidden: true,
+                            path: Path(textNode.bounds?
+                                        .inset(by: -10) ?? Rect(),
+                                       cornerRadius: 8),
+                            lineWidth: 1, lineType: .color(.border),
+                            fillType: .color(.background))
+            return ($0, node)
+        }
+        runnerNodes.forEach { rootNode.append(child: $0.node) }
+        
+        updateRunnerNodesPosition()
+    }
+    func updateRunnerNodesPosition() {
+        guard !runnerNodes.isEmpty else { return }
+        let b = screenBounds.inset(by: 5)
+        for (p, node) in runnerNodes {
+            let sp = convertWorldToScreen(p)
+            if !b.contains(sp) || worldToScreenScale < 0.25 {
+                node.isHidden = false
+                
+                let fp = b.centerPoint
+                let ps = b.intersection(Edge(fp, sp))
+                if !ps.isEmpty, let cvb = node.bounds {
+                    let np = ps[0]
+                    let cvf = Rect(x: np.x - cvb.width / 2,
+                                   y: np.y - cvb.height / 2,
+                                   width: cvb.width, height: cvb.height)
+                    let nf = screenBounds.inset(by: 5).clipped(cvf)
+                    node.attitude.position = convertScreenToWorld(nf.origin - cvb.origin)
+                } else {
+                    node.attitude.position = p
+                }
+                node.attitude.scale = Size(square: 1 / worldToScreenScale)
+                if camera.rotation != 0 {
+                    node.attitude.rotation = camera.rotation
+                }
+            } else {
+                node.isHidden = true
+            }
+        }
+    }
     
     var selections = [Selection]() {
         didSet {
@@ -1329,7 +1377,7 @@ final class Document: @unchecked Sendable {
                     for (li, lineView) in sheetView.linesView.elementViews.enumerated() {
                         let sli = IntPoint(si, li)
                         if !addedLineIndexes.contains(sli),
-                            lineView.intersects(rectInSheet) {
+                           lineView.intersects(rectInSheet) {
                             if case .line(let line) =  lineView.node.path.pathlines.first?.elements.first,
                                case .color(let color) = lineView.node.lineType {//
                                 
@@ -1713,9 +1761,9 @@ final class Document: @unchecked Sendable {
                             let h = r1.minY - r0.maxY
                             if h > 0 {
                                 nodes.append(Node(path: Path(Edge(r0.minXMaxYPoint,
-                                                                      r1.maxXMinYPoint)),
-                                                      lineWidth: l,
-                                                      lineType: .color(.selected)))
+                                                                  r1.maxXMinYPoint)),
+                                                  lineWidth: l,
+                                                  lineType: .color(.selected)))
                             }
                         }
                     }
@@ -1770,7 +1818,7 @@ final class Document: @unchecked Sendable {
                         oldString: String? = nil,
                         oldTextView: SheetTextView? = nil) {
         let fromStr = finding.string
-        func make(_ sheetView: SheetView) -> Bool {
+        @Sendable func make(_ sheetView: SheetView) -> Bool {
             var isNewUndoGroup = true
             func updateUndoGroup() {
                 if isNewUndoGroup {
@@ -1791,11 +1839,11 @@ final class Document: @unchecked Sendable {
                     ns = ns.replacingOccurrences(of: fromStr, with: toStr)
                     text.replaceSubrange(ns, from: rRange, clipFrame: sb)
                     let origin = textView.model.origin != text.origin ?
-                        text.origin : nil
+                    text.origin : nil
                     let size = textView.model.size != text.size ?
-                        text.size : nil
+                    text.size : nil
                     let widthCount = textView.model.widthCount != text.widthCount ?
-                        text.widthCount : nil
+                    text.widthCount : nil
                     let tv = TextValue(string: ns,
                                        replacedRange: rRange,
                                        origin: origin, size: size,
@@ -1828,20 +1876,20 @@ final class Document: @unchecked Sendable {
             Task { @MainActor in
                 let result = await rootNode
                     .show(message: String(format: "Do you want to replace the \"%2$@\" written on the %1$d sheets with the \"%3$@\"?".localized, nRecordCount, fromStr.omit(count: 12), toStr.omit(count: 12)),
-                              infomation: "This operation can be undone for each sheet, but not for all sheets at once.".localized,
-                              okTitle: "Replace".localized,
-                              isDefaultButton: true)
+                          infomation: "This operation can be undone for each sheet, but not for all sheets at once.".localized,
+                          okTitle: "Replace".localized,
+                          isDefaultButton: true)
                 guard result == .ok else { return }
                 
                 syncSave()
                 
                 let progressPanel = ProgressPanel(message: "Replacing sheets".localized)
                 rootNode.show(progressPanel)
+                let shps = Array(findingNodes.keys)
                 let task = Task.detached {
-                    let progress = ActorProgress(total: self.findingNodes.count)
-                    for v in self.findingNodes {
+                    let progress = ActorProgress(total: shps.count)
+                    for shp in shps {
                         Task { @MainActor in
-                            let shp = v.key
                             if let sheetView = self.sheetViewValues[shp]?.view {
                                 _ = make(sheetView)
                             } else if let sid = self.sheetID(at: shp),
@@ -1891,7 +1939,7 @@ final class Document: @unchecked Sendable {
                             progressPanel.progress = await progress.fractionCompleted
                         }
                     }
-
+                    
                     Task { @MainActor in
                         progressPanel.closePanel()
                         self.finding.string = toStr
@@ -1907,29 +1955,6 @@ final class Document: @unchecked Sendable {
             }
             finding.string = toStr
         }
-    }
-    
-    func string(at p: Point) -> String? {
-        if isSelect(at: p), !selections.isEmpty {
-            let se = LineEditor(self)
-            se.updateClipBoundsAndIndexRange(at: p)
-            if let r = selections.map({ $0.rect }).union() {
-                se.tempLine = Line(r) * Transform(translation: -se.centerOrigin)
-                let value = se.sheetValue(isRemove: false,
-                                          isEnableLine: !isSelectedText,
-                                          isEnablePlane: !isSelectedText,
-                                          selections: selections,
-                                          at: p)
-                if !value.isEmpty {
-                    return value.allTextsString
-                }
-            }
-        } else if let sheetView = sheetView(at: p),
-                  let textView = sheetView.textTuple(at: sheetView.convertFromWorld(p))?.textView {
-            
-            return textView.model.string
-        }
-        return nil
     }
     
     func containsLookingUp(at wp: Point) -> Bool {
@@ -1958,8 +1983,8 @@ final class Document: @unchecked Sendable {
             return
         }
         let ratio = clipRatio != nil ?
-            min(fromSize / Font.defaultSize, clipRatio!) :
-            fromSize / Font.defaultSize
+        min(fromSize / Font.defaultSize, clipRatio!) :
+        fromSize / Font.defaultSize
         let origin: Point
         let pd = (padding + 3.75 + textPadding + toSize / 2 + 1) * ratio
         let lpd = padding * ratio
@@ -2023,7 +2048,7 @@ final class Document: @unchecked Sendable {
         typobute.clippedMaxTypelineWidth = text.size * 30
         let typesetter = Typesetter(string: text.string, typobute: typobute)
         guard let b = typesetter.typoBounds?
-                .outset(by: (toSize / 2 + 1) * ratio) else { return }
+            .outset(by: (toSize / 2 + 1) * ratio) else { return }
         let textNode = Node(attitude: Attitude(position: text.origin),
                             path: typesetter.path(), fillType: .color(.content))
         let boundsNode = Node(path: Path(b + text.origin,
@@ -2103,14 +2128,26 @@ final class Document: @unchecked Sendable {
     
     private var menuNode: Node?
     
+    weak var editingSheetView: SheetView?
+    weak var editingTextView: SheetTextView? {
+        didSet {
+            if editingTextView !== oldValue {
+                oldValue?.unmark()
+                TextInputContext.update()
+                oldValue?.isHiddenSelectedRange = true
+            }
+            editingTextView?.isHiddenSelectedRange = false
+            if editingTextView == nil && Cursor.isHidden {
+                Cursor.isHidden = false
+            }
+        }
+    }
     var textMaxTypelineWidthNode = Node(lineWidth: 0.5, lineType: .color(.border))
     var textCursorWidthNode = Node(lineWidth: 3, lineType: .color(.border))
     var textCursorNode = Node(lineWidth: 0.5, lineType: .color(.background),
                               fillType: .color(.content))
     func updateTextCursor(isMove: Bool = false) {
         func close() {
-            textEditor.isIndicated = false
-            
             if textCursorNode.parent != nil {
                 textCursorNode.removeFromParent()
             }
@@ -2121,7 +2158,7 @@ final class Document: @unchecked Sendable {
                 textMaxTypelineWidthNode.removeFromParent()
             }
         }
-        if isEditingSheet && textEditor.editingTextView == nil,
+        if isEditingSheet && editingTextView == nil,
            let sheetView = sheetView(at: cursorSHP) {
             
             if isMove {
@@ -2133,8 +2170,6 @@ final class Document: @unchecked Sendable {
                 let vp = sheetView.convertFromWorld(cp)
                 if let textView = sheetView.selectedTextView,
                    let i = textView.selectedRange?.lowerBound {
-                    
-                    textEditor.isIndicated = true
                     
                     if textMaxTypelineWidthNode.parent == nil {
                         rootNode.append(child: textMaxTypelineWidthNode)
@@ -2160,8 +2195,6 @@ final class Document: @unchecked Sendable {
                     let mPath = textView.typesetter.maxTypelineWidthPath
                     textMaxTypelineWidthNode.path = textView.convertToWorld(mPath)
                 } else if let (textView, _, _, cursorIndex) = sheetView.textTuple(at: vp) {
-                    textEditor.isIndicated = true
-                    
                     if textMaxTypelineWidthNode.parent == nil {
                         rootNode.append(child: textMaxTypelineWidthNode)
                     }
@@ -2229,7 +2262,7 @@ final class Document: @unchecked Sendable {
         }
     }
     
-    struct SheetRecorder {
+    struct SheetRecorder: @unchecked Sendable {
         let directory: Directory
         
         static let sheetKey = "sheet.pb"
@@ -2295,16 +2328,16 @@ final class Document: @unchecked Sendable {
         }
     }
     
-    struct SheetViewValue {
+    struct SheetViewValue: @unchecked Sendable {
         let sheetID: SheetID
         var view: SheetView?
-        weak var workItem: DispatchWorkItem?
+        var task: Task<(), Never>?
     }
     struct ThumbnailNodeValue {
         var type: ThumbnailType?
         let sheetID: SheetID
         var node: Node?
-        weak var workItem: DispatchWorkItem?
+        var task: Task<(), Never>?
     }
     private(set) var sheetRecorders: [SheetID: SheetRecorder]
     private(set) var baseThumbnailBlocks: [SheetID: Texture.Block]
@@ -2447,15 +2480,14 @@ final class Document: @unchecked Sendable {
     }
     func hideSelectedRange(_ handler: () -> ()) {
         var isHiddenSelectedRange = false
-        if let textView = textEditor.editingTextView, !textView.isHiddenSelectedRange {
-            
+        if let textView = editingTextView, !textView.isHiddenSelectedRange {
             textView.isHiddenSelectedRange = true
             isHiddenSelectedRange = true
         }
         
         handler()
         
-        if isHiddenSelectedRange, let textView = textEditor.editingTextView {
+        if isHiddenSelectedRange, let textView = editingTextView {
             textView.isHiddenSelectedRange = false
         }
     }
@@ -2531,28 +2563,6 @@ final class Document: @unchecked Sendable {
         return .texture(texture)
     }
     
-    func containsAllTimelines(with event: any Event) -> Bool {
-        let sp = lastEditedSheetScreenCenterPositionNoneCursor ?? event.screenPoint
-        let p = convertScreenToWorld(sp)
-        guard let sheetView = sheetView(at: p) else { return false }
-        let inP = sheetView.convertFromWorld(p)
-        return sheetView.animationView.containsTimeline(inP, scale: screenToWorldScale)
-        || sheetView.containsOtherTimeline(inP, scale: screenToWorldScale)
-    }
-    func isPlaying(with event: any Event) -> Bool {
-        let sp = lastEditedSheetScreenCenterPositionNoneCursor ?? event.screenPoint
-        let p = convertScreenToWorld(sp)
-        if let sheetView = sheetView(at: p), sheetView.isPlaying {
-            return true
-        }
-        for shp in aroundSheetpos(atCenter: intPosition(at: p)) {
-            if let sheetView = sheetView(at: shp.shp), sheetView.isPlaying {
-                return true
-            }
-        }
-        return false
-    }
-    
     var isUpdateWithCursorPosition = true
     var cursorPoint = Point() {
         didSet {
@@ -2614,11 +2624,11 @@ final class Document: @unchecked Sendable {
         for shp in shps {
             nshps[shp] = nil
         }
-        nshps.forEach { readAndClose(.none, qos: .default, at: $0.value.sheetID, $0.key) }
+        nshps.forEach { readAndClose(.none, priority: .medium, at: $0.value.sheetID, $0.key) }
         for nshp in shps {
             if oshps[nshp] == nil, let sid = sheetID(at: nshp) {
                 readAndClose(.sheet,
-                             qos: nshp == shp ? .userInteractive : (utilitySHPs.contains(nshp) ? .utility : .default),
+                             priority: nshp == shp ? .high : (utilitySHPs.contains(nshp) ? .low : .medium),
                              at: sid, nshp)
             }
         }
@@ -2664,7 +2674,7 @@ final class Document: @unchecked Sendable {
         if let type = type {
             if let oldType = tv.type {
                 if type != oldType {
-                    tv.workItem?.cancel()
+                    tv.task?.cancel()
                     openThumbnail(at: shp, sid, tv.node, type)
                 }
             } else {
@@ -2672,7 +2682,7 @@ final class Document: @unchecked Sendable {
             }
         } else {
             if tv.type != nil {
-                tv.workItem?.cancel()
+                tv.task?.cancel()
                 tv.node?.removeFromParent()
                 thumbnailNodeValues[shp]?.node?.removeFromParent()
                 thumbnailNodeValues[shp] = .init(type: type, sheetID: sid, node: nil)
@@ -2690,37 +2700,31 @@ final class Document: @unchecked Sendable {
             return
         }
         
-        var workItem: DispatchWorkItem!
-        workItem = DispatchWorkItem() { [weak thumbnailRecord, weak node] in
-            defer { workItem = nil }
-            guard !workItem.isCancelled else { return }
-            
-            guard let thumbnailRecord,
-                  let block = try? Texture.block(from: thumbnailRecord, isMipmapped: true) else { return }
-            DispatchQueue.main.async { [weak node] in
-                if let thumbnailTexture = try? Texture(block: block) {
-                    node?.fillType = .texture(thumbnailTexture)
-                }
+        let task = Task.detached {
+            guard let block = try? Texture.block(from: thumbnailRecord, isMipmapped: true) else { return }
+            Task { @MainActor in
+                try Task.checkCancellation()
+                let thumbnailTexture = try Texture(block: block)
+                node.fillType = .texture(thumbnailTexture)
             }
         }
-        DispatchQueue.global().async(execute: workItem)
         
         thumbnailNodeValues[shp]?.node?.removeFromParent()
-        thumbnailNodeValues[shp] = .init(type: type, sheetID: sid, node: node, workItem: workItem)
+        thumbnailNodeValues[shp] = .init(type: type, sheetID: sid, node: node, task: task)
         sheetsNode.append(child: node)
     }
     
     func close(from shps: [Sheetpos]) {
         shps.forEach {
             if let sid = sheetID(at: $0) {
-                readAndClose(.none, qos: .default, at: sid, $0)
+                readAndClose(.none, priority: .medium, at: sid, $0)
             }
         }
     }
     func close(from sids: [SheetID]) {
         sids.forEach {
             if let shp = sheetPosition(at: $0) {
-                readAndClose(.none, qos: .default, at: $0, shp)
+                readAndClose(.none, priority: .medium, at: $0, shp)
             }
         }
     }
@@ -2747,12 +2751,12 @@ final class Document: @unchecked Sendable {
         }
     }
     struct ReadingError: Error {}
-    private func readAndClose(_ type: NodeType, qos: DispatchQoS = .default,
+    private func readAndClose(_ type: NodeType, priority: TaskPriority = .medium,
                               at sid: SheetID, _ shp: Sheetpos) {
         switch type {
         case .none:
             if let sheetViewValue = sheetViewValues[shp] {
-                sheetViewValue.workItem?.cancel()
+                sheetViewValue.task?.cancel()
                 
                 if let sheetView = sheetViewValue.view {
                     sheetView.node.updateCache()
@@ -2788,6 +2792,7 @@ final class Document: @unchecked Sendable {
                 
                 updateThumbnail(sheetViewValue, at: shp, sid)
                 sheetViewValues[shp]?.view?.node.removeFromParent()
+                sheetViewValues[shp]?.view?.cancelTasks()
                 sheetViewValues[shp] = nil
                 sheetViewValue.view?.node.removeFromParent()
                 updateFindingNodes(at: shp)
@@ -2795,41 +2800,40 @@ final class Document: @unchecked Sendable {
             updateSelects()
         case .sheet:
             if sheetViewValues.contains(where: { $0.value.sheetID == sid }) { return }
-            
-            var workItem: DispatchWorkItem!
-            workItem = DispatchWorkItem(qos: qos) { [weak self] in
-                defer { workItem = nil }
-                guard let self, !workItem.isCancelled,
-                      let sheetRecorder = self.sheetRecorders[sid] else { return }
+            guard let sheetRecorder = self.sheetRecorders[sid] else { return }
+            let frame = self.sheetFrame(with: shp)
+            let screenToWorldScale = self.screenToWorldScale
+            let task = Task.detached(priority: priority) {
                 let sheetRecord = sheetRecorder.sheetRecord
-                let historyRecord = sheetRecorder.sheetHistoryRecord
-                
                 let sheet = sheetRecord.decodedValue ?? Sheet(message: "Failed to load".localized)
+                let historyRecord = sheetRecorder.sheetHistoryRecord
+                let history = historyRecord.decodedValue
+                
                 let sheetBinder = RecordBinder(value: sheet, record: sheetRecord)
                 let sheetView = SheetView(binder: sheetBinder, keyPath: \SheetBinder.value)
-                sheetView.screenToWorldScale = self.screenToWorldScale
+                sheetView.screenToWorldScale = screenToWorldScale
                 sheetView.id = sid
-                if let history = historyRecord.decodedValue {
+                if let history {
                     sheetView.history = history
                 }
-                let frame = self.sheetFrame(with: shp)
                 sheetView.bounds = Rect(size: frame.size)
                 sheetView.node.attitude.position = frame.origin
                 sheetView.node.allChildrenAndSelf { $0.updateDatas() }
-                updateWithIsFullEdit(in: sheetView)
                 do {
                     guard let thumbnail = sheetRecorder.thumbnail1024Record.decodedValue else { throw ReadingError() }
                     let block = try Texture.block(from: thumbnail, isMipmapped: true)
-                    DispatchQueue.main.async {
-                        sheetView.node.cacheTexture = try? .init(block: block)
+                    Task { @MainActor in
+                        sheetView.node.cacheTexture = try .init(block: block)
                     }
                 } catch {
-//                    sheetView.enableCache = true
+                    //                    sheetView.enableCache = true
                 }
                 
-                DispatchQueue.main.async {
+                Task { @MainActor in
+                    try Task.checkCancellation()
                     guard self.sheetID(at: shp) == sid,
                           self.sheetViewValues[shp] != nil else { return }
+                    self.updateWithIsFullEdit(in: sheetView)
                     sheetRecord.willwriteClosure = { [weak sheetView, weak self, weak historyRecord] (record) in
                         if let sheetView = sheetView {
                             record.value = sheetView.model
@@ -2841,7 +2845,7 @@ final class Document: @unchecked Sendable {
                     }
                     
                     self.sheetView(at: shp)?.node.removeFromParent()
-                    self.sheetViewValues[shp] = .init(sheetID: sid, view: sheetView, workItem: nil)
+                    self.sheetViewValues[shp] = .init(sheetID: sid, view: sheetView, task: nil)
                     if sheetView.node.parent == nil {
                         self.sheetsNode.append(child: sheetView.node)
                         sheetView.node.enableCache = true
@@ -2856,22 +2860,19 @@ final class Document: @unchecked Sendable {
                 }
             }
             sheetViewValues[shp]?.view?.node.removeFromParent()
-            sheetViewValues[shp] = .init(sheetID: sid, view: nil, workItem: workItem)
-            DispatchQueue.global().async(execute: workItem)
+            sheetViewValues[shp]?.view?.cancelTasks()
+            sheetViewValues[shp] = .init(sheetID: sid, view: nil, task: task)
         }
     }
     
     func renderableSheet(at sid: SheetID) -> Sheet? {
         sheetRecorders[sid]?.sheetRecord.decodedValue
     }
-    func renderableSheetNode(at sid: SheetID) -> Node? {
+    func renderableSheetNode(at sid: SheetID) -> CPUNode? {
         guard let shp = sheetPosition(at: sid) else { return nil }
-        guard let sheet = sheetRecorders[sid]?
-                .sheetRecord.decodedValue else { return nil }
-        let bounds = sheetFrame(with: shp).bounds
-        let node = sheet.node(isBorder: false, in: bounds)
-        node.attitude.position = sheetFrame(with: shp).origin
-        return node
+        guard let sheet = sheetRecorders[sid]?.sheetRecord.decodedValue else { return nil }
+        let frame = sheetFrame(with: shp)
+        return sheet.node(isBorder: false, attitude: .init(position: frame.origin), in: frame.bounds)
     }
     
     func readSheetView(at sid: SheetID) -> SheetView? {
@@ -2923,7 +2924,7 @@ final class Document: @unchecked Sendable {
         
         if isUpdateNode {
             self.sheetView(at: shp)?.node.removeFromParent()
-            sheetViewValues[shp] = SheetViewValue(sheetID: sid, view: sheetView, workItem: nil)
+            sheetViewValues[shp] = SheetViewValue(sheetID: sid, view: sheetView, task: nil)
             if sheetView.node.parent == nil {
                 sheetsNode.append(child: sheetView.node)
             }
@@ -3016,7 +3017,7 @@ final class Document: @unchecked Sendable {
                            isNewUndoGroup: Bool = true) -> SheetView? {
         let shp = sheetPosition(at: p)
         return if let ssv = madeSheetView(at: shp,
-                                   isNewUndoGroup: isNewUndoGroup) {
+                                          isNewUndoGroup: isNewUndoGroup) {
             ssv
         } else if let sid = sheetID(at: shp) {
             readSheetView(at: sid, shp, isUpdateNode: true)
@@ -3105,7 +3106,7 @@ final class Document: @unchecked Sendable {
         self.sheetView(at: shp)?.node.removeFromParent()
         sheetRecorders[sid] = sheetRecorder
         sheetViewValues[shp]?.view?.node.removeFromParent()
-        sheetViewValues[shp] = SheetViewValue(sheetID: sid, view: sheetView, workItem: nil)
+        sheetViewValues[shp] = .init(sheetID: sid, view: sheetView, task: nil)
         sheetsNode.append(child: sheetView.node)
         updateMap()
         updateWithIsFullEdit(in: sheetView)
@@ -3209,17 +3210,18 @@ final class Document: @unchecked Sendable {
         }
         if let sheetViewValue = sheetViewValues[shp] {
             sheetViewValue.view?.node.removeFromParent()
+            sheetViewValue.view?.cancelTasks()
             sheetViewValues[shp] = nil
         }
         updateMap()
     }
     
+    func updateLastEditedSheetpos(fromScreen screenPoint: Point) {
+        lastEditedSheetpos = sheetPosition(at: convertScreenToWorld(screenPoint))
+    }
+    
     private(set) var lastEditedSheetpos: Sheetpos?
     private var lastEditedSheetNode: Node?
-    func updateLastEditedSheetpos(from event: any Event) {
-        lastEditedSheetpos
-            = sheetPosition(at: convertScreenToWorld(event.screenPoint))
-    }
     var isShownLastEditedSheet = false {
         didSet {
             updateSelectedColor(isMain: true)
@@ -3277,7 +3279,7 @@ final class Document: @unchecked Sendable {
     }
     func isSelectNoneCursor(at p: Point) -> Bool {
         (isNoneCursor && lastEditedSheetposNoneCursor == nil)
-            || isSelect(at: p)
+        || isSelect(at: p)
     }
     var lastEditedSheetWorldCenterPositionNoneCursor: Point? {
         if let shp = lastEditedSheetposNoneCursor {
@@ -3309,7 +3311,7 @@ final class Document: @unchecked Sendable {
     }
     func isSelectSelectedNoneCursor(at p: Point) -> Bool {
         (isNoneCursor && selectedScreenPositionNoneCursor == nil)
-            || isSelect(at: p)
+        || isSelect(at: p)
     }
     var selectedSheetViewNoneCursor: SheetView? {
         guard isNoneCursor else { return nil }
@@ -3367,9 +3369,9 @@ final class Document: @unchecked Sendable {
     }
     
     func sheetViewAndFrame(at p: Point) -> (shp: Sheetpos,
-                                              sheetView: SheetView?,
-                                              frame: Rect,
-                                              isAll: Bool) {
+                                            sheetView: SheetView?,
+                                            frame: Rect,
+                                            isAll: Bool) {
         let shp = sheetPosition(at: p)
         let frame = sheetFrame(with: shp)
         if let sheetView = sheetView(at: p) {
@@ -3544,7 +3546,7 @@ final class Document: @unchecked Sendable {
             let inP = sheetView.convertFromWorld(p)
             return sheetView.sheetColorOwner(at: inP,
                                              scale: screenToWorldScale).value.uuColor
-                == Sheet.defalutBackgroundUUColor
+            == Sheet.defalutBackgroundUUColor
         } else {
             return true
         }
@@ -3616,7 +3618,7 @@ final class Document: @unchecked Sendable {
             if sortedXSHPs.count > 1 {
                 for i in 1 ..< sortedXSHPs.count {
                     roads.append(Road(shp0: sortedXSHPs[i - 1],
-                                                        shp1: sortedXSHPs[i]))
+                                      shp1: sortedXSHPs[i]))
                 }
             }
             if !previousSHPs.isEmpty {
@@ -3759,410 +3761,5 @@ final class Document: @unchecked Sendable {
         } else {
             .circle(string: string)
         }
-    }
-    
-    var modifierKeys = ModifierKeys()
-    
-    func indicate(with event: DragEvent) {
-        cursorPoint = event.screenPoint
-        textEditor.isMovedCursor = true
-        textEditor.moveEndInputKey(isStopFromMarkedText: true)
-    }
-    
-    private(set) var oldPinchEvent: PinchEvent?, zoomer: Zoomer?
-    func pinch(_ event: PinchEvent) {
-        switch event.phase {
-        case .began:
-            zoomer = Zoomer(self)
-            zoomer?.send(event)
-            oldPinchEvent = event
-        case .changed:
-            zoomer?.send(event)
-            oldPinchEvent = event
-        case .ended:
-            oldPinchEvent = nil
-            zoomer?.send(event)
-            zoomer = nil
-        }
-    }
-    
-    private(set) var oldScrollEvent: ScrollEvent?, scroller: Scroller?
-    func scroll(_ event: ScrollEvent) {
-        textEditor.moveEndInputKey()
-        switch event.phase {
-        case .began:
-            scroller = Scroller(self)
-            scroller?.send(event)
-            oldScrollEvent = event
-        case .changed:
-            scroller?.send(event)
-            oldScrollEvent = event
-        case .ended:
-            oldScrollEvent = nil
-            scroller?.send(event)
-            scroller = nil
-        }
-    }
-    
-    private(set) var oldSwipeEvent: SwipeEvent?, swiper: KeyframeSwiper?
-    func swipe(_ event: SwipeEvent) {
-        textEditor.moveEndInputKey()
-        switch event.phase {
-        case .began:
-            swiper = KeyframeSwiper(self)
-            swiper?.send(event)
-            oldSwipeEvent = event
-        case .changed:
-            swiper?.send(event)
-            oldSwipeEvent = event
-        case .ended:
-            oldSwipeEvent = nil
-            swiper?.send(event)
-            swiper = nil
-        }
-    }
-    
-    private(set) var oldRotateEvent: RotateEvent?, rotater: Rotater?
-    func rotate(_ event: RotateEvent) {
-        switch event.phase {
-        case .began:
-            rotater = Rotater(self)
-            rotater?.send(event)
-            oldRotateEvent = event
-        case .changed:
-            rotater?.send(event)
-            oldRotateEvent = event
-        case .ended:
-            oldRotateEvent = nil
-            rotater?.send(event)
-            rotater = nil
-        }
-    }
-    
-    func strongDrag(_ event: DragEvent) {}
-    
-    private(set) var oldSubDragEvent: DragEvent?, subDragEditor: (any DragEditor)?
-    func subDrag(_ event: DragEvent) {
-        switch event.phase {
-        case .began:
-            updateLastEditedSheetpos(from: event)
-            stopInputTextEvent()
-            subDragEditor = RangeSelector(self)
-            subDragEditor?.send(event)
-            oldSubDragEvent = event
-            textCursorNode.isHidden = true
-            textMaxTypelineWidthNode.isHidden = true
-        case .changed:
-            subDragEditor?.send(event)
-            oldSubDragEvent = event
-        case .ended:
-            oldSubDragEvent = nil
-            subDragEditor?.send(event)
-            subDragEditor = nil
-            cursorPoint = event.screenPoint
-        }
-    }
-    
-    private(set) var oldMiddleDragEvent: DragEvent?, middleDragEditor: (any DragEditor)?
-    func middleDrag(_ event: DragEvent) {
-        switch event.phase {
-        case .began:
-            updateLastEditedSheetpos(from: event)
-            stopInputTextEvent()
-            middleDragEditor = LassoCutter(self)
-            middleDragEditor?.send(event)
-            oldMiddleDragEvent = event
-            textCursorNode.isHidden = true
-            textMaxTypelineWidthNode.isHidden = true
-        case .changed:
-            middleDragEditor?.send(event)
-            oldMiddleDragEvent = event
-        case .ended:
-            oldMiddleDragEvent = nil
-            middleDragEditor?.send(event)
-            middleDragEditor = nil
-            cursorPoint = event.screenPoint
-        }
-    }
-    
-    private func dragEditor(with quasimode: Quasimode) -> (any DragEditor)? {
-        switch quasimode {
-        case .drawLine: LineDrawer(self)
-        case .drawStraightLine: StraightLineDrawer(self)
-        case .lassoCut: LassoCutter(self)
-        case .selectByRange: RangeSelector(self)
-        case .changeLightness: LightnessChanger(self)
-        case .changeTint: TintChanger(self)
-        case .slide: Slider(self)
-        case .selectFrame: FrameSelecter(self)
-            
-        case .moveLinePoint, .fnMoveLinePoint: LineSlider(self)
-        case .moveLineZ: LineZSlider(self)
-        case .selectVersion: VersionSelector(self)
-        default: nil
-        }
-    }
-    private(set) var oldDragEvent: DragEvent?, dragEditor: (any DragEditor)?
-    func drag(_ event: DragEvent) {
-        switch event.phase {
-        case .began:
-            updateLastEditedSheetpos(from: event)
-            stopInputTextEvent()
-            let quasimode = Quasimode(modifier: modifierKeys, .drag)
-            if quasimode != .selectFrame {
-                stopInputKeyEvent()
-            }
-            dragEditor = self.dragEditor(with: quasimode)
-            dragEditor?.send(event)
-            oldDragEvent = event
-            textCursorNode.isHidden = true
-            textMaxTypelineWidthNode.isHidden = true
-            
-            isUpdateWithCursorPosition = false
-            cursorPoint = event.screenPoint
-        case .changed:
-            dragEditor?.send(event)
-            oldDragEvent = event
-            
-            cursorPoint = event.screenPoint
-        case .ended:
-            oldDragEvent = nil
-            dragEditor?.send(event)
-            dragEditor = nil
-            
-            isUpdateWithCursorPosition = true
-            cursorPoint = event.screenPoint
-        }
-    }
-    
-    private(set) var oldInputTextKeys = Set<InputKeyType>()
-    lazy private(set) var textEditor: TextEditor = { TextEditor(self) } ()
-    func inputText(_ event: InputTextEvent) {
-        switch event.phase {
-        case .began:
-            updateLastEditedSheetpos(from: event)
-            oldInputTextKeys.insert(event.inputKeyType)
-            textEditor.send(event)
-        case .changed:
-            textEditor.send(event)
-        case .ended:
-            oldInputTextKeys.remove(event.inputKeyType)
-            textEditor.send(event)
-        }
-    }
-    
-    var runners = Set<RunEditor>() {
-        didSet {
-            updateRunners()
-        }
-    }
-    var runnerNodes = [(origin: Point, node: Node)]()
-    var runnersNode: Node?
-    func updateRunners() {
-        runnerNodes.forEach { $0.node.removeFromParent() }
-        runnerNodes = runners.map {
-            let text = Text(string: "Calculating".localized)
-            let textNode = text.node
-            let node = Node(children: [textNode], isHidden: true,
-                            path: Path(textNode.bounds?
-                                        .inset(by: -10) ?? Rect(),
-                                       cornerRadius: 8),
-                            lineWidth: 1, lineType: .color(.border),
-                            fillType: .color(.background))
-            return ($0.worldPrintOrigin, node)
-        }
-        runnerNodes.forEach { rootNode.append(child: $0.node) }
-        
-        updateRunnerNodesPosition()
-    }
-    func updateRunnerNodesPosition() {
-        guard !runnerNodes.isEmpty else { return }
-        let b = screenBounds.inset(by: 5)
-        for (p, node) in runnerNodes {
-            let sp = convertWorldToScreen(p)
-            if !b.contains(sp) || worldToScreenScale < 0.25 {
-                node.isHidden = false
-                
-                let fp = b.centerPoint
-                let ps = b.intersection(Edge(fp, sp))
-                if !ps.isEmpty, let cvb = node.bounds {
-                    let np = ps[0]
-                    let cvf = Rect(x: np.x - cvb.width / 2,
-                                   y: np.y - cvb.height / 2,
-                                   width: cvb.width, height: cvb.height)
-                    let nf = screenBounds.inset(by: 5).clipped(cvf)
-                    node.attitude.position
-                        = convertScreenToWorld(nf.origin - cvb.origin)
-                } else {
-                    node.attitude.position = p
-                }
-                node.attitude.scale = Size(square: 1 / worldToScreenScale)
-                if camera.rotation != 0 {
-                    node.attitude.rotation = camera.rotation
-                }
-            } else {
-                node.isHidden = true
-            }
-        }
-    }
-    
-    private func inputKeyEditor(with quasimode: Quasimode) -> (any InputKeyEditor)? {
-        switch quasimode {
-        case .cut: Cutter(self)
-        case .copy: Copier(self)
-        case .copyLineColor: LineColorCopier(self)
-        case .paste: Paster(self)
-        case .undo: Undoer(self)
-        case .redo: Redoer(self)
-        case .find: Finder(self)
-        case .lookUp: Looker(self)
-        case .changeToVerticalText: VerticalTextChanger(self)
-        case .changeToHorizontalText: HorizontalTextChanger(self)
-        case .changeToSuperscript: SuperscriptChanger(self)
-        case .changeToSubscript: SubscriptChanger(self)
-        case .run: Runner(self)
-        case .changeToDraft: DraftChanger(self)
-        case .cutDraft: DraftCutter(self)
-        case .makeFaces: FacesMaker(self)
-        case .cutFaces: FacesCutter(self)
-        case .play, .sPlay: Player(self)
-        case .movePreviousKeyframe: KeyframePreviousMover(self)
-        case .moveNextKeyframe: KeyframeNextMover(self)
-        case .movePreviousFrame: FramePreviousMover(self)
-        case .moveNextFrame: FrameNextMover(self)
-        case .insertKeyframe: KeyframeInserter(self)
-        case .addScore: ScoreAdder(self)
-        case .interpolate: Interpolater(self)
-        case .crossErase: CrossEraser(self)
-        case .showTone: ToneShower(self)
-        case .stop: Stopper(self)
-        default: nil
-        }
-    }
-    private(set) var oldInputKeyEvent: InputKeyEvent?
-    private(set) var inputKeyEditor: (any InputKeyEditor)?
-    func inputKey(_ event: InputKeyEvent) {
-        switch event.phase {
-        case .began:
-            updateLastEditedSheetpos(from: event)
-            guard inputKeyEditor == nil else { return }
-            let quasimode = Quasimode(modifier: modifierKeys,
-                                      event.inputKeyType)
-            if textEditor.editingTextView != nil
-                && quasimode != .changeToSuperscript
-                && quasimode != .changeToSubscript
-                && quasimode != .changeToHorizontalText
-                && quasimode != .changeToVerticalText
-                && quasimode != .paste {
-                
-                stopInputTextEvent(isEndEdit: quasimode != .undo
-                                    && quasimode != .redo)
-            }
-            if quasimode == .run {
-                textEditor.moveEndInputKey()
-            }
-            stopDragEvent()
-            inputKeyEditor = self.inputKeyEditor(with: quasimode)
-            inputKeyEditor?.send(event)
-            oldInputKeyEvent = event
-        case .changed:
-            inputKeyEditor?.send(event)
-            oldInputKeyEvent = event
-        case .ended:
-            oldInputKeyEvent = nil
-            inputKeyEditor?.send(event)
-            inputKeyEditor = nil
-        }
-    }
-    
-    func keepOut(with event: any Event) {
-        switch event.phase {
-        case .began:
-            cursor = .block
-        case .changed:
-            break
-        case .ended:
-            cursor = defaultCursor
-        }
-    }
-    func stopPlaying(with event: any Event) {
-        switch event.phase {
-        case .began:
-            cursor = .stop
-            
-            for (_, v) in sheetViewValues {
-                v.view?.stop()
-            }
-        case .changed:
-            break
-        case .ended:
-            cursor = defaultCursor
-        }
-    }
-    
-    func stopAllEvents(isEnableText: Bool = true) {
-        stopPinchEvent()
-        stopScrollEvent()
-        stopSwipeEvent()
-        stopDragEvent()
-        if isEnableText {
-            stopInputTextEvent()
-        }
-        stopInputKeyEvent()
-        if isEnableText {
-            textEditor.moveEndInputKey()
-        }
-        modifierKeys = []
-    }
-    func stopPinchEvent() {
-        if var event = oldPinchEvent, let pinchEditor = zoomer {
-            event.phase = .ended
-            self.zoomer = nil
-            oldPinchEvent = nil
-            pinchEditor.send(event)
-        }
-    }
-    func stopScrollEvent() {
-        if var event = oldScrollEvent, let scrollEditor = scroller {
-            event.phase = .ended
-            self.scroller = nil
-            oldScrollEvent = nil
-            scrollEditor.send(event)
-        }
-    }
-    func stopSwipeEvent() {
-        if var event = oldSwipeEvent, let swiper {
-            event.phase = .ended
-            self.swiper = nil
-            oldSwipeEvent = nil
-            swiper.send(event)
-        }
-    }
-    func stopDragEvent() {
-        if var event = oldDragEvent, let dragEditor = dragEditor {
-            event.phase = .ended
-            self.dragEditor = nil
-            oldDragEvent = nil
-            dragEditor.send(event)
-        }
-    }
-    func stopInputTextEvent(isEndEdit: Bool = true) {
-        oldInputTextKeys.removeAll()
-        textEditor.stopInputKey(isEndEdit: isEndEdit)
-    }
-    func stopInputKeyEvent() {
-        if var event = oldInputKeyEvent, let inputKeyEditor = inputKeyEditor {
-            event.phase = .ended
-            self.inputKeyEditor = nil
-            oldInputKeyEvent = nil
-            inputKeyEditor.send(event)
-        }
-    }
-    func updateEditorNode() {
-        zoomer?.updateNode()
-        scroller?.updateNode()
-        swiper?.updateNode()
-        dragEditor?.updateNode()
-        inputKeyEditor?.updateNode()
     }
 }

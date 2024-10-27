@@ -18,7 +18,7 @@
 import Dispatch
 import struct Foundation.UUID
 
-final class LineView<T: BinderProtocol>: View {
+final class LineView<T: BinderProtocol>: View, @unchecked Sendable {
     typealias Model = Line
     typealias Binder = T
     let binder: Binder
@@ -86,7 +86,7 @@ final class LineView<T: BinderProtocol>: View {
 }
 typealias SheetLineView = LineView<SheetBinder>
 
-final class PlaneView<T: BinderProtocol>: View {
+final class PlaneView<T: BinderProtocol>: View, @unchecked Sendable {
     typealias Model = Plane
     typealias Binder = T
     let binder: Binder
@@ -125,7 +125,7 @@ typealias SheetPlaneView = PlaneView<SheetBinder>
 typealias SheetTextView = TextView<SheetBinder>
 typealias SheetContentView = ContentView<SheetBinder>
 
-final class BorderView<T: BinderProtocol>: View {
+final class BorderView<T: BinderProtocol>: View, @unchecked Sendable {
     typealias Model = Border
     typealias Binder = T
     let binder: Binder
@@ -163,7 +163,7 @@ final class BorderView<T: BinderProtocol>: View {
 }
 typealias SheetBorderView = BorderView<SheetBinder>
 
-final class KeyframeView: View {
+final class KeyframeView: View, @unchecked Sendable {
     typealias Model = Keyframe
     typealias Binder = SheetBinder
     let binder: Binder
@@ -262,7 +262,7 @@ extension TimelineView {
     }
 }
 
-final class AnimationView: TimelineView {
+final class AnimationView: TimelineView, @unchecked Sendable {
     typealias Binder = KeyframeView.Binder
     typealias Model = Animation
     let binder: Binder
@@ -1132,7 +1132,8 @@ final class SheetView: View, @unchecked Sendable {
         
         animationView.isSelected = true
     }
-    deinit {
+    
+    func cancelTasks() {
         playingTimer?.cancel()
         playingTimer = nil
         
@@ -6791,6 +6792,7 @@ final class SheetView: View, @unchecked Sendable {
         }
     }
     
+    @MainActor
     func makeFaces(with path: Path?, isSelection: Bool) {
         if selectedFrameIndexes.isEmpty {
             makeFacesFromKeyframeIndex(with: path, isSelection: isSelection)

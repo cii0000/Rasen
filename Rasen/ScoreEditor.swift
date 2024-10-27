@@ -17,7 +17,7 @@
 
 import struct Foundation.UUID
 
-protocol TimelineView: View, TempoType {
+protocol TimelineView: View where Model: TempoType {
     func x(atBeat beat: Rational) -> Double
     func x(atBeat beat: Double) -> Double
     func x(atSec sec: Rational) -> Double
@@ -47,10 +47,10 @@ extension TimelineView {
         beat * Sheet.beatWidth + Sheet.textPadding.width - origin.x
     }
     func x(atSec sec: Rational) -> Double {
-        x(atBeat: beat(fromSec: sec))
+        x(atBeat: model.beat(fromSec: sec))
     }
     func x(atSec sec: Double) -> Double {
-        x(atBeat: beat(fromSec: sec))
+        x(atBeat: model.beat(fromSec: sec))
     }
     
     func width(atDurBeat durBeat: Rational) -> Double {
@@ -60,10 +60,10 @@ extension TimelineView {
         durBeat * Sheet.beatWidth
     }
     func width(atDurSec durSec: Rational) -> Double {
-        width(atDurBeat: beat(fromSec: durSec))
+        width(atDurBeat: model.beat(fromSec: durSec))
     }
     func width(atDurSec durSec: Double) -> Double {
-        width(atDurBeat: beat(fromSec: durSec))
+        width(atDurBeat: model.beat(fromSec: durSec))
     }
     
     func beat(atX x: Double, interval: Rational) -> Rational {
@@ -80,10 +80,10 @@ extension TimelineView {
     }
     
     func sec(atX x: Double, interval: Rational) -> Rational {
-        sec(fromBeat: beat(atX: x, interval: interval))
+        model.sec(fromBeat: beat(atX: x, interval: interval))
     }
     func sec(atX x: Double) -> Double {
-        sec(fromBeat: beat(atX: x))
+        model.sec(fromBeat: beat(atX: x))
     }
     func sec(atX x: Double) -> Rational {
         sec(atX: x, interval: Rational(1, frameRate))
@@ -91,7 +91,7 @@ extension TimelineView {
     
     func containsSec(_ p: Point, maxDistance: Double) -> Bool {
         guard let beatRange else { return false }
-        let secRange = secRange(fromBeat: beatRange)
+        let secRange = model.secRange(fromBeat: beatRange)
         let sy = timelineCenterY - Sheet.timelineHalfHeight + origin.y
         for sec in Int(secRange.start.rounded(.up)) ..< Int(secRange.end.rounded(.up)) {
             let sec = Rational(sec)
@@ -118,21 +118,22 @@ protocol SpectrgramView: TimelineView {
 }
 
 final class ScoreAdder: InputKeyEditor {
-    let document: Document
+    let root: RootEditor, document: Document
     let isEditingSheet: Bool
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
         isEditingSheet = document.isEditingSheet
     }
     
     func send(_ event: InputKeyEvent) {
         guard isEditingSheet else {
-            document.keepOut(with: event)
+            root.keepOut(with: event)
             return
         }
-        if document.isPlaying(with: event) {
-            document.stopPlaying(with: event)
+        if root.isPlaying(with: event) {
+            root.stopPlaying(with: event)
         }
         let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
@@ -149,7 +150,7 @@ final class ScoreAdder: InputKeyEditor {
                 sheetView.newUndoGroup()
                 sheetView.set(option)
                 
-                document.updateEditorNode()
+                root.updateEditorNode()
                 document.updateSelects()
             }
         case .changed:
@@ -161,21 +162,22 @@ final class ScoreAdder: InputKeyEditor {
 }
 
 final class ToneShower: InputKeyEditor {
-    let document: Document
+    let root: RootEditor, document: Document
     let isEditingSheet: Bool
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
         isEditingSheet = document.isEditingSheet
     }
     
     func send(_ event: InputKeyEvent) {
         guard isEditingSheet else {
-            document.keepOut(with: event)
+            root.keepOut(with: event)
             return
         }
-        if document.isPlaying(with: event) {
-            document.stopPlaying(with: event)
+        if root.isPlaying(with: event) {
+            root.stopPlaying(with: event)
         }
         let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
@@ -220,11 +222,12 @@ final class ToneShower: InputKeyEditor {
 }
 
 final class ScoreSlider: DragEditor {
-    let document: Document
+    let root: RootEditor, document: Document
     let isEditingSheet: Bool
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
         isEditingSheet = document.isEditingSheet
     }
     
@@ -256,7 +259,7 @@ final class ScoreSlider: DragEditor {
     
     func send(_ event: DragEvent) {
         guard isEditingSheet else {
-            document.keepOut(with: event)
+            root.keepOut(with: event)
             return
         }
         
@@ -267,8 +270,8 @@ final class ScoreSlider: DragEditor {
         case .began:
             document.cursor = .arrow
             
-            if document.isPlaying(with: event) {
-                document.stopPlaying(with: event)
+            if root.isPlaying(with: event) {
+                root.stopPlaying(with: event)
             }
             
             if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
@@ -689,7 +692,7 @@ struct ScoreLayout {
     static let isShownSpectrogramHeight = 6.0
 }
 
-final class ScoreView: TimelineView {
+final class ScoreView: TimelineView, @unchecked Sendable {
     typealias Model = Score
     typealias Binder = SheetBinder
     let binder: Binder
@@ -1715,7 +1718,7 @@ extension ScoreView {
                 var lastV: [PAndColor]?, isLastAppned = false
                 while nBeat <= note.beatRange.end {
                     let x = self.x(atBeat: nBeat)
-                    let sprols = pitbend.spectlope(atSec: Double(sec(fromBeat: nBeat - note.beatRange.start))).sprols
+                    let sprols = pitbend.spectlope(atSec: Double(model.sec(fromBeat: nBeat - note.beatRange.start))).sprols
                     let psPitch = pitch(atBeat: nBeat, from: note)
                     let noteY = y(fromPitch: psPitch)
                     let v = pAndColors(x: x, pitch: psPitch, noteY: noteY, sprols: sprols, isBack: isBack)
@@ -1732,7 +1735,7 @@ extension ScoreView {
                 }
                 if nBeat != note.beatRange.end {
                     let x = self.x(atBeat: note.beatRange.end)
-                    let sprols = pitbend.spectlope(atSec: Double(sec(fromBeat: note.beatRange.end - note.beatRange.start))).sprols
+                    let sprols = pitbend.spectlope(atSec: Double(model.sec(fromBeat: note.beatRange.end - note.beatRange.start))).sprols
                     let psPitch = pitch(atBeat: note.beatRange.end, from: note)
                     let noteY = y(fromPitch: psPitch)
                     let v = pAndColors(x: x, pitch: psPitch, noteY: noteY, sprols: sprols, isBack: isBack)

@@ -20,8 +20,8 @@ import struct Foundation.UUID
 final class LightnessChanger: DragEditor {
     let editor: ColorEditor
     
-    init(_ document: Document) {
-        editor = ColorEditor(document)
+    init(_ root: RootEditor) {
+        editor = ColorEditor(root)
     }
     
     func send(_ event: DragEvent) {
@@ -34,8 +34,8 @@ final class LightnessChanger: DragEditor {
 final class TintChanger: DragEditor {
     let editor: ColorEditor
     
-    init(_ document: Document) {
-        editor = ColorEditor(document)
+    init(_ root: RootEditor) {
+        editor = ColorEditor(root)
     }
     
     func send(_ event: DragEvent) {
@@ -46,11 +46,12 @@ final class TintChanger: DragEditor {
     }
 }
 final class ColorEditor: Editor {
-    let document: Document
+    let root: RootEditor, document: Document
     let isEditingSheet: Bool
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
         isEditingSheet = document.isEditingSheet
     }
     
@@ -301,7 +302,7 @@ final class ColorEditor: Editor {
     
     func changeVolm(with event: DragEvent) {
         guard isEditingSheet else {
-            document.keepOut(with: event)
+            root.keepOut(with: event)
             return
         }
         
@@ -310,8 +311,8 @@ final class ColorEditor: Editor {
         case .began:
             document.cursor = .arrow
             
-            if document.isPlaying(with: event) {
-                document.stopPlaying(with: event)
+            if root.isPlaying(with: event) {
+                root.stopPlaying(with: event)
             }
             
             beganSP = sp
@@ -752,7 +753,7 @@ final class ColorEditor: Editor {
     private var beganNoise = 0.0, oldNoise = 0.0
     func changePan(with event: DragEvent) {
         guard isEditingSheet else {
-            document.keepOut(with: event)
+            root.keepOut(with: event)
             return
         }
         
@@ -761,8 +762,8 @@ final class ColorEditor: Editor {
         case .began:
             document.cursor = .arrow
             
-            if document.isPlaying(with: event) {
-                document.stopPlaying(with: event)
+            if root.isPlaying(with: event) {
+                root.stopPlaying(with: event)
             }
             
             beganSP = sp
@@ -1132,11 +1133,11 @@ final class ColorEditor: Editor {
     
     func changeLightness(with event: DragEvent) {
         guard isEditingSheet else {
-            document.keepOut(with: event)
+            root.keepOut(with: event)
             return
         }
-        if document.isPlaying(with: event) {
-            document.stopPlaying(with: event)
+        if root.isPlaying(with: event) {
+            root.stopPlaying(with: event)
         }
         
         if isChangeVolm {
@@ -1317,11 +1318,11 @@ final class ColorEditor: Editor {
     var lastTintSnapTime: Double?
     func changeTint(with event: DragEvent) {
         guard isEditingSheet else {
-            document.keepOut(with: event)
+            root.keepOut(with: event)
             return
         }
-        if document.isPlaying(with: event) {
-            document.stopPlaying(with: event)
+        if root.isPlaying(with: event) {
+            root.stopPlaying(with: event)
         }
         
         if isChangePan {

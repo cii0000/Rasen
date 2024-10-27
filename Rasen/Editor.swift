@@ -17,7 +17,7 @@
 
 import struct Foundation.UUID
 
-protocol Editor {
+@MainActor protocol Editor {
     func updateNode()
 }
 extension Editor {
@@ -43,11 +43,414 @@ protocol InputKeyEditor: Editor {
     func send(_ event: InputKeyEvent)
 }
 
-final class Zoomer: PinchEditor {
-    let document: Document
+final class RootEditor: Editor {
+    var document: Document
     
     init(_ document: Document) {
         self.document = document
+        
+        document.updateNodeNotifications.append { [weak self] _ in
+            self?.updateEditorNode()
+        }
+    }
+    
+    func cancelTasks() {
+        runners.forEach { $0.cancel() }
+        
+        textEditor.cancelTasks()
+        
+        document.cancelTasks()
+    }
+    
+    func containsAllTimelines(with event: any Event) -> Bool {
+        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor ?? event.screenPoint
+        let p = document.convertScreenToWorld(sp)
+        guard let sheetView = document.sheetView(at: p) else { return false }
+        let inP = sheetView.convertFromWorld(p)
+        return sheetView.animationView.containsTimeline(inP, scale: document.screenToWorldScale)
+        || sheetView.containsOtherTimeline(inP, scale: document.screenToWorldScale)
+    }
+    func isPlaying(with event: any Event) -> Bool {
+        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor ?? event.screenPoint
+        let p = document.convertScreenToWorld(sp)
+        if let sheetView = document.sheetView(at: p), sheetView.isPlaying {
+            return true
+        }
+        for shp in document.aroundSheetpos(atCenter: document.intPosition(at: p)) {
+            if let sheetView = document.sheetView(at: shp.shp), sheetView.isPlaying {
+                return true
+            }
+        }
+        return false
+    }
+    
+    var modifierKeys = ModifierKeys()
+    
+    func indicate(with event: DragEvent) {
+        document.cursorPoint = event.screenPoint
+        textEditor.isMovedCursor = true
+        textEditor.moveEndInputKey(isStopFromMarkedText: true)
+    }
+    
+    private(set) var oldPinchEvent: PinchEvent?, zoomer: Zoomer?
+    func pinch(_ event: PinchEvent) {
+        switch event.phase {
+        case .began:
+            zoomer = Zoomer(self)
+            zoomer?.send(event)
+            oldPinchEvent = event
+        case .changed:
+            zoomer?.send(event)
+            oldPinchEvent = event
+        case .ended:
+            oldPinchEvent = nil
+            zoomer?.send(event)
+            zoomer = nil
+        }
+    }
+    
+    private(set) var oldScrollEvent: ScrollEvent?, scroller: Scroller?
+    func scroll(_ event: ScrollEvent) {
+        textEditor.moveEndInputKey()
+        switch event.phase {
+        case .began:
+            scroller = Scroller(self)
+            scroller?.send(event)
+            oldScrollEvent = event
+        case .changed:
+            scroller?.send(event)
+            oldScrollEvent = event
+        case .ended:
+            oldScrollEvent = nil
+            scroller?.send(event)
+            scroller = nil
+        }
+    }
+    
+    private(set) var oldSwipeEvent: SwipeEvent?, swiper: KeyframeSwiper?
+    func swipe(_ event: SwipeEvent) {
+        textEditor.moveEndInputKey()
+        switch event.phase {
+        case .began:
+            swiper = KeyframeSwiper(self)
+            swiper?.send(event)
+            oldSwipeEvent = event
+        case .changed:
+            swiper?.send(event)
+            oldSwipeEvent = event
+        case .ended:
+            oldSwipeEvent = nil
+            swiper?.send(event)
+            swiper = nil
+        }
+    }
+    
+    private(set) var oldRotateEvent: RotateEvent?, rotater: Rotater?
+    func rotate(_ event: RotateEvent) {
+        switch event.phase {
+        case .began:
+            rotater = Rotater(self)
+            rotater?.send(event)
+            oldRotateEvent = event
+        case .changed:
+            rotater?.send(event)
+            oldRotateEvent = event
+        case .ended:
+            oldRotateEvent = nil
+            rotater?.send(event)
+            rotater = nil
+        }
+    }
+    
+    func strongDrag(_ event: DragEvent) {}
+    
+    private(set) var oldSubDragEvent: DragEvent?, subDragEditor: (any DragEditor)?
+    func subDrag(_ event: DragEvent) {
+        switch event.phase {
+        case .began:
+            updateLastEditedSheetpos(from: event)
+            stopInputTextEvent()
+            subDragEditor = RangeSelector(self)
+            subDragEditor?.send(event)
+            oldSubDragEvent = event
+            document.textCursorNode.isHidden = true
+            document.textMaxTypelineWidthNode.isHidden = true
+        case .changed:
+            subDragEditor?.send(event)
+            oldSubDragEvent = event
+        case .ended:
+            oldSubDragEvent = nil
+            subDragEditor?.send(event)
+            subDragEditor = nil
+            document.cursorPoint = event.screenPoint
+        }
+    }
+    
+    private(set) var oldMiddleDragEvent: DragEvent?, middleDragEditor: (any DragEditor)?
+    func middleDrag(_ event: DragEvent) {
+        switch event.phase {
+        case .began:
+            updateLastEditedSheetpos(from: event)
+            stopInputTextEvent()
+            middleDragEditor = LassoCutter(self)
+            middleDragEditor?.send(event)
+            oldMiddleDragEvent = event
+            document.textCursorNode.isHidden = true
+            document.textMaxTypelineWidthNode.isHidden = true
+        case .changed:
+            middleDragEditor?.send(event)
+            oldMiddleDragEvent = event
+        case .ended:
+            oldMiddleDragEvent = nil
+            middleDragEditor?.send(event)
+            middleDragEditor = nil
+            document.cursorPoint = event.screenPoint
+        }
+    }
+    
+    private func dragEditor(with quasimode: Quasimode) -> (any DragEditor)? {
+        switch quasimode {
+        case .drawLine: LineDrawer(self)
+        case .drawStraightLine: StraightLineDrawer(self)
+        case .lassoCut: LassoCutter(self)
+        case .selectByRange: RangeSelector(self)
+        case .changeLightness: LightnessChanger(self)
+        case .changeTint: TintChanger(self)
+        case .slide: Slider(self)
+        case .selectFrame: FrameSelecter(self)
+            
+        case .moveLinePoint, .fnMoveLinePoint: LineSlider(self)
+        case .moveLineZ: LineZSlider(self)
+        case .selectVersion: VersionSelector(self)
+        default: nil
+        }
+    }
+    private(set) var oldDragEvent: DragEvent?, dragEditor: (any DragEditor)?
+    func drag(_ event: DragEvent) {
+        switch event.phase {
+        case .began:
+            updateLastEditedSheetpos(from: event)
+            stopInputTextEvent()
+            let quasimode = Quasimode(modifier: modifierKeys, .drag)
+            if quasimode != .selectFrame {
+                stopInputKeyEvent()
+            }
+            dragEditor = self.dragEditor(with: quasimode)
+            dragEditor?.send(event)
+            oldDragEvent = event
+            document.textCursorNode.isHidden = true
+            document.textMaxTypelineWidthNode.isHidden = true
+            
+            document.isUpdateWithCursorPosition = false
+            document.cursorPoint = event.screenPoint
+        case .changed:
+            dragEditor?.send(event)
+            oldDragEvent = event
+            
+            document.cursorPoint = event.screenPoint
+        case .ended:
+            oldDragEvent = nil
+            dragEditor?.send(event)
+            dragEditor = nil
+            
+            document.isUpdateWithCursorPosition = true
+            document.cursorPoint = event.screenPoint
+        }
+    }
+    
+    private(set) var oldInputTextKeys = Set<InputKeyType>()
+    lazy private(set) var textEditor: TextEditor = { TextEditor(self) } ()
+    func inputText(_ event: InputTextEvent) {
+        switch event.phase {
+        case .began:
+            updateLastEditedSheetpos(from: event)
+            oldInputTextKeys.insert(event.inputKeyType)
+            textEditor.send(event)
+        case .changed:
+            textEditor.send(event)
+        case .ended:
+            oldInputTextKeys.remove(event.inputKeyType)
+            textEditor.send(event)
+        }
+    }
+    
+    var runners = Set<RunEditor>() {
+        didSet {
+            document.updateRunners(fromWorldPrintOrigins: runners.map { $0.worldPrintOrigin })
+        }
+    }
+    
+    private func inputKeyEditor(with quasimode: Quasimode) -> (any InputKeyEditor)? {
+        switch quasimode {
+        case .cut: Cutter(self)
+        case .copy: Copier(self)
+        case .copyLineColor: LineColorCopier(self)
+        case .paste: Paster(self)
+        case .undo: Undoer(self)
+        case .redo: Redoer(self)
+        case .find: Finder(self)
+        case .lookUp: Looker(self)
+        case .changeToVerticalText: VerticalTextChanger(self)
+        case .changeToHorizontalText: HorizontalTextChanger(self)
+        case .changeToSuperscript: SuperscriptChanger(self)
+        case .changeToSubscript: SubscriptChanger(self)
+        case .run: RunEditor(self)
+        case .changeToDraft: DraftChanger(self)
+        case .cutDraft: DraftCutter(self)
+        case .makeFaces: FacesMaker(self)
+        case .cutFaces: FacesCutter(self)
+        case .play, .sPlay: Player(self)
+        case .movePreviousKeyframe: KeyframePreviousMover(self)
+        case .moveNextKeyframe: KeyframeNextMover(self)
+        case .movePreviousFrame: FramePreviousMover(self)
+        case .moveNextFrame: FrameNextMover(self)
+        case .insertKeyframe: KeyframeInserter(self)
+        case .addScore: ScoreAdder(self)
+        case .interpolate: Interpolater(self)
+        case .crossErase: CrossEraser(self)
+        case .showTone: ToneShower(self)
+        case .stop: Stopper(self)
+        default: nil
+        }
+    }
+    private(set) var oldInputKeyEvent: InputKeyEvent?
+    private(set) var inputKeyEditor: (any InputKeyEditor)?
+    func inputKey(_ event: InputKeyEvent) {
+        switch event.phase {
+        case .began:
+            updateLastEditedSheetpos(from: event)
+            guard inputKeyEditor == nil else { return }
+            let quasimode = Quasimode(modifier: modifierKeys,
+                                      event.inputKeyType)
+            if document.editingTextView != nil
+                && quasimode != .changeToSuperscript
+                && quasimode != .changeToSubscript
+                && quasimode != .changeToHorizontalText
+                && quasimode != .changeToVerticalText
+                && quasimode != .paste {
+                
+                stopInputTextEvent(isEndEdit: quasimode != .undo
+                                    && quasimode != .redo)
+            }
+            if quasimode == .run {
+                textEditor.moveEndInputKey()
+            }
+            stopDragEvent()
+            inputKeyEditor = self.inputKeyEditor(with: quasimode)
+            inputKeyEditor?.send(event)
+            oldInputKeyEvent = event
+        case .changed:
+            inputKeyEditor?.send(event)
+            oldInputKeyEvent = event
+        case .ended:
+            oldInputKeyEvent = nil
+            inputKeyEditor?.send(event)
+            inputKeyEditor = nil
+        }
+    }
+    
+    func updateLastEditedSheetpos(from event: any Event) {
+        document.updateLastEditedSheetpos(fromScreen: event.screenPoint)
+    }
+    
+    func keepOut(with event: any Event) {
+        switch event.phase {
+        case .began:
+            document.cursor = .block
+        case .changed:
+            break
+        case .ended:
+            document.cursor = document.defaultCursor
+        }
+    }
+    func stopPlaying(with event: any Event) {
+        switch event.phase {
+        case .began:
+            document.cursor = .stop
+            
+            for (_, v) in document.sheetViewValues {
+                v.view?.stop()
+            }
+        case .changed:
+            break
+        case .ended:
+            document.cursor = document.defaultCursor
+        }
+    }
+    
+    func stopAllEvents(isEnableText: Bool = true) {
+        stopPinchEvent()
+        stopScrollEvent()
+        stopSwipeEvent()
+        stopDragEvent()
+        if isEnableText {
+            stopInputTextEvent()
+        }
+        stopInputKeyEvent()
+        if isEnableText {
+            textEditor.moveEndInputKey()
+        }
+        modifierKeys = []
+    }
+    func stopPinchEvent() {
+        if var event = oldPinchEvent, let pinchEditor = zoomer {
+            event.phase = .ended
+            self.zoomer = nil
+            oldPinchEvent = nil
+            pinchEditor.send(event)
+        }
+    }
+    func stopScrollEvent() {
+        if var event = oldScrollEvent, let scrollEditor = scroller {
+            event.phase = .ended
+            self.scroller = nil
+            oldScrollEvent = nil
+            scrollEditor.send(event)
+        }
+    }
+    func stopSwipeEvent() {
+        if var event = oldSwipeEvent, let swiper {
+            event.phase = .ended
+            self.swiper = nil
+            oldSwipeEvent = nil
+            swiper.send(event)
+        }
+    }
+    func stopDragEvent() {
+        if var event = oldDragEvent, let dragEditor = dragEditor {
+            event.phase = .ended
+            self.dragEditor = nil
+            oldDragEvent = nil
+            dragEditor.send(event)
+        }
+    }
+    func stopInputTextEvent(isEndEdit: Bool = true) {
+        oldInputTextKeys.removeAll()
+        textEditor.stopInputKey(isEndEdit: isEndEdit)
+    }
+    func stopInputKeyEvent() {
+        if var event = oldInputKeyEvent, let inputKeyEditor = inputKeyEditor {
+            event.phase = .ended
+            self.inputKeyEditor = nil
+            oldInputKeyEvent = nil
+            inputKeyEditor.send(event)
+        }
+    }
+    func updateEditorNode() {
+        zoomer?.updateNode()
+        scroller?.updateNode()
+        swiper?.updateNode()
+        dragEditor?.updateNode()
+        inputKeyEditor?.updateNode()
+    }
+}
+
+final class Zoomer: PinchEditor {
+    let root: RootEditor, document: Document
+    
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
     }
     
     let correction = 3.0
@@ -67,7 +470,7 @@ final class Zoomer: PinchEditor {
         document.camera = Document.clippedCamera(from: Camera(transform))
         
         if oldIsEditingSheet != document.isEditingSheet {
-            document.textEditor.moveEndInputKey()
+            root.textEditor.moveEndInputKey()
             document.updateTextCursor()
         }
         
@@ -81,10 +484,11 @@ final class Zoomer: PinchEditor {
 }
 
 final class Rotater: RotateEditor {
-    let document: Document
+    let root: RootEditor, document: Document
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
     }
     
     let correction = .pi / 40.0, clipD = .pi / 8.0
@@ -130,10 +534,11 @@ final class Rotater: RotateEditor {
 }
 
 final class Scroller: ScrollEditor {
-    let document: Document
+    let root: RootEditor, document: Document
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
     }
     
     enum SnapType {
@@ -195,8 +600,8 @@ final class Scroller: ScrollEditor {
 final class DraftChanger: InputKeyEditor {
     let editor: DraftEditor
     
-    init(_ document: Document) {
-        editor = DraftEditor(document)
+    init(_ root: RootEditor) {
+        editor = DraftEditor(root)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -209,8 +614,8 @@ final class DraftChanger: InputKeyEditor {
 final class DraftCutter: InputKeyEditor {
     let editor: DraftEditor
     
-    init(_ document: Document) {
-        editor = DraftEditor(document)
+    init(_ root: RootEditor) {
+        editor = DraftEditor(root)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -221,21 +626,22 @@ final class DraftCutter: InputKeyEditor {
     }
 }
 final class DraftEditor: Editor {
-    let document: Document
+    let root: RootEditor, document: Document
     let isEditingSheet: Bool
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
         isEditingSheet = document.isEditingSheet
     }
     
     func changeToDraft(with event: InputKeyEvent) {
         guard isEditingSheet else {
-            document.keepOut(with: event)
+            root.keepOut(with: event)
             return
         }
-        if document.isPlaying(with: event) {
-            document.stopPlaying(with: event)
+        if root.isPlaying(with: event) {
+            root.stopPlaying(with: event)
         }
         let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
@@ -309,11 +715,11 @@ final class DraftEditor: Editor {
     }
     func cutDraft(with event: InputKeyEvent) {
         guard isEditingSheet else {
-            document.keepOut(with: event)
+            root.keepOut(with: event)
             return
         }
-        if document.isPlaying(with: event) {
-            document.stopPlaying(with: event)
+        if root.isPlaying(with: event) {
+            root.stopPlaying(with: event)
         }
         let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
@@ -422,11 +828,11 @@ final class DraftEditor: Editor {
     }
 }
 
-final class FacesMaker: InputKeyEditor, @unchecked Sendable {
+final class FacesMaker: InputKeyEditor {
     let editor: FaceEditor
     
-    init(_ document: Document) {
-        editor = FaceEditor(document)
+    init(_ root: RootEditor) {
+        editor = FaceEditor(root)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -436,11 +842,11 @@ final class FacesMaker: InputKeyEditor, @unchecked Sendable {
         editor.updateNode()
     }
 }
-final class FacesCutter: InputKeyEditor, @unchecked Sendable {
+final class FacesCutter: InputKeyEditor {
     let editor: FaceEditor
     
-    init(_ document: Document) {
-        editor = FaceEditor(document)
+    init(_ root: RootEditor) {
+        editor = FaceEditor(root)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -450,22 +856,23 @@ final class FacesCutter: InputKeyEditor, @unchecked Sendable {
         editor.updateNode()
     }
 }
-final class FaceEditor: Editor, @unchecked Sendable {
-    let document: Document
+final class FaceEditor: Editor {
+    let root: RootEditor, document: Document
     let isEditingSheet: Bool
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
         isEditingSheet = document.isEditingSheet
     }
     
     func makeFaces(with event: InputKeyEvent) {
         guard isEditingSheet else {
-            document.keepOut(with: event)
+            root.keepOut(with: event)
             return
         }
-        if document.isPlaying(with: event) {
-            document.stopPlaying(with: event)
+        if root.isPlaying(with: event) {
+            root.stopPlaying(with: event)
         }
         let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
@@ -547,11 +954,11 @@ final class FaceEditor: Editor, @unchecked Sendable {
     }
     func cutFaces(with event: InputKeyEvent) {
         guard isEditingSheet else {
-            document.keepOut(with: event)
+            root.keepOut(with: event)
             return
         }
-        if document.isPlaying(with: event) {
-            document.stopPlaying(with: event)
+        if root.isPlaying(with: event) {
+            root.stopPlaying(with: event)
         }
         let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint

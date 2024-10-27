@@ -182,6 +182,11 @@ struct Content: Hashable, Codable {
         }
     }
 }
+extension Content: TempoType {
+    var tempo: Rational {
+        timeOption?.tempo ?? 0
+    }
+}
 extension Content {
     var durBeat: Rational? {
         if let timeOption {

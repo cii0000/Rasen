@@ -364,6 +364,11 @@ extension Text: Protobuf {
         }
     }
 }
+extension Text: TempoType {
+    var tempo: Rational {
+        timeOption?.tempo ?? 0
+    }
+}
 extension Text: Hashable, Codable {}
 extension Text: AppliableTransform {
     static func * (lhs: Text, rhs: Transform) -> Text {

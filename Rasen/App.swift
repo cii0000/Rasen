@@ -58,9 +58,6 @@ final class SubNSApplication: NSApplication {
         AppDelegate.updateSelectedColor()
         super.init()
     }
-    deinit {
-        urlTimer.cancel()
-    }
     
     func updateSelectedColor() {
         AppDelegate.updateSelectedColor()
@@ -99,7 +96,11 @@ final class SubNSApplication: NSApplication {
             window.toggleFullScreen(nil)
         }
         
-        view.document.restoreDatabase()
+        do {
+            try view.document.restoreDatabase()
+        } catch {
+            view.document.rootNode.show(error)
+        }
         view.document.cursorPoint = view.clippedScreenPointFromCursor.my
         
         SubNSApplication.shared.servicesMenu = NSMenu()
@@ -310,6 +311,7 @@ final class SubNSApplication: NSApplication {
     func applicationShouldTerminateAfterLastWindowClosed(_ document: NSApplication) -> Bool { true }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         view.cancelTasks()
+        urlTimer.cancel()
         view.document.endSave { _ in
             SubNSApplication.shared.reply(toApplicationShouldTerminate: true)
         }
@@ -336,7 +338,7 @@ final class SubNSApplication: NSApplication {
                 self.view.replaceDatabase(from: urls[0])
             } else {
                 guard !urls.isEmpty else { return }
-                let editor = IOEditor(self.view.document)
+                let editor = IOEditor(self.view.rootEditor)
                 let sp =  self.view.bounds.my.centerPoint
                 let shp = editor.beginImportFile(at: sp)
                 editor.importFile(from: urls, at: shp)
@@ -368,18 +370,18 @@ final class SubNSApplication: NSApplication {
         view.update()
     }
     func windowWillBeginSheet(_ notification: Notification) {
-        view.document.stopAllEvents()
+        view.rootEditor.stopAllEvents()
         view.draw()
     }
     func windowDidEndSheet(_ notification: Notification) {
         updateDocumentFromWindow()
     }
     func windowDidResignKey(_ notification: Notification) {
-        view.document.stopAllEvents(isEnableText: false)
+        view.rootEditor.stopAllEvents(isEnableText: false)
         view.document.endSeqencer()
     }
     func updateDocumentFromWindow() {
-        view.document.stopAllEvents(isEnableText: false)
+        view.rootEditor.stopAllEvents(isEnableText: false)
         view.document.cursorPoint = view.screenPointFromCursor.my
         view.document.updateTextCursor()
     }
@@ -1562,7 +1564,7 @@ actor ActorProgress {
     }
 }
 
-final class ProgressPanel: @unchecked Sendable {
+@MainActor final class ProgressPanel {
     weak var topWindow: NSWindow?
     let window: NSWindow
     fileprivate var progressIndicator = NSProgressIndicator(frame: NSRect(x: 20, y: 50, width: 360, height: 20))
@@ -2585,8 +2587,6 @@ struct Cursor {
         self.darkNode = darkNode
         self.hotSpot = hotSpot
     }
-    
-    
 }
 extension Cursor: Equatable {
     static func == (lhs: Cursor, rhs: Cursor) -> Bool {

@@ -20,11 +20,13 @@ import struct Foundation.UUID
 import struct Foundation.URL
 
 final class Stopper: InputKeyEditor {
+    let root: RootEditor
     let document: Document
     let isEditingSheet: Bool
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
         isEditingSheet = document.isEditingSheet
     }
     
@@ -36,8 +38,8 @@ final class Stopper: InputKeyEditor {
             let p = document.convertScreenToWorld(event.screenPoint)
             document.closeAllPanels(at: p)
             
-            if document.isPlaying(with: event) {
-                document.stopPlaying(with: event)
+            if root.isPlaying(with: event) {
+                root.stopPlaying(with: event)
                 return
             }
         case .changed: break
@@ -47,21 +49,8 @@ final class Stopper: InputKeyEditor {
     }
 }
 
-final class Runner: InputKeyEditor, @unchecked Sendable {
-    let editor: RunEditor
-    
-    init(_ document: Document) {
-        editor = RunEditor(document)
-    }
-    
-    func send(_ event: InputKeyEvent) {
-        editor.send(event)
-    }
-    func updateNode() {
-        editor.updateNode()
-    }
-}
-final class RunEditor: InputKeyEditor, @unchecked Sendable {
+final class RunEditor: InputKeyEditor {
+    let root: RootEditor
     let document: Document
     let isEditingSheet: Bool
     
@@ -78,8 +67,9 @@ final class RunEditor: InputKeyEditor, @unchecked Sendable {
     private var task: Task<(o: O, id: ID?), Never>?
     private var firstErrorNode: Node?
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
         isEditingSheet = document.isEditingSheet
     }
     
@@ -88,15 +78,15 @@ final class RunEditor: InputKeyEditor, @unchecked Sendable {
         let p = document.convertScreenToWorld(sp)
         if event.phase == .began && document.closePanel(at: p) { return }
         guard isEditingSheet else {
-            document.keepOut(with: event)
+            root.keepOut(with: event)
             
             if event.phase == .began {
                 document.closeAllPanels(at: p)
             }
             return
         }
-        if document.isPlaying(with: event) {
-            document.stopPlaying(with: event)
+        if root.isPlaying(with: event) {
+            root.stopPlaying(with: event)
             return
         }
         
@@ -223,10 +213,10 @@ final class RunEditor: InputKeyEditor, @unchecked Sendable {
     }
 }
 extension RunEditor: Hashable {
-    static func == (lhs: RunEditor, rhs: RunEditor) -> Bool {
+    nonisolated static func == (lhs: RunEditor, rhs: RunEditor) -> Bool {
         lhs === rhs
     }
-    func hash(into hasher: inout Hasher) {
+    nonisolated func hash(into hasher: inout Hasher) {
         hasher.combine(ObjectIdentifier(self))
     }
 }
@@ -331,7 +321,7 @@ extension RunEditor {
             }
         }
         
-        document.runners.insert(self)
+        root.runners.insert(self)
         
         let xoDic = oDic
         Task { @MainActor in
@@ -346,7 +336,7 @@ extension RunEditor {
             calculatingTimer?.cancel()
             calculatingTimer = nil
             
-            document.runners.remove(self)
+            root.runners.remove(self)
             
             calculatingNode.removeFromParent()
             

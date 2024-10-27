@@ -15,8 +15,15 @@
 // You should have received a copy of the GNU General Public License
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
+protocol NodeOwner: AnyObject {
+    var sampleCount: Int { get }
+    func draw()
+    func update()
+    func viewportBounds(from: Transform, bounds: Rect) -> Rect
+    var viewportBounds: Rect { get }
+}
 final class Node: @unchecked Sendable {
-    weak var owner: NodeOwner?
+    weak var owner: (any NodeOwner)?
     private func setNeedsDisplay() {
         owner?.update()
         cacheLink?.isUpdateCache = true

@@ -1799,6 +1799,7 @@ struct Music {
     static let defaultDurBeat = Rational(16)
     static let defaultBeatRange = 0 ..< defaultDurBeat
 }
+
 protocol TempoType {
     var tempo: Rational { get }
 }
