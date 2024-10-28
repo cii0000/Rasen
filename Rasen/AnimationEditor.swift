@@ -20,13 +20,13 @@ import struct Foundation.URL
 import struct Foundation.Data
 
 final class KeyframePreviousMover: InputKeyEditor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     private var sheetView: SheetView?, contentIndex: Int?
@@ -38,22 +38,22 @@ final class KeyframePreviousMover: InputKeyEditor {
     
     func send(_ event: InputKeyEvent) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
-        if root.isPlaying(with: event) {
-            root.stopPlaying(with: event)
+        if rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
         }
         
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
-        let p = document.convertScreenToWorld(sp)
+        let p = rootView.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
-            sheetView = document.sheetView(at: p)
+            sheetView = rootView.sheetView(at: p)
             if let sheetView {
                 if let contentIndex = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
-                                                             scale: document.screenToWorldScale),
+                                                             scale: rootView.screenToWorldScale),
                    sheetView.contentsView.elementViews[contentIndex].model.type == .movie {
                     self.contentIndex = contentIndex
                     contentView?.movePreviousInterKeyframe()
@@ -66,7 +66,7 @@ final class KeyframePreviousMover: InputKeyEditor {
                 }
             }
             
-            document.cursor = document.cursor(from: contentView?.currentTimeString(isInter: true)
+            rootView.cursor = rootView.cursor(from: contentView?.currentTimeString(isInter: true)
                                               ?? sheetView?.currentTimeString()
                                               ?? Animation.timeString(fromTime: 0, frameRate: 0))
         case .changed:
@@ -75,13 +75,13 @@ final class KeyframePreviousMover: InputKeyEditor {
                     contentView.movePreviousInterKeyframe()
                     sheetView.showOtherTimeNodeFromMainBeat()
                     
-                    document.cursor = .circle(string: contentView.currentTimeString(isInter: true))
+                    rootView.cursor = .circle(string: contentView.currentTimeString(isInter: true))
                 } else {
                     move(from: sheetView, at: p)
                     sheetView.showOtherTimeNodeFromMainBeat()
                     sheetView.animationView.shownInterTypeKeyframeIndex = sheetView.animationView.model.index
                     
-                    document.cursor = .circle(string: sheetView.currentTimeString())
+                    rootView.cursor = .circle(string: sheetView.currentTimeString())
                 }
             }
         case .ended:
@@ -91,25 +91,25 @@ final class KeyframePreviousMover: InputKeyEditor {
             }
             sheetView?.hideOtherTimeNode()
             
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
     
     func move(from sheetView: SheetView?, at sp: Point) {
         sheetView?.movePreviousInterKeyframe()
-        root.updateEditorNode()
-        document.updateSelects()
+        rootEditor.updateEditorNode()
+        rootView.updateSelects()
     }
 }
 
 final class KeyframeNextMover: InputKeyEditor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     private var sheetView: SheetView?, contentIndex: Int?
@@ -121,24 +121,24 @@ final class KeyframeNextMover: InputKeyEditor {
     
     func send(_ event: InputKeyEvent) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
-        if root.isPlaying(with: event) {
-            root.stopPlaying(with: event)
+        if rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
         }
         
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
         ?? event.screenPoint
         
-        let p = document.convertScreenToWorld(sp)
+        let p = rootView.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
-            sheetView = document.sheetView(at: p)
+            sheetView = rootView.sheetView(at: p)
         
             if let sheetView {
                 if let contentIndex = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
-                                                             scale: document.screenToWorldScale),
+                                                             scale: rootView.screenToWorldScale),
                    sheetView.contentsView.elementViews[contentIndex].model.type == .movie {
                     self.contentIndex = contentIndex
                     contentView?.moveNextInterKeyframe()
@@ -151,7 +151,7 @@ final class KeyframeNextMover: InputKeyEditor {
                 }
             }
             
-            document.cursor = document.cursor(from: contentView?.currentTimeString(isInter: true)
+            rootView.cursor = rootView.cursor(from: contentView?.currentTimeString(isInter: true)
                                               ?? sheetView?.currentTimeString()
                                               ?? Animation.timeString(fromTime: 0, frameRate: 0))
         case .changed:
@@ -160,13 +160,13 @@ final class KeyframeNextMover: InputKeyEditor {
                     contentView.moveNextInterKeyframe()
                     sheetView.showOtherTimeNodeFromMainBeat()
                     
-                    document.cursor = .circle(string: contentView.currentTimeString(isInter: true))
+                    rootView.cursor = .circle(string: contentView.currentTimeString(isInter: true))
                 } else {
                     move(from: sheetView, at: p)
                     sheetView.showOtherTimeNodeFromMainBeat()
                     sheetView.animationView.shownInterTypeKeyframeIndex = sheetView.animationView.model.index
                     
-                    document.cursor = document.cursor(from: sheetView.currentTimeString())
+                    rootView.cursor = rootView.cursor(from: sheetView.currentTimeString())
                 }
             }
         case .ended:
@@ -175,25 +175,25 @@ final class KeyframeNextMover: InputKeyEditor {
                 sheetView.animationView.shownInterTypeKeyframeIndex = nil
             }
             
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
     
     func move(from sheetView: SheetView?, at sp: Point) {
         sheetView?.moveNextInterKeyframe()
-        root.updateEditorNode()
-        document.updateSelects()
+        rootEditor.updateEditorNode()
+        rootView.updateSelects()
     }
 }
 
 final class FramePreviousMover: InputKeyEditor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     private var sheetView: SheetView?, contentIndex: Int?
@@ -205,23 +205,23 @@ final class FramePreviousMover: InputKeyEditor {
     
     func send(_ event: InputKeyEvent) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
-        if root.isPlaying(with: event) {
-            root.stopPlaying(with: event)
+        if rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
         }
         
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
-        let p = document.convertScreenToWorld(sp)
+        let p = rootView.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
-            sheetView = document.sheetView(at: p)
+            sheetView = rootView.sheetView(at: p)
             
             if let sheetView {
                 if let contentIndex = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
-                                                             scale: document.screenToWorldScale),
+                                                             scale: rootView.screenToWorldScale),
                    sheetView.contentsView.elementViews[contentIndex].model.type == .movie {
                     self.contentIndex = contentIndex
                     contentView?.movePreviousKeyframe()
@@ -234,7 +234,7 @@ final class FramePreviousMover: InputKeyEditor {
                 }
             }
             
-            document.cursor = document.cursor(from: contentView?.currentTimeString(isInter: false)
+            rootView.cursor = rootView.cursor(from: contentView?.currentTimeString(isInter: false)
                                               ?? sheetView?.currentTimeString()
                                               ?? Animation.timeString(fromTime: 0, frameRate: 0))
         case .changed:
@@ -243,13 +243,13 @@ final class FramePreviousMover: InputKeyEditor {
                     contentView.movePreviousKeyframe()
                     sheetView.showOtherTimeNodeFromMainBeat()
                     
-                    document.cursor = .circle(string: contentView.currentTimeString(isInter: false))
+                    rootView.cursor = .circle(string: contentView.currentTimeString(isInter: false))
                 } else {
                     move(from: sheetView, at: p)
                     sheetView.showOtherTimeNodeFromMainBeat()
                     sheetView.animationView.shownInterTypeKeyframeIndex = sheetView.animationView.model.index
                     
-                    document.cursor = document.cursor(from: sheetView.currentTimeString())
+                    rootView.cursor = rootView.cursor(from: sheetView.currentTimeString())
                 }
             }
         case .ended:
@@ -258,25 +258,25 @@ final class FramePreviousMover: InputKeyEditor {
                 sheetView.animationView.shownInterTypeKeyframeIndex = nil
             }
             
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
     
     func move(from sheetView: SheetView?, at sp: Point) {
         sheetView?.movePreviousKeyframe()
-        root.updateEditorNode()
-        document.updateSelects()
+        rootEditor.updateEditorNode()
+        rootView.updateSelects()
     }
 }
 
 final class FrameNextMover: InputKeyEditor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     private var sheetView: SheetView?, contentIndex: Int?
@@ -288,24 +288,24 @@ final class FrameNextMover: InputKeyEditor {
     
     func send(_ event: InputKeyEvent) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
-        if root.isPlaying(with: event) {
-            root.stopPlaying(with: event)
+        if rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
         }
         
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
         ?? event.screenPoint
         
-        let p = document.convertScreenToWorld(sp)
+        let p = rootView.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
-            sheetView = document.sheetView(at: p)
+            sheetView = rootView.sheetView(at: p)
             
             if let sheetView {
                 if let contentIndex = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
-                                                             scale: document.screenToWorldScale),
+                                                             scale: rootView.screenToWorldScale),
                    sheetView.contentsView.elementViews[contentIndex].model.type == .movie {
                     self.contentIndex = contentIndex
                     contentView?.moveNextKeyframe()
@@ -318,7 +318,7 @@ final class FrameNextMover: InputKeyEditor {
                 }
             }
             
-            document.cursor = document.cursor(from: contentView?.currentTimeString(isInter: false)
+            rootView.cursor = rootView.cursor(from: contentView?.currentTimeString(isInter: false)
                                               ?? sheetView?.currentTimeString()
                                               ?? Animation.timeString(fromTime: 0, frameRate: 0))
         case .changed:
@@ -327,13 +327,13 @@ final class FrameNextMover: InputKeyEditor {
                     contentView.moveNextKeyframe()
                     sheetView.showOtherTimeNodeFromMainBeat()
                     
-                    document.cursor = .circle(string: contentView.currentTimeString(isInter: false))
+                    rootView.cursor = .circle(string: contentView.currentTimeString(isInter: false))
                 } else {
                     move(from: sheetView, at: p)
                     sheetView.showOtherTimeNodeFromMainBeat()
                     sheetView.animationView.shownInterTypeKeyframeIndex = sheetView.animationView.model.index
                     
-                    document.cursor = document.cursor(from: sheetView.currentTimeString())
+                    rootView.cursor = rootView.cursor(from: sheetView.currentTimeString())
                 }
             }
         case .ended:
@@ -342,25 +342,25 @@ final class FrameNextMover: InputKeyEditor {
                 sheetView.animationView.shownInterTypeKeyframeIndex = nil
             }
             
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
     
     func move(from sheetView: SheetView?, at sp: Point) {
         sheetView?.moveNextKeyframe()
-        root.updateEditorNode()
-        document.updateSelects()
+        rootEditor.updateEditorNode()
+        rootView.updateSelects()
     }
 }
 
 final class KeyframeSwiper: SwipeEditor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     private let indexInterval = 10.0
@@ -385,30 +385,30 @@ final class KeyframeSwiper: SwipeEditor {
     
     func send(_ event: SwipeEvent) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
-        if root.isPlaying(with: event) {
-            root.stopPlaying(with: event)
+        if rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
         }
         
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
-        let p = document.convertScreenToWorld(sp)
+        let p = rootView.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
             beganSP = event.screenPoint
             beganEventTime = event.time
-            sheetView = document.sheetView(at: p)
+            sheetView = rootView.sheetView(at: p)
             if let sheetView {
                 if let contentIndex = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
-                                                             scale: document.screenToWorldScale),
+                                                             scale: rootView.screenToWorldScale),
                    sheetView.contentsView.elementViews[contentIndex].model.type == .movie {
                     self.contentIndex = contentIndex
                     if let contentView {
                         beganContentBeat = contentView.model.beat
                         oldContentBeat = beganContentBeat
-                        document.cursor = document.cursor(from: contentView.currentTimeString(isInter: true))
+                        rootView.cursor = rootView.cursor(from: contentView.currentTimeString(isInter: true))
                     }
                 }
                 
@@ -422,10 +422,10 @@ final class KeyframeSwiper: SwipeEditor {
                     animationView.shownInterTypeKeyframeIndex = animationView.model.index
                     oldDeltaI = nil
                     
-                    document.cursor = document.cursor(from: sheetView.currentTimeString())
+                    rootView.cursor = rootView.cursor(from: sheetView.currentTimeString())
                 }
             } else {
-                document.cursor = document.cursor(from: Animation.timeString(fromTime: 0, frameRate: 0))
+                rootView.cursor = rootView.cursor(from: Animation.timeString(fromTime: 0, frameRate: 0))
             }
             
             sheetView?.showOtherTimeNodeFromMainBeat()
@@ -447,7 +447,7 @@ final class KeyframeSwiper: SwipeEditor {
                             
                             contentView.beat = nBeat
                             
-                            document.cursor = .circle(string: contentView.currentTimeString(isInter: true))
+                            rootView.cursor = .circle(string: contentView.currentTimeString(isInter: true))
                         }
                     }
                     return
@@ -505,18 +505,18 @@ final class KeyframeSwiper: SwipeEditor {
                         
                         sheetView.showOtherTimeNodeFromMainBeat()
                         
-                        root.updateEditorNode()
-                        document.updateSelects()
+                        rootEditor.updateEditorNode()
+                        rootView.updateSelects()
                         if oldKI != animationView.model.index {
                             animationView.shownInterTypeKeyframeIndex = animationView.model.index
                         }
                         
-                        document.cursor = document.cursor(from: sheetView.currentTimeString())
+                        rootView.cursor = rootView.cursor(from: sheetView.currentTimeString())
                     }
                 }
             }
         case .ended:
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
             
             interpolatedNode.removeFromParent()
             if let sheetView {
@@ -528,8 +528,8 @@ final class KeyframeSwiper: SwipeEditor {
                 for (sec, rootI) in lastRootIs.reversed() {
                     if event.time - sec > minLastSec {
                         sheetView.rootKeyframeIndex = rootI
-                        root.updateEditorNode()
-                        document.updateSelects()
+                        rootEditor.updateEditorNode()
+                        rootView.updateSelects()
                         break
                     }
                 }
@@ -538,13 +538,13 @@ final class KeyframeSwiper: SwipeEditor {
     }
 }
 final class KeyframeSlider: DragEditor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     private let indexInterval = 10.0
@@ -568,30 +568,30 @@ final class KeyframeSlider: DragEditor {
     
     func send(_ event: DragEvent) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
-        if root.isPlaying(with: event) {
-            root.stopPlaying(with: event)
+        if rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
         }
         
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
-        let p = document.convertScreenToWorld(sp)
+        let p = rootView.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
             beganSP = event.screenPoint
             beganEventTime = event.time
-            sheetView = document.sheetView(at: p)
+            sheetView = rootView.sheetView(at: p)
             if let sheetView {
                 if let contentIndex = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
-                                                             scale: document.screenToWorldScale),
+                                                             scale: rootView.screenToWorldScale),
                    sheetView.contentsView.elementViews[contentIndex].model.type == .movie {
                     self.contentIndex = contentIndex
                     if let contentView {
                         beganContentBeat = contentView.model.beat
                         oldContentBeat = beganContentBeat
-                        document.cursor = document.cursor(from: contentView.currentTimeString(isInter: true))
+                        rootView.cursor = rootView.cursor(from: contentView.currentTimeString(isInter: true))
                     }
                 }
                 
@@ -605,10 +605,10 @@ final class KeyframeSlider: DragEditor {
                     animationView.shownInterTypeKeyframeIndex = animationView.model.index
                     oldDeltaI = nil
                     
-                    document.cursor = document.cursor(from: sheetView.currentTimeString())
+                    rootView.cursor = rootView.cursor(from: sheetView.currentTimeString())
                 }
             } else {
-                document.cursor = document.cursor(from: Animation.timeString(fromTime: 0, frameRate: 0))
+                rootView.cursor = rootView.cursor(from: Animation.timeString(fromTime: 0, frameRate: 0))
             }
             
             sheetView?.showOtherTimeNodeFromMainBeat()
@@ -630,7 +630,7 @@ final class KeyframeSlider: DragEditor {
                             
                             contentView.beat = nBeat
                             
-                            document.cursor = .circle(string: contentView.currentTimeString(isInter: false))
+                            rootView.cursor = .circle(string: contentView.currentTimeString(isInter: false))
                         }
                     }
                 } else {
@@ -685,19 +685,19 @@ final class KeyframeSlider: DragEditor {
                             
                             sheetView.showOtherTimeNodeFromMainBeat()
                             
-                            root.updateEditorNode()
-                            document.updateSelects()
+                            rootEditor.updateEditorNode()
+                            rootView.updateSelects()
                             if oldKI != animationView.model.index {
                                 animationView.shownInterTypeKeyframeIndex = animationView.model.index
                             }
                             
-                            document.cursor = document.cursor(from: sheetView.currentTimeString())
+                            rootView.cursor = rootView.cursor(from: sheetView.currentTimeString())
                         }
                     }
                 }
             }
         case .ended:
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
             
             interpolatedNode.removeFromParent()
             if let sheetView {
@@ -709,8 +709,8 @@ final class KeyframeSlider: DragEditor {
                 for (sec, rootI) in lastRootIs.reversed() {
                     if event.time - sec > minLastSec {
                         sheetView.rootKeyframeIndex = rootI
-                        root.updateEditorNode()
-                        document.updateSelects()
+                        rootEditor.updateEditorNode()
+                        rootView.updateSelects()
                         break
                     }
                 }
@@ -722,8 +722,8 @@ final class KeyframeSlider: DragEditor {
 final class FrameSelecter: DragEditor {
     let editor: FrameEditor
     
-    init(_ root: RootEditor) {
-        editor = FrameEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = FrameEditor(rootEditor)
     }
     
     func send(_ event: DragEvent) {
@@ -736,8 +736,8 @@ final class FrameSelecter: DragEditor {
 final class MultiFrameSelecter: DragEditor {
     let editor: FrameEditor
     
-    init(_ root: RootEditor) {
-        editor = FrameEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = FrameEditor(rootEditor)
     }
     
     func send(_ event: DragEvent) {
@@ -748,13 +748,13 @@ final class MultiFrameSelecter: DragEditor {
     }
 }
 final class FrameEditor: Editor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     private let indexInterval = 5.0
@@ -777,30 +777,30 @@ final class FrameEditor: Editor {
     
     func selectFrame(with event: DragEvent, isMultiple: Bool) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
-        if root.isPlaying(with: event) {
-            root.stopPlaying(with: event)
+        if rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
         }
         
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
-        let p = document.convertScreenToWorld(sp)
+        let p = rootView.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
             beganSP = event.screenPoint
             beganEventTime = event.time
-            sheetView = document.sheetView(at: p)
+            sheetView = rootView.sheetView(at: p)
             if let sheetView {
                 if let contentIndex = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
-                                                             scale: document.screenToWorldScale),
+                                                             scale: rootView.screenToWorldScale),
                    sheetView.contentsView.elementViews[contentIndex].model.type == .movie {
                     self.contentIndex = contentIndex
                     if let contentView {
                         beganContentBeat = contentView.model.beat
                         oldContentBeat = beganContentBeat
-                        document.cursor = document.cursor(from: contentView.currentTimeString(isInter: true))
+                        rootView.cursor = rootView.cursor(from: contentView.currentTimeString(isInter: true))
                     }
                 }
                 
@@ -814,10 +814,10 @@ final class FrameEditor: Editor {
                         animationView.shownInterTypeKeyframeIndex = animationView.model.index
                     }
                     
-                    document.cursor = document.cursor(from: sheetView.currentTimeString())
+                    rootView.cursor = rootView.cursor(from: sheetView.currentTimeString())
                 }
             } else {
-                document.cursor = document.cursor(from: Animation.timeString(fromTime: 0, frameRate: 0))
+                rootView.cursor = rootView.cursor(from: Animation.timeString(fromTime: 0, frameRate: 0))
             }
             
             sheetView?.showOtherTimeNodeFromMainBeat()
@@ -839,7 +839,7 @@ final class FrameEditor: Editor {
                             
                             contentView.beat = nBeat
                             
-                            document.cursor = .circle(string: contentView.currentTimeString(isInter: false))
+                            rootView.cursor = .circle(string: contentView.currentTimeString(isInter: false))
                         }
                     }
                 } else {
@@ -861,8 +861,8 @@ final class FrameEditor: Editor {
                             }
                             preMoveEventTime = event.time
                             sheetView.rootKeyframeIndex = nRootI
-                            root.updateEditorNode()
-                            document.updateSelects()
+                            rootEditor.updateEditorNode()
+                            rootView.updateSelects()
                             
                             lastRootBeats.append((event.time, nRootI))
                             for (i, v) in lastRootBeats.enumerated().reversed() {
@@ -890,14 +890,14 @@ final class FrameEditor: Editor {
                                 animationView.shownInterTypeKeyframeIndex = animationView.model.index
                             }
                             
-                            document.cursor = document.cursor(from: sheetView.currentTimeString())
+                            rootView.cursor = rootView.cursor(from: sheetView.currentTimeString())
                             sheetView.showOtherTimeNodeFromMainBeat()
                         }
                     }
                 }
             }
         case .ended:
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
             
             if let sheetView {
                 let animationView = sheetView.animationView
@@ -908,8 +908,8 @@ final class FrameEditor: Editor {
                 for (sec, rootI) in lastRootBeats.reversed() {
                     if event.time - sec > minLastSec {
                         sheetView.rootKeyframeIndex = rootI
-                        root.updateEditorNode()
-                        document.updateSelects()
+                        rootEditor.updateEditorNode()
+                        rootView.updateSelects()
                         break
                     }
                 }
@@ -919,13 +919,13 @@ final class FrameEditor: Editor {
 }
 
 final class TimeEditor: Editor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     private let indexInterval = 2.0
@@ -942,23 +942,23 @@ final class TimeEditor: Editor {
     
     func selectFrame(with event: DragEvent, isMultiple: Bool) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
-        if root.isPlaying(with: event) {
-            root.stopPlaying(with: event)
+        if rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
         }
         
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
-        let p = document.convertScreenToWorld(sp)
+        let p = rootView.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
             beganSP = event.screenPoint
             beganEventTime = event.time
-            sheetView = document.sheetView(at: p)
+            sheetView = rootView.sheetView(at: p)
             if let sheetView {
                 if sheetView.model.enabledAnimation {
                     let animationView = sheetView.animationView
@@ -968,7 +968,7 @@ final class TimeEditor: Editor {
                     beganSelectedFrameIndexes = animationView.selectedFrameIndexes
                 }
             }
-            document.cursor = document.cursor(from: sheetView?.currentTimeString() ?? Animation.timeString(fromTime: 0, frameRate: 0))
+            rootView.cursor = rootView.cursor(from: sheetView?.currentTimeString() ?? Animation.timeString(fromTime: 0, frameRate: 0))
             
             sheetView?.showOtherTimeNodeFromMainBeat()
         case .changed:
@@ -993,8 +993,8 @@ final class TimeEditor: Editor {
                         }
                         preMoveEventTime = event.time
                         sheetView.rootBeat = nRootBeat
-                        root.updateEditorNode()
-                        document.updateSelects()
+                        rootEditor.updateEditorNode()
+                        rootView.updateSelects()
                         
                         lastRootBeats.append((event.time, nRootBeat))
                         for (i, v) in lastRootBeats.enumerated().reversed() {
@@ -1022,13 +1022,13 @@ final class TimeEditor: Editor {
                             }
                         }
                         
-                        document.cursor = document.cursor(from: sheetView.currentTimeString())
+                        rootView.cursor = rootView.cursor(from: sheetView.currentTimeString())
                         sheetView.showOtherTimeNodeFromMainBeat()
                     }
                 }
             }
         case .ended:
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
             
             if let sheetView {
                 sheetView.hideOtherTimeNode()
@@ -1036,8 +1036,8 @@ final class TimeEditor: Editor {
                 for (sec, rootBeat) in lastRootBeats.reversed() {
                     if event.time - sec > minLastSec {
                         sheetView.rootBeat = rootBeat
-                        root.updateEditorNode()
-                        document.updateSelects()
+                        rootEditor.updateEditorNode()
+                        rootView.updateSelects()
                         break
                     }
                 }
@@ -1047,13 +1047,13 @@ final class TimeEditor: Editor {
 }
 
 final class Player: InputKeyEditor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     private var sheetView: SheetView?
@@ -1061,31 +1061,31 @@ final class Player: InputKeyEditor {
     
     func send(_ event: InputKeyEvent) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
-        let p = document.convertScreenToWorld(sp)
+        let p = rootView.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
-            sheetView = document.sheetView(at: p)
-            let cip = document.intPosition(at: p)
-            let cshp = document.sheetPosition(at: cip)
-            if let cSheetView = document.sheetView(at: cshp) {
-                for (_, v) in document.sheetViewValues {
-                    if cSheetView != v.view {
-                        v.view?.stop()
+            sheetView = rootView.sheetView(at: p)
+            let cip = rootView.intPosition(at: p)
+            let cshp = rootView.sheetPosition(at: cip)
+            if let cSheetView = rootView.sheetView(at: cshp) {
+                for (_, v) in rootView.sheetViewValues {
+                    if cSheetView != v.sheetView {
+                        v.sheetView?.stop()
                     }
                 }
                 
                 var filledShps = Set<Sheetpos>()
                 func sheetView(at ip: IntPoint) -> SheetView? {
-                    let shp = document.sheetPosition(at: ip)
+                    let shp = rootView.sheetPosition(at: ip)
                     if !filledShps.contains(shp),
-                       let aSheetView = document.sheetView(at: shp),
+                       let aSheetView = rootView.sheetView(at: shp),
                        aSheetView.model.enabledTimeline {
                         
                         filledShps.insert(shp)
@@ -1095,10 +1095,10 @@ final class Player: InputKeyEditor {
                     }
                 }
                 
-                let preX = cshp == document.world.sheetpos(at: .init(cip.x - 1, cip.y))
+                let preX = cshp == rootView.world.sheetpos(at: .init(cip.x - 1, cip.y))
                 ? cip.x - 2 : cip.x - 1
                 
-                let nextX = cshp == document.world.sheetpos(at: .init(cip.x + 1, cip.y))
+                let nextX = cshp == rootView.world.sheetpos(at: .init(cip.x + 1, cip.y))
                 ? cip.x + 2 : cip.x + 1
                 
                 if let aSheetView = sheetView(at: .init(preX, cip.y)) {
@@ -1128,7 +1128,7 @@ final class Player: InputKeyEditor {
                     cSheetView.topSheetView = aSheetView
                 }
                 
-                if !(root.containsAllTimelines(with: event)
+                if !(rootEditor.containsAllTimelines(with: event)
                     || (!cSheetView.model.enabledAnimation && cSheetView.model.enabledMusic)) {
                     
                     cSheetView.play()
@@ -1141,18 +1141,18 @@ final class Player: InputKeyEditor {
                     if scoreView.model.enabled, let scoreTrackItem = scoreView.scoreTrackItem {
                         let scoreP = scoreView.convertFromWorld(p)
                         let score = scoreView.model
-                        if let (noteI, pitI) = scoreView.noteAndPitI(at: scoreP, scale: document.screenToWorldScale) {
+                        if let (noteI, pitI) = scoreView.noteAndPitI(at: scoreP, scale: rootView.screenToWorldScale) {
                             let beat = score.notes[noteI].pits[pitI].beat
                             + score.notes[noteI].beatRange.start + score.beatRange.start
                             sec = score.sec(fromBeat: beat)
                             secRange = score.secRange
                             ids.insert(scoreTrackItem.id)
-                        } else if let noteI = scoreView.noteIndex(at: scoreP, scale: document.screenToWorldScale) {
+                        } else if let noteI = scoreView.noteIndex(at: scoreP, scale: rootView.screenToWorldScale) {
                             let beat = score.notes[noteI].beatRange.start + score.beatRange.start
                             sec = score.sec(fromBeat: beat)
                             secRange = score.secRange
                             ids.insert(scoreTrackItem.id)
-                        } else if scoreView.containsMainLine(scoreP, scale: document.screenToWorldScale) {
+                        } else if scoreView.containsMainLine(scoreP, scale: rootView.screenToWorldScale) {
                             ids.insert(scoreTrackItem.id)
                         }
                         if secRange != nil {
@@ -1160,11 +1160,11 @@ final class Player: InputKeyEditor {
                             cSheetView.nextSheetView = nil
                         }
                     } else if let ci = cSheetView.contentIndex(at: sheetP,
-                                                               scale: document.screenToWorldScale) {
+                                                               scale: rootView.screenToWorldScale) {
                         let contentView = cSheetView.contentsView.elementViews[ci]
                         if contentView.model.type == .movie
                             && !contentView.containsTimeline(contentView.convertFromWorld(p),
-                                                             scale: document.screenToWorldScale) {
+                                                             scale: rootView.screenToWorldScale) {
                             sec = contentView.model.sec(fromBeat: contentView.model.beat)
                         }
                     }
@@ -1177,7 +1177,7 @@ final class Player: InputKeyEditor {
             if isEndStop {
                 sheetView?.stop()
             }
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
 }
@@ -1185,8 +1185,8 @@ final class Player: InputKeyEditor {
 final class TimeSlider: DragEditor {
     let editor: FrameSlideEditor
     
-    init(_ root: RootEditor) {
-        editor = FrameSlideEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = FrameSlideEditor(rootEditor)
     }
     
     func send(_ event: DragEvent) {
@@ -1199,8 +1199,8 @@ final class TimeSlider: DragEditor {
 final class MultiFrameSlider: DragEditor {
     let editor: FrameSlideEditor
     
-    init(_ root: RootEditor) {
-        editor = FrameSlideEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = FrameSlideEditor(rootEditor)
     }
     
     func send(_ event: DragEvent) {
@@ -1211,13 +1211,13 @@ final class MultiFrameSlider: DragEditor {
     }
 }
 final class FrameSlideEditor: Editor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     private var sheetView: SheetView?
@@ -1247,19 +1247,19 @@ final class FrameSlideEditor: Editor {
     
     func slideFrame(with event: DragEvent, isMultiple: Bool) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
-        if root.isPlaying(with: event) {
-            root.stopPlaying(with: event)
+        if rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
         }
         
-        let p = document.convertScreenToWorld(event.screenPoint)
+        let p = rootView.convertScreenToWorld(event.screenPoint)
         switch event.phase {
         case .began:
-            document.cursor = .arrow
-            if let sheetView = document.sheetView(at: p),
-               sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p), scale: document.screenToWorldScale) {
+            rootView.cursor = .arrow
+            if let sheetView = rootView.sheetView(at: p),
+               sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p), scale: rootView.screenToWorldScale) {
                 
                 self.sheetView = sheetView
                 let animationView = sheetView.animationView
@@ -1270,8 +1270,8 @@ final class FrameSlideEditor: Editor {
                 let nRootBeat = animationView.model.rootBeat(at: rbp)
                 if animationView.rootBeat != nRootBeat {
                     sheetView.rootBeat = nRootBeat
-                    root.updateEditorNode()
-                    document.updateSelects()
+                    rootEditor.updateEditorNode()
+                    rootView.updateSelects()
                 }
                 animationView.shownInterTypeKeyframeIndex = animationView.model.index
                 
@@ -1307,8 +1307,8 @@ final class FrameSlideEditor: Editor {
                 
                 if sheetView.rootBeat != nRootBeat {
                     sheetView.rootBeat = nRootBeat
-                    root.updateEditorNode()
-                    document.updateSelects()
+                    rootEditor.updateEditorNode()
+                    rootView.updateSelects()
                     
                     lastRootBeats.append((event.time, nRootBeat))
                     for (i, v) in lastRootBeats.enumerated().reversed() {
@@ -1347,46 +1347,46 @@ final class FrameSlideEditor: Editor {
                 }
             }
             
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
 }
 
 final class KeyframeInserter: InputKeyEditor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     private var linesNode = Node()
     
     func send(_ event: InputKeyEvent) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
-        if root.isPlaying(with: event) {
-            root.stopPlaying(with: event)
+        if rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
         }
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
-        let p = document.convertScreenToWorld(sp)
+        let p = rootView.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
-            if let sheetView = document.madeSheetView(at: p) {
+            if let sheetView = rootView.madeSheetView(at: p) {
                 let inP = sheetView.convertFromWorld(p)
                 
                 let animationView = sheetView.animationView
-                if animationView.containsTimeline(inP, scale: document.screenToWorldScale),
+                if animationView.containsTimeline(inP, scale: rootView.screenToWorldScale),
                    let i = animationView
                        .slidableKeyframeIndex(at: inP,
-                                              maxDistance: document.worldKnobEditDistance,
+                                              maxDistance: rootView.worldKnobEditDistance,
                                               enabledKeyOnly: true),
                    sheetView.selectedFrameIndexes.contains(i) {
                     
@@ -1417,15 +1417,15 @@ final class KeyframeInserter: InputKeyEditor {
                         }
                     }
                     sheetView.rootBeat = animationView.model.localDurBeat * count + beat
-                    root.updateEditorNode()
-                    document.updateSelects()
-                } else if sheetView.animationView.containsTimeline(inP, scale: document.screenToWorldScale) {
+                    rootEditor.updateEditorNode()
+                    rootView.updateSelects()
+                } else if sheetView.animationView.containsTimeline(inP, scale: rootView.screenToWorldScale) {
                     sheetView.selectedFrameIndexes = []
                     
                     let animationView = sheetView.animationView
                     let animation = animationView.model
                     
-                    let interval = document.currentBeatInterval
+                    let interval = rootView.currentBeatInterval
                     let oBeat = animationView.beat(atX: inP.x, interval: interval)
                     let beat = (oBeat - animation.beatRange.start)
                         .clipped(min: 0, max: animation.beatRange.length)
@@ -1491,7 +1491,7 @@ final class KeyframeInserter: InputKeyEditor {
                     let scoreView = sheetView.scoreView
                     let scoreP = sheetView.scoreView.convertFromWorld(p)
                     if let noteI = sheetView.scoreView.noteIndex(at: scoreP,
-                                                                 scale: document.screenToWorldScale) {
+                                                                 scale: rootView.screenToWorldScale) {
                         let score = scoreView.model
                         let scoreP = scoreView.convertFromWorld(p)
                         if let (pitI, _) = scoreView.pitIAndSprolI(at: scoreP, at: noteI) {
@@ -1529,8 +1529,8 @@ final class KeyframeInserter: InputKeyEditor {
                         } else {
                             var pits = score.notes[noteI].pits
                             let pit = scoreView.splittedPit(at: scoreP, at: noteI,
-                                                            beatInterval: document.currentBeatInterval,
-                                                            pitchInterval: document.currentPitchInterval)
+                                                            beatInterval: rootView.currentBeatInterval,
+                                                            pitchInterval: rootView.currentPitchInterval)
                             if pits.allSatisfy({ $0.beat != pit.beat }) {
                                 pits.append(pit)
                                 pits.sort { $0.beat < $1.beat }
@@ -1543,8 +1543,8 @@ final class KeyframeInserter: InputKeyEditor {
                                 sheetView.updatePlaying()
                             }
                         }
-                    } else if scoreView.containsTimeline(scoreP, scale: document.screenToWorldScale) {
-                        let interval = document.currentBeatInterval
+                    } else if scoreView.containsTimeline(scoreP, scale: rootView.screenToWorldScale) {
+                        let interval = rootView.currentBeatInterval
                         let beat = scoreView.beat(atX: inP.x, interval: interval)
                         var option = scoreView.model.option
                         option.keyBeats.append(beat)
@@ -1552,7 +1552,7 @@ final class KeyframeInserter: InputKeyEditor {
                         sheetView.newUndoGroup()
                         sheetView.set(option)
                     }
-                } else if let ci = sheetView.contentIndex(at: inP, scale: document.screenToWorldScale) {
+                } else if let ci = sheetView.contentIndex(at: inP, scale: rootView.screenToWorldScale) {
                     let contentView = sheetView.contentsView.elementViews[ci]
                     if contentView.model.timeOption == nil {
                         var content = contentView.model
@@ -1565,7 +1565,7 @@ final class KeyframeInserter: InputKeyEditor {
                         
                         sheetView.updatePlaying()
                     }
-                } else if let ti = sheetView.textIndex(at: inP, scale: document.screenToWorldScale) {
+                } else if let ti = sheetView.textIndex(at: inP, scale: rootView.screenToWorldScale) {
                     let textView = sheetView.textsView.elementViews[ti]
                     if textView.model.timeOption == nil {
                         var text = textView.model
@@ -1586,49 +1586,49 @@ final class KeyframeInserter: InputKeyEditor {
                     sheetView.set(option)
                 }
                 
-                root.updateEditorNode()
-                document.updateSelects()
+                rootEditor.updateEditorNode()
+                rootView.updateSelects()
             }
         case .changed:
             break
         case .ended:
             linesNode.removeFromParent()
             
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
 }
 
 final class Interpolater: InputKeyEditor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     private var linesNode = Node()
     
     func send(_ event: InputKeyEvent) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
-        if root.isPlaying(with: event) {
-            root.stopPlaying(with: event)
+        if rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
         }
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
-        let p = document.convertScreenToWorld(sp)
+        let p = rootView.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
-            if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
-                if document.isSelectNoneCursor(at: p), !document.isSelectedText {
-                    let nis = sheetView.noteIndexes(from: document.selections)
+            if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled {
+                if rootView.isSelectNoneCursor(at: p), !rootView.isSelectedText {
+                    let nis = sheetView.noteIndexes(from: rootView.selections)
                     if !nis.isEmpty {
                         let noteIAndNotes = nis
                             .map { ($0, sheetView.scoreView.model.notes[$0]) }
@@ -1671,8 +1671,8 @@ final class Interpolater: InputKeyEditor {
                    v.lines.isEmpty,
                     let oUUColor = v.planes.first?.uuColor {
                     
-                    let nUUColor = document.uuColor(at: p)
-                    if let sheetView = document.sheetView(at: p),
+                    let nUUColor = rootView.uuColor(at: p)
+                    if let sheetView = rootView.sheetView(at: p),
                        sheetView.id == v.id {
                         
                         let animationView = sheetView.animationView
@@ -1704,7 +1704,7 @@ final class Interpolater: InputKeyEditor {
                             
                             let svs = vs.sorted(by: { $0.ki < $1.ki })
                             var nodes = [Node]()
-                            let scale = 1 / document.worldToScreenScale
+                            let scale = 1 / rootView.worldToScreenScale
                             svs.forEach {
                                 let cv = ColorValue(uuColor: $0.uuColor,
                                                     planeIndexes: [], lineIndexes: [],
@@ -1733,7 +1733,7 @@ final class Interpolater: InputKeyEditor {
                             }
                             
                             linesNode.children = nodes
-                            document.rootNode.append(child: linesNode)
+                            rootView.node.append(child: linesNode)
                         }
                     }
                     return
@@ -1756,7 +1756,7 @@ final class Interpolater: InputKeyEditor {
             default: return
             }
             
-            if let sheetView = document.sheetView(at: p),
+            if let sheetView = rootView.sheetView(at: p),
                sheetView.id == sheetID {
                 
                 let animationView = sheetView.animationView
@@ -1793,15 +1793,15 @@ final class Interpolater: InputKeyEditor {
 //                        }
 //                    }
 //                    sheetView.rootBeat = animationView.model.localDurBeat * count + beat
-//                    root.updateEditorNode()
-//                    document.updateSelects()
+//                    rootEditor.updateEditorNode()
+//                    rootView.updateSelects()
 //                }
                 
                 let lis: [Int]
-                if document.isSelectNoneCursor(at: p), !document.isSelectedText {
-                    lis = sheetView.lineIndexes(from: document.selections)
+                if rootView.isSelectNoneCursor(at: p), !rootView.isSelectedText {
+                    lis = sheetView.lineIndexes(from: rootView.selections)
                 } else {
-                    if let li = sheetView.lineTuple(at: sheetView.convertFromWorld(p), scale: 1 / document.worldToScreenScale)?.lineIndex {
+                    if let li = sheetView.lineTuple(at: sheetView.convertFromWorld(p), scale: 1 / rootView.worldToScreenScale)?.lineIndex {
                         lis = [li]
                     } else {
                         lis = []
@@ -1833,7 +1833,7 @@ final class Interpolater: InputKeyEditor {
                 if idivs.isEmpty {
                     for li in lis {
                         let lw = Line.defaultLineWidth
-                        let scale = 1 / document.worldToScreenScale
+                        let scale = 1 / rootView.worldToScreenScale
                         let blw = max(lw * 1.5, lw * 2.5 * scale, 1 * scale)
                         let line = animationView.currentKeyframe.picture.lines[li]
                         let nLine = sheetView.convertToWorld(line)
@@ -1853,7 +1853,7 @@ final class Interpolater: InputKeyEditor {
                     } else if idLines.isEmpty
                                 && animationView.isInterpolated(atLineIndex: idiv.index) {
                         let lw = Line.defaultLineWidth
-                        let scale = 1 / document.worldToScreenScale
+                        let scale = 1 / rootView.worldToScreenScale
                         let blw = max(lw * 1.5, lw * 2.5 * scale, 1 * scale)
                         let nLine = sheetView.convertToWorld(line)
                         noNodes.append(Node(path: Path(nLine),
@@ -1862,7 +1862,7 @@ final class Interpolater: InputKeyEditor {
                         return true
                     } else {
                         let lw = Line.defaultLineWidth
-                        let scale = 1 / document.worldToScreenScale
+                        let scale = 1 / rootView.worldToScreenScale
                         let blw = max(lw * 1.5, lw * 2.5 * scale, 1 * scale)
                         let nLine = sheetView.convertToWorld(line)
                         noNodes.append(Node(path: Path(nLine),
@@ -1879,7 +1879,7 @@ final class Interpolater: InputKeyEditor {
                 }
                 
                 if !nidivs.isEmpty {
-                    let scale = 1 / document.worldToScreenScale
+                    let scale = 1 / rootView.worldToScreenScale
                     let lw = Line.defaultLineWidth
                     let nodes = lis.map {
                         Node(path: sheetView.linesView.elementViews[$0].node.path * sheetView.node.localTransform,
@@ -1948,14 +1948,14 @@ final class Interpolater: InputKeyEditor {
                     linesNode.children = noNodes
                 }
                 
-                document.rootNode.append(child: linesNode)
+                rootView.node.append(child: linesNode)
             }
         case .changed:
             break
         case .ended:
             linesNode.removeFromParent()
             
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
 }
@@ -2229,48 +2229,48 @@ extension SheetView {
 }
 
 final class CrossEraser: InputKeyEditor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     private var linesNode = Node()
     
     func send(_ event: InputKeyEvent) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
-        if root.isPlaying(with: event) {
-            root.stopPlaying(with: event)
+        if rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
         }
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
-        let p = document.convertScreenToWorld(sp)
+        let p = rootView.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
-            let (_, sheetView, _, _) = document.sheetViewAndFrame(at: p)
+            let (_, sheetView, _, _) = rootView.sheetViewAndFrame(at: p)
             if let sheetView = sheetView {
                 let inP = sheetView.convertFromWorld(p)
                 let lis: [Int], isSelected: Bool
-                if document.isSelectNoneCursor(at: p), !document.isSelectedText {
-                    lis = sheetView.lineIndexes(from: document.selections)
+                if rootView.isSelectNoneCursor(at: p), !rootView.isSelectedText {
+                    lis = sheetView.lineIndexes(from: rootView.selections)
                     isSelected = true
                 } else {
-                    if let li = sheetView.lineTuple(at: inP, scale: 1 / document.worldToScreenScale)?.lineIndex {
+                    if let li = sheetView.lineTuple(at: inP, scale: 1 / rootView.worldToScreenScale)?.lineIndex {
                         lis = [li]
                     } else {
                         lis = []
                     }
                     isSelected = false
                 }
-                let d = 2 / document.worldToScreenScale
+                let d = 2 / rootView.worldToScreenScale
                 let ids = lis.map { sheetView.model.picture.lines[$0].id }
                 if ids.count == 1 && !isSelected {
                     func splitLineIndexValues(with lineView0: SheetLineView, index i0: Int,
@@ -2468,10 +2468,10 @@ final class CrossEraser: InputKeyEditor {
                     }
                     
                     linesNode.children = nodes
-                    document.rootNode.append(child: linesNode)
+                    rootView.node.append(child: linesNode)
                     
-                    root.updateEditorNode()
-                    document.updateSelects()
+                    rootEditor.updateEditorNode()
+                    rootView.updateSelects()
                 } else if ids.count >= 1 {
                     let keyframes = sheetView.model.animation.keyframes
                     var nodes = [Node]()
@@ -2532,10 +2532,10 @@ final class CrossEraser: InputKeyEditor {
                     }
                     
                     linesNode.children = nodes
-                    document.rootNode.append(child: linesNode)
+                    rootView.node.append(child: linesNode)
                     
-                    root.updateEditorNode()
-                    document.updateSelects()
+                    rootEditor.updateEditorNode()
+                    rootView.updateSelects()
                 }
             }
         case .changed:
@@ -2543,7 +2543,7 @@ final class CrossEraser: InputKeyEditor {
         case .ended:
             linesNode.removeFromParent()
             
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
 }

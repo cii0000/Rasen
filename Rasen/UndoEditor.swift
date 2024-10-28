@@ -20,8 +20,8 @@ import struct Foundation.Date
 final class Undoer: InputKeyEditor {
     let editor: UndoEditor
     
-    init(_ root: RootEditor) {
-        editor = UndoEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = UndoEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -34,8 +34,8 @@ final class Undoer: InputKeyEditor {
 final class Redoer: InputKeyEditor {
     let editor: UndoEditor
     
-    init(_ root: RootEditor) {
-        editor = UndoEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = UndoEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -48,8 +48,8 @@ final class Redoer: InputKeyEditor {
 final class VersionSelector: DragEditor {
     let editor: UndoEditor
     
-    init(_ root: RootEditor) {
-        editor = UndoEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = UndoEditor(rootEditor)
     }
     
     func send(_ event: DragEvent) {
@@ -60,11 +60,11 @@ final class VersionSelector: DragEditor {
     }
 }
 final class UndoEditor: Editor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
     }
     
     enum UndoType {
@@ -101,10 +101,10 @@ final class UndoEditor: Editor {
     var type = UndoType.x
     
     func updateNode() {
-        selectingOutlineRootNode.lineWidth = document.worldLineWidth * 3
-        selectingRootNode.lineWidth = document.worldLineWidth
-        outOfBoundsOutlineNode.lineWidth = document.worldLineWidth * 3
-        outOfBoundsNode.lineWidth = document.worldLineWidth
+        selectingOutlineRootNode.lineWidth = rootView.worldLineWidth * 3
+        selectingRootNode.lineWidth = rootView.worldLineWidth
+        outOfBoundsOutlineNode.lineWidth = rootView.worldLineWidth * 3
+        outOfBoundsNode.lineWidth = rootView.worldLineWidth
     }
     
     func yPath(selectedIndex: Int,
@@ -123,8 +123,8 @@ final class UndoEditor: Editor {
         outlineNode.path = linePath
         lineNode.path = linePath
         
-        var attitude = Attitude(document.screenToWorldTransform)
-        let up = document.convertScreenToWorld(document.convertWorldToScreen(p))
+        var attitude = Attitude(rootView.screenToWorldTransform)
+        let up = rootView.convertScreenToWorld(rootView.convertWorldToScreen(p))
         attitude.position = up
         rootNode.attitude = attitude
         
@@ -132,7 +132,7 @@ final class UndoEditor: Editor {
         rootNode.append(child: outlineNode)
         rootNode.append(child: lineNode)
         rootNode.append(child: currentKnobNode)
-        document.rootNode.append(child: rootNode)
+        rootView.node.append(child: rootNode)
     }
     func updatePath<T: UndoItem>(maxTopIndex: Int, rootBranch: Branch<T>) {
         var pathlines = [Pathline]()
@@ -184,10 +184,10 @@ final class UndoEditor: Editor {
             }
             nodes = aNodes
         } else {
-            frame = document.undo(to: undoIndex)
+            frame = rootView.undo(to: undoIndex)
         }
         if let frame = frame {
-            let f = document.screenBounds * document.screenToWorldTransform
+            let f = rootView.screenBounds * rootView.screenToWorldTransform
             if frame.width > 0 || frame.height > 0, !f.intersects(frame) {
                 let fp = f.centerPoint, lp = frame.centerPoint
                 let d = max(frame.width, frame.height)
@@ -199,7 +199,7 @@ final class UndoEditor: Editor {
                     let angle = Edge(nfp, nlp).reversed().angle()
                     var pathlines = [Pathline]()
                     pathlines.append(Pathline([nfp, nlp]))
-                    let l = 10 / document.worldToScreenScale
+                    let l = 10 / rootView.worldToScreenScale
                     pathlines.append(Pathline([nlp.movedWith(distance: l,
                                                              angle: angle - .pi / 6),
                                                nlp,
@@ -216,9 +216,9 @@ final class UndoEditor: Editor {
                 outOfBoundsOutlineNode.path = Path()
                 outOfBoundsNode.path = Path()
             }
-            let nf = frame * document.worldToScreenTransform
-            if !document.isEditingSheet || (nf.width < 6 && nf.height < 6) {
-                let s = 1 / document.worldToScreenScale
+            let nf = frame * rootView.worldToScreenTransform
+            if !rootView.isEditingSheet || (nf.width < 6 && nf.height < 6) {
+                let s = 1 / rootView.worldToScreenScale
                 let path = Path(frame.outset(by: 4 * s),
                                 cornerRadius: 3 * s)
                 selectingOutlineRootNode.path = path
@@ -242,12 +242,12 @@ final class UndoEditor: Editor {
         undo(with: event, isRedo: true)
     }
     func undo(with event: InputKeyEvent, isRedo: Bool) {
-        let sp = document.lastEditedSheetScreenCenterPositionNoneSelectedNoneCursor
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneSelectedNoneCursor
             ?? event.screenPoint
-        let p = document.convertScreenToWorld(sp)
+        let p = rootView.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
             updateUndoOrRedo(at: p, isRedo: isRedo)
         case .changed:
@@ -261,12 +261,12 @@ final class UndoEditor: Editor {
             selectingRootNode.removeFromParent()
             rootNode.removeFromParent()
             
-            document.updateSelects()
+            rootView.updateSelects()
             if let sheetView = sheetView {
-                document.updateFinding(from: sheetView)
+                rootView.updateFinding(from: sheetView)
             }
             
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
     func updateUndoOrRedo(at p: Point, isRedo: Bool) {
@@ -282,8 +282,8 @@ final class UndoEditor: Editor {
                 
                 let rp = Point(undoXWidth * Double(topIndex), 0)
                 
-                var attitude = Attitude(document.screenToWorldTransform)
-                let up = document.convertScreenToWorld(document.convertWorldToScreen(p) - rp)
+                var attitude = Attitude(rootView.screenToWorldTransform)
+                let up = rootView.convertScreenToWorld(rootView.convertWorldToScreen(p) - rp)
                 attitude.position = up
                 rootNode.attitude = attitude
                 
@@ -292,7 +292,7 @@ final class UndoEditor: Editor {
                 rootNode.append(child: outlineNode)
                 rootNode.append(child: lineNode)
                 rootNode.append(child: currentKnobNode)
-                document.rootNode.append(child: rootNode)
+                rootView.node.append(child: rootNode)
             }
             let ni = currentVersionIndex + (isRedo ? 1 : -1)
             let nsi = ni.clipped(min: 0, max: currentMaxVersionIndex)
@@ -307,23 +307,23 @@ final class UndoEditor: Editor {
             }
             if currentVersionIndex != nsi {
                 undo(at: p, undoIndex: nsi)
-                selectingOutlineRootNode.lineWidth = document.worldLineWidth * 3
-                selectingRootNode.lineWidth = document.worldLineWidth
-                outOfBoundsOutlineNode.lineWidth = document.worldLineWidth * 3
-                outOfBoundsNode.lineWidth = document.worldLineWidth
-                document.rootNode.append(child: selectingOutlineRootNode)
-                document.rootNode.append(child: selectingRootNode)
-                document.rootNode.append(child: outOfBoundsOutlineNode)
-                document.rootNode.append(child: outOfBoundsNode)
+                selectingOutlineRootNode.lineWidth = rootView.worldLineWidth * 3
+                selectingRootNode.lineWidth = rootView.worldLineWidth
+                outOfBoundsOutlineNode.lineWidth = rootView.worldLineWidth * 3
+                outOfBoundsNode.lineWidth = rootView.worldLineWidth
+                rootView.node.append(child: selectingOutlineRootNode)
+                rootView.node.append(child: selectingRootNode)
+                rootView.node.append(child: outOfBoundsOutlineNode)
+                rootView.node.append(child: outOfBoundsNode)
             }
         }
-        if !document.isEditingSheet {
+        if !rootView.isEditingSheet {
             self.sheetView = nil
             isEditRoot = true
             
-            update(currentVersionIndex: document.history.currentVersionIndex,
-                   currentMaxVersionIndex: document.history.currentMaxVersionIndex)
-        } else if let sheetView = document.sheetView(at: p) {
+            update(currentVersionIndex: rootView.history.currentVersionIndex,
+                   currentMaxVersionIndex: rootView.history.currentMaxVersionIndex)
+        } else if let sheetView = rootView.sheetView(at: p) {
             self.sheetView = sheetView
             isEditRoot = false
             
@@ -335,15 +335,15 @@ final class UndoEditor: Editor {
             
             updateEmptyPath(at: p)
         }
-        document.updateTextCursor()
+        rootView.updateTextCursor()
     }
     
     func selectVersion(with event: DragEvent) {
-        let p = document.convertScreenToWorld(event.screenPoint)
+        let p = rootView.convertScreenToWorld(event.screenPoint)
         
         func updateDate(_ date: Date) {
             guard date != oldDate else { return }
-            document.cursor = date.timeIntervalSinceReferenceDate == 0 ?
+            rootView.cursor = date.timeIntervalSinceReferenceDate == 0 ?
                 .arrow : .arrowWith(string: date.defaultString)
             
             oldDate = date
@@ -381,31 +381,31 @@ final class UndoEditor: Editor {
                 
                 updatePath(maxTopIndex: currentMaxVersionIndex,
                            rootBranch: rootBranch)
-                var attitude = Attitude(document.screenToWorldTransform)
-                let up = document.convertScreenToWorld(document.convertWorldToScreen(p) - beganDP)
+                var attitude = Attitude(rootView.screenToWorldTransform)
+                let up = rootView.convertScreenToWorld(rootView.convertWorldToScreen(p) - beganDP)
                 attitude.position = up
                 rootNode.attitude = attitude
                 currentKnobNode.attitude.position = beganDP
                 
-                document.rootNode.append(child: rootNode)
-                selectingOutlineRootNode.lineWidth = document.worldLineWidth * 3
-                selectingRootNode.lineWidth = document.worldLineWidth
-                outOfBoundsOutlineNode.lineWidth = document.worldLineWidth * 3
-                outOfBoundsNode.lineWidth = document.worldLineWidth
-                document.rootNode.append(child: selectingOutlineRootNode)
-                document.rootNode.append(child: selectingRootNode)
-                document.rootNode.append(child: outOfBoundsOutlineNode)
-                document.rootNode.append(child: outOfBoundsNode)
+                rootView.node.append(child: rootNode)
+                selectingOutlineRootNode.lineWidth = rootView.worldLineWidth * 3
+                selectingRootNode.lineWidth = rootView.worldLineWidth
+                outOfBoundsOutlineNode.lineWidth = rootView.worldLineWidth * 3
+                outOfBoundsNode.lineWidth = rootView.worldLineWidth
+                rootView.node.append(child: selectingOutlineRootNode)
+                rootView.node.append(child: selectingRootNode)
+                rootView.node.append(child: outOfBoundsOutlineNode)
+                rootView.node.append(child: outOfBoundsNode)
             }
-            if !document.isEditingSheet {
+            if !rootView.isEditingSheet {
                 self.sheetView = nil
                 isEditRoot = true
                 
-                update(currentVersion: document.history.currentVersion,
-                       currentVersionIndex: document.history.currentVersionIndex,
-                       currentMaxVersionIndex: document.history.currentMaxVersionIndex,
-                       rootBranch: document.history.rootBranch)
-            } else if let sheetView = document.sheetView(at: p) {
+                update(currentVersion: rootView.history.currentVersion,
+                       currentVersionIndex: rootView.history.currentVersionIndex,
+                       currentMaxVersionIndex: rootView.history.currentMaxVersionIndex,
+                       rootBranch: rootView.history.rootBranch)
+            } else if let sheetView = rootView.sheetView(at: p) {
                 self.sheetView = sheetView
                 isEditRoot = false
                 
@@ -424,13 +424,13 @@ final class UndoEditor: Editor {
                 if let version = sheetView.history.currentVersion {
                     updateDate(sheetView.history.rootBranch[version].date)
                 } else {
-                    document.cursor = .arrow
+                    rootView.cursor = .arrow
                 }
             } else {
-                if let version = document.history.currentVersion {
-                    updateDate(document.history.rootBranch[version].date)
+                if let version = rootView.history.currentVersion {
+                    updateDate(rootView.history.rootBranch[version].date)
                 } else {
-                    document.cursor = .arrow
+                    rootView.cursor = .arrow
                 }
             }
         case .changed:
@@ -454,8 +454,8 @@ final class UndoEditor: Editor {
                 buip = uip(currentVersion: sheetView.history.currentVersion,
                            rootBranch: sheetView.history.rootBranch)
             } else {
-                buip = uip(currentVersion: document.history.currentVersion,
-                           rootBranch: document.history.rootBranch)
+                buip = uip(currentVersion: rootView.history.currentVersion,
+                           rootBranch: rootView.history.rootBranch)
             }
             
             let speed = (event.screenPoint - oldSP).length()
@@ -500,14 +500,14 @@ final class UndoEditor: Editor {
                         updateY(currentVersion: sheetView.history.currentVersion,
                                 rootBranch: sheetView.history.rootBranch)
                     } else {
-                        updateY(currentVersion: document.history.currentVersion,
-                                rootBranch: document.history.rootBranch)
+                        updateY(currentVersion: rootView.history.currentVersion,
+                                rootBranch: rootView.history.rootBranch)
                     }
                     
-                    let np = document.convertScreenToWorld(beganSP)
+                    let np = rootView.convertScreenToWorld(beganSP)
                     let nnp = Point(undoXWidth * Double(beganXIndex),
                                     undoYWidth * Double(dyIndex))
-                    let up = document.convertScreenToWorld(document.convertWorldToScreen(np) - nnp)
+                    let up = rootView.convertScreenToWorld(rootView.convertWorldToScreen(np) - nnp)
                     rootNode.attitude.position = up
                 }
             case .y:
@@ -529,18 +529,18 @@ final class UndoEditor: Editor {
                                        rootBranch: sheetView.history.rootBranch)
                             maxXCount = maxIndex + 1
                         } else {
-                            document.history.rootBranch[buip]
+                            rootView.history.rootBranch[buip]
                                 .selectedChildIndex = newIndex
-                            let maxIndex = document.history.currentMaxVersionIndex
+                            let maxIndex = rootView.history.currentMaxVersionIndex
                             updatePath(maxTopIndex: maxIndex,
-                                       rootBranch: document.history.rootBranch)
+                                       rootBranch: rootView.history.rootBranch)
                             maxXCount = maxIndex + 1
                         }
                         
-                        let np = document.convertScreenToWorld(beganSP)
+                        let np = rootView.convertScreenToWorld(beganSP)
                         let nnp = Point(undoXWidth * Double(beganXIndex),
                                         undoYWidth * Double(dyIndex))
-                        let up = document.convertScreenToWorld(document.convertWorldToScreen(np) - nnp)
+                        let up = rootView.convertScreenToWorld(rootView.convertWorldToScreen(np) - nnp)
                         rootNode.attitude.position = up
                     }
                 }
@@ -551,8 +551,8 @@ final class UndoEditor: Editor {
                     updateDate(sheetView.history.rootBranch[version].date)
                 }
             } else {
-                if let version = document.history.currentVersion {
-                    updateDate(document.history.rootBranch[version].date)
+                if let version = rootView.history.currentVersion {
+                    updateDate(rootView.history.rootBranch[version].date)
                 }
             }
         case .ended:
@@ -562,17 +562,17 @@ final class UndoEditor: Editor {
             selectingRootNode.removeFromParent()
             rootNode.removeFromParent()
             
-            document.updateSelects()
+            rootView.updateSelects()
             if let sheetView = sheetView {
-                document.updateFinding(from: sheetView)
+                rootView.updateFinding(from: sheetView)
             }
             
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
 }
 
-extension Document {
+extension RootView {
     func clearHistorys(from shps: [Sheetpos], progressHandler: (Double, inout Bool) -> ()) throws {
         var isStop = false
         for (j, shp) in shps.enumerated() {
@@ -589,68 +589,68 @@ extension Document {
 }
 
 final class HistoryCleaner: InputKeyEditor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
     }
     
     let selectingLineNode = Node(lineWidth: 1.5)
     func updateNode() {
-        selectingLineNode.lineWidth = document.worldLineWidth
+        selectingLineNode.lineWidth = rootView.worldLineWidth
     }
     func end() {
         selectingLineNode.removeFromParent()
         
-        document.cursor = document.defaultCursor
+        rootView.cursor = rootView.defaultCursor
         
-        document.updateSelectedColor(isMain: true)
+        rootView.updateSelectedColor(isMain: true)
     }
     
     func send(_ event: InputKeyEvent) {
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor ?? event.screenPoint
-        let p = document.convertScreenToWorld(sp)
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor ?? event.screenPoint
+        let p = rootView.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
-            if document.isSelectNoneCursor(at: p), !document.isSelectedText {
-                let vs: [Rect] = document.world.sheetIDs.keys.compactMap { shp in
-                    let frame = document.sheetFrame(with: shp)
-                    return document.multiSelection.intersects(frame) ? frame : nil
+            if rootView.isSelectNoneCursor(at: p), !rootView.isSelectedText {
+                let vs: [Rect] = rootView.world.sheetIDs.keys.compactMap { shp in
+                    let frame = rootView.sheetFrame(with: shp)
+                    return rootView.multiSelection.intersects(frame) ? frame : nil
                 }
                 selectingLineNode.children = vs.map {
                     Node(path: Path($0),
-                         lineWidth: document.worldLineWidth,
+                         lineWidth: rootView.worldLineWidth,
                          lineType: .color(.selected),
                          fillType: .color(.subSelected))
                 }
             } else {
-                selectingLineNode.lineWidth = document.worldLineWidth
+                selectingLineNode.lineWidth = rootView.worldLineWidth
                 selectingLineNode.fillType = .color(.subSelected)
                 selectingLineNode.lineType = .color(.selected)
-                let frame = document
-                    .sheetFrame(with: document.sheetPosition(at: p))
+                let frame = rootView
+                    .sheetFrame(with: rootView.sheetPosition(at: p))
                 selectingLineNode.path = Path(frame)
                 
-                document.updateSelectedColor(isMain: false)
+                rootView.updateSelectedColor(isMain: false)
             }
-            document.rootNode.append(child: selectingLineNode)
+            rootView.node.append(child: selectingLineNode)
             
-            document.textCursorNode.isHidden = true
-            document.textMaxTypelineWidthNode.isHidden = true
+            rootView.textCursorNode.isHidden = true
+            rootView.textMaxTypelineWidthNode.isHidden = true
         case .changed:
             break
         case .ended:
-            if document.isSelectNoneCursor(at: p), !document.isSelectedText {
-                let shps = document.sheetposWithSelection()
+            if rootView.isSelectNoneCursor(at: p), !rootView.isSelectedText {
+                let shps = rootView.sheetposWithSelection()
                 
                 let mes = shps.count == 1 ?
                     "Do you want to clear history of this sheet?".localized :
                     String(format: "Do you want to clear %d historys?".localized, shps.count)
                 Task { @MainActor in
-                    let result = await document.rootNode
+                    let result = await rootView.node
                         .show(message: mes,
                               infomation: "You can’t undo this action. \nHistory is what is used in \"Undo\", \"Redo\" or \"Select Version\", and if you clear it, you will not be able to return to the previous work.".localized,
                               okTitle: "Clear History".localized,
@@ -658,10 +658,10 @@ final class HistoryCleaner: InputKeyEditor {
                     switch result {
                     case .ok:
                         let progressPanel = ProgressPanel(message: "Clearing Historys".localized)
-                        self.document.rootNode.show(progressPanel)
+                        self.rootView.node.show(progressPanel)
                         let task = Task.detached {
                             do {
-                                try self.document.clearHistorys(from: shps) { (progress, isStop) in
+                                try self.rootView.clearHistorys(from: shps) { (progress, isStop) in
                                     if Task.isCancelled {
                                         isStop = true
                                         return
@@ -676,7 +676,7 @@ final class HistoryCleaner: InputKeyEditor {
                                 }
                             } catch {
                                 Task { @MainActor in
-                                    self.document.rootNode.show(error)
+                                    self.rootView.node.show(error)
                                     progressPanel.closePanel()
                                     self.end()
                                 }
@@ -690,20 +690,20 @@ final class HistoryCleaner: InputKeyEditor {
                     }
                 }
             } else {
-                let shp = document.sheetPosition(at: p)
+                let shp = rootView.sheetPosition(at: p)
                 
                 Task { @MainActor in
-                    let result = await document.rootNode
+                    let result = await rootView.node
                         .show(message: "Do you want to clear history of this sheet?".localized,
                               infomation: "You can’t undo this action. \nHistory is what is used in \"Undo\", \"Redo\" or \"Select Version\", and if you clear it, you will not be able to return to the previous work.".localized,
                               okTitle: "Clear History".localized)
                     switch result {
                     case .ok:
-                        if let sheetView = document.sheetView(at: shp) {
+                        if let sheetView = rootView.sheetView(at: shp) {
                             sheetView.clearHistory()
-                            document.clearContents(from: sheetView)
+                            rootView.clearContents(from: sheetView)
                         } else {
-                            document.removeUndo(at: shp)
+                            rootView.removeUndo(at: shp)
                         }
                         
                         end()

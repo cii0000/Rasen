@@ -20,38 +20,36 @@ import struct Foundation.UUID
 import struct Foundation.URL
 
 final class Stopper: InputKeyEditor {
-    let root: RootEditor
-    let document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     func send(_ event: InputKeyEvent) {
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
-            let p = document.convertScreenToWorld(event.screenPoint)
-            document.closeAllPanels(at: p)
+            let p = rootView.convertScreenToWorld(event.screenPoint)
+            rootView.closeAllPanels(at: p)
             
-            if root.isPlaying(with: event) {
-                root.stopPlaying(with: event)
+            if rootEditor.isPlaying(with: event) {
+                rootEditor.stopPlaying(with: event)
                 return
             }
         case .changed: break
         case .ended:
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
 }
 
 final class RunEditor: InputKeyEditor {
-    let root: RootEditor
-    let document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
     private(set) var worldPrintOrigin = Point()
@@ -67,37 +65,37 @@ final class RunEditor: InputKeyEditor {
     private var task: Task<(o: O, id: ID?), Never>?
     private var firstErrorNode: Node?
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     func send(_ event: InputKeyEvent) {
         let sp = event.screenPoint
-        let p = document.convertScreenToWorld(sp)
-        if event.phase == .began && document.closePanel(at: p) { return }
+        let p = rootView.convertScreenToWorld(sp)
+        if event.phase == .began && rootView.closePanel(at: p) { return }
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             
             if event.phase == .began {
-                document.closeAllPanels(at: p)
+                rootView.closeAllPanels(at: p)
             }
             return
         }
-        if root.isPlaying(with: event) {
-            root.stopPlaying(with: event)
+        if rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
             return
         }
         
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
-            document.closeAllPanels(at: p)
+            rootView.closeAllPanels(at: p)
             
-            let shp = document.sheetPosition(at: p)
-            guard let sheetView = document.sheetView(at: shp) else { break }
+            let shp = rootView.sheetPosition(at: p)
+            guard let sheetView = rootView.sheetView(at: shp) else { break }
             let inP = sheetView.convertFromWorld(p)
             if let (textView, ti, _, _) = sheetView.textTuple(at: inP) {
                 let text = textView.model
@@ -171,8 +169,8 @@ final class RunEditor: InputKeyEditor {
                         return
                     }
                 } else if text.string == "getLoudness =" {
-                    if let sheetView = document.sheetView(at: p) {
-                        let maxD = document.worldKnobEditDistance
+                    if let sheetView = rootView.sheetView(at: p) {
+                        let maxD = rootView.worldKnobEditDistance
                         var minD = Double.infinity, minContentView: SheetContentView?
                         for contentView in sheetView.contentsView.elementViews {
                             let d = contentView.mainLineDistance(contentView.convertFromWorld(p))
@@ -186,7 +184,7 @@ final class RunEditor: InputKeyEditor {
                             if let buffer = contentView.pcmBuffer {
                                 let lufs = buffer.integratedLoudness
                                 let db = buffer.samplePeakDb
-                                document.show("Sound".localized
+                                rootView.show("Sound".localized
                                               + "\n\t\("Loudness".localized): \(lufs.string(digitsCount: 4)) LUFS"
                                               + "\n\t\("Sample Peak".localized): \(db.string(digitsCount: 4)) dB",
                                               at: p)
@@ -195,7 +193,7 @@ final class RunEditor: InputKeyEditor {
                         } else if let buffer = sheetView.model.pcmBuffer {
                             let lufs = buffer.integratedLoudness
                             let db = buffer.samplePeakDb
-                            document.show("Sheet".localized + "\n\t\("Loudness".localized): \(lufs.string(digitsCount: 4)) LUFS" + "\n\t\("Sample Peak".localized): \(db.string(digitsCount: 4)) dB", at: p)
+                            rootView.show("Sheet".localized + "\n\t\("Loudness".localized): \(lufs.string(digitsCount: 4)) LUFS" + "\n\t\("Sample Peak".localized): \(db.string(digitsCount: 4)) dB", at: p)
                             return
                         }
                     }
@@ -208,7 +206,7 @@ final class RunEditor: InputKeyEditor {
         case .changed:
             break
         case .ended:
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
 }
@@ -226,16 +224,16 @@ extension RunEditor {
               _ shp: Sheetpos, _ sheetView: SheetView) {
         runText = text
         runTypobute = text.typobute
-        let sf = document.sheetFrame(with: shp)
+        let sf = rootView.sheetFrame(with: shp)
         let shpp = sf.origin
         var ssDic = [O: O](), tsss = [([Text], Sheetpos, Sheet)]()
         var shps = Set<Sheetpos>(), shpStack = Stack<Sheetpos>()
         shps.insert(shp)
         shpStack.push(shp)
         while let nshp = shpStack.pop() {
-            guard let sid = document.sheetID(at: nshp) else { continue }
-            guard let sheet = document.readSheet(at: sid) else { continue }
-            let sheetBounds = document.sheetFrame(with: nshp).bounds
+            guard let sid = rootView.sheetID(at: nshp) else { continue }
+            guard let sheet = rootView.readSheet(at: sid) else { continue }
+            let sheetBounds = rootView.sheetFrame(with: nshp).bounds
             let dshp = nshp - shp
             ssDic[O(dshp)] = O(OSheet(sheet, bounds: sheetBounds))
             
@@ -308,11 +306,11 @@ extension RunEditor {
         let oText = sheetView.model.texts[ti]
         var nText = oText
         nText.string.removeLast()
-        nText.origin += document.sheetFrame(with: shp).origin
+        nText.origin += rootView.sheetFrame(with: shp).origin
         let xo = O(nText, &oDic)
         
         calculatingNode.attitude.position = nodePoint(from: nText)
-        document.rootNode.append(child: calculatingNode)
+        rootView.node.append(child: calculatingNode)
         
         let clock = SuspendingClock.now
         calculatingTimer = DispatchSource.scheduledTimer(withTimeInterval: 1) { [weak self] in
@@ -321,7 +319,7 @@ extension RunEditor {
             }
         }
         
-        root.runners.insert(self)
+        rootEditor.runners.insert(self)
         
         let xoDic = oDic
         Task { @MainActor in
@@ -336,18 +334,18 @@ extension RunEditor {
             calculatingTimer?.cancel()
             calculatingTimer = nil
             
-            root.runners.remove(self)
+            rootEditor.runners.remove(self)
             
             calculatingNode.removeFromParent()
             
             if no != .stopped {
                 let time = clock.duration(to: .now).sec
-                if let sheetView = document.madeReadSheetView(at: worldPrintOrigin) {
-                    let shp = document.sheetPosition(at: worldPrintOrigin)
+                if let sheetView = rootView.madeReadSheetView(at: worldPrintOrigin) {
+                    let shp = rootView.sheetPosition(at: worldPrintOrigin)
                     draw(no, id, from: text, time: time, in: sheetView, shp)
                 }
             }
-            document.updateTextCursor()
+            rootView.updateTextCursor()
         }
     }
     
@@ -407,7 +405,7 @@ extension RunEditor {
         }
     }
     func draw(_ ss: OSheet, from text: Text, at shp: Sheetpos) {
-        guard let sheetView = document.readSheetView(at: shp) else { return }
+        guard let sheetView = rootView.readSheetView(at: shp) else { return }
         sheetView.newUndoGroup()
         func lineCount(_ line: Line) -> Int {
             line.controls.count * MemoryLayout<Point>.size
@@ -490,7 +488,7 @@ extension RunEditor {
     func draw(_ id: ID, in sheetView: SheetView) {
         guard let b = id.typoBounds, let ratio = id.typobute?.font.defaultRatio else { return }
         let p = b.centerPoint
-        if let nSheetView = document.sheetView(at: p) {
+        if let nSheetView = rootView.sheetView(at: p) {
             let nb = nSheetView.convertFromWorld(b)
             let s = Line.defaultLineWidth * ratio
             let line = Line.wave(Edge(nb.minXMinYPoint + Point(-s * 2, -s * 2),

@@ -277,7 +277,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     static let isHiddenActionListKey = "isHiddenActionList"
     static let isShownTrackpadAlternativeKey = "isShownTrackpadAlternative"
     private(set) var rootEditor: RootEditor
-    private(set) var document: Document
+    private(set) var rootView: RootView
     let renderstate = Renderstate.sampleCount4!
     
     var isShownDebug = false
@@ -303,7 +303,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     private func makeActionNode(isEditingSheet: Bool) -> Node {
         let actionNode = ActionList.default.node(isEditingSheet: isEditingSheet)
-        let b = document.screenBounds
+        let b = rootView.screenBounds
         let w = b.maxX - (actionNode.bounds?.maxX ?? 0)
         let h = b.midY - (actionNode.bounds?.midY ?? 0)
         actionNode.attitude.position = Point(w, h)
@@ -317,7 +317,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             sheetActionNode = makeActionNode(isEditingSheet: true)
             rootActionNode = makeActionNode(isEditingSheet: false)
         }
-        actionIsEditingSheet = document.isEditingSheet
+        actionIsEditingSheet = rootView.isEditingSheet
         update()
     }
     
@@ -326,15 +326,15 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     
     required init(url: URL, frame: NSRect = NSRect()) {
-        let document = Document(url: url)
-        self.document = document
-        self.rootEditor = .init(document)
+        let rootView = RootView(url: url)
+        self.rootView = rootView
+        self.rootEditor = .init(rootView)
         
         super.init(frame: frame, device: Renderer.shared.device)
         delegate = self
         sampleCount = renderstate.sampleCount
         depthStencilPixelFormat = .stencil8
-        clearColor = document.backgroundColor.mtl
+        clearColor = rootView.backgroundColor.mtl
         
         if ColorSpace.default.isHDR {
             colorPixelFormat = Renderer.shared.hdrPixelFormat
@@ -349,7 +349,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         enableSetNeedsDisplay = true
         self.allowedTouchTypes = .indirect
         self.wantsRestingTouches = true
-        setupDocument()
+        setupRootView()
         
         if !UserDefaults.standard.bool(forKey: SubMTKView.isHiddenActionListKey) {
             isHiddenActionList = false
@@ -424,29 +424,29 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         }
     }
     
-    func setupDocument() {
-        document.backgroundColorNotifications.append { [weak self] (_, backgroundColor) in
+    func setupRootView() {
+        rootView.backgroundColorNotifications.append { [weak self] (_, backgroundColor) in
             self?.clearColor = backgroundColor.mtl
             self?.update()
         }
-        document.cursorNotifications.append { [weak self] (_, cursor) in
+        rootView.cursorNotifications.append { [weak self] (_, cursor) in
             guard let self else { return }
             self.window?.invalidateCursorRects(for: self)
             self.addCursorRect(self.bounds, cursor: cursor.ns)
             Cursor.current = cursor
         }
-        document.cameraNotifications.append { [weak self] (_, _) in
+        rootView.cameraNotifications.append { [weak self] (_, _) in
             guard let self else { return }
             if !self.isHiddenActionList {
-                if self.actionIsEditingSheet != self.document.isEditingSheet {
+                if self.actionIsEditingSheet != self.rootView.isEditingSheet {
                     self.updateActionList()
                 }
             }
             self.update()
         }
-        document.rootNode.allChildrenAndSelf { $0.owner = self }
+        rootView.node.allChildrenAndSelf { $0.owner = self }
         
-        document.cursorPoint = clippedScreenPointFromCursor.my
+        rootView.cursorPoint = clippedScreenPointFromCursor.my
     }
     
     var isShownTrackpadAlternative = false {
@@ -467,11 +467,11 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                                            .lookUp) { [weak self] (event, dp) in
                 guard let self else { return }
                 if event.phase == .began,
-                   let r = self.document.selections
-                    .first(where: { self.document.worldBounds.intersects($0.rect) })?.rect {
+                   let r = self.rootView.selections
+                    .first(where: { self.rootView.worldBounds.intersects($0.rect) })?.rect {
                     
                     let p = r.centerPoint
-                    let sp = self.document.convertWorldToScreen(p)
+                    let sp = self.rootView.convertWorldToScreen(p)
                     self.rootEditor.inputKey(self.inputKeyEventWith(at: sp, .lookUpTap, .began))
                     self.rootEditor.inputKey(self.inputKeyEventWith(at: sp, .lookUpTap, .ended))
                 }
@@ -482,7 +482,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             let scrollButton = SubNSButton(frame: NSRect(),
                                            .scroll) { [weak self] (event, dp) in
                 guard let self else { return }
-                let nEvent = ScrollEvent(screenPoint: self.document.screenBounds.centerPoint,
+                let nEvent = ScrollEvent(screenPoint: self.rootView.screenBounds.centerPoint,
                                          time: event.time,
                                          scrollDeltaPoint: Point(dp.x, -dp.y) * 2,
                                          phase: event.phase,
@@ -496,7 +496,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             let zoomButton = SubNSButton(frame: NSRect(),
                                          .zoom) { [weak self] (event, dp) in
                 guard let self else { return }
-                let nEvent = PinchEvent(screenPoint: self.document.screenBounds.centerPoint,
+                let nEvent = PinchEvent(screenPoint: self.rootView.screenBounds.centerPoint,
                                         time: event.time,
                                         magnification: -dp.y / 100,
                                         phase: event.phase)
@@ -508,7 +508,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             let rotateButton = SubNSButton(frame: NSRect(),
                                            .rotate) { [weak self] (event, dp) in
                 guard let self else { return }
-                let nEvent = RotateEvent(screenPoint: self.document.screenBounds.centerPoint,
+                let nEvent = RotateEvent(screenPoint: self.rootView.screenBounds.centerPoint,
                                          time: event.time,
                                          rotationQuantity: -dp.x / 10,
                                          phase: event.phase)
@@ -567,111 +567,111 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     override func resetCursorRects() {
         discardCursorRects()
-        addCursorRect(bounds, cursor: document.cursor.ns)
+        addCursorRect(bounds, cursor: rootView.cursor.ns)
     }
     
     var isEnableMenuCommand = false {
         didSet {
             guard isEnableMenuCommand != oldValue else { return }
-            document.isShownLastEditedSheet = isEnableMenuCommand
-            document.isNoneCursor = isEnableMenuCommand
+            rootView.isShownLastEditedSheet = isEnableMenuCommand
+            rootView.isNoneCursor = isEnableMenuCommand
         }
     }
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         switch menuItem.action {
         case #selector(SubMTKView.importDocument(_:)):
-            return document.isSelectedNoneCursor
+            return rootView.isSelectedNoneCursor
             
         case #selector(SubMTKView.exportAsImage(_:)):
-            return document.isSelectedNoneCursor
+            return rootView.isSelectedNoneCursor
         case #selector(SubMTKView.exportAsImage4K(_:)):
-            return document.isSelectedNoneCursor
+            return rootView.isSelectedNoneCursor
         case #selector(SubMTKView.exportAsPDF(_:)):
-            return document.isSelectedNoneCursor
+            return rootView.isSelectedNoneCursor
         case #selector(SubMTKView.exportAsGIF(_:)):
-            return document.isSelectedNoneCursor
+            return rootView.isSelectedNoneCursor
             
         case #selector(SubMTKView.exportAsMovie(_:)):
-            return document.isSelectedNoneCursor
+            return rootView.isSelectedNoneCursor
         case #selector(SubMTKView.exportAsMovie4K(_:)):
-            return document.isSelectedNoneCursor
+            return rootView.isSelectedNoneCursor
         case #selector(SubMTKView.exportAsSound(_:)):
-            return document.isSelectedNoneCursor
+            return rootView.isSelectedNoneCursor
         case #selector(SubMTKView.exportAsLinearPCM(_:)):
-            return document.isSelectedNoneCursor
+            return rootView.isSelectedNoneCursor
             
         case #selector(SubMTKView.exportAsDocument(_:)):
-            return document.isSelectedNoneCursor
+            return rootView.isSelectedNoneCursor
         case #selector(SubMTKView.exportAsDocumentWithHistory(_:)):
-            return document.isSelectedNoneCursor
+            return rootView.isSelectedNoneCursor
             
         case #selector(SubMTKView.clearHistory(_:)):
-            return document.isSelectedNoneCursor
+            return rootView.isSelectedNoneCursor
             
         case #selector(SubMTKView.undo(_:)):
             if isEnableMenuCommand {
-                if document.isEditingSheet {
-                    if document.isSelectedNoneCursor {
-                        return document.selectedSheetViewNoneCursor?.history.isCanUndo ?? false
+                if rootView.isEditingSheet {
+                    if rootView.isSelectedNoneCursor {
+                        return rootView.selectedSheetViewNoneCursor?.history.isCanUndo ?? false
                     }
                 } else {
-                    return document.history.isCanUndo
+                    return rootView.history.isCanUndo
                 }
             }
             return false
         case #selector(SubMTKView.redo(_:)):
             if isEnableMenuCommand {
-                if document.isEditingSheet {
-                    if document.isSelectedNoneCursor {
-                        return document.selectedSheetViewNoneCursor?.history.isCanRedo ?? false
+                if rootView.isEditingSheet {
+                    if rootView.isSelectedNoneCursor {
+                        return rootView.selectedSheetViewNoneCursor?.history.isCanRedo ?? false
                     }
                 } else {
-                    return document.history.isCanRedo
+                    return rootView.history.isCanRedo
                 }
             }
             return false
         case #selector(SubMTKView.cut(_:)):
             return isEnableMenuCommand
-                && document.isSelectedNoneCursor && document.isSelectedOnlyNoneCursor
+                && rootView.isSelectedNoneCursor && rootView.isSelectedOnlyNoneCursor
         case #selector(SubMTKView.copy(_:)):
             return isEnableMenuCommand
-                && document.isSelectedNoneCursor && document.isSelectedOnlyNoneCursor
+                && rootView.isSelectedNoneCursor && rootView.isSelectedOnlyNoneCursor
         case #selector(SubMTKView.paste(_:)):
             return if isEnableMenuCommand
-                && document.isSelectedNoneCursor {
+                && rootView.isSelectedNoneCursor {
                 switch Pasteboard.shared.copiedObjects.first {
-                case .picture, .planesValue: document.isEditingSheet
-                case .copiedSheetsValue: !document.isEditingSheet
+                case .picture, .planesValue: rootView.isEditingSheet
+                case .copiedSheetsValue: !rootView.isEditingSheet
                 default: false
                 }
             } else {
                 false
             }
         case #selector(SubMTKView.find(_:)):
-            return isEnableMenuCommand && document.isEditingSheet
-                && document.isSelectedNoneCursor && document.isSelectedText
+            return isEnableMenuCommand && rootView.isEditingSheet
+                && rootView.isSelectedNoneCursor && rootView.isSelectedText
         case #selector(SubMTKView.changeToDraft(_:)):
-            return isEnableMenuCommand && document.isEditingSheet
-                && document.isSelectedNoneCursor
-                && !(document.selectedSheetViewNoneCursor?.model.picture.isEmpty ?? true)
+            return isEnableMenuCommand && rootView.isEditingSheet
+                && rootView.isSelectedNoneCursor
+                && !(rootView.selectedSheetViewNoneCursor?.model.picture.isEmpty ?? true)
         case #selector(SubMTKView.cutDraft(_:)):
-            return isEnableMenuCommand && document.isEditingSheet
-                && document.isSelectedNoneCursor
-                && !(document.selectedSheetViewNoneCursor?.model.draftPicture.isEmpty ?? true)
+            return isEnableMenuCommand && rootView.isEditingSheet
+                && rootView.isSelectedNoneCursor
+                && !(rootView.selectedSheetViewNoneCursor?.model.draftPicture.isEmpty ?? true)
         case #selector(SubMTKView.makeFaces(_:)):
-            return isEnableMenuCommand && document.isEditingSheet
-                && document.isSelectedNoneCursor
-                && !(document.selectedSheetViewNoneCursor?.model.picture.lines.isEmpty ?? true)
+            return isEnableMenuCommand && rootView.isEditingSheet
+                && rootView.isSelectedNoneCursor
+                && !(rootView.selectedSheetViewNoneCursor?.model.picture.lines.isEmpty ?? true)
         case #selector(SubMTKView.cutFaces(_:)):
-            return isEnableMenuCommand && document.isEditingSheet
-                && document.isSelectedNoneCursor
-                && !(document.selectedSheetViewNoneCursor?.model.picture.planes.isEmpty ?? true)
+            return isEnableMenuCommand && rootView.isEditingSheet
+                && rootView.isSelectedNoneCursor
+                && !(rootView.selectedSheetViewNoneCursor?.model.picture.planes.isEmpty ?? true)
         case #selector(SubMTKView.changeToVerticalText(_:)):
-            return isEnableMenuCommand && document.isEditingSheet
-                && document.isSelectedNoneCursor && document.isSelectedText
+            return isEnableMenuCommand && rootView.isEditingSheet
+                && rootView.isSelectedNoneCursor && rootView.isSelectedText
         case #selector(SubMTKView.changeToHorizontalText(_:)):
-            return isEnableMenuCommand && document.isEditingSheet
-                && document.isSelectedNoneCursor && document.isSelectedText
+            return isEnableMenuCommand && rootView.isEditingSheet
+                && rootView.isSelectedNoneCursor && rootView.isSelectedText
         
         case #selector(SubMTKView.shownActionList(_:)):
             menuItem.state = !isHiddenActionList ? .on : .off
@@ -691,7 +691,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     @objc func clearHistoryDatabase(_ sender: Any) {
         Task { @MainActor in
-            let result = await document.rootNode
+            let result = await rootView.node
                 .show(message: "Do you want to clear root history?".localized,
                       infomation: "You can’t undo this action. \nRoot history is what is used in \"Undo\", \"Redo\" or \"Select Version\" when in root operation, and if you clear it, you will not be able to return to the previous work.".localized,
                       okTitle: "Clear Root History".localized,
@@ -699,9 +699,9 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             switch result {
             case .ok:
                 let progressPanel = ProgressPanel(message: "Clearing Root History".localized)
-                self.document.rootNode.show(progressPanel)
+                self.rootView.node.show(progressPanel)
                 let task = Task.detached {
-                    await self.document.clearHistory { (progress, isStop) in
+                    await self.rootView.clearHistory { (progress, isStop) in
                         if Task.isCancelled {
                             isStop = true
                             return
@@ -738,12 +738,12 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             if stop { return }
         }
         
-        document.syncSave()
+        rootView.syncSave()
         
-        let toURL = document.url
+        let toURL = rootView.model.url
         
         let progressPanel = ProgressPanel(message: String(format: "Replacing %@".localized, System.dataName))
-        document.rootNode.show(progressPanel)
+        rootView.node.show(progressPanel)
         let task = Task.detached {
             do {
                 try replace(to: toURL) { (progress, isStop) in
@@ -761,7 +761,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 }
             } catch {
                 Task { @MainActor in
-                    self.document.rootNode.show(error)
+                    self.rootView.node.show(error)
                     self.updateWithURL()
                     progressPanel.closePanel()
                 }
@@ -771,7 +771,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     func replaceDatabase(from url: URL) {
         Task { @MainActor in
-            let result = await document.rootNode
+            let result = await rootView.node
                 .show(message: String(format: "Do you want to replace %@?".localized, System.dataName),
                       infomation: String(format: "You can’t undo this action. \n%1$@ is all the data written to this %2$@, if you replace %1$@ with new %1$@, all old %1$@ will be moved to the Trash.".localized, System.dataName, System.appName),
                       okTitle: String(format: "Replace %@".localized, System.dataName),
@@ -784,11 +784,11 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func replaceDatabase(_ sender: Any) {
         Task { @MainActor in
-            let result = await document.rootNode
+            let result = await rootView.node
                 .show(message: String(format: "Do you want to replace %@?".localized, System.dataName),
                       infomation: String(format: "You can’t undo this action. \n%1$@ is all the data written to this %2$@, if you replace %1$@ with new %1$@, all old %1$@ will be moved to the Trash.".localized, System.dataName, System.appName),
                       okTitle: String(format: "Replace %@...".localized, System.dataName),
-                      isSaftyCheck: document.url.allFileSize > 20*1024*1024)
+                      isSaftyCheck: rootView.model.url.allFileSize > 20*1024*1024)
             switch result {
             case .ok:
                 let loadResult = await URL.load(prompt: "Replace".localized,
@@ -806,12 +806,12 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     @objc func exportDatabase(_ sender: Any) {
         Task { @MainActor in
-            let url = document.url
+            let url = rootView.model.url
             let result = await URL.export(name: "User", fileType: Document.FileType.rasendata,
                                           fileSizeHandler: { url.allFileSize })
             switch result {
             case .complete(let ioResult):
-                document.syncSave()
+                rootView.syncSave()
                 
                 @Sendable func export(progressHandler: @Sendable (Double, inout Bool) -> ()) async throws {
                     var stop = false
@@ -838,7 +838,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 }
                 
                 let progressPanel = ProgressPanel(message: String(format: "Exporting %@".localized, System.dataName))
-                document.rootNode.show(progressPanel)
+                rootView.node.show(progressPanel)
                 let task = Task.detached {
                     do {
                         try await export { (progress, isStop) in
@@ -855,7 +855,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                         }
                     } catch {
                         Task { @MainActor in
-                            self.document.rootNode.show(error)
+                            self.rootView.node.show(error)
                             progressPanel.closePanel()
                         }
                     }
@@ -868,11 +868,11 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     @objc func resetDatabase(_ sender: Any) {
         Task { @MainActor in
-            let result = await document.rootNode
+            let result = await rootView.node
                 .show(message: String(format: "Do you want to reset the %@?".localized, System.dataName),
                       infomation: String(format: "You can’t undo this action. \n%1$@ is all the data written to this %2$@, if you reset %1$@, all %1$@ will be moved to the Trash.".localized, System.dataName, System.appName),
                       okTitle: String(format: "Reset %@".localized, System.dataName),
-                      isSaftyCheck: document.url.allFileSize > 20*1024*1024)
+                      isSaftyCheck: rootView.model.url.allFileSize > 20*1024*1024)
             switch result {
             case .ok:
                 @Sendable func reset(in url: URL, progressHandler: (Double, inout Bool) -> ()) throws {
@@ -890,12 +890,12 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     if stop { return }
                 }
                 
-                document.syncSave()
+                rootView.syncSave()
                 
-                let url = document.url
+                let url = rootView.model.url
                 
                 let progressPanel = ProgressPanel(message: String(format: "Resetting %@".localized, System.dataName))
-                self.document.rootNode.show(progressPanel)
+                self.rootView.node.show(progressPanel)
                 let task = Task.detached {
                     do {
                         try reset(in: url) { (progress, isStop) in
@@ -913,7 +913,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                         }
                     } catch {
                         Task { @MainActor in
-                            self.document.rootNode.show(error)
+                            self.rootView.node.show(error)
                             self.updateWithURL()
                             progressPanel.closePanel()
                         }
@@ -944,200 +944,200 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     
     @objc func importDocument(_ sender: Any) {
-        document.isNoneCursor = true
+        rootView.isNoneCursor = true
         let editor = Importer(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
+        rootView.isNoneCursor = false
     }
     
     @objc func exportAsImage(_ sender: Any) {
-        document.isNoneCursor = true
+        rootView.isNoneCursor = true
         let editor = ImageExporter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
+        rootView.isNoneCursor = false
     }
     @objc func exportAsImage4K(_ sender: Any) {
-        document.isNoneCursor = true
+        rootView.isNoneCursor = true
         let editor = Image4KExporter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
+        rootView.isNoneCursor = false
     }
     @objc func exportAsPDF(_ sender: Any) {
-        document.isNoneCursor = true
+        rootView.isNoneCursor = true
         let editor = PDFExporter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
+        rootView.isNoneCursor = false
     }
     @objc func exportAsGIF(_ sender: Any) {
-        document.isNoneCursor = true
+        rootView.isNoneCursor = true
         let editor = GIFExporter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
+        rootView.isNoneCursor = false
     }
     @objc func exportAsMovie(_ sender: Any) {
-        document.isNoneCursor = true
+        rootView.isNoneCursor = true
         let editor = MovieExporter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
+        rootView.isNoneCursor = false
     }
     @objc func exportAsMovie4K(_ sender: Any) {
-        document.isNoneCursor = true
+        rootView.isNoneCursor = true
         let editor = Movie4KExporter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
+        rootView.isNoneCursor = false
     }
     @objc func exportAsSound(_ sender: Any) {
-        document.isNoneCursor = true
+        rootView.isNoneCursor = true
         let editor = SoundExporter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
+        rootView.isNoneCursor = false
     }
     @objc func exportAsLinearPCM(_ sender: Any) {
-        document.isNoneCursor = true
+        rootView.isNoneCursor = true
         let editor = LinearPCMExporter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
+        rootView.isNoneCursor = false
     }
     
     @objc func exportAsDocument(_ sender: Any) {
-        document.isNoneCursor = true
+        rootView.isNoneCursor = true
         let editor = DocumentWithoutHistoryExporter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
+        rootView.isNoneCursor = false
     }
     @objc func exportAsDocumentWithHistory(_ sender: Any) {
-        document.isNoneCursor = true
+        rootView.isNoneCursor = true
         let editor = DocumentExporter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
+        rootView.isNoneCursor = false
     }
     
     @objc func clearHistory(_ sender: Any) {
-        document.isNoneCursor = true
+        rootView.isNoneCursor = true
         let editor = HistoryCleaner(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
+        rootView.isNoneCursor = false
     }
     
     @objc func undo(_ sender: Any) {
-        document.isNoneCursor = true
+        rootView.isNoneCursor = true
         let editor = Undoer(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
+        rootView.isNoneCursor = false
     }
     @objc func redo(_ sender: Any) {
-        document.isNoneCursor = true
+        rootView.isNoneCursor = true
         let editor = Redoer(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
+        rootView.isNoneCursor = false
     }
     @objc func cut(_ sender: Any) {
-        document.isNoneCursor = true
+        rootView.isNoneCursor = true
         let editor = Cutter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
+        rootView.isNoneCursor = false
     }
     @objc func copy(_ sender: Any) {
-        document.isNoneCursor = true
+        rootView.isNoneCursor = true
         let editor = Copier(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
+        rootView.isNoneCursor = false
     }
     @objc func paste(_ sender: Any) {
-        document.isNoneCursor = true
+        rootView.isNoneCursor = true
         let editor = Paster(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
+        rootView.isNoneCursor = false
     }
     @objc func find(_ sender: Any) {
-        document.isNoneCursor = true
+        rootView.isNoneCursor = true
         let editor = Finder(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
+        rootView.isNoneCursor = false
     }
     @objc func changeToDraft(_ sender: Any) {
-        document.isNoneCursor = true
+        rootView.isNoneCursor = true
         let editor = DraftChanger(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
+        rootView.isNoneCursor = false
     }
     @objc func cutDraft(_ sender: Any) {
-        document.isNoneCursor = true
+        rootView.isNoneCursor = true
         let editor = DraftCutter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
+        rootView.isNoneCursor = false
     }
     @objc func makeFaces(_ sender: Any) {
-        document.isNoneCursor = true
+        rootView.isNoneCursor = true
         let editor = FacesMaker(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
+        rootView.isNoneCursor = false
     }
     @objc func cutFaces(_ sender: Any) {
-        document.isNoneCursor = true
+        rootView.isNoneCursor = true
         let editor = FacesCutter(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
+        rootView.isNoneCursor = false
     }
     @objc func changeToVerticalText(_ sender: Any) {
-        document.isNoneCursor = true
+        rootView.isNoneCursor = true
         let editor = VerticalTextChanger(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
+        rootView.isNoneCursor = false
     }
     @objc func changeToHorizontalText(_ sender: Any) {
-        document.isNoneCursor = true
+        rootView.isNoneCursor = true
         let editor = HorizontalTextChanger(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
-        document.isNoneCursor = false
+        rootView.isNoneCursor = false
     }
     
 //    @objc func startDictation(_ sender: Any) {
@@ -1146,27 +1146,27 @@ final class SubMTKView: MTKView, MTKViewDelegate,
 //    }
     
     func updateWithURL() {
-        document = Document(url: document.url)
-        setupDocument()
+        rootView = .init(url: rootView.model.url)
+        setupRootView()
         do {
-            try document.restoreDatabase()
+            try rootView.restoreDatabase()
         } catch {
-            document.rootNode.show(error)
+            rootView.node.show(error)
         }
-        document.screenBounds = bounds.my
-        document.drawableSize = drawableSize.my
-        clearColor = document.backgroundColor.mtl
+        rootView.screenBounds = bounds.my
+        rootView.drawableSize = drawableSize.my
+        clearColor = rootView.backgroundColor.mtl
         draw()
     }
     
     func draw(in view: MTKView) {}
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
-        document.screenBounds = bounds.my
-        document.drawableSize = size.my
+        rootView.screenBounds = bounds.my
+        rootView.drawableSize = size.my
         
         if !isHiddenActionList {
             func update(_ node: Node) {
-                let b = document.screenBounds
+                let b = rootView.screenBounds
                 let w = b.maxX - (node.bounds?.maxX ?? 0)
                 let h = b.midY - (node.bounds?.midY ?? 0)
                 node.attitude.position = Point(w, h)
@@ -1191,8 +1191,8 @@ final class SubMTKView: MTKView, MTKViewDelegate,
              height: Double(drawableSize.height))
     }
     func viewportScale() -> Double {
-        return document.worldToViewportTransform.absXScale
-            * document.viewportToScreenTransform.absXScale
+        return rootView.worldToViewportTransform.absXScale
+            * rootView.viewportToScreenTransform.absXScale
             * Double(drawableSize.width / self.bounds.width)
     }
     func viewportBounds(from transform: Transform, bounds: Rect) -> Rect {
@@ -1201,9 +1201,9 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                       height: Double(drawableSize.height))
         let scale = Double(drawableSize.width / self.bounds.width)
         let st = transform
-            * document.viewportToScreenTransform
+            * rootView.viewportToScreenTransform
             * Transform(translationX: 0,
-                        y: -document.screenBounds.height)
+                        y: -rootView.screenBounds.height)
             * Transform(scaleX: scale, y: -scale)
         return dr.intersection(bounds * st) ?? dr
     }
@@ -2303,10 +2303,10 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         [.markedClauseSegment, .glyphInfo]
     }
     func hasMarkedText() -> Bool {
-        rootEditor.document.editingTextView?.isMarked ?? false
+        rootEditor.rootView.editingTextView?.isMarked ?? false
     }
     func markedRange() -> NSRange {
-        if let textView = rootEditor.document.editingTextView,
+        if let textView = rootEditor.rootView.editingTextView,
            let range = textView.markedRange {
             return textView.model.string.nsRange(from: range)
                 ?? NSRange(location: NSNotFound, length: 0)
@@ -2315,7 +2315,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         }
     }
     func selectedRange() -> NSRange {
-        if let textView = rootEditor.document.editingTextView,
+        if let textView = rootEditor.rootView.editingTextView,
            let range = textView.selectedRange {
             return textView.model.string.nsRange(from: range)
                 ?? NSRange(location: NSNotFound, length: 0)
@@ -2324,7 +2324,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         }
     }
     func attributedString() -> NSAttributedString {
-        if let text = rootEditor.document.editingTextView?.model {
+        if let text = rootEditor.rootView.editingTextView?.model {
             return NSAttributedString(string: text.string.nsBased,
                                       attributes: text.typobute.attributes())
         } else {
@@ -2349,7 +2349,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     func characterIndex(for nsP: NSPoint) -> Int {
         let p = convertFromTopScreen(nsP).my
         if let i = rootEditor.textEditor.characterIndex(for: p),
-           let string = rootEditor.document.editingTextView?.model.string {
+           let string = rootEditor.rootView.editingTextView?.model.string {
             
             return string.nsIndex(from: i)
         } else {
@@ -2358,7 +2358,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     func firstRect(forCharacterRange nsRange: NSRange,
                    actualRange: NSRangePointer?) -> NSRect {
-        if let string = rootEditor.document.editingTextView?.model.string,
+        if let string = rootEditor.rootView.editingTextView?.model.string,
            let range = string.range(fromNS: nsRange),
            let rect = rootEditor.textEditor.firstRect(for: range) {
             return convertToTopScreen(rect.cg)
@@ -2367,7 +2367,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         }
     }
     func baselineDeltaForCharacter(at nsI: Int) -> CGFloat {
-        if let string = rootEditor.document.editingTextView?.model.string,
+        if let string = rootEditor.rootView.editingTextView?.model.string,
            let i = string.index(fromNS: nsI),
            let d = rootEditor.textEditor.baselineDelta(at: i) {
             
@@ -2377,7 +2377,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         }
     }
     func drawsVerticallyForCharacter(at nsI: Int) -> Bool {
-        if let o = rootEditor.document.editingTextView?.textOrientation {
+        if let o = rootEditor.rootView.editingTextView?.textOrientation {
             return o == .vertical
         } else {
             return false
@@ -2391,7 +2391,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     func setMarkedText(_ str: Any,
                        selectedRange selectedNSRange: NSRange,
                        replacementRange replacementNSRange: NSRange) {
-        guard let string = rootEditor.document.editingTextView?.model.string else { return }
+        guard let string = rootEditor.rootView.editingTextView?.model.string else { return }
         let range = string.range(fromNS: replacementNSRange)
         
         func mark(_ mStr: String) {
@@ -2406,7 +2406,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         }
     }
     func insertText(_ str: Any, replacementRange: NSRange) {
-        guard let string = rootEditor.document.editingTextView?.model.string else { return }
+        guard let string = rootEditor.rootView.editingTextView?.model.string else { return }
         let range = string.range(fromNS: replacementRange)
         
         if let attString = str as? NSAttributedString {
@@ -2463,15 +2463,15 @@ extension SubMTKView {
         
         if let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor) {
             let ctx = Context(encoder, renderstate)
-            let wtvTransform = document.worldToViewportTransform
-            let wtsScale = document.worldToScreenScale
-            document.rootNode.draw(with: wtvTransform, scale: wtsScale, in: ctx)
+            let wtvTransform = rootView.worldToViewportTransform
+            let wtsScale = rootView.worldToScreenScale
+            rootView.node.draw(with: wtvTransform, scale: wtsScale, in: ctx)
             
             if isShownDebug || isShownClock {
                 drawDebugNode(in: ctx)
             }
             if !isHiddenActionList {
-                let t = document.screenToViewportTransform
+                let t = rootView.screenToViewportTransform
                 actionNode?.draw(with: t, scale: 1, in: ctx)
             }
             
@@ -2493,7 +2493,7 @@ extension SubMTKView {
             let string1 = isShownDebug ? "GPU Memory: \(debugGPUSize) / \(debugMaxGPUSize) MB" : ""
             debugNode.path = Text(string: string0 + (isShownClock && isShownDebug ? " " : "") + string1).typesetter.path()
         }
-        let t = document.screenToViewportTransform
+        let t = rootView.screenToViewportTransform
         debugNode.draw(with: t, scale: 1, in: context)
     }
 }
@@ -2595,7 +2595,7 @@ extension Node {
                                       orientation: orientation).attributes()
             let attString = NSAttributedString(string: definition,
                                                attributes: attributes)
-            let sp = owner.document.convertWorldToScreen(convertToWorld(p))
+            let sp = owner.rootView.convertWorldToScreen(convertToWorld(p))
             owner.showDefinition(for: attString, at: sp.cg)
         }
     }

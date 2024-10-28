@@ -22,8 +22,8 @@ import struct Foundation.URL
 final class Importer: InputKeyEditor {
     let editor: IOEditor
     
-    init(_ root: RootEditor) {
-        editor = IOEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = IOEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -36,8 +36,8 @@ final class Importer: InputKeyEditor {
 final class Exporter: InputKeyEditor {
     let editor: IOEditor
     
-    init(_ root: RootEditor) {
-        editor = IOEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = IOEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -50,8 +50,8 @@ final class Exporter: InputKeyEditor {
 final class ImageExporter: InputKeyEditor {
     let editor: IOEditor
     
-    init(_ root: RootEditor) {
-        editor = IOEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = IOEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -64,8 +64,8 @@ final class ImageExporter: InputKeyEditor {
 final class Image4KExporter: InputKeyEditor {
     let editor: IOEditor
     
-    init(_ root: RootEditor) {
-        editor = IOEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = IOEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -78,8 +78,8 @@ final class Image4KExporter: InputKeyEditor {
 final class PDFExporter: InputKeyEditor {
     let editor: IOEditor
     
-    init(_ root: RootEditor) {
-        editor = IOEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = IOEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -92,8 +92,8 @@ final class PDFExporter: InputKeyEditor {
 final class GIFExporter: InputKeyEditor {
     let editor: IOEditor
     
-    init(_ root: RootEditor) {
-        editor = IOEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = IOEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -106,8 +106,8 @@ final class GIFExporter: InputKeyEditor {
 final class MovieExporter: InputKeyEditor {
     let editor: IOEditor
     
-    init(_ root: RootEditor) {
-        editor = IOEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = IOEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -121,8 +121,8 @@ final class MovieExporter: InputKeyEditor {
 final class Movie4KExporter: InputKeyEditor {
     let editor: IOEditor
     
-    init(_ root: RootEditor) {
-        editor = IOEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = IOEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -135,8 +135,8 @@ final class Movie4KExporter: InputKeyEditor {
 final class SoundExporter: InputKeyEditor {
     let editor: IOEditor
     
-    init(_ root: RootEditor) {
-        editor = IOEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = IOEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -149,8 +149,8 @@ final class SoundExporter: InputKeyEditor {
 final class LinearPCMExporter: InputKeyEditor {
     let editor: IOEditor
     
-    init(_ root: RootEditor) {
-        editor = IOEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = IOEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -163,8 +163,8 @@ final class LinearPCMExporter: InputKeyEditor {
 final class DocumentExporter: InputKeyEditor {
     let editor: IOEditor
     
-    init(_ root: RootEditor) {
-        editor = IOEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = IOEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -177,8 +177,8 @@ final class DocumentExporter: InputKeyEditor {
 final class DocumentWithoutHistoryExporter: InputKeyEditor {
     let editor: IOEditor
     
-    init(_ root: RootEditor) {
-        editor = IOEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = IOEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -189,13 +189,13 @@ final class DocumentWithoutHistoryExporter: InputKeyEditor {
     }
 }
 final class IOEditor: Editor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     var fp = Point()
@@ -204,18 +204,18 @@ final class IOEditor: Editor {
     
     let selectingLineNode = Node(lineWidth: 1.5)
     func updateNode() {
-        selectingLineNode.lineWidth = document.worldLineWidth
+        selectingLineNode.lineWidth = rootView.worldLineWidth
     }
     func end(isUpdateSelect: Bool = false, isUpdateCursor: Bool = true) {
         selectingLineNode.removeFromParent()
         
         if isUpdateSelect {
-            document.updateSelects()
+            rootView.updateSelects()
         }
         if isUpdateCursor {
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
-        document.updateSelectedColor(isMain: true)
+        rootView.updateSelectedColor(isMain: true)
     }
     func name(from shp: Sheetpos) -> String {
         return "\(shp.x)_\(shp.y)"
@@ -261,19 +261,19 @@ final class IOEditor: Editor {
     }
     
     @discardableResult func beginImportFile(at sp: Point) -> Sheetpos {
-        fp = document.convertScreenToWorld(sp)
-        selectingLineNode.lineWidth = document.worldLineWidth
+        fp = rootView.convertScreenToWorld(sp)
+        selectingLineNode.lineWidth = rootView.worldLineWidth
         selectingLineNode.fillType = .color(.subSelected)
         selectingLineNode.lineType = .color(.selected)
-        let shp = document.sheetPosition(at: fp)
-        let frame = document.sheetFrame(with: shp)
+        let shp = rootView.sheetPosition(at: fp)
+        let frame = rootView.sheetFrame(with: shp)
         selectingLineNode.path = Path(frame)
-        document.rootNode.append(child: selectingLineNode)
+        rootView.node.append(child: selectingLineNode)
         
-        document.textCursorNode.isHidden = true
-        document.textMaxTypelineWidthNode.isHidden = true
+        rootView.textCursorNode.isHidden = true
+        rootView.textMaxTypelineWidthNode.isHidden = true
         
-        document.updateSelectedColor(isMain: false)
+        rootView.updateSelectedColor(isMain: false)
         
         return shp
     }
@@ -281,7 +281,7 @@ final class IOEditor: Editor {
         var mshp = shp
         var onSHPs = [Sheetpos](), willremoveSHPs = [Sheetpos]()
         for url in urls {
-            let importedDocument = Document(url: url)
+            let importedDocument = RootView(url: url)
             
             var maxX = mshp.x
             for (osid, _) in importedDocument.sheetRecorders {
@@ -289,7 +289,7 @@ final class IOEditor: Editor {
                     continue
                 }
                 let nshp = oshp + mshp
-                if document.sheetID(at: nshp) != nil {
+                if rootView.sheetID(at: nshp) != nil {
                     willremoveSHPs.append(nshp)
                 }
                 
@@ -307,7 +307,7 @@ final class IOEditor: Editor {
         let viewSHPs = sorted(nSHPs.map { SelectingValue(shp: $0, bounds: Rect()) }, with: .maxXMinY)
             .map { $0.shp }
         selectingLineNode.children = viewSHPs.map {
-            let frame = document.sheetFrame(with: $0)
+            let frame = rootView.sheetFrame(with: $0)
             if let op = oldP {
                 let cp = frame.centerPoint
                 let path = Path([Pathline([op, cp])])
@@ -328,7 +328,7 @@ final class IOEditor: Editor {
                             fillType: selectingLineNode.fillType)
             }
         } + willremoveSHPs.map {
-            Node(path: Path(document.sheetFrame(with: $0)),
+            Node(path: Path(rootView.sheetFrame(with: $0)),
                  lineWidth: selectingLineNode.lineWidth * 2,
                  lineType: selectingLineNode.lineType,
                  fillType: selectingLineNode.fillType)
@@ -341,20 +341,20 @@ final class IOEditor: Editor {
             var dshp = Sheetpos()
             let xCount = max(1, Int(Double(contentURLs.count).squareRoot()))
             for url in contentURLs {
-                if let sheetView = document.madeSheetView(at: shp + dshp) {
+                if let sheetView = rootView.madeSheetView(at: shp + dshp) {
                     let np = contentURLs.count == 1 ? sheetView.convertFromWorld(fp) : Point(10, 50)
                     let filename = url.deletingPathExtension().lastPathComponent
                     let name = UUID().uuidString + "." + url.pathExtension
                     
-                    if let directory = document.sheetRecorders[sheetView.id]?.contentsDirectory {
+                    if let directory = rootView.sheetRecorders[sheetView.id]?.contentsDirectory {
                         directory.isWillwrite = true
                         try? directory.write()
                         try? directory.copy(name: name, from: url)
                     }
                     
-                    let maxBounds = document.sheetFrame(with: shp).bounds.inset(by: Sheet.textPadding)
+                    let maxBounds = rootView.sheetFrame(with: shp).bounds.inset(by: Sheet.textPadding)
                     let content = Content(directoryName: sheetView.id.uuidString,
-                                          name: name, origin: document.roundedPoint(from: np))
+                                          name: name, origin: rootView.roundedPoint(from: np))
                     if content.type == .movie {
                         Task.detached {
                             if let size = try? await Movie.size(from: content.url),
@@ -411,7 +411,7 @@ final class IOEditor: Editor {
                         content.origin = nnp
                         if content.type.hasDur {
                             let tempo = sheetView.nearestTempo(at: np) ?? Music.defaultTempo
-                            let interval = document.currentBeatInterval
+                            let interval = rootView.currentBeatInterval
                             let startBeat = sheetView.animationView.beat(atX: np.x, interval: interval)
                             let durBeat = ContentTimeOption.beat(fromSec: content.durSec, tempo: tempo)
                             let beatRange = Range(start: startBeat, length: durBeat)
@@ -460,7 +460,7 @@ final class IOEditor: Editor {
                 }
             }
             Task { @MainActor in
-                let result = await document.rootNode
+                let result = await rootView.node
                     .show(message: message,
                           infomation: "This operation can be undone when in root mode, but the data will remain until the root history is cleared.".localized,
                           okTitle: "Import".localized,
@@ -480,20 +480,20 @@ final class IOEditor: Editor {
         var nSIDs = [Sheetpos: SheetID](), willremoveSHPs = [Sheetpos]()
         var resetSIDs = Set<SheetID>()
         for url in urls {
-            let importedDocument = Document(url: url)
+            let importedDocument = RootView(url: url)
             
             var maxX = mshp.x
             for (osid, osrr) in importedDocument.sheetRecorders {
                 guard let oshp = importedDocument.sheetPosition(at: osid) else {
-                    let nsid = document.appendSheet(from: osrr)
+                    let nsid = rootView.appendSheet(from: osrr)
                     resetSIDs.insert(nsid)
                     continue
                 }
                 let nshp = oshp + mshp
-                if document.sheetID(at: nshp) != nil {
+                if rootView.sheetID(at: nshp) != nil {
                     willremoveSHPs.append(nshp)
                 }
-                nSIDs[nshp] = document.appendSheet(from: osrr)
+                nSIDs[nshp] = rootView.appendSheet(from: osrr)
                 
                 if nshp.x > maxX {
                     maxX = nshp.x + (oshp.isRight ? 1 : 0)
@@ -502,27 +502,27 @@ final class IOEditor: Editor {
             mshp.x = maxX + 2
         }
         if !willremoveSHPs.isEmpty || !nSIDs.isEmpty || !resetSIDs.isEmpty {
-            document.history.newUndoGroup()
+            rootView.history.newUndoGroup()
             if !willremoveSHPs.isEmpty {
-                document.removeSheets(at: willremoveSHPs)
+                rootView.removeSheets(at: willremoveSHPs)
             }
             if !nSIDs.isEmpty {
-                document.append(nSIDs)
+                rootView.append(nSIDs)
             }
             if !resetSIDs.isEmpty {
-                document.moveSheetsToUpperRightCorner(with: Array(resetSIDs),
+                rootView.moveSheetsToUpperRightCorner(with: Array(resetSIDs),
                                                       isNewUndoGroup: false)
-                document.rootNode.show(Document.ReadingError())
+                rootView.node.show(RootView.ReadingError())
             }
-            document.updateNode()
+            rootView.updateNode()
         }
     }
     func importFile(with event: InputKeyEvent) {
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
-            let sp = document.lastEditedSheetScreenCenterPositionNoneSelectedNoneCursor ?? event.screenPoint
+            let sp = rootView.lastEditedSheetScreenCenterPositionNoneSelectedNoneCursor ?? event.screenPoint
             beginImportFile(at: sp)
         case .changed:
             break
@@ -533,7 +533,7 @@ final class IOEditor: Editor {
                                             fileTypes: Document.FileType.allCases + Content.FileType.allCases)
                 switch result {
                 case .complete(let ioResults):
-                    let shp = document.sheetPosition(at: fp)
+                    let shp = rootView.sheetPosition(at: fp)
                     importFile(from: ioResults.map { $0.url }, at: shp)
                 case .cancel:
                     end(isUpdateSelect: true)
@@ -557,20 +557,20 @@ final class IOEditor: Editor {
     func exportFile(with event: InputKeyEvent, _ type: ExportType) {
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
-            let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+            let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
                 ?? event.screenPoint
-            fp = document.convertScreenToWorld(sp)
-            if document.isSelectNoneCursor(at: fp),
-               !document.isSelectedText, !document.selections.isEmpty {
+            fp = rootView.convertScreenToWorld(sp)
+            if rootView.isSelectNoneCursor(at: fp),
+               !rootView.isSelectedText, !rootView.selections.isEmpty {
                 
                 var nvs = [SelectingValue]()
-                for selection in document.selections {
-                    let vs: [SelectingValue] = document.world.sheetIDs.keys.compactMap { shp in
-                        let frame = document.sheetFrame(with: shp)
+                for selection in rootView.selections {
+                    let vs: [SelectingValue] = rootView.world.sheetIDs.keys.compactMap { shp in
+                        let frame = rootView.sheetFrame(with: shp)
                         if let rf = selection.rect.intersection(frame) {
-                            if document.isEditingSheet {
+                            if rootView.isEditingSheet {
                                 let nf = rf - frame.origin
                                 return SelectingValue(shp: shp,
                                                       bounds: nf)
@@ -585,11 +585,11 @@ final class IOEditor: Editor {
                     nvs += sorted(vs, with: selection.rectCorner)
                 }
                 
-                if let unionFrame = document.isEditingSheet
+                if let unionFrame = rootView.isEditingSheet
                     && nvs.count > 1 && !type.isDocument ?
-                        document.multiSelection.firstSelection(at: fp)?.rect : nil {
+                        rootView.multiSelection.firstSelection(at: fp)?.rect : nil {
                     
-                    selectingLineNode.lineWidth = document.worldLineWidth
+                    selectingLineNode.lineWidth = rootView.worldLineWidth
                     selectingLineNode.fillType = .color(.subSelected)
                     selectingLineNode.lineType = .color(.selected)
                     selectingLineNode.path = Path(unionFrame)
@@ -597,8 +597,8 @@ final class IOEditor: Editor {
                     var oldP: Point?
                     selectingLineNode.children = nvs.map {
                         let frame = !type.isDocument ?
-                        ($0.bounds + document.sheetFrame(with: $0.shp).origin) :
-                        document.sheetFrame(with: $0.shp)
+                        ($0.bounds + rootView.sheetFrame(with: $0.shp).origin) :
+                        rootView.sheetFrame(with: $0.shp)
                         
                         if !type.isDocument, let op = oldP {
                             let cp = frame.centerPoint
@@ -609,41 +609,41 @@ final class IOEditor: Editor {
                             let path = Path([Pathline([op, cp]),
                                              Pathline([p0, cp, p1])])
                             let arrowNode = Node(path: path,
-                                                 lineWidth: document.worldLineWidth,
+                                                 lineWidth: rootView.worldLineWidth,
                                                  lineType: .color(.selected))
                             oldP = frame.centerPoint
                             return Node(children: [arrowNode],
                                         path: Path(frame),
-                                        lineWidth: document.worldLineWidth,
+                                        lineWidth: rootView.worldLineWidth,
                                         lineType: .color(.selected),
                                         fillType: .color(.subSelected))
                         } else {
                             oldP = frame.centerPoint
                             return Node(path: Path(frame),
-                                        lineWidth: document.worldLineWidth,
+                                        lineWidth: rootView.worldLineWidth,
                                         lineType: .color(.selected),
                                         fillType: .color(.subSelected))
                         }
                     }
                 }
             } else {
-                selectingLineNode.lineWidth = document.worldLineWidth
+                selectingLineNode.lineWidth = rootView.worldLineWidth
                 selectingLineNode.fillType = .color(.subSelected)
                 selectingLineNode.lineType = .color(.selected)
                 if !type.isDocument {
-                    let (_, _, frame, _) = document.sheetViewAndFrame(at: fp)
+                    let (_, _, frame, _) = rootView.sheetViewAndFrame(at: fp)
                     selectingLineNode.path = Path(frame)
                 } else {
-                    let frame = document.sheetFrame(with: document.sheetPosition(at: fp))
+                    let frame = rootView.sheetFrame(with: rootView.sheetPosition(at: fp))
                     selectingLineNode.path = Path(frame)
                 }
                 
-                document.updateSelectedColor(isMain: false)
+                rootView.updateSelectedColor(isMain: false)
             }
-            document.rootNode.append(child: selectingLineNode)
+            rootView.node.append(child: selectingLineNode)
             
-            document.textCursorNode.isHidden = true
-            document.textMaxTypelineWidthNode.isHidden = true
+            rootView.textCursorNode.isHidden = true
+            rootView.textMaxTypelineWidthNode.isHidden = true
         case .changed:
             break
         case .ended:
@@ -681,12 +681,12 @@ final class IOEditor: Editor {
     
     func beginExportFile(_ type: ExportType, at p: Point) {
         let nvs: [SelectingValue], unionFrame: Rect?
-        if document.isSelectNoneCursor(at: p), !document.isSelectedText {
-            nvs = document.selections.flatMap { selection in
-                let vs: [SelectingValue] = document.world.sheetIDs.keys.compactMap { shp in
-                    let frame = document.sheetFrame(with: shp)
+        if rootView.isSelectNoneCursor(at: p), !rootView.isSelectedText {
+            nvs = rootView.selections.flatMap { selection in
+                let vs: [SelectingValue] = rootView.world.sheetIDs.keys.compactMap { shp in
+                    let frame = rootView.sheetFrame(with: shp)
                     if let rf = selection.rect.intersection(frame) {
-                        if document.isEditingSheet {
+                        if rootView.isEditingSheet {
                             let nf = rf - frame.origin
                             return SelectingValue(shp: shp,
                                                   bounds: nf)
@@ -701,13 +701,13 @@ final class IOEditor: Editor {
                 return sorted(vs, with: selection.rectCorner)
             }
             
-            unionFrame = document.isEditingSheet && nvs.count > 1 && !type.isDocument ?
-            document.multiSelection.firstSelection(at: p)?.rect : nil
+            unionFrame = rootView.isEditingSheet && nvs.count > 1 && !type.isDocument ?
+            rootView.multiSelection.firstSelection(at: p)?.rect : nil
         } else {
-            let (shp, sheetView, frame, _) = document.sheetViewAndFrame(at: p)
+            let (shp, sheetView, frame, _) = rootView.sheetViewAndFrame(at: p)
             if let sheetView {
                 let bounds = sheetView.model.boundsTuple(at: sheetView.convertFromWorld(p),
-                                                         in: document.sheetFrame(with: shp).bounds).bounds.integral
+                                                         in: rootView.sheetFrame(with: shp).bounds).bounds.integral
                 nvs = [SelectingValue(shp: shp, bounds: bounds)]
             } else {
                 let bounds = Rect(size: frame.size)
@@ -722,7 +722,7 @@ final class IOEditor: Editor {
             return
         }
         let size = unionFrame?.size ??
-        (nvs.count >= 2 ? document.sheetView(at: fv.shp)?.model.mainFrame?.size : nil) ?? fv.bounds.size
+        (nvs.count >= 2 ? rootView.sheetView(at: fv.shp)?.model.mainFrame?.size : nil) ?? fv.bounds.size
         guard size.width > 0 && size.height > 0 else {
             end()
             return
@@ -742,19 +742,19 @@ final class IOEditor: Editor {
         
         let colorSpace = ColorSpace.export
         
-        let renderings: [Rendering], documentRecorders: [Document.SheetRecorder]
+        let renderings: [Rendering], documentRecorders: [RootView.SheetRecorder]
         switch type {
         case .image, .image4K, .pdf:
             renderings = nvs.map {
-                if let sid = document.sheetID(at: $0.shp),
-                   let sheetRecord = document.sheetRecorders[sid]?.sheetRecord {
+                if let sid = rootView.sheetID(at: $0.shp),
+                   let sheetRecord = rootView.sheetRecorders[sid]?.sheetRecord {
                     
                     .init(mainItem: .init(sheet: sheetRecord.value, data: sheetRecord.data, url: sheetRecord.url,
-                                          frame: document.sheetFrame(with: $0.shp)),
+                                          frame: rootView.sheetFrame(with: $0.shp)),
                           bounds: $0.bounds)
                 } else {
                     .init(mainItem: .init(sheet: nil, data: nil, url: nil,
-                                          frame: document.sheetFrame(with: $0.shp)),
+                                          frame: rootView.sheetFrame(with: $0.shp)),
                           bounds: $0.bounds)
                 }
             }
@@ -766,15 +766,15 @@ final class IOEditor: Editor {
                 var bottomItems = [Rendering.Item]()
                 var shp = $0.shp
                 shp.y -= 1
-                while let sid = self.document.sheetID(at: shp),
-                      let sheetRecord = document.sheetRecorders[sid]?.sheetRecord {
+                while let sid = self.rootView.sheetID(at: shp),
+                      let sheetRecord = rootView.sheetRecorders[sid]?.sheetRecord {
                     
                     if !filledShps.contains(shp) {
                         filledShps.insert(shp)
                         
                         bottomItems.append(.init(sheet: sheetRecord.value, data: sheetRecord.data,
                                                  url: sheetRecord.url,
-                                                 frame: document.sheetFrame(with: shp)))
+                                                 frame: rootView.sheetFrame(with: shp)))
                     }
                     shp.y -= 1
                 }
@@ -782,29 +782,29 @@ final class IOEditor: Editor {
                 var topItems = [Rendering.Item]()
                 shp = $0.shp
                 shp.y += 1
-                while let sid = self.document.sheetID(at: shp),
-                      let sheetRecord = document.sheetRecorders[sid]?.sheetRecord {
+                while let sid = self.rootView.sheetID(at: shp),
+                      let sheetRecord = rootView.sheetRecorders[sid]?.sheetRecord {
                     
                     if !filledShps.contains(shp) {
                         filledShps.insert(shp)
                         
                         topItems.append(.init(sheet: sheetRecord.value, data: sheetRecord.data,
                                               url: sheetRecord.url,
-                                              frame: document.sheetFrame(with: shp)))
+                                              frame: rootView.sheetFrame(with: shp)))
                     }
                     
                     shp.y += 1
                 }
                 
-                return if let sid = document.sheetID(at: $0.shp),
-                   let sheetRecord = document.sheetRecorders[sid]?.sheetRecord {
+                return if let sid = rootView.sheetID(at: $0.shp),
+                   let sheetRecord = rootView.sheetRecorders[sid]?.sheetRecord {
                     .init(mainItem: .init(sheet: sheetRecord.value, data: sheetRecord.data, url: sheetRecord.url,
-                                          frame: document.sheetFrame(with: $0.shp)),
+                                          frame: rootView.sheetFrame(with: $0.shp)),
                           bottomItems: bottomItems, topItems: topItems,
                           bounds: $0.bounds)
                 } else {
                     .init(mainItem: .init(sheet: nil, data: nil, url: nil,
-                                          frame: document.sheetFrame(with: $0.shp)),
+                                          frame: rootView.sheetFrame(with: $0.shp)),
                           bottomItems: bottomItems, topItems: topItems,
                           bounds: $0.bounds)
                 }
@@ -812,11 +812,11 @@ final class IOEditor: Editor {
             documentRecorders = []
         case .document, .documentWithHistory:
             let sids = nvs.reduce(into: [Sheetpos: SheetID]()) {
-                $0[$1.shp] = document.sheetID(at: $1.shp)
+                $0[$1.shp] = rootView.sheetID(at: $1.shp)
             }
             let csv = CopiedSheetsValue(deltaPoint: Point(), sheetIDs: sids)
             renderings = []
-            documentRecorders = csv.sheetIDs.compactMap { document.sheetRecorders[$0.value] }
+            documentRecorders = csv.sheetIDs.compactMap { rootView.sheetRecorders[$0.value] }
         }
         
         let fileSize: @Sendable () -> (Int?) = {
@@ -880,7 +880,7 @@ final class IOEditor: Editor {
                                           fileSizeHandler: fileSize)
             switch result {
             case .complete(let ioResult):
-                document.syncSave()
+                rootView.syncSave()
                 
                 switch type {
                 case .image:
@@ -958,12 +958,12 @@ final class IOEditor: Editor {
                 
                 try ioResult.setAttributes()
             } catch {
-                document.rootNode.show(error)
+                rootView.node.show(error)
             }
         } else {
             let progressPanel = ProgressPanel(message: is4K ?
                                               "Exporting 4K Images".localized : "Exporting Images".localized)
-            document.rootNode.show(progressPanel)
+            rootView.node.show(progressPanel)
             do {
                 try ioResult.remove()
                 try ioResult.makeDirectory()
@@ -1000,7 +1000,7 @@ final class IOEditor: Editor {
                         }
                     } catch {
                         Task { @MainActor in
-                            self.document.rootNode.show(error)
+                            self.rootView.node.show(error)
                             progressPanel.closePanel()
                             self.end()
                         }
@@ -1008,7 +1008,7 @@ final class IOEditor: Editor {
                 }
                 progressPanel.cancelHandler = { task.cancel() }
             } catch {
-                self.document.rootNode.show(error)
+                self.rootView.node.show(error)
                 progressPanel.closePanel()
                 self.end()
             }
@@ -1055,12 +1055,12 @@ final class IOEditor: Editor {
                 try export { (_, isStop) in }
                 end()
             } catch {
-                document.rootNode.show(error)
+                rootView.node.show(error)
                 end()
             }
         } else {
             let progressPanel = ProgressPanel(message: "Exporting PDF".localized)
-            document.rootNode.show(progressPanel)
+            rootView.node.show(progressPanel)
             do {
                 try ioResult.remove()
                 
@@ -1081,7 +1081,7 @@ final class IOEditor: Editor {
                         }
                     } catch {
                         Task { @MainActor in
-                            self.document.rootNode.show(error)
+                            self.rootView.node.show(error)
                             progressPanel.closePanel()
                             self.end()
                         }
@@ -1089,7 +1089,7 @@ final class IOEditor: Editor {
                 }
                 progressPanel.cancelHandler = { task.cancel() }
             } catch {
-                document.rootNode.show(error)
+                rootView.node.show(error)
                 progressPanel.closePanel()
                 end()
             }
@@ -1140,7 +1140,7 @@ final class IOEditor: Editor {
         }
         
         let progressPanel = ProgressPanel(message: "Exporting GIF".localized)
-        document.rootNode.show(progressPanel)
+        rootView.node.show(progressPanel)
         do {
             try ioResult.remove()
             
@@ -1161,7 +1161,7 @@ final class IOEditor: Editor {
                     }
                 } catch {
                     Task { @MainActor in
-                        self.document.rootNode.show(error)
+                        self.rootView.node.show(error)
                         progressPanel.closePanel()
                         self.end()
                     }
@@ -1169,7 +1169,7 @@ final class IOEditor: Editor {
             }
             progressPanel.cancelHandler = { task.cancel() }
         } catch {
-            document.rootNode.show(error)
+            rootView.node.show(error)
             progressPanel.closePanel()
             end()
         }
@@ -1178,7 +1178,7 @@ final class IOEditor: Editor {
     func exportMovie(from renderings: [Rendering], is4K: Bool,
                      _ colorSpace: ColorSpace,
                      size: Size, at ioResult: IOResult) {
-        let isMainFrame = !document.isEditingSheet
+        let isMainFrame = !rootView.isEditingSheet
         @Sendable func export(progressHandler: (Double, inout Bool) -> (),
                               completionHandler handler: @escaping (Bool, (any Error)?) -> ()) async {
             do {
@@ -1334,7 +1334,7 @@ final class IOEditor: Editor {
         
         let progressPanel = ProgressPanel(message: is4K ?
                                           "Exporting 4K Movie".localized : "Exporting Movie".localized)
-        document.rootNode.show(progressPanel)
+        rootView.node.show(progressPanel)
         do {
             try ioResult.remove()
             
@@ -1351,12 +1351,12 @@ final class IOEditor: Editor {
                     Task { @MainActor in
                         if !stop {
                             if let error {
-                                self.document.rootNode.show(error)
+                                self.rootView.node.show(error)
                             } else {
                                 do {
                                     try ioResult.setAttributes()
                                 } catch {
-                                    self.document.rootNode.show(error)
+                                    self.rootView.node.show(error)
                                 }
                             }
                         }
@@ -1367,7 +1367,7 @@ final class IOEditor: Editor {
             }
             progressPanel.cancelHandler = { task.cancel() }
         } catch {
-            document.rootNode.show(error)
+            rootView.node.show(error)
             progressPanel.closePanel()
             end()
         }
@@ -1422,7 +1422,7 @@ final class IOEditor: Editor {
         
         let progressPanel = ProgressPanel(message: isLinearPCM ?
                                           "Exporting Linear PCM".localized : "Exporting Sound".localized)
-        document.rootNode.show(progressPanel)
+        rootView.node.show(progressPanel)
         do {
             try ioResult.remove()
             
@@ -1438,12 +1438,12 @@ final class IOEditor: Editor {
                 }, completionHandler: { error in
                     Task { @MainActor in
                         if let error {
-                            self.document.rootNode.show(error)
+                            self.rootView.node.show(error)
                         } else {
                             do {
                                 try ioResult.setAttributes()
                             } catch {
-                                self.document.rootNode.show(error)
+                                self.rootView.node.show(error)
                             }
                         }
                         progressPanel.closePanel()
@@ -1453,7 +1453,7 @@ final class IOEditor: Editor {
             }
             progressPanel.cancelHandler = { task.cancel() }
         } catch {
-            document.rootNode.show(error)
+            rootView.node.show(error)
             progressPanel.closePanel()
             end()
         }
@@ -1468,15 +1468,15 @@ final class IOEditor: Editor {
             try ioResult.remove()
             
             let sids = vs.reduce(into: [Sheetpos: SheetID]()) {
-                $0[$1.shp - shp0] = document.sheetID(at: $1.shp)
+                $0[$1.shp - shp0] = rootView.sheetID(at: $1.shp)
             }
             let csv = CopiedSheetsValue(deltaPoint: Point(), sheetIDs: sids)
             
             var isStop = false
-            let nDocument = Document(url: ioResult.url)
+            let nDocument = RootView(url: ioResult.url)
             for (i, v) in csv.sheetIDs.enumerated() {
                 let (shp, osid) = v
-                guard let osrr = document.sheetRecorders[osid] else { continue }
+                guard let osrr = rootView.sheetRecorders[osid] else { continue }
                 let nsid = SheetID()
                 let nsrr = nDocument.makeSheetRecorder(at: nsid)
                 if let oldSID = nDocument.world.sheetIDs[shp] {
@@ -1526,7 +1526,7 @@ final class IOEditor: Editor {
                 progressHandler(Double(i + 1) / Double(csv.sheetIDs.count + 1), &isStop)
                 if isStop { break }
             }
-            nDocument.camera = document.camera
+            nDocument.camera = rootView.camera
             nDocument.syncSave()
             
             try ioResult.setAttributes()
@@ -1537,12 +1537,12 @@ final class IOEditor: Editor {
                 try export { (_, isStop) in }
                 end()
             } catch {
-                document.rootNode.show(error)
+                rootView.node.show(error)
                 end()
             }
         } else {
             let progressPanel = ProgressPanel(message: "Exporting Document".localized)
-            document.rootNode.show(progressPanel)
+            rootView.node.show(progressPanel)
             let task = Task.detached {
                 do {
                     try export { (progress, isStop) in
@@ -1560,7 +1560,7 @@ final class IOEditor: Editor {
                     }
                 } catch {
                     Task { @MainActor in
-                        self.document.rootNode.show(error)
+                        self.rootView.node.show(error)
                         progressPanel.closePanel()
                         self.end()
                     }
@@ -1572,11 +1572,11 @@ final class IOEditor: Editor {
 }
 
 final class ToMP4MovieEditor: InputKeyEditor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
     }
     
     func send(_ event: InputKeyEvent) {
@@ -1596,7 +1596,7 @@ final class ToMP4MovieEditor: InputKeyEditor {
                         do {
                             try await Movie.toMP4(from: fromURL, to: toURL)
                         } catch {
-                            document.rootNode.show(error)
+                            rootView.node.show(error)
                         }
                     }
                 case .cancel: break

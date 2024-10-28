@@ -62,7 +62,7 @@ final class SubNSApplication: NSApplication {
     func updateSelectedColor() {
         AppDelegate.updateSelectedColor()
         if window.isMainWindow {
-            view.document.updateSelectedColor(isMain: true)
+            view.rootView.updateSelectedColor(isMain: true)
         }
     }
     static func updateSelectedColor() {
@@ -97,11 +97,11 @@ final class SubNSApplication: NSApplication {
         }
         
         do {
-            try view.document.restoreDatabase()
+            try view.rootView.restoreDatabase()
         } catch {
-            view.document.rootNode.show(error)
+            view.rootView.node.show(error)
         }
-        view.document.cursorPoint = view.clippedScreenPointFromCursor.my
+        view.rootView.cursorPoint = view.clippedScreenPointFromCursor.my
         
         SubNSApplication.shared.servicesMenu = NSMenu()
         SubNSApplication.shared.mainMenu = mainMenu()
@@ -308,11 +308,11 @@ final class SubNSApplication: NSApplication {
         window.makeKeyAndOrderFront(nil)
     }
     
-    func applicationShouldTerminateAfterLastWindowClosed(_ document: NSApplication) -> Bool { true }
+    func applicationShouldTerminateAfterLastWindowClosed(_ application: NSApplication) -> Bool { true }
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         view.cancelTasks()
         urlTimer.cancel()
-        view.document.endSave { _ in
+        view.rootView.endSave { _ in
             SubNSApplication.shared.reply(toApplicationShouldTerminate: true)
         }
         return .terminateLater
@@ -331,7 +331,7 @@ final class SubNSApplication: NSApplication {
         let cancelClosure: () -> () = {}
         let endClosure: () -> () = { [weak self] in
             guard let self else { return }
-            let urls = self.urls.filter { $0 != self.view.document.url }
+            let urls = self.urls.filter { $0 != self.view.rootView.model.url }
             if urls.count == 1
                 && urls[0].pathExtension == Document.FileType.rasendata.filenameExtension {
                 
@@ -354,10 +354,10 @@ final class SubNSApplication: NSApplication {
     func windowDidBecomeMain(_ notification: Notification) {
         updateDocumentFromWindow()
         view.update()
-        view.document.updateSelectedColor(isMain: true)
+        view.rootView.updateSelectedColor(isMain: true)
     }
     func windowDidResignMain(_ notification: Notification) {
-        view.document.updateSelectedColor(isMain: false)
+        view.rootView.updateSelectedColor(isMain: false)
     }
     func windowDidEnterFullScreen(_ notification: Notification) {
         UserDefaults.standard.set(true, forKey: AppDelegate.isFullscreenKey)
@@ -378,12 +378,12 @@ final class SubNSApplication: NSApplication {
     }
     func windowDidResignKey(_ notification: Notification) {
         view.rootEditor.stopAllEvents(isEnableText: false)
-        view.document.endSeqencer()
+        view.rootView.endSeqencer()
     }
     func updateDocumentFromWindow() {
         view.rootEditor.stopAllEvents(isEnableText: false)
-        view.document.cursorPoint = view.screenPointFromCursor.my
-        view.document.updateTextCursor()
+        view.rootView.cursorPoint = view.screenPointFromCursor.my
+        view.rootView.updateTextCursor()
     }
     
     private var isShownFileMenu = false, isShownEditMenu = false
@@ -1262,7 +1262,7 @@ final class SubNSTrackpadView: NSView {
     }
     override func mouseExited(with event: NSEvent) {
         if !isDrag {
-            (superview as? SubMTKView)?.document.cursor.ns.set()
+            (superview as? SubMTKView)?.rootView.cursor.ns.set()
         }
     }
     private var trackingArea: NSTrackingArea?
@@ -1343,7 +1343,7 @@ final class SubNSButton: NSButton {
         if superview?.bounds.contains(convert(nsEvent.locationInWindow, from: nil)) ?? false {
             NSCursor.arrow.set()
         } else {
-            (superview?.superview as? SubMTKView)?.document.cursor.ns.set()
+            (superview?.superview as? SubMTKView)?.rootView.cursor.ns.set()
         }
         isDrag = false
     }

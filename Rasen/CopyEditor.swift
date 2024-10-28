@@ -506,8 +506,8 @@ extension PastableObject {
 final class Cutter: InputKeyEditor {
     let editor: CopyEditor
     
-    init(_ root: RootEditor) {
-        editor = CopyEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = CopyEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -520,8 +520,8 @@ final class Cutter: InputKeyEditor {
 final class Copier: InputKeyEditor {
     let editor: CopyEditor
     
-    init(_ root: RootEditor) {
-        editor = CopyEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = CopyEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -534,8 +534,8 @@ final class Copier: InputKeyEditor {
 final class Paster: InputKeyEditor {
     let editor: CopyEditor
     
-    init(_ root: RootEditor) {
-        editor = CopyEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = CopyEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -546,13 +546,13 @@ final class Paster: InputKeyEditor {
     }
 }
 final class CopyEditor: Editor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     enum CopiableType {
@@ -567,9 +567,9 @@ final class CopyEditor: Editor {
     
     func updateNode() {
         if selectingLineNode.children.isEmpty {
-            selectingLineNode.lineWidth = document.worldLineWidth
+            selectingLineNode.lineWidth = rootView.worldLineWidth
         } else {
-            let w = document.worldLineWidth
+            let w = rootView.worldLineWidth
             for node in selectingLineNode.children {
                 node.lineWidth = w
             }
@@ -584,7 +584,7 @@ final class CopyEditor: Editor {
             case .copy: updateWithCopy(for: editingP, isSendPasteboard: true,
                                        isCutColor: false)
             case .paste:
-                let p = document.convertScreenToWorld(editingSP)
+                let p = rootView.convertScreenToWorld(editingSP)
                 updateWithPaste(at: p, atScreen: editingSP, .changed)
             }
         }
@@ -669,10 +669,10 @@ final class CopyEditor: Editor {
     
     @discardableResult
     func updateWithCopy(for p: Point, isSendPasteboard: Bool, isCutColor: Bool) -> Bool {
-        let d = 5 / document.worldToScreenScale
+        let d = 5 / rootView.worldToScreenScale
         
-        if let sheetView = document.sheetView(at: p),
-           sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p), scale: document.screenToWorldScale),
+        if let sheetView = rootView.sheetView(at: p),
+           sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p), scale: rootView.screenToWorldScale),
            let ki = sheetView.animationView.keyframeIndex(at: sheetView.convertFromWorld(p)) {
             
             let animationView = sheetView.animationView
@@ -694,23 +694,23 @@ final class CopyEditor: Editor {
             
             selectingLineNode.fillType = .color(.subSelected)
             selectingLineNode.lineType = .color(.selected)
-            selectingLineNode.lineWidth = document.worldLineWidth
+            selectingLineNode.lineWidth = rootView.worldLineWidth
             let rects = indexes
                 .compactMap { animationView.transformedKeyframeBounds(at: $0) }
             selectingLineNode.path = Path(rects.map { Pathline(sheetView.convertToWorld($0)) })
-        } else if document.isSelectSelectedNoneCursor(at: p), !document.selections.isEmpty {
-            if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
+        } else if rootView.isSelectSelectedNoneCursor(at: p), !rootView.selections.isEmpty {
+            if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled,
                sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
-                                             scale: document.screenToWorldScale) != nil {//lassoCopy
+                                             scale: rootView.screenToWorldScale) != nil {//lassoCopy
                 
                 let scoreView = sheetView.scoreView
-                let nis = sheetView.noteIndexes(from: document.selections)
+                let nis = sheetView.noteIndexes(from: rootView.selections)
                 if !nis.isEmpty {
                     let scoreP = scoreView.convertFromWorld(p)
-                    let pitchInterval = document.currentPitchInterval
+                    let pitchInterval = rootView.currentPitchInterval
                     let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
                     let score = scoreView.model
-                    let beatInterval = document.currentBeatInterval
+                    let beatInterval = rootView.currentBeatInterval
                     let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
                     let notes: [Note] = nis.map {
                         var note = score.notes[$0]
@@ -721,10 +721,10 @@ final class CopyEditor: Editor {
                     if isSendPasteboard {
                         Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: notes))]
                     }
-                    let rects = document.isSelectedText ?
-                    document.selectedFrames :
-                    document.selections.map { $0.rect } + document.selectedFrames
-                    let lw = Line.defaultLineWidth * 2 / document.worldToScreenScale
+                    let rects = rootView.isSelectedText ?
+                    rootView.selectedFrames :
+                    rootView.selections.map { $0.rect } + rootView.selectedFrames
+                    let lw = Line.defaultLineWidth * 2 / rootView.worldToScreenScale
                     selectingLineNode.children = rects.map {
                         Node(path: Path($0),
                              lineWidth: lw,
@@ -734,22 +734,22 @@ final class CopyEditor: Editor {
                 }
             } else {
                 if isSendPasteboard {
-                    let se = LineEditor(root)
+                    let se = LineEditor(rootEditor)
                     se.updateClipBoundsAndIndexRange(at: p)
-                    if let r = document.selections.map({ $0.rect }).union() {
+                    if let r = rootView.selections.map({ $0.rect }).union() {
                         se.tempLine = Line(r) * Transform(translation: -se.centerOrigin)
                         se.lassoCopy(isRemove: false,
-                                     isEnableLine: !document.isSelectedText,
-                                     isEnablePlane: !document.isSelectedText,
+                                     isEnableLine: !rootView.isSelectedText,
+                                     isEnablePlane: !rootView.isSelectedText,
                                      isSplitLine: false,
-                                     selections: document.selections,
-                                     at: document.roundedPoint(from: p))
+                                     selections: rootView.selections,
+                                     at: rootView.roundedPoint(from: p))
                     }
                 }
-                let rects = document.isSelectedText ?
-                document.selectedFrames :
-                document.selections.map { $0.rect } + document.selectedFrames
-                let lw = Line.defaultLineWidth * 2 / document.worldToScreenScale
+                let rects = rootView.isSelectedText ?
+                rootView.selectedFrames :
+                rootView.selections.map { $0.rect } + rootView.selectedFrames
+                let lw = Line.defaultLineWidth * 2 / rootView.worldToScreenScale
                 selectingLineNode.children = rects.map {
                     Node(path: Path($0),
                          lineWidth: lw,
@@ -759,35 +759,35 @@ final class CopyEditor: Editor {
             }
             
             return true
-        } else if document.containsLookingUp(at: p),
-                  !document.lookingUpString.isEmpty {
+        } else if rootView.containsLookingUp(at: p),
+                  !rootView.lookingUpString.isEmpty {
             if isSendPasteboard {
-                Pasteboard.shared.copiedObjects = [.string(document.lookingUpString)]
+                Pasteboard.shared.copiedObjects = [.string(rootView.lookingUpString)]
             }
             
-            let lw = Line.defaultLineWidth * 2 / document.worldToScreenScale
+            let lw = Line.defaultLineWidth * 2 / rootView.worldToScreenScale
             selectingLineNode.children =
-            [Node(path: document.lookingUpBoundsNode?.path ?? Path(),
+            [Node(path: rootView.lookingUpBoundsNode?.path ?? Path(),
                      lineWidth: lw,
                      lineType: .color(.selected),
                      fillType: .color(.subSelected))]
             return true
-        } else if let sheetView = document.sheetView(at: p),
+        } else if let sheetView = rootView.sheetView(at: p),
                   let (textView, _, si, _) = sheetView.textTuple(at: sheetView.convertFromWorld(p)) {
-            if let node = document.findingNode(at: p) {
+            if let node = rootView.findingNode(at: p) {
                 if isSendPasteboard {
-                    if let range = textView.model.string.ranges(of: document.finding.string)
+                    if let range = textView.model.string.ranges(of: rootView.finding.string)
                         .first(where: { $0.contains(si) }) {
                         
                         var text = textView.model
-                        text.string = document.finding.string
+                        text.string = rootView.finding.string
                         let minP = textView.typesetter.characterPosition(at: range.lowerBound)
                         text.origin -= sheetView.convertFromWorld(p) - minP
                         Pasteboard.shared.copiedObjects = [.text(text),
                                                            .string(text.string)]
                     }
                 }
-                let scale = 1 / document.worldToScreenScale
+                let scale = 1 / rootView.worldToScreenScale
                 selectingLineNode.children = [Node(path: node.path,
                                                    lineWidth: Line.defaultLineWidth * scale,
                                                    lineType: .color(.selected),
@@ -799,11 +799,11 @@ final class CopyEditor: Editor {
                 let x = result.offset +
                 (textView.textOrientation == .horizontal ?
                  textView.model.origin.x : textView.model.origin.y)
-                let origin = document.sheetFrame(with: document.sheetPosition(at: p)).origin
+                let origin = rootView.sheetFrame(with: rootView.sheetPosition(at: p)).origin
                 let path =  wcPath * Transform(translation: textView.model.origin + origin)
                 selectingLineNode.fillType = .color(.subSelected)
                 selectingLineNode.lineType = .color(.selected)
-                selectingLineNode.lineWidth = document.worldLineWidth
+                selectingLineNode.lineWidth = rootView.worldLineWidth
                 selectingLineNode.path = path
                 
                 let text = textView.model
@@ -823,7 +823,7 @@ final class CopyEditor: Editor {
             }
             let paths = textView.typesetter.allPaddingRects()
                 .map { Path(textView.convertToWorld($0)) }
-            let scale = 1 / document.worldToScreenScale
+            let scale = 1 / rootView.worldToScreenScale
             selectingLineNode.children = paths.map {
                 Node(path: $0,
                      lineWidth: Line.defaultLineWidth * scale,
@@ -831,9 +831,9 @@ final class CopyEditor: Editor {
                      fillType: .color(.subSelected))
             }
             return true
-        } else if let sheetView = document.sheetView(at: p),
-                  let (_, textView) = sheetView.textIndexAndView(at: sheetView.convertFromWorld(p), scale: document.screenToWorldScale),
-                  textView.containsTimeline(textView.convertFromWorld(p), scale: document.screenToWorldScale),
+        } else if let sheetView = rootView.sheetView(at: p),
+                  let (_, textView) = sheetView.textIndexAndView(at: sheetView.convertFromWorld(p), scale: rootView.screenToWorldScale),
+                  textView.containsTimeline(textView.convertFromWorld(p), scale: rootView.screenToWorldScale),
                   let beatRange = textView.beatRange, let tf = textView.timelineFrame {
             
             if isSendPasteboard {
@@ -842,11 +842,11 @@ final class CopyEditor: Editor {
             
             selectingLineNode.fillType = .color(.subSelected)
             selectingLineNode.lineType = .color(.selected)
-            selectingLineNode.lineWidth = document.worldLineWidth
+            selectingLineNode.lineWidth = rootView.worldLineWidth
             selectingLineNode.path = Path(textView.convertToWorld(tf))
-        } else if let sheetView = document.sheetView(at: p),
+        } else if let sheetView = rootView.sheetView(at: p),
                   let lineView = sheetView.lineTuple(at: sheetView.convertFromWorld(p),
-                                                     scale: 1 / document.worldToScreenScale)?.lineView {
+                                                     scale: 1 / rootView.worldToScreenScale)?.lineView {
             let t = Transform(translation: -sheetView.convertFromWorld(p))
             let ssv = SheetValue(lines: [lineView.model],
                                  planes: [], texts: [],
@@ -857,7 +857,7 @@ final class CopyEditor: Editor {
                 Pasteboard.shared.copiedObjects = [.sheetValue(ssv)]
             }
             
-            let scale = 1 / document.worldToScreenScale
+            let scale = 1 / rootView.worldToScreenScale
             let lw = Line.defaultLineWidth
             let selectedNode = Node(path: lineView.node.path * sheetView.node.localTransform,
                                     lineWidth: max(lw * 1.5, lw * 2.5 * scale, 1 * scale),
@@ -871,12 +871,12 @@ final class CopyEditor: Editor {
             }
             
             return true
-        } else if let sheetView = document.sheetView(at: p),
+        } else if let sheetView = rootView.sheetView(at: p),
                   let ci = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
-                                                  scale: document.screenToWorldScale) {
+                                                  scale: rootView.screenToWorldScale) {
             let contentView = sheetView.contentsView.elementViews[ci]
             let contentP = contentView.convertFromWorld(p)
-            if contentView.containsTimeline(contentP, scale: document.screenToWorldScale),
+            if contentView.containsTimeline(contentP, scale: rootView.screenToWorldScale),
                let beatRange = contentView.beatRange, let tf = contentView.timelineFrame {
                 
                 if isSendPasteboard {
@@ -891,7 +891,7 @@ final class CopyEditor: Editor {
                 
                 selectingLineNode.fillType = .color(.subSelected)
                 selectingLineNode.lineType = .color(.selected)
-                selectingLineNode.lineWidth = document.worldLineWidth
+                selectingLineNode.lineWidth = rootView.worldLineWidth
                 selectingLineNode.path = Path(contentView.convertToWorld(tf))
             } else if let frame = contentView.imageFrame {
                 if isSendPasteboard {
@@ -902,20 +902,20 @@ final class CopyEditor: Editor {
                 
                 selectingLineNode.fillType = .color(.subSelected)
                 selectingLineNode.lineType = .color(.selected)
-                selectingLineNode.lineWidth = document.worldLineWidth
+                selectingLineNode.lineWidth = rootView.worldLineWidth
                 selectingLineNode.path = Path(sheetView.convertToWorld(frame))
             }
-//        } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
-//            
-        } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
+//        } else if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled {
+//
+        } else if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled,
                   let (noteI, result) = sheetView.scoreView
-            .hitTestPoint(sheetView.scoreView.convertFromWorld(p), scale: document.screenToWorldScale / 2) {
+            .hitTestPoint(sheetView.scoreView.convertFromWorld(p), scale: rootView.screenToWorldScale / 2) {
             
             let scoreView = sheetView.scoreView
             let score = scoreView.model
             
             func show(_ ps: [Point]) {
-                let scale = 1 / document.worldToScreenScale
+                let scale = 1 / rootView.worldToScreenScale
                 let lw = Line.defaultLineWidth
                 let nlw = max(lw * 1.5, lw * 2.5 * scale, 1 * scale)
                 
@@ -993,16 +993,16 @@ final class CopyEditor: Editor {
                 show(ps)
             }
             return true
-        } else if let sheetView = document.sheetView(at: p),
+        } else if let sheetView = rootView.sheetView(at: p),
                     let noteI = sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
-                                                              scale: document.screenToWorldScale) {
+                                                              scale: rootView.screenToWorldScale) {
             let scoreView = sheetView.scoreView
             let score = scoreView.model
             let scoreP = scoreView.convertFromWorld(p)
             
-            let pitchInterval = document.currentPitchInterval
+            let pitchInterval = rootView.currentPitchInterval
             let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
-            let beatInterval = document.currentBeatInterval
+            let beatInterval = rootView.currentBeatInterval
             let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
             var note = score.notes[noteI]
             note.pitch -= pitch
@@ -1015,30 +1015,30 @@ final class CopyEditor: Editor {
                 .map { scoreView.convertToWorld($0) }
             selectingLineNode.children = lines.map {
                 Node(path: Path($0.controls.map { $0.point }),
-                     lineWidth: document.worldLineWidth * 1.5,
+                     lineWidth: rootView.worldLineWidth * 1.5,
                      lineType: .color(.selected))
             }
             return true
-        } else if let (sBorder, edge) = document.worldBorder(at: p, distance: d) {
+        } else if let (sBorder, edge) = rootView.worldBorder(at: p, distance: d) {
             if isSendPasteboard {
                 Pasteboard.shared.copiedObjects = [.border(sBorder)]
             }
             selectingLineNode.fillType = .color(.subSelected)
             selectingLineNode.lineType = .color(.selected)
-            selectingLineNode.lineWidth = document.worldLineWidth
+            selectingLineNode.lineWidth = rootView.worldLineWidth
             selectingLineNode.path = Path([Pathline([edge.p0, edge.p1])])
             return true
-        } else if let (border, _, edge) = document.border(at: p, distance: d) {
+        } else if let (border, _, edge) = rootView.border(at: p, distance: d) {
             if isSendPasteboard {
                 Pasteboard.shared.copiedObjects = [.border(border)]
             }
             selectingLineNode.fillType = .color(.subSelected)
             selectingLineNode.lineType = .color(.selected)
-            selectingLineNode.lineWidth = document.worldLineWidth
+            selectingLineNode.lineWidth = rootView.worldLineWidth
             selectingLineNode.path = Path([Pathline([edge.p0, edge.p1])])
             return true
-        } else if !document.isDefaultUUColor(at: p) {
-            let colorOwners = document.readColorOwners(at: p)
+        } else if !rootView.isDefaultUUColor(at: p) {
+            let colorOwners = rootView.readColorOwners(at: p)
             if let fco = colorOwners.first {
                 var mainPlanePath: Path?
                 if isSendPasteboard {
@@ -1052,14 +1052,14 @@ final class CopyEditor: Editor {
                                           id: fco.sheetView.id,
                                           rootKeyframeIndex: fco.sheetView.model.animation.rootIndex)
                         Pasteboard.shared.copiedObjects =
-                            [.uuColor(document.uuColor(at: p)),
+                            [.uuColor(rootView.uuColor(at: p)),
                              .sheetValue(sheetValue)]
                     } else {
                         Pasteboard.shared.copiedObjects =
-                            [.uuColor(document.uuColor(at: p))]
+                            [.uuColor(rootView.uuColor(at: p))]
                     }
                 }
-                let scale = 1 / document.worldToScreenScale
+                let scale = 1 / rootView.worldToScreenScale
                 selectingLineNode.children = colorOwners.reduce(into: [Node]()) {
                     let value = $1.colorPathValue(toColor: nil, color: .selected,
                                                   subColor: .subSelected)
@@ -1079,10 +1079,10 @@ final class CopyEditor: Editor {
     
     @discardableResult
     func cut(at p: Point) -> Bool {
-        let d = 5 / document.worldToScreenScale
+        let d = 5 / rootView.worldToScreenScale
         
-        if let sheetView = document.sheetView(at: p),
-           sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p), scale: document.screenToWorldScale),
+        if let sheetView = rootView.sheetView(at: p),
+           sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p), scale: rootView.screenToWorldScale),
            let ki = sheetView.animationView.keyframeIndex(at: sheetView.convertFromWorld(p)) {
             
             let animationView = sheetView.animationView
@@ -1121,25 +1121,25 @@ final class CopyEditor: Editor {
             } else {
                 sheetView.removeKeyframes(at: indexes)
             }
-            document.updateSelects()
+            rootView.updateSelects()
 
             Pasteboard.shared.copiedObjects = [.animation(Animation(keyframes: kfs))]
-        } else if document.isSelectSelectedNoneCursor(at: p), !document.selections.isEmpty {
-            if document.isSelectedText, document.selections.count == 1 {
-                root.textEditor.cut(from: document.selections[0], at: p)
+        } else if rootView.isSelectSelectedNoneCursor(at: p), !rootView.selections.isEmpty {
+            if rootView.isSelectedText, rootView.selections.count == 1 {
+                rootEditor.textEditor.cut(from: rootView.selections[0], at: p)
             } else {
-                if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
+                if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled,
                    sheetView.scoreView
                     .containsNote(sheetView.scoreView.convertFromWorld(p),
-                               scale: document.screenToWorldScale) {
+                               scale: rootView.screenToWorldScale) {
                     
                     let scoreView = sheetView.scoreView
                     let scoreP = scoreView.convertFromWorld(p)
-                    let pitchInterval = document.currentPitchInterval
+                    let pitchInterval = rootView.currentPitchInterval
                     let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
-                    let nis = sheetView.noteIndexes(from: document.selections)
+                    let nis = sheetView.noteIndexes(from: rootView.selections)
                     if !nis.isEmpty {
-                        let beatInterval = document.currentBeatInterval
+                        let beatInterval = rootView.currentBeatInterval
                         let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
                         let score = scoreView.model
                         let notes: [Note] = nis.map {
@@ -1157,26 +1157,26 @@ final class CopyEditor: Editor {
                         sheetView.updatePlaying()
                     }
                 } else {
-                    let se = LineEditor(root)
+                    let se = LineEditor(rootEditor)
                     se.updateClipBoundsAndIndexRange(at: p)
-                    if let r = document.selections.map({ $0.rect }).union() {
+                    if let r = rootView.selections.map({ $0.rect }).union() {
                         se.tempLine = Line(r) * Transform(translation: -se.centerOrigin)
                         se.lassoCopy(isRemove: true,
-                                     isEnableLine: !document.isSelectedText,
-                                     isEnablePlane: !document.isSelectedText,
+                                     isEnableLine: !rootView.isSelectedText,
+                                     isEnablePlane: !rootView.isSelectedText,
                                      isSplitLine: false,
-                                     selections: document.selections,
-                                     at: document.roundedPoint(from: p))
+                                     selections: rootView.selections,
+                                     at: rootView.roundedPoint(from: p))
                     }
                 }
             }
             
-            document.selections = []
+            rootView.selections = []
             return true
-        } else if let sheetView = document.sheetView(at: p),
+        } else if let sheetView = rootView.sheetView(at: p),
                   let (lineView, li) = sheetView
                     .lineTuple(at: sheetView.convertFromWorld(p),
-                               scale: 1 / document.worldToScreenScale) {
+                               scale: 1 / rootView.worldToScreenScale) {
             
             let t = Transform(translation: -sheetView.convertFromWorld(p))
             let ssv = SheetValue(lines: [lineView.model],
@@ -1187,7 +1187,7 @@ final class CopyEditor: Editor {
             Pasteboard.shared.copiedObjects = [.sheetValue(ssv)]
             
             if sheetView.model.enabledAnimation {
-                let scale = 1 / document.worldToScreenScale
+                let scale = 1 / rootView.worldToScreenScale
                 let nodes = sheetView.animationView.interpolationNodes(from: [lineView.model.id], scale: scale,
                                                          removeLineIndex: li)
                 if nodes.count > 1 {
@@ -1198,21 +1198,21 @@ final class CopyEditor: Editor {
             sheetView.newUndoGroup()
             sheetView.removeLines(at: [li])
             return true
-        } else if let sheetView = document.sheetView(at: p),
+        } else if let sheetView = rootView.sheetView(at: p),
                   let (textView, ti, si, _) = sheetView.textTuple(at: sheetView.convertFromWorld(p)) {
-            if document.findingNode(at: p) != nil {
-                if let range = textView.model.string.ranges(of: document.finding.string)
+            if rootView.findingNode(at: p) != nil {
+                if let range = textView.model.string.ranges(of: rootView.finding.string)
                     .first(where: { $0.contains(si) }) {
                     
                     var text = textView.model
-                    text.string = document.finding.string
+                    text.string = rootView.finding.string
                     let minP = textView.typesetter.characterPosition(at: range.lowerBound)
                     text.origin -= sheetView.convertFromWorld(p) - minP
                     Pasteboard.shared.copiedObjects = [.text(text),
                                                        .string(text.string)]
                 }
                 
-                document.replaceFinding(from: "")
+                rootView.replaceFinding(from: "")
                 return true
             } else if let result = textView.typesetter.warpCursorOffset(at: textView.convertFromWorld(p)), result.isLastWarp {
                 let x = result.offset
@@ -1250,9 +1250,9 @@ final class CopyEditor: Editor {
             sheetView.newUndoGroup()
             sheetView.removeText(at: ti)
             return true
-        } else if let sheetView = document.sheetView(at: p),
-                  let (ti, textView) = sheetView.textIndexAndView(at: sheetView.convertFromWorld(p), scale: document.screenToWorldScale),
-                  textView.containsTimeline(textView.convertFromWorld(p), scale: document.screenToWorldScale),
+        } else if let sheetView = rootView.sheetView(at: p),
+                  let (ti, textView) = sheetView.textIndexAndView(at: sheetView.convertFromWorld(p), scale: rootView.screenToWorldScale),
+                  textView.containsTimeline(textView.convertFromWorld(p), scale: rootView.screenToWorldScale),
                   let beatRange = textView.beatRange {
                 
             Pasteboard.shared.copiedObjects = [.beatRange(beatRange)]
@@ -1263,10 +1263,10 @@ final class CopyEditor: Editor {
             sheetView.newUndoGroup()
             sheetView.replace([IndexValue(value: text, index: ti)])
             return true
-        } else if let sheetView = document.sheetView(at: p),
+        } else if let sheetView = rootView.sheetView(at: p),
                   let (ci, contentView) = sheetView.contentIndexAndView(at: sheetView.convertFromWorld(p),
-                                                                        scale: document.screenToWorldScale) {
-            if contentView.containsTimeline(contentView.convertFromWorld(p), scale: document.screenToWorldScale),
+                                                                        scale: rootView.screenToWorldScale) {
+            if contentView.containsTimeline(contentView.convertFromWorld(p), scale: rootView.screenToWorldScale),
                let beatRange = contentView.beatRange, !contentView.model.type.isAudio {
                 
                 Pasteboard.shared.copiedObjects = [.beatRange(beatRange)]
@@ -1289,9 +1289,9 @@ final class CopyEditor: Editor {
                 sheetView.updatePlaying()
                 return true
             }
-        } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
+        } else if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled,
                   let (noteI, result) = sheetView.scoreView
-            .hitTestPoint(sheetView.scoreView.convertFromWorld(p), scale: document.screenToWorldScale) {
+            .hitTestPoint(sheetView.scoreView.convertFromWorld(p), scale: rootView.screenToWorldScale) {
             
             let scoreView = sheetView.scoreView
             let score = scoreView.model
@@ -1369,16 +1369,16 @@ final class CopyEditor: Editor {
                 sheetView.replace(nivs)
                 return true
             }
-        } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
+        } else if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled,
                   let noteI = sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
-                                                            scale: document.screenToWorldScale) {
+                                                            scale: rootView.screenToWorldScale) {
             let scoreView = sheetView.scoreView
             let score = scoreView.model
             let scoreP = scoreView.convertFromWorld(p)
             
-            let pitchInterval = document.currentPitchInterval
+            let pitchInterval = rootView.currentPitchInterval
             let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
-            let beatInterval = document.currentBeatInterval
+            let beatInterval = rootView.currentBeatInterval
             let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
             var note = score.notes[noteI]
             note.pitch -= pitch
@@ -1391,9 +1391,9 @@ final class CopyEditor: Editor {
             
             sheetView.updatePlaying()
             return true
-        } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
+        } else if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled,
                     let keyBeatI = sheetView.scoreView.keyBeatIndex(at: sheetView.scoreView.convertFromWorld(p),
-                                                                    scale: document.screenToWorldScale) {
+                                                                    scale: rootView.screenToWorldScale) {
             let keyBeat = sheetView.model.score.keyBeats[keyBeatI]
             
             var option = sheetView.model.score.option
@@ -1404,7 +1404,7 @@ final class CopyEditor: Editor {
             sheetView.newUndoGroup()
             sheetView.set(option)
             return true
-        } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled,
+        } else if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled,
                   sheetView.scoreView.model.notes.isEmpty {
             var option = sheetView.model.score.option
             option.enabled = false
@@ -1412,8 +1412,8 @@ final class CopyEditor: Editor {
             sheetView.newUndoGroup()
             sheetView.set(option)
             return true
-        } else if let (border, i, edge) = document.border(at: p, distance: d),
-                  let sheetView = document.sheetView(at: p) {
+        } else if let (border, i, edge) = rootView.border(at: p, distance: d),
+                  let sheetView = rootView.sheetView(at: p) {
             
             Pasteboard.shared.copiedObjects = [.border(border)]
             
@@ -1422,10 +1422,10 @@ final class CopyEditor: Editor {
             sheetView.newUndoGroup()
             sheetView.removeBorder(at: i)
             return true
-         } else if !document.isDefaultUUColor(at: p) {
-            let colorOwners = document.colorOwners(at: p)
+         } else if !rootView.isDefaultUUColor(at: p) {
+            let colorOwners = rootView.colorOwners(at: p)
             if !colorOwners.isEmpty {
-                Pasteboard.shared.copiedObjects = [.uuColor(document.uuColor(at: p))]
+                Pasteboard.shared.copiedObjects = [.uuColor(rootView.uuColor(at: p))]
                 var nug = Set<SheetView>()
                 colorOwners.forEach {
                     if $0.colorValue.isBackground {
@@ -1480,12 +1480,12 @@ final class CopyEditor: Editor {
     var snapDistance = 1.0
     
     func updateWithPaste(at p: Point, atScreen sp: Point, _ phase: Phase) {
-        let shp = document.sheetPosition(at: p)
-        let sb = document.sheetFrame(with: shp)
-        let sheetView = document.sheetView(at: shp)
+        let shp = rootView.sheetPosition(at: p)
+        let sb = rootView.sheetFrame(with: shp)
+        let sheetView = rootView.sheetView(at: shp)
         
         func updateWithValue(_ value: SheetValue) {
-            let scale = firstScale * document.screenToWorldScale
+            let scale = firstScale * rootView.screenToWorldScale
             if phase == .began {
                 let lineNodes = value.keyframes.isEmpty ?
                     value.lines.map { $0.node } :
@@ -1513,8 +1513,8 @@ final class CopyEditor: Editor {
             if !(sheetView?.id == value.id && sheetView?.rootKeyframeIndex == value.rootKeyframeIndex) {
                 let snapP = value.origin + sb.origin
                 nSnapP = snapP
-                np = snapP.distance(p) < snapDistance * document.screenToWorldScale && firstScale == document.worldToScreenScale ?
-                    snapP : document.roundedPoint(from: p)
+                np = snapP.distance(p) < snapDistance * rootView.screenToWorldScale && firstScale == rootView.worldToScreenScale ?
+                    snapP : rootView.roundedPoint(from: p)
                 let isSnapped = np == snapP
                 if isSnapped {
                     if oldFillSnapP != np {
@@ -1528,20 +1528,20 @@ final class CopyEditor: Editor {
                 }
                 oldFillSnapP = np
             } else {
-                np = document.roundedPoint(from: p)
+                np = rootView.roundedPoint(from: p)
                 nSnapP = nil
             }
             
             if selectingLineNode.children.count == 3 {
                 selectingLineNode.children[0].attitude = Attitude(position: np,
                                                                   scale: Size(square: 1.0 * scale),
-                                                                  rotation: document.camera.rotation - firstRotation)
+                                                                  rotation: rootView.camera.rotation - firstRotation)
                 
                 let textChildren = selectingLineNode.children[1].children
                 if textChildren.count == value.texts.count {
-                    let screenScale = document.worldToScreenScale
+                    let screenScale = rootView.worldToScreenScale
                     let t = Transform(scale: 1.0 * firstScale / screenScale)
-                            .rotated(by: document.camera.rotation - firstRotation)
+                            .rotated(by: rootView.camera.rotation - firstRotation)
                     let nt = t.translated(by: np - sb.minXMinYPoint)
                     for (i, text) in value.texts.enumerated() {
                         textChildren[i].attitude = Attitude(position: (text.origin) * nt + sb.minXMinYPoint,
@@ -1552,7 +1552,7 @@ final class CopyEditor: Editor {
                 if nSnapP != oldSnapP {
                     if let nSnapP {
                         selectingLineNode.children[2].path = Path(circleRadius: isSnapped ? 5 : 3)
-                        selectingLineNode.children[2].attitude = Attitude(position: nSnapP, scale: Size(square: document.screenToWorldScale))
+                        selectingLineNode.children[2].attitude = Attitude(position: nSnapP, scale: Size(square: rootView.screenToWorldScale))
                     } else {
                         selectingLineNode.children[2].path = Path()
                     }
@@ -1566,7 +1566,7 @@ final class CopyEditor: Editor {
             var isAppend = false
             
             var textView: SheetTextView?, sri: String.Index?
-            if let aTextView = root.textEditor.editingTextView,
+            if let aTextView = rootEditor.textEditor.editingTextView,
                !aTextView.isHiddenSelectedRange {
                 
                 if let asri = aTextView.selectedRange?.lowerBound {
@@ -1589,7 +1589,7 @@ final class CopyEditor: Editor {
                 isAppend = true
             }
             if !isAppend {
-                let fScale = firstScale * document.screenToWorldScale
+                let fScale = firstScale * rootView.screenToWorldScale
                 let s = text.font.defaultRatio * fScale
                 let os = oldScale ?? s
                 func scaleIndex(_ cs: Double) -> Double {
@@ -1613,10 +1613,10 @@ final class CopyEditor: Editor {
                     selectingLineNode.children = [nText.node]
                     self.textNode = nText.node
                     self.textFrame = nText.frame
-                    textScale = document.worldToScreenScale
+                    textScale = rootView.worldToScreenScale
                 }
                 
-                let scale = textScale * document.screenToWorldScale
+                let scale = textScale * rootView.screenToWorldScale
                 let np: Point
                 if let stb = textFrame {
                     let textFrame = stb
@@ -1636,9 +1636,9 @@ final class CopyEditor: Editor {
                 var snapDP = Point(), path: Path?
                 if let sheetView = sheetView {
                     let np = sheetView.convertFromWorld(np)
-                    let scale = firstScale / document.worldToScreenScale
+                    let scale = firstScale / rootView.worldToScreenScale
                     let nnp = text.origin * scale + np
-                    let fp1 = document.roundedPoint(from: nnp)
+                    let fp1 = rootView.roundedPoint(from: nnp)
                     let lp1 = fp1 + (text.typesetter.typelines.last?.origin ?? Point())
                     for textView in sheetView.textsView.elementViews {
                         guard !textView.typesetter.typelines.isEmpty else { continue }
@@ -1652,7 +1652,7 @@ final class CopyEditor: Editor {
                                 ?? Point())
                         
                         if text.size.absRatio(textView.model.size) < 1.25 {
-                            let d = 3.0 * document.screenToWorldScale
+                            let d = 3.0 * rootView.screenToWorldScale
                             if fp0.distance(lp1) < d {
                                 let spacing = textView.model.typelineSpacing
                                 let edge = textView.typesetter.firstEdge(offset: spacing / 2)
@@ -1740,7 +1740,7 @@ final class CopyEditor: Editor {
             
             let inP = p - sb.origin
             let bnp = borderSnappedPoint(inP, with: sb,
-                                         distance: 3 / document.worldToScreenScale,
+                                         distance: 3 / rootView.worldToScreenScale,
                                          oldBorder: oldBorder)
             isSnapped = bnp.isSnapped
             let np = bnp.point + sb.origin
@@ -1770,33 +1770,33 @@ final class CopyEditor: Editor {
                     let nxs = xs.sorted(), nys = ys.sorted()
                     let width = nxs[1] - nxs[0], height = nys[1] - nys[0]
                     let nString = nBorder.location.string(digitsCount: 1, enabledZeroInteger: false)
-                    document.cursor = document.cursor(from: "\(nString) (\(Looker.sizeString(from: .init(width: width, height: height))))")
+                    rootView.cursor = rootView.cursor(from: "\(nString) (\(Looker.sizeString(from: .init(width: width, height: height))))")
                 } else {
                     let nString = nBorder.location.string(digitsCount: 1, enabledZeroInteger: false)
-                    document.cursor = switch nBorder.orientation {
-                    case .horizontal: document.cursor(from: nString)
-                    case .vertical: document.cursor(from: nString)
+                    rootView.cursor = switch nBorder.orientation {
+                    case .horizontal: rootView.cursor(from: nString)
+                    case .vertical: rootView.cursor(from: nString)
                     }
                 }
             } else {
                 let nString = nBorder.location.string(digitsCount: 1, enabledZeroInteger: false)
-                document.cursor = switch nBorder.orientation {
-                case .horizontal: document.cursor(from: nString)
-                case .vertical: document.cursor(from: nString)
+                rootView.cursor = switch nBorder.orientation {
+                case .horizontal: rootView.cursor(from: nString)
+                case .vertical: rootView.cursor(from: nString)
                 }
             }
         }
         func updateIDs(_ ids: [InterOption]) {
             guard let sheetView = sheetView else { return }
             let lis: [Int]
-            if document.isSelectNoneCursor(at: p),
-               !document.isSelectedText, !document.selections.isEmpty {
+            if rootView.isSelectNoneCursor(at: p),
+               !rootView.isSelectedText, !rootView.selections.isEmpty {
                 
-                let ms = sheetView.convertFromWorld(document.multiSelection)
+                let ms = sheetView.convertFromWorld(rootView.multiSelection)
                 lis = sheetView.model.picture.lines.enumerated()
                     .compactMap { ms.intersects($0.element) ? $0.offset : nil }
             } else {
-                if let li = sheetView.lineTuple(at: sheetView.convertFromWorld(p), scale: 1 / document.worldToScreenScale)?.lineIndex {
+                if let li = sheetView.lineTuple(at: sheetView.convertFromWorld(p), scale: 1 / rootView.worldToScreenScale)?.lineIndex {
                     lis = [li]
                 } else {
                     lis = []
@@ -1809,7 +1809,7 @@ final class CopyEditor: Editor {
             
             let idSet = Set(ids)
             let lw = Line.defaultLineWidth
-            let scale = 1 / document.worldToScreenScale
+            let scale = 1 / rootView.worldToScreenScale
             
             var nodes = [Node]()
             for keyframe in sheetView.model.animation.keyframes {
@@ -1848,7 +1848,7 @@ final class CopyEditor: Editor {
                         rect = Rect(origin: -Point(size.width / 2, size.height / 2), size: size)
                     }
                     
-                    let scale = firstScale / document.worldToScreenScale
+                    let scale = firstScale / rootView.worldToScreenScale
                     let imageNode = Node(name: "content",
                                          attitude: .init(position: p, scale: .init(square: scale)),
                                          path: Path(rect),
@@ -1857,17 +1857,17 @@ final class CopyEditor: Editor {
                     selectingLineNode.children = [imageNode]
                 }
             } else if !selectingLineNode.children.isEmpty {
-                let scale = firstScale / document.worldToScreenScale
+                let scale = firstScale / rootView.worldToScreenScale
                 selectingLineNode.children[0].attitude = Attitude(position: p, scale: .init(square: scale))
             }
         }
         func updateNotes(_ notes: [Note]) {
-            guard let sheetView = document.madeSheetView(at: shp) else { return }
+            guard let sheetView = rootView.madeSheetView(at: shp) else { return }
             let scoreView = sheetView.scoreView
             let scoreP = scoreView.convertFromWorld(p)
-            let pitchInterval = document.currentPitchInterval
+            let pitchInterval = rootView.currentPitchInterval
             let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
-            let beatInterval = document.currentBeatInterval
+            let beatInterval = rootView.currentBeatInterval
             let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
             
             if phase == .began {
@@ -1894,7 +1894,7 @@ final class CopyEditor: Editor {
                 octaveNode.attitude.position
                 = sheetView.convertToWorld(scoreView.node.attitude.position)
                 self.octaveNode = octaveNode
-                document.rootNode.append(child: octaveNode)
+                rootView.node.append(child: octaveNode)
             }
             
             var notes = beganNotes.sorted(by: { $0.key < $1.key }).map { $0.value }
@@ -1914,7 +1914,7 @@ final class CopyEditor: Editor {
 //                return node
 //            }
             
-            document.cursor = .circle(string: Pitch(value: pitch)
+            rootView.cursor = .circle(string: Pitch(value: pitch)
                 .octaveString(deltaPitch: pitch - beganPitch))
         }
         
@@ -1969,25 +1969,25 @@ final class CopyEditor: Editor {
     }
     
     func paste(at p: Point, atScreen sp: Point) {
-        let shp = document.sheetPosition(at: p)
+        let shp = rootView.sheetPosition(at: p)
         
         var isRootNewUndoGroup = true
         var isUpdateUndoGroupSet = Set<Sheetpos>()
         func updateUndoGroup(with nshp: Sheetpos) {
             if !isUpdateUndoGroupSet.contains(nshp),
-               let sheetView = document.sheetView(at: nshp) {
+               let sheetView = rootView.sheetView(at: nshp) {
                 
                 sheetView.newUndoGroup()
                 isUpdateUndoGroupSet.insert(nshp)
             }
         }
         
-        let screenScale = document.worldToScreenScale
+        let screenScale = rootView.worldToScreenScale
         func firstTransform(at p: Point) -> Transform {
             if firstScale != screenScale
-                || firstRotation != document.camera.rotation {
+                || firstRotation != rootView.camera.rotation {
                 let t = Transform(scale: 1.0 * firstScale / screenScale)
-                    .rotated(by: document.camera.rotation - firstRotation)
+                    .rotated(by: rootView.camera.rotation - firstRotation)
                 return t.translated(by: p)
             } else {
                 return Transform(translation: p)
@@ -1995,9 +1995,9 @@ final class CopyEditor: Editor {
         }
         func transform(in frame: Rect, at p: Point) -> Transform {
             if firstScale != screenScale
-                || firstRotation != document.camera.rotation{
+                || firstRotation != rootView.camera.rotation{
                 let t = Transform(scale: 1.0 * firstScale / screenScale)
-                    .rotated(by: document.camera.rotation - firstRotation)
+                    .rotated(by: rootView.camera.rotation - firstRotation)
                 return t.translated(by: p - frame.minXMinYPoint)
             } else {
                 return Transform(translation: p - frame.minXMinYPoint)
@@ -2005,9 +2005,9 @@ final class CopyEditor: Editor {
         }
         
         func pasteLines(_ lines: [Line], at p: Point) {
-            let p = document.roundedPoint(from: p)
+            let p = rootView.roundedPoint(from: p)
             let pt = firstTransform(at: p)
-            let ratio = firstScale / document.worldToScreenScale
+            let ratio = firstScale / rootView.worldToScreenScale
             let pLines: [Line] = lines.map {
                 var l = $0 * pt
                 l.size *= ratio
@@ -2015,9 +2015,9 @@ final class CopyEditor: Editor {
             }
             guard !pLines.isEmpty, let rect = pLines.bounds else { return }
             
-            let minXMinYSHP = document.sheetPosition(at: rect.minXMinYPoint)
-            let maxXMinYSHP = document.sheetPosition(at: rect.maxXMinYPoint)
-            let minXMaxYSHP = document.sheetPosition(at: rect.minXMaxYPoint)
+            let minXMinYSHP = rootView.sheetPosition(at: rect.minXMinYPoint)
+            let maxXMinYSHP = rootView.sheetPosition(at: rect.maxXMinYPoint)
+            let minXMaxYSHP = rootView.sheetPosition(at: rect.minXMaxYPoint)
             let lx = max(minXMinYSHP.x, shp.x - 1)
             let rx = min(maxXMinYSHP.x, shp.x + 1)
             let by = max(minXMinYSHP.y, shp.y - 1)
@@ -2026,12 +2026,12 @@ final class CopyEditor: Editor {
             if lx <= rx && by <= ty {
                 for xi in lx ... rx {
                     for yi in by ... ty {
-                        let nshp = document
+                        let nshp = rootView
                             .sheetPosition(at: IntPoint(xi, yi))
                         guard !filledShps.contains(nshp) else { continue }
                         filledShps.insert(nshp)
                         
-                        let frame = document.sheetFrame(with: nshp)
+                        let frame = rootView.sheetFrame(with: nshp)
                         let t = transform(in: frame, at: p)
                         let oLines: [Line] = lines.map {
                             var l = $0 * t
@@ -2041,7 +2041,7 @@ final class CopyEditor: Editor {
                         var nLines = Sheet.clipped(oLines,
                                                    in: Rect(size: frame.size))
                         if !nLines.isEmpty,
-                           let (sheetView, isNew) = document
+                           let (sheetView, isNew) = rootView
                             .madeSheetViewIsNew(at: nshp, isNewUndoGroup: isRootNewUndoGroup) {
                             
                             let idSet = Set(sheetView.model.picture.lines.map { $0.id })
@@ -2061,14 +2061,14 @@ final class CopyEditor: Editor {
             }
         }
         func pastePlanes(_ planes: [Plane], at p: Point) {
-            let p = document.roundedPoint(from: p)
+            let p = rootView.roundedPoint(from: p)
             let pt = firstTransform(at: p)
             let pPlanes = planes.map { $0 * pt }
             guard !pPlanes.isEmpty, let rect = pPlanes.bounds else { return }
             
-            let minXMinYSHP = document.sheetPosition(at: rect.minXMinYPoint)
-            let maxXMinYSHP = document.sheetPosition(at: rect.maxXMinYPoint)
-            let minXMaxYSHP = document.sheetPosition(at: rect.minXMaxYPoint)
+            let minXMinYSHP = rootView.sheetPosition(at: rect.minXMinYPoint)
+            let maxXMinYSHP = rootView.sheetPosition(at: rect.maxXMinYPoint)
+            let minXMaxYSHP = rootView.sheetPosition(at: rect.minXMaxYPoint)
             let lx = max(minXMinYSHP.x, shp.x - 1)
             let rx = min(maxXMinYSHP.x, shp.x + 1)
             let by = max(minXMinYSHP.y, shp.y - 1)
@@ -2077,17 +2077,17 @@ final class CopyEditor: Editor {
             if lx <= rx && by <= ty {
                 for xi in lx ... rx {
                     for yi in by ... ty {
-                        let nshp = document
+                        let nshp = rootView
                             .sheetPosition(at: IntPoint(xi, yi))
                         guard !filledShps.contains(nshp) else { continue }
                         filledShps.insert(nshp)
                         
-                        let frame = document.sheetFrame(with: nshp)
+                        let frame = rootView.sheetFrame(with: nshp)
                         let t = transform(in: frame, at: p)
                         let nPlanes = Sheet.clipped(planes.map { $0 * t },
                                                     in: Rect(size: frame.size))
                         if !nPlanes.isEmpty,
-                           let (sheetView, isNew) = document
+                           let (sheetView, isNew) = rootView
                             .madeSheetViewIsNew(at: nshp,
                                                 isNewUndoGroup:
                                                     isRootNewUndoGroup) {
@@ -2102,21 +2102,21 @@ final class CopyEditor: Editor {
             }
         }
         func pasteTexts(_ texts: [Text], at p: Point) {
-            let p = document.roundedPoint(from: p)
+            let p = rootView.roundedPoint(from: p)
             let pt = firstTransform(at: p)
             guard !texts.isEmpty else { return }
             
             for text in texts {
-                let nshp = document.sheetPosition(at: (text * pt).origin)
+                let nshp = rootView.sheetPosition(at: (text * pt).origin)
                 guard ((shp.x - 1) ... (shp.x + 1)).contains(nshp.x)
                     && ((shp.y - 1) ... (shp.y + 1)).contains(nshp.y) else {
                     
                     continue
                 }
-                let frame = document.sheetFrame(with: nshp)
+                let frame = rootView.sheetFrame(with: nshp)
                 let t = transform(in: frame, at: p)
                 var nText = text * t
-                if let (sheetView, isNew) = document
+                if let (sheetView, isNew) = rootView
                     .madeSheetViewIsNew(at: nshp, isNewUndoGroup: isRootNewUndoGroup) {
                     let sb = sheetView.bounds.inset(by: Sheet.textPadding)
                     if let textFrame = nText.frame,
@@ -2147,29 +2147,29 @@ final class CopyEditor: Editor {
             let nshp = shp
             guard ((shp.x - 1) ... (shp.x + 1)).contains(nshp.x)
                     && ((shp.y - 1) ... (shp.y + 1)).contains(nshp.y),
-                  let sheetView = document.madeSheetView(at: nshp) else { return }
+                  let sheetView = rootView.madeSheetView(at: nshp) else { return }
             var text = text
             var isAppend = false
             
-            root.textEditor.begin(atScreen: sp)
-            if let textView = root.textEditor.editingTextView,
+            rootEditor.textEditor.begin(atScreen: sp)
+            if let textView = rootEditor.textEditor.editingTextView,
                !textView.isHiddenSelectedRange,
                let i = sheetView.textsView.elementViews.firstIndex(of: textView) {
                 
-                root.textEditor.endInputKey(isUnmarkText: true,
+                rootEditor.textEditor.endInputKey(isUnmarkText: true,
                                                 isRemoveText: false)
-                if document.findingNode(at: p) != nil,
-                    document.finding.string != text.string {
+                if rootView.findingNode(at: p) != nil,
+                    rootView.finding.string != text.string {
                     
-                    document.replaceFinding(from: text.string)
+                    rootView.replaceFinding(from: text.string)
                 } else if let ati = textView.selectedRange?.lowerBound {
                     let rRange: Range<Int>
-                    if let selection = document.multiSelection.firstSelection(at: p),
+                    if let selection = rootView.multiSelection.firstSelection(at: p),
                        let sRange = textView.range(from: selection),
                        sRange.contains(ati) {
                             
                         rRange = textView.model.string.intRange(from: sRange)
-                        document.selections = []
+                        rootView.selections = []
                     } else {
                         let ti = textView.model.string.intIndex(from: ati)
                         rRange = ti ..< ti
@@ -2196,9 +2196,9 @@ final class CopyEditor: Editor {
             
             if !isAppend {
                 let np = sheetView.convertFromWorld(p)
-                let scale = firstScale / document.worldToScreenScale
+                let scale = firstScale / rootView.worldToScreenScale
                 let nnp = text.origin * scale + np
-                let fp1 = document.roundedPoint(from: nnp)
+                let fp1 = rootView.roundedPoint(from: nnp)
                 let lp1 = fp1 + (text.typesetter.typelines.last?.origin ?? Point())
                 for (i, textView) in sheetView.textsView.elementViews.enumerated() {
                     guard !textView.typesetter.typelines.isEmpty else { continue }
@@ -2213,7 +2213,7 @@ final class CopyEditor: Editor {
                     
                     if text.size.absRatio(textView.model.size) < 1.25 {
                         var str = text.string
-                        let d = 3.0 * document.screenToWorldScale
+                        let d = 3.0 * rootView.screenToWorldScale
                         var dp = Point(), rRange: Range<Int>?
                         if fp0.distance(lp1) < d {
                             str.append("\n")
@@ -2258,9 +2258,9 @@ final class CopyEditor: Editor {
             
             if !isAppend {
                 let np = sheetView.convertFromWorld(p)
-                let scale = firstScale / document.worldToScreenScale
+                let scale = firstScale / rootView.worldToScreenScale
                 let nnp = text.origin * scale + np
-                text.origin = document.roundedPoint(from: nnp)
+                text.origin = rootView.roundedPoint(from: nnp)
                 text.size = text.size * scale
                 let sb = sheetView.bounds.inset(by: Sheet.textPadding)
                 if let textFrame = text.frame, !sb.contains(textFrame) {
@@ -2285,19 +2285,19 @@ final class CopyEditor: Editor {
         switch pasteObject {
         case .copiedSheetsValue: break
         case .picture(let picture):
-            if let sheetView = document.madeSheetView(at: shp) {
+            if let sheetView = rootView.madeSheetView(at: shp) {
                 sheetView.newUndoGroup()
                 sheetView.set(picture)
             }
         case .sheetValue(let value):
-            let snapP = value.origin + document.sheetFrame(with: shp).origin
-            let np = snapP.distance(p) < snapDistance / document.worldToScreenScale && firstScale == screenScale ?
+            let snapP = value.origin + rootView.sheetFrame(with: shp).origin
+            let np = snapP.distance(p) < snapDistance / rootView.worldToScreenScale && firstScale == screenScale ?
                 snapP : p
             if !value.keyframes.isEmpty {
-                guard let sheetView = document.madeSheetView(at: shp) else { return }
+                guard let sheetView = rootView.madeSheetView(at: shp) else { return }
                 let pt = firstTransform(at: np)
-                let ratio = firstScale / document.worldToScreenScale
-                let frame = document.sheetFrame(with: shp)
+                let ratio = firstScale / rootView.worldToScreenScale
+                let frame = rootView.sheetFrame(with: shp)
                 let fki = sheetView.model.animation.index - value.keyframeBeganIndex
                 
                 func keyLines(isDraft: Bool) -> [IndexValue<[Line]>] {
@@ -2387,7 +2387,7 @@ final class CopyEditor: Editor {
             }
         case .planesValue(let planesValue):
             guard !planesValue.planes.isEmpty else { return }
-            guard let sheetView = document.madeSheetView(at: shp) else { return }
+            guard let sheetView = rootView.madeSheetView(at: shp) else { return }
             sheetView.newUndoGroup()
             if !sheetView.model.picture.planes.isEmpty {
                 let counts = Array(0 ..< sheetView.model.picture.planes.count)
@@ -2400,7 +2400,7 @@ final class CopyEditor: Editor {
         case .text(let text):
             pasteText(text)
         case .border(let border):
-            if let sheetView = document.madeSheetView(at: shp) {
+            if let sheetView = rootView.madeSheetView(at: shp) {
                 
                 if let (textView, ti, _, _) = sheetView.textTuple(at: sheetView.convertFromWorld(p)),
                    let x = textView.typesetter.warpCursorOffset(at: textView.convertFromWorld(p))?.offset {
@@ -2436,18 +2436,18 @@ final class CopyEditor: Editor {
                 }
                 
                 
-                let sb = document.sheetFrame(with: shp)
+                let sb = rootView.sheetFrame(with: shp)
                 let inP = sheetView.convertFromWorld(p)
                 let np = borderSnappedPoint(inP, with: sb,
-                                            distance: 3 / document.worldToScreenScale,
+                                            distance: 3 / rootView.worldToScreenScale,
                                             oldBorder: border).point
                 sheetView.newUndoGroup()
                 sheetView.append(Border(position: np, border: border))
             }
         case .uuColor(let uuColor):
-            guard document.isSelect(at: p) else {
-                guard let _ = document.madeSheetView(at: shp) else { return }
-                let colorOwners = document.madeColorOwner(at: p,
+            guard rootView.isSelect(at: p) else {
+                guard let _ = rootView.madeSheetView(at: shp) else { return }
+                let colorOwners = rootView.madeColorOwner(at: p,
                                                           removingUUColor: uuColor)
                 colorOwners.forEach {
                     if $0.uuColor != uuColor {
@@ -2455,11 +2455,11 @@ final class CopyEditor: Editor {
                         $0.captureUUColor(isNewUndoGroup: true)
                     }
                 }
-                document.updateSelects()
+                rootView.updateSelects()
                 return
             }
             
-            guard let (_, owners) = document.madeColorOwnersWithSelection(at: p,
+            guard let (_, owners) = rootView.madeColorOwnersWithSelection(at: p,
                                                                           removingUUColor: uuColor) else { return }
             let ownerDic = owners.reduce(into: [SheetView: [SheetColorOwner]]()) {
                 if $0[$1.sheetView] == nil {
@@ -2478,10 +2478,10 @@ final class CopyEditor: Editor {
                     }
                 }
             }
-            document.updateSelects()
+            rootView.updateSelects()
         case .animation(let animation):
             guard !animation.keyframes.isEmpty,
-                  let sheetView = document.sheetView(at: shp) else { return }
+                  let sheetView = rootView.sheetView(at: shp) else { return }
             let beat: Rational = sheetView.animationView.beat(atX: sheetView.convertFromWorld(p).x)
             var ni = 0
             for (i, kf) in sheetView.model.animation.keyframes.enumerated().reversed() {
@@ -2509,20 +2509,20 @@ final class CopyEditor: Editor {
             sheetView.newUndoGroup()
             sheetView.insert(kivs)
             sheetView.rootKeyframeIndex = sheetView.model.animation.keyframes.count * count + ni
-            root.updateEditorNode()
-            document.updateSelects()
+            rootEditor.updateEditorNode()
+            rootView.updateSelects()
         case .ids(let idv):
             let ids = idv.ids
-            guard let sheetView = document.sheetView(at: shp) else { return }
+            guard let sheetView = rootView.sheetView(at: shp) else { return }
             let lis: [Int]
-            if document.isSelectNoneCursor(at: p),
-               !document.isSelectedText, !document.selections.isEmpty {
+            if rootView.isSelectNoneCursor(at: p),
+               !rootView.isSelectedText, !rootView.selections.isEmpty {
                 
-                let ms = sheetView.convertFromWorld(document.multiSelection)
+                let ms = sheetView.convertFromWorld(rootView.multiSelection)
                 lis = sheetView.model.picture.lines.enumerated()
                     .compactMap { ms.intersects($0.element) ? $0.offset : nil }
             } else {
-                if let li = sheetView.lineTuple(at: sheetView.convertFromWorld(p), scale: 1 / document.worldToScreenScale)?.lineIndex {
+                if let li = sheetView.lineTuple(at: sheetView.convertFromWorld(p), scale: 1 / rootView.worldToScreenScale)?.lineIndex {
                     lis = [li]
                 } else {
                     lis = []
@@ -2536,7 +2536,7 @@ final class CopyEditor: Editor {
                 sheetView.set([IndexValue(value: idivs, index: sheetView.animationView.model.index)])
             }
         case .score(let score):
-            guard !score.notes.isEmpty, let sheetView = document.sheetView(at: shp) else { return }
+            guard !score.notes.isEmpty, let sheetView = rootView.sheetView(at: shp) else { return }
             
             var ni = sheetView.model.score.notes.count
             let nivs: [IndexValue<Note>] = score.notes.map {
@@ -2554,14 +2554,14 @@ final class CopyEditor: Editor {
                 sheetView.set(option)
             }
         case .content(var content):
-            guard let sheetView = document.madeSheetView(at: shp) else { return }
+            guard let sheetView = rootView.madeSheetView(at: shp) else { return }
             let sheetP = sheetView.convertFromWorld(p)
             
-            let scale = firstScale / document.worldToScreenScale
+            let scale = firstScale / rootView.worldToScreenScale
             let nnp = content.origin * scale + sheetP
             
             if !sheetView.contentsView.model.contains(where: { $0.isEqualFile(content) }) {
-                if let directory = document.sheetRecorders[sheetView.id]?.contentsDirectory {
+                if let directory = rootView.sheetRecorders[sheetView.id]?.contentsDirectory {
                     directory.isWillwrite = true
                     try? directory.write()
                     try? directory.copy(name: content.name, from: content.url)
@@ -2572,18 +2572,18 @@ final class CopyEditor: Editor {
             
             if content.type.hasDur, var timeOption = content.timeOption {
                 let tempo = sheetView.nearestTempo(at: sheetP) ?? timeOption.tempo
-                let interval = document.currentBeatInterval
+                let interval = rootView.currentBeatInterval
                 let startBeat = sheetView.animationView.beat(atX: sheetP.x, interval: interval)
                 timeOption.beatRange.start += startBeat
                 timeOption.tempo = tempo
                 content.timeOption = timeOption
                 content.origin = .init(sheetView.animationView.x(atBeat: timeOption.beatRange.start), nnp.y)
             } else {
-                content.origin = document.roundedPoint(from: nnp)
+                content.origin = rootView.roundedPoint(from: nnp)
             }
             
             content.size = content.size * scale
-            let maxSize = document.sheetFrame(with: shp).bounds.inset(by: Sheet.textPadding).size
+            let maxSize = rootView.sheetFrame(with: shp).bounds.inset(by: Sheet.textPadding).size
             if content.size.width > maxSize.width || content.size.height > maxSize.height {
                 content.size *= min(maxSize.width / content.size.width, maxSize.height / content.size.height)
             }
@@ -2593,22 +2593,22 @@ final class CopyEditor: Editor {
             sheetView.newUndoGroup()
             sheetView.append(content)
         case .image(let image):
-            guard let sheetView = document.madeSheetView(at: shp) else { return }
+            guard let sheetView = rootView.madeSheetView(at: shp) else { return }
             let sheetP = sheetView.convertFromWorld(p)
             
             let name = UUID().uuidString + ".tiff"
-            if let directory = document.sheetRecorders[sheetView.id]?.contentsDirectory {
+            if let directory = rootView.sheetRecorders[sheetView.id]?.contentsDirectory {
                 directory.isWillwrite = true
                 try? directory.write()
                 try? directory.write(image, .tiff, name: name)
             }
             
-            let scale = firstScale / document.worldToScreenScale
-            let nnp = document.roundedPoint(from: sheetP)
+            let scale = firstScale / rootView.worldToScreenScale
+            let nnp = rootView.roundedPoint(from: sheetP)
             
             var content = Content(directoryName: sheetView.id.uuidString, name: name, origin: nnp)
             if let size = content.image?.size {
-                let maxSize = document.sheetFrame(with: shp).bounds.inset(by: Sheet.textPadding).size
+                let maxSize = rootView.sheetFrame(with: shp).bounds.inset(by: Sheet.textPadding).size
                 var size = size / 2
                 if size.width > maxSize.width || size.height > maxSize.height {
                     size *= min(maxSize.width / size.width, maxSize.height / size.height)
@@ -2621,10 +2621,10 @@ final class CopyEditor: Editor {
             sheetView.newUndoGroup()
             sheetView.append(content)
         case .beatRange(let beatRange):
-            guard let sheetView = document.sheetView(at: shp) else { return }
+            guard let sheetView = rootView.sheetView(at: shp) else { return }
             let sheetP = sheetView.convertFromWorld(p)
             if let ci = sheetView.contentIndex(at: sheetP,
-                                               scale: document.screenToWorldScale) {
+                                               scale: rootView.screenToWorldScale) {
                 var content = sheetView.model.contents[ci]
                 let beatRange = Range(start: sheetView.animationView.beat(atX: content.origin.x),
                                       length: beatRange.length)
@@ -2635,7 +2635,7 @@ final class CopyEditor: Editor {
                 }
                 sheetView.newUndoGroup()
                 sheetView.replace(content, at: ci)
-            } else if let ti = sheetView.textIndex(at: sheetP, scale: document.screenToWorldScale) {
+            } else if let ti = sheetView.textIndex(at: sheetP, scale: rootView.screenToWorldScale) {
                 var text = sheetView.model.texts[ti]
                 let beatRange = Range(start: sheetView.animationView.beat(atX: text.origin.x),
                                       length: beatRange.length)
@@ -2655,7 +2655,7 @@ final class CopyEditor: Editor {
             octaveNode?.removeFromParent()
             octaveNode = nil
             
-            guard let sheetView = document.sheetView(at: shp) else { return }
+            guard let sheetView = rootView.sheetView(at: shp) else { return }
             let scoreView = sheetView.scoreView
             let score = scoreView.model
             var noteIVs = [IndexValue<Note>](), oldNoteIVs = [IndexValue<Note>]()
@@ -2671,14 +2671,14 @@ final class CopyEditor: Editor {
                 sheetView.capture(noteIVs, old: oldNoteIVs)
             }
         case .stereo(let stereo):
-            guard let sheetView = document.sheetView(at: shp) else { return }
+            guard let sheetView = rootView.sheetView(at: shp) else { return }
             if sheetView.model.score.enabled {
                 let scoreView = sheetView.scoreView
                 if let (noteI, pitI) = scoreView.noteAndPitIEnabledNote(at: scoreView.convertFromWorld(p),
-                                                                        scale: document.screenToWorldScale) {
-                    if document.isSelect(at: p) {
+                                                                        scale: rootView.screenToWorldScale) {
+                    if rootView.isSelect(at: p) {
                         let score = scoreView.model
-                        let nis = sheetView.noteAndPitIndexes(from: document.selections)
+                        let nis = sheetView.noteAndPitIndexes(from: rootView.selections)
                         var nivs = [IndexValue<Note>]()
                         for (noteI, pitIs) in nis {
                             var note = score.notes[noteI], isChanged = false
@@ -2710,14 +2710,14 @@ final class CopyEditor: Editor {
                 }
             }
         case .tone(let tone):
-            guard let sheetView = document.sheetView(at: shp) else { return }
+            guard let sheetView = rootView.sheetView(at: shp) else { return }
             if sheetView.model.score.enabled {
                 let scoreView = sheetView.scoreView
                 if let (noteI, pitI) = scoreView.noteAndPitIEnabledNote(at: scoreView.convertFromWorld(p),
-                                                                        scale: document.screenToWorldScale) {
-                    if document.isSelect(at: p) {
+                                                                        scale: rootView.screenToWorldScale) {
+                    if rootView.isSelect(at: p) {
                         let score = scoreView.model
-                        let nis = sheetView.noteAndPitIndexes(from: document.selections)
+                        let nis = sheetView.noteAndPitIndexes(from: rootView.selections)
                         var nivs = [IndexValue<Note>]()
                         for (noteI, pitIs) in nis {
                             var note = score.notes[noteI], isChanged = false
@@ -2749,14 +2749,14 @@ final class CopyEditor: Editor {
                 }
             }
         case .envelope(let envelope):
-            guard let sheetView = document.sheetView(at: shp) else { return }
+            guard let sheetView = rootView.sheetView(at: shp) else { return }
             if sheetView.model.score.enabled {
                 let scoreView = sheetView.scoreView
                 if let noteI = scoreView.noteIndex(at: scoreView.convertFromWorld(p),
-                                                scale: document.screenToWorldScale) {
-                    if document.isSelect(at: p) {
+                                                scale: rootView.screenToWorldScale) {
+                    if rootView.isSelect(at: p) {
                         let score = scoreView.model
-                        let nis = sheetView.noteIndexes(from: document.selections)
+                        let nis = sheetView.noteIndexes(from: rootView.selections)
                             .filter { score.notes[$0].envelope != envelope }
                         if !nis.isEmpty {
                             sheetView.newUndoGroup()
@@ -2801,18 +2801,18 @@ final class CopyEditor: Editor {
     }
     
     func cut(with event: InputKeyEvent) {
-        let sp = document.selectedScreenPositionNoneCursor
+        let sp = rootView.selectedScreenPositionNoneCursor
             ?? event.screenPoint
-        let p = document.convertScreenToWorld(sp)
-        for runner in root.runners {
+        let p = rootView.convertScreenToWorld(sp)
+        for runner in rootEditor.runners {
             if runner.containsCalculating(p) {
                 Pasteboard.shared.copiedObjects = [.string(runner.calculatingString)]
                 runner.cancel()
                 return
             }
         }
-        if document.containsLookingUp(at: p) {
-            document.closeLookingUpNode()
+        if rootView.containsLookingUp(at: p) {
+            rootView.closeLookingUpNode()
             return
         }
         
@@ -2822,23 +2822,23 @@ final class CopyEditor: Editor {
         }
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
             type = .cut
             editingSP = sp
-            editingP = document.convertScreenToWorld(sp)
+            editingP = rootView.convertScreenToWorld(sp)
             cut(at: editingP)
             
-            document.updateSelects()
-            document.updateFinding(at: editingP)
-            document.updateTextCursor()
-            document.rootNode.append(child: selectingLineNode)
+            rootView.updateSelects()
+            rootView.updateFinding(at: editingP)
+            rootView.updateTextCursor()
+            rootView.node.append(child: selectingLineNode)
         case .changed:
             break
         case .ended:
             selectingLineNode.removeFromParent()
             
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
     
@@ -2847,25 +2847,25 @@ final class CopyEditor: Editor {
             copySheet(with: event)
             return
         }
-        let sp = document.selectedScreenPositionNoneCursor
+        let sp = rootView.selectedScreenPositionNoneCursor
             ?? event.screenPoint
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
             type = .copy
-            firstScale = document.worldToScreenScale
+            firstScale = rootView.worldToScreenScale
             editingSP = sp
-            editingP = document.convertScreenToWorld(sp)
+            editingP = rootView.convertScreenToWorld(sp)
             updateWithCopy(for: editingP,
                            isSendPasteboard: true, isCutColor: false)
-            document.rootNode.append(child: selectingLineNode)
+            rootView.node.append(child: selectingLineNode)
         case .changed:
             break
         case .ended:
             selectingLineNode.removeFromParent()
             
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
     
@@ -2876,13 +2876,13 @@ final class CopyEditor: Editor {
         }
         guard !isEditingText else { return }
         
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
         switch event.phase {
         case .began:
-            if let textView = root.textEditor.editingTextView,
+            if let textView = rootEditor.textEditor.editingTextView,
                !textView.isHiddenSelectedRange,
-               let sheetView = root.textEditor.editingSheetView,
+               let sheetView = rootEditor.textEditor.editingSheetView,
                let i = sheetView.textsView.elementViews
                 .firstIndex(of: textView),
                let o = Pasteboard.shared.copiedObjects.first {
@@ -2894,7 +2894,7 @@ final class CopyEditor: Editor {
                 default: str = nil
                 }
                 if let str = str {
-                    root.textEditor.endInputKey(isUnmarkText: true, isRemoveText: false)
+                    rootEditor.textEditor.endInputKey(isUnmarkText: true, isRemoveText: false)
                     guard let ti = textView.selectedRange?.lowerBound,
                           ti >= textView.model.string.startIndex else { return }
                     let text = textView.model
@@ -2920,47 +2920,47 @@ final class CopyEditor: Editor {
                 }
             }
             
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
             type = .paste
-            firstScale = document.worldToScreenScale
-            firstRotation = document.camera.rotation
+            firstScale = rootView.worldToScreenScale
+            firstRotation = rootView.camera.rotation
             textScale = firstScale
             editingSP = sp
-            editingP = document.convertScreenToWorld(sp)
+            editingP = rootView.convertScreenToWorld(sp)
             guard let o = Pasteboard.shared.copiedObjects.first else { return }
             pasteObject = o
             if isMovePasteObject {
-                selectingLineNode.lineWidth = document.worldLineWidth
+                selectingLineNode.lineWidth = rootView.worldLineWidth
                 snapLineNode.lineWidth = selectingLineNode.lineWidth
                 updateWithPaste(at: editingP, atScreen: sp,
                                 event.phase)
-                document.rootNode.append(child: snapLineNode)
-                document.rootNode.append(child: selectingLineNode)
+                rootView.node.append(child: snapLineNode)
+                rootView.node.append(child: selectingLineNode)
             } else {
                 paste(at: editingP, atScreen: sp)
             }
         case .changed:
             if isMovePasteObject {
                 editingSP = sp
-                editingP = document.convertScreenToWorld(sp)
+                editingP = rootView.convertScreenToWorld(sp)
                 updateWithPaste(at: editingP, atScreen: sp,
                                 event.phase)
             }
         case .ended:
             if isMovePasteObject {
                 editingSP = sp
-                editingP = document.convertScreenToWorld(sp)
+                editingP = rootView.convertScreenToWorld(sp)
                 paste(at: editingP, atScreen: sp)
                 snapLineNode.removeFromParent()
                 selectingLineNode.removeFromParent()
             }
             
-            document.updateSelects()
-            document.updateFinding(at: editingP)
-            document.updateTextCursor()
+            rootView.updateSelects()
+            rootView.updateFinding(at: editingP)
+            rootView.updateTextCursor()
             
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
     
@@ -2968,21 +2968,21 @@ final class CopyEditor: Editor {
         var shp: Sheetpos, frame: Rect
     }
     func values(at p: Point, isCut: Bool) -> [Value] {
-        if document.isSelectSelectedNoneCursor(at: p), !document.isSelectedText {
-            let vs: [Value] = document.world.sheetIDs.keys.compactMap { shp in
-                let frame = document.sheetFrame(with: shp)
-                return document.multiSelection.intersects(frame) ?
+        if rootView.isSelectSelectedNoneCursor(at: p), !rootView.isSelectedText {
+            let vs: [Value] = rootView.world.sheetIDs.keys.compactMap { shp in
+                let frame = rootView.sheetFrame(with: shp)
+                return rootView.multiSelection.intersects(frame) ?
                     Value(shp: shp, frame: frame) : nil
             }
             if isCut {
-                document.selections = []
+                rootView.selections = []
             }
             return vs
         } else {
-            let shp = document.sheetPosition(at: p)
-            if document.sheetID(at: shp) != nil {
+            let shp = rootView.sheetPosition(at: p)
+            if rootView.sheetID(at: shp) != nil {
                 return [Value(shp: shp,
-                              frame: document.sheetFrame(with: shp))]
+                              frame: rootView.sheetFrame(with: shp))]
             } else {
                 return []
             }
@@ -2992,7 +2992,7 @@ final class CopyEditor: Editor {
     func updateWithCopySheet(at dp: Point, from values: [Value]) {
         var csv = CopiedSheetsValue()
         for value in values {
-            if let sid = document.sheetID(at: value.shp) {
+            if let sid = rootView.sheetID(at: value.shp) {
                 csv.sheetIDs[value.shp] = sid
             }
         }
@@ -3003,15 +3003,15 @@ final class CopyEditor: Editor {
     }
     
     func updateWithPasteSheet(at sp: Point, phase: Phase) {
-        let p = document.convertScreenToWorld(sp)
+        let p = rootView.convertScreenToWorld(sp)
         if case .copiedSheetsValue(let csv) = pasteObject {
             if phase == .began {
-                let lw = Line.defaultLineWidth / document.worldToScreenScale
+                let lw = Line.defaultLineWidth / rootView.worldToScreenScale
                 pasteSheetNode.children = csv.sheetIDs.map {
-                    let fillType = document.readFillType(at: $0.value)
+                    let fillType = rootView.readFillType(at: $0.value)
                         ?? .color(.disabled)
                     
-                    let sf = document.sheetFrame(with: $0.key)
+                    let sf = rootView.sheetFrame(with: $0.key)
                     return Node(attitude: Attitude(position: sf.origin),
                                 path: Path(Rect(size: sf.size)),
                                 lineWidth: lw,
@@ -3021,12 +3021,12 @@ final class CopyEditor: Editor {
             
             var children = [Node]()
             for (shp, _) in csv.sheetIDs {
-                var sf = document.sheetFrame(with: shp)
+                var sf = rootView.sheetFrame(with: shp)
                 sf.origin += p - csv.deltaPoint
-                let nshp = document.sheetPosition(at: Point(Sheet.width / 2, Sheet.height / 2) + sf.origin)
-                let nsf = Rect(origin: document.sheetFrame(with: nshp).origin,
+                let nshp = rootView.sheetPosition(at: Point(Sheet.width / 2, Sheet.height / 2) + sf.origin)
+                let nsf = Rect(origin: rootView.sheetFrame(with: nshp).origin,
                               size: sf.size)
-                let lw = Line.defaultLineWidth / document.worldToScreenScale
+                let lw = Line.defaultLineWidth / rootView.worldToScreenScale
                 children.append(Node(attitude: Attitude(position: nsf.origin),
                                      path: Path(Rect(size: nsf.size)),
                                      lineWidth: lw,
@@ -3039,84 +3039,84 @@ final class CopyEditor: Editor {
         }
     }
     func pasteSheet(at sp: Point) {
-        document.cursorPoint = sp
-        let p = document.convertScreenToWorld(sp)
+        rootView.cursorPoint = sp
+        let p = rootView.convertScreenToWorld(sp)
         if case .copiedSheetsValue(let csv) = pasteObject {
             var nIndexes = [Sheetpos: SheetID]()
             var removeIndexes = [Sheetpos]()
             for (shp, sid) in csv.sheetIDs {
-                var sf = document.sheetFrame(with: shp)
+                var sf = rootView.sheetFrame(with: shp)
                 sf.origin += p - csv.deltaPoint
-                var nshp = document.sheetPosition(at: Point(Sheet.width / 2, Sheet.height / 2) + sf.origin)
+                var nshp = rootView.sheetPosition(at: Point(Sheet.width / 2, Sheet.height / 2) + sf.origin)
                 nshp.isRight = shp.isRight
                 
-                if document.sheetID(at: nshp) != nil {
+                if rootView.sheetID(at: nshp) != nil {
                     removeIndexes.append(nshp)
                 }
-                if document.sheetPosition(at: sid) != nil {
-                    nIndexes[nshp] = document.duplicateSheet(from: sid)
+                if rootView.sheetPosition(at: sid) != nil {
+                    nIndexes[nshp] = rootView.duplicateSheet(from: sid)
                 } else {
                     nIndexes[nshp] = sid
                 }
             }
             if !removeIndexes.isEmpty || !nIndexes.isEmpty {
-                document.history.newUndoGroup()
+                rootView.history.newUndoGroup()
                 if !removeIndexes.isEmpty {
-                    document.removeSheets(at: removeIndexes)
+                    rootView.removeSheets(at: removeIndexes)
                 }
                 if !nIndexes.isEmpty {
-                    document.append(nIndexes)
+                    rootView.append(nIndexes)
                 }
-                document.updateNode()
+                rootView.updateNode()
             }
         }
     }
     
     func cutSheet(with event: InputKeyEvent) {
-        let sp = document.selectedScreenPositionNoneCursor
+        let sp = rootView.selectedScreenPositionNoneCursor
             ?? event.screenPoint
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
             type = .cut
             editingSP = sp
-            editingP = document.convertScreenToWorld(sp)
-            let p = document.convertScreenToWorld(sp)
+            editingP = rootView.convertScreenToWorld(sp)
+            let p = rootView.convertScreenToWorld(sp)
             let values = self.values(at: p, isCut: true)
             updateWithCopySheet(at: p, from: values)
             if !values.isEmpty {
                 let shps = values.map { $0.shp }
-                document.cursorPoint = sp
-                document.close(from: shps)
-                document.newUndoGroup()
-                document.removeSheets(at: shps)
+                rootView.cursorPoint = sp
+                rootView.close(from: shps)
+                rootView.newUndoGroup()
+                rootView.removeSheets(at: shps)
             }
             
-            document.updateSelects()
-            document.updateWithFinding()
+            rootView.updateSelects()
+            rootView.updateWithFinding()
         case .changed:
             break
         case .ended:
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
     
     func copySheet(with event: InputKeyEvent) {
-        let sp = document.selectedScreenPositionNoneCursor
+        let sp = rootView.selectedScreenPositionNoneCursor
             ?? event.screenPoint
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
             type = .copy
             editingSP = sp
-            editingP = document.convertScreenToWorld(sp)
+            editingP = rootView.convertScreenToWorld(sp)
             selectingLineNode.fillType = .color(.subSelected)
             selectingLineNode.lineType = .color(.selected)
-            selectingLineNode.lineWidth = document.worldLineWidth
+            selectingLineNode.lineWidth = rootView.worldLineWidth
             
-            let p = document.convertScreenToWorld(sp)
+            let p = rootView.convertScreenToWorld(sp)
             let values = self.values(at: p, isCut: false)
             selectingLineNode.children = values.map {
                 let sf = $0.frame
@@ -3128,35 +3128,35 @@ final class CopyEditor: Editor {
             }
             updateWithCopySheet(at: p, from: values)
             
-            document.rootNode.append(child: selectingLineNode)
+            rootView.node.append(child: selectingLineNode)
         case .changed:
             break
         case .ended:
             selectingLineNode.removeFromParent()
             
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
     var pasteSheetNode = Node()
     func pasteSheet(with event: InputKeyEvent) {
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
             type = .paste
-            firstScale = document.worldToScreenScale
+            firstScale = rootView.worldToScreenScale
             editingSP = sp
-            editingP = document.convertScreenToWorld(sp)
+            editingP = rootView.convertScreenToWorld(sp)
             pasteObject = Pasteboard.shared.copiedObjects.first
                 ?? .sheetValue(SheetValue())
             selectingLineNode.fillType = .color(.subSelected)
             selectingLineNode.lineType = .color(.selected)
-            selectingLineNode.lineWidth = document.worldLineWidth
+            selectingLineNode.lineWidth = rootView.worldLineWidth
             
-            document.rootNode.append(child: selectingLineNode)
-            document.rootNode.append(child: pasteSheetNode)
+            rootView.node.append(child: selectingLineNode)
+            rootView.node.append(child: pasteSheetNode)
             
             updateWithPasteSheet(at: sp, phase: event.phase)
         case .changed:
@@ -3166,22 +3166,22 @@ final class CopyEditor: Editor {
             selectingLineNode.removeFromParent()
             pasteSheetNode.removeFromParent()
             
-            document.updateSelects()
-            document.updateWithFinding()
+            rootView.updateSelects()
+            rootView.updateWithFinding()
             
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
 }
 
 final class LineColorCopier: InputKeyEditor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     var selectingLineNode = Node(lineWidth: 1.5)
@@ -3189,9 +3189,9 @@ final class LineColorCopier: InputKeyEditor {
     
     func updateNode() {
         if selectingLineNode.children.isEmpty {
-            selectingLineNode.lineWidth = document.worldLineWidth
+            selectingLineNode.lineWidth = rootView.worldLineWidth
         } else {
-            let w = document.worldLineWidth
+            let w = rootView.worldLineWidth
             for node in selectingLineNode.children {
                 node.lineWidth = w
             }
@@ -3206,38 +3206,38 @@ final class LineColorCopier: InputKeyEditor {
         guard isEditingSheet else {
             return
         }
-        let sp = document.selectedScreenPositionNoneCursor
+        let sp = rootView.selectedScreenPositionNoneCursor
             ?? event.screenPoint
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
-            firstScale = document.worldToScreenScale
+            firstScale = rootView.worldToScreenScale
             editingSP = sp
-            editingP = document.convertScreenToWorld(sp)
+            editingP = rootView.convertScreenToWorld(sp)
             updateWithCopy(for: editingP,
                            isSendPasteboard: true, isCutColor: false)
-            document.rootNode.append(child: selectingLineNode)
+            rootView.node.append(child: selectingLineNode)
         case .changed:
             break
         case .ended:
             selectingLineNode.removeFromParent()
             
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
     
     @discardableResult
     func updateWithCopy(for p: Point, isSendPasteboard: Bool, isCutColor: Bool) -> Bool {
-        if let sheetView = document.sheetView(at: p),
+        if let sheetView = rootView.sheetView(at: p),
            let lineView = sheetView.lineTuple(at: sheetView.convertFromWorld(p),
-                                              scale: 1 / document.worldToScreenScale)?.lineView {
+                                              scale: 1 / rootView.worldToScreenScale)?.lineView {
             
             if isSendPasteboard {
                 Pasteboard.shared.copiedObjects = [.uuColor(lineView.model.uuColor)]
             }
             
-            let scale = 1 / document.worldToScreenScale
+            let scale = 1 / rootView.worldToScreenScale
             let lw = Line.defaultLineWidth
             let selectedNode = Node(path: lineView.node.path * sheetView.node.localTransform,
                                     lineWidth: max(lw * 1.5, lw * 2.5 * scale, 1 * scale),
@@ -3251,15 +3251,15 @@ final class LineColorCopier: InputKeyEditor {
             }
             
             return true
-        } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+        } else if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled {
             let scoreView = sheetView.scoreView
             let scoreP = scoreView.convertFromWorld(p)
             
             if let (noteI, _) = scoreView.noteAndPitIEnabledNote(at: scoreP,
-                                                                 scale: document.screenToWorldScale) {
+                                                                 scale: rootView.screenToWorldScale) {
                 
                 func show(_ ps: [Point], color: Color) {
-                    let scale = 1 / document.worldToScreenScale
+                    let scale = 1 / rootView.worldToScreenScale
                     let lw = Line.defaultLineWidth
                     let nlw = max(lw * 1.5, lw * 2.5 * scale, 1 * scale)
                     

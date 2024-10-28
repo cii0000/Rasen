@@ -44,12 +44,12 @@ protocol InputKeyEditor: Editor {
 }
 
 final class RootEditor: Editor {
-    var document: Document
+    var rootView: RootView
     
-    init(_ document: Document) {
-        self.document = document
+    init(_ rootView: RootView) {
+        self.rootView = rootView
         
-        document.updateNodeNotifications.append { [weak self] _ in
+        rootView.updateNodeNotifications.append { [weak self] _ in
             self?.updateEditorNode()
         }
     }
@@ -59,25 +59,25 @@ final class RootEditor: Editor {
         
         textEditor.cancelTasks()
         
-        document.cancelTasks()
+        rootView.cancelTasks()
     }
     
     func containsAllTimelines(with event: any Event) -> Bool {
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor ?? event.screenPoint
-        let p = document.convertScreenToWorld(sp)
-        guard let sheetView = document.sheetView(at: p) else { return false }
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor ?? event.screenPoint
+        let p = rootView.convertScreenToWorld(sp)
+        guard let sheetView = rootView.sheetView(at: p) else { return false }
         let inP = sheetView.convertFromWorld(p)
-        return sheetView.animationView.containsTimeline(inP, scale: document.screenToWorldScale)
-        || sheetView.containsOtherTimeline(inP, scale: document.screenToWorldScale)
+        return sheetView.animationView.containsTimeline(inP, scale: rootView.screenToWorldScale)
+        || sheetView.containsOtherTimeline(inP, scale: rootView.screenToWorldScale)
     }
     func isPlaying(with event: any Event) -> Bool {
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor ?? event.screenPoint
-        let p = document.convertScreenToWorld(sp)
-        if let sheetView = document.sheetView(at: p), sheetView.isPlaying {
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor ?? event.screenPoint
+        let p = rootView.convertScreenToWorld(sp)
+        if let sheetView = rootView.sheetView(at: p), sheetView.isPlaying {
             return true
         }
-        for shp in document.aroundSheetpos(atCenter: document.intPosition(at: p)) {
-            if let sheetView = document.sheetView(at: shp.shp), sheetView.isPlaying {
+        for shp in rootView.aroundSheetpos(atCenter: rootView.intPosition(at: p)) {
+            if let sheetView = rootView.sheetView(at: shp.shp), sheetView.isPlaying {
                 return true
             }
         }
@@ -87,7 +87,7 @@ final class RootEditor: Editor {
     var modifierKeys = ModifierKeys()
     
     func indicate(with event: DragEvent) {
-        document.cursorPoint = event.screenPoint
+        rootView.cursorPoint = event.screenPoint
         textEditor.isMovedCursor = true
         textEditor.moveEndInputKey(isStopFromMarkedText: true)
     }
@@ -173,8 +173,8 @@ final class RootEditor: Editor {
             subDragEditor = RangeSelector(self)
             subDragEditor?.send(event)
             oldSubDragEvent = event
-            document.textCursorNode.isHidden = true
-            document.textMaxTypelineWidthNode.isHidden = true
+            rootView.textCursorNode.isHidden = true
+            rootView.textMaxTypelineWidthNode.isHidden = true
         case .changed:
             subDragEditor?.send(event)
             oldSubDragEvent = event
@@ -182,7 +182,7 @@ final class RootEditor: Editor {
             oldSubDragEvent = nil
             subDragEditor?.send(event)
             subDragEditor = nil
-            document.cursorPoint = event.screenPoint
+            rootView.cursorPoint = event.screenPoint
         }
     }
     
@@ -195,8 +195,8 @@ final class RootEditor: Editor {
             middleDragEditor = LassoCutter(self)
             middleDragEditor?.send(event)
             oldMiddleDragEvent = event
-            document.textCursorNode.isHidden = true
-            document.textMaxTypelineWidthNode.isHidden = true
+            rootView.textCursorNode.isHidden = true
+            rootView.textMaxTypelineWidthNode.isHidden = true
         case .changed:
             middleDragEditor?.send(event)
             oldMiddleDragEvent = event
@@ -204,7 +204,7 @@ final class RootEditor: Editor {
             oldMiddleDragEvent = nil
             middleDragEditor?.send(event)
             middleDragEditor = nil
-            document.cursorPoint = event.screenPoint
+            rootView.cursorPoint = event.screenPoint
         }
     }
     
@@ -238,23 +238,23 @@ final class RootEditor: Editor {
             dragEditor = self.dragEditor(with: quasimode)
             dragEditor?.send(event)
             oldDragEvent = event
-            document.textCursorNode.isHidden = true
-            document.textMaxTypelineWidthNode.isHidden = true
+            rootView.textCursorNode.isHidden = true
+            rootView.textMaxTypelineWidthNode.isHidden = true
             
-            document.isUpdateWithCursorPosition = false
-            document.cursorPoint = event.screenPoint
+            rootView.isUpdateWithCursorPosition = false
+            rootView.cursorPoint = event.screenPoint
         case .changed:
             dragEditor?.send(event)
             oldDragEvent = event
             
-            document.cursorPoint = event.screenPoint
+            rootView.cursorPoint = event.screenPoint
         case .ended:
             oldDragEvent = nil
             dragEditor?.send(event)
             dragEditor = nil
             
-            document.isUpdateWithCursorPosition = true
-            document.cursorPoint = event.screenPoint
+            rootView.isUpdateWithCursorPosition = true
+            rootView.cursorPoint = event.screenPoint
         }
     }
     
@@ -276,7 +276,7 @@ final class RootEditor: Editor {
     
     var runners = Set<RunEditor>() {
         didSet {
-            document.updateRunners(fromWorldPrintOrigins: runners.map { $0.worldPrintOrigin })
+            rootView.updateRunners(fromWorldPrintOrigins: runners.map { $0.worldPrintOrigin })
         }
     }
     
@@ -322,7 +322,7 @@ final class RootEditor: Editor {
             guard inputKeyEditor == nil else { return }
             let quasimode = Quasimode(modifier: modifierKeys,
                                       event.inputKeyType)
-            if document.editingTextView != nil
+            if rootView.editingTextView != nil
                 && quasimode != .changeToSuperscript
                 && quasimode != .changeToSubscript
                 && quasimode != .changeToHorizontalText
@@ -350,31 +350,31 @@ final class RootEditor: Editor {
     }
     
     func updateLastEditedSheetpos(from event: any Event) {
-        document.updateLastEditedSheetpos(fromScreen: event.screenPoint)
+        rootView.updateLastEditedSheetpos(fromScreen: event.screenPoint)
     }
     
     func keepOut(with event: any Event) {
         switch event.phase {
         case .began:
-            document.cursor = .block
+            rootView.cursor = .block
         case .changed:
             break
         case .ended:
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
     func stopPlaying(with event: any Event) {
         switch event.phase {
         case .began:
-            document.cursor = .stop
+            rootView.cursor = .stop
             
-            for (_, v) in document.sheetViewValues {
-                v.view?.stop()
+            for (_, v) in rootView.sheetViewValues {
+                v.sheetView?.stop()
             }
         case .changed:
             break
         case .ended:
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
     
@@ -446,49 +446,49 @@ final class RootEditor: Editor {
 }
 
 final class Zoomer: PinchEditor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
     }
     
     let correction = 3.0
     func send(_ event: PinchEvent) {
         guard event.magnification != 0 else { return }
-        let oldIsEditingSheet = document.isEditingSheet
+        let oldIsEditingSheet = rootView.isEditingSheet
         
-        var transform = document.camera.transform
-        let p = event.screenPoint * document.screenToWorldTransform
+        var transform = rootView.camera.transform
+        let p = event.screenPoint * rootView.screenToWorldTransform
         let log2Scale = transform.log2Scale
         let newLog2Scale = (log2Scale - (event.magnification * correction))
-            .clipped(min: Document.minCameraLog2Scale,
-                     max: Document.maxCameraLog2Scale) - log2Scale
+            .clipped(min: RootView.minCameraLog2Scale,
+                     max: RootView.maxCameraLog2Scale) - log2Scale
         transform.translate(by: -p)
         transform.scale(byLog2Scale: newLog2Scale)
         transform.translate(by: p)
-        document.camera = Document.clippedCamera(from: Camera(transform))
+        rootView.camera = RootView.clippedCamera(from: Camera(transform))
         
-        if oldIsEditingSheet != document.isEditingSheet {
-            root.textEditor.moveEndInputKey()
-            document.updateTextCursor()
+        if oldIsEditingSheet != rootView.isEditingSheet {
+            rootEditor.textEditor.moveEndInputKey()
+            rootView.updateTextCursor()
         }
         
-        if document.selectedNode != nil {
-            document.updateSelectedNode()
+        if rootView.selectedNode != nil {
+            rootView.updateSelectedNode()
         }
-        if !document.finding.isEmpty {
-            document.updateFindingNodes()
+        if !rootView.finding.isEmpty {
+            rootView.updateFindingNodes()
         }
     }
 }
 
 final class Rotater: RotateEditor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
     }
     
     let correction = .pi / 40.0, clipD = .pi / 8.0
@@ -499,8 +499,8 @@ final class Rotater: RotateEditor {
         default: break
         }
         guard !isClipped && event.rotationQuantity != 0 else { return }
-        var transform = document.camera.transform
-        let p = event.screenPoint * document.screenToWorldTransform
+        var transform = rootView.camera.transform
+        let p = event.screenPoint * rootView.screenToWorldTransform
         let r = transform.angle
         let rotation = r - event.rotationQuantity * correction
         let nr: Double
@@ -516,29 +516,29 @@ final class Rotater: RotateEditor {
         transform.translate(by: -p)
         transform.rotate(by: nr - r)
         transform.translate(by: p)
-        var camera = Document.clippedCamera(from: Camera(transform))
+        var camera = RootView.clippedCamera(from: Camera(transform))
         if isClipped {
             camera.rotation = 0
-            document.camera = camera
+            rootView.camera = camera
         } else {
-            document.camera = camera
+            rootView.camera = camera
         }
-        if document.camera.rotation != 0 {
-            document.defaultCursor = Cursor.rotate(rotation: -document.camera.rotation + .pi / 2)
-            document.cursor = document.defaultCursor
+        if rootView.camera.rotation != 0 {
+            rootView.defaultCursor = Cursor.rotate(rotation: -rootView.camera.rotation + .pi / 2)
+            rootView.cursor = rootView.defaultCursor
         } else {
-            document.defaultCursor = .drawLine
-            document.cursor = document.defaultCursor
+            rootView.defaultCursor = .drawLine
+            rootView.cursor = rootView.defaultCursor
         }
     }
 }
 
 final class Scroller: ScrollEditor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
     }
     
     enum SnapType {
@@ -562,8 +562,8 @@ final class Scroller: ScrollEditor {
             guard !event.scrollDeltaPoint.isEmpty else { return }
             let dt = event.time - oldTime
             var dp = event.scrollDeltaPoint.mid(oldDeltaPoint)
-            if document.camera.rotation != 0 {
-                dp = dp * Transform(rotation: document.camera.rotation)
+            if rootView.camera.rotation != 0 {
+                dp = dp * Transform(rotation: rootView.camera.rotation)
             }
             
             oldDeltaPoint = event.scrollDeltaPoint
@@ -571,26 +571,26 @@ final class Scroller: ScrollEditor {
             let length = dp.length()
             let lengthDt = length / dt
             
-            var transform = document.camera.transform
+            var transform = rootView.camera.transform
             let newPoint = dp * correction * transform.absXScale
             
             let oldPosition = transform.position
-            let newP = Document.clippedCameraPosition(from: oldPosition - newPoint) - oldPosition
+            let newP = RootView.clippedCameraPosition(from: oldPosition - newPoint) - oldPosition
             
             transform.translate(by: newP)
-            document.camera = Camera(transform)
+            rootView.camera = Camera(transform)
             
-            document.isUpdateWithCursorPosition = lengthDt < updateSpeed / 2
-            document.updateWithCursorPosition()
-            if !document.isUpdateWithCursorPosition {
-                document.textCursorNode.isHidden = true
-                document.textMaxTypelineWidthNode.isHidden = true
+            rootView.isUpdateWithCursorPosition = lengthDt < updateSpeed / 2
+            rootView.updateWithCursorPosition()
+            if !rootView.isUpdateWithCursorPosition {
+                rootView.textCursorNode.isHidden = true
+                rootView.textMaxTypelineWidthNode.isHidden = true
             }
             
             oldTime = event.time
         case .ended:
-            if !document.isUpdateWithCursorPosition {
-                document.isUpdateWithCursorPosition = true
+            if !rootView.isUpdateWithCursorPosition {
+                rootView.isUpdateWithCursorPosition = true
             }
             break
         }
@@ -600,8 +600,8 @@ final class Scroller: ScrollEditor {
 final class DraftChanger: InputKeyEditor {
     let editor: DraftEditor
     
-    init(_ root: RootEditor) {
-        editor = DraftEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = DraftEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -614,8 +614,8 @@ final class DraftChanger: InputKeyEditor {
 final class DraftCutter: InputKeyEditor {
     let editor: DraftEditor
     
-    init(_ root: RootEditor) {
-        editor = DraftEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = DraftEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -626,66 +626,66 @@ final class DraftCutter: InputKeyEditor {
     }
 }
 final class DraftEditor: Editor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     func changeToDraft(with event: InputKeyEvent) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
-        if root.isPlaying(with: event) {
-            root.stopPlaying(with: event)
+        if rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
         }
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
-        let p = document.convertScreenToWorld(sp)
+        let p = rootView.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
-            if document.isSelectNoneCursor(at: p), !document.isSelectedText {
-                for (shp, _) in document.sheetViewValues {
-                    let ssFrame = document.sheetFrame(with: shp)
-                    if document.selections.contains(where: { ssFrame.intersects($0.rect) }),
-                       let sheetView = document.sheetView(at: shp) {
+            if rootView.isSelectNoneCursor(at: p), !rootView.isSelectedText {
+                for (shp, _) in rootView.sheetViewValues {
+                    let ssFrame = rootView.sheetFrame(with: shp)
+                    if rootView.selections.contains(where: { ssFrame.intersects($0.rect) }),
+                       let sheetView = rootView.sheetView(at: shp) {
                         
                         if sheetView.model.score.enabled {
-                            let nis = sheetView.noteIndexes(from: document.selections)
+                            let nis = sheetView.noteIndexes(from: rootView.selections)
                             if !nis.isEmpty {
                                 sheetView.newUndoGroup()
                                 sheetView.changeToDraft(withNoteInexes: nis)
-                                document.updateSelects()
+                                rootView.updateSelects()
                             }
                         } else {
-                            let lis = sheetView.lineIndexes(from: document.selections)
-                            let pis = sheetView.planeIndexes(from: document.selections)
+                            let lis = sheetView.lineIndexes(from: rootView.selections)
+                            let pis = sheetView.planeIndexes(from: rootView.selections)
                             if !lis.isEmpty {
                                 sheetView.newUndoGroup()
                                 sheetView.changeToDraft(withLineInexes: lis,
                                                         planeInexes: pis)
-                                document.updateSelects()
+                                rootView.updateSelects()
                             }
                         }
                     }
                 }
             } else {
-                if let sheetView = document.sheetView(at: p) {
+                if let sheetView = rootView.sheetView(at: p) {
                     let inP = sheetView.convertFromWorld(p)
                     if sheetView.model.score.enabled {
                         let nis = (0 ..< sheetView.model.score.notes.count).map { $0 }
                         if !nis.isEmpty {
                             sheetView.newUndoGroup()
                             sheetView.changeToDraft(withNoteInexes: nis)
-                            document.updateSelects()
+                            rootView.updateSelects()
                         }
-                    } else if sheetView.animationView.containsTimeline(inP, scale: document.screenToWorldScale),
+                    } else if sheetView.animationView.containsTimeline(inP, scale: rootView.screenToWorldScale),
                        let ki = sheetView.animationView.keyframeIndex(at: inP) {
                         
                         let animationView = sheetView.animationView
@@ -710,42 +710,42 @@ final class DraftEditor: Editor {
         case .changed:
             break
         case .ended:
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
     func cutDraft(with event: InputKeyEvent) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
-        if root.isPlaying(with: event) {
-            root.stopPlaying(with: event)
+        if rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
         }
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
-        let p = document.convertScreenToWorld(sp)
+        let p = rootView.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
-            if document.isSelectNoneCursor(at: p), !document.isSelectedText,
-               !document.selections.isEmpty {
+            if rootView.isSelectNoneCursor(at: p), !rootView.isSelectedText,
+               !rootView.selections.isEmpty {
                 
                 var value = SheetValue()
-                for selection in document.selections {
-                    for (shp, _) in document.sheetViewValues {
-                        let ssFrame = document.sheetFrame(with: shp)
+                for selection in rootView.selections {
+                    for (shp, _) in rootView.sheetViewValues {
+                        let ssFrame = rootView.sheetFrame(with: shp)
                         if ssFrame.intersects(selection.rect),
-                           let sheetView = document.sheetView(at: shp) {
+                           let sheetView = rootView.sheetView(at: shp) {
                            
                             if sheetView.model.score.enabled {
-                                let nis = sheetView.draftNoteIndexes(from: document.selections)
+                                let nis = sheetView.draftNoteIndexes(from: rootView.selections)
                                 if !nis.isEmpty {
                                     let scoreView = sheetView.scoreView
                                     let scoreP = scoreView.convertFromWorld(p)
-                                    let pitchInterval = document.currentPitchInterval
+                                    let pitchInterval = rootView.currentPitchInterval
                                     let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
-                                    let beatInterval = document.currentBeatInterval
+                                    let beatInterval = rootView.currentBeatInterval
                                     let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
                                     let notes: [Note] = nis.map {
                                         var note = scoreView.model.draftNotes[$0]
@@ -772,18 +772,18 @@ final class DraftEditor: Editor {
                 if !value.isEmpty {
                     Pasteboard.shared.copiedObjects = [.sheetValue(value)]
                 }
-                document.selections = []
+                rootView.selections = []
             } else {
-                if let sheetView = document.sheetView(at: p) {
+                if let sheetView = rootView.sheetView(at: p) {
                     let inP = sheetView.convertFromWorld(p)
                     if sheetView.model.score.enabled {
                         let nis = (0 ..< sheetView.model.score.draftNotes.count).map { $0 }
                         if !nis.isEmpty {
                             let scoreView = sheetView.scoreView
                             let scoreP = scoreView.convertFromWorld(p)
-                            let pitchInterval = document.currentPitchInterval
+                            let pitchInterval = rootView.currentPitchInterval
                             let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
-                            let beatInterval = document.currentBeatInterval
+                            let beatInterval = rootView.currentBeatInterval
                             let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
                             let notes: [Note] = sheetView.model.score.draftNotes.map {
                                 var note = $0
@@ -797,7 +797,7 @@ final class DraftEditor: Editor {
                             
                             Pasteboard.shared.copiedObjects = [.notesValue(.init(notes: notes))]//
                         }
-                    } else if sheetView.animationView.containsTimeline(inP, scale: document.screenToWorldScale),
+                    } else if sheetView.animationView.containsTimeline(inP, scale: rootView.screenToWorldScale),
                        let ki = sheetView.animationView.keyframeIndex(at: inP) {
                         
                         let animationView = sheetView.animationView
@@ -823,7 +823,7 @@ final class DraftEditor: Editor {
         case .changed:
             break
         case .ended:
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
 }
@@ -831,8 +831,8 @@ final class DraftEditor: Editor {
 final class FacesMaker: InputKeyEditor {
     let editor: FaceEditor
     
-    init(_ root: RootEditor) {
-        editor = FaceEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = FaceEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -845,8 +845,8 @@ final class FacesMaker: InputKeyEditor {
 final class FacesCutter: InputKeyEditor {
     let editor: FaceEditor
     
-    init(_ root: RootEditor) {
-        editor = FaceEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = FaceEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -857,34 +857,34 @@ final class FacesCutter: InputKeyEditor {
     }
 }
 final class FaceEditor: Editor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     func makeFaces(with event: InputKeyEvent) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
-        if root.isPlaying(with: event) {
-            root.stopPlaying(with: event)
+        if rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
         }
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
-        let p = document.convertScreenToWorld(sp)
+        let p = rootView.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
-            if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+            if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled {
                 let score = sheetView.scoreView.model
-                let nis = document.isSelectNoneCursor(at: p) && !document.isSelectedText ?
-                sheetView.noteIndexes(from: document.selections) :
+                let nis = rootView.isSelectNoneCursor(at: p) && !rootView.isSelectedText ?
+                sheetView.noteIndexes(from: rootView.selections) :
                 Array(score.notes.count.range)
                 let nnis = nis.filter { score.notes[$0].isDefaultTone }.sorted()
                 if !nnis.isEmpty {
@@ -923,20 +923,20 @@ final class FaceEditor: Editor {
                 return
             }
             
-            if document.isSelectNoneCursor(at: p), !document.isSelectedText {
-                for (shp, _) in document.sheetViewValues {
-                    let ssFrame = document.sheetFrame(with: shp)
-                    if document.multiSelection.intersects(ssFrame),
-                       let sheetView = document.sheetView(at: shp) {
+            if rootView.isSelectNoneCursor(at: p), !rootView.isSelectedText {
+                for (shp, _) in rootView.sheetViewValues {
+                    let ssFrame = rootView.sheetFrame(with: shp)
+                    if rootView.multiSelection.intersects(ssFrame),
+                       let sheetView = rootView.sheetView(at: shp) {
                         
-                        let rects = document.selections
+                        let rects = rootView.selections
                             .map { sheetView.convertFromWorld($0.rect) }
                         let path = Path(rects.map { Pathline($0) })
                         sheetView.makeFaces(with: path, isSelection: true)
                     }
                 }
             } else {
-                let (_, sheetView, frame, isAll) = document.sheetViewAndFrame(at: p)
+                let (_, sheetView, frame, isAll) = rootView.sheetViewAndFrame(at: p)
                 if let sheetView = sheetView {
                     if isAll {
                         sheetView.makeFaces(with: nil, isSelection: false)
@@ -949,28 +949,28 @@ final class FaceEditor: Editor {
         case .changed:
             break
         case .ended:
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
     func cutFaces(with event: InputKeyEvent) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
-        if root.isPlaying(with: event) {
-            root.stopPlaying(with: event)
+        if rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
         }
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
-        let p = document.convertScreenToWorld(sp)
+        let p = rootView.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
-            if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+            if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled {
                 let score = sheetView.scoreView.model
-                let nis = document.isSelectNoneCursor(at: p) && !document.isSelectedText ?
-                sheetView.noteIndexes(from: document.selections) :
+                let nis = rootView.isSelectNoneCursor(at: p) && !rootView.isSelectedText ?
+                sheetView.noteIndexes(from: rootView.selections) :
                 Array(score.notes.count.range)
                 let nnis = nis
                     .filter { !score.notes[$0].isOneOvertone && !score.notes[$0].isFullNoise }
@@ -993,14 +993,14 @@ final class FaceEditor: Editor {
                 return
             }
             
-            if document.isSelectNoneCursor(at: p), !document.isSelectedText {
+            if rootView.isSelectNoneCursor(at: p), !rootView.isSelectedText {
                 var value = SheetValue()
-                for (shp, _) in document.sheetViewValues {
-                    let ssFrame = document.sheetFrame(with: shp)
-                    if document.multiSelection.intersects(ssFrame),
-                       let sheetView = document.sheetView(at: shp) {
+                for (shp, _) in rootView.sheetViewValues {
+                    let ssFrame = rootView.sheetFrame(with: shp)
+                    if rootView.multiSelection.intersects(ssFrame),
+                       let sheetView = rootView.sheetView(at: shp) {
                         
-                        let rects = document.selections
+                        let rects = rootView.selections
                             .map { sheetView.convertFromWorld($0.rect).inset(by: 1) }
                         let path = Path(rects.map { Pathline($0) })
                         if let v = sheetView.removeFilledFaces(with: path, at: p) {
@@ -1010,9 +1010,9 @@ final class FaceEditor: Editor {
                 }
                 Pasteboard.shared.copiedObjects = [.sheetValue(value)]
                 
-                document.selections = []
+                rootView.selections = []
             } else {
-                let (_, sheetView, frame, isAll) = document.sheetViewAndFrame(at: p)
+                let (_, sheetView, frame, isAll) = rootView.sheetViewAndFrame(at: p)
                 if let sheetView = sheetView {
                     if isAll {
                         sheetView.cutFaces(with: nil)
@@ -1025,37 +1025,37 @@ final class FaceEditor: Editor {
         case .changed:
             break
         case .ended:
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
 }
 
 final class ScoreAdder: InputKeyEditor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     func send(_ event: InputKeyEvent) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
-        if root.isPlaying(with: event) {
-            root.stopPlaying(with: event)
+        if rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
         }
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
-        let p = document.convertScreenToWorld(sp)
+        let p = rootView.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
-            if let sheetView = document.madeSheetView(at: p) {
+            if let sheetView = rootView.madeSheetView(at: p) {
                 let inP = sheetView.convertFromWorld(p)
                 let option = ScoreOption(tempo: sheetView.nearestTempo(at: inP) ?? Music.defaultTempo,
                                          enabled: true)
@@ -1063,46 +1063,46 @@ final class ScoreAdder: InputKeyEditor {
                 sheetView.newUndoGroup()
                 sheetView.set(option)
                 
-                root.updateEditorNode()
-                document.updateSelects()
+                rootEditor.updateEditorNode()
+                rootView.updateSelects()
             }
         case .changed:
             break
         case .ended:
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
 }
 
 final class ToneShower: InputKeyEditor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     func send(_ event: InputKeyEvent) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
-        if root.isPlaying(with: event) {
-            root.stopPlaying(with: event)
+        if rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
         }
-        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
-        let p = document.convertScreenToWorld(sp)
+        let p = rootView.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
-            if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
-                if document.isSelectSelectedNoneCursor(at: p), !document.isSelectedText {
+            if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled {
+                if rootView.isSelectSelectedNoneCursor(at: p), !rootView.isSelectedText {
                     let scoreView = sheetView.scoreView
-                    let toneIs = sheetView.noteIndexes(from: document.selections).filter {
+                    let toneIs = sheetView.noteIndexes(from: rootView.selections).filter {
                         !scoreView.model.notes[$0].isShownTone
                     }
                     if !toneIs.isEmpty {
@@ -1111,7 +1111,7 @@ final class ToneShower: InputKeyEditor {
                     }
                 } else {
                     let inP = sheetView.scoreView.convertFromWorld(p)
-                    if let (noteI, _) = sheetView.scoreView.noteAndPitIEnabledNote(at: inP, scale: document.screenToWorldScale) {
+                    if let (noteI, _) = sheetView.scoreView.noteAndPitIEnabledNote(at: inP, scale: rootView.screenToWorldScale) {
                         
                         let oldToneIs = sheetView.scoreView.model.notes.enumerated().compactMap {
                             $0.element.isShownTone && noteI != $0.offset ? $0.offset : nil
@@ -1129,7 +1129,7 @@ final class ToneShower: InputKeyEditor {
             break
         case .ended:
             
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
 }

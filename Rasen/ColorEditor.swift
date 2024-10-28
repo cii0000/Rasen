@@ -20,8 +20,8 @@ import struct Foundation.UUID
 final class LightnessChanger: DragEditor {
     let editor: ColorEditor
     
-    init(_ root: RootEditor) {
-        editor = ColorEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = ColorEditor(rootEditor)
     }
     
     func send(_ event: DragEvent) {
@@ -34,8 +34,8 @@ final class LightnessChanger: DragEditor {
 final class TintChanger: DragEditor {
     let editor: ColorEditor
     
-    init(_ root: RootEditor) {
-        editor = ColorEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = ColorEditor(rootEditor)
     }
     
     func send(_ event: DragEvent) {
@@ -46,13 +46,13 @@ final class TintChanger: DragEditor {
     }
 }
 final class ColorEditor: Editor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     var colorOwners = [SheetColorOwner]()
@@ -66,7 +66,7 @@ final class ColorEditor: Editor {
     var isEditableOpacity = false
     
     func updateNode() {
-        let attitude = Attitude(document.screenToWorldTransform)
+        let attitude = Attitude(rootView.screenToWorldTransform)
         
         var lightnessAttitude = attitude
         lightnessAttitude.position = lightnessWorldPosition
@@ -158,7 +158,7 @@ final class ColorEditor: Editor {
                                                      splitCount: Int(maxLightnessHeight), 
                                                      isReversed: isReversedLightness)
                 lightnessNode.lineType = .gradient(gradient)
-                document.rootNode.append(child: lightnessNode)
+                rootView.node.append(child: lightnessNode)
                 if isEditableMaxLightness {
                     whiteLineNode.path = Path(Edge(Point(-0.5, whiteLightnessHeight),
                                                    Point(0.5, whiteLightnessHeight)))
@@ -178,12 +178,12 @@ final class ColorEditor: Editor {
         }
     }
     var lightnessWorldPosition: Point {
-        let sfp = document.convertWorldToScreen(firstLightnessPosition)
+        let sfp = rootView.convertWorldToScreen(firstLightnessPosition)
         let t = oldEditingLightness.clipped(min: Color.minLightness,
                                             max: maxLightness,
                                             newMin: 0, newMax: 1)
         let dp = Point(0, maxLightnessHeight * t)
-        return document.convertScreenToWorld(sfp - dp)
+        return rootView.convertScreenToWorld(sfp - dp)
     }
     var isSnappedLightness = true {
         didSet {
@@ -211,9 +211,9 @@ final class ColorEditor: Editor {
     }
     
     func updateOwners(with event: DragEvent) {
-        let p = document.convertScreenToWorld(event.screenPoint)
+        let p = rootView.convertScreenToWorld(event.screenPoint)
         
-        if let (uuColor, owners) = document.madeColorOwnersWithSelection(at: p) {
+        if let (uuColor, owners) = rootView.madeColorOwnersWithSelection(at: p) {
             self.firstUUColor = uuColor
             self.colorOwners = owners
         } else {
@@ -221,10 +221,10 @@ final class ColorEditor: Editor {
         }
     }
     func updateTintPointNodes(with event: DragEvent) {
-        let p = document.convertScreenToWorld(event.screenPoint)
+        let p = rootView.convertScreenToWorld(event.screenPoint)
         
         if isDrawPoints {
-            pointNodes = document.colors(at: p).map {
+            pointNodes = rootView.colors(at: p).map {
                 let cp = $0.tint.rectangular
                 return Node(path: .init(circleRadius: 1.5, position: cp),
                             lineWidth: 0.5,
@@ -302,26 +302,26 @@ final class ColorEditor: Editor {
     
     func changeVolm(with event: DragEvent) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
         
         let sp = event.screenPoint
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
-            if root.isPlaying(with: event) {
-                root.stopPlaying(with: event)
+            if rootEditor.isPlaying(with: event) {
+                rootEditor.stopPlaying(with: event)
             }
             
             beganSP = sp
-            let p = document.convertScreenToWorld(sp)
-            if let sheetView = document.sheetView(at: p) {
+            let p = rootView.convertScreenToWorld(sp)
+            if let sheetView = rootView.sheetView(at: p) {
                 self.sheetView = sheetView
                 
                 func updateContentsWithSelections() {
-                    let fs = document.selections
+                    let fs = rootView.selections
                         .map { $0.rect }
                         .map { sheetView.convertFromWorld($0) }
                     if !fs.isEmpty {
@@ -349,8 +349,8 @@ final class ColorEditor: Editor {
                 func updatePitsWithSelection(noteI: Int, pitI: Int?, sprolI: Int?, _ type: PitIDType) {
                     var noteAndPitIs: [Int: [Int: Set<Int>]]
                     if let sprolI {
-                        if document.isSelect(at: p) {
-                            noteAndPitIs = sheetView.noteAndPitAndSprolIs(from: document.selections)
+                        if rootView.isSelect(at: p) {
+                            noteAndPitIs = sheetView.noteAndPitAndSprolIs(from: rootView.selections)
                         } else {
                             let id = pitI != nil ? score.notes[noteI].pits[pitI!][type] : nil
                             noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) {
@@ -361,8 +361,8 @@ final class ColorEditor: Editor {
                                 }
                             }
                         }
-                    } else if document.isSelect(at: p) {
-                        let aNoteAndPitIs = sheetView.noteAndPitIndexes(from: document.selections)
+                    } else if rootView.isSelect(at: p) {
+                        let aNoteAndPitIs = sheetView.noteAndPitIndexes(from: rootView.selections)
                         noteAndPitIs = [:]
                         for (noteI, v) in aNoteAndPitIs {
                             noteAndPitIs[noteI] = v.reduce(into: [Int: Set<Int>]()) {
@@ -428,7 +428,7 @@ final class ColorEditor: Editor {
                 let score = scoreView.model
                 
                 if let (noteI, result) = scoreView
-                    .hitTestColor(scoreP, scale: document.screenToWorldScale) {
+                    .hitTestColor(scoreP, scale: rootView.screenToWorldScale) {
                     
                     let note = score.notes[noteI]
                     
@@ -439,8 +439,8 @@ final class ColorEditor: Editor {
                         updatePitsWithSelection(noteI: noteI, pitI: nil, sprolI: nil, .stereo)
                         beganBeat = scoreView.beat(atX: scoreP.x)
                     case .reverbEarlyRVolm:
-                        if document.isSelect(at: p) {
-                            let noteIs = sheetView.noteIndexes(from: document.selections)
+                        if rootView.isSelect(at: p) {
+                            let noteIs = sheetView.noteIndexes(from: rootView.selections)
                             beganNotes = noteIs.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
                         } else {
                             let id = score.notes[noteI].envelope.id
@@ -456,8 +456,8 @@ final class ColorEditor: Editor {
                         beganVolm = score.notes[noteI].envelope.reverb.earlyVolm
                         beganBeat = scoreView.beat(atX: scoreP.x)
                     case .reverbLateRVolm:
-                        if document.isSelect(at: p) {
-                            let noteIs = sheetView.noteIndexes(from: document.selections)
+                        if rootView.isSelect(at: p) {
+                            let noteIs = sheetView.noteIndexes(from: rootView.selections)
                             beganNotes = noteIs.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
                         } else {
                             let id = score.notes[noteI].envelope.id
@@ -503,7 +503,7 @@ final class ColorEditor: Editor {
                     playerBeatNoteIndexes = vs.map { $0.noteI }
                     
                     updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
-                } else if let ci = sheetView.contentIndex(at: sheetP, scale: document.screenToWorldScale),
+                } else if let ci = sheetView.contentIndex(at: sheetP, scale: rootView.screenToWorldScale),
                           sheetView.model.contents[ci].type.isAudio {
                     let content = sheetView.contentsView.elementViews[ci].model
                     beganVolm = content.stereo.volm
@@ -521,13 +521,13 @@ final class ColorEditor: Editor {
                 lightnessNode.path = Path([Pathline(lightnessPointsWith(splitCount: Int(maxLightnessHeight)))])
                 oldEditingLightness = beganVolm.clipped(min: minV, max: maxV, newMin: 0, newMax: 100)
                 editingLightness = oldEditingLightness
-                firstLightnessPosition = document.convertScreenToWorld(fp)
+                firstLightnessPosition = rootView.convertScreenToWorld(fp)
                 isEditingLightness = true
             }
         case .changed:
             guard let sheetView else { return }
             
-            let wp = document.convertScreenToWorld(event.screenPoint)
+            let wp = rootView.convertScreenToWorld(event.screenPoint)
             let p = lightnessNode.convertFromWorld(wp)
             let t = (p.y / maxLightnessHeight).clipped(min: 0, max: 1)
             let volm = (scoreResult?.isStereo ?? false) ?
@@ -724,7 +724,7 @@ final class ColorEditor: Editor {
             
             isEditingLightness = false
             lightnessNode.removeFromParent()
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
     
@@ -739,11 +739,11 @@ final class ColorEditor: Editor {
         }
     }
     var panWorldPosition: Point {
-        beganWorldP - .init(panWidth * beganPan / 2 * document.screenToWorldScale, 0)
+        beganWorldP - .init(panWidth * beganPan / 2 * rootView.screenToWorldScale, 0)
     }
     
     var noiseWorldPosition: Point {
-        beganWorldP - .init(panWidth * beganNoise * document.screenToWorldScale, 0)
+        beganWorldP - .init(panWidth * beganNoise * rootView.screenToWorldScale, 0)
     }
     
     let panWidth = 140.0
@@ -753,27 +753,27 @@ final class ColorEditor: Editor {
     private var beganNoise = 0.0, oldNoise = 0.0
     func changePan(with event: DragEvent) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
         
         let sp = event.screenPoint
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
-            if root.isPlaying(with: event) {
-                root.stopPlaying(with: event)
+            if rootEditor.isPlaying(with: event) {
+                rootEditor.stopPlaying(with: event)
             }
             
             beganSP = sp
-            let p = document.convertScreenToWorld(sp)
+            let p = rootView.convertScreenToWorld(sp)
             beganWorldP = p
-            if let sheetView = document.sheetView(at: p) {
+            if let sheetView = rootView.sheetView(at: p) {
                 self.sheetView = sheetView
                 
                 func updateContentsWithSelections() {
-                    let fs = document.selections
+                    let fs = rootView.selections
                         .map { $0.rect }
                         .map { sheetView.convertFromWorld($0) }
                     if !fs.isEmpty {
@@ -801,8 +801,8 @@ final class ColorEditor: Editor {
                 func updatePitsWithSelection(noteI: Int, pitI: Int?, sprolI: Int?, _ type: PitIDType) {
                     var noteAndPitIs: [Int: [Int: Set<Int>]]
                     if let sprolI {
-                        if document.isSelect(at: p) {
-                            noteAndPitIs = sheetView.noteAndPitAndSprolIs(from: document.selections)
+                        if rootView.isSelect(at: p) {
+                            noteAndPitIs = sheetView.noteAndPitAndSprolIs(from: rootView.selections)
                         } else {
                             let id = pitI != nil ? score.notes[noteI].pits[pitI!][type] : nil
                             noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) {
@@ -813,8 +813,8 @@ final class ColorEditor: Editor {
                                 }
                             }
                         }
-                    } else if document.isSelect(at: p) {
-                        let aNoteAndPitIs = sheetView.noteAndPitIndexes(from: document.selections)
+                    } else if rootView.isSelect(at: p) {
+                        let aNoteAndPitIs = sheetView.noteAndPitIndexes(from: rootView.selections)
                         noteAndPitIs = [:]
                         for (noteI, v) in aNoteAndPitIs {
                             noteAndPitIs[noteI] = v.reduce(into: [Int: Set<Int>]()) {
@@ -881,7 +881,7 @@ final class ColorEditor: Editor {
                 
                 var beganStereo: Stereo?
                 if let (noteI, result) = scoreView
-                    .hitTestColor(scoreP, scale: document.screenToWorldScale) {
+                    .hitTestColor(scoreP, scale: rootView.screenToWorldScale) {
                     
                     let note = score.notes[noteI]
                     
@@ -915,10 +915,10 @@ final class ColorEditor: Editor {
                         panNode.append(child: outlineGradientNode)
                         panNode.append(child: gradientNode)
                         panNode.append(child: colorPointNode)
-                        let attitude = Attitude(document.screenToWorldTransform)
+                        let attitude = Attitude(rootView.screenToWorldTransform)
                         panNode.attitude = attitude.with(position: noiseWorldPosition)
                         
-                        document.rootNode.append(child: panNode)
+                        rootView.node.append(child: panNode)
                     case .sprol(let pitI, let sprolI):
                         let volm = score.notes[noteI].pits[pitI].tone.spectlope.sprols[sprolI].volm
                         beganNoise = score.notes[noteI].pits[pitI].tone.spectlope.sprols[sprolI].noise
@@ -937,17 +937,17 @@ final class ColorEditor: Editor {
                         panNode.append(child: outlineGradientNode)
                         panNode.append(child: gradientNode)
                         panNode.append(child: colorPointNode)
-                        let attitude = Attitude(document.screenToWorldTransform)
+                        let attitude = Attitude(rootView.screenToWorldTransform)
                         panNode.attitude = attitude.with(position: noiseWorldPosition)
                         
-                        document.rootNode.append(child: panNode)
+                        rootView.node.append(child: panNode)
                     }
                     
                     let noteIsSet = Set(beganNotePits.values.flatMap { $0.dic.keys }).sorted()
                     let vs = score.noteIAndNormarizedPits(atBeat: beganBeat, in: noteIsSet)
                     playerBeatNoteIndexes = vs.map { $0.noteI }
                     updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
-                } else if let ci = sheetView.contentIndex(at: sheetP, scale: document.screenToWorldScale),
+                } else if let ci = sheetView.contentIndex(at: sheetP, scale: rootView.screenToWorldScale),
                           sheetView.model.contents[ci].type.isAudio {
                     let content = sheetView.contentsView.elementViews[ci].model
                     beganStereo = content.stereo
@@ -974,17 +974,17 @@ final class ColorEditor: Editor {
                     panNode.append(child: gradientNode)
                     panNode.append(child: whiteLineNode)
                     panNode.append(child: colorPointNode)
-                    let attitude = Attitude(document.screenToWorldTransform)
+                    let attitude = Attitude(rootView.screenToWorldTransform)
                     panNode.attitude = attitude.with(position: panWorldPosition)
                     
-                    document.rootNode.append(child: panNode)
+                    rootView.node.append(child: panNode)
                 }
             }
         case .changed:
             guard let sheetView else { return }
             
             if scoreResult?.isSprol ?? false {
-                let noise = (beganNoise + (sp.x - document.convertWorldToScreen(beganWorldP).x) / panWidth).clipped(min: 0, max: 1)
+                let noise = (beganNoise + (sp.x - rootView.convertWorldToScreen(beganWorldP).x) / panWidth).clipped(min: 0, max: 1)
                 let noiseScale = beganNoise == 0 ? 0 : noise / beganNoise
                 func newNoise(from otherNoise: Double) -> Double {
                     if beganNoise == otherNoise {
@@ -1020,7 +1020,7 @@ final class ColorEditor: Editor {
                     scoreView.normarizedPitResult(atBeat: beganBeat, at: $0)
                 }
             } else {
-                let oPan = beganPan + (sp.x - document.convertWorldToScreen(beganWorldP).x) / (panWidth / 2)
+                let oPan = beganPan + (sp.x - rootView.convertWorldToScreen(beganWorldP).x) / (panWidth / 2)
                 let pan: Double
                 if oldPan < 0 && oPan > 0 {
                     isSnappedPan = oPan <= 0.05
@@ -1127,17 +1127,17 @@ final class ColorEditor: Editor {
             
             colorPointNode.removeFromParent()
             panNode.removeFromParent()
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
     
     func changeLightness(with event: DragEvent) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
-        if root.isPlaying(with: event) {
-            root.stopPlaying(with: event)
+        if rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
         }
         
         if isChangeVolm {
@@ -1145,14 +1145,14 @@ final class ColorEditor: Editor {
             return
         }
         if event.phase == .began {
-            let p = document.convertScreenToWorld(event.screenPoint)
-            if let sheetView = document.sheetView(at: p) {
+            let p = rootView.convertScreenToWorld(event.screenPoint)
+            if let sheetView = rootView.sheetView(at: p) {
                 if sheetView.model.score.enabled {
                     isChangeVolm = true
                     changeVolm(with: event)
                     return
                 } else if let ci = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
-                                                          scale: document.screenToWorldScale),
+                                                          scale: rootView.screenToWorldScale),
                    sheetView.model.contents[ci].type.isAudio {
                     isChangeVolm = true
                     changeVolm(with: event)
@@ -1162,7 +1162,7 @@ final class ColorEditor: Editor {
         }
         
         func updateLightness() {
-            let wp = document.convertScreenToWorld(event.screenPoint)
+            let wp = rootView.convertScreenToWorld(event.screenPoint)
             let p = lightnessNode.convertFromWorld(wp)
             if isEditableMaxLightness {
                 let r = abs(p.y - whiteLightnessHeight)
@@ -1202,7 +1202,7 @@ final class ColorEditor: Editor {
         }
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
             updateNode()
             updateOwners(with: event)
@@ -1215,7 +1215,7 @@ final class ColorEditor: Editor {
             opacityNode.path = Path([Pathline(opacityPointsWith())])
             oldEditingLightness = firstUUColor.value.lightness
             editingLightness = oldEditingLightness
-            firstLightnessPosition = document.convertScreenToWorld(fp)
+            firstLightnessPosition = rootView.convertScreenToWorld(fp)
             editingUUColor = firstUUColor
             isEditingLightness = true
         case .changed:
@@ -1228,7 +1228,7 @@ final class ColorEditor: Editor {
             tintBorderNode.removeFromParent()
             tintNode.removeFromParent()
             
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
     
@@ -1244,8 +1244,8 @@ final class ColorEditor: Editor {
             if isEditingTint {
                 updateTintNode()
                 tintBorderNode.lineType = .color(tintLightness > 50 ? .content : .background)
-                document.rootNode.append(child: tintBorderNode)
-                document.rootNode.append(child: tintNode)
+                rootView.node.append(child: tintBorderNode)
+                rootView.node.append(child: tintNode)
                 if isDrawPoints {
                     pointNodes.forEach {
                         tintNode.append(child: $0)
@@ -1291,8 +1291,8 @@ final class ColorEditor: Editor {
         }
     }
     var tintWorldPosition: Point {
-        let sfp = document.convertWorldToScreen(beganTintPosition)
-        return document.convertScreenToWorld(sfp - oldEditingTintPosition)
+        let sfp = rootView.convertWorldToScreen(beganTintPosition)
+        return rootView.convertScreenToWorld(sfp - oldEditingTintPosition)
     }
     var isSnappedTint = true {
         didSet {
@@ -1318,11 +1318,11 @@ final class ColorEditor: Editor {
     var lastTintSnapTime: Double?
     func changeTint(with event: DragEvent) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
-        if root.isPlaying(with: event) {
-            root.stopPlaying(with: event)
+        if rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
         }
         
         if isChangePan {
@@ -1330,15 +1330,15 @@ final class ColorEditor: Editor {
             return
         }
         if event.phase == .began {
-            let p = document.convertScreenToWorld(event.screenPoint)
-            if let sheetView = document.sheetView(at: p) {
+            let p = rootView.convertScreenToWorld(event.screenPoint)
+            if let sheetView = rootView.sheetView(at: p) {
                 let sheetP = sheetView.convertFromWorld(p)
                 if sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
-                                                 scale: document.screenToWorldScale) != nil {
+                                                 scale: rootView.screenToWorldScale) != nil {
                     isChangePan = true
                     changePan(with: event)
                     return
-                } else if let ci = sheetView.contentIndex(at: sheetP, scale: document.screenToWorldScale),
+                } else if let ci = sheetView.contentIndex(at: sheetP, scale: rootView.screenToWorldScale),
                           sheetView.model.contents[ci].type.isAudio {
                     isChangePan = true
                     changePan(with: event)
@@ -1348,7 +1348,7 @@ final class ColorEditor: Editor {
         }
         
         func updateTint() {
-            let wp = document.convertScreenToWorld(event.screenPoint)
+            let wp = rootView.convertScreenToWorld(event.screenPoint)
             let p = tintNode.convertFromWorld(wp)
             let fTintP = Point()
             let r = fTintP.distance(p)
@@ -1382,7 +1382,7 @@ final class ColorEditor: Editor {
         }
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
             updateNode()
             updateOwners(with: event)
@@ -1394,7 +1394,7 @@ final class ColorEditor: Editor {
             oldEditingTintPosition = PolarPoint(firstUUColor.value.chroma,
                                               firstUUColor.value.hue).rectangular
             editingTintPosition = oldEditingTintPosition
-            beganTintPosition = document.convertScreenToWorld(fp)
+            beganTintPosition = rootView.convertScreenToWorld(fp)
             editingUUColor = firstUUColor
             isEditingTint = true
         case .changed:
@@ -1407,7 +1407,7 @@ final class ColorEditor: Editor {
             tintNode.removeFromParent()
             tintBorderNode.removeFromParent()
             
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
 }

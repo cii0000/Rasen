@@ -17,7 +17,7 @@
 
 import struct Foundation.UUID
 
-protocol TimelineView: View where Model: TempoType {
+protocol TimelineView: BindableView where Model: TempoType {
     func x(atBeat beat: Rational) -> Double
     func x(atBeat beat: Double) -> Double
     func x(atSec sec: Rational) -> Double

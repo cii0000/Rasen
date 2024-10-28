@@ -18,7 +18,7 @@
 import Dispatch
 import struct Foundation.UUID
 
-final class LineView<T: BinderProtocol>: View, @unchecked Sendable {
+final class LineView<T: BinderProtocol>: BindableView, @unchecked Sendable {
     typealias Model = Line
     typealias Binder = T
     let binder: Binder
@@ -86,7 +86,7 @@ final class LineView<T: BinderProtocol>: View, @unchecked Sendable {
 }
 typealias SheetLineView = LineView<SheetBinder>
 
-final class PlaneView<T: BinderProtocol>: View, @unchecked Sendable {
+final class PlaneView<T: BinderProtocol>: BindableView, @unchecked Sendable {
     typealias Model = Plane
     typealias Binder = T
     let binder: Binder
@@ -125,7 +125,7 @@ typealias SheetPlaneView = PlaneView<SheetBinder>
 typealias SheetTextView = TextView<SheetBinder>
 typealias SheetContentView = ContentView<SheetBinder>
 
-final class BorderView<T: BinderProtocol>: View, @unchecked Sendable {
+final class BorderView<T: BinderProtocol>: BindableView, @unchecked Sendable {
     typealias Model = Border
     typealias Binder = T
     let binder: Binder
@@ -163,7 +163,7 @@ final class BorderView<T: BinderProtocol>: View, @unchecked Sendable {
 }
 typealias SheetBorderView = BorderView<SheetBinder>
 
-final class KeyframeView: View, @unchecked Sendable {
+final class KeyframeView: BindableView, @unchecked Sendable {
     typealias Model = Keyframe
     typealias Binder = SheetBinder
     let binder: Binder
@@ -1066,7 +1066,7 @@ final class AnimationView: TimelineView, @unchecked Sendable {
 typealias SheetBinder = RecordBinder<Sheet>
 typealias SheetHistory = History<SheetUndoItem>
 
-final class SheetView: View, @unchecked Sendable {
+final class SheetView: BindableView, @unchecked Sendable {
     typealias Model = Sheet
     typealias Binder = SheetBinder
     let binder: Binder

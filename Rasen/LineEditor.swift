@@ -18,31 +18,31 @@
 import Dispatch
 
 final class RangeSelector: DragEditor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
     }
     
     private var firstP = Point(), multiFrameSlider: MultiFrameSlider?
     let snappedDistance = 4.0
     
     func send(_ event: DragEvent) {
-        let p = document.convertScreenToWorld(event.screenPoint)
+        let p = rootView.convertScreenToWorld(event.screenPoint)
         switch event.phase {
         case .began:
-            if let sheetView = document.sheetView(at: p),
+            if let sheetView = rootView.sheetView(at: p),
                sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p),
-                                                        scale: document.screenToWorldScale) {
+                                                        scale: rootView.screenToWorldScale) {
                 
-                multiFrameSlider = MultiFrameSlider(root)
+                multiFrameSlider = MultiFrameSlider(rootEditor)
                 multiFrameSlider?.send(event)
                 return
             }
             
-            document.cursor = .arrow
-            document.selections.append(Selection(rect: Rect(Edge(p, p)),
+            rootView.cursor = .arrow
+            rootView.selections.append(Selection(rect: Rect(Edge(p, p)),
                                              rectCorner: .maxXMinY))
             firstP = p
         case .changed:
@@ -50,8 +50,8 @@ final class RangeSelector: DragEditor {
                 multiFrameSlider.send(event)
                 return
             }
-//            guard firstP.distance(p) >= snappedDistance * document.screenToWorldScale else {
-//                document.selections = []
+//            guard firstP.distance(p) >= snappedDistance * rootView.screenToWorldScale else {
+//                rootView.selections = []
 //                return
 //            }
             let orientation: RectCorner
@@ -68,11 +68,11 @@ final class RangeSelector: DragEditor {
                     orientation = .minXMinY
                 }
             }
-            if document.selections.isEmpty {
-                document.selections = [Selection(rect: Rect(Edge(p, p)),
+            if rootView.selections.isEmpty {
+                rootView.selections = [Selection(rect: Rect(Edge(p, p)),
                                                  rectCorner: .maxXMinY)]
             } else {
-                document.selections[.last] = Selection(rect: Rect(Edge(firstP, p)),
+                rootView.selections[.last] = Selection(rect: Rect(Edge(firstP, p)),
                                                         rectCorner: orientation)
             }
             
@@ -81,29 +81,29 @@ final class RangeSelector: DragEditor {
                 multiFrameSlider.send(event)
                 return
             }
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
 }
 final class Unselector: InputKeyEditor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
     }
     
     func send(_ event: InputKeyEvent) {
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
-            document.closeLookingUp()
-            document.selections = []
+            rootView.closeLookingUp()
+            rootView.selections = []
         case .changed:
             break
         case .ended:
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
 }
@@ -111,8 +111,8 @@ final class Unselector: InputKeyEditor {
 final class LineDrawer: DragEditor {
     let editor: LineEditor
     
-    init(_ root: RootEditor) {
-        editor = LineEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = LineEditor(rootEditor)
     }
     
     func send(_ event: DragEvent) {
@@ -125,8 +125,8 @@ final class LineDrawer: DragEditor {
 final class StraightLineDrawer: DragEditor {
     let editor: LineEditor
     
-    init(_ root: RootEditor) {
-        editor = LineEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = LineEditor(rootEditor)
     }
     
     func send(_ event: DragEvent) {
@@ -139,8 +139,8 @@ final class StraightLineDrawer: DragEditor {
 final class LassoCutter: DragEditor {
     let editor: LineEditor
     
-    init(_ root: RootEditor) {
-        editor = LineEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = LineEditor(rootEditor)
     }
     
     func send(_ event: DragEvent) {
@@ -153,8 +153,8 @@ final class LassoCutter: DragEditor {
 final class LassoCopier: DragEditor {
     let editor: LineEditor
     
-    init(_ root: RootEditor) {
-        editor = LineEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = LineEditor(rootEditor)
     }
     
     func send(_ event: DragEvent) {
@@ -168,13 +168,13 @@ enum LassoType {
     case cut, copy, makeFaces, cutFaces, changeDraft, cutDraft
 }
 final class LineEditor: Editor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     private(set) var tempLineNode: Node?
@@ -210,7 +210,7 @@ final class LineEditor: Editor {
     var tempLine = Line()
     
     func updateNode() {
-        lassoPathNodeLineWidth = 1 * document.screenToWorldScale
+        lassoPathNodeLineWidth = 1 * rootView.screenToWorldScale
         selectingNode.children.forEach { $0.lineWidth = lassoPathNodeLineWidth }
         rectNode?.children.forEach { $0.lineWidth = lassoPathNodeLineWidth }
         updateStraightNode()
@@ -219,7 +219,7 @@ final class LineEditor: Editor {
         if let isStraightNode = isStraightNode {
             let fp = firstPoint + centerOrigin
             let lw = lassoPathNodeLineWidth
-            let wb = document.worldBounds
+            let wb = rootView.worldBounds
             let b0 = Rect(x: fp.x - lw / 2, y: wb.minY, width: lw, height: wb.height)
             let b1 = Rect(x: wb.minX, y: fp.y - lw / 2, width: wb.width, height: lw)
             let paths = [Path(b0), Path(b1)]
@@ -229,20 +229,20 @@ final class LineEditor: Editor {
         }
     }
     func updateClipBoundsAndIndexRange(at p: Point) {
-        let ip = document.intPosition(at: p)
-        let shp = document.sheetPosition(at: ip)
-        let aroundShps = document.aroundSheetpos(atCenter: ip).map { $0.shp }
+        let ip = rootView.intPosition(at: p)
+        let shp = rootView.sheetPosition(at: ip)
+        let aroundShps = rootView.aroundSheetpos(atCenter: ip).map { $0.shp }
         nearestShps = [shp] + aroundShps
         
-        let nearestB = nearestShps.reduce(into: document.sheetFrame(with: shp)) {
-            $0.formUnion(document.sheetFrame(with: $1))
+        let nearestB = nearestShps.reduce(into: rootView.sheetFrame(with: shp)) {
+            $0.formUnion(rootView.sheetFrame(with: $1))
         }
         
-        let cb = document.sheetFrame(with: shp)
+        let cb = rootView.sheetFrame(with: shp)
         centerOrigin = cb.origin
         centerBounds = Rect(origin: Point(), size: cb.size)
         
-        clipBounds = nearestB.inset(by: document.sheetLineWidth) - cb.origin
+        clipBounds = nearestB.inset(by: rootView.sheetLineWidth) - cb.origin
         centerSHP = shp
     }
     
@@ -469,7 +469,7 @@ final class LineEditor: Editor {
                       sheetLineWidth: Double,
                       _ phase: Phase) {
             let wtsScale = worldToScreenScale
-            var p = Document.roundedPoint(from: p, scale: wtsScale)
+            var p = RootView.roundedPoint(from: p, scale: wtsScale)
             let pressure = revision(pressure: pressure).rounded(decimalPlaces: 2)
             
             switch phase {
@@ -501,7 +501,7 @@ final class LineEditor: Editor {
                               time: time, position: fc.point, length: 0)]
             case .changed:
                 //
-    //            document.rootNode.append(child: Node(attitude: Attitude(position: centerOrigin + p),
+    //            rootView.node.append(child: Node(attitude: Attitude(position: centerOrigin + p),
     //                                                 path: Path(circleRadius: 0.25),
     //                                                 fillType: .color(.border)))
                 let tempLine = nLine
@@ -519,7 +519,7 @@ final class LineEditor: Editor {
                         snapDC?.point *= 0.75
                         p += nSnapDC.point * 0.75
                         
-                        p = Document.roundedPoint(from: p, scale: wtsScale)
+                        p = RootView.roundedPoint(from: p, scale: wtsScale)
                     }
                     p = clipBounds.clipped(p)
                 }
@@ -595,7 +595,7 @@ final class LineEditor: Editor {
                         times = [time, time, time, time]
                     } else {
                         //
-    //                    document.rootNode.append(child: Node(attitude: Attitude(position: centerOrigin + jc.point),
+    //                    rootView.node.append(child: Node(attitude: Attitude(position: centerOrigin + jc.point),
     //                                                         path: Path(circleRadius: 1),
     //                                                         fillType: .color(.selected)))
                         
@@ -623,7 +623,7 @@ final class LineEditor: Editor {
                     times.insert(times[times.count - 1], at: times.count - 1)
                     
                     //
-    //                document.rootNode.append(child: Node(attitude: Attitude(position: centerOrigin + prp.point),
+    //                rootView.node.append(child: Node(attitude: Attitude(position: centerOrigin + prp.point),
     //                                                     path: Path(circleRadius: 0.5),
     //                                                     fillType: .color(.selected)))
                     
@@ -758,7 +758,7 @@ final class LineEditor: Editor {
                       sheetLineWidth: Double,
                       _ phase: Phase) {
             let wtsScale = worldToScreenScale
-            var p = Document.roundedPoint(from: p, scale: wtsScale)
+            var p = RootView.roundedPoint(from: p, scale: wtsScale)
             let pressure = Self.revision(pressure: pressure).rounded(decimalPlaces: 2)
             
             switch phase {
@@ -802,7 +802,7 @@ final class LineEditor: Editor {
                         snapDC?.point *= 0.75
                         p += nSnapDC.point * 0.75
                         
-                        p = Document.roundedPoint(from: p, scale: wtsScale)
+                        p = RootView.roundedPoint(from: p, scale: wtsScale)
                     }
                     p = clipBounds.clipped(p)
                 }
@@ -980,26 +980,26 @@ final class LineEditor: Editor {
                 noteI: Int?, noteStartBeat: Rational?, notePlayer: NotePlayer?
     func drawNote(with event: DragEvent, isStraight: Bool = false) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
         switch event.phase {
         case .began:
-            if root.isPlaying(with: event) {
-                root.stopPlaying(with: event)
+            if rootEditor.isPlaying(with: event) {
+                rootEditor.stopPlaying(with: event)
             }
             
-            let p = document.convertScreenToWorld(event.screenPoint)
+            let p = rootView.convertScreenToWorld(event.screenPoint)
             if let sheetView = noteSheetView, sheetView.model.score.enabled {
                 let scoreView = sheetView.scoreView
                 let inP = sheetView.convertFromWorld(p)
                 let scoreP = scoreView.convertFromWorld(p)
-                let pitchInterval = document.currentPitchInterval
+                let pitchInterval = rootView.currentPitchInterval
                 let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
                     .clipped(min: Score.pitchRange.start, max: Score.pitchRange.end)
                 let score = scoreView.model
                 let count = score.notes.count
-                let beatInterval = document.currentBeatInterval
+                let beatInterval = rootView.currentBeatInterval
                 let beat = scoreView.beat(atX: inP.x, interval: beatInterval)
                 let beatRange = beat ..< beat
                 firstTone = isStraight ? Tone.empty() : Tone()
@@ -1030,25 +1030,25 @@ final class LineEditor: Editor {
 //                        = scoreView.node.attitude.position
 //                        + sheetView.node.attitude.position
 //                    self.tempLineNode = noteNode
-//                    document.rootNode.insert(child: noteNode,
-//                                             at: document.accessoryNodeIndex)
+//                    rootView.node.insert(child: noteNode,
+//                                             at: rootView.accessoryNodeIndex)
                 
                 let octaveNode = scoreView.octaveNode(fromPitch: pitch, scoreView.notesNode.children.last!.children[0].clone,
                                                   .subInterpolated)
                 octaveNode.attitude.position
                 = sheetView.convertToWorld(scoreView.node.attitude.position)
                 self.octaveNode = octaveNode
-                document.rootNode.append(child: octaveNode)
+                rootView.node.append(child: octaveNode)
                 
-                document.cursor = .circle(string: Pitch(value: pitch).octaveString())
+                rootView.cursor = .circle(string: Pitch(value: pitch).octaveString())
             }
         case .changed:
-            let p = document.convertScreenToWorld(event.screenPoint)
+            let p = rootView.convertScreenToWorld(event.screenPoint)
             if let sheetView = noteSheetView,
                 let nsBeat = noteStartBeat, let noteI {
                 
-                let pitchInterval = document.currentPitchInterval
-                let beatInterval = document.currentBeatInterval
+                let pitchInterval = rootView.currentPitchInterval
+                let beatInterval = rootView.currentBeatInterval
                 let scoreView = sheetView.scoreView
                 let sheetP = sheetView.convertFromWorld(p)
                 let scoreP = scoreView.convertFromWorld(p)
@@ -1077,7 +1077,7 @@ final class LineEditor: Editor {
                     oldBeat = beat
                 }
                 
-                document.cursor = .circle(string: Pitch(value: pitch)
+                rootView.cursor = .circle(string: Pitch(value: pitch)
                     .octaveString(deltaPitch: pitch - beganPitch))
             }
         case .ended:
@@ -1086,13 +1086,13 @@ final class LineEditor: Editor {
             octaveNode?.removeFromParent()
             octaveNode = nil
             
-            let p = document.convertScreenToWorld(event.screenPoint)
+            let p = rootView.convertScreenToWorld(event.screenPoint)
             if let sheetView = noteSheetView, let nsBeat = noteStartBeat, let noteI,
                !sheetView.model.score.notes.isEmpty {
                 
                 let scoreView = sheetView.scoreView
                 let sheetP = sheetView.convertFromWorld(p)
-                let interval = document.currentBeatInterval
+                let interval = rootView.currentBeatInterval
                 let beat = scoreView.beat(atX: sheetP.x, interval: interval)
                 let beatRange = beat > nsBeat ? nsBeat ..< beat : beat ..< nsBeat
                 if beatRange.length == 0 {
@@ -1107,13 +1107,13 @@ final class LineEditor: Editor {
             
             notePlayer?.stop()
             
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
     
     func removeNote(with event: DragEvent) {
-        let p = document.convertScreenToWorld(event.screenPoint)
-        if let sheetView = document.sheetView(at: p) {
+        let p = rootView.convertScreenToWorld(event.screenPoint)
+        if let sheetView = rootView.sheetView(at: p) {
             let scoreView = sheetView.scoreView
             let scoreP = scoreView.convertFromWorld(p)
             let nLine = tempLine * Transform(translation: -centerBounds.origin)
@@ -1122,13 +1122,13 @@ final class LineEditor: Editor {
                 lasso.intersects(scoreView.pointline(from: scoreView.model.notes[i])) ? i : nil
             }
             if !nis.isEmpty {
-                if root.isPlaying(with: event) {
-                    root.stopPlaying(with: event)
+                if rootEditor.isPlaying(with: event) {
+                    rootEditor.stopPlaying(with: event)
                 }
                 
-                let pitch = scoreView.pitch(atY: scoreP.y, interval: document.currentPitchInterval)
+                let pitch = scoreView.pitch(atY: scoreP.y, interval: rootView.currentPitchInterval)
                 let score = scoreView.model
-                let interval = document.currentBeatInterval
+                let interval = rootView.currentBeatInterval
                 let beat = scoreView.beat(atX: scoreP.x, interval: interval)
                 let notes: [Note] = nis.map {
                     var note = score.notes[$0]
@@ -1148,7 +1148,7 @@ final class LineEditor: Editor {
     
     func drawLine(with event: DragEvent) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
         
@@ -1156,8 +1156,8 @@ final class LineEditor: Editor {
             drawNote(with: event)
             return
         } else if event.phase == .began {
-            let p = document.convertScreenToWorld(event.screenPoint)
-            if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+            let p = rootView.convertScreenToWorld(event.screenPoint)
+            if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled {
                 isDrawNote = true
                 noteSheetView = sheetView
                 drawNote(with: event)
@@ -1165,8 +1165,8 @@ final class LineEditor: Editor {
             }
         }
         
-        if isStopPlaying || root.isPlaying(with: event) {
-            root.stopPlaying(with: event)
+        if isStopPlaying || rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
             isStopPlaying = true
             return
         }
@@ -1174,7 +1174,7 @@ final class LineEditor: Editor {
     }
     func drawStraightLine(with event: DragEvent) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
         
@@ -1182,8 +1182,8 @@ final class LineEditor: Editor {
             drawNote(with: event, isStraight: true)
             return
         } else if event.phase == .began {
-            let p = document.convertScreenToWorld(event.screenPoint)
-            if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+            let p = rootView.convertScreenToWorld(event.screenPoint)
+            if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled {
                 isDrawNote = true
                 noteSheetView = sheetView
                 drawNote(with: event, isStraight: true)
@@ -1191,8 +1191,8 @@ final class LineEditor: Editor {
             }
         }
         
-        if isStopPlaying || root.isPlaying(with: event) {
-            root.stopPlaying(with: event)
+        if isStopPlaying || rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
             isStopPlaying = true
             return
         }
@@ -1213,36 +1213,36 @@ final class LineEditor: Editor {
     var textView: SheetTextView?
     
     func drawLine(with event: DragEvent, isStraight: Bool) {
-        let p = document.convertScreenToWorld(event.screenPoint)
+        let p = rootView.convertScreenToWorld(event.screenPoint)
         switch event.phase {
         case .began:
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
             
             updateClipBoundsAndIndexRange(at: p)
             let tempLineNode = Node(attitude: Attitude(position: centerOrigin),
                                     path: Path(),
-                                    lineWidth: document.sheetLineWidth,
+                                    lineWidth: rootView.sheetLineWidth,
                                     lineType: .color(Line.defaultUUColor.value))
             self.tempLineNode = tempLineNode
-            document.rootNode.insert(child: tempLineNode,
-                                     at: document.accessoryNodeIndex)
+            rootView.node.insert(child: tempLineNode,
+                                     at: rootView.accessoryNodeIndex)
             
-            snapLines = document.sheetView(at: centerSHP)?
+            snapLines = rootView.sheetView(at: centerSHP)?
                 .model.picture.lines ?? []
             
             drawLineEvents.append(.init(p: p - centerOrigin,
                                         sp: event.screenPoint, pressure: event.pressure,
                                         time: event.time,
-                                        worldToScreenScale: document.worldToScreenScale,
-                                        screenToWorldScale: document.screenToWorldScale,
+                                        worldToScreenScale: rootView.worldToScreenScale,
+                                        screenToWorldScale: rootView.screenToWorldScale,
                                         phase: .began))
             
             if isStraight {
                 let isStraightNode = Node(fillType: .color(.subSelected))
                 self.isStraightNode = isStraightNode
-                document.rootNode.insert(child: isStraightNode,
-                                         at: document.accessoryNodeIndex + 1)
-                firstPoint = document.roundedPoint(from: p - centerOrigin)
+                rootView.node.insert(child: isStraightNode,
+                                         at: rootView.accessoryNodeIndex + 1)
+                firstPoint = rootView.roundedPoint(from: p - centerOrigin)
                 updateStraightNode()
             }
             
@@ -1278,19 +1278,19 @@ final class LineEditor: Editor {
             drawLineEvents.append(.init(p: p - centerOrigin,
                                         sp: event.screenPoint, pressure: event.pressure,
                                         time: event.time,
-                                        worldToScreenScale: document.worldToScreenScale,
-                                        screenToWorldScale: document.screenToWorldScale,
+                                        worldToScreenScale: rootView.worldToScreenScale,
+                                        screenToWorldScale: rootView.screenToWorldScale,
                                         phase: .changed))
         case .ended:
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
             
             drawLineTimer?.cancel()
             
             drawLineEvents.append(.init(p: p - centerOrigin,
                                         sp: event.screenPoint, pressure: event.pressure,
                                         time: event.time,
-                                        worldToScreenScale: document.worldToScreenScale,
-                                        screenToWorldScale: document.screenToWorldScale,
+                                        worldToScreenScale: rootView.worldToScreenScale,
+                                        screenToWorldScale: rootView.screenToWorldScale,
                                         phase: .ended))
             let tempLine = Self.line(from: drawLineEvents,
                                      firstSnapLines: snapLines,
@@ -1309,26 +1309,26 @@ final class LineEditor: Editor {
             }
             
             if centerBounds.contains(lb),
-               let sheetView = document.madeSheetView(at: centerSHP) {
+               let sheetView = rootView.madeSheetView(at: centerSHP) {
                 
                 sheetView.newUndoGroup()
                 sheetView.append(tempLine)
 //                if sheetView.isSound {
-//                    document.updateAudio()
+//                    rootView.updateAudio()
 //                }
             } else {
                 var isWorldNewUndoGroup = true
                 for shp in nearestShps {
-                    let b = document.sheetFrame(with: shp) - centerOrigin
+                    let b = rootView.sheetFrame(with: shp) - centerOrigin
                     if lb.intersects(b),
-                       let sheetView = document.madeSheetView(at: shp, isNewUndoGroup: isWorldNewUndoGroup) {
+                       let sheetView = rootView.madeSheetView(at: shp, isNewUndoGroup: isWorldNewUndoGroup) {
                         isWorldNewUndoGroup = false
                         let nLine = tempLine * Transform(translation: -b.origin)
                         if let b = sheetView.node.bounds {
                             let nLines = Sheet.clipped([nLine], in: b).filter {
                                 if let b = $0.bounds {
                                     return max(b.width, b.height)
-                                    > document.worldLineWidth * 4
+                                    > rootView.worldLineWidth * 4
                                 } else {
                                     return true
                                 }
@@ -1349,7 +1349,7 @@ final class LineEditor: Editor {
                 isStraightNode = nil
             }
             
-            document.updateSelects()
+            rootView.updateSelects()
         }
     }
     
@@ -1360,15 +1360,15 @@ final class LineEditor: Editor {
         lasso(with: event, .copy)
     }
     func lasso(with event: DragEvent, _ type: LassoType) {
-        let p = document.convertScreenToWorld(event.screenPoint)
+        let p = rootView.convertScreenToWorld(event.screenPoint)
         switch event.phase {
         case .began:
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
             
-            let isScore = document.sheetView(at: p)?.model.score.enabled ?? false
+            let isScore = rootView.sheetView(at: p)?.model.score.enabled ?? false
             
-            if !isScore && root.isPlaying(with: event) {
-                root.stopPlaying(with: event)
+            if !isScore && rootEditor.isPlaying(with: event) {
+                rootEditor.stopPlaying(with: event)
                 return
             }
             if isEditingSheet {
@@ -1376,7 +1376,7 @@ final class LineEditor: Editor {
             }
             
             let path = tempLine.path(isClosed: true, isPolygon: false)
-            lassoPathNodeLineWidth = 1 * document.screenToWorldScale
+            lassoPathNodeLineWidth = 1 * rootView.screenToWorldScale
             let lineType = Node.LineType.color(type == .copy ? .selected : .removing)
             let fillType = Node.FillType.color(type == .copy ? .subSelected : .subRemoving)
             
@@ -1388,10 +1388,10 @@ final class LineEditor: Editor {
                                  path: path, fillType: fillType)
             selectingNode.lineType = lineType
             selectingNode.fillType = fillType
-            let i = document.accessoryNodeIndex
-            document.rootNode.insert(child: lassoNode, at: i)
-            document.rootNode.insert(child: outlineLassoNode, at: i + 1)
-            document.rootNode.insert(child: selectingNode, at: i + 2)
+            let i = rootView.accessoryNodeIndex
+            rootView.node.insert(child: lassoNode, at: i)
+            rootView.node.insert(child: outlineLassoNode, at: i + 1)
+            rootView.node.insert(child: selectingNode, at: i + 2)
             self.outlineLassoNode = outlineLassoNode
             self.lassoNode = lassoNode
             
@@ -1399,7 +1399,7 @@ final class LineEditor: Editor {
                 let rectNode = Node(lineWidth: lassoPathNodeLineWidth,
                                     lineType: lineType, fillType: fillType)
                 self.rectNode = rectNode
-                document.rootNode.append(child: rectNode)
+                rootView.node.append(child: rectNode)
             }
             
             drawLineEvents.append(.init(p: p - centerOrigin,
@@ -1408,11 +1408,11 @@ final class LineEditor: Editor {
                                         time: event.time,
                                         isClip: isEditingSheet,
                                         isSnap: false,
-                                        worldToScreenScale: document.worldToScreenScale,
-                                        screenToWorldScale: document.screenToWorldScale,
+                                        worldToScreenScale: rootView.worldToScreenScale,
+                                        screenToWorldScale: rootView.screenToWorldScale,
                                         phase: .began))
             
-            snapLines = document.sheetView(at: centerSHP)?
+            snapLines = rootView.sheetView(at: centerSHP)?
                 .model.picture.lines ?? []
             
             drawLineTimer = DispatchSource.scheduledTimer(withTimeInterval: 1 / 60) { [weak self] in
@@ -1454,11 +1454,11 @@ final class LineEditor: Editor {
                                         time: event.time,
                                         isClip: isEditingSheet,
                                         isSnap: false,
-                                        worldToScreenScale: document.worldToScreenScale,
-                                        screenToWorldScale: document.screenToWorldScale,
+                                        worldToScreenScale: rootView.worldToScreenScale,
+                                        screenToWorldScale: rootView.screenToWorldScale,
                                         phase: .changed))
         case .ended:
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
             
             drawLineTimer?.cancel()
             
@@ -1468,8 +1468,8 @@ final class LineEditor: Editor {
                                         time: event.time,
                                         isClip: isEditingSheet,
                                         isSnap: false,
-                                        worldToScreenScale: document.worldToScreenScale,
-                                        screenToWorldScale: document.screenToWorldScale,
+                                        worldToScreenScale: rootView.worldToScreenScale,
+                                        screenToWorldScale: rootView.screenToWorldScale,
                                         phase: .ended))
             
             tempLine = Self.line(from: drawLineEvents,
@@ -1481,11 +1481,11 @@ final class LineEditor: Editor {
             switch type {
             case .cut:
                 if isEditingSheet {
-                    if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+                    if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled {
                         removeNote(with: event)
                     } else {
                         lassoCopy(isRemove: true, distance: lassoDistance,
-                                  at: document.roundedPoint(from: p))
+                                  at: rootView.roundedPoint(from: p))
                     }
                 } else {
                     cutSheets(at: p)
@@ -1493,7 +1493,7 @@ final class LineEditor: Editor {
             case .copy:
                 if isEditingSheet {
                     lassoCopy(isRemove: false, distance: lassoDistance,
-                              at: document.roundedPoint(from: p))
+                              at: rootView.roundedPoint(from: p))
                 } else {
                     copySheets(at: p)
                 }
@@ -1513,8 +1513,8 @@ final class LineEditor: Editor {
             outlineLassoNode = nil
             rectNode?.removeFromParent()
             
-            document.updateSelects()
-            document.updateFinding(at: p)
+            rootView.updateSelects()
+            rootView.updateFinding(at: p)
         }
     }
     
@@ -1542,7 +1542,7 @@ final class LineEditor: Editor {
             return
         }
         if centerBounds.contains(lb),
-           let sheetView = document.sheetView(at: centerSHP) {
+           let sheetView = rootView.sheetView(at: centerSHP) {
             
             let nLine = tempLine * Transform(translation: -centerBounds.origin)
             let paths = selectingTextPaths(with: nLine, with: sheetView)
@@ -1554,9 +1554,9 @@ final class LineEditor: Editor {
         } else {
             var paths = [Path]()
             for shp in nearestShps {
-                let b = document.sheetFrame(with: shp)
+                let b = rootView.sheetFrame(with: shp)
                 if lb.intersects(b),
-                   let sheetView = document.sheetView(at: shp) {
+                   let sheetView = rootView.sheetView(at: shp) {
                     
                     let nLine = tempLine * Transform(translation: -b.origin)
                     paths += selectingTextPaths(with: nLine, with: sheetView)
@@ -1580,10 +1580,10 @@ final class LineEditor: Editor {
                    selections: [Selection] = [], at p: Point) {
         guard let lb = tempLine.bounds else { return }
         if centerBounds.contains(lb),
-           let sheetView = document.sheetView(at: centerSHP) {
+           let sheetView = rootView.sheetView(at: centerSHP) {
             
             let nLine = tempLine * Transform(translation: -centerBounds.origin)
-            let d = distance  * document.screenToWorldScale
+            let d = distance  * rootView.screenToWorldScale
             if let value = sheetView.lassoErase(with: Lasso(line: nLine),
                                                 distance: d,
                                                 isSplitLine: isSplitLine,
@@ -1607,9 +1607,9 @@ final class LineEditor: Editor {
         } else {
             var value = SheetValue()
             for shp in nearestShps {
-                let b = document.sheetFrame(with: shp) - centerOrigin
+                let b = rootView.sheetFrame(with: shp) - centerOrigin
                 if lb.intersects(b),
-                   let sheetView = document.sheetView(at: shp) {
+                   let sheetView = rootView.sheetView(at: shp) {
                     
                     let nLine = tempLine
                         * Transform(translation: -b.origin)
@@ -1647,10 +1647,10 @@ final class LineEditor: Editor {
                     selections: [Selection] = [], at p: Point) -> SheetValue {
         guard let lb = tempLine.bounds else { return SheetValue() }
         if centerBounds.contains(lb),
-           let sheetView = document.sheetView(at: centerSHP) {
+           let sheetView = rootView.sheetView(at: centerSHP) {
             
             let nLine = tempLine * Transform(translation: -centerBounds.origin)
-            let d = distance * document.screenToWorldScale
+            let d = distance * rootView.screenToWorldScale
             if let value = sheetView.lassoErase(with: Lasso(line: nLine),
                                                 distance: d,
                                                   isSplitLine: isSplitLine,
@@ -1666,9 +1666,9 @@ final class LineEditor: Editor {
         } else {
             var value = SheetValue()
             for shp in nearestShps {
-                let b = document.sheetFrame(with: shp) - centerOrigin
+                let b = rootView.sheetFrame(with: shp) - centerOrigin
                 if lb.intersects(b),
-                   let sheetView = document.sheetView(at: shp) {
+                   let sheetView = rootView.sheetView(at: shp) {
                     
                     let nLine = tempLine
                         * Transform(translation: -b.origin)
@@ -1697,17 +1697,17 @@ final class LineEditor: Editor {
     }
     func values(with line: Line) -> [Value] {
         guard let rect = line.bounds else { return [] }
-        let minXMinYSHP = document.sheetPosition(at: rect.minXMinYPoint)
-        let maxXMinYSHP = document.sheetPosition(at: rect.maxXMinYPoint)
-        let minXMaxYSHP = document.sheetPosition(at: rect.minXMaxYPoint)
+        let minXMinYSHP = rootView.sheetPosition(at: rect.minXMinYPoint)
+        let maxXMinYSHP = rootView.sheetPosition(at: rect.maxXMinYPoint)
+        let minXMaxYSHP = rootView.sheetPosition(at: rect.minXMaxYPoint)
         let lx = minXMinYSHP.x, rx = maxXMinYSHP.x
         let by = minXMinYSHP.y, ty = minXMaxYSHP.y
         
         var vs = [Value]()
-        for shp in document.world.sheetIDs.keys {
+        for shp in rootView.world.sheetIDs.keys {
             if shp.x >= lx && shp.x <= rx {
                 if shp.y >= by && shp.y <= ty {
-                    let frame = document.sheetFrame(with: shp)
+                    let frame = rootView.sheetFrame(with: shp)
                     if line.lassoIntersects(frame) {
                         vs.append(Value(shp: shp, frame: frame))
                     }
@@ -1728,7 +1728,7 @@ final class LineEditor: Editor {
     func updateWithCopySheet(at dp: Point, from values: [Value]) {
         var csv = CopiedSheetsValue()
         for value in values {
-            if let sid = document.sheetID(at: value.shp) {
+            if let sid = rootView.sheetID(at: value.shp) {
                 csv.sheetIDs[value.shp] = sid
             }
         }
@@ -1739,8 +1739,8 @@ final class LineEditor: Editor {
         let values = self.values(with: tempLine)
         updateWithCopySheet(at: p, from: values)
         if !values.isEmpty {
-            document.newUndoGroup()
-            document.removeSheets(at: values.map { $0.shp })
+            rootView.newUndoGroup()
+            rootView.removeSheets(at: values.map { $0.shp })
         }
     }
     func copySheets(at p: Point) {
@@ -1750,7 +1750,7 @@ final class LineEditor: Editor {
     func changeDraft() {
         guard let lb = tempLine.bounds else { return }
         if centerBounds.contains(lb),
-           let sheetView = document.madeSheetView(at: centerSHP) {
+           let sheetView = rootView.madeSheetView(at: centerSHP) {
             
             let nLine = tempLine * Transform(translation: -centerBounds.origin)
             if let value = sheetView.lassoErase(with: Lasso(line: nLine),
@@ -1767,15 +1767,15 @@ final class LineEditor: Editor {
             }
         } else {
             for shp in nearestShps {
-                let b = document.sheetFrame(with: shp)
+                let b = rootView.sheetFrame(with: shp)
                 if b.contains(lb),
-                   let sheetView = document.sheetView(at: shp),
+                   let sheetView = rootView.sheetView(at: shp),
                    !sheetView.model.picture.isEmpty {
                     
                     sheetView.newUndoGroup()
                     sheetView.changeToDraft()
                 } else if lb.intersects(b),
-                          let sheetView = document.sheetView(at: shp) {
+                          let sheetView = rootView.sheetView(at: shp) {
                     let nLine = tempLine * Transform(translation: -b.origin)
                     
                     if let value = sheetView.lassoErase(with: Lasso(line: nLine),
@@ -1797,7 +1797,7 @@ final class LineEditor: Editor {
     func cutDraft(at p: Point) {
         guard let lb = tempLine.bounds else { return }
         if centerBounds.contains(lb),
-           let sheetView = document.madeSheetView(at: centerSHP) {
+           let sheetView = rootView.madeSheetView(at: centerSHP) {
             
             let nLine = tempLine * Transform(translation: -centerBounds.origin)
             if let value = sheetView.lassoErase(with: Lasso(line: nLine),
@@ -1810,9 +1810,9 @@ final class LineEditor: Editor {
         } else {
             var value = SheetValue()
             for shp in nearestShps {
-                let b = document.sheetFrame(with: shp)
+                let b = rootView.sheetFrame(with: shp)
                 if lb.intersects(b),
-                   let sheetView = document.sheetView(at: shp) {
+                   let sheetView = rootView.sheetView(at: shp) {
                     let nLine = tempLine * Transform(translation: -b.origin)
                     if let aValue = sheetView.lassoErase(with: Lasso(line: nLine),
                                                     isRemove: true,
@@ -1832,16 +1832,16 @@ final class LineEditor: Editor {
     func makeFaces() {
         guard let lb = tempLine.bounds else { return }
         if centerBounds.contains(lb),
-           let sheetView = document.madeSheetView(at: centerSHP) {
+           let sheetView = rootView.madeSheetView(at: centerSHP) {
             
             let nLine = tempLine * Transform(translation: -centerBounds.origin)
             let path = Path(nLine)
             sheetView.makeFaces(with: path, isSelection: true)
         } else {
             for shp in nearestShps {
-                let b = document.sheetFrame(with: shp)
+                let b = rootView.sheetFrame(with: shp)
                 if lb.intersects(b),
-                   let sheetView = document.sheetView(at: shp) {
+                   let sheetView = rootView.sheetView(at: shp) {
                     
                     let nLine = tempLine * Transform(translation: -b.origin)
                     
@@ -1854,7 +1854,7 @@ final class LineEditor: Editor {
     func cutFaces() {
         guard let lb = tempLine.bounds else { return }
         if centerBounds.contains(lb),
-           let sheetView = document.madeSheetView(at: centerSHP) {
+           let sheetView = rootView.madeSheetView(at: centerSHP) {
             
             let nLine = tempLine * Transform(translation: -centerBounds.origin)
             let path = Path(nLine)

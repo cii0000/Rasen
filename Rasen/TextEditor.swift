@@ -18,100 +18,100 @@
 import struct Foundation.UUID
 
 final class Finder: InputKeyEditor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
     }
     
     func send(_ event: InputKeyEvent) {
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
-            let p = document.convertScreenToWorld(event.screenPoint)
-            guard let sheetView = document.sheetView(at: p) else { return }
+            let p = rootView.convertScreenToWorld(event.screenPoint)
+            guard let sheetView = rootView.sheetView(at: p) else { return }
             let inP = sheetView.convertFromWorld(p)
             if let (textView, _, i, _) = sheetView.textTuple(at: inP) {
-                if document.isSelect(at: p),
-                   let selection = document.multiSelection.firstSelection(at: p) {
+                if rootView.isSelect(at: p),
+                   let selection = rootView.multiSelection.firstSelection(at: p) {
                     
                     let nSelection = textView.convertFromWorld(selection)
                     let ranges = textView.ranges(at: nSelection)
                     if let range = ranges.first {
                         let string = String(textView.model.string[range])
-                        document.selections.removeLast()
-                        document.finding = Finding(worldPosition: p,
+                        rootView.selections.removeLast()
+                        rootView.finding = Finding(worldPosition: p,
                                                    string: string)
-                        document.selections = []
+                        rootView.selections = []
                     } else {
-                        document.finding = Finding()
+                        rootView.finding = Finding()
                     }
                 } else {
                     if let range = textView.wordRange(at: i) {
                         let string = String(textView.model.string[range])
-                        document.finding = Finding(worldPosition: p,
+                        rootView.finding = Finding(worldPosition: p,
                                                    string: string)
                     }
                 }
             } else {
-                let topOwner = sheetView.sheetColorOwner(at: inP, scale: document.screenToWorldScale).value
+                let topOwner = sheetView.sheetColorOwner(at: inP, scale: rootView.screenToWorldScale).value
                 let uuColor = topOwner.uuColor
                 if uuColor != Sheet.defalutBackgroundUUColor {
                     let string = uuColor.id.uuidString
-                    document.finding = Finding(worldPosition: p,
+                    rootView.finding = Finding(worldPosition: p,
                                                string: string)
                 } else {
-                    document.finding = Finding()
+                    rootView.finding = Finding()
                 }
             }
         case .changed:
             break
         case .ended:
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
 }
 
 final class Looker: InputKeyEditor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
     }
     
     func send(_ event: InputKeyEvent) {
         switch event.phase {
         case .began:
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
-            let p = document.convertScreenToWorld(event.screenPoint)
+            let p = rootView.convertScreenToWorld(event.screenPoint)
             show(for: p)
         case .changed:
             break
         case .ended:
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
     func show(for p: Point) {
-        let d = 5 / document.worldToScreenScale
-        if !document.isEditingSheet {
-            if let sid = document.sheetID(at: document.sheetPosition(at: p)),
-               let recoder = document.sheetRecorders[sid],
+        let d = 5 / rootView.worldToScreenScale
+        if !rootView.isEditingSheet {
+            if let sid = rootView.sheetID(at: rootView.sheetPosition(at: p)),
+               let recoder = rootView.sheetRecorders[sid],
                let updateDate = recoder.directory.updateDate,
                let createdDate = recoder.directory.createdDate {
                
                 let fileSize = recoder.fileSize
                 let string = IOResult.fileSizeNameFrom(fileSize: fileSize)
-                document.show("Sheet".localized + "\n\t\("File Size".localized): \(string)" + "\n\t\("Update Date".localized): \(updateDate.defaultString)" + "\n\t\("Created Date".localized): \(createdDate.defaultString)", at: p)
+                rootView.show("Sheet".localized + "\n\t\("File Size".localized): \(string)" + "\n\t\("Update Date".localized): \(updateDate.defaultString)" + "\n\t\("Created Date".localized): \(createdDate.defaultString)", at: p)
             } else {
-                document.show("Root".localized, at: p)
+                rootView.show("Root".localized, at: p)
             }
-        } else if document.isSelect(at: p), !document.selections.isEmpty {
-            if let selection = document.multiSelection.firstSelection(at: p) {
-                if let sheetView = document.sheetView(at: p),
+        } else if rootView.isSelect(at: p), !rootView.selections.isEmpty {
+            if let selection = rootView.multiSelection.firstSelection(at: p) {
+                if let sheetView = rootView.sheetView(at: p),
                    let (textView, _, _, _) = sheetView.textTuple(at: sheetView.convertFromWorld(p)) {
                     
                     let nSelection = textView.convertFromWorld(selection)
@@ -121,7 +121,7 @@ final class Looker: InputKeyEditor {
                                        in: textView, in: sheetView)
                         
                     }
-                } else if let sheetView = document.sheetView(at: p),
+                } else if let sheetView = rootView.sheetView(at: p),
                           let (node, contentView) = sheetView.spectrogramNode(at: sheetView.convertFromWorld(p)) {
                     let nSelection = sheetView.convertFromWorld(selection)
                     let rect = node.convertFromWorld(selection.rect)
@@ -134,11 +134,11 @@ final class Looker: InputKeyEditor {
                     let maxFq = Pitch(value: maxPitchRat).fq
                     let minSec: Double = sheetView.animationView.sec(atX: nSelection.rect.minX)
                     let maxSec: Double = sheetView.animationView.sec(atX: nSelection.rect.maxX)
-                    document.show("Δ\((maxSec - minSec).string(digitsCount: 4)) sec, Δ\(Pitch(value: maxPitchRat - minPitchRat).octaveString()), (Δ\((maxFq - minFq).string(digitsCount: 1)) Hz)", at: p)
-                } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+                    rootView.show("Δ\((maxSec - minSec).string(digitsCount: 4)) sec, Δ\(Pitch(value: maxPitchRat - minPitchRat).octaveString()), (Δ\((maxFq - minFq).string(digitsCount: 1)) Hz)", at: p)
+                } else if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled {
                     let scoreView = sheetView.scoreView
                     let score = scoreView.model
-                    let nis = sheetView.noteIndexes(from: document.selections)
+                    let nis = sheetView.noteIndexes(from: rootView.selections)
                     if !nis.isEmpty {
                         let notes = nis.map { score.notes[$0] }
                         var fpr = notes[0].pitchRange
@@ -149,32 +149,32 @@ final class Looker: InputKeyEditor {
                         let endPitch = Pitch(value: fpr.end)
                         
                         let str = "\(startPitch.octaveString()) ... \(endPitch.octaveString())  (\(startPitch.fq.string(digitsCount: 1)) ... \(endPitch.fq.string(digitsCount: 1)) Hz)".localized
-                        document.show(str, at: p)
+                        rootView.show(str, at: p)
                     } else {
                         let nSelection = sheetView.convertFromWorld(selection)
                         let rect = scoreView.convertFromWorld(selection.rect)
                         let minY = rect.minY, maxY = rect.maxY
-                        let pitchInterval = document.currentPitchInterval
+                        let pitchInterval = rootView.currentPitchInterval
                         let minPitch = scoreView.pitch(atY: minY, interval: pitchInterval)
                         let minFq = Pitch(value: minPitch).fq
                         let maxPitch = scoreView.pitch(atY: maxY, interval: pitchInterval)
                         let maxFq = Pitch(value: maxPitch).fq
                         let minSec: Double = sheetView.animationView.sec(atX: nSelection.rect.minX)
                         let maxSec: Double = sheetView.animationView.sec(atX: nSelection.rect.maxX)
-                        document.show("Δ\((maxSec - minSec).string(digitsCount: 4)) sec, Δ\(Pitch(value: maxPitch - minPitch).octaveString()), (Δ\((maxFq - minFq).string(digitsCount: 1)) Hz)", at: p)
+                        rootView.show("Δ\((maxSec - minSec).string(digitsCount: 4)) sec, Δ\(Pitch(value: maxPitch - minPitch).octaveString()), (Δ\((maxFq - minFq).string(digitsCount: 1)) Hz)", at: p)
                     }
                 } else {
-                    document.show("No selection".localized, at: p)
+                    rootView.show("No selection".localized, at: p)
                 }
             }
-        } else if let (_, _) = document.worldBorder(at: p, distance: d) {
-            document.show("Border".localized, at: p)
-        } else if let (_, _, _) = document.border(at: p, distance: d) {
-            document.show("Border".localized, at: p)
-        } else if let sheetView = document.sheetView(at: p),
-                  let lineView = sheetView.lineTuple(at: sheetView.convertFromWorld(p), scale: 1 / document.worldToScreenScale)?.lineView {
-            document.show("Line".localized + "\n\t\("Length".localized):  \(lineView.model.length().string(digitsCount: 4))", at: p)
-        } else if let sheetView = document.sheetView(at: p),
+        } else if let (_, _) = rootView.worldBorder(at: p, distance: d) {
+            rootView.show("Border".localized, at: p)
+        } else if let (_, _, _) = rootView.border(at: p, distance: d) {
+            rootView.show("Border".localized, at: p)
+        } else if let sheetView = rootView.sheetView(at: p),
+                  let lineView = sheetView.lineTuple(at: sheetView.convertFromWorld(p), scale: 1 / rootView.worldToScreenScale)?.lineView {
+            rootView.show("Line".localized + "\n\t\("Length".localized):  \(lineView.model.length().string(digitsCount: 4))", at: p)
+        } else if let sheetView = rootView.sheetView(at: p),
                   let (textView, _, i, _) = sheetView.textTuple(at: sheetView.convertFromWorld(p)) {
             
             if let range = textView.wordRange(at: i) {
@@ -182,54 +182,54 @@ final class Looker: InputKeyEditor {
                 showDefinition(string: string, range: range,
                                in: textView, in: sheetView)
             } else {
-                document.show("Text".localized, at: p)
+                rootView.show("Text".localized, at: p)
             }
-        } else if let sheetView = document.sheetView(at: p),
+        } else if let sheetView = rootView.sheetView(at: p),
                   let noteI = sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
-                                                            scale: document.screenToWorldScale) {
+                                                            scale: rootView.screenToWorldScale) {
             let y = sheetView.scoreView.noteY(atX: sheetView.scoreView.convertFromWorld(p).x, at: noteI)
             let pitch = Pitch(value: sheetView.scoreView.pitch(atY: y, interval: Rational(1, 12)))
             let fq = pitch.fq
             let fqStr = "\("Note".localized) \(pitch.octaveString()) (\(fq.string(digitsCount: 2)) Hz)".localized
-            document.show(fqStr, at: p)
-        } else if let sheetView = document.sheetView(at: p),
+            rootView.show(fqStr, at: p)
+        } else if let sheetView = rootView.sheetView(at: p),
                     let ci = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
-                                                    scale: document.screenToWorldScale) {
+                                                    scale: rootView.screenToWorldScale) {
             let content = sheetView.contentsView.elementViews[ci].model
             let fileSize = content.url.fileSize ?? 0
             let string = IOResult.fileSizeNameFrom(fileSize: fileSize)
-            document.show(content.type.displayName + "\n\t\("File Size".localized): \(string)", at: p)
-        } else if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+            rootView.show(content.type.displayName + "\n\t\("File Size".localized): \(string)", at: p)
+        } else if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled {
             let scoreView = sheetView.scoreView
-            let pitchInterval = document.currentPitchInterval
+            let pitchInterval = rootView.currentPitchInterval
             let pitch = Pitch(value: scoreView.pitch(atY: scoreView.convertFromWorld(p).y, interval: pitchInterval))
             let fqStr = "\(pitch.octaveString()) (\(pitch.fq.string(digitsCount: 2)) Hz)".localized
-            let typers = scoreView.chordTypers(at: scoreView.convertFromWorld(p), scale: document.screenToWorldScale)
+            let typers = scoreView.chordTypers(at: scoreView.convertFromWorld(p), scale: rootView.screenToWorldScale)
             if !typers.isEmpty {
                 let str = typers.reduce(into: "") { $0 += (!$0.isEmpty ? " " : "") + $1.type.description }
-                document.show(fqStr + " " + str, at: p)
+                rootView.show(fqStr + " " + str, at: p)
             } else {
-                document.show(fqStr, at: p)
+                rootView.show(fqStr, at: p)
             }
-        } else if let sheetView = document.sheetView(at: p),
+        } else if let sheetView = rootView.sheetView(at: p),
                   let (node, contentView) = sheetView.spectrogramNode(at: sheetView.convertFromWorld(p)) {
             let y = node.convertFromWorld(p).y
             let pitch = contentView.spectrogramPitch(atY: y)!
             let pitchRat = Rational(pitch, intervalScale: .init(1, 12))
             let nfq = Pitch(value: pitchRat).fq
             let fqStr = "\(Pitch(value: pitchRat).octaveString()) (\(nfq.string(digitsCount: 2)) Hz)".localized
-            document.show(fqStr, at: p)
-        } else if !document.isDefaultUUColor(at: p),
-                  let sheetView = document.sheetView(at: p),
+            rootView.show(fqStr, at: p)
+        } else if !rootView.isDefaultUUColor(at: p),
+                  let sheetView = rootView.sheetView(at: p),
                   let plane = sheetView.plane(at: sheetView.convertFromWorld(p)) {
             let rgba = plane.uuColor.value.rgba
-            document.show("Face".localized + "\n\t\("Area".localized):  \(plane.topolygon.area.string(digitsCount: 4))\n\tsRGB: \(rgba.r) \(rgba.g) \(rgba.b)", at: p)
-        } else if let sheetView = document.sheetView(at: p) {
+            rootView.show("Face".localized + "\n\t\("Area".localized):  \(plane.topolygon.area.string(digitsCount: 4))\n\tsRGB: \(rgba.r) \(rgba.g) \(rgba.b)", at: p)
+        } else if let sheetView = rootView.sheetView(at: p) {
             let bounds = sheetView.model.boundsTuple(at: sheetView.convertFromWorld(p),
-                                                     in: document.sheetFrame(with: document.sheetPosition(at: p)).bounds).bounds.integral
-            document.show("Background".localized + "\n\t\("Size".localized): \(Self.sizeString(from: bounds.size))", at: p)
+                                                     in: rootView.sheetFrame(with: rootView.sheetPosition(at: p)).bounds).bounds.integral
+            rootView.show("Background".localized + "\n\t\("Size".localized): \(Self.sizeString(from: bounds.size))", at: p)
         } else {
-            document.show("Background".localized, at: p)
+            rootView.show("Background".localized, at: p)
         }
     }
     
@@ -249,7 +249,7 @@ final class Looker: InputKeyEditor {
     }
     func show(string: String, fromSize: Double, rects: [Rect], at p: Point,
               in textView: SheetTextView, in sheetView: SheetView) {
-        document.show(string,
+        rootView.show(string,
                       fromSize: fromSize,
                       rects: rects.map { sheetView.convertToWorld($0) },
                       textView.model.orientation)
@@ -277,8 +277,8 @@ final class Looker: InputKeyEditor {
 final class VerticalTextChanger: InputKeyEditor {
     let editor: TextOrientationEditor
     
-    init(_ root: RootEditor) {
-        editor = TextOrientationEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = TextOrientationEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -291,8 +291,8 @@ final class VerticalTextChanger: InputKeyEditor {
 final class HorizontalTextChanger: InputKeyEditor {
     let editor: TextOrientationEditor
     
-    init(_ root: RootEditor) {
-        editor = TextOrientationEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = TextOrientationEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -303,13 +303,13 @@ final class HorizontalTextChanger: InputKeyEditor {
     }
 }
 final class TextOrientationEditor: Editor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     func changeToVerticalText(with event: InputKeyEvent) {
@@ -322,23 +322,23 @@ final class TextOrientationEditor: Editor {
         guard isEditingSheet else {
             switch event.phase {
             case .began:
-                document.cursor = .arrow
+                rootView.cursor = .arrow
                 
-                let p = document.convertScreenToWorld(event.screenPoint)
-                var shp = document.sheetPosition(at: p)
+                let p = rootView.convertScreenToWorld(event.screenPoint)
+                var shp = rootView.sheetPosition(at: p)
                 let isRight = orientation == .horizontal
-                if let sid = document.sheetID(at: shp),
+                if let sid = rootView.sheetID(at: shp),
                    shp.isRight != isRight {
                    
                     shp.isRight = isRight
-                    document.history.newUndoGroup()
-                    document.removeSheets(at: [shp])
-                    document.append([shp: sid])
+                    rootView.history.newUndoGroup()
+                    rootView.removeSheets(at: [shp])
+                    rootView.append([shp: sid])
                 }
             case .changed:
                 break
             case .ended:
-                document.cursor = document.defaultCursor
+                rootView.cursor = rootView.defaultCursor
             }
             
             return
@@ -346,19 +346,19 @@ final class TextOrientationEditor: Editor {
         switch event.phase {
         case .began:
             defer {
-                document.updateTextCursor()
+                rootView.updateTextCursor()
             }
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
-            let p = document.convertScreenToWorld(event.screenPoint)
+            let p = rootView.convertScreenToWorld(event.screenPoint)
             
-            if document.isSelectNoneCursor(at: p), !document.multiSelection.isEmpty {
-                for (shp, _) in document.sheetViewValues {
-                    let ssFrame = document.sheetFrame(with: shp)
-                    if document.multiSelection.intersects(ssFrame),
-                       let sheetView = document.sheetView(at: shp) {
+            if rootView.isSelectNoneCursor(at: p), !rootView.multiSelection.isEmpty {
+                for (shp, _) in rootView.sheetViewValues {
+                    let ssFrame = rootView.sheetFrame(with: shp)
+                    if rootView.multiSelection.intersects(ssFrame),
+                       let sheetView = rootView.sheetView(at: shp) {
                         
-                        let ms = sheetView.convertFromWorld(document.multiSelection)
+                        let ms = sheetView.convertFromWorld(rootView.multiSelection)
                         var tivs = [IndexValue<Text>]()
                         for (i, textView) in sheetView.textsView.elementViews.enumerated() {
                             if let tb = textView.transformedBounds, ms.intersects(tb) {
@@ -374,15 +374,15 @@ final class TextOrientationEditor: Editor {
                         }
                     }
                 }
-            } else if !document.isNoneCursor {
-                root.textEditor.begin(atScreen: event.screenPoint)
+            } else if !rootView.isNoneCursor {
+                rootEditor.textEditor.begin(atScreen: event.screenPoint)
                 
-                guard let sheetView = document.sheetView(at: p) else { return }
-                if let aTextView = root.textEditor.editingTextView,
+                guard let sheetView = rootView.sheetView(at: p) else { return }
+                if let aTextView = rootEditor.textEditor.editingTextView,
                    !aTextView.isHiddenSelectedRange,
                    let i = sheetView.textsView.elementViews.firstIndex(of: aTextView) {
                     
-                    root.textEditor.endInputKey(isUnmarkText: true, isRemoveText: false)
+                    rootEditor.textEditor.endInputKey(isUnmarkText: true, isRemoveText: false)
                     let textView = aTextView
                     var text = textView.model
                     if text.orientation != orientation {
@@ -408,19 +408,19 @@ final class TextOrientationEditor: Editor {
                     }
                 } else {
                     let inP = sheetView.convertFromWorld(p)
-                    root.textEditor.appendEmptyText(screenPoint: event.screenPoint,
+                    rootEditor.textEditor.appendEmptyText(screenPoint: event.screenPoint,
                                                     at: inP,
                                                     orientation: orientation,
                                                     in: sheetView)
                 }
             }
             
-            document.updateSelects()
-            document.updateFinding(at: p)
+            rootView.updateSelects()
+            rootView.updateFinding(at: p)
         case .changed:
             break
         case .ended:
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
 }
@@ -428,8 +428,8 @@ final class TextOrientationEditor: Editor {
 final class SuperscriptChanger: InputKeyEditor {
     let editor: TextScriptEditor
     
-    init(_ root: RootEditor) {
-        editor = TextScriptEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = TextScriptEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -442,8 +442,8 @@ final class SuperscriptChanger: InputKeyEditor {
 final class SubscriptChanger: InputKeyEditor {
     let editor: TextScriptEditor
     
-    init(_ root: RootEditor) {
-        editor = TextScriptEditor(root)
+    init(_ rootEditor: RootEditor) {
+        editor = TextScriptEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -454,18 +454,18 @@ final class SubscriptChanger: InputKeyEditor {
     }
 }
 final class TextScriptEditor: Editor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
-        isEditingSheet = document.isEditingSheet
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     func changeScripst(_ isSuper: Bool, with event: InputKeyEvent) {
         guard isEditingSheet else {
-            root.keepOut(with: event)
+            rootEditor.keepOut(with: event)
             return
         }
         func moveCharacter(isSuper: Bool, from c: Character) -> Character? {
@@ -491,19 +491,19 @@ final class TextScriptEditor: Editor {
         switch event.phase {
         case .began:
             defer {
-                document.updateTextCursor()
+                rootView.updateTextCursor()
             }
-            document.cursor = .arrow
+            rootView.cursor = .arrow
             
-            let p = document.convertScreenToWorld(event.screenPoint)
+            let p = rootView.convertScreenToWorld(event.screenPoint)
             
-            if document.isSelect(at: p),
-               let selection = document.multiSelection.firstSelection(at: p) {
+            if rootView.isSelect(at: p),
+               let selection = rootView.multiSelection.firstSelection(at: p) {
                 
-                for (shp, _) in document.sheetViewValues {
-                    let ssFrame = document.sheetFrame(with: shp)
+                for (shp, _) in rootView.sheetViewValues {
+                    let ssFrame = rootView.sheetFrame(with: shp)
                     if ssFrame.intersects(selection.rect),
-                       let sheetView = document.sheetView(at: shp) {
+                       let sheetView = rootView.sheetView(at: shp) {
                         
                         var isNewUndoGroup = true
                         for (j, textView) in sheetView.textsView.elementViews.enumerated() {
@@ -537,14 +537,14 @@ final class TextScriptEditor: Editor {
                     }
                 }
             } else {
-                root.textEditor.begin(atScreen: event.screenPoint)
+                rootEditor.textEditor.begin(atScreen: event.screenPoint)
                 
-                guard let sheetView = document.sheetView(at: p) else { return }
-                if let aTextView = root.textEditor.editingTextView,
+                guard let sheetView = rootView.sheetView(at: p) else { return }
+                if let aTextView = rootEditor.textEditor.editingTextView,
                    !aTextView.isHiddenSelectedRange,
                    let ai = sheetView.textsView.elementViews.firstIndex(of: aTextView) {
                     
-                    root.textEditor.endInputKey(isUnmarkText: true, isRemoveText: true)
+                    rootEditor.textEditor.endInputKey(isUnmarkText: true, isRemoveText: true)
                     guard let ati = aTextView.selectedRange?.lowerBound,
                           ati > aTextView.model.string.startIndex else { return }
                     let textView = aTextView
@@ -569,22 +569,22 @@ final class TextScriptEditor: Editor {
                 }
             }
             
-            document.updateSelects()
-            document.updateFinding(at: p)
+            rootView.updateSelects()
+            rootView.updateFinding(at: p)
         case .changed:
             break
         case .ended:
-            document.cursor = document.defaultCursor
+            rootView.cursor = rootView.defaultCursor
         }
     }
 }
 
 final class TextEditor: Editor {
-    let root: RootEditor, document: Document
+    let rootEditor: RootEditor, rootView: RootView
     
-    init(_ root: RootEditor) {
-        self.root = root
-        document = root.document
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
     }
     
     func cancelTasks() {
@@ -592,12 +592,12 @@ final class TextEditor: Editor {
     }
     
     var editingSheetView: SheetView? {
-        get { document.editingSheetView }
-        set { document.editingSheetView = newValue }
+        get { rootView.editingSheetView }
+        set { rootView.editingSheetView = newValue }
     }
     var editingTextView: SheetTextView? {
-        get { document.editingTextView }
-        set { document.editingTextView = newValue }
+        get { rootView.editingTextView }
+        set { rootView.editingTextView = newValue }
     }
     
     var isMovedCursor = true
@@ -613,13 +613,13 @@ final class TextEditor: Editor {
                 isFirstInputKey = false
     
     func begin(atScreen sp: Point) {
-        guard document.isEditingSheet else { return }
-        let p = document.convertScreenToWorld(sp)
+        guard rootView.isEditingSheet else { return }
+        let p = rootView.convertScreenToWorld(sp)
         
-        document.textCursorNode.isHidden = true
-        document.textMaxTypelineWidthNode.isHidden = true
+        rootView.textCursorNode.isHidden = true
+        rootView.textMaxTypelineWidthNode.isHidden = true
         
-        guard let sheetView = document.madeSheetView(at: p) else { return }
+        guard let sheetView = rootView.madeSheetView(at: p) else { return }
         let inP = sheetView.convertFromWorld(p)
         if !isMovedCursor, let eTextView = editingTextView,
            sheetView.textsView.elementViews.contains(eTextView) {
@@ -648,8 +648,8 @@ final class TextEditor: Editor {
         }
     }
     func sendEnd() {
-        if root.oldInputTextKeys.isEmpty && !Cursor.isHidden {
-            document.cursor = document.defaultCursor
+        if rootEditor.oldInputTextKeys.isEmpty && !Cursor.isHidden {
+            rootView.cursor = rootView.defaultCursor
         }
     }
     func stopInputKey(isEndEdit: Bool = true) {
@@ -658,13 +658,13 @@ final class TextEditor: Editor {
         endInputKey(isUnmarkText: true, isRemoveText: true)
     }
     func beginInputKey(_ event: InputTextEvent) {
-        guard document.isEditingSheet else {
-            root.keepOut(with: event)
+        guard rootView.isEditingSheet else {
+            rootEditor.keepOut(with: event)
             return
         }
         
-        let p = document.convertScreenToWorld(event.screenPoint)
-        if !event.isRepeat, let sheetView = document.sheetView(at: p),
+        let p = rootView.convertScreenToWorld(event.screenPoint)
+        if !event.isRepeat, let sheetView = rootView.sheetView(at: p),
            sheetView.model.score.enabled,
            sheetView.scoreView.containsMainFrame(sheetView.scoreView.convertFromWorld(p)) {
             let scoreView = sheetView.scoreView
@@ -684,8 +684,8 @@ final class TextEditor: Editor {
                     lyric += key
                 }
                 if lyric != note.pits[pitI].lyric {
-                    if root.isPlaying(with: event) {
-                        root.stopPlaying(with: event)
+                    if rootEditor.isPlaying(with: event) {
+                        rootEditor.stopPlaying(with: event)
                     }
                     
                     note.replace(lyric: lyric, at: pitI, tempo: scoreView.model.tempo)
@@ -695,12 +695,12 @@ final class TextEditor: Editor {
                     sheetView.replace(note, at: noteI)
                 }
             }
-            if let (noteI, pitI) = scoreView.noteAndPitI(at: scoreP, scale: document.screenToWorldScale) {
+            if let (noteI, pitI) = scoreView.noteAndPitI(at: scoreP, scale: rootView.screenToWorldScale) {
                 appendLyric(atPit: pitI, atNote: noteI)
-            } else if let noteI = scoreView.noteIndex(at: scoreP, scale: document.screenToWorldScale) {
+            } else if let noteI = scoreView.noteIndex(at: scoreP, scale: rootView.screenToWorldScale) {
                 var pit = scoreView.splittedPit(at: scoreP, at: noteI,
-                                                beatInterval: document.currentBeatInterval,
-                                                pitchInterval: document.currentPitchInterval)
+                                                beatInterval: rootView.currentBeatInterval,
+                                                pitchInterval: rootView.currentPitchInterval)
                 pit.lyric = ""
                 let pitI = scoreView.insertablePitIndex(atBeat: pit.beat, at: noteI)
                 var note = scoreView.model.notes[noteI]
@@ -709,8 +709,8 @@ final class TextEditor: Editor {
                 sheetView.replace([IndexValue(value: note, index: noteI)])
                 appendLyric(atPit: pitI, atNote: noteI, isNewUndoGroup: false)
             } else {
-                let beat = scoreView.beat(atX: scoreP.x, interval: document.currentBeatInterval)
-                let pitch = scoreView.pitch(atY: scoreP.y, interval: document.currentPitchInterval)
+                let beat = scoreView.beat(atX: scoreP.x, interval: rootView.currentBeatInterval)
+                let pitch = scoreView.pitch(atY: scoreP.y, interval: rootView.currentPitchInterval)
                 sheetView.newUndoGroup()
                 sheetView.append(Note(beatRange: beat ..< beat + .init(1, 4), pitch: pitch, pits: [.init()]))
                 appendLyric(atPit: 0, atNote: scoreView.model.notes.count - 1, isNewUndoGroup: false)
@@ -718,32 +718,32 @@ final class TextEditor: Editor {
             return
         }
         
-        if !document.finding.isEmpty,
-           document.editingFindingSheetView == nil {
+        if !rootView.finding.isEmpty,
+           rootView.editingFindingSheetView == nil {
             let sp = event.screenPoint
-            let p = document.convertScreenToWorld(sp)
-            guard let sheetView = document.sheetView(at: p) else { return }
+            let p = rootView.convertScreenToWorld(sp)
+            guard let sheetView = rootView.sheetView(at: p) else { return }
             let inP = sheetView.convertFromWorld(p)
             
             if let (textView, _, si, _) = sheetView.textTuple(at: inP),
-                let range = textView.model.string.ranges(of: document.finding.string)
+                let range = textView.model.string.ranges(of: rootView.finding.string)
                 .first(where: { $0.contains(si) }) {
                 
-                document.isEditingFinding = true
-                document.editingFindingSheetView = sheetView
-                document.editingFindingTextView = textView
-                document.editingFindingRange
+                rootView.isEditingFinding = true
+                rootView.editingFindingSheetView = sheetView
+                rootView.editingFindingTextView = textView
+                rootView.editingFindingRange
                 = textView.model.string.intRange(from: range)
                 let str = textView.model.string
                 var nstr = str
                 nstr.removeSubrange(range)
-                document.editingFindingOldString = str
-                document.editingFindingOldRemovedString = nstr
+                rootView.editingFindingOldString = str
+                rootView.editingFindingOldRemovedString = nstr
             }
         }
         
-        document.textCursorNode.isHidden = true
-        document.textMaxTypelineWidthNode.isHidden = true
+        rootView.textCursorNode.isHidden = true
+        rootView.textMaxTypelineWidthNode.isHidden = true
         
         if !isMovedCursor,
            let eSheetView = editingSheetView,
@@ -753,8 +753,8 @@ final class TextEditor: Editor {
             inputKey(with: event, in: eTextView, in: eSheetView)
         } else {
             let sp = event.screenPoint
-            let p = document.convertScreenToWorld(sp)
-            guard let sheetView = document.madeSheetView(at: p) else { return }
+            let p = rootView.convertScreenToWorld(sp)
+            guard let sheetView = rootView.madeSheetView(at: p) else { return }
             let inP = sheetView.convertFromWorld(p)
             if let (textView, _, _, sri) = sheetView.textTuple(at: inP) {
                 if isMovedCursor {
@@ -776,7 +776,7 @@ final class TextEditor: Editor {
                          orientation: Orientation = .horizontal,
                          in sheetView: SheetView) {
         let text = Text(string: "", orientation: orientation,
-                        size: document.sheetTextSize, origin: inP,
+                        size: rootView.sheetTextSize, origin: inP,
                         locale: TextInputContext.currentLocale)
         sheetView.newUndoGroup()
         sheetView.append(text)
@@ -802,7 +802,7 @@ final class TextEditor: Editor {
                          orientation: Orientation = .horizontal,
                          in sheetView: SheetView) {
         let text = Text(string: "", orientation: orientation,
-                        size: document.sheetTextSize, origin: inP,
+                        size: rootView.sheetTextSize, origin: inP,
                         locale: TextInputContext.currentLocale)
         sheetView.newUndoGroup()
         sheetView.append(text)
@@ -834,9 +834,9 @@ final class TextEditor: Editor {
                 Cursor.isHidden = false
             }
             
-            document.updateSelects()
+            rootView.updateSelects()
             if let oldEditingSheetView = oldEditingSheetView {
-                document.updateFinding(from: oldEditingSheetView)
+                rootView.updateFinding(from: oldEditingSheetView)
             }
         }
     }
@@ -852,9 +852,9 @@ final class TextEditor: Editor {
                 removeText(in: editingTextView, in: sheetView)
             }
             
-            document.updateSelects()
+            rootView.updateSelects()
             if let editingSheetView = editingSheetView {
-                document.updateFinding(from: editingSheetView)
+                rootView.updateFinding(from: editingSheetView)
             }
         }
     }
@@ -937,23 +937,23 @@ final class TextEditor: Editor {
     }
     func moveEndInputKey(isStopFromMarkedText: Bool = false) {
         func updateFinding() {
-            if !document.finding.isEmpty {
+            if !rootView.finding.isEmpty {
                 if let sheetView = editingSheetView,
                    let textView = editingTextView,
-                   sheetView == document.editingFindingSheetView
-                    && textView == document.editingFindingTextView,
-                   let oldString = document.editingFindingOldString,
-                   let oldRemovedString = document.editingFindingOldRemovedString {
+                   sheetView == rootView.editingFindingSheetView
+                    && textView == rootView.editingFindingTextView,
+                   let oldString = rootView.editingFindingOldString,
+                   let oldRemovedString = rootView.editingFindingOldRemovedString {
                     let substring = oldRemovedString
                         .difference(to: textView.model.string)?.subString ?? ""
-                    if substring != document.finding.string {
-                        document.replaceFinding(from: substring,
+                    if substring != rootView.finding.string {
+                        rootView.replaceFinding(from: substring,
                                                 oldString: oldString,
                                                 oldTextView: textView)
                     }
                 }
                 
-                document.isEditingFinding = false
+                rootView.isEditingFinding = false
             }
         }
         if let editingTextView = editingTextView,
@@ -1042,13 +1042,13 @@ final class TextEditor: Editor {
                 editingSheetView = nil
                 editingTextView = nil
             }
-            document.updateSelects()
-            document.updateFinding(from: sheetView)
+            rootView.updateSelects()
+            rootView.updateFinding(from: sheetView)
         }
     }
     
     func cut(from selection: Selection, at p: Point) {
-        guard let sheetView = document.madeSheetView(at: p) else { return }
+        guard let sheetView = rootView.madeSheetView(at: p) else { return }
         let inP = sheetView.convertFromWorld(p)
         guard let (textView, ti, _, _) = sheetView.textTuple(at: inP) else { return }
         
@@ -1127,12 +1127,12 @@ final class TextEditor: Editor {
         guard textView.model.string != oldString else {
             if isUpdateCursor {
                 let osp = textView.convertToWorld(p)
-                let sp = document.convertWorldToScreen(osp)
-                if sp != document.cursorPoint {
+                let sp = rootView.convertWorldToScreen(osp)
+                if sp != rootView.cursorPoint {
                     textView.node.moveCursor(to: sp)
-                    document.isUpdateWithCursorPosition = false
-                    document.cursorPoint = sp
-                    document.isUpdateWithCursorPosition = true
+                    rootView.isUpdateWithCursorPosition = false
+                    rootView.cursorPoint = sp
+                    rootView.isUpdateWithCursorPosition = true
                 }
             }
             return
@@ -1140,26 +1140,26 @@ final class TextEditor: Editor {
         
         if isUpdateCursor {
             let osp = textView.convertToWorld(p)
-            let sp = document.convertWorldToScreen(osp)
+            let sp = rootView.convertWorldToScreen(osp)
             textView.node.moveCursor(to: sp)
-            document.isUpdateWithCursorPosition = false
-            document.cursorPoint = sp
-            document.isUpdateWithCursorPosition = true
+            rootView.isUpdateWithCursorPosition = false
+            rootView.cursorPoint = sp
+            rootView.isUpdateWithCursorPosition = true
         }
         
-        document.updateSelects()
-        document.updateFinding(from: sheetView)
+        rootView.updateSelects()
+        rootView.updateFinding(from: sheetView)
     }
     
     func characterIndex(for point: Point) -> String.Index? {
         guard let textView = editingTextView else { return nil }
-        let sp = document.convertScreenToWorld(point)
+        let sp = rootView.convertScreenToWorld(point)
         let p = textView.convertFromWorld(sp)
         return textView.characterIndex(for: p)
     }
     func characterRatio(for point: Point) -> Double? {
         guard let textView = editingTextView else { return nil }
-        let sp = document.convertScreenToWorld(point)
+        let sp = rootView.convertScreenToWorld(point)
         let p = textView.convertFromWorld(sp)
         return textView.characterRatio(for: p)
     }
@@ -1167,19 +1167,19 @@ final class TextEditor: Editor {
         guard let textView = editingTextView else { return nil }
         let p = textView.characterPosition(at: i)
         let sp = textView.convertToWorld(p)
-        return document.convertWorldToScreen(sp)
+        return rootView.convertWorldToScreen(sp)
     }
     func characterBasePosition(at i: String.Index) -> Point? {
         guard let textView = editingTextView else { return nil }
         let p = textView.characterBasePosition(at: i)
         let sp = textView.convertToWorld(p)
-        return document.convertWorldToScreen(sp)
+        return rootView.convertWorldToScreen(sp)
     }
     func characterBounds(at i: String.Index) -> Rect? {
         guard let textView = editingTextView,
               let rect = textView.characterBounds(at: i) else { return nil }
         let sRect = textView.convertToWorld(rect)
-        return document.convertWorldToScreen(sRect)
+        return rootView.convertWorldToScreen(sRect)
     }
     func baselineDelta(at i: String.Index) -> Double? {
         guard let textView = editingTextView else { return nil }
@@ -1189,7 +1189,7 @@ final class TextEditor: Editor {
         guard let textView = editingTextView,
               let rect = textView.firstRect(for: range) else { return nil }
         let sRect = textView.convertToWorld(rect)
-        return document.convertWorldToScreen(sRect)
+        return rootView.convertWorldToScreen(sRect)
     }
     
     func unmark() {
@@ -1231,7 +1231,7 @@ final class TextEditor: Editor {
             inputType = .insert
         }
         
-        if root.modifierKeys == .shift {
+        if rootEditor.modifierKeys == .shift {
             if let textView = editingTextView {
                 let d = textView.selectedLineLocation
                 let count = (d / textView.model.size)
@@ -1268,7 +1268,7 @@ final class TextEditor: Editor {
             inputType = .remove
         }
         
-        if root.modifierKeys == .shift {
+        if rootEditor.modifierKeys == .shift {
             if let textView = editingTextView {
                 if textView.binder[keyPath: textView.keyPath]
                     .widthCount != Typobute.defaultWidthCount {
@@ -1307,9 +1307,9 @@ final class TextEditor: Editor {
         }
         guard let deleteRange = textView.selectedRange else { return }
         
-        if !document.selectedFrames.isEmpty {
-            if textView.delete(from: document.selections) {
-                document.selections = []
+        if !rootView.selectedFrames.isEmpty {
+            if textView.delete(from: rootView.selections) {
+                rootView.selections = []
                 return
             }
         }
@@ -1332,9 +1332,9 @@ final class TextEditor: Editor {
         }
         guard let deleteRange = textView.selectedRange else { return }
         
-        if !document.selectedFrames.isEmpty {
-            if textView.delete(from: document.selections) {
-                document.selections = []
+        if !rootView.selectedFrames.isEmpty {
+            if textView.delete(from: rootView.selections) {
+                rootView.selections = []
                 return
             }
         }
