@@ -216,7 +216,7 @@ final class RootEditor: Editor {
         case .selectByRange: RangeSelector(self)
         case .changeLightness: LightnessChanger(self)
         case .changeTint: TintChanger(self)
-        case .slide: Slider(self)
+        case .slide: MoveEditor(self)
         case .selectFrame: FrameSelecter(self)
             
         case .moveLinePoint, .fnMoveLinePoint: LineSlider(self)
@@ -1025,6 +1025,110 @@ final class FaceEditor: Editor {
         case .changed:
             break
         case .ended:
+            document.cursor = document.defaultCursor
+        }
+    }
+}
+
+final class ScoreAdder: InputKeyEditor {
+    let root: RootEditor, document: Document
+    let isEditingSheet: Bool
+    
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
+        isEditingSheet = document.isEditingSheet
+    }
+    
+    func send(_ event: InputKeyEvent) {
+        guard isEditingSheet else {
+            root.keepOut(with: event)
+            return
+        }
+        if root.isPlaying(with: event) {
+            root.stopPlaying(with: event)
+        }
+        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+            ?? event.screenPoint
+        let p = document.convertScreenToWorld(sp)
+        switch event.phase {
+        case .began:
+            document.cursor = .arrow
+            
+            if let sheetView = document.madeSheetView(at: p) {
+                let inP = sheetView.convertFromWorld(p)
+                let option = ScoreOption(tempo: sheetView.nearestTempo(at: inP) ?? Music.defaultTempo,
+                                         enabled: true)
+                
+                sheetView.newUndoGroup()
+                sheetView.set(option)
+                
+                root.updateEditorNode()
+                document.updateSelects()
+            }
+        case .changed:
+            break
+        case .ended:
+            document.cursor = document.defaultCursor
+        }
+    }
+}
+
+final class ToneShower: InputKeyEditor {
+    let root: RootEditor, document: Document
+    let isEditingSheet: Bool
+    
+    init(_ root: RootEditor) {
+        self.root = root
+        document = root.document
+        isEditingSheet = document.isEditingSheet
+    }
+    
+    func send(_ event: InputKeyEvent) {
+        guard isEditingSheet else {
+            root.keepOut(with: event)
+            return
+        }
+        if root.isPlaying(with: event) {
+            root.stopPlaying(with: event)
+        }
+        let sp = document.lastEditedSheetScreenCenterPositionNoneCursor
+            ?? event.screenPoint
+        let p = document.convertScreenToWorld(sp)
+        switch event.phase {
+        case .began:
+            document.cursor = .arrow
+            
+            if let sheetView = document.sheetView(at: p), sheetView.model.score.enabled {
+                if document.isSelectSelectedNoneCursor(at: p), !document.isSelectedText {
+                    let scoreView = sheetView.scoreView
+                    let toneIs = sheetView.noteIndexes(from: document.selections).filter {
+                        !scoreView.model.notes[$0].isShownTone
+                    }
+                    if !toneIs.isEmpty {
+                        sheetView.newUndoGroup()
+                        sheetView.setIsShownTones(toneIs.map { .init(value: true, index: $0) })
+                    }
+                } else {
+                    let inP = sheetView.scoreView.convertFromWorld(p)
+                    if let (noteI, _) = sheetView.scoreView.noteAndPitIEnabledNote(at: inP, scale: document.screenToWorldScale) {
+                        
+                        let oldToneIs = sheetView.scoreView.model.notes.enumerated().compactMap {
+                            $0.element.isShownTone && noteI != $0.offset ? $0.offset : nil
+                        }
+                        let toneIVs: [IndexValue<Bool>] = oldToneIs.map { .init(value: false, index: $0) }
+                        + (!sheetView.scoreView.model.notes[noteI].isShownTone ? [.init(value: true, index: noteI)] : [])
+                        if !toneIVs.isEmpty {
+                            sheetView.newUndoGroup()
+                            sheetView.setIsShownTones(toneIVs)
+                        }
+                    }
+                }
+            }
+        case .changed:
+            break
+        case .ended:
+            
             document.cursor = document.defaultCursor
         }
     }
