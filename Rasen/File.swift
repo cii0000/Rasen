@@ -230,7 +230,7 @@ extension Directory {
     }
     func resetWrite() {}
     
-    func makeRecord<T: Codable & Serializable>(forKey key: String) -> Record<T> {
+    func makeRecord<T: Codable & Serializable>(forKey key: String, isLoadOnly: Bool = false) -> Record<T> {
         if let child = children[key] {
             switch child {
             case .file(let file):
@@ -238,12 +238,14 @@ extension Directory {
                     return record
                 }
             case .directory(let directory):
-                try? remove(directory)
+                if !isLoadOnly {
+                    try? remove(directory)
+                }
             }
         }
         let url = self.url.appendingPathComponent(key)
         let record = Record<T>(url: url)
-        if childrenURLs[key] == nil {
+        if childrenURLs[key] == nil && !isLoadOnly {
             record.isWillwrite = true
         }
         record.parent = self
@@ -251,18 +253,20 @@ extension Directory {
         children[key] = .file(record)
         return record
     }
-    func makeDirectory(forKey key: String) -> Directory {
+    func makeDirectory(forKey key: String, isLoadOnly: Bool = false) -> Directory {
         if let child = children[key] {
             switch child {
             case .file(let file):
-                try? remove(file)
+                if !isLoadOnly {
+                    try? remove(file)
+                }
             case .directory(let directory):
                 return directory
             }
         }
         let url = self.url.appendingPathComponent(key)
         let directory = Directory(url: url)
-        if childrenURLs[key] == nil {
+        if childrenURLs[key] == nil && !isLoadOnly {
             directory.isWillwrite = true
         }
         directory.parent = self

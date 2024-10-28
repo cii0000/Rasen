@@ -99,7 +99,7 @@ final class Looker: InputKeyEditor {
         let d = 5 / rootView.worldToScreenScale
         if !rootView.isEditingSheet {
             if let sid = rootView.sheetID(at: rootView.sheetPosition(at: p)),
-               let recoder = rootView.sheetRecorders[sid],
+               let recoder = rootView.model.sheetRecorders[sid],
                let updateDate = recoder.directory.updateDate,
                let createdDate = recoder.directory.createdDate {
                

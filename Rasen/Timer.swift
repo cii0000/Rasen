@@ -23,7 +23,7 @@ extension Duration {
     }
 }
 
-final class OneshotTimer {
+final class OneshotTimer: @unchecked Sendable {
     private(set) var workItem: DispatchWorkItem?
     private var cancelClosure: (() -> ())?
     func start(afterTime: Double,

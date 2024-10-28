@@ -580,7 +580,7 @@ extension RootView {
                 sheetView.clearHistory()
                 clearContents(from: sheetView)
             } else {
-                removeUndo(at: shp)
+                removeSheetHistory(at: shp)
             }
             progressHandler(Double(j + 1) / Double(shps.count), &isStop)
             if isStop { break }
@@ -703,7 +703,7 @@ final class HistoryCleaner: InputKeyEditor {
                             sheetView.clearHistory()
                             rootView.clearContents(from: sheetView)
                         } else {
-                            rootView.removeUndo(at: shp)
+                            rootView.removeSheetHistory(at: shp)
                         }
                         
                         end()

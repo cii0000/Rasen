@@ -15,6 +15,9 @@
 // You should have received a copy of the GNU General Public License
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
+import Dispatch
+import struct Foundation.UUID
+import struct Foundation.Data
 import struct Foundation.URL
 
 typealias Camera = Attitude
@@ -123,7 +126,7 @@ extension Finding: Protobuf {
 }
 extension Finding: Codable {}
 
-private struct Road {
+struct Road {
     var shp0: IntPoint, shp1: IntPoint
 }
 extension Road {
@@ -426,9 +429,9 @@ extension World {
 
 typealias WorldHistory = History<WorldUndoItem>
 
-typealias Root = Document
+typealias Document = Root
 
-final class Document {
+final class Root: @unchecked Sendable {
     enum FileType: FileTypeProtocol, CaseIterable {
         case sksdoc
         case skshdoc
@@ -473,9 +476,216 @@ final class Document {
         }
     }
     
+    struct SheetRecorder: @unchecked Sendable {
+        let sheetID: SheetID
+        let directory: Directory
+        
+        static let sheetKey = "sheet.pb"
+        let sheetRecord: Record<Sheet>
+        
+        static let sheetHistoryKey = "sheet_h.pb"
+        let sheetHistoryRecord: Record<SheetHistory>
+        
+        static let contentsDirectoryKey = "contents"
+        let contentsDirectory: Directory
+        
+        static let thumbnail4Key = "t4.jpg"
+        let thumbnail4Record: Record<Thumbnail>
+        static let thumbnail16Key = "t16.jpg"
+        let thumbnail16Record: Record<Thumbnail>
+        static let thumbnail64Key = "t64.jpg"
+        let thumbnail64Record: Record<Thumbnail>
+        static let thumbnail256Key = "t256.jpg"
+        let thumbnail256Record: Record<Thumbnail>
+        static let thumbnail1024Key = "t1024.jpg"
+        let thumbnail1024Record: Record<Thumbnail>
+        
+        static let stringKey = "string.txt"
+        let stringRecord: Record<String>
+        
+        var fileSize: Int {
+            var size = 0
+            size += sheetRecord.size ?? 0
+            size += sheetHistoryRecord.size ?? 0
+            size += thumbnail4Record.size ?? 0
+            size += thumbnail16Record.size ?? 0
+            size += thumbnail64Record.size ?? 0
+            size += thumbnail256Record.size ?? 0
+            size += thumbnail1024Record.size ?? 0
+            size += contentsDirectory.size ?? 0
+            size += stringRecord.size ?? 0
+            return size
+        }
+        var fileSizeWithoutHistory: Int {
+            var size = 0
+            size += sheetRecord.size ?? 0
+            size += thumbnail4Record.size ?? 0
+            size += thumbnail16Record.size ?? 0
+            size += thumbnail64Record.size ?? 0
+            size += thumbnail256Record.size ?? 0
+            size += thumbnail1024Record.size ?? 0
+            size += contentsDirectory.size ?? 0
+            size += stringRecord.size ?? 0
+            return size
+        }
+        
+        init(_ directory: Directory, _ sid: SheetID, isLoadOnly: Bool = false) {
+            self.sheetID = sid
+            self.directory = directory
+            sheetRecord = directory.makeRecord(forKey: Self.sheetKey, isLoadOnly: isLoadOnly)
+            sheetHistoryRecord = directory.makeRecord(forKey: Self.sheetHistoryKey, isLoadOnly: isLoadOnly)
+            contentsDirectory = directory.makeDirectory(forKey: Self.contentsDirectoryKey, isLoadOnly: isLoadOnly)
+            thumbnail4Record = directory.makeRecord(forKey: Self.thumbnail4Key, isLoadOnly: isLoadOnly)
+            thumbnail16Record = directory.makeRecord(forKey: Self.thumbnail16Key, isLoadOnly: isLoadOnly)
+            thumbnail64Record = directory.makeRecord(forKey: Self.thumbnail64Key, isLoadOnly: isLoadOnly)
+            thumbnail256Record = directory.makeRecord(forKey: Self.thumbnail256Key, isLoadOnly: isLoadOnly)
+            thumbnail1024Record = directory.makeRecord(forKey: Self.thumbnail1024Key, isLoadOnly: isLoadOnly)
+            stringRecord = directory.makeRecord(forKey: Self.stringKey, isLoadOnly: isLoadOnly)
+        }
+    }
+    
     var url: URL
     
-    init(_ url: URL) {
+    let rootDirectory: Directory
+    
+    static let worldRecordKey = "world.pb"
+    let worldRecord: Record<World>
+    
+    static let worldHistoryRecordKey = "world_h.pb"
+    let worldHistoryRecord: Record<WorldHistory>
+    
+    static let selectionsRecordKey = "selections.pb"
+    var selectionsRecord: Record<[Selection]>
+    
+    static let findingRecordKey = "finding.pb"
+    var findingRecord: Record<Finding>
+    
+    static let cameraRecordKey = "camera.pb"
+    var cameraRecord: Record<Camera>
+    
+    static let sheetsDirectoryKey = "sheets"
+    let sheetsDirectory: Directory
+    
+    private(set) var sheetRecorders: [SheetID: SheetRecorder]
+    
+    init(_ url: URL, isLoadOnly: Bool = false) {
         self.url = url
+        
+        rootDirectory = .init(url: url)
+        
+        worldRecord = rootDirectory.makeRecord(forKey: Self.worldRecordKey, isLoadOnly: isLoadOnly)
+        worldHistoryRecord = rootDirectory.makeRecord(forKey: Self.worldHistoryRecordKey, isLoadOnly: isLoadOnly)
+        selectionsRecord = rootDirectory.makeRecord(forKey: Self.selectionsRecordKey, isLoadOnly: isLoadOnly)
+        findingRecord = rootDirectory.makeRecord(forKey: Self.findingRecordKey, isLoadOnly: isLoadOnly)
+        cameraRecord = rootDirectory.makeRecord(forKey: Self.cameraRecordKey, isLoadOnly: isLoadOnly)
+        sheetsDirectory = rootDirectory.makeDirectory(forKey: Self.sheetsDirectoryKey, isLoadOnly: isLoadOnly)
+        sheetRecorders = Self.sheetRecorders(from: sheetsDirectory, isLoadOnly: isLoadOnly)
     }
+    static func sheetID(forKey key: String) -> SheetID? { SheetID(uuidString: key) }
+    static func sheetIDKey(at sid: SheetID) -> String { sid.uuidString }
+    private static func sheetRecorders(from sheetsDirectory: Directory,
+                                       isLoadOnly: Bool = false) -> [SheetID: SheetRecorder] {
+        var srrs = [SheetID: SheetRecorder]()
+        srrs.reserveCapacity(sheetsDirectory.childrenURLs.count)
+        for (key, _) in sheetsDirectory.childrenURLs {
+            guard let sid = sheetID(forKey: key) else { continue }
+            let directory = sheetsDirectory.makeDirectory(forKey: sheetIDKey(at: sid), isLoadOnly: isLoadOnly)
+            srrs[sid] = SheetRecorder(directory, sid, isLoadOnly: isLoadOnly)
+        }
+        return srrs
+    }
+    
+    func write() throws {
+        rootDirectory.prepareToWriteAll()
+        do {
+            try rootDirectory.writeAll()
+            rootDirectory.resetWriteAll()
+        } catch {
+            rootDirectory.resetWriteAll()
+            throw error
+        }
+    }
+    
+    func world() -> World {
+        worldRecord.decodedValue ?? .init()
+    }
+    func history() -> WorldHistory {
+        worldHistoryRecord.decodedValue ?? .init()
+    }
+    func selections() -> [Selection] {
+        selectionsRecord.decodedValue ?? []
+    }
+    func finding() -> Finding {
+        findingRecord.decodedValue ?? .init()
+    }
+    func camera() -> Camera {
+        cameraRecord.decodedValue ?? Self.defaultCamera
+    }
+    
+    func baseThumbnailBlocks() -> [SheetID: Texture.Block] {
+        var baseThumbnailBlocks = [SheetID: Texture.Block]()
+        sheetRecorders.forEach {
+            guard let data = $0.value.thumbnail4Record.decodedData else { return }
+            if let block = try? Texture.block(from: data) {
+                baseThumbnailBlocks[$0.key] = block
+            } else if let image = Image(size: Size(width: 4, height: 4),
+                                        color: .init(red: 1.0, green: 0, blue: 0)) {
+                $0.value.thumbnail4Record.value = image
+                $0.value.thumbnail4Record.isWillwrite = true
+                baseThumbnailBlocks[$0.key] = try? Texture.block(from: image)
+            } else {
+                baseThumbnailBlocks[$0.key] = nil
+            }
+        }
+        return baseThumbnailBlocks
+    }
+    
+    enum ThumbnailType: Int {
+        case w4 = 4, w16 = 16, w64 = 64, w256 = 256, w1024 = 1024
+    }
+    func thumbnailRecord(at sid: SheetID,
+                         with type: ThumbnailType) -> Record<Thumbnail>? {
+        switch type {
+        case .w4: sheetRecorders[sid]?.thumbnail4Record
+        case .w16: sheetRecorders[sid]?.thumbnail16Record
+        case .w64: sheetRecorders[sid]?.thumbnail64Record
+        case .w256: sheetRecorders[sid]?.thumbnail256Record
+        case .w1024: sheetRecorders[sid]?.thumbnail1024Record
+        }
+    }
+    
+    func sheet(at sid: SheetID) -> Sheet? {
+        sheetRecorders[sid]?.sheetRecord.decodedValue
+    }
+    func sheetHistory(at sid: SheetID) -> SheetHistory? {
+        sheetRecorders[sid]?.sheetHistoryRecord.decodedValue
+    }
+    
+    func makeSheetRecorder(at sid: SheetID) -> SheetRecorder {
+        let sheetRecoder = SheetRecorder(sheetsDirectory.makeDirectory(forKey: Self.sheetIDKey(at: sid)), sid)
+        sheetRecorders[sid] = sheetRecoder
+        return sheetRecoder
+    }
+    func removeSheetRecoder(at sid: SheetID) throws {
+        if let sheetRecoder = sheetRecorders[sid] {
+            sheetRecorders[sid] = nil
+            try sheetsDirectory.remove(sheetRecoder.directory)
+        }
+    }
+    func remove(_ srr: SheetRecorder) throws {
+        sheetRecorders[srr.sheetID] = nil
+        try sheetsDirectory.remove(srr.directory)
+    }
+    func removeSheetHistory(at sid: SheetID) throws {
+        if let srr = sheetRecorders[sid] {
+            try srr.directory.remove(srr.sheetHistoryRecord)
+        }
+    }
+    func contains(at sid: SheetID) -> Bool {
+        sheetsDirectory.childrenURLs[Self.sheetIDKey(at: sid)] != nil
+    }
+}
+extension Document {
+    static let defaultCamera = Camera(position: Sheet.defaultBounds.centerPoint,
+                                      scale: Size(width: 1.25, height: 1.25))
 }

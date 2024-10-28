@@ -2561,7 +2561,7 @@ final class CopyEditor: Editor {
             let nnp = content.origin * scale + sheetP
             
             if !sheetView.contentsView.model.contains(where: { $0.isEqualFile(content) }) {
-                if let directory = rootView.sheetRecorders[sheetView.id]?.contentsDirectory {
+                if let directory = rootView.model.sheetRecorders[sheetView.id]?.contentsDirectory {
                     directory.isWillwrite = true
                     try? directory.write()
                     try? directory.copy(name: content.name, from: content.url)
@@ -2597,7 +2597,7 @@ final class CopyEditor: Editor {
             let sheetP = sheetView.convertFromWorld(p)
             
             let name = UUID().uuidString + ".tiff"
-            if let directory = rootView.sheetRecorders[sheetView.id]?.contentsDirectory {
+            if let directory = rootView.model.sheetRecorders[sheetView.id]?.contentsDirectory {
                 directory.isWillwrite = true
                 try? directory.write()
                 try? directory.write(image, .tiff, name: name)

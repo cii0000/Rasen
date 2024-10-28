@@ -281,11 +281,12 @@ final class IOEditor: Editor {
         var mshp = shp
         var onSHPs = [Sheetpos](), willremoveSHPs = [Sheetpos]()
         for url in urls {
-            let importedDocument = RootView(url: url)
+            let importedDocument = Document(url, isLoadOnly: true)
+            let world = importedDocument.world()
             
             var maxX = mshp.x
             for (osid, _) in importedDocument.sheetRecorders {
-                guard let oshp = importedDocument.sheetPosition(at: osid) else {
+                guard let oshp = world.sheetPositions[osid] else {
                     continue
                 }
                 let nshp = oshp + mshp
@@ -346,7 +347,7 @@ final class IOEditor: Editor {
                     let filename = url.deletingPathExtension().lastPathComponent
                     let name = UUID().uuidString + "." + url.pathExtension
                     
-                    if let directory = rootView.sheetRecorders[sheetView.id]?.contentsDirectory {
+                    if let directory = rootView.model.sheetRecorders[sheetView.id]?.contentsDirectory {
                         directory.isWillwrite = true
                         try? directory.write()
                         try? directory.copy(name: name, from: url)
@@ -480,11 +481,12 @@ final class IOEditor: Editor {
         var nSIDs = [Sheetpos: SheetID](), willremoveSHPs = [Sheetpos]()
         var resetSIDs = Set<SheetID>()
         for url in urls {
-            let importedDocument = RootView(url: url)
+            let importedDocument = Document(url, isLoadOnly: true)
+            let world = importedDocument.world()
             
             var maxX = mshp.x
             for (osid, osrr) in importedDocument.sheetRecorders {
-                guard let oshp = importedDocument.sheetPosition(at: osid) else {
+                guard let oshp = world.sheetPositions[osid] else {
                     let nsid = rootView.appendSheet(from: osrr)
                     resetSIDs.insert(nsid)
                     continue
@@ -742,12 +744,12 @@ final class IOEditor: Editor {
         
         let colorSpace = ColorSpace.export
         
-        let renderings: [Rendering], documentRecorders: [RootView.SheetRecorder]
+        let renderings: [Rendering], documentRecorders: [Document.SheetRecorder]
         switch type {
         case .image, .image4K, .pdf:
             renderings = nvs.map {
                 if let sid = rootView.sheetID(at: $0.shp),
-                   let sheetRecord = rootView.sheetRecorders[sid]?.sheetRecord {
+                   let sheetRecord = rootView.model.sheetRecorders[sid]?.sheetRecord {
                     
                     .init(mainItem: .init(sheet: sheetRecord.value, data: sheetRecord.data, url: sheetRecord.url,
                                           frame: rootView.sheetFrame(with: $0.shp)),
@@ -767,7 +769,7 @@ final class IOEditor: Editor {
                 var shp = $0.shp
                 shp.y -= 1
                 while let sid = self.rootView.sheetID(at: shp),
-                      let sheetRecord = rootView.sheetRecorders[sid]?.sheetRecord {
+                      let sheetRecord = rootView.model.sheetRecorders[sid]?.sheetRecord {
                     
                     if !filledShps.contains(shp) {
                         filledShps.insert(shp)
@@ -783,7 +785,7 @@ final class IOEditor: Editor {
                 shp = $0.shp
                 shp.y += 1
                 while let sid = self.rootView.sheetID(at: shp),
-                      let sheetRecord = rootView.sheetRecorders[sid]?.sheetRecord {
+                      let sheetRecord = rootView.model.sheetRecorders[sid]?.sheetRecord {
                     
                     if !filledShps.contains(shp) {
                         filledShps.insert(shp)
@@ -797,7 +799,7 @@ final class IOEditor: Editor {
                 }
                 
                 return if let sid = rootView.sheetID(at: $0.shp),
-                   let sheetRecord = rootView.sheetRecorders[sid]?.sheetRecord {
+                          let sheetRecord = rootView.model.sheetRecorders[sid]?.sheetRecord {
                     .init(mainItem: .init(sheet: sheetRecord.value, data: sheetRecord.data, url: sheetRecord.url,
                                           frame: rootView.sheetFrame(with: $0.shp)),
                           bottomItems: bottomItems, topItems: topItems,
@@ -816,7 +818,7 @@ final class IOEditor: Editor {
             }
             let csv = CopiedSheetsValue(deltaPoint: Point(), sheetIDs: sids)
             renderings = []
-            documentRecorders = csv.sheetIDs.compactMap { rootView.sheetRecorders[$0.value] }
+            documentRecorders = csv.sheetIDs.compactMap { rootView.model.sheetRecorders[$0.value] }
         }
         
         let fileSize: @Sendable () -> (Int?) = {
@@ -1473,17 +1475,19 @@ final class IOEditor: Editor {
             let csv = CopiedSheetsValue(deltaPoint: Point(), sheetIDs: sids)
             
             var isStop = false
-            let nDocument = RootView(url: ioResult.url)
+            let nDocument = Document(ioResult.url)
+            var world = World()
             for (i, v) in csv.sheetIDs.enumerated() {
                 let (shp, osid) = v
-                guard let osrr = rootView.sheetRecorders[osid] else { continue }
+                guard let osrr = rootView.model.sheetRecorders[osid] else { continue }
                 let nsid = SheetID()
                 let nsrr = nDocument.makeSheetRecorder(at: nsid)
-                if let oldSID = nDocument.world.sheetIDs[shp] {
-                    nDocument.world.sheetPositions[oldSID] = nil
+                
+                if let oldSID = world.sheetIDs[shp] {
+                    world.sheetPositions[oldSID] = nil
                 }
-                nDocument.world.sheetIDs[shp] = nsid
-                nDocument.world.sheetPositions[nsid] = shp
+                world.sheetIDs[shp] = nsid
+                world.sheetPositions[nsid] = shp
                 
                 nsrr.sheetRecord.data = osrr.sheetRecord.decodedData
                 nsrr.thumbnail4Record.data = osrr.thumbnail4Record.decodedData
@@ -1501,8 +1505,7 @@ final class IOEditor: Editor {
                 nsrr.stringRecord.isWillwrite = true
                 
                 if isHistory {
-                    nsrr.sheetHistoryRecord.data
-                        = osrr.sheetHistoryRecord.decodedData
+                    nsrr.sheetHistoryRecord.data = osrr.sheetHistoryRecord.decodedData
                     nsrr.sheetHistoryRecord.isWillwrite = true
                 }
                 
@@ -1526,8 +1529,11 @@ final class IOEditor: Editor {
                 progressHandler(Double(i + 1) / Double(csv.sheetIDs.count + 1), &isStop)
                 if isStop { break }
             }
-            nDocument.camera = rootView.camera
-            nDocument.syncSave()
+            nDocument.worldRecord.data = try? world.serializedData()
+            nDocument.worldRecord.isWillwrite = true
+            nDocument.cameraRecord.data = try? rootView.camera.serializedData()
+            nDocument.cameraRecord.isWillwrite = true
+            try nDocument.write()
             
             try ioResult.setAttributes()
         }

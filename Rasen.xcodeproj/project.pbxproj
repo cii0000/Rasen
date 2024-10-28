@@ -72,7 +72,7 @@
 		23C8C6D525E21CCB009FEA85 /* Typeline.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23C8C6D425E21CCB009FEA85 /* Typeline.swift */; };
 		23D0D3EC2CCEA126006631C4 /* MoveEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23D0D3EB2CCEA11E006631C4 /* MoveEditor.swift */; };
 		23D0D3EE2CCEA537006631C4 /* TextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23D0D3ED2CCEA531006631C4 /* TextView.swift */; };
-		23D0D3F02CCF214F006631C4 /* Document.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23D0D3EF2CCF214A006631C4 /* Document.swift */; };
+		23D0D3F02CCF214F006631C4 /* Root.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23D0D3EF2CCF214A006631C4 /* Root.swift */; };
 		23D75E0125F0AA5900583878 /* Double2x2.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23D75E0025F0AA5900583878 /* Double2x2.swift */; };
 		23D9971523A627D4006CBDD7 /* Object.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23D9971423A627D4006CBDD7 /* Object.swift */; };
 		23DBF642256F3BE500343022 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23DBF641256F3BE500343022 /* App.swift */; };
@@ -159,7 +159,7 @@
 		23C8C6D425E21CCB009FEA85 /* Typeline.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Typeline.swift; sourceTree = "<group>"; };
 		23D0D3EB2CCEA11E006631C4 /* MoveEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoveEditor.swift; sourceTree = "<group>"; };
 		23D0D3ED2CCEA531006631C4 /* TextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextView.swift; sourceTree = "<group>"; };
-		23D0D3EF2CCF214A006631C4 /* Document.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Document.swift; sourceTree = "<group>"; };
+		23D0D3EF2CCF214A006631C4 /* Root.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Root.swift; sourceTree = "<group>"; };
 		23D75E0025F0AA5900583878 /* Double2x2.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Double2x2.swift; sourceTree = "<group>"; };
 		23D9971423A627D4006CBDD7 /* Object.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Object.swift; sourceTree = "<group>"; };
 		23DBF641256F3BE500343022 /* App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
@@ -232,6 +232,8 @@
 				23D0D3EB2CCEA11E006631C4 /* MoveEditor.swift */,
 				2399F01526E11B81005CD031 /* AnimationEditor.swift */,
 				23E2B2A7241490000028F44E /* RunEditor.swift */,
+				23A728A0216CF266000A7350 /* Action.swift */,
+				23A728A9216CF268000A7350 /* Event.swift */,
 				23A728A2216CF266000A7350 /* View.swift */,
 				23A728B1216CF269000A7350 /* RootView.swift */,
 				2346B2A626ECC124008AA04C /* SheetView.swift */,
@@ -239,14 +241,12 @@
 				236195A32B7C7EBB00CF0B2F /* ScoreView.swift */,
 				236195A52B7C7EC500CF0B2F /* ContentView.swift */,
 				23A728A7216CF267000A7350 /* Node.swift */,
-				23D0D3EF2CCF214A006631C4 /* Document.swift */,
+				23D0D3EF2CCF214A006631C4 /* Root.swift */,
 				236855F22295106000958469 /* Sheet.swift */,
 				23D9971423A627D4006CBDD7 /* Object.swift */,
 				234E31752426EED900D8B0AE /* ObjectEx0.swift */,
 				23FB0F82258E5A740096AD23 /* ObjectEx1.swift */,
 				23F9FC0C2590922500662CD0 /* ObjectEx2.swift */,
-				23A728A0216CF266000A7350 /* Action.swift */,
-				23A728A9216CF268000A7350 /* Event.swift */,
 				23A728A8216CF268000A7350 /* File.swift */,
 				234ED98722AB80D30012B057 /* History.swift */,
 				237AEFA52214285E004EE702 /* Picture.swift */,
@@ -409,7 +409,7 @@
 				23A728BB216CF269000A7350 /* Real.swift in Sources */,
 				23A728C2216CF26A000A7350 /* Precedence.swift in Sources */,
 				239A799B22D99A9800876D43 /* TextEditor.swift in Sources */,
-				23D0D3F02CCF214F006631C4 /* Document.swift in Sources */,
+				23D0D3F02CCF214F006631C4 /* Root.swift in Sources */,
 				234F2A522382798A00107A1D /* UndoEditor.swift in Sources */,
 				23A728CF216CF26A000A7350 /* Interpolation.swift in Sources */,
 				23A728DC216CF26A000A7350 /* RootView.swift in Sources */,

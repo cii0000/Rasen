@@ -34,67 +34,37 @@ final class RootView: View, @unchecked Sendable {
     init(url: URL) {
         model = .init(url)
         
-        rootDirectory = Directory(url: url)
-        
-        worldRecord = rootDirectory.makeRecord(forKey: RootView.worldRecordKey)
-        world = worldRecord.decodedValue ?? World()
-        
-        worldHistoryRecord = rootDirectory.makeRecord(forKey: RootView.worldHistoryRecordKey)
-        history = worldHistoryRecord.decodedValue ?? WorldHistory()
-        
-        selectionsRecord = rootDirectory.makeRecord(forKey: RootView.selectionsRecordKey)
-        selections = selectionsRecord.decodedValue ?? []
-        
-        findingRecord = rootDirectory.makeRecord(forKey: RootView.findingRecordKey)
-        finding = findingRecord.decodedValue ?? Finding()
-        
-        cameraRecord = rootDirectory.makeRecord(forKey: RootView.cameraRecordKey)
-        let camera = cameraRecord.decodedValue ?? RootView.defaultCamera
-        self.camera = RootView.clippedCamera(from: camera)
-        
-        sheetsDirectory = rootDirectory.makeDirectory(forKey: RootView.sheetsDirectoryKey)
-        sheetRecorders = RootView.sheetRecorders(from: sheetsDirectory)
-        
-        var baseThumbnailBlocks = [SheetID: Texture.Block]()
-        sheetRecorders.forEach {
-            guard let data = $0.value.thumbnail4Record.decodedData else { return }
-            if let block = try? Texture.block(from: data) {
-                baseThumbnailBlocks[$0.key] = block
-            } else if let image = Image(size: Size(width: 4, height: 4),
-                                        color: .init(red: 1.0, green: 0, blue: 0)) {
-                $0.value.thumbnail4Record.value = image
-                $0.value.thumbnail4Record.isWillwrite = true
-                baseThumbnailBlocks[$0.key] = try? Texture.block(from: image)
-            } else {
-                baseThumbnailBlocks[$0.key] = nil
-            }
-        }
-        self.baseThumbnailBlocks = baseThumbnailBlocks
+        world = model.world()
+        history = model.history()
+        selections = model.selections()
+        finding = model.finding()
+        camera = Self.clippedCamera(from: model.camera())
+        baseThumbnailBlocks = model.baseThumbnailBlocks()
         
         node.children = [sheetsNode, gridNode, mapNode, currentMapNode]
         
-        rootDirectory.changedIsWillwriteByChildrenClosure = { [weak self] (_, isWillwrite) in
+        model.rootDirectory.changedIsWillwriteByChildrenClosure = { [weak self] (_, isWillwrite) in
             if isWillwrite {
                 self?.updateAutosavingTimer()
             }
         }
-        cameraRecord.willwriteClosure = { [weak self] (record) in
+        model.cameraRecord.willwriteClosure = { [weak self] (record) in
             guard let self else { return }
             record.value = self.camera
         }
-        selectionsRecord.willwriteClosure = { [weak self] (record) in
+        model.selectionsRecord.willwriteClosure = { [weak self] (record) in
             guard let self else { return }
             record.value = self.selections
         }
-        findingRecord.willwriteClosure = { [weak self] (record) in
+        model.findingRecord.willwriteClosure = { [weak self] (record) in
             guard let self else { return }
             record.value = self.finding
         }
-        worldRecord.willwriteClosure = { [weak self] (record) in
+        model.worldRecord.willwriteClosure = { [weak self] (record) in
             guard let self else { return }
             record.value = self.world
-            self.worldHistoryRecord.value = self.history
-            self.worldHistoryRecord.isPreparedWrite = true
+            self.model.worldHistoryRecord.value = self.history
+            self.model.worldHistoryRecord.isPreparedWrite = true
         }
         
         if camera.rotation != 0 {
@@ -112,8 +82,6 @@ final class RootView: View, @unchecked Sendable {
     }
     
     func cancelTasks() {
-        autosavingTimer.cancel()
-        
         sheetViewValues.forEach {
             $0.value.task?.cancel()
         }
@@ -138,21 +106,21 @@ final class RootView: View, @unchecked Sendable {
     private var savingItem: DispatchWorkItem?
     private var savingFuncs = [() -> ()]()
     private func asyncSave() {
-        rootDirectory.prepareToWriteAll()
+        model.rootDirectory.prepareToWriteAll()
         if let item = savingItem {
             item.wait()
         }
         
-        let item = DispatchWorkItem(flags: .barrier) { [weak self] in
+        let item = DispatchWorkItem(flags: .barrier) { @Sendable [weak self] in
             do {
-                try self?.rootDirectory.writeAll()
+                try self?.model.rootDirectory.writeAll()
             } catch {
                 DispatchQueue.main.async { [weak self] in
                     self?.node.show(error)
                 }
             }
             DispatchQueue.main.async { [weak self] in
-                self?.rootDirectory.resetWriteAll()
+                self?.model.rootDirectory.resetWriteAll()
                 self?.savingItem = nil
                 
                 self?.savingFuncs.forEach { $0() }
@@ -167,18 +135,16 @@ final class RootView: View, @unchecked Sendable {
             autosavingTimer.cancel()
             autosavingTimer = OneshotTimer()
             
-            rootDirectory.prepareToWriteAll()
             do {
-                try rootDirectory.writeAll()
+                try model.write()
             } catch {
                 Task { @MainActor in
                     node.show(error)
                 }
             }
-            rootDirectory.resetWriteAll()
         }
     }
-    @MainActor func endSave(completionHandler: @escaping (RootView?) -> ()) {
+    @MainActor func endSave(completionHandler: @MainActor @escaping (RootView?) -> ()) {
         let progressPanel = ProgressPanel(message: "Saving".localized,
                                           isCancel : false,
                                           isIndeterminate: true)
@@ -191,17 +157,17 @@ final class RootView: View, @unchecked Sendable {
         if autosavingTimer.isWait {
             autosavingTimer.cancel()
             autosavingTimer = OneshotTimer()
-            rootDirectory.prepareToWriteAll()
-            let workItem = DispatchWorkItem(flags: .barrier) { [weak self] in
+            model.rootDirectory.prepareToWriteAll()
+            let workItem = DispatchWorkItem(flags: .barrier) { @Sendable [weak self] in
                 do {
-                    try self?.rootDirectory.writeAll()
+                    try self?.model.rootDirectory.writeAll()
                 } catch {
-                    DispatchQueue.main.async { [weak self] in
+                    DispatchQueue.main.async { @MainActor [weak self] in
                         self?.node.show(error)
                     }
                 }
-                DispatchQueue.main.async { [weak self] in
-                    self?.rootDirectory.resetWriteAll()
+                DispatchQueue.main.async { @MainActor [weak self] in
+                    self?.model.rootDirectory.resetWriteAll()
                     timer.cancel()
                     progressPanel.close()
                     completionHandler(self)
@@ -209,7 +175,7 @@ final class RootView: View, @unchecked Sendable {
             }
             queue.async(execute: workItem)
         } else if let workItem = savingItem {
-            workItem.notify(queue: .main) { [weak self] in
+            workItem.notify(queue: .main) { @MainActor [weak self] in
                 timer.cancel()
                 progressPanel.close()
                 completionHandler(self)
@@ -219,31 +185,13 @@ final class RootView: View, @unchecked Sendable {
             progressPanel.close()
             completionHandler(self)
         }
+        
+        autosavingTimer.cancel()
     }
-    
-    let rootDirectory: Directory
-    
-    static let worldRecordKey = "world.pb"
-    let worldRecord: Record<World>
-    
-    static let worldHistoryRecordKey = "world_h.pb"
-    let worldHistoryRecord: Record<WorldHistory>
-    
-    static let selectionsRecordKey = "selections.pb"
-    var selectionsRecord: Record<[Selection]>
-    
-    static let findingRecordKey = "finding.pb"
-    var findingRecord: Record<Finding>
-    
-    static let cameraRecordKey = "camera.pb"
-    var cameraRecord: Record<Camera>
-    
-    static let sheetsDirectoryKey = "sheets"
-    let sheetsDirectory: Directory
     
     var world = World() {
         didSet {
-            worldRecord.isWillwrite = true
+            model.worldRecord.isWillwrite = true
         }
     }
     var history = WorldHistory()
@@ -429,7 +377,7 @@ final class RootView: View, @unchecked Sendable {
     }
     func restoreDatabase() throws {
         var resetSIDs = Set<SheetID>()
-        for sid in sheetRecorders.keys {
+        for sid in model.sheetRecorders.keys {
             if world.sheetPositions[sid] == nil {
                 resetSIDs.insert(sid)
             }
@@ -480,9 +428,9 @@ final class RootView: View, @unchecked Sendable {
     }
     
     func resetAllThumbnails(_ handler: (String) -> (Bool)) {
-        for (i, v) in sheetRecorders.enumerated() {
+        for (i, v) in model.sheetRecorders.enumerated() {
             let (sheetID, sheetRecorder) = v
-            guard handler("\(i) / \(sheetRecorders.count - 1)") else { return }
+            guard handler("\(i) / \(model.sheetRecorders.count - 1)") else { return }
             autoreleasepool {
                 let record = sheetRecorder.sheetRecord
                 guard let sheet = record.decodedValue,
@@ -501,9 +449,9 @@ final class RootView: View, @unchecked Sendable {
         }
     }
     func resetAllSheets(_ handler: (String) -> (Bool)) {
-        for (i, v) in sheetRecorders.enumerated() {
+        for (i, v) in model.sheetRecorders.enumerated() {
             let (_, sheetRecorder) = v
-            guard handler("\(i) / \(sheetRecorders.count - 1)") else { return }
+            guard handler("\(i) / \(model.sheetRecorders.count - 1)") else { return }
             autoreleasepool {
                 let record = sheetRecorder.sheetRecord
                 guard let sheet = record.decodedValue else { return }
@@ -514,9 +462,9 @@ final class RootView: View, @unchecked Sendable {
         }
     }
     func resetAllAnimationSheets(_ handler: (String) -> (Bool)) {
-        for (i, v) in sheetRecorders.enumerated() {
+        for (i, v) in model.sheetRecorders.enumerated() {
             let (_, sheetRecorder) = v
-            guard handler("\(i) / \(sheetRecorders.count - 1)") else { return }
+            guard handler("\(i) / \(model.sheetRecorders.count - 1)") else { return }
             autoreleasepool {
                 let record = sheetRecorder.sheetRecord
                 guard let sheet = record.decodedValue else { return }
@@ -529,9 +477,9 @@ final class RootView: View, @unchecked Sendable {
         }
     }
     func resetAllMusicSheets(_ handler: (String) -> (Bool)) {
-        for (i, v) in sheetRecorders.enumerated() {
+        for (i, v) in model.sheetRecorders.enumerated() {
             let (_, sheetRecorder) = v
-            guard handler("\(i) / \(sheetRecorders.count - 1)") else { return }
+            guard handler("\(i) / \(model.sheetRecorders.count - 1)") else { return }
             autoreleasepool {
                 let record = sheetRecorder.sheetRecord
                 guard let sheet = record.decodedValue else { return }
@@ -544,9 +492,9 @@ final class RootView: View, @unchecked Sendable {
         }
     }
     func resetAllStrings(_ handler: (String) -> (Bool)) {
-        for (i, v) in sheetRecorders.enumerated() {
+        for (i, v) in model.sheetRecorders.enumerated() {
             let (_, sheetRecorder) = v
-            guard handler("\(i) / \(sheetRecorders.count - 1)") else { return }
+            guard handler("\(i) / \(model.sheetRecorders.count - 1)") else { return }
             autoreleasepool {
                 let record = sheetRecorder.sheetRecord
                 guard let sheet = record.decodedValue else { return }
@@ -560,8 +508,8 @@ final class RootView: View, @unchecked Sendable {
     func clearHistory(progressHandler: (Double, inout Bool) -> ()) {
         syncSave()
         
-        var resetSRRs = [SheetID: SheetRecorder]()
-        for (sid, srr) in sheetRecorders {
+        var resetSRRs = [SheetID: Model.SheetRecorder]()
+        for (sid, srr) in model.sheetRecorders {
             if world.sheetPositions[sid] == nil {
                 resetSRRs[sid] = srr
             }
@@ -569,20 +517,19 @@ final class RootView: View, @unchecked Sendable {
         var isStop = false
         if !resetSRRs.isEmpty {
             for (i, v) in resetSRRs.enumerated() {
-                remove(v.value)
-                sheetRecorders[v.key] = nil
+                try? model.remove(v.value)
                 progressHandler(Double(i + 1) / Double(resetSRRs.count), &isStop)
                 if isStop { break }
             }
         }
         
         history.reset()
-        worldHistoryRecord.value = history
-        worldHistoryRecord.isWillwrite = true
+        model.worldHistoryRecord.value = history
+        model.worldHistoryRecord.isWillwrite = true
     }
     
     func clearContents(from sheetView: SheetView) {
-        if let directory = sheetRecorders[sheetView.id]?.contentsDirectory {
+        if let directory = model.sheetRecorders[sheetView.id]?.contentsDirectory {
             let nUrls = Set(sheetView.model.contents.map { $0.url })
             directory.childrenURLs.filter { !nUrls.contains($0.value) }.forEach {
                 try? directory.remove(from: $0.value, key: $0.key)
@@ -649,8 +596,8 @@ final class RootView: View, @unchecked Sendable {
     var cameraNotifications = [((RootView, Camera) -> ())]()
     var camera = defaultCamera {
         didSet {
+            model.cameraRecord.isWillwrite = true
             updateTransformsWithCamera()
-            cameraRecord.isWillwrite = true
             cameraNotifications.forEach { $0(self, camera) }
         }
     }
@@ -789,7 +736,7 @@ final class RootView: View, @unchecked Sendable {
     
     var selections = [Selection]() {
         didSet {
-            selectionsRecord.isWillwrite = true
+            model.selectionsRecord.isWillwrite = true
             updateWithSelections(oldValue: oldValue)
         }
     }
@@ -1150,7 +1097,7 @@ final class RootView: View, @unchecked Sendable {
     
     var finding = Finding() {
         didSet {
-            findingRecord.isWillwrite = true
+            model.findingRecord.isWillwrite = true
             updateWithFinding()
         }
     }
@@ -1194,7 +1141,7 @@ final class RootView: View, @unchecked Sendable {
         let isSelected = isSelect(at: finding.worldPosition)
         var findingChildNodes = [Node]()
         var findingChildrenNodeDic = [Sheetpos: Node]()
-        for sr in sheetRecorders {
+        for sr in model.sheetRecorders {
             guard let shp = sheetPosition(at: sr.key) else { continue }
             if isSelected && !isSelect(at: sheetFrame(with: shp)) { continue }
             let string = sheetViewValues[shp]?.sheetView?.model.allTextsString
@@ -1398,16 +1345,16 @@ final class RootView: View, @unchecked Sendable {
         var recordCount = 0
         for (shp, _) in findingChildNodeDic {
             if sheetViewValues[shp]?.sheetView == nil,
-               let sid = sheetID(at: shp),
-               sheetRecorders[sid] != nil {
+                let sid = sheetID(at: shp), model.sheetRecorders[sid] != nil {
+                
                 recordCount += 1
             }
         }
         if recordCount > 0 {
             for (shp, _) in findingChildNodeDic {
                 if sheetViewValues[shp]?.sheetView != nil,
-                   let sid = sheetID(at: shp),
-                   sheetRecorders[sid] != nil {
+                   let sid = sheetID(at: shp), model.sheetRecorders[sid] != nil {
+                    
                     recordCount += 1
                 }
             }
@@ -1433,7 +1380,7 @@ final class RootView: View, @unchecked Sendable {
                             if let sheetView = self.sheetViewValues[shp]?.sheetView {
                                 _ = make(sheetView)
                             } else if let sid = self.sheetID(at: shp),
-                                      let sheetRecorder = self.sheetRecorders[sid] {
+                                      let sheetRecorder = self.model.sheetRecorders[sid] {
                                 let record = sheetRecorder.sheetRecord
                                 guard let sheet = record.decodedValue else { return }
                                 
@@ -1779,16 +1726,12 @@ final class RootView: View, @unchecked Sendable {
         }
     }
     
-    enum ThumbnailType: Int {
-        case w4 = 4, w16 = 16, w64 = 64, w256 = 256, w1024 = 1024
-    }
     let thumbnail4Scale = 2.0 ** -8
     let thumbnail16Scale = 2.0 ** -6
     let thumbnail64Scale = 2.0 ** -4
     let thumbnail256Scale = 2.0 ** -2
     let thumbnail1024Scale = 2.0 ** 0
-    var thumbnailType = ThumbnailType.w4
-    func thumbnailType(withScale scale: Double) -> ThumbnailType {
+    func thumbnailType(withScale scale: Double) -> Model.ThumbnailType {
         if scale < thumbnail4Scale {
             .w4
         } else if scale < thumbnail16Scale {
@@ -1801,132 +1744,28 @@ final class RootView: View, @unchecked Sendable {
             .w1024
         }
     }
+    var thumbnailType = Model.ThumbnailType.w4
     
-    struct SheetRecorder: @unchecked Sendable {
-        let directory: Directory
-        
-        static let sheetKey = "sheet.pb"
-        let sheetRecord: Record<Sheet>
-        
-        static let sheetHistoryKey = "sheet_h.pb"
-        let sheetHistoryRecord: Record<SheetHistory>
-        
-        static let contentsDirectoryKey = "contents"
-        let contentsDirectory: Directory
-        
-        static let thumbnail4Key = "t4.jpg"
-        let thumbnail4Record: Record<Thumbnail>
-        static let thumbnail16Key = "t16.jpg"
-        let thumbnail16Record: Record<Thumbnail>
-        static let thumbnail64Key = "t64.jpg"
-        let thumbnail64Record: Record<Thumbnail>
-        static let thumbnail256Key = "t256.jpg"
-        let thumbnail256Record: Record<Thumbnail>
-        static let thumbnail1024Key = "t1024.jpg"
-        let thumbnail1024Record: Record<Thumbnail>
-        
-        static let stringKey = "string.txt"
-        let stringRecord: Record<String>
-        
-        var fileSize: Int {
-            var size = 0
-            size += sheetRecord.size ?? 0
-            size += sheetHistoryRecord.size ?? 0
-            size += thumbnail4Record.size ?? 0
-            size += thumbnail16Record.size ?? 0
-            size += thumbnail64Record.size ?? 0
-            size += thumbnail256Record.size ?? 0
-            size += thumbnail1024Record.size ?? 0
-            size += contentsDirectory.size ?? 0
-            size += stringRecord.size ?? 0
-            return size
-        }
-        var fileSizeWithoutHistory: Int {
-            var size = 0
-            size += sheetRecord.size ?? 0
-            size += thumbnail4Record.size ?? 0
-            size += thumbnail16Record.size ?? 0
-            size += thumbnail64Record.size ?? 0
-            size += thumbnail256Record.size ?? 0
-            size += thumbnail1024Record.size ?? 0
-            size += contentsDirectory.size ?? 0
-            size += stringRecord.size ?? 0
-            return size
-        }
-        
-        init(_ directory: Directory) {
-            self.directory = directory
-            sheetRecord = directory.makeRecord(forKey: SheetRecorder.sheetKey)
-            sheetHistoryRecord = directory.makeRecord(forKey: SheetRecorder.sheetHistoryKey)
-            contentsDirectory = directory.makeDirectory(forKey: SheetRecorder.contentsDirectoryKey)
-            thumbnail4Record = directory.makeRecord(forKey: SheetRecorder.thumbnail4Key)
-            thumbnail16Record = directory.makeRecord(forKey: SheetRecorder.thumbnail16Key)
-            thumbnail64Record = directory.makeRecord(forKey: SheetRecorder.thumbnail64Key)
-            thumbnail256Record = directory.makeRecord(forKey: SheetRecorder.thumbnail256Key)
-            thumbnail1024Record = directory.makeRecord(forKey: SheetRecorder.thumbnail1024Key)
-            stringRecord = directory.makeRecord(forKey: SheetRecorder.stringKey)
-        }
+    private(set) var baseThumbnailBlocks: [SheetID: Texture.Block]
+    
+    struct ThumbnailNodeValue {
+        var type: Model.ThumbnailType?
+        let sheetID: SheetID
+        var node: Node?
+        var task: Task<(), Never>?
     }
+    private(set) var thumbnailNodeValues = [Sheetpos: ThumbnailNodeValue]()
     
     struct SheetViewValue: @unchecked Sendable {
         let sheetID: SheetID
         var sheetView: SheetView?
         var task: Task<(), Never>?
     }
-    struct ThumbnailNodeValue {
-        var type: ThumbnailType?
-        let sheetID: SheetID
-        var node: Node?
-        var task: Task<(), Never>?
-    }
-    private(set) var sheetRecorders: [SheetID: SheetRecorder]
-    private(set) var baseThumbnailBlocks: [SheetID: Texture.Block]
     private(set) var sheetViewValues = [Sheetpos: SheetViewValue]()
-    private(set) var thumbnailNodeValues = [Sheetpos: ThumbnailNodeValue]()
     
-    static func sheetRecorders(from sheetsDirectory: Directory) -> [SheetID: SheetRecorder] {
-        var srrs = [SheetID: SheetRecorder]()
-        srrs.reserveCapacity(sheetsDirectory.childrenURLs.count)
-        for (key, _) in sheetsDirectory.childrenURLs {
-            guard let sid = sheetID(forKey: key) else { continue }
-            let directory = sheetsDirectory.makeDirectory(forKey: sheetIDKey(at: sid))
-            srrs[sid] = SheetRecorder(directory)
-        }
-        return srrs
-    }
-    
-    func makeSheetRecorder(at sid: SheetID) -> SheetRecorder {
-        SheetRecorder(sheetsDirectory.makeDirectory(forKey: Self.sheetIDKey(at: sid)))
-    }
-    func append(_ srr: SheetRecorder, at sid: SheetID) {
-        sheetRecorders[sid] = srr
-        if let data = srr.thumbnail4Record.decodedData {
-            baseThumbnailBlocks[sid] = try? Texture.block(from: data)
-        }
-    }
-    func remove(_ srr: SheetRecorder) {
-        try? sheetsDirectory.remove(srr.directory)
-    }
-    func removeUndo(at shp: Sheetpos) {
-        if let sid = sheetID(at: shp), let srr = sheetRecorders[sid] {
-            try? srr.directory.remove(srr.sheetHistoryRecord)
-        }
-    }
-    func contains(at sid: SheetID) -> Bool {
-        sheetsDirectory.childrenURLs[Self.sheetIDKey(at: sid)] != nil
-    }
-    
-    static func sheetID(forKey key: String) -> SheetID? { SheetID(uuidString: key) }
-    static func sheetIDKey(at sid: SheetID) -> String { sid.uuidString }
-    
-    func thumbnailRecord(at sid: SheetID,
-                         with type: ThumbnailType) -> Record<Thumbnail>? {
-        switch type {
-        case .w4: sheetRecorders[sid]?.thumbnail4Record
-        case .w16: sheetRecorders[sid]?.thumbnail16Record
-        case .w64: sheetRecorders[sid]?.thumbnail64Record
-        case .w256: sheetRecorders[sid]?.thumbnail256Record
-        case .w1024: sheetRecorders[sid]?.thumbnail1024Record
+    func removeSheetHistory(at shp: Sheetpos) {
+        if let sid = sheetID(at: shp) {
+            try? model.removeSheetHistory(at: sid)
         }
     }
     
@@ -1955,7 +1794,7 @@ final class RootView: View, @unchecked Sendable {
         
         guard let data = readThumbnailData(at: sid),
               let thumbnailTexture = try? Texture(imageData: data, isOpaque: true) else {
-            return thumbnailRecord(at: sid, with: thumbnailType)?.decodedValue?.texture
+            return model.thumbnailRecord(at: sid, with: thumbnailType)?.decodedValue?.texture
         }
         return thumbnailTexture
     }
@@ -1968,7 +1807,7 @@ final class RootView: View, @unchecked Sendable {
         
         guard let data = readThumbnailData(at: sid),
               let thumbnailTexture = try? Texture(imageData: data, isOpaque: true) else {
-            guard let thumbnailTexture = thumbnailRecord(at: sid, with: thumbnailType)?.decodedValue?.texture else {
+            guard let thumbnailTexture = model.thumbnailRecord(at: sid, with: thumbnailType)?.decodedValue?.texture else {
                 return nil
             }
             return .texture(thumbnailTexture)
@@ -1976,32 +1815,26 @@ final class RootView: View, @unchecked Sendable {
         return .texture(thumbnailTexture)
     }
     func readThumbnailData(at sid: SheetID) -> Data? {
-        thumbnailRecord(at: sid, with: thumbnailType)?.decodedData
+        model.thumbnailRecord(at: sid, with: thumbnailType)?.decodedData
     }
     func readSheet(at sid: SheetID) -> Sheet? {
         if let shp = sheetPosition(at: sid), let sheet = sheetView(at: shp)?.model {
-            return sheet
-        }
-        if let sheetRecorder = sheetRecorders[sid] {
-            return sheetRecorder.sheetRecord.decodedValue
+            sheet
         } else {
-            return nil
+            model.sheet(at: sid)
         }
     }
     func readSheetHistory(at sid: SheetID) -> SheetHistory? {
         if let shp = sheetPosition(at: sid), let history = sheetView(at: shp)?.history {
-            return history
-        }
-        if let sheetRecorder = sheetRecorders[sid] {
-            return sheetRecorder.sheetHistoryRecord.decodedValue
+            history
         } else {
-            return nil
+            model.sheetHistory(at: sid)
         }
     }
     
     func updateStringRecord(at sid: SheetID, with sheetView: SheetView,
                             isPreparedWrite: Bool = false) {
-        guard let sheetRecorder = sheetRecorders[sid] else { return }
+        guard let sheetRecorder = model.sheetRecorders[sid] else { return }
         sheetRecorder.stringRecord.value = sheetView.model.allTextsString
         if isPreparedWrite {
             sheetRecorder.stringRecord.isPreparedWrite = true
@@ -2035,7 +1868,7 @@ final class RootView: View, @unchecked Sendable {
                              isPreparedWrite: Bool = false) {
         hideSelectedRange {
             if let tm = thumbnailMipmap(from: sheetView),
-               let sheetRecorder = sheetRecorders[sid] {
+               let sheetRecorder = model.sheetRecorders[sid] {
                 
                 saveThumbnailRecord(tm, in: sheetRecorder,
                                     isPreparedWrite: isPreparedWrite)
@@ -2068,7 +1901,7 @@ final class RootView: View, @unchecked Sendable {
                                thumbnail1024: thumbnail1024)
     }
     func saveThumbnailRecord(_ tm: ThumbnailMipmap,
-                             in srr: SheetRecorder,
+                             in srr: Model.SheetRecorder,
                              isPreparedWrite: Bool = false) {
         srr.thumbnail4Record.value = tm.thumbnail4
         srr.thumbnail16Record.value = tm.thumbnail16
@@ -2180,10 +2013,10 @@ final class RootView: View, @unchecked Sendable {
         case none, sheet
     }
     func readAndClose(with aBounds: Rect, _ transform: Transform) {
-        readAndClose(with: aBounds, transform, sheetRecorders)
+        readAndClose(with: aBounds, transform, model.sheetRecorders)
     }
     func readAndClose(with aBounds: Rect, _ transform: Transform,
-                      _ sheetRecorders: [SheetID: SheetRecorder]) {
+                      _ sheetRecorders: [SheetID: Model.SheetRecorder]) {
         let bounds = aBounds * transform
         let d = transform.log2Scale.clipped(min: 0, max: 4, newMin: 1440, newMax: 360)
         let thumbnailsBounds = bounds.inset(by: -d)
@@ -2194,7 +2027,7 @@ final class RootView: View, @unchecked Sendable {
         
         for (sid, _) in sheetRecorders {
             guard let shp = sheetPosition(at: sid) else { continue }
-            let type: ThumbnailType?
+            let type: Model.ThumbnailType?
             if shp.x >= minXIndex && shp.x <= maxXIndex
                 && shp.y >= minYIndex && shp.y <= maxYIndex {
                 
@@ -2208,7 +2041,7 @@ final class RootView: View, @unchecked Sendable {
             }
         }
     }
-    private func set(_ type: ThumbnailType?, in tv: ThumbnailNodeValue,
+    private func set(_ type: Model.ThumbnailType?, in tv: ThumbnailNodeValue,
                      at sid: SheetID, _ shp: Sheetpos) {
         if sheetViewValues[shp]?.sheetView != nil { return }
         if let type = type {
@@ -2230,9 +2063,9 @@ final class RootView: View, @unchecked Sendable {
         }
     }
     func openThumbnail(at shp: Sheetpos, _ sid: SheetID, _ thumbnailNode: Node?,
-                       _ type: ThumbnailType) {
+                       _ type: Model.ThumbnailType) {
         let thumbnailNode = thumbnailNode ?? emptyNode(at: shp)
-        guard type != .w4, let thumbnailRecord = self.thumbnailRecord(at: sid, with: type) else {
+        guard type != .w4, let thumbnailRecord = self.model.thumbnailRecord(at: sid, with: type) else {
             thumbnailNode.fillType = baseFillType(at: shp)
             thumbnailNodeValues[shp]?.node?.removeFromParent()
             thumbnailNodeValues[shp] = .init(type: type, sheetID: sid, node: thumbnailNode)
@@ -2302,7 +2135,7 @@ final class RootView: View, @unchecked Sendable {
                     sheetView.node.updateCache()
                 }
                 if let sheetView = sheetViewValue.sheetView,
-                   let sheetRecorder = sheetRecorders[sheetViewValue.sheetID],
+                   let sheetRecorder = model.sheetRecorders[sheetViewValue.sheetID],
                    sheetRecorder.sheetRecord.isWillwrite {
                     
                     if savingItem != nil {
@@ -2340,7 +2173,7 @@ final class RootView: View, @unchecked Sendable {
             updateSelects()
         case .sheet:
             if sheetViewValues.contains(where: { $0.value.sheetID == sid }) { return }
-            guard let sheetRecorder = self.sheetRecorders[sid] else { return }
+            guard let sheetRecorder = self.model.sheetRecorders[sid] else { return }
             let frame = self.sheetFrame(with: shp)
             let screenToWorldScale = self.screenToWorldScale
             let task = Task.detached(priority: priority) {
@@ -2405,12 +2238,9 @@ final class RootView: View, @unchecked Sendable {
         }
     }
     
-    func renderableSheet(at sid: SheetID) -> Sheet? {
-        sheetRecorders[sid]?.sheetRecord.decodedValue
-    }
     func renderableSheetNode(at sid: SheetID) -> CPUNode? {
         guard let shp = sheetPosition(at: sid) else { return nil }
-        guard let sheet = sheetRecorders[sid]?.sheetRecord.decodedValue else { return nil }
+        guard let sheet = model.sheet(at: sid) else { return nil }
         let frame = sheetFrame(with: shp)
         return sheet.node(isBorder: false, attitude: .init(position: frame.origin), in: frame.bounds)
     }
@@ -2433,7 +2263,7 @@ final class RootView: View, @unchecked Sendable {
     }
     func readSheetView(at sid: SheetID, _ shp: Sheetpos,
                        isUpdateNode: Bool = false) -> SheetView? {
-        guard let sheetRecorder = sheetRecorders[sid] else { return nil }
+        guard let sheetRecorder = model.sheetRecorders[sid] else { return nil }
         let sheetRecord = sheetRecorder.sheetRecord
         let sheetHistoryRecord = sheetRecorder.sheetHistoryRecord
         
@@ -2482,10 +2312,7 @@ final class RootView: View, @unchecked Sendable {
         while true {
             let shp = sheetPosition(at: nip)
             if shp.isRight { nip.x -= 1 }
-            if let id = sheetID(at: shp),
-               let sr = sheetRecorders[id],
-               let sheet = sr.sheetRecord.decodedValue {
-                
+            if let sid = sheetID(at: shp), let sheet = model.sheet(at: sid) {
                 firstAudiotracks.append(sheet.audiotrack)
                 
                 nip.x -= 1
@@ -2502,10 +2329,7 @@ final class RootView: View, @unchecked Sendable {
         while true {
             let shp = sheetPosition(at: nip)
             if shp.isRight { nip.x += 1 }
-            if let id = sheetID(at: shp),
-               let sr = sheetRecorders[id],
-               let sheet = sr.sheetRecord.decodedValue {
-                
+            if let sid = sheetID(at: shp), let sheet = model.sheet(at: sid) {
                 lastAudiotracks.append(sheet.audiotrack)
                 
                 nip.x += 1
@@ -2577,7 +2401,7 @@ final class RootView: View, @unchecked Sendable {
         if let sheetView = sheetView(at: shp) { return sheetView }
         if sheetID(at: shp) != nil { return nil }
         let newSID = SheetID()
-        guard !contains(at: newSID) else { return nil }
+        guard !model.contains(at: newSID) else { return nil }
         return append(Sheet(), history: nil, at: newSID, at: shp,
                       isNewUndoGroup: isNewUndoGroup)
     }
@@ -2588,7 +2412,7 @@ final class RootView: View, @unchecked Sendable {
         if let sheetView = sheetView(at: shp) { return (sheetView, false) }
         if sheetID(at: shp) != nil { return nil }
         let newSID = SheetID()
-        guard !contains(at: newSID) else { return nil }
+        guard !model.contains(at: newSID) else { return nil }
         return (append(Sheet(), history: nil, at: newSID, at: shp,
                        isNewUndoGroup: isNewUndoGroup), true)
     }
@@ -2601,7 +2425,7 @@ final class RootView: View, @unchecked Sendable {
             sheetView.node.removeFromParent()
         }
         let newSID = SheetID()
-        guard !contains(at: newSID) else { return nil }
+        guard !model.contains(at: newSID) else { return nil }
         return append(sheet, history: history,
                       at: newSID, at: shp,
                       isNewUndoGroup: isNewUndoGroup)
@@ -2615,7 +2439,7 @@ final class RootView: View, @unchecked Sendable {
         }
         append([shp: sid], enableNode: false)
         
-        let sheetRecorder = makeSheetRecorder(at: sid)
+        let sheetRecorder = model.makeSheetRecorder(at: sid)
         let sheetRecord = sheetRecorder.sheetRecord
         let sheetHistoryRecord = sheetRecorder.sheetHistoryRecord
         
@@ -2644,7 +2468,6 @@ final class RootView: View, @unchecked Sendable {
         }
         
         self.sheetView(at: shp)?.node.removeFromParent()
-        sheetRecorders[sid] = sheetRecorder
         sheetViewValues[shp]?.sheetView?.node.removeFromParent()
         sheetViewValues[shp] = .init(sheetID: sid, sheetView: sheetView, task: nil)
         sheetsNode.append(child: sheetView.node)
@@ -2656,7 +2479,7 @@ final class RootView: View, @unchecked Sendable {
     @discardableResult
     func duplicateSheet(from sid: SheetID) -> SheetID {
         let nsid = SheetID()
-        let nsrr = makeSheetRecorder(at: nsid)
+        let nsrr = model.makeSheetRecorder(at: nsid)
         if let shp = sheetPosition(at: sid),
            let sheetView = sheetView(at: shp) {
             nsrr.sheetRecord.value = sheetView.model
@@ -2666,7 +2489,7 @@ final class RootView: View, @unchecked Sendable {
                     saveThumbnailRecord(t, in: nsrr)
                 }
             }
-        } else if let osrr = sheetRecorders[sid] {
+        } else if let osrr = model.sheetRecorders[sid] {
             nsrr.sheetRecord.data = osrr.sheetRecord.valueDataOrDecodedData
             nsrr.thumbnail4Record.data = osrr.thumbnail4Record.valueDataOrDecodedData
             nsrr.thumbnail16Record.data = osrr.thumbnail16Record.valueDataOrDecodedData
@@ -2677,7 +2500,7 @@ final class RootView: View, @unchecked Sendable {
             nsrr.stringRecord.data = osrr.stringRecord.valueDataOrDecodedData
         }
         
-        if let osrr = sheetRecorders[sid], !osrr.contentsDirectory.childrenURLs.isEmpty {
+        if let osrr = model.sheetRecorders[sid], !osrr.contentsDirectory.childrenURLs.isEmpty {
             nsrr.contentsDirectory.isWillwrite = true
             try? nsrr.contentsDirectory.write()
             for (key, url) in osrr.contentsDirectory.childrenURLs {
@@ -2701,12 +2524,16 @@ final class RootView: View, @unchecked Sendable {
         nsrr.thumbnail1024Record.isWillwrite = true
         nsrr.sheetHistoryRecord.isWillwrite = true
         nsrr.stringRecord.isWillwrite = true
-        append(nsrr, at: nsid)
+        
+        if let data = nsrr.thumbnail4Record.decodedData {
+            baseThumbnailBlocks[nsid] = try? Texture.block(from: data)
+        }
+        
         return nsid
     }
-    func appendSheet(from osrr: SheetRecorder) -> SheetID {
+    func appendSheet(from osrr: Model.SheetRecorder) -> SheetID {
         let nsid = SheetID()
-        let nsrr = makeSheetRecorder(at: nsid)
+        let nsrr = model.makeSheetRecorder(at: nsid)
         nsrr.sheetRecord.data = osrr.sheetRecord.valueDataOrDecodedData
         nsrr.thumbnail4Record.data = osrr.thumbnail4Record.valueDataOrDecodedData
         nsrr.thumbnail16Record.data = osrr.thumbnail16Record.valueDataOrDecodedData
@@ -2740,14 +2567,16 @@ final class RootView: View, @unchecked Sendable {
         nsrr.thumbnail1024Record.isWillwrite = true
         nsrr.sheetHistoryRecord.isWillwrite = true
         nsrr.stringRecord.isWillwrite = true
-        append(nsrr, at: nsid)
+        
+        if let data = nsrr.thumbnail4Record.decodedData {
+            baseThumbnailBlocks[nsid] = try? Texture.block(from: data)
+        }
+        
         return nsid
     }
     func removeSheet(at sid: SheetID, for shp: Sheetpos) {
-        if let sheetRecorder = sheetRecorders[sid] {
-            remove(sheetRecorder)
-            sheetRecorders[sid] = nil
-        }
+        try? model.removeSheetRecoder(at: sid)
+        
         if let sheetViewValue = sheetViewValues[shp] {
             sheetViewValue.sheetView?.node.removeFromParent()
             sheetViewValue.sheetView?.cancelTasks()
@@ -3131,7 +2960,7 @@ final class RootView: View, @unchecked Sendable {
     }
     private var roads = [Road]()
     func updateMap() {
-        mapIntPositions = Set(sheetRecorders.keys.reduce(into: [IntPoint]()) {
+        mapIntPositions = Set(model.sheetRecorders.keys.reduce(into: [IntPoint]()) {
             if let shp = sheetPosition(at: $1) {
                 if shp.isRight {
                     $0 += [mapIntPosition(at: IntPoint(shp.x, shp.y)),
