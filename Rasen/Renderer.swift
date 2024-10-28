@@ -18,6 +18,8 @@
 //#if os(macOS) && os(iOS) && os(watchOS) && os(tvOS) && os(visionOS)
 import MetalKit
 import MetalPerformanceShaders
+import Accelerate.vImage
+import UniformTypeIdentifiers
 //#elseif os(linux) && os(windows)
 //#endif
 
@@ -271,2240 +273,11 @@ final class DynamicBuffer {
     }
 }
 
-final class SubMTKView: MTKView, MTKViewDelegate,
-                        @preconcurrency NSTextInputClient, NSMenuItemValidation, NSMenuDelegate {
-    static let enabledAnimationKey = "enabledAnimation"
-    static let isHiddenActionListKey = "isHiddenActionList"
-    static let isShownTrackpadAlternativeKey = "isShownTrackpadAlternative"
-    private(set) var rootEditor: RootEditor
-    private(set) var rootView: RootView
-    let renderstate = Renderstate.sampleCount4!
-    
-    var isShownDebug = false
-    var isShownClock = false
-    private var updateDebugCount = 0
-    private let debugNode = Node(attitude: Attitude(position: Point(5, 5)),
-                                 fillType: .color(.content))
-    
-    private var sheetActionNode, rootActionNode: Node?,
-                actionIsEditingSheet = true
-    private var actionNode: Node? {
-        actionIsEditingSheet ? sheetActionNode : rootActionNode
-    }
-    var isHiddenActionList = true {
-        didSet {
-            
-            guard isHiddenActionList != oldValue else { return }
-            updateActionList()
-            if isShownTrackpadAlternative {
-                updateTrackpadAlternativePositions()
-            }
-        }
-    }
-    private func makeActionNode(isEditingSheet: Bool) -> Node {
-        let actionNode = ActionList.default.node(isEditingSheet: isEditingSheet)
-        let b = rootView.screenBounds
-        let w = b.maxX - (actionNode.bounds?.maxX ?? 0)
-        let h = b.midY - (actionNode.bounds?.midY ?? 0)
-        actionNode.attitude.position = Point(w, h)
-        return actionNode
-    }
-    private func updateActionList() {
-        if isHiddenActionList {
-            sheetActionNode = nil
-            rootActionNode = nil
-        } else if sheetActionNode == nil || rootActionNode == nil {
-            sheetActionNode = makeActionNode(isEditingSheet: true)
-            rootActionNode = makeActionNode(isEditingSheet: false)
-        }
-        actionIsEditingSheet = rootView.isEditingSheet
-        update()
-    }
-    
-    func update() {
-        needsDisplay = true
-    }
-    
-    required init(url: URL, frame: NSRect = NSRect()) {
-        let rootView = RootView(url: url)
-        self.rootView = rootView
-        self.rootEditor = .init(rootView)
-        
-        super.init(frame: frame, device: Renderer.shared.device)
-        delegate = self
-        sampleCount = renderstate.sampleCount
-        depthStencilPixelFormat = .stencil8
-        clearColor = rootView.backgroundColor.mtl
-        
-        if ColorSpace.default.isHDR {
-            colorPixelFormat = Renderer.shared.hdrPixelFormat
-            colorspace = Renderer.shared.hdrColorSpace
-            (layer as? CAMetalLayer)?.wantsExtendedDynamicRangeContent = true
-        } else {
-            colorPixelFormat = Renderer.shared.pixelFormat
-            colorspace = Renderer.shared.colorSpace
-        }
-        
-        isPaused = true
-        enableSetNeedsDisplay = true
-        self.allowedTouchTypes = .indirect
-        self.wantsRestingTouches = true
-        setupRootView()
-        
-        if !UserDefaults.standard.bool(forKey: SubMTKView.isHiddenActionListKey) {
-            isHiddenActionList = false
-            updateActionList()
-        }
-        
-        if UserDefaults.standard.bool(forKey: SubMTKView.isShownTrackpadAlternativeKey) {
-            isShownTrackpadAlternative = true
-            updateTrackpadAlternative()
-        }
-        
-        updateWithAppearance()
-    }
-    required init(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-    
-    func cancelTasks() {
-        scrollTimer?.cancel()
-        scrollTimer = nil
-        pinchTimer?.cancel()
-        pinchTimer = nil
-        rootEditor.cancelTasks()
-    }
-    
-    override func viewDidChangeEffectiveAppearance() {
-        updateWithAppearance()
-    }
-    var enabledAppearance = false {
-        didSet {
-            guard enabledAppearance != oldValue else { return }
-            updateWithAppearance()
-        }
-    }
-    func updateWithAppearance() {
-        if enabledAppearance {
-            Appearance.current
-                = NSApp.effectiveAppearance.name == .darkAqua ? .dark : .light
-            
-            window?.invalidateCursorRects(for: self)
-            addCursorRect(bounds, cursor: Cursor.current.ns)
-            
-            switch Appearance.current {
-            case .light:
-                if layer?.filters != nil {
-                    layer?.filters = nil
-                }
-            case .dark:
-                 layer?.filters = SubMTKView.darkFilters()
-                // change edit lightness
-                // export
-            }
-        } else {
-            if layer?.filters != nil {
-                layer?.filters = nil
-            }
-        }
-    }
-    static func darkFilters() -> [CIFilter] {
-        if let invertFilter = CIFilter(name: "CIColorInvert"),
-           let gammaFilter = CIFilter(name: "CIGammaAdjust"),
-           let brightnessFilter = CIFilter(name: "CIColorControls"),
-           let hueFilter = CIFilter(name: "CIHueAdjust") {
-            
-            gammaFilter.setValue(1.75, forKey: "inputPower")
-            brightnessFilter.setValue(0.02, forKey: "inputBrightness")
-            hueFilter.setValue(Double.pi, forKey: "inputAngle")
-            
-            return [invertFilter, gammaFilter, brightnessFilter, hueFilter]
-        } else {
-            return []
-        }
-    }
-    
-    func setupRootView() {
-        rootView.backgroundColorNotifications.append { [weak self] (_, backgroundColor) in
-            self?.clearColor = backgroundColor.mtl
-            self?.update()
-        }
-        rootView.cursorNotifications.append { [weak self] (_, cursor) in
-            guard let self else { return }
-            self.window?.invalidateCursorRects(for: self)
-            self.addCursorRect(self.bounds, cursor: cursor.ns)
-            Cursor.current = cursor
-        }
-        rootView.cameraNotifications.append { [weak self] (_, _) in
-            guard let self else { return }
-            if !self.isHiddenActionList {
-                if self.actionIsEditingSheet != self.rootView.isEditingSheet {
-                    self.updateActionList()
-                }
-            }
-            self.update()
-        }
-        rootView.node.allChildrenAndSelf { $0.owner = self }
-        
-        rootView.cursorPoint = clippedScreenPointFromCursor.my
-    }
-    
-    var isShownTrackpadAlternative = false {
-        didSet {
-            guard isShownTrackpadAlternative != oldValue else { return }
-            updateTrackpadAlternative()
-        }
-    }
-    private var trackpadView: NSView?,
-                lookUpButton: NSButton?,
-                scrollButton: NSButton?,
-                zoomButton: NSButton?,
-                rotateButton: NSButton?
-    func updateTrackpadAlternative() {
-        if isShownTrackpadAlternative {
-            let trackpadView = SubNSTrackpadView(frame: NSRect())
-            let lookUpButton = SubNSButton(frame: NSRect(),
-                                           .lookUp) { [weak self] (event, dp) in
-                guard let self else { return }
-                if event.phase == .began,
-                   let r = self.rootView.selections
-                    .first(where: { self.rootView.worldBounds.intersects($0.rect) })?.rect {
-                    
-                    let p = r.centerPoint
-                    let sp = self.rootView.convertWorldToScreen(p)
-                    self.rootEditor.inputKey(self.inputKeyEventWith(at: sp, .lookUpTap, .began))
-                    self.rootEditor.inputKey(self.inputKeyEventWith(at: sp, .lookUpTap, .ended))
-                }
-            }
-            trackpadView.addSubview(lookUpButton)
-            self.lookUpButton = lookUpButton
-            
-            let scrollButton = SubNSButton(frame: NSRect(),
-                                           .scroll) { [weak self] (event, dp) in
-                guard let self else { return }
-                let nEvent = ScrollEvent(screenPoint: self.rootView.screenBounds.centerPoint,
-                                         time: event.time,
-                                         scrollDeltaPoint: Point(dp.x, -dp.y) * 2,
-                                         phase: event.phase,
-                                         touchPhase: nil,
-                                         momentumPhase: nil)
-                self.rootEditor.scroll(nEvent)
-            }
-            trackpadView.addSubview(scrollButton)
-            self.scrollButton = scrollButton
-            
-            let zoomButton = SubNSButton(frame: NSRect(),
-                                         .zoom) { [weak self] (event, dp) in
-                guard let self else { return }
-                let nEvent = PinchEvent(screenPoint: self.rootView.screenBounds.centerPoint,
-                                        time: event.time,
-                                        magnification: -dp.y / 100,
-                                        phase: event.phase)
-                self.rootEditor.pinch(nEvent)
-            }
-            trackpadView.addSubview(zoomButton)
-            self.zoomButton = zoomButton
-            
-            let rotateButton = SubNSButton(frame: NSRect(),
-                                           .rotate) { [weak self] (event, dp) in
-                guard let self else { return }
-                let nEvent = RotateEvent(screenPoint: self.rootView.screenBounds.centerPoint,
-                                         time: event.time,
-                                         rotationQuantity: -dp.x / 10,
-                                         phase: event.phase)
-                self.rootEditor.rotate(nEvent)
-            }
-            trackpadView.addSubview(rotateButton)
-            self.rotateButton = rotateButton
-            
-            addSubview(trackpadView)
-            self.trackpadView = trackpadView
-            
-            updateTrackpadAlternativePositions()
-        } else {
-            trackpadView?.removeFromSuperview()
-            lookUpButton?.removeFromSuperview()
-            scrollButton?.removeFromSuperview()
-            zoomButton?.removeFromSuperview()
-            rotateButton?.removeFromSuperview()
-        }
-    }
-    func updateTrackpadAlternativePositions() {
-        let aw = max(actionNode?.transformedBounds?.cg.width ?? 0, 150)
-        let w: CGFloat = 40.0, padding: CGFloat = 4.0
-        let lookUpSize = NSSize(width: w, height: 40)
-        let scrollSize = NSSize(width: w, height: 40)
-        let zoomSize = NSSize(width: w, height: 100)
-        let rotateSize = NSSize(width: w, height: 40)
-        let h = lookUpSize.height + scrollSize.height + zoomSize.height + rotateSize.height + padding * 5
-        let b = bounds
-        
-        lookUpButton?.frame = NSRect(x: padding,
-                                     y: padding * 4 + rotateSize.height + zoomSize.height + scrollSize.height,
-                                   width: lookUpSize.width,
-                                   height: lookUpSize.height)
-        scrollButton?.frame = NSRect(x: padding,
-                                     y: padding * 3 + rotateSize.height + zoomSize.height,
-                                   width: scrollSize.width,
-                                   height: scrollSize.height)
-        zoomButton?.frame = NSRect(x: padding,
-                                   y: padding * 2 + rotateSize.height,
-                                   width: zoomSize.width,
-                                   height: zoomSize.height)
-        rotateButton?.frame = NSRect(x: padding,
-                                   y: padding,
-                                   width: rotateSize.width,
-                                   height: rotateSize.height)
-        trackpadView?.frame = NSRect(x: b.width - aw - w - padding * 2,
-                                     y: b.midY - h / 2,
-                                     width: w + padding * 2,
-                                     height: h)
-    }
-    
-    override var acceptsFirstResponder: Bool { true }
-    override func becomeFirstResponder() -> Bool { true }
-    override func resignFirstResponder() -> Bool { true }
-    
-    override func resetCursorRects() {
-        discardCursorRects()
-        addCursorRect(bounds, cursor: rootView.cursor.ns)
-    }
-    
-    var isEnableMenuCommand = false {
-        didSet {
-            guard isEnableMenuCommand != oldValue else { return }
-            rootView.isShownLastEditedSheet = isEnableMenuCommand
-            rootView.isNoneCursor = isEnableMenuCommand
-        }
-    }
-    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
-        switch menuItem.action {
-        case #selector(SubMTKView.importDocument(_:)):
-            return rootView.isSelectedNoneCursor
-            
-        case #selector(SubMTKView.exportAsImage(_:)):
-            return rootView.isSelectedNoneCursor
-        case #selector(SubMTKView.exportAsImage4K(_:)):
-            return rootView.isSelectedNoneCursor
-        case #selector(SubMTKView.exportAsPDF(_:)):
-            return rootView.isSelectedNoneCursor
-        case #selector(SubMTKView.exportAsGIF(_:)):
-            return rootView.isSelectedNoneCursor
-            
-        case #selector(SubMTKView.exportAsMovie(_:)):
-            return rootView.isSelectedNoneCursor
-        case #selector(SubMTKView.exportAsMovie4K(_:)):
-            return rootView.isSelectedNoneCursor
-        case #selector(SubMTKView.exportAsSound(_:)):
-            return rootView.isSelectedNoneCursor
-        case #selector(SubMTKView.exportAsLinearPCM(_:)):
-            return rootView.isSelectedNoneCursor
-            
-        case #selector(SubMTKView.exportAsDocument(_:)):
-            return rootView.isSelectedNoneCursor
-        case #selector(SubMTKView.exportAsDocumentWithHistory(_:)):
-            return rootView.isSelectedNoneCursor
-            
-        case #selector(SubMTKView.clearHistory(_:)):
-            return rootView.isSelectedNoneCursor
-            
-        case #selector(SubMTKView.undo(_:)):
-            if isEnableMenuCommand {
-                if rootView.isEditingSheet {
-                    if rootView.isSelectedNoneCursor {
-                        return rootView.selectedSheetViewNoneCursor?.history.isCanUndo ?? false
-                    }
-                } else {
-                    return rootView.history.isCanUndo
-                }
-            }
-            return false
-        case #selector(SubMTKView.redo(_:)):
-            if isEnableMenuCommand {
-                if rootView.isEditingSheet {
-                    if rootView.isSelectedNoneCursor {
-                        return rootView.selectedSheetViewNoneCursor?.history.isCanRedo ?? false
-                    }
-                } else {
-                    return rootView.history.isCanRedo
-                }
-            }
-            return false
-        case #selector(SubMTKView.cut(_:)):
-            return isEnableMenuCommand
-                && rootView.isSelectedNoneCursor && rootView.isSelectedOnlyNoneCursor
-        case #selector(SubMTKView.copy(_:)):
-            return isEnableMenuCommand
-                && rootView.isSelectedNoneCursor && rootView.isSelectedOnlyNoneCursor
-        case #selector(SubMTKView.paste(_:)):
-            return if isEnableMenuCommand
-                && rootView.isSelectedNoneCursor {
-                switch Pasteboard.shared.copiedObjects.first {
-                case .picture, .planesValue: rootView.isEditingSheet
-                case .copiedSheetsValue: !rootView.isEditingSheet
-                default: false
-                }
-            } else {
-                false
-            }
-        case #selector(SubMTKView.find(_:)):
-            return isEnableMenuCommand && rootView.isEditingSheet
-                && rootView.isSelectedNoneCursor && rootView.isSelectedText
-        case #selector(SubMTKView.changeToDraft(_:)):
-            return isEnableMenuCommand && rootView.isEditingSheet
-                && rootView.isSelectedNoneCursor
-                && !(rootView.selectedSheetViewNoneCursor?.model.picture.isEmpty ?? true)
-        case #selector(SubMTKView.cutDraft(_:)):
-            return isEnableMenuCommand && rootView.isEditingSheet
-                && rootView.isSelectedNoneCursor
-                && !(rootView.selectedSheetViewNoneCursor?.model.draftPicture.isEmpty ?? true)
-        case #selector(SubMTKView.makeFaces(_:)):
-            return isEnableMenuCommand && rootView.isEditingSheet
-                && rootView.isSelectedNoneCursor
-                && !(rootView.selectedSheetViewNoneCursor?.model.picture.lines.isEmpty ?? true)
-        case #selector(SubMTKView.cutFaces(_:)):
-            return isEnableMenuCommand && rootView.isEditingSheet
-                && rootView.isSelectedNoneCursor
-                && !(rootView.selectedSheetViewNoneCursor?.model.picture.planes.isEmpty ?? true)
-        case #selector(SubMTKView.changeToVerticalText(_:)):
-            return isEnableMenuCommand && rootView.isEditingSheet
-                && rootView.isSelectedNoneCursor && rootView.isSelectedText
-        case #selector(SubMTKView.changeToHorizontalText(_:)):
-            return isEnableMenuCommand && rootView.isEditingSheet
-                && rootView.isSelectedNoneCursor && rootView.isSelectedText
-        
-        case #selector(SubMTKView.shownActionList(_:)):
-            menuItem.state = !isHiddenActionList ? .on : .off
-        case #selector(SubMTKView.hiddenActionList(_:)):
-            menuItem.state = isHiddenActionList ? .on : .off
-            
-        case #selector(SubMTKView.shownTrackpadAlternative(_:)):
-            menuItem.state = isShownTrackpadAlternative ? .on : .off
-        case #selector(SubMTKView.hiddenTrackpadAlternative(_:)):
-            menuItem.state = !isShownTrackpadAlternative ? .on : .off
-            
-        default:
-            break
-        }
-        return true
-    }
-    
-    @objc func clearHistoryDatabase(_ sender: Any) {
-        Task { @MainActor in
-            let result = await rootView.node
-                .show(message: "Do you want to clear root history?".localized,
-                      infomation: "You can’t undo this action. \nRoot history is what is used in \"Undo\", \"Redo\" or \"Select Version\" when in root operation, and if you clear it, you will not be able to return to the previous work.".localized,
-                      okTitle: "Clear Root History".localized,
-                      isSaftyCheck: true)
-            switch result {
-            case .ok:
-                let progressPanel = ProgressPanel(message: "Clearing Root History".localized)
-                self.rootView.node.show(progressPanel)
-                let task = Task.detached {
-                    await self.rootView.clearHistory { (progress, isStop) in
-                        if Task.isCancelled {
-                            isStop = true
-                            return
-                        }
-                        Task { @MainActor in
-                            progressPanel.progress = progress
-                        }
-                    }
-                    Task { @MainActor in
-                        progressPanel.closePanel()
-                    }
-                }
-                progressPanel.cancelHandler = { task.cancel() }
-            case .cancel: break
-            }
-        }
-    }
-    
-    func replacingDatabase(from url: URL) {
-        @Sendable func replace(to toURL: URL, progressHandler: (Double, inout Bool) -> ()) throws {
-            var stop = false
-            
-            progressHandler(0.5, &stop)
-            if stop { return }
-            
-            guard toURL != url else { throw URL.readError }
-            let fm = FileManager.default
-            if fm.fileExists(atPath: toURL.path) {
-                try fm.trashItem(at: toURL, resultingItemURL: nil)
-            }
-            try fm.copyItem(at: url, to: toURL)
-            
-            progressHandler(1, &stop)
-            if stop { return }
-        }
-        
-        rootView.syncSave()
-        
-        let toURL = rootView.model.url
-        
-        let progressPanel = ProgressPanel(message: String(format: "Replacing %@".localized, System.dataName))
-        rootView.node.show(progressPanel)
-        let task = Task.detached {
-            do {
-                try replace(to: toURL) { (progress, isStop) in
-                    if Task.isCancelled {
-                        isStop = true
-                        return
-                    }
-                    Task { @MainActor in
-                        progressPanel.progress = progress
-                    }
-                }
-                Task { @MainActor in
-                    self.updateWithURL()
-                    progressPanel.closePanel()
-                }
-            } catch {
-                Task { @MainActor in
-                    self.rootView.node.show(error)
-                    self.updateWithURL()
-                    progressPanel.closePanel()
-                }
-            }
-        }
-        progressPanel.cancelHandler = { task.cancel() }
-    }
-    func replaceDatabase(from url: URL) {
-        Task { @MainActor in
-            let result = await rootView.node
-                .show(message: String(format: "Do you want to replace %@?".localized, System.dataName),
-                      infomation: String(format: "You can’t undo this action. \n%1$@ is all the data written to this %2$@, if you replace %1$@ with new %1$@, all old %1$@ will be moved to the Trash.".localized, System.dataName, System.appName),
-                      okTitle: String(format: "Replace %@".localized, System.dataName),
-                      isSaftyCheck: true)
-            switch result {
-            case .ok: replacingDatabase(from: url)
-            case .cancel: break
-            }
-        }
-    }
-    @objc func replaceDatabase(_ sender: Any) {
-        Task { @MainActor in
-            let result = await rootView.node
-                .show(message: String(format: "Do you want to replace %@?".localized, System.dataName),
-                      infomation: String(format: "You can’t undo this action. \n%1$@ is all the data written to this %2$@, if you replace %1$@ with new %1$@, all old %1$@ will be moved to the Trash.".localized, System.dataName, System.appName),
-                      okTitle: String(format: "Replace %@...".localized, System.dataName),
-                      isSaftyCheck: rootView.model.url.allFileSize > 20*1024*1024)
-            switch result {
-            case .ok:
-                let loadResult = await URL.load(prompt: "Replace".localized,
-                                                fileTypes: [Document.FileType.rasendata,
-                                                            Document.FileType.sksdata])
-                switch loadResult {
-                case .complete(let ioResults):
-                    replacingDatabase(from: ioResults[0].url)
-                case .cancel: break
-                }
-            case .cancel: break
-            }
-        }
-    }
-    
-    @objc func exportDatabase(_ sender: Any) {
-        Task { @MainActor in
-            let url = rootView.model.url
-            let result = await URL.export(name: "User", fileType: Document.FileType.rasendata,
-                                          fileSizeHandler: { url.allFileSize })
-            switch result {
-            case .complete(let ioResult):
-                rootView.syncSave()
-                
-                @Sendable func export(progressHandler: @Sendable (Double, inout Bool) -> ()) async throws {
-                    var stop = false
-                    
-                    progressHandler(0.5, &stop)
-                    if stop { return }
-                    
-                    guard url != ioResult.url else { throw URL.readError }
-                    let fm = FileManager.default
-                    if fm.fileExists(atPath: ioResult.url.path) {
-                        try fm.removeItem(at: ioResult.url)
-                    }
-                    if fm.fileExists(atPath: url.path) {
-                        try fm.copyItem(at: url, to: ioResult.url)
-                    } else {
-                        try fm.createDirectory(at: ioResult.url,
-                                               withIntermediateDirectories: false)
-                    }
-                    
-                    try ioResult.setAttributes()
-                    
-                    progressHandler(1, &stop)
-                    if stop { return }
-                }
-                
-                let progressPanel = ProgressPanel(message: String(format: "Exporting %@".localized, System.dataName))
-                rootView.node.show(progressPanel)
-                let task = Task.detached {
-                    do {
-                        try await export { (progress, isStop) in
-                            if Task.isCancelled {
-                                isStop = true
-                                return
-                            }
-                            Task { @MainActor in
-                                progressPanel.progress = progress
-                            }
-                        }
-                        Task { @MainActor in
-                            progressPanel.closePanel()
-                        }
-                    } catch {
-                        Task { @MainActor in
-                            self.rootView.node.show(error)
-                            progressPanel.closePanel()
-                        }
-                    }
-                }
-                progressPanel.cancelHandler = { task.cancel() }
-            case .cancel: break
-            }
-        }
-    }
-    
-    @objc func resetDatabase(_ sender: Any) {
-        Task { @MainActor in
-            let result = await rootView.node
-                .show(message: String(format: "Do you want to reset the %@?".localized, System.dataName),
-                      infomation: String(format: "You can’t undo this action. \n%1$@ is all the data written to this %2$@, if you reset %1$@, all %1$@ will be moved to the Trash.".localized, System.dataName, System.appName),
-                      okTitle: String(format: "Reset %@".localized, System.dataName),
-                      isSaftyCheck: rootView.model.url.allFileSize > 20*1024*1024)
-            switch result {
-            case .ok:
-                @Sendable func reset(in url: URL, progressHandler: (Double, inout Bool) -> ()) throws {
-                    var stop = false
-                    
-                    progressHandler(0.5, &stop)
-                    if stop { return }
-                    
-                    let fm = FileManager.default
-                    if fm.fileExists(atPath: url.path) {
-                        try fm.trashItem(at: url, resultingItemURL: nil)
-                    }
-                    
-                    progressHandler(1, &stop)
-                    if stop { return }
-                }
-                
-                rootView.syncSave()
-                
-                let url = rootView.model.url
-                
-                let progressPanel = ProgressPanel(message: String(format: "Resetting %@".localized, System.dataName))
-                self.rootView.node.show(progressPanel)
-                let task = Task.detached {
-                    do {
-                        try reset(in: url) { (progress, isStop) in
-                            if Task.isCancelled {
-                                isStop = true
-                                return
-                            }
-                            Task { @MainActor in
-                                progressPanel.progress = progress
-                            }
-                        }
-                        Task { @MainActor in
-                            self.updateWithURL()
-                            progressPanel.closePanel()
-                        }
-                    } catch {
-                        Task { @MainActor in
-                            self.rootView.node.show(error)
-                            self.updateWithURL()
-                            progressPanel.closePanel()
-                        }
-                    }
-                }
-                progressPanel.cancelHandler = { task.cancel() }
-            case .cancel: break
-            }
-        }
-    }
-    
-    @objc func shownActionList(_ sender: Any) {
-        UserDefaults.standard.set(false, forKey: SubMTKView.isHiddenActionListKey)
-        isHiddenActionList = false
-    }
-    @objc func hiddenActionList(_ sender: Any) {
-        UserDefaults.standard.set(true, forKey: SubMTKView.isHiddenActionListKey)
-        isHiddenActionList = true
-    }
-    
-    @objc func shownTrackpadAlternative(_ sender: Any) {
-        UserDefaults.standard.set(true, forKey: SubMTKView.isShownTrackpadAlternativeKey)
-        isShownTrackpadAlternative = true
-    }
-    @objc func hiddenTrackpadAlternative(_ sender: Any) {
-        UserDefaults.standard.set(false, forKey: SubMTKView.isShownTrackpadAlternativeKey)
-        isShownTrackpadAlternative = false
-    }
-    
-    @objc func importDocument(_ sender: Any) {
-        rootView.isNoneCursor = true
-        let editor = Importer(rootEditor)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        rootView.isNoneCursor = false
-    }
-    
-    @objc func exportAsImage(_ sender: Any) {
-        rootView.isNoneCursor = true
-        let editor = ImageExporter(rootEditor)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        rootView.isNoneCursor = false
-    }
-    @objc func exportAsImage4K(_ sender: Any) {
-        rootView.isNoneCursor = true
-        let editor = Image4KExporter(rootEditor)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        rootView.isNoneCursor = false
-    }
-    @objc func exportAsPDF(_ sender: Any) {
-        rootView.isNoneCursor = true
-        let editor = PDFExporter(rootEditor)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        rootView.isNoneCursor = false
-    }
-    @objc func exportAsGIF(_ sender: Any) {
-        rootView.isNoneCursor = true
-        let editor = GIFExporter(rootEditor)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        rootView.isNoneCursor = false
-    }
-    @objc func exportAsMovie(_ sender: Any) {
-        rootView.isNoneCursor = true
-        let editor = MovieExporter(rootEditor)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        rootView.isNoneCursor = false
-    }
-    @objc func exportAsMovie4K(_ sender: Any) {
-        rootView.isNoneCursor = true
-        let editor = Movie4KExporter(rootEditor)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        rootView.isNoneCursor = false
-    }
-    @objc func exportAsSound(_ sender: Any) {
-        rootView.isNoneCursor = true
-        let editor = SoundExporter(rootEditor)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        rootView.isNoneCursor = false
-    }
-    @objc func exportAsLinearPCM(_ sender: Any) {
-        rootView.isNoneCursor = true
-        let editor = LinearPCMExporter(rootEditor)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        rootView.isNoneCursor = false
-    }
-    
-    @objc func exportAsDocument(_ sender: Any) {
-        rootView.isNoneCursor = true
-        let editor = DocumentWithoutHistoryExporter(rootEditor)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        rootView.isNoneCursor = false
-    }
-    @objc func exportAsDocumentWithHistory(_ sender: Any) {
-        rootView.isNoneCursor = true
-        let editor = DocumentExporter(rootEditor)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        rootView.isNoneCursor = false
-    }
-    
-    @objc func clearHistory(_ sender: Any) {
-        rootView.isNoneCursor = true
-        let editor = HistoryCleaner(rootEditor)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        rootView.isNoneCursor = false
-    }
-    
-    @objc func undo(_ sender: Any) {
-        rootView.isNoneCursor = true
-        let editor = Undoer(rootEditor)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        rootView.isNoneCursor = false
-    }
-    @objc func redo(_ sender: Any) {
-        rootView.isNoneCursor = true
-        let editor = Redoer(rootEditor)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        rootView.isNoneCursor = false
-    }
-    @objc func cut(_ sender: Any) {
-        rootView.isNoneCursor = true
-        let editor = Cutter(rootEditor)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        rootView.isNoneCursor = false
-    }
-    @objc func copy(_ sender: Any) {
-        rootView.isNoneCursor = true
-        let editor = Copier(rootEditor)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        rootView.isNoneCursor = false
-    }
-    @objc func paste(_ sender: Any) {
-        rootView.isNoneCursor = true
-        let editor = Paster(rootEditor)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        rootView.isNoneCursor = false
-    }
-    @objc func find(_ sender: Any) {
-        rootView.isNoneCursor = true
-        let editor = Finder(rootEditor)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        rootView.isNoneCursor = false
-    }
-    @objc func changeToDraft(_ sender: Any) {
-        rootView.isNoneCursor = true
-        let editor = DraftChanger(rootEditor)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        rootView.isNoneCursor = false
-    }
-    @objc func cutDraft(_ sender: Any) {
-        rootView.isNoneCursor = true
-        let editor = DraftCutter(rootEditor)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        rootView.isNoneCursor = false
-    }
-    @objc func makeFaces(_ sender: Any) {
-        rootView.isNoneCursor = true
-        let editor = FacesMaker(rootEditor)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        rootView.isNoneCursor = false
-    }
-    @objc func cutFaces(_ sender: Any) {
-        rootView.isNoneCursor = true
-        let editor = FacesCutter(rootEditor)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        rootView.isNoneCursor = false
-    }
-    @objc func changeToVerticalText(_ sender: Any) {
-        rootView.isNoneCursor = true
-        let editor = VerticalTextChanger(rootEditor)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        rootView.isNoneCursor = false
-    }
-    @objc func changeToHorizontalText(_ sender: Any) {
-        rootView.isNoneCursor = true
-        let editor = HorizontalTextChanger(rootEditor)
-        editor.send(inputKeyEventWith(.began))
-        Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
-        rootView.isNoneCursor = false
-    }
-    
-//    @objc func startDictation(_ sender: Any) {
-//    }
-//    @objc func orderFrontCharacterPalette(_ sender: Any) {
-//    }
-    
-    func updateWithURL() {
-        rootView = .init(url: rootView.model.url)
-        setupRootView()
-        do {
-            try rootView.restoreDatabase()
-        } catch {
-            rootView.node.show(error)
-        }
-        rootView.screenBounds = bounds.my
-        rootView.drawableSize = drawableSize.my
-        clearColor = rootView.backgroundColor.mtl
-        draw()
-    }
-    
-    func draw(in view: MTKView) {}
-    func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
-        rootView.screenBounds = bounds.my
-        rootView.drawableSize = size.my
-        
-        if !isHiddenActionList {
-            func update(_ node: Node) {
-                let b = rootView.screenBounds
-                let w = b.maxX - (node.bounds?.maxX ?? 0)
-                let h = b.midY - (node.bounds?.midY ?? 0)
-                node.attitude.position = Point(w, h)
-            }
-            if let actionNode = sheetActionNode {
-                update(actionNode)
-            }
-            if let actionNode = rootActionNode {
-                update(actionNode)
-            }
-        }
-        if isShownTrackpadAlternative {
-            updateTrackpadAlternativePositions()
-        }
-        
-        update()
-    }
-    
-    var viewportBounds: Rect {
-        Rect(x: 0, y: 0,
-             width: Double(drawableSize.width),
-             height: Double(drawableSize.height))
-    }
-    func viewportScale() -> Double {
-        return rootView.worldToViewportTransform.absXScale
-            * rootView.viewportToScreenTransform.absXScale
-            * Double(drawableSize.width / self.bounds.width)
-    }
-    func viewportBounds(from transform: Transform, bounds: Rect) -> Rect {
-        let dr = Rect(x: 0, y: 0,
-                      width: Double(drawableSize.width),
-                      height: Double(drawableSize.height))
-        let scale = Double(drawableSize.width / self.bounds.width)
-        let st = transform
-            * rootView.viewportToScreenTransform
-            * Transform(translationX: 0,
-                        y: -rootView.screenBounds.height)
-            * Transform(scaleX: scale, y: -scale)
-        return dr.intersection(bounds * st) ?? dr
-    }
-    
-    func screenPoint(with event: NSEvent) -> NSPoint {
-        convertToLayer(convert(event.locationInWindow, from: nil))
-    }
-    var screenPointFromCursor: NSPoint {
-        guard let window = window else {
-            return NSPoint()
-        }
-        let windowPoint = window.mouseLocationOutsideOfEventStream
-        return convertToLayer(convert(windowPoint, from: nil))
-    }
-    var clippedScreenPointFromCursor: NSPoint {
-        guard let window = window else {
-            return NSPoint()
-        }
-        let windowPoint = window.mouseLocationOutsideOfEventStream
-        let b = NSRect(origin: NSPoint(), size: window.frame.size)
-        if b.contains(windowPoint) {
-            return convertToLayer(convert(windowPoint, from: nil))
-        } else {
-            let wp = NSPoint(x: b.midX, y: b.midY)
-            return convertToLayer(convert(wp, from: nil))
-        }
-    }
-    func convertFromTopScreen(_ p: NSPoint) -> NSPoint {
-        guard let window = window else {
-            return NSPoint()
-        }
-        let windowPoint = window
-            .convertFromScreen(NSRect(origin: p, size: NSSize())).origin
-        return convertToLayer(convert(windowPoint, from: nil))
-    }
-    func convertToTopScreen(_ r: NSRect) -> NSRect {
-        guard let window = window else {
-            return NSRect()
-        }
-        return window.convertToScreen(convert(convertFromLayer(r), to: nil))
-    }
-    func convertToTopScreen(_ p: NSPoint) -> NSPoint {
-        convertToTopScreen(NSRect(origin: p, size: CGSize())).origin
-    }
-    
-    override func mouseEntered(with event: NSEvent) {}
-    override func mouseExited(with event: NSEvent) {
-        rootEditor.stopScrollEvent()
-    }
-    private var trackingArea: NSTrackingArea?
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        if let trackingArea = self.trackingArea {
-            removeTrackingArea(trackingArea)
-        }
-        let trackingArea = NSTrackingArea(rect: bounds,
-                                          options: [.mouseEnteredAndExited,
-                                                    .mouseMoved,
-                                                    .activeWhenFirstResponder],
-                                          owner: self, userInfo: nil)
-        addTrackingArea(trackingArea)
-        self.trackingArea = trackingArea
-    }
-    
-    func dragEventWith(indicate nsEvent: NSEvent) -> DragEvent {
-        DragEvent(screenPoint: screenPoint(with: nsEvent).my,
-                  time: nsEvent.timestamp,
-                  pressure: 1, phase: .changed)
-    }
-    func dragEventWith(_ nsEvent: NSEvent, _ phase: Phase) -> DragEvent {
-        DragEvent(screenPoint: screenPoint(with: nsEvent).my,
-                  time: nsEvent.timestamp,
-                  pressure: Double(nsEvent.pressure), phase: phase)
-    }
-    func pinchEventWith(_ nsEvent: NSEvent, _ phase: Phase) -> PinchEvent {
-        PinchEvent(screenPoint: screenPoint(with: nsEvent).my,
-                   time: nsEvent.timestamp,
-                   magnification: Double(nsEvent.magnification), phase: phase)
-    }
-    func scrollEventWith(_ nsEvent: NSEvent, _ phase: Phase,
-                         touchPhase: Phase?,
-                         momentumPhase: Phase?) -> ScrollEvent {
-        let sdp = NSPoint(x: nsEvent.scrollingDeltaX,
-                          y: -nsEvent.scrollingDeltaY).my
-        let nsdp = Point(sdp.x.clipped(min: -500, max: 500),
-                         sdp.y.clipped(min: -500, max: 500))
-        return ScrollEvent(screenPoint: screenPoint(with: nsEvent).my,
-                           time: nsEvent.timestamp,
-                           scrollDeltaPoint: nsdp,
-                           phase: phase,
-                           touchPhase: touchPhase,
-                           momentumPhase: momentumPhase)
-    }
-    func rotateEventWith(_ nsEvent: NSEvent,
-                         _ phase: Phase) -> RotateEvent {
-        RotateEvent(screenPoint: screenPoint(with: nsEvent).my,
-                    time: nsEvent.timestamp,
-                    rotationQuantity: Double(nsEvent.rotation), phase: phase)
-    }
-    func inputKeyEventWith(_ phase: Phase) -> InputKeyEvent {
-        return InputKeyEvent(screenPoint: screenPointFromCursor.my,
-                             time: ProcessInfo.processInfo.systemUptime,
-                             pressure: 1, phase: phase, isRepeat: false,
-                             inputKeyType: .click)
-    }
-    func inputKeyEventWith(at sp: Point, _ keyType: InputKeyType = .click,
-                           _ phase: Phase) -> InputKeyEvent {
-        InputKeyEvent(screenPoint: sp,
-                      time: ProcessInfo.processInfo.systemUptime,
-                      pressure: 1, phase: phase, isRepeat: false,
-                      inputKeyType: keyType)
-    }
-    func inputKeyEventWith(_ nsEvent: NSEvent, _ keyType: InputKeyType,
-                           isRepeat: Bool = false,
-                           _ phase: Phase) -> InputKeyEvent {
-        InputKeyEvent(screenPoint: screenPointFromCursor.my,
-                      time: nsEvent.timestamp,
-                      pressure: 1, phase: phase, isRepeat: isRepeat,
-                      inputKeyType: keyType)
-    }
-    func inputKeyEventWith(drag nsEvent: NSEvent,
-                           _ phase: Phase) -> InputKeyEvent {
-        InputKeyEvent(screenPoint: screenPoint(with: nsEvent).my,
-                      time: nsEvent.timestamp,
-                      pressure: Double(nsEvent.pressure),
-                      phase: phase, isRepeat: false,
-                      inputKeyType: .click)
-    }
-    func inputKeyEventWith(_ dragEvent: DragEvent,
-                           _ phase: Phase) -> InputKeyEvent {
-        InputKeyEvent(screenPoint: dragEvent.screenPoint,
-                      time: dragEvent.time,
-                      pressure: dragEvent.pressure,
-                      phase: phase, isRepeat: false,
-                      inputKeyType: .click)
-    }
-    func inputTextEventWith(_ nsEvent: NSEvent, _ keyType: InputKeyType,
-                            _ phase: Phase) -> InputTextEvent {
-        InputTextEvent(screenPoint: screenPointFromCursor.my,
-                       time: nsEvent.timestamp,
-                       pressure: 1, phase: phase, isRepeat: nsEvent.isARepeat,
-                       inputKeyType: keyType,
-                       ns: nsEvent, inputContext: inputContext)
-    }
-    
-    private var isOneFlag = false, oneFlagTime: Double?
-    override func flagsChanged(with nsEvent: NSEvent) {
-        let oldModifierKeys = rootEditor.modifierKeys
-        
-        rootEditor.modifierKeys = nsEvent.modifierKeys
-        
-        if oldModifierKeys.isEmpty && rootEditor.modifierKeys.isOne {
-            isOneFlag = true
-            oneFlagTime = nsEvent.timestamp
-        } else if let oneKey = oldModifierKeys.oneInputKeyTYpe,
-                  rootEditor.modifierKeys.isEmpty && isOneFlag,
-            let oneFlagTime, nsEvent.timestamp - oneFlagTime < 0.175 {
-            rootEditor.inputKey(inputKeyEventWith(nsEvent, oneKey, .began))
-            rootEditor.inputKey(inputKeyEventWith(nsEvent, oneKey, .ended))
-            isOneFlag = false
-        } else {
-            isOneFlag = false
-        }
-    }
-    
-    override func mouseMoved(with nsEvent: NSEvent) {
-        rootEditor.indicate(with: dragEventWith(indicate: nsEvent))
-        
-        if let oldEvent = rootEditor.oldInputKeyEvent,
-           let editor = rootEditor.inputKeyEditor {
-            
-            editor.send(inputKeyEventWith(nsEvent, oldEvent.inputKeyType, .changed))
-        }
-    }
-    
-    override func keyDown(with nsEvent: NSEvent) {
-        isOneFlag = false
-        guard let key = nsEvent.key else { return }
-        let phase: Phase = nsEvent.isARepeat ? .changed : .began
-        if key.isTextEdit
-            && !rootEditor.modifierKeys.contains(.command)
-            && rootEditor.modifierKeys != .control
-            && rootEditor.modifierKeys != [.control, .option]
-            && !rootEditor.modifierKeys.contains(.function) {
-            
-            rootEditor.inputText(inputTextEventWith(nsEvent, key, phase))
-        } else {
-            rootEditor.inputKey(inputKeyEventWith(nsEvent, key,
-                                                isRepeat: nsEvent.isARepeat,
-                                                phase))
-        }
-    }
-    override func keyUp(with nsEvent: NSEvent) {
-        guard let key = nsEvent.key else { return }
-        let textEvent = inputTextEventWith(nsEvent, key, .ended)
-        if rootEditor.oldInputTextKeys.contains(textEvent.inputKeyType) {
-            rootEditor.inputText(textEvent)
-        }
-        if rootEditor.oldInputKeyEvent?.inputKeyType == key {
-            rootEditor.inputKey(inputKeyEventWith(nsEvent, key, .ended))
-        }
-    }
-    
-    private var beganDragEvent: DragEvent?,
-                oldPressureStage = 0, isDrag = false, isStrongDrag = false,
-                firstTime = 0.0, firstP = Point(), isMovedDrag = false
-    override func mouseDown(with nsEvent: NSEvent) {
-        isOneFlag = false
-        isDrag = false
-        isStrongDrag = false
-        let beganDragEvent = dragEventWith(nsEvent, .began)
-        self.beganDragEvent = beganDragEvent
-        oldPressureStage = 0
-        firstTime = beganDragEvent.time
-        firstP = beganDragEvent.screenPoint
-        isMovedDrag = false
-    }
-    override func mouseDragged(with nsEvent: NSEvent) {
-        guard let beganDragEvent = beganDragEvent else { return }
-        let dragEvent = dragEventWith(nsEvent, .changed)
-        guard dragEvent.screenPoint.distance(firstP) >= 2.5
-            || dragEvent.time - firstTime >= 0.1 else { return }
-        isMovedDrag = true
-        if !isDrag {
-            isDrag = true
-            if oldPressureStage == 2 {
-                isStrongDrag = true
-                rootEditor.strongDrag(beganDragEvent)
-            } else {
-                rootEditor.drag(beganDragEvent)
-            }
-        }
-        if isStrongDrag {
-            rootEditor.strongDrag(dragEventWith(nsEvent, .changed))
-        } else {
-            rootEditor.drag(dragEventWith(nsEvent, .changed))
-        }
-    }
-    override func mouseUp(with nsEvent: NSEvent) {
-        let endedDragEvent = dragEventWith(nsEvent, .ended)
-        if isDrag {
-            if isStrongDrag {
-                rootEditor.strongDrag(endedDragEvent)
-                isStrongDrag = false
-            } else {
-                rootEditor.drag(endedDragEvent)
-            }
-            isDrag = false
-        } else {
-            if oldPressureStage >= 2 {
-                quickLook(with: nsEvent)
-            } else {
-                guard let beganDragEvent = beganDragEvent else { return }
-                if isMovedDrag {
-                    rootEditor.drag(beganDragEvent)
-                    rootEditor.drag(endedDragEvent)
-                } else {
-                    rootEditor.inputKey(inputKeyEventWith(beganDragEvent, .began))
-                    Sleep.start()
-                    rootEditor.inputKey(inputKeyEventWith(beganDragEvent, .ended))
-                }
-            }
-        }
-        beganDragEvent = nil
-    }
-    
-    override func pressureChange(with event: NSEvent) {
-        oldPressureStage = max(event.stage, oldPressureStage)
-    }
-    
-    private var beganSubDragEvent: DragEvent?, isSubDrag = false, isSubTouth = false
-    override func rightMouseDown(with nsEvent: NSEvent) {
-        isOneFlag = false
-        isSubTouth = nsEvent.subtype == .touch
-        isSubDrag = false
-        let beganDragEvent = dragEventWith(nsEvent, .began)
-        self.beganSubDragEvent = beganDragEvent
-    }
-    override func rightMouseDragged(with nsEvent: NSEvent) {
-        guard let beganDragEvent = beganSubDragEvent else { return }
-        if !isSubDrag {
-            isSubDrag = true
-            rootEditor.subDrag(beganDragEvent)
-        }
-        rootEditor.subDrag(dragEventWith(nsEvent, .changed))
-    }
-    override func rightMouseUp(with nsEvent: NSEvent) {
-        let endedDragEvent = dragEventWith(nsEvent, .ended)
-        if isSubDrag {
-            rootEditor.subDrag(endedDragEvent)
-            isSubDrag = false
-        } else {
-            guard let beganDragEvent = beganSubDragEvent else { return }
-            if beganDragEvent.screenPoint != endedDragEvent.screenPoint {
-                rootEditor.subDrag(beganDragEvent)
-                rootEditor.subDrag(endedDragEvent)
-            } else {
-                showMenu(nsEvent)
-            }
-        }
-        if isSubTouth {
-            oldScrollPosition = nil
-        }
-        isSubTouth = false
-        beganSubDragEvent = nil
-    }
-    
-    private var menuEditor: Exporter?
-    func showMenu(_ nsEvent: NSEvent) {
-        guard window?.sheets.isEmpty ?? false else { return }
-        guard window?.isMainWindow ?? false else { return }
-        
-        let event = inputKeyEventWith(drag: nsEvent, .began)
-        rootEditor.updateLastEditedSheetpos(from: event)
-        let menu = NSMenu()
-        if menuEditor != nil {
-            menuEditor?.editor.end()
-        }
-        menuEditor = Exporter(rootEditor)
-        menuEditor?.send(event)
-        menu.delegate = self
-        menu.addItem(SubNSMenuItem(title: "Import...".localized, closure: { [weak self] in
-            guard let self else { return }
-            let editor = Importer(self.rootEditor)
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
-        }))
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(SubNSMenuItem(title: "Export as Image...".localized, closure: { [weak self] in
-            guard let self else { return }
-            let editor = ImageExporter(self.rootEditor)
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
-        }))
-        menu.addItem(SubNSMenuItem(title: "Export as 4K Image...".localized, closure: { [weak self] in
-            guard let self else { return }
-            let editor = Image4KExporter(self.rootEditor)
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
-        }))
-        menu.addItem(SubNSMenuItem(title: "Export as PDF...".localized, closure: { [weak self] in
-            guard let self else { return }
-            let editor = PDFExporter(self.rootEditor)
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
-        }))
-        menu.addItem(SubNSMenuItem(title: "Export as GIF...".localized, closure: { [weak self] in
-            guard let self else { return }
-            let editor = GIFExporter(self.rootEditor)
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
-        }))
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(SubNSMenuItem(title: "Export as Movie...".localized, closure: { [weak self] in
-            guard let self else { return }
-            let editor = MovieExporter(self.rootEditor)
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
-        }))
-        menu.addItem(SubNSMenuItem(title: "Export as 4K Movie...".localized, closure: { [weak self] in
-            guard let self else { return }
-            let editor = Movie4KExporter(self.rootEditor)
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
-        }))
-        menu.addItem(SubNSMenuItem(title: "Export as Sound...".localized, closure: { [weak self] in
-            guard let self else { return }
-            let editor = SoundExporter(self.rootEditor)
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
-        }))
-        menu.addItem(SubNSMenuItem(title: "Export as Linear PCM...".localized, closure: { [weak self] in
-            guard let self else { return }
-            let editor = LinearPCMExporter(self.rootEditor)
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
-        }))
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(SubNSMenuItem(title: "Export as Document...".localized, closure: { [weak self] in
-            guard let self else { return }
-            let editor = DocumentWithoutHistoryExporter(self.rootEditor)
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
-        }))
-        menu.addItem(SubNSMenuItem(title: "Export as Document with History...".localized, closure: { [weak self] in
-            guard let self else { return }
-            let editor = DocumentExporter(self.rootEditor)
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
-        }))
-        menu.addItem(NSMenuItem.separator())
-        menu.addItem(SubNSMenuItem(title: "Clear History...".localized, closure: { [weak self] in
-            guard let self else { return }
-            let editor = HistoryCleaner(self.rootEditor)
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
-        }))
-        
-//        menu.addItem(SubNSMenuItem(title: "test".localized, closure: { [weak self] in
-//            guard let self else { return }
-//            self.isEnabledPinch = !self.isEnabledPinch
-//            self.isEnabledScroll = !self.isEnabledScroll
-//            self.isEnabledRotate = !self.isEnabledRotate
-//        }))
-        
-        rootEditor.stopAllEvents()
-        NSMenu.popUpContextMenu(menu, with: nsEvent, for: self)
-    }
-    func menuDidClose(_ menu: NSMenu) {
-        menuEditor?.editor.end()
-        menuEditor = nil
-    }
-    
-    private var beganMiddleDragEvent: DragEvent?, isMiddleDrag = false
-    override func otherMouseDown(with nsEvent: NSEvent) {
-        isOneFlag = false
-        isMiddleDrag = false
-        let beganDragEvent = dragEventWith(nsEvent, .began)
-        self.beganMiddleDragEvent = beganDragEvent
-    }
-    override func otherMouseDragged(with nsEvent: NSEvent) {
-        guard let beganDragEvent = beganMiddleDragEvent else { return }
-        if !isMiddleDrag {
-            isMiddleDrag = true
-            rootEditor.middleDrag(beganDragEvent)
-        }
-        rootEditor.middleDrag(dragEventWith(nsEvent, .changed))
-    }
-    override func otherMouseUp(with nsEvent: NSEvent) {
-        let endedDragEvent = dragEventWith(nsEvent, .ended)
-        if isMiddleDrag {
-            rootEditor.middleDrag(endedDragEvent)
-            isMiddleDrag = false
-        } else {
-            guard let beganDragEvent = beganSubDragEvent else { return }
-            if beganDragEvent.screenPoint != endedDragEvent.screenPoint {
-                rootEditor.middleDrag(beganDragEvent)
-                rootEditor.middleDrag(endedDragEvent)
-            }
-        }
-        beganMiddleDragEvent = nil
-    }
-    
-    let scrollEndSec = 0.1
-    private var scrollTask: Task<(), any Error>?
-    override func scrollWheel(with nsEvent: NSEvent) {
-        guard !isEnabledScroll else { return }
-        
-        func beginEvent() -> Phase {
-            if scrollTask != nil {
-                scrollTask?.cancel()
-                scrollTask = nil
-                return .changed
-            } else {
-                return .began
-            }
-        }
-        func endEvent() {
-            scrollTask = Task {
-                try await Task.sleep(sec: scrollEndSec)
-                try Task.checkCancellation()
-                
-                var event = scrollEventWith(nsEvent, .ended, touchPhase: nil, momentumPhase: nil)
-                event.screenPoint = screenPointFromCursor.my
-                event.time += scrollEndSec
-                rootEditor.scroll(event)
-                
-                scrollTask = nil
-            }
-        }
-        if nsEvent.phase.contains(.began) {
-            allScrollPosition = .init()
-            rootEditor.scroll(scrollEventWith(nsEvent, beginEvent(), touchPhase: .began, momentumPhase: nil))
-        } else if nsEvent.phase.contains(.ended) {
-            rootEditor.scroll(scrollEventWith(nsEvent, .changed, touchPhase: .ended, momentumPhase: nil))
-            endEvent()
-        } else if nsEvent.phase.contains(.changed) {
-            var event = scrollEventWith(nsEvent, .changed,
-                                        touchPhase: .changed,
-                                        momentumPhase: nil)
-            var dp = event.scrollDeltaPoint
-            allScrollPosition += dp
-            switch snapScrollType {
-            case .x:
-                if abs(allScrollPosition.y) < 5 {
-                    dp.y = 0
-                } else {
-                    snapScrollType = .none
-                }
-            case .y:
-                if abs(allScrollPosition.x) < 5 {
-                    dp.x = 0
-                } else {
-                    snapScrollType = .none
-                }
-            case .none: break
-            }
-            event.scrollDeltaPoint = dp
-            
-            rootEditor.scroll(event)
-        } else {
-            if nsEvent.momentumPhase.contains(.began) {
-                var event = scrollEventWith(nsEvent, beginEvent(),
-                                            touchPhase: nil,
-                                            momentumPhase: .began)
-                var dp = event.scrollDeltaPoint
-                switch snapScrollType {
-                case .x: dp.y = 0
-                case .y: dp.x = 0
-                case .none: break
-                }
-                event.scrollDeltaPoint = dp
-                rootEditor.scroll(event)
-            } else if nsEvent.momentumPhase.contains(.ended) {
-                var event = scrollEventWith(nsEvent, .changed,
-                                            touchPhase: nil,
-                                            momentumPhase: .ended)
-                var dp = event.scrollDeltaPoint
-                switch snapScrollType {
-                case .x: dp.y = 0
-                case .y: dp.x = 0
-                case .none: break
-                }
-                event.scrollDeltaPoint = dp
-                rootEditor.scroll(event)
-                endEvent()
-            } else if nsEvent.momentumPhase.contains(.changed) {
-                var event = scrollEventWith(nsEvent, .changed,
-                                            touchPhase: nil,
-                                            momentumPhase: .changed)
-                var dp = event.scrollDeltaPoint
-                switch snapScrollType {
-                case .x: dp.y = 0
-                case .y: dp.x = 0
-                case .none: break
-                }
-                event.scrollDeltaPoint = dp
-                rootEditor.scroll(event)
-            }
-        }
-    }
-    
-    var oldTouchPoints = [TouchID: Point]()
-    var touchedIDs = [TouchID]()
-    
-    var isEnabledScroll = true
-    var isEnabledPinch = true
-    var isEnabledRotate = true
-    var isEnabledSwipe = true
-    var isEnabledPlay = true
-    
-    var isBeganScroll = false, oldScrollPosition: Point?, allScrollPosition = Point()
-    var isBeganPinch = false, oldPinchDistance: Double?
-    var isBeganRotate = false, oldRotateAngle: Double?
-    var isPreparePlay = false
-    var scrollVs = [(dp: Point, time: Double)]()
-    var pinchVs = [(d: Double, time: Double)]()
-    var rotateVs = [(d: Double, time: Double)]()
-    var lastScrollDeltaPosition = Point()
-    enum  SnapScrollType {
-        case none, x, y
-    }
-    var snapScrollType = SnapScrollType.none
-    var lastMagnification = 0.0
-    var lastRotationQuantity = 0.0
-    var isBeganSwipe = false, swipePosition: Point?
-    
-    private var scrollTimeValue = 0.0
-    private var scrollTimer: (any DispatchSourceTimer)?
-    private var pinchTimeValue = 0.0
-    private var pinchTimer: (any DispatchSourceTimer)?
-    
-    struct TouchID: Hashable {
-        var id: any NSCopying & NSObjectProtocol
-        
-        static func ==(lhs: Self, rhs: Self) -> Bool {
-            lhs.id.isEqual(rhs.id)
-        }
-        func hash(into hasher: inout Hasher) {
-            hasher.combine(id.hash)
-        }
-    }
-    func touchPoints(with event: NSEvent) -> [TouchID: Point] {
-        let touches = event.touches(matching: .touching, in: self)
-        return touches.reduce(into: [TouchID: Point]()) {
-            $0[.init(id: $1.identity)] =
-            Point(Double($1.normalizedPosition.x * $1.deviceSize.width),
-                  Double($1.normalizedPosition.y * $1.deviceSize.height))
-        }
-    }
-    override func touchesBegan(with event: NSEvent) {
-        let ps = touchPoints(with: event)
-        oldTouchPoints = ps
-        touchedIDs = Array(ps.keys)
-        if ps.count == 2 {
-            swipePosition = nil
-            let ps0 = ps[touchedIDs[0]]!, ps1 = ps[touchedIDs[1]]!
-            oldPinchDistance = ps0.distance(ps1)
-            oldRotateAngle = ps0.angle(ps1)
-            oldScrollPosition = ps0.mid(ps1)
-            isBeganPinch = false
-            isBeganScroll = false
-            isBeganRotate = false
-            snapScrollType = .none
-            lastScrollDeltaPosition = .init()
-            lastMagnification = 0
-            pinchVs = []
-            scrollVs = []
-            rotateVs = []
-        } else if ps.count == 3 {
-            oldPinchDistance = nil
-            oldRotateAngle = nil
-            oldScrollPosition = nil
-            
-            isBeganSwipe = false
-            swipePosition = Point()
-        } else if ps.count == 4 {
-            oldPinchDistance = nil
-            oldRotateAngle = nil
-            oldScrollPosition = nil
-            
-            oldScrollPosition = (0 ..< 4).map { ps[touchedIDs[$0]]! }.mean()!
-            isPreparePlay = true
-        }
-    }
-    override func touchesMoved(with event: NSEvent) {
-        let ps = touchPoints(with: event)
-        if ps.count == 2 {
-            if touchedIDs.count == 2,
-                isEnabledPinch || isEnabledScroll,
-                let oldPinchDistance, let oldRotateAngle,
-                let oldScrollPosition,
-                let ps0 = ps[touchedIDs[0]],
-                let ps1 = ps[touchedIDs[1]],
-                let ops0 = oldTouchPoints[touchedIDs[0]],
-                let ops1 = oldTouchPoints[touchedIDs[1]] {
-               
-                let nps0 = ps0.mid(ops0), nps1 = ps1.mid(ops1)
-                let nPinchDistance = nps0.distance(nps1)
-                let nRotateAngle = nps0.angle(nps1)
-                let nScrollPosition = nps0.mid(nps1)
-                if isEnabledPinch
-                    && !isBeganScroll && !isBeganPinch && !isBeganRotate
-                    && abs(Edge(ops0, ps0).angle(Edge(ops1, ps1))) > .pi / 2
-                    && abs(nPinchDistance - oldPinchDistance) > 6
-                    && nScrollPosition.distance(oldScrollPosition) <= 5 {
-                    
-                    isBeganPinch = true
-                    
-                    scrollTimer?.cancel()
-                    scrollTimer = nil
-                    pinchTimer?.cancel()
-                    pinchTimer = nil
-                    rootEditor.pinch(.init(screenPoint: screenPoint(with: event).my,
-                                         time: event.timestamp,
-                                         magnification: 0,
-                                         phase: .began))
-                    pinchVs.append((0, event.timestamp))
-                    self.oldPinchDistance = nPinchDistance
-                    lastMagnification = 0
-                } else if isBeganPinch {
-                    let magnification = (nPinchDistance - oldPinchDistance) * 0.0125
-                    rootEditor.pinch(.init(screenPoint: screenPoint(with: event).my,
-                                         time: event.timestamp,
-                                         magnification: magnification.mid(lastMagnification),
-                                         phase: .changed))
-                    pinchVs.append((magnification, event.timestamp))
-                    self.oldPinchDistance = nPinchDistance
-                    lastMagnification = magnification
-                } else if isEnabledScroll && !(isSubDrag && isSubTouth)
-                            && !isBeganScroll && !isBeganPinch
-                            && !isBeganRotate
-                            && abs(nPinchDistance - oldPinchDistance) <= 6
-                            && nScrollPosition.distance(oldScrollPosition) > 5 {
-                    isBeganScroll = true
-                    
-                    scrollTimer?.cancel()
-                    scrollTimer = nil
-                    pinchTimer?.cancel()
-                    pinchTimer = nil
-                    rootEditor.scroll(.init(screenPoint: screenPoint(with: event).my,
-                                          time: event.timestamp,
-                                          scrollDeltaPoint: .init(),
-                                          phase: .began,
-                                          touchPhase: .began,
-                                          momentumPhase: nil))
-                    scrollVs.append((.init(), event.timestamp))
-                    self.oldScrollPosition = nScrollPosition
-                    lastScrollDeltaPosition = .init()
-                    let dp = nScrollPosition - oldScrollPosition
-                    snapScrollType = min(abs(dp.x), abs(dp.y)) < 3
-                        ? (abs(dp.x) > abs(dp.y) ? .x : .y) : .none
-                    
-                    allScrollPosition = .init()
-                } else if isBeganScroll {
-                    var dp = nScrollPosition - oldScrollPosition
-                    allScrollPosition += dp
-                    switch snapScrollType {
-                    case .x:
-                        if abs(allScrollPosition.y) < 5 {
-                            dp.y = 0
-                        } else {
-                            snapScrollType = .none
-                        }
-                    case .y:
-                        if abs(allScrollPosition.x) < 5 {
-                            dp.x = 0
-                        } else {
-                            snapScrollType = .none
-                        }
-                    case .none: break
-                    }
-                    let angle = dp.angle()
-                    let dpl = dp.length() * 3.25
-                    let length = dpl < 15 ? dpl : dpl
-                        .clipped(min: 15, max: 200,
-                                 newMin: 15, newMax: 500)
-                    let scrollDeltaPosition = Point()
-                        .movedWith(distance: length, angle: angle)
-                    
-                    rootEditor.scroll(.init(screenPoint: screenPoint(with: event).my,
-                                          time: event.timestamp,
-                                          scrollDeltaPoint: scrollDeltaPosition.mid(lastScrollDeltaPosition),
-                                          phase: .changed,
-                                          touchPhase: .changed,
-                                          momentumPhase: nil))
-                    scrollVs.append((scrollDeltaPosition, event.timestamp))
-                    self.oldScrollPosition = nScrollPosition
-                    lastScrollDeltaPosition = scrollDeltaPosition
-                } else if isEnabledRotate
-                            && !isBeganScroll && !isBeganPinch && !isBeganRotate
-                            && nPinchDistance > 120
-                            && abs(nPinchDistance - oldPinchDistance) <= 6
-                            && nScrollPosition.distance(oldScrollPosition) <= 5
-                            && abs(nRotateAngle.differenceRotation(oldRotateAngle)) > .pi * 0.02 {
-                    
-                    isBeganRotate = true
-                    
-                    scrollTimer?.cancel()
-                    scrollTimer = nil
-                    pinchTimer?.cancel()
-                    pinchTimer = nil
-                    rootEditor.rotate(.init(screenPoint: screenPoint(with: event).my,
-                                         time: event.timestamp,
-                                         rotationQuantity: 0,
-                                         phase: .began))
-                    self.oldRotateAngle = nRotateAngle
-                    lastRotationQuantity = 0
-                } else if isBeganRotate {
-                    let rotationQuantity = nRotateAngle.differenceRotation(oldRotateAngle) * 80
-                    rootEditor.rotate(.init(screenPoint: screenPoint(with: event).my,
-                                          time: event.timestamp,
-                                          rotationQuantity: rotationQuantity.mid(lastRotationQuantity),
-                                          phase: .changed))
-                    self.oldRotateAngle = nRotateAngle
-                    lastRotationQuantity = rotationQuantity
-                }
-            }
-        } else if ps.count == 3 {
-            if touchedIDs.count == 3,
-               isEnabledSwipe, let swipePosition,
-               let ps0 = ps[touchedIDs[0]],
-               let ops0 = oldTouchPoints[touchedIDs[0]],
-               let ps1 = ps[touchedIDs[1]],
-               let ops1 = oldTouchPoints[touchedIDs[1]],
-               let ps2 = ps[touchedIDs[2]],
-               let ops2 = oldTouchPoints[touchedIDs[2]] {
-                
-                let deltaP = [ps0 - ops0, ps1 - ops1, ps2 - ops2].sum()
-                
-                if !isBeganSwipe && abs(deltaP.x) > abs(deltaP.y) {
-                    isBeganSwipe = true
-                    
-                    rootEditor.swipe(.init(screenPoint: screenPoint(with: event).my,
-                                         time: event.timestamp,
-                                         scrollDeltaPoint: Point(),
-                                         phase: .began))
-                    self.swipePosition = swipePosition + deltaP
-                } else if isBeganSwipe {
-                    rootEditor.swipe(.init(screenPoint: screenPoint(with: event).my,
-                                         time: event.timestamp,
-                                         scrollDeltaPoint: deltaP,
-                                         phase: .changed))
-                    self.swipePosition = swipePosition + deltaP
-                }
-            }
-        } else if ps.count == 4 {
-            let vs = (0 ..< 4).compactMap { ps[touchedIDs[$0]] }
-            if let oldScrollPosition, vs.count == 4 {
-                let np = vs.mean()!
-                if np.distance(oldScrollPosition) > 5 {
-                    isPreparePlay = false
-                }
-            }
-        } else {
-            if swipePosition != nil, isBeganSwipe {
-                rootEditor.swipe(.init(screenPoint: screenPoint(with: event).my,
-                                     time: event.timestamp,
-                                     scrollDeltaPoint: Point(),
-                                     phase: .ended))
-                swipePosition = nil
-                isBeganSwipe = false
-            }
-            
-            endPinch(with: event)
-            endRotate(with: event)
-            endScroll(with: event)
-        }
-        
-        oldTouchPoints = ps
-    }
-    override func touchesEnded(with event: NSEvent) {
-        if oldTouchPoints.count == 4 {
-            if isEnabledPlay && isPreparePlay {
-                var event = inputKeyEventWith(event, .click, .began)
-                event.inputKeyType = .control
-                let player = Player(rootEditor)
-                player.send(event)
-                Sleep.start()
-                event.phase = .ended
-                player.send(event)
-            }
-        }
-        
-        if swipePosition != nil {
-            rootEditor.swipe(.init(screenPoint: screenPoint(with: event).my,
-                                 time: event.timestamp,
-                                 scrollDeltaPoint: Point(),
-                                 phase: .ended))
-            swipePosition = nil
-            isBeganSwipe = false
-        }
-        
-        endPinch(with: event)
-        endRotate(with: event)
-        endScroll(with: event)
-        
-        oldTouchPoints = [:]
-        touchedIDs = []
-    }
-    
-    func endPinch(with event: NSEvent,
-                  timeInterval: Double = 1 / 60) {
-        guard isBeganPinch else { return }
-        self.oldPinchDistance = nil
-        isBeganPinch = false
-        guard pinchVs.count >= 2 else { return }
-        
-        let fpi = pinchVs[..<(pinchVs.count - 1)]
-            .lastIndex(where: { event.timestamp - $0.time > 0.05 }) ?? 0
-        let lpv = pinchVs.last!
-        let t = timeInterval + lpv.time
-        
-        let sd = pinchVs.last!.d
-        let sign = sd < 0 ? -1.0 : 1.0
-        let (a, b) = Double.leastSquares(xs: pinchVs[fpi...].map { $0.time },
-                                         ys: pinchVs[fpi...].map { abs($0.d) })
-        let v = min(a * t + b, 10)
-        let tv = v / timeInterval
-        let minTV = 0.01
-        let sv = tv / (tv - minTV)
-        if tv.isNaN || v < 0.04 || a == 0 {
-            rootEditor.pinch(.init(screenPoint: screenPoint(with: event).my,
-                                 time: event.timestamp,
-                                 magnification: 0,
-                                 phase: .ended))
-        } else {
-            pinchTimeValue = tv
-            let screenPoint = screenPoint(with: event).my, time = event.timestamp
-            pinchTimer = DispatchSource.scheduledTimer(withTimeInterval: timeInterval) { [weak self] in
-                DispatchQueue.main.async { [weak self] in
-                    guard let self else { return }
-                    let ntv = self.pinchTimeValue * 0.8
-                    self.pinchTimeValue = ntv
-                    if ntv < minTV {
-                        self.pinchTimer?.cancel()
-                        self.pinchTimer = nil
-                        self.pinchTimeValue = 0
-                        
-                        self.rootEditor.pinch(.init(screenPoint: screenPoint,
-                                              time: time,
-                                              magnification: 0,
-                                              phase: .ended))
-                    } else {
-                        let m = timeInterval * (ntv - minTV) * sv * sign
-                        self.rootEditor.pinch(.init(screenPoint: screenPoint,
-                                              time: time,
-                                              magnification: m,
-                                              phase: .changed))
-                    }
-                }
-            }
-        }
-    }
-    func endRotate(with event: NSEvent) {
-        guard isBeganRotate else { return }
-        self.oldRotateAngle = nil
-        isBeganRotate = false
-        guard rotateVs.count >= 2 else { return }
-        
-        rootEditor.rotate(.init(screenPoint: screenPoint(with: event).my,
-                             time: event.timestamp,
-                             rotationQuantity: 0,
-                             phase: .ended))
-    }
-    func endScroll(with event: NSEvent,
-                   timeInterval: Double = 1 / 60) {
-        guard isBeganScroll else { return }
-        self.oldScrollPosition = nil
-        isBeganScroll = false
-        guard scrollVs.count >= 2 else { return }
-        
-        let fsi = scrollVs[..<(scrollVs.count - 1)]
-            .lastIndex(where: { event.timestamp - $0.time > 0.05 }) ?? 0
-        let lsv = scrollVs.last!
-        let t = timeInterval + lsv.time
-        
-        let sdp = scrollVs.last!.dp
-        let angle = sdp.angle()
-        let (a, b) = Double.leastSquares(xs: scrollVs[fsi...].map { $0.time },
-                            ys: scrollVs[fsi...].map { $0.dp.length() })
-        let v = min(a * t + b, 700)
-        let scale = v.clipped(min: 100, max: 700,
-                              newMin: 0.9, newMax: 0.95)
-        let tv = v / timeInterval
-        let minTV = 100.0
-        let sv = tv / (tv - minTV)
-        if tv.isNaN || v < 5 || a == 0 {
-            rootEditor.scroll(.init(screenPoint: screenPoint(with: event).my,
-                                  time: event.timestamp,
-                                  scrollDeltaPoint: .init(),
-                                  phase: .ended,
-                                  touchPhase: .ended,
-                                  momentumPhase: nil))
-        } else {
-            rootEditor.scroll(.init(screenPoint: screenPoint(with: event).my,
-                                  time: event.timestamp,
-                                  scrollDeltaPoint: .init(),
-                                  phase: .changed,
-                                  touchPhase: .ended,
-                                  momentumPhase: .began))
-            
-            scrollTimeValue = tv
-            let screenPoint = screenPoint(with: event).my, time = event.timestamp
-            scrollTimer = DispatchSource.scheduledTimer(withTimeInterval: timeInterval) { [weak self] in
-                DispatchQueue.main.async { [weak self] in
-                    guard let self else { return }
-                    let ntv = self.scrollTimeValue * scale
-                    self.scrollTimeValue = ntv
-                    let sdp = Point().movedWith(distance: timeInterval * (ntv - minTV) * sv,
-                                                angle: angle)
-                    if ntv < minTV {
-                        self.scrollTimer?.cancel()
-                        self.scrollTimer = nil
-                        self.scrollTimeValue = 0
-                        
-                        self.rootEditor.scroll(.init(screenPoint: screenPoint,
-                                              time: time,
-                                              scrollDeltaPoint: .init(),
-                                              phase: .ended,
-                                              touchPhase: nil, momentumPhase: .ended))
-                    } else {
-                        self.rootEditor.scroll(.init(screenPoint: screenPoint,
-                                              time: time,
-                                              scrollDeltaPoint: sdp,
-                                              phase: .changed,
-                                              touchPhase: nil, momentumPhase: .changed))
-                    }
-                }
-            }
-        }
-    }
-    
-    func cancelScroll(with event: NSEvent) {
-        scrollTimer?.cancel()
-        scrollTimer = nil
-        
-        guard isBeganScroll else { return }
-        isBeganScroll = false
-        rootEditor.scroll(.init(screenPoint: screenPoint(with: event).my,
-                              time: event.timestamp,
-                              scrollDeltaPoint: .init(),
-                              phase: .ended,
-                              touchPhase: .ended,
-                              momentumPhase: nil))
-        oldScrollPosition = nil
-    }
-    func cancelPinch(with event: NSEvent) {
-        pinchTimer?.cancel()
-        pinchTimer = nil
-        
-        guard isBeganPinch else { return }
-        isBeganPinch = false
-        rootEditor.pinch(.init(screenPoint: screenPoint(with: event).my,
-                             time: event.timestamp,
-                             magnification: 0,
-                             phase: .ended))
-        oldPinchDistance = nil
-    }
-    func cancelRotatte(with event: NSEvent) {
-        guard isBeganRotate else { return }
-        isBeganRotate = false
-        rootEditor.rotate(.init(screenPoint: screenPoint(with: event).my,
-                             time: event.timestamp,
-                              rotationQuantity: 0,
-                             phase: .ended))
-        oldRotateAngle = nil
-    }
-    override func touchesCancelled(with event: NSEvent) {
-        if swipePosition != nil {
-            rootEditor.swipe(.init(screenPoint: screenPoint(with: event).my,
-                                 time: event.timestamp,
-                                 scrollDeltaPoint: .init(),
-                                 phase: .ended))
-            swipePosition = nil
-            isBeganSwipe = false
-        }
-        
-        cancelScroll(with: event)
-        cancelRotatte(with: event)
-        cancelPinch(with: event)
-        
-        oldTouchPoints = [:]
-        touchedIDs = []
-    }
-    
-    private enum TouchGesture {
-        case none, pinch, rotate
-    }
-    private var blockGesture = TouchGesture.none
-    override func magnify(with nsEvent: NSEvent) {
-        guard !isEnabledPinch else { return }
-        if nsEvent.phase.contains(.began) {
-            blockGesture = .pinch
-            pinchVs = []
-            rootEditor.pinch(pinchEventWith(nsEvent, .began))
-        } else if nsEvent.phase.contains(.ended) {
-            blockGesture = .none
-            rootEditor.pinch(pinchEventWith(nsEvent, .ended))
-            pinchVs = []
-        } else if nsEvent.phase.contains(.changed) {
-            pinchVs.append((Double(nsEvent.magnification), nsEvent.timestamp))
-            rootEditor.pinch(pinchEventWith(nsEvent, .changed))
-        }
-    }
-    
-    private var isFirstStoppedRotation = true
-    private var isBlockedRotation = false
-    private var rotatedValue: Float = 0.0
-    private let blockRotationValue: Float = 4.0
-    override func rotate(with nsEvent: NSEvent) {
-        guard !isEnabledRotate else { return }
-        if nsEvent.phase.contains(.began) {
-            if blockGesture != .pinch {
-                isBlockedRotation = false
-                isFirstStoppedRotation = true
-                rotatedValue = nsEvent.rotation
-            } else {
-                isBlockedRotation = true
-            }
-        } else if nsEvent.phase.contains(.ended) {
-            if !isBlockedRotation {
-                if !isFirstStoppedRotation {
-                    isFirstStoppedRotation = true
-                    rootEditor.rotate(rotateEventWith(nsEvent, .ended))
-                }
-            } else {
-                isBlockedRotation = false
-            }
-        } else if nsEvent.phase.contains(.changed) {
-            if !isBlockedRotation {
-                rotatedValue += abs(nsEvent.rotation)
-                if rotatedValue > blockRotationValue {
-                    if isFirstStoppedRotation {
-                        isFirstStoppedRotation = false
-                        rootEditor.rotate(rotateEventWith(nsEvent, .began))
-                    } else {
-                        rootEditor.rotate(rotateEventWith(nsEvent, .changed))
-                    }
-                }
-            }
-        }
-    }
-    
-    override func quickLook(with nsEvent: NSEvent) {
-        guard window?.sheets.isEmpty ?? false else { return }
-        
-        rootEditor.inputKey(inputKeyEventWith(nsEvent, .lookUpTap, .began))
-        Sleep.start()
-        rootEditor.inputKey(inputKeyEventWith(nsEvent, .lookUpTap, .ended))
-    }
-    
-    func windowLevel() -> Int {
-        window?.level.rawValue ?? 0
-    }
-    func validAttributesForMarkedText() -> [NSAttributedString.Key] {
-        [.markedClauseSegment, .glyphInfo]
-    }
-    func hasMarkedText() -> Bool {
-        rootEditor.rootView.editingTextView?.isMarked ?? false
-    }
-    func markedRange() -> NSRange {
-        if let textView = rootEditor.rootView.editingTextView,
-           let range = textView.markedRange {
-            return textView.model.string.nsRange(from: range)
-                ?? NSRange(location: NSNotFound, length: 0)
-        } else {
-            return NSRange(location: NSNotFound, length: 0)
-        }
-    }
-    func selectedRange() -> NSRange {
-        if let textView = rootEditor.rootView.editingTextView,
-           let range = textView.selectedRange {
-            return textView.model.string.nsRange(from: range)
-                ?? NSRange(location: NSNotFound, length: 0)
-        } else {
-            return NSRange(location: NSNotFound, length: 0)
-        }
-    }
-    func attributedString() -> NSAttributedString {
-        if let text = rootEditor.rootView.editingTextView?.model {
-            return NSAttributedString(string: text.string.nsBased,
-                                      attributes: text.typobute.attributes())
-        } else {
-            return NSAttributedString()
-        }
-    }
-    func attributedSubstring(forProposedRange nsRange: NSRange,
-                             actualRange: NSRangePointer?) -> NSAttributedString? {
-        actualRange?.pointee = nsRange
-        let attString = attributedString()
-        if nsRange.location >= 0 && nsRange.upperBound <= attString.length {
-            return attString.attributedSubstring(from: nsRange)
-        } else {
-            return nil
-        }
-    }
-    func fractionOfDistanceThroughGlyph(for point: NSPoint) -> CGFloat {
-        let p = convertFromTopScreen(point).my
-        let d = rootEditor.textEditor.characterRatio(for: p)
-        return CGFloat(d ?? 0)
-    }
-    func characterIndex(for nsP: NSPoint) -> Int {
-        let p = convertFromTopScreen(nsP).my
-        if let i = rootEditor.textEditor.characterIndex(for: p),
-           let string = rootEditor.rootView.editingTextView?.model.string {
-            
-            return string.nsIndex(from: i)
-        } else {
-            return 0
-        }
-    }
-    func firstRect(forCharacterRange nsRange: NSRange,
-                   actualRange: NSRangePointer?) -> NSRect {
-        if let string = rootEditor.rootView.editingTextView?.model.string,
-           let range = string.range(fromNS: nsRange),
-           let rect = rootEditor.textEditor.firstRect(for: range) {
-            return convertToTopScreen(rect.cg)
-        } else {
-            return NSRect()
-        }
-    }
-    func baselineDeltaForCharacter(at nsI: Int) -> CGFloat {
-        if let string = rootEditor.rootView.editingTextView?.model.string,
-           let i = string.index(fromNS: nsI),
-           let d = rootEditor.textEditor.baselineDelta(at: i) {
-            
-            return CGFloat(d)
-        } else {
-            return 0
-        }
-    }
-    func drawsVerticallyForCharacter(at nsI: Int) -> Bool {
-        if let o = rootEditor.rootView.editingTextView?.textOrientation {
-            return o == .vertical
-        } else {
-            return false
-        }
-    }
-    
-    func unmarkText() {
-        rootEditor.textEditor.unmark()
-    }
-    
-    func setMarkedText(_ str: Any,
-                       selectedRange selectedNSRange: NSRange,
-                       replacementRange replacementNSRange: NSRange) {
-        guard let string = rootEditor.rootView.editingTextView?.model.string else { return }
-        let range = string.range(fromNS: replacementNSRange)
-        
-        func mark(_ mStr: String) {
-            if let markingRange = mStr.range(fromNS: selectedNSRange) {
-                rootEditor.textEditor.mark(mStr, markingRange: markingRange, at: range)
-            }
-        }
-        if let attString = str as? NSAttributedString {
-            mark(attString.string.swiftBased)
-        } else if let nsString = str as? NSString {
-            mark((nsString as String).swiftBased)
-        }
-    }
-    func insertText(_ str: Any, replacementRange: NSRange) {
-        guard let string = rootEditor.rootView.editingTextView?.model.string else { return }
-        let range = string.range(fromNS: replacementRange)
-        
-        if let attString = str as? NSAttributedString {
-            rootEditor.textEditor.insert(attString.string.swiftBased, at: range)
-        } else if let nsString = str as? NSString {
-            rootEditor.textEditor.insert((nsString as String).swiftBased, at: range)
-        }
-    }
-    
-//    // control return
-//    override func insertLineBreak(_ sender: Any?) {}
-//    // option return
-//    override func insertNewlineIgnoringFieldEditor(_ sender: Any?) {}
-    override func insertNewline(_ sender: Any?) {
-        rootEditor.textEditor.insertNewline()
-    }
-    override func insertTab(_ sender: Any?) {
-        rootEditor.textEditor.insertTab()
-    }
-    override func deleteBackward(_ sender: Any?) {
-        rootEditor.textEditor.deleteBackward()
-    }
-    override func deleteForward(_ sender: Any?) {
-        rootEditor.textEditor.deleteForward()
-    }
-    override func moveLeft(_ sender: Any?) {
-        rootEditor.textEditor.moveLeft()
-    }
-    override func moveRight(_ sender: Any?) {
-        rootEditor.textEditor.moveRight()
-    }
-    override func moveUp(_ sender: Any?) {
-        rootEditor.textEditor.moveUp()
-    }
-    override func moveDown(_ sender: Any?) {
-        rootEditor.textEditor.moveDown()
-    }
-}
-extension SubMTKView {
-    override func draw(_ dirtyRect: NSRect) {
-        autoreleasepool { self.render() }
-    }
-    func render() {
-        guard let commandBuffer
-                = Renderer.shared.commandQueue.makeCommandBuffer() else { return }
-        guard let renderPassDescriptor = currentRenderPassDescriptor,
-              let drawable = currentDrawable else {
-            commandBuffer.commit()
-            return
-        }
-        renderPassDescriptor.colorAttachments[0].texture = multisampleColorTexture
-        renderPassDescriptor.colorAttachments[0].resolveTexture = drawable.texture
-        renderPassDescriptor.stencilAttachment.texture = depthStencilTexture
-        
-        if let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: renderPassDescriptor) {
-            let ctx = Context(encoder, renderstate)
-            let wtvTransform = rootView.worldToViewportTransform
-            let wtsScale = rootView.worldToScreenScale
-            rootView.node.draw(with: wtvTransform, scale: wtsScale, in: ctx)
-            
-            if isShownDebug || isShownClock {
-                drawDebugNode(in: ctx)
-            }
-            if !isHiddenActionList {
-                let t = rootView.screenToViewportTransform
-                actionNode?.draw(with: t, scale: 1, in: ctx)
-            }
-            
-            ctx.encoder.endEncoding()
-        }
-        
-        commandBuffer.present(drawable)
-        commandBuffer.commit()
-    }
-    func drawDebugNode(in context: Context) {
-        updateDebugCount += 1
-        if updateDebugCount >= 10 {
-            updateDebugCount = 0
-            let size = Renderer.shared.device.currentAllocatedSize
-            let debugGPUSize = Int(Double(size) / (1024 * 1024))
-            let maxSize = Renderer.shared.device.recommendedMaxWorkingSetSize
-            let debugMaxGPUSize = Int(Double(maxSize) / (1024 * 1024))
-            let string0 = isShownClock ? "\(Date().defaultString)" : ""
-            let string1 = isShownDebug ? "GPU Memory: \(debugGPUSize) / \(debugMaxGPUSize) MB" : ""
-            debugNode.path = Text(string: string0 + (isShownClock && isShownDebug ? " " : "") + string1).typesetter.path()
-        }
-        let t = rootView.screenToViewportTransform
-        debugNode.draw(with: t, scale: 1, in: context)
-    }
-}
-extension SubMTKView: @preconcurrency NodeOwner {}
-
 final class Context {
-    fileprivate var encoder: any MTLRenderCommandEncoder
+    var encoder: any MTLRenderCommandEncoder
     fileprivate let rs: Renderstate
     
-    fileprivate init(_ encoder: any MTLRenderCommandEncoder,
-                     _ rs: Renderstate) {
+    init(_ encoder: any MTLRenderCommandEncoder, _ rs: Renderstate) {
         self.encoder = encoder
         self.rs = rs
     }
@@ -2579,103 +352,6 @@ final class Context {
     }
     func setClippingDepthStencil() {
         encoder.setDepthStencilState(rs.clippingDepthStencilState)
-    }
-}
-
-extension Node {
-    @MainActor func moveCursor(to sp: Point) {
-        if let subMTKView = owner as? SubMTKView, let h = NSScreen.main?.frame.height {
-            let np = subMTKView.convertToTopScreen(sp.cg)
-            CGDisplayMoveCursorToPoint(0, CGPoint(x: np.x, y: h - np.y))
-        }
-    }
-    @MainActor func show(definition: String, font: Font, orientation: Orientation, at p: Point) {
-        if let owner = owner as? SubMTKView {
-            let attributes = Typobute(font: font,
-                                      orientation: orientation).attributes()
-            let attString = NSAttributedString(string: definition,
-                                               attributes: attributes)
-            let sp = owner.rootView.convertWorldToScreen(convertToWorld(p))
-            owner.showDefinition(for: attString, at: sp.cg)
-        }
-    }
-    
-    @MainActor func show(_ error: any Error) {
-        guard let window = (owner as? SubMTKView)?.window else { return }
-        NSAlert(error: error).beginSheetModal(for: window,
-                                              completionHandler: { _ in })
-    }
-    
-    @MainActor func show(message: String = "", infomation: String = "", isCaution: Bool = false) {
-        guard let window = (owner as? SubMTKView)?.window else { return }
-        let alert = NSAlert()
-        alert.messageText = message
-        alert.informativeText = infomation
-        if isCaution {
-            alert.alertStyle = .critical
-            alert.window.defaultButtonCell = nil
-        }
-        alert.beginSheetModal(for: window) { _ in }
-    }
-    
-    enum AlertResult {
-        case ok, cancel
-    }
-    @MainActor func show(message: String, infomation: String, okTitle: String,
-                         isSaftyCheck: Bool = false,
-                         isDefaultButton: Bool = false) async -> AlertResult {
-        guard let window = (owner as? SubMTKView)?.window else { return .cancel }
-        let alert = NSAlert()
-        let okButton = alert.addButton(withTitle: okTitle)
-        alert.addButton(withTitle: "Cancel".localized)
-        alert.messageText = message
-        if isSaftyCheck {
-            okButton.isEnabled = false
-            
-            let textField = SubNSCheckbox(onTitle: "Enable the run button".localized,
-                                          offTitle: "Disable the run button".localized) { [weak okButton] bool in
-                okButton?.isEnabled = bool
-            }
-            alert.accessoryView = textField
-        }
-        alert.informativeText = infomation
-        alert.alertStyle = .critical
-        if !isDefaultButton {
-            alert.window.defaultButtonCell = nil
-        }
-        let result = await alert.beginSheetModal(for: window)
-        return switch result {
-        case .alertFirstButtonReturn: .ok
-        default: .cancel
-        }
-    }
-    
-    @MainActor func show(message: String, infomation: String, titles: [String]) async -> Int? {
-        guard let window = (owner as? SubMTKView)?.window else { return nil }
-        let alert = NSAlert()
-        for title in titles {
-            alert.addButton(withTitle: title)
-        }
-        alert.messageText = message
-        alert.informativeText = infomation
-        return await alert.beginSheetModal(for: window).rawValue
-    }
-    
-    @MainActor func show(message: String, infomation: String) async {
-        guard let window = (owner as? SubMTKView)?.window else { return }
-        let alert = NSAlert()
-        alert.addButton(withTitle: "Done".localized)
-        alert.messageText = message
-        alert.informativeText = infomation
-        
-        _ = await alert.beginSheetModal(for: window)
-    }
-    
-    @MainActor func show(_ progressPanel: ProgressPanel) {
-        guard let window = (owner as? SubMTKView)?.window else { return }
-        progressPanel.topWindow = window
-        progressPanel.begin()
-        window.beginSheet(progressPanel.window) { _ in }
     }
 }
 
@@ -3926,5 +1602,472 @@ extension CPUNode {
         if !isIdentityFromLocal {
             ctx.restoreGState()
         }
+    }
+}
+
+struct Image {
+    let cg: CGImage
+    
+    init(cgImage: CGImage) {
+        self.cg = cgImage
+    }
+    init?(data: Data) {
+        guard let cgImageSource
+                = CGImageSourceCreateWithData(data as CFData, nil) else {
+            return nil
+        }
+        guard let cg
+                = CGImageSourceCreateImageAtIndex(cgImageSource, 0, nil) else {
+            return nil
+        }
+        self.cg = cg
+    }
+    init?(url: URL) {
+        let dic = [kCGImageSourceShouldCacheImmediately: kCFBooleanTrue]
+        guard let s = CGImageSourceCreateWithURL(url as CFURL,
+                                                 dic as CFDictionary),
+              let cgImage = CGImageSourceCreateImageAtIndex(s, 0, dic as CFDictionary),
+              let cs = CGColorSpace.sRGBColorSpace else { return nil }
+        
+        if cgImage.colorSpace?.name == cs.name
+            && ((cgImage.bitmapInfo.rawValue & CGImageAlphaInfo.premultipliedLast.rawValue) != 0
+                || (cgImage.bitmapInfo.rawValue & CGImageAlphaInfo.noneSkipLast.rawValue) != 0) {
+            cg = cgImage
+        } else {
+            let isNoneAlpha = (cgImage.bitmapInfo.rawValue & CGImageAlphaInfo.noneSkipLast.rawValue) != 0
+            || (cgImage.bitmapInfo.rawValue & CGImageAlphaInfo.noneSkipFirst.rawValue) != 0
+            || (cgImage.bitmapInfo.rawValue & CGImageAlphaInfo.none.rawValue) != 0
+            let bitmapInfo = CGBitmapInfo(rawValue: isNoneAlpha ?
+                                          CGImageAlphaInfo.noneSkipLast.rawValue : CGImageAlphaInfo.premultipliedLast.rawValue)
+            guard let data = cgImage.dataProvider,
+                  let colorSpace = cgImage.colorSpace,
+                  let nCGImage = CGImage(width: cgImage.width,
+                                       height: cgImage.height,
+                                       bitsPerComponent: cgImage.bitsPerComponent,
+                                       bitsPerPixel: cgImage.bitsPerPixel,
+                                       bytesPerRow: cgImage.bytesPerRow,
+                                       space: colorSpace,
+                                       bitmapInfo: cgImage.bitmapInfo,
+                                       provider: data,
+                                       decode: nil,
+                                       shouldInterpolate: false,
+                                       intent: .absoluteColorimetric),
+                  let ctx = CGContext(data: nil,
+                                      width: cgImage.width,
+                                      height: cgImage.height,
+                                      bitsPerComponent: 8,
+                                      bytesPerRow: 4 * cgImage.width,
+                                      space: cs,
+                                      bitmapInfo: bitmapInfo.rawValue) else { return nil }
+            ctx.draw(nCGImage, in: CGRect(x: 0,
+                                          y: 0,
+                                          width: nCGImage.width,
+                                          height: nCGImage.height))
+            guard let nnCGImage = ctx.makeImage() else { return nil }
+            cg = nnCGImage
+        }
+    }
+    init?(size: Size, color: Color) {
+        let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue)
+        guard let ctx = CGContext(data: nil,
+                                  width: Int(size.width), height: Int(size.height),
+                                  bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: color.colorSpace.cg ?? .default,
+                                  bitmapInfo: bitmapInfo.rawValue) else { return nil }
+        ctx.setFillColor(color.cg)
+        ctx.fill(CGRect(x: 0, y: 0, width: size.width, height: size.height))
+        guard let nCGImage = ctx.makeImage() else { return nil }
+        self.cg = nCGImage
+    }
+    func resize(with size: Size) -> Image? {
+        let cgColorSpace: Unmanaged<CGColorSpace>?
+        if let cs = cg.colorSpace {
+            cgColorSpace = Unmanaged.passUnretained(cs)
+        } else {
+            cgColorSpace = nil
+        }
+        var format = vImage_CGImageFormat(bitsPerComponent: 8, bitsPerPixel: 32,
+                                          colorSpace: cgColorSpace,
+                                          bitmapInfo: cg.bitmapInfo,
+                                          version: 0, decode: nil,
+                                          renderingIntent: .defaultIntent)
+        
+        var sourceBuffer = vImage_Buffer()
+        defer {
+            sourceBuffer.data.deallocate()
+        }
+        var error = vImageBuffer_InitWithCGImage(&sourceBuffer,
+                                                 &format, nil, cg,
+                                                 numericCast(kvImageNoFlags))
+        guard error == kvImageNoError else { return nil }
+        
+        let w = Int(size.width), h = Int(size.height)
+        let bytesPerPixel = 4
+        let destBytesPerPixel = w * bytesPerPixel
+        let destData = UnsafeMutablePointer<UInt8>.allocate(capacity: h * destBytesPerPixel)
+        defer {
+            destData.deallocate()
+        }
+        
+        var destBuffer = vImage_Buffer(data: destData,
+                                       height: vImagePixelCount(h),
+                                       width: vImagePixelCount(w),
+                                       rowBytes: destBytesPerPixel)
+        
+        error = vImageScale_ARGB8888(&sourceBuffer, &destBuffer, nil,
+                                     numericCast(kvImageDoNotTile))
+        guard error == kvImageNoError else { return nil }
+        
+        let newCGImage = vImageCreateCGImageFromBuffer(&destBuffer,
+                                                       &format, nil, nil,
+                                                       numericCast(kvImageNoFlags),
+                                                       &error)
+        guard error == kvImageNoError,
+              let nCGImage = newCGImage else { return nil }
+        
+        return Image(cgImage: nCGImage.takeRetainedValue())
+    }
+    
+    func drawn(_ image: Image, in rect: Rect) -> Image? {
+        let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue)
+        guard let ctx = CGContext(data: nil,
+                                  width: cg.width, height: cg.height,
+                                  bitsPerComponent: 8, bytesPerRow: 0, space: cg.colorSpace ?? .default,
+                                  bitmapInfo: bitmapInfo.rawValue) else { return nil }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0,
+                                width: cg.width,
+                                height: cg.height))
+        ctx.draw(image.cg, in: rect.cg)
+        guard let nImage = ctx.makeImage() else { return nil }
+        return Image(cgImage: nImage)
+    }
+    
+    var size: Size {
+        cg.size
+    }
+    var texture: Texture? {
+        if let data = self.data(.jpeg) {
+            return try? Texture(imageData: data, isOpaque: true)
+        }
+        return nil
+    }
+    
+    func render(in ctx: CGContext) {
+        ctx.draw(cg, in: CGRect(x: 0, y: 0,
+                                width: cg.width, height: cg.height))
+    }
+}
+extension Image {
+    enum FileType: FileTypeProtocol, CaseIterable {
+        case png, jpeg, tiff, gif, pngs
+        var name: String {
+            switch self {
+            case .png: "PNG"
+            case .jpeg: "JPEG"
+            case .tiff: "TIFF"
+            case .gif: "GIF"
+            case .pngs: "PNGs".localized
+            }
+        }
+        var utType: UTType {
+            switch self {
+            case .png: UTType(.png)
+            case .jpeg: UTType(.jpeg)
+            case .tiff: UTType(.tiff)
+            case .gif: UTType(.gif)
+            case .pngs: UTType(exportedAs: "\(System.id).rasenpngs")
+            }
+        }
+    }
+    
+    func data(_ type: FileType, size: Size, to url: URL) -> Data? {
+        guard let v = size == self.size ?
+                self : resize(with: size) else {
+            return nil
+        }
+        return v.cg.data(type)
+    }
+    func data(_ type: FileType) -> Data? {
+        cg.data(type)
+    }
+    func write(_ type: FileType, size: Size, to url: URL) throws {
+        guard let v = size == self.size ?
+                self : resize(with: size) else {
+            throw URL.writeError
+        }
+        try v.write(type, to: url)
+    }
+    func write(_ type: FileType, to url: URL) throws {
+        try cg.write(type, to: url)
+    }
+    static func writeGIF(_ images: [(image: Image, time: Rational)], to url: URL) throws {
+        guard !images.isEmpty,
+              let d = CGImageDestinationCreateWithURL(url as CFURL, UniformTypeIdentifiers.UTType.gif.identifier as CFString, images.count, nil) else {
+            throw URL.writeError
+        }
+        let properties = [(kCGImagePropertyGIFDictionary as String):
+                            [(kCGImagePropertyGIFLoopCount as String): 0]]
+        CGImageDestinationSetProperties(d, properties as CFDictionary)
+        for (image, time) in images {
+            let properties = [(kCGImagePropertyGIFDictionary as String):
+                                [(kCGImagePropertyGIFDelayTime as String): Float(time)]]
+            CGImageDestinationAddImage(d, image.cg, properties as CFDictionary)
+        }
+        if !CGImageDestinationFinalize(d) {
+            throw URL.writeError
+        }
+    }
+    func convertRGBA() -> Image? {
+        if cg.alphaInfo == .premultipliedLast {
+            return self
+        }
+        guard let cs = cg.colorSpace,
+              let ctx = CGContext(data: nil,
+                        width: cg.width, height: cg.height,
+                        bitsPerComponent: cg.bitsPerComponent,
+                        bytesPerRow: cg.bytesPerRow, space: cs,
+                        bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue |
+                                  CGBitmapInfo.byteOrder32Little.rawValue) else { return nil }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
+        if let ncg = ctx.makeImage() {
+            return Image(cgImage: ncg)
+        } else {
+            return nil
+        }
+    }
+    
+    static func metadata(from url: URL) -> [String: Any] {
+        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let dic = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any] else {
+                  return [:]
+              }
+        return dic
+    }
+    func write(_ type: FileType, to url: URL,
+               metadata: [String: Any]) throws {
+        guard let des = CGImageDestinationCreateWithURL(url as CFURL, type.utType.uti.identifier as CFString, 1, nil) else {
+            throw URL.writeError
+        }
+        CGImageDestinationAddImage(des, cg, metadata as CFDictionary)
+        CGImageDestinationFinalize(des)
+    }
+    
+    var fileType: FileType {
+        switch cg.utType as? String {
+        case UniformTypeIdentifiers.UTType.jpeg.identifier: .jpeg
+        case UniformTypeIdentifiers.UTType.png.identifier: .png
+        case UniformTypeIdentifiers.UTType.tiff.identifier: .tiff
+        case UniformTypeIdentifiers.UTType.gif.identifier: .gif
+        default: .jpeg
+        }
+    }
+}
+extension Image: Hashable {}
+extension Image: Codable {
+    struct CodableError: Error {}
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let data = try container.decode(Data.self)
+        guard let aSelf = Image(data: data) else {
+            throw CodableError()
+        }
+        self = aSelf
+    }
+    func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        if let data = data(fileType) {
+            try container.encode(data)
+        } else {
+            throw CodableError()
+        }
+    }
+}
+extension Image: Serializable {
+    struct SerializableError: Error {}
+    init(serializedData data: Data) throws {
+        guard let cgImageSource
+                = CGImageSourceCreateWithData(data as CFData, nil) else {
+            throw SerializableError()
+        }
+        guard let cg
+                = CGImageSourceCreateImageAtIndex(cgImageSource, 0, nil) else {
+            throw SerializableError()
+        }
+        self.cg = cg
+    }
+    func serializedData() throws -> Data {
+        if let data = data(fileType) {
+            return data
+        } else {
+            throw SerializableError()
+        }
+    }
+}
+extension Image: Protobuf {
+    struct DecodeError: Error {}
+    init(_ pb: PBImage) throws {
+        guard let aSelf = Image(data: pb.data) else {
+            throw DecodeError()
+        }
+        self = aSelf
+    }
+    var pb: PBImage {
+        .with {
+            $0.data = data(fileType) ?? .init()
+        }
+    }
+}
+
+final class PDF {
+    enum FileType: FileTypeProtocol, CaseIterable {
+        case pdf
+        var name: String {
+            switch self {
+            case .pdf: "PDF"
+            }
+        }
+        var utType: UTType {
+            switch self {
+            case .pdf: UTType(.pdf)
+            }
+        }
+    }
+    
+    let ctx: CGContext
+    private var mData: NSMutableData?
+    var data: Data? {
+        mData as Data?
+    }
+    
+    init(mediaBox: Rect) throws {
+        var mb = mediaBox.cg
+        let data = NSMutableData()
+        self.mData = data
+        guard let dc = CGDataConsumer(data: data as CFMutableData),
+              let ctx = CGContext(consumer: dc, mediaBox: &mb, nil) else {
+            
+            throw URL.writeError
+        }
+        self.ctx = ctx
+    }
+    init(url: URL, mediaBox: Rect) throws {
+        let cfURL = url as CFURL
+        var mb = mediaBox.cg
+        guard let ctx = CGContext(cfURL, mediaBox: &mb, nil) else {
+            throw URL.writeError
+        }
+        self.ctx = ctx
+    }
+    func finish() {
+        ctx.closePDF()
+    }
+    var dataSize: Int {
+        mData?.length ?? 0
+    }
+    func newPage(handler: (PDF) -> ()) {
+        ctx.beginPDFPage(nil)
+        handler(self)
+        ctx.endPDFPage()
+    }
+}
+
+final class Bitmap<Value: FixedWidthInteger & UnsignedInteger> {
+    enum ColorSpace {
+        case grayscale
+        case sRGB
+        case sRGBLinear
+        var cg: CGColorSpace {
+            switch self {
+            case .grayscale: CGColorSpaceCreateDeviceGray()
+            case .sRGB: CGColorSpace.sRGBColorSpace!
+            case .sRGBLinear: CGColorSpace.sRGBLinearColorSpace!
+            }
+        }
+    }
+    private let ctx: CGContext
+    let data: UnsafeMutablePointer<Value>
+    let offsetPerRow: Int, offsetPerPixel: Int
+    let width: Int, height: Int
+    
+    convenience init?(width: Int, height: Int, colorSpace: ColorSpace) {
+        let bitmapInfo = colorSpace == .grayscale ? CGImageAlphaInfo.none.rawValue : CGImageAlphaInfo.premultipliedLast.rawValue
+        guard let ctx = CGContext(data: nil, width: width, height: height,
+                                  bitsPerComponent: MemoryLayout<Value>.size * 8,
+                                  bytesPerRow: 0, space: colorSpace.cg,
+                                  bitmapInfo: bitmapInfo) else { return nil }
+        self.init(ctx)
+    }
+    init?(_ ctx: CGContext) {
+        guard let data = ctx.data?.assumingMemoryBound(to: Value.self) else { return nil }
+        self.ctx = ctx
+        self.data = data
+        offsetPerRow = ctx.bytesPerRow / (ctx.bitsPerComponent / 8)
+        offsetPerPixel = ctx.bitsPerPixel / ctx.bitsPerComponent
+        self.width = ctx.width
+        self.height = ctx.height
+    }
+    
+    subscript(_ x: Int, _ y: Int) -> Value {
+        get {
+            data[offsetPerRow * y + x]
+        }
+        set {
+            data[offsetPerRow * y + x] = newValue
+        }
+    }
+    subscript(_ x: Int, _ y: Int, _ row: Int) -> Value {
+        get {
+            data[offsetPerRow * y + offsetPerPixel * x + row]
+        }
+        set {
+            data[offsetPerRow * y + offsetPerPixel * x + row] = newValue
+        }
+    }
+    func draw(_ texture: Texture, in rect: Rect) {
+        if let cgImage = texture.cgImage {
+            ctx.draw(cgImage, in: rect.cg)
+        }
+    }
+    func draw(_ image: Image, in rect: Rect) {
+        ctx.draw(image.cg, in: rect.cg)
+    }
+    
+    func set(isAntialias: Bool) {
+        ctx.setShouldAntialias(isAntialias)
+    }
+    func set(_ transform: Transform) {
+        ctx.concatenate(transform.cg)
+    }
+    func set(fillColor: Color) {
+        ctx.setFillColor(fillColor.cg)
+    }
+    func set(lineCap: LineCap) {
+        ctx.setLineCap(lineCap.cg)
+    }
+    func set(lineWidth: Double) {
+        ctx.setLineWidth(.init(lineWidth))
+    }
+    func set(lineColor: Color) {
+        ctx.setStrokeColor(lineColor.cg)
+    }
+    
+    func fill(_ rect: Rect) {
+        ctx.addRect(rect.cg)
+        ctx.fillPath()
+    }
+    func fill(_ ps: [Point]) {
+        ctx.addLines(between: ps.map { $0.cg })
+        ctx.closePath()
+        ctx.fillPath()
+    }
+    func stroke(_ edge: Edge) {
+        ctx.move(to: edge.p0.cg)
+        ctx.addLine(to: edge.p1.cg)
+        ctx.strokePath()
+    }
+    
+    var image: Image? {
+        guard let cgImage = ctx.makeImage() else { return nil }
+        return Image(cgImage: cgImage)
     }
 }

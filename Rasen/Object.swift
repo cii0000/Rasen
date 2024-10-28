@@ -510,7 +510,7 @@ struct F: Hashable, Sendable {
     let os: [O]
     let isShortCircuit: Bool
     let runType: RunType
-    fileprivate let id = UUID()
+    let id = UUID()
 }
 extension F.FType: CustomStringConvertible {
     var description: String {
@@ -1047,2241 +1047,4161 @@ extension O {
         case .double(let d): self = .double(d)
         }
     }
+    
+    static let sendName = "send"
 }
 extension O {
-    private enum Temp: CustomStringConvertible {
-        case o(O, Substring), uncal(Substring)
+    static func defaultDictionary(with sheet: Sheet, bounds: Rect,
+                                  ssDic: [O: O],
+                                  cursorP: Point, printP: Point) -> [OKey: O] {
+        var oDic = [OKey : O]()
+        var i = 0, gi = 0, oldName = ""
+        func append(_ str: String, _ info: OKeyInfo, _ f: F) {
+            if oldName != info.group.name {
+                oldName = info.group.name
+                gi += 1
+            }
+            var info = info
+            info.index = i
+            info.group.index = gi
+            i += 1
+            oDic[f.key(from: str, info: info)] = O(f)
+        }
+        func append(_ key: OKey, _ o: O) {
+            if let name = key.info?.group.name, oldName != name {
+                oldName = name
+                gi += 1
+            }
+            var key = key
+            key.info?.index = i
+            key.info?.group.index = gi
+            i += 1
+            oDic[key] = o
+        }
         
-        var o: O? {
-            switch self {
-            case .o(let o, _): o
-            default: nil
-            }
-        }
-        var uncal: Substring? {
-            switch self {
-            case .uncal(let uncal): uncal
-            default: nil
-            }
-        }
-        var description: String {
-            switch self {
-            case .o(let o, _): "o:'\(o.description)'"
-            case .uncal(let str): "uncal:'\(str.description)'"
-            }
-        }
+        let constantGroup = OKeyInfo.Group(name: "Constant".localized)
+        append(OKey(piName, OKeyInfo(constantGroup, "Archimedes' constant. Key input: ⌥ p".localized)), pi)
+        
+        let bboGroup = OKeyInfo.Group(name: "Basic binary operation".localized)
+        append(powName, OKeyInfo(bboGroup, "Exponentiation (Principal value). a ** b = aᵇ".localized),
+               F(170, .right, left: 1, right: 1, .pow))
+        append(apowName, OKeyInfo(bboGroup, "Logarithm (Principal value). b */ a = logₐb".localized),
+               F(170, .right, left: 1, right: 1, .apow))
+        append(multiplyName, OKeyInfo(bboGroup, "Multiply.".localized),
+               F(160, left: 1, right: 1, .multiply))
+        append(divisionName, OKeyInfo(bboGroup, "Division.".localized),
+               F(160, left: 1, right: 1, .division))
+        append(moduloName, OKeyInfo(bboGroup, "Modulo.".localized),
+               F(160, left: 1, right: 1, .modulo))
+        append(additionName, OKeyInfo(bboGroup, "Add.".localized),
+               F(150, left: 1, right: 1, .addition))
+        append(subtractionName, OKeyInfo(bboGroup, "Subtract.".localized),
+               F(150, left: 1, right: 1,  .subtraction))
+        append(equalName, OKeyInfo(bboGroup, "Equal.".localized),
+               F(130, left: 1, right: 1, .equal))
+        append(notEqualName, OKeyInfo(bboGroup, "Not equal.".localized),
+               F(130, left: 1, right: 1, .notEqual))
+        append(lessName, OKeyInfo(bboGroup, "$0 < $1"),
+               F(130, left: 1, right: 1, .less))
+        append(greaterName, OKeyInfo(bboGroup, "$0 > $1"),
+               F(130, left: 1, right: 1, .greater))
+        append(lessEqualName, OKeyInfo(bboGroup, "$0 ≤ $1"),
+               F(130, left: 1, right: 1, .lessEqual))
+        append(greaterEqualName, OKeyInfo(bboGroup, "$0 ≥ $1"),
+               F(130, left: 1, right: 1, .greaterEqual))
+        append(andName, OKeyInfo(bboGroup, "Logical multiply. Short circuit evaluation.".localized),
+               F(precedence: 120,
+                 left: [Argument(inKey: nil, outKey: OKey("a"))],
+                 right: [Argument(inKey: nil, outKey: OKey("b"))],
+                 os: [O(F([O(F([O(false), O(ID("b"))])), O(ID(atName)), O(ID("a"))])), O(ID(sendName)), O()],
+                 isShortCircuit: true))
+        append(orName, OKeyInfo(bboGroup, "Logical add. Short circuit evaluation.".localized),
+               F(precedence: 110,
+                 left: [Argument(inKey: nil, outKey: OKey("a"))],
+                 right: [Argument(inKey: nil, outKey: OKey("b"))],
+                 os: [O(F([O(F([O(ID("b")), O(true)])), O(ID(atName)), O(ID("a"))])), O(ID(sendName)), O()],
+                 isShortCircuit: true))
+        
+        let buoGroup = OKeyInfo.Group(name: "Basic unary operation".localized)
+        append(notName, OKeyInfo(buoGroup, "Negation.".localized),
+               F(right: 1, .not))
+        append(floorName, OKeyInfo(buoGroup, "Floor function.".localized),
+               F(right: 1, .floor))
+        append(roundName, OKeyInfo(buoGroup, "Rounding function.".localized),
+               F(right: 1, .round))
+        append(ceilName, OKeyInfo(buoGroup, "Ceiling function.".localized),
+               F(right: 1, .ceil))
+        append(absName, OKeyInfo(buoGroup, "Absolute value function.".localized),
+               F(right: 1, .abs))
+        append(sqrtName, OKeyInfo(buoGroup, "Square root (Principal value).".localized),
+               F(right: 1, .sqrt))
+        append(sinName, OKeyInfo(buoGroup, "Sine.".localized),
+               F(right: 1, .sin))
+        append(cosName, OKeyInfo(buoGroup, "Cosine.".localized),
+               F(right: 1, .cos))
+        append(tanName, OKeyInfo(buoGroup, "Tangent.".localized),
+               F(right: 1, .tan))
+        append(asinName, OKeyInfo(buoGroup, "Arcsine (Principal value).".localized),
+               F(right: 1, .asin))
+        append(acosName, OKeyInfo(buoGroup, "Arccosine (Principal value).".localized),
+               F(right: 1, .acos))
+        append(atanName, OKeyInfo(buoGroup, "Arctangent (Principal value).".localized),
+               F(right: 1, .atan))
+        append(atan2Name, OKeyInfo(buoGroup, "Arctangent2 (Principal value).".localized),
+               F(right: 1, .atan2))
+        append(plusName, OKeyInfo(buoGroup, "Plus.".localized),
+               F(150, right: 1, .plus))
+        append(minusName, OKeyInfo(buoGroup, "Minus.".localized),
+               F(150, right: 1, .minus))
+        
+        let rangeGroup = OKeyInfo.Group(name: "Range".localized)
+        append(filiZName, OKeyInfo(rangeGroup, "{x | $0 ≤ x ≤ $1, x ∈ Z}"),
+               F(140, left: 1, right: 1, .filiZ))
+        append(filoZName, OKeyInfo(rangeGroup, "{x | $0 ≤ x < $1, x ∈ Z}"),
+               F(140, left: 1, right: 1, .filoZ))
+        
+        let arrayGroup = OKeyInfo.Group(name: "Array or set".localized)
+        append(countaName, OKeyInfo(arrayGroup, "Get count.".localized),
+               F(200, left: 1, .counta))
+        append(atName, OKeyInfo(arrayGroup, "Get, e.g. (3 4 5).2 = 5".localized),
+               F(140, left: 1, right: 1, .at))
+        append(selectName, OKeyInfo(arrayGroup, "Select.".localized),
+               F(140, left: 1, right: 1, .select))
+        append(setName, OKeyInfo(arrayGroup, "Replace, e.g. (3 4 5)/.1 <- 2 = (3 2 5)".localized),
+               F(140, left: 1, right: 1, .set))
+        append(insertName, OKeyInfo(arrayGroup, "Append, e.g. (3 4)/.1 ++ 5 = (3 5 4), (3 4) ++ 5 = (3 4 5)".localized),
+               F(140, left: 1, right: 1, .insert))
+        append(removeName, OKeyInfo(arrayGroup, "Remove, e.g. (3 4 5)/.1 -- = (3 5)".localized),
+               F(140, left: 1, .remove))
+        append(makeMatrixName, OKeyInfo(arrayGroup, "Make matrix".localized),
+               F(140, left: 1, .makeMatrix))
+        append(releaseMatrixName, OKeyInfo(arrayGroup, "Release matrix".localized),
+               F(140, left: 1, .releaseMatrix))
+        append(isName, OKeyInfo(arrayGroup, "$0 is $1 = $0 ∈ $1"),
+               F(200, left: 1, right: 1, .is))
+        append(mapName, OKeyInfo(arrayGroup, "Map function, e.g. (3 4 5) map (x | x + 2) = (5 6 7)".localized),
+               F(200, left: 1, right: 1, .map))
+        append(filterName, OKeyInfo(arrayGroup, "Filter function, e.g. (3 4 5 6) filter (x | x % 2 != 0) = (3 5)".localized),
+               F(200, left: 1, right: 1, .filter))
+        append(reduceName, OKeyInfo(arrayGroup, "Reduce function, e.g. (3 4 5) reduce 0 (y x | y + x) = 12".localized),
+               F(200, left: 1, right: 2, .reduce))
+        append(randomName, OKeyInfo(arrayGroup, "Random, e.g. (3 4 5) random = 4".localized),
+               F(200, left: 1, .random))
+        
+        let orientationGroup = OKeyInfo.Group(name: "Orientation".localized)
+        append(OKey(horizontalName, OKeyInfo(orientationGroup, "Horizontal.".localized)),
+               O(horizontalName))
+        append(OKey(verticalName, OKeyInfo(orientationGroup, "Vertical.".localized)),
+               O(verticalName))
+        
+        let sheetGroup = OKeyInfo.Group(name: "Sheet".localized)
+        append(OKey(sheetDicName, OKeyInfo(sheetGroup, "Sheets dictionary where key is coordinates. Key of the sheet at the cursor position is the origin (0 0). The keys on the other sheets are relative to the origin.".localized)),
+               O(ssDic))
+        append(OKey(sheetName, OKeyInfo(sheetGroup, "Sheet at the cursor position.".localized)),
+               O(OSheet(sheet, bounds: bounds)))
+        append(OKey(sheetSizeName, OKeyInfo(sheetGroup, "Sheet size.".localized)),
+               O([O("width"): O(bounds.width), O("height"): O(bounds.height)]))
+        append(OKey(cursorPName, OKeyInfo(sheetGroup, "Cursor position.".localized)),
+               O(cursorP))
+        append(OKey(printPName, OKeyInfo(sheetGroup, "Display position of the execution result.".localized)),
+               O(printP))
+        append(showAboutRunName, OKeyInfo(sheetGroup, "Show about Run.".localized),
+               F(left: 1, .showAboutRun))
+        append(showAllDefinitionsName, OKeyInfo(sheetGroup, "Show all definitions.".localized),
+               F(left: 1, .showAllDefinitions))
+        append(drawName, OKeyInfo(sheetGroup, "Draw points $0 on sheet, e.g. draw ((100 100) (200 200))".localized),
+               F(right: 1, .draw))
+        append(drawAxesName, OKeyInfo(sheetGroup, "Draw axes on the sheet with $0 as the base scale, $1 as the x axis name, $2 as the y axis name, and the center of the sheet as the origin,\ne.g. drawAxes base: 1 \"X\" \"Y\"".localized),
+               F(left: [], right: ["base", "", ""], .drawAxes))
+        append(plotName, OKeyInfo(sheetGroup, "Plot points $1 on the sheet with $0 as the base scale, center of the sheet as the origin,\ne.g. plot base: 1 ((0 0) (1 1))".localized),
+               F(left: [], right: ["base", ""], .plot))
+        append(flipName, OKeyInfo(sheetGroup, "Flip sheet based on $0, e.g. flip horizontal".localized),
+               F(right: 1, .flip))
+        
+        let otherGroup = OKeyInfo.Group(name: "Other".localized)
+        append(asLabelName, OKeyInfo(otherGroup, "Make label.".localized),
+               F(left: 1, .asLabel))
+        append(asStringName, OKeyInfo(otherGroup, "Make string.".localized),
+               F(right: 1, .asString))
+        append(asErrorName, OKeyInfo(otherGroup, "Make error.".localized),
+               F(right: 1, .asError))
+        append(isErrorName, OKeyInfo(otherGroup, "Error check.".localized),
+               F(130, left: 1, .isError))
+        append(nilCoalescingName, OKeyInfo(otherGroup, "Nil coalescing. Short circuit evaluation, e.g. (0 1).2 ?? 3 = 3".localized),
+               F(precedence: 140,
+                 left: [Argument(inKey: nil, outKey: OKey("a"))],
+                 right: [Argument(inKey: nil, outKey: OKey("b"))],
+                 os: [O(F([O(F([O(F([O(ID("a"))]).with(isBlock: true)),
+                                O(ID("b"))])), O(ID(atName)), O(F([O(ID("a")), O(ID(equalName)), O.nilV]))])), O(ID(sendName)), O()],
+                 isShortCircuit: true))
+        append(sendName, OKeyInfo(otherGroup, "Send $1 to $0. $+$ send (a b) = a + b".localized),
+               F(left: 1, right: 1, .send))
+        
+        return oDic
     }
-    init(_ text: Text, range: Range<String.Index>? = nil, isDictionary: Bool = false, _ oDic: inout [OKey: O]) {
-        let range = range ?? (text.string.startIndex ..< text.string.endIndex)
-        guard !text.isEmpty && !range.isEmpty else {
-            self = O()
-            return
-        }
-        
-        enum Tree: CustomStringConvertible {
-            case literal([Tree], Substring)
-            case fo([Tree], Substring)
-            case string(Substring)
-            
-            var string: Substring {
-                switch self {
-                case .literal(_, let str): str
-                case .fo(_, let str): str
-                case .string(let str): str
-                }
-            }
-            var description: String {
-                switch self {
-                case .literal(let ts, _): "literal:'\(ts.description)'"
-                case .fo(let ts, _): "fo:'\(ts.description)'"
-                case .string(let s): "s:'\(s)'"
-                }
-            }
-        }
-        
-        let srs = O.analyzed(from: text, range: range).filter { !$0.string.isEmpty }
-        var trees = [Tree](), height = 0
-        var bracketStack = Stack<(Int)>(), unionStack = Stack<((Int, Int))>()
-        for (sri, sr) in srs.enumerated() {
-            func unionTree(from i: Int) {
-                guard i + 1 < trees.count else { return }
-                let no = Array(trees[i...])
-                trees.removeLast(trees.count - i)
-                trees.append(.literal(no, no.first?.string ?? ""))
-            }
-            switch sr.type {
-            case .start:
-                if sri - 1 < 0 || !srs[sri - 1].isLeftUnion {
-                    unionStack.push((trees.count, height))
-                }
-                bracketStack.push(trees.count)
-                height += 1
-            case .endStart:
-                guard let i = bracketStack.pop() else { break }
-                let nfo = Array(trees[i...])
-                if let str = nfo.first?.string {
-                    trees.removeLast(trees.count - i)
-                    trees.append(.fo(nfo, str))
-                }
-                
-                bracketStack.push(trees.count)
-                
-//                if let (i, _) = unionStack.pop() {
-//                    unionStack.push((i, false))
-//                }
-            case .end:
-                height -= 1
-                guard let i = bracketStack.pop() else { break }
-                let nfo = Array(trees[i...])
-                trees.removeLast(trees.count - i)
-                trees.append(.fo(nfo, nfo.first?.string ?? ""))
-                
-                if sri + 1 >= srs.count || !srs[sri + 1].isRightUnion,
-                   unionStack.elements.last?.1 == height,
-                   let (i, _) = unionStack.pop() {
-                    
-                    unionTree(from: i)
-                }
-            case .leftLiteral:
-                unionStack.push((trees.count, height))
-                trees.append(.string(sr.string))
-            case .string:
-                trees.append(.string(sr.string))
-            case .leftString:
-                unionStack.push((trees.count, height))
-                trees.append(.string(sr.string))
-            case .rightString:
-                trees.append(.string(sr.string))
-                if let (i, _) = unionStack.pop() {
-                    unionTree(from: i)
-                }
-            case .centerString:
-                trees.append(.string(sr.string))
-//                if let (i, _) = unionStack.pop() {
-//                    unionStack.push((i, height))
-//                }
-            case .rightLiteral:
-                trees.append(.string(sr.string))
-                if let (i, _) = unionStack.pop() {
-                    unionTree(from: i)
-                }
-            case .centerLiteral:
-                trees.append(.string(sr.string))
-//                if let (i, _) = unionStack.pop() {
-//                    unionStack.push((i, height))
-//                }
-            case .stringBracketError:
-                self = O(OError("Unterminated string literal '\"'".localized))
-                return
-            case .bracketError:
-                self = O(OError("Unterminated function literal ')'".localized))
-                return
-            }
-        }
-        
-        func substring(from trees: [Tree]) -> Substring? {
-            for tree in trees {
-                switch tree {
-                case .string(let s): return s
-                default: break
-                }
-            }
-            return nil
-        }
-        
-        let typesetter = text.typesetter
-        func subO(from tree: Tree) -> O {
-            switch tree {
-            case .fo(let fts, _):
-                return o(from: fts)
-            case .literal(let lts, _):
-                let temps: [Temp] = lts.compactMap {
-                    switch $0 {
-                    case .fo(let fts, let fstr): .o(o(from: fts), fstr)
-                    case .literal: fatalError()
-                    case .string(let s): .uncal(s)
-                    }
-                }
-                return O.literalO(from: temps,
-                                  text, typesetter, &oDic)
-            case .string(let s):
-                return O.literalO(from: [.uncal(s)],
-                                  text, typesetter, &oDic)
-            }
-        }
-        func fDics(_ fods: [Tree]) -> [(label: Tree, values: [Tree])] {
-            var dics = [(label: Tree, values: [Tree])](), preLabel: Tree?
-            var vs = [Tree]()
-            for fod in fods {
-                var nLabel: Tree?
-                switch fod {
-                case .literal(let fs, let fstr):
-                    if let lt = fs.last {
-                        switch lt {
-                        case .literal, .fo: nLabel = nil
-                        case .string(var s):
-                            if s.last == ":" {
-                                var fs = fs
-                                fs.removeLast()
-                                s.removeLast()
-                                if !s.isEmpty {
-                                    fs.append(.string(s))
-                                }
-                                nLabel = .literal(fs, fstr)
-                            } else {
-                                nLabel = nil
-                            }
-                        }
-                    } else {
-                        nLabel = nil
-                    }
-                case .fo: nLabel = nil
-                case .string(var s):
-                    if s.last == ":" {
-                        s.removeLast()
-                        nLabel = .string(s)
-                    } else {
-                        nLabel = nil
-                    }
-                }
-                if let nLabel = nLabel {
-                    if let label = preLabel, !vs.isEmpty {
-                        dics.append((label, vs))
-                        vs = []
-                    }
-                    preLabel = nLabel
-                } else {
-                    vs.append(fod)
-                }
-            }
-            if let label = preLabel, !vs.isEmpty {
-                dics.append((label, vs))
-                vs = []
-            }
-            return dics
-        }
-        func ifO(from ts: [Tree]) -> O? {
-            let thenKey = "->", elseKey = "-!", caseKey = "case"
-            guard let ii0 = ts.firstIndex(where: {
-                switch $0 {
-                case .string(let s): s == thenKey || s == caseKey
-                default: false
-                }
-            }) else { return nil }
-            var i = ii0
-            
-            struct IfTree {
-                var ifLiteral: Substring = ""
-                var ifValueTrees: [Tree]
-                var returnTuples = [(label: [Tree], value: [Tree])]()
-                var elseLiteral: Substring = ""
-                var elseTrees: [Tree]
-            }
-            enum IfType {
-                case thenLiteral, elseLiteral, caseLiteral
-                case ifTrees, caseTrees, valueTrees, elseTrees
-                var isLiteral: Bool {
-                    switch self {
-                    case .thenLiteral, .elseLiteral, .caseLiteral:
-                        return true
-                    default:
-                        return false
-                    }
-                }
-            }
-            var ifTrees = [IfTree]()
-            var preType = IfType.ifTrees
-            let firstTrees = Array(ts[..<i])
-            
-            var curerntTrees = [Tree](), preLabel: [Tree]?
-            ifTrees.append(IfTree(ifValueTrees: firstTrees, elseTrees: []))
-            func append() {
-                if !curerntTrees.isEmpty {
-                    switch preType {
-                    case .ifTrees:
-                        ifTrees[.last].ifValueTrees = curerntTrees
-                    case .caseTrees:
-                        preLabel = curerntTrees
-                    case .elseTrees:
-                        ifTrees[.last].elseTrees = curerntTrees
-                    case .valueTrees:
-                        if let preLabel = preLabel {
-                            ifTrees[.last].returnTuples.append((preLabel, curerntTrees))
-                        }
-                        preLabel = nil
-                    default: break
-                    }
-                    curerntTrees = []
-                }
-            }
-            loop: while true {
-                let v = ts[i]
-                switch v {
-                case .string(let s):
-                     if s == thenKey {
-                        if preType.isLiteral {
-                            return O(OError("Conditional syntax error".localized))
-                        }
-                        if preType == .elseTrees {
-                            ifTrees.append(IfTree(ifValueTrees: curerntTrees, elseTrees: []))
-                            curerntTrees = []
-                            ifTrees[.last].ifLiteral = s
-                        } else {
-                            ifTrees[.last].ifLiteral = s
-                            append()
-                        }
-                        if preLabel == nil {
-                            let trueStr = s.substring("true", s.startIndex ..< s.startIndex)
-                            preLabel = [Tree.string(trueStr)]
-                        }
-                        preType = .thenLiteral
-                    } else if s == elseKey {
-                        if preType.isLiteral || preType == .elseTrees {
-                            return O(OError("Conditional syntax error".localized))
-                        }
-                        ifTrees[.last].elseLiteral = s
-                        append()
-                        preType = .elseLiteral
-                    } else if s == caseKey {
-                        if preType.isLiteral {
-                            return O(OError("Conditional syntax error".localized))
-                        }
-                        if preType == .elseTrees {
-                            ifTrees.append(IfTree(ifValueTrees: curerntTrees, elseTrees: []))
-                            curerntTrees = []
-                            ifTrees[.last].ifLiteral = s
-                        } else {
-                            ifTrees[.last].ifLiteral = s
-                            append()
-                        }
-                        preType = .caseLiteral
-                    } else {
-                        curerntTrees.append(v)
-                        switch preType {
-                        case .thenLiteral: preType = .valueTrees
-                        case .elseLiteral: preType = .elseTrees
-                        case .caseLiteral: preType = .caseTrees
-                        default: break
-                        }
-                    }
-                default:
-                    curerntTrees.append(v)
-                    switch preType {
-                    case .thenLiteral: preType = .valueTrees
-                    case .elseLiteral: preType = .elseTrees
-                    case .caseLiteral: preType = .caseTrees
-                    default: break
-                    }
-                }
-                i = ts.index(after: i)
-                if i == ts.endIndex { break }
-            }
-            append()
-            
-            var nextO: O
-            if let elseTrees = ifTrees.last?.elseTrees, !elseTrees.isEmpty {
-                let elseOs = os(from: elseTrees)
-                nextO = O(F(elseOs))
-            } else {
-                nextO = O(F([O(OError("-! value".localized))]))
-            }
-            
-            func rect(at i: Substring.Index, _ str: Substring) -> Rect? {
-                return typesetter.characterBounds(at: i)
-            }
-            func v(_ nstr: String, in str: Substring) -> ID {
-                if !str.isEmpty, var r = rect(at: str.startIndex, str) {
-                    r.size.width = 0
-                    return ID(nstr, typesetter.typobute, r + text.origin)
-                } else {
-                    return ID(nstr, typesetter.typobute)
-                }
-            }
-            for ifTree in ifTrees.reversed() {
-                let valuesOs = ifTree.returnTuples.reduce(into: [O]()) {
-                    let los = os(from: $1.label)
-                    $0.append(O(F([los.count == 1 ? los[0] : O(F(los)),
-                                   O(v(":", in: ifTree.ifLiteral))])))
-                    $0.append(O(F(os(from: $1.value)).with(isBlock: true)))
-                }
-                
-                let getO = O(v(".", in: ifTree.ifLiteral))
-                let ifValueOs = os(from: ifTree.ifValueTrees)
-                
-                let elseO = O(v("??", in: ifTree.elseLiteral))
-                
-                let vos = [O(F([O(F(valuesOs)), getO, O(F(ifValueOs))])), elseO, nextO]
-                nextO = O(F(vos))
-            }
-            let sendO = O(v("send", in: ts[ii0].string))
-            let sendOsO = O(F([]))
-            return O(F([nextO, sendO, sendOsO]))
-        }
-        func os(from ts: [Tree]) -> [O] {
-            if let o = ifO(from: ts) {
-                return [o]
-            }
-            
-            let fos = ts.map { subO(from: $0) }
-            if fos.count == 1,
-                case .f(let sf) = fos[0],
-            sf.definitions.isEmpty && sf.type == .empty && !sf.isBlock {
-                
-                return sf.os
-            } else {
-                return fos
-            }
-        }
-        
-        struct FOption {
-            var leftVs = [Argument]()
-            var ovName: String?
-            var rightVs = [Argument]()
-            var prece: Int?, asso = F.AssociativityType.left
-        }
-        func fOption(_ nfs: [Tree],
-                     isNoname: Bool = false) -> FOption? {
-            var fs: [Tree]
-            if case .literal(let nfs, _)? = nfs.first {
-                fs = nfs
-            } else {
-                fs = nfs
-            }
-            let dics = fDics(fs)
-            if isNoname && dics.isEmpty && !fs.contains(where: {
-                switch $0 {
-                case .literal, .fo: true
-                case .string: false
-                }
-            }) {
-                let args: [Argument] = fs.compactMap {
-                    switch $0 {
-                    case .literal, .fo:
-                        return nil
-                    case .string(let name):
-                        return Argument(inKey: nil, outKey: OKey(name))
-                    }
-                }
-                if args.isEmpty {
-                    return nil
-                }
-                return FOption(leftVs: args, ovName: nil, rightVs: [],
-                               prece: F.defaultPrecedence, asso: .left)
-            } else {
-                func vDic(_ vs: [Tree]) -> [Argument] {
-                    var dic = [Argument](), preLabel: String?
-                    for v in vs {
-                        switch v {
-                        case .literal, .fo: break
-                        case .string(var s):
-                            if s.last == ":" {
-                                s.removeLast()
-                                preLabel = String(s)
-                            } else {
-                                let value = String(s)
-                                if let label = preLabel {
-                                    dic.append(Argument(inKey: OKey(label), outKey: OKey(value)))
-                                    preLabel = nil
-                                } else {
-                                    dic.append(Argument(inKey: nil, outKey: OKey(value)))
-                                }
-                            }
-                        }
-                    }
-                    return dic
-                }
-                if fs.count == 2 {
-                    if case .string(let s0) = fs[0],
-                        case .fo(let fos, _) = fs[1] {
-                        
-                        if !isNoname || (isNoname && s0 == "$") {
-                            return FOption(leftVs: [],
-                                           ovName: String(s0),
-                                           rightVs: vDic(fos),
-                                           prece: nil, asso: .right)
-                        }
-                    } else if case .fo(let fos, _) = fs[0],
-                        case .string(let s0) = fs[1] {
-                        
-                        if !isNoname || (isNoname && s0 == "$") {
-                            return FOption(leftVs: vDic(fos),
-                                           ovName: String(s0),
-                                           rightVs: [],
-                                           prece: nil, asso: .left)
-                        }
-                    }
-                } else if fs.count == 3 {
-                    if case .fo(let fos0, _) = fs[0],
-                        case .string(let s0) = fs[1],
-                        case .fo(let fos1, _) = fs[2] {
-                        
-                        if !isNoname || (isNoname && s0 == "$") {
-                            return FOption(leftVs: vDic(fos0),
-                                           ovName: String(s0),
-                                           rightVs: vDic(fos1),
-                                           prece: nil, asso: .left)
-                        }
-                    }
-                } else if fs.count == 4 {
-                    if case .fo(let fos0, _) = fs[0],
-                        case .string(let s0) = fs[1],
-                        case .fo(let fos1, _) = fs[2],
-                        case .string(var s1) = fs[3] {
-                        
-                        let prece: Int?, asso: F.AssociativityType
-                        if s1.last == "r" {
-                            if s1.count >= 2 {
-                                s1.removeLast()
-                                if let p = Int(s1) {
-                                    prece = p
-                                    asso = .right
-                                } else {
-                                    return nil
-                                }
-                            } else {
-                                prece = nil
-                                asso = .right
-                            }
-                        } else {
-                            if let p = Int(s1) {
-                                prece = p
-                                asso = .left
-                            } else {
-                                return nil
-                            }
-                        }
-                        if !isNoname || (isNoname && s0 == "$") {
-                            return FOption(leftVs: vDic(fos0),
-                                           ovName: String(s0),
-                                           rightVs: vDic(fos1),
-                                           prece: prece, asso: asso)
-                        }
-                    }
-                }
-                return nil
-            }
-        }
-        func foDic(_ fods: [Tree],
-                   _ oldDic: inout [OKey: O?]) -> [OKey: F]? {
-            let dics = fDics(fods)
-            
-            for (label, _) in dics {
-                switch label {
-                case .literal(let fs, _):
-                    guard let option = fOption(fs),
-                        let name = option.ovName else { continue }
-                    let f = F(precedence: option.prece ?? F.defaultPrecedence,
-                              associativity: option.asso,
-                              left: option.leftVs, right: option.rightVs,
-                              [:], os: [])
-                    let fname = f.key(from: name)
-                    oldDic[fname] = oDic[fname]
-                    oDic[fname] = O()
-                case .fo: fatalError()
-                case .string(let n):
-                    let name = OKey(n)
-                    oldDic[name] = oDic[name]
-                    oDic[name] = O()
-                }
-            }
-            
-            var foDic = [OKey: F]()
-            for (label, values) in dics {
-                switch label {
-                case .literal(let fs, _):
-                    var oldFODic = [OKey: O?]()
-                    
-                    guard let option = fOption(fs),
-                        let name = option.ovName else { return nil }
-                    for arg in option.leftVs {
-                        oldFODic[arg.outKey] = oDic[arg.outKey]
-                        oDic[arg.outKey] = O()
-                    }
-                    for arg in option.rightVs {
-                        oldFODic[arg.outKey] = oDic[arg.outKey]
-                        oDic[arg.outKey] = O()
-                    }
-                    let fos = os(from: values)
-                    
-                    for (key, value) in oldFODic { oDic[key] = value }
-                    
-                    let f = F(precedence: option.prece ?? F.defaultPrecedence,
-                              associativity: option.asso,
-                              left: option.leftVs, right: option.rightVs,
-                              [:], os: fos)
-                    foDic[f.key(from: name)] = f
-                case .fo: fatalError()
-                case .string(let name):
-                    foDic[OKey(name)] = F(os(from: values))
-                }
-            }
-            return foDic
-        }
-        func o(from ts: [Tree], isDic: Bool = false) -> O {
-            let fi0 = ts.firstIndex {
-                switch $0 {
-                case .string(let s): s == "|"
-                default: false
-                }
-            }
-            if isDic {
-                var oldDic = [OKey: O?]()
-                
-                guard let foDic = foDic(Array(ts[..<(fi0 ?? ts.count)]),
-                                        &oldDic)
-                    else { return O(OError("Function syntax error".localized)) }
-                
-                for (key, value) in oldDic { oDic[key] = value }
-                
-                return O(F(foDic))
-            } else if let fi0 = fi0 {
-                let fi1 = ts.lastIndex {
-                    switch $0 {
-                    case .string(let s): s == "|"
-                    default: false
-                    }
-                }
-                if let fi1 = fi1, fi0 != fi1 {
-                    if fi0 == ts.startIndex {//(| b | c)
-                        var oldDic = [OKey: O?]()
-                        
-                        guard fi0 + 1 < fi1,
-                              let foDic = foDic(Array(ts[(fi0 + 1) ..< fi1]).filter({
-                                switch $0 {
-                                case .string(let s): s != "|"
-                                default: true
-                                }
-                              }),
-                                              &oldDic)
-                            else { return O(OError("Function syntax error".localized)) }
-                        let foTemps = fi1 + 1 < ts.count ?
-                            Array(ts[(fi1 + 1)...]) : []
-                        let fos = os(from: foTemps)
-                        
-                        for (key, value) in oldDic { oDic[key] = value }
-                        
-                        let f = foDic.isEmpty ? F(fos) : F(foDic, os: fos)
-                        return O(f.with(isBlock: true))
-                    } else {//(a | b | c)
-                        var oldDic = [OKey: O?]()
-                        
-                        guard let option = fOption(Array(ts[..<fi0]),
-                                                   isNoname: true)
-                            else { return O(OError("Function syntax error".localized)) }
-                        for arg in option.leftVs {
-                            oldDic[arg.outKey] = oDic[arg.outKey]
-                            oDic[arg.outKey] = O()
-                        }
-                        for arg in option.rightVs {
-                            oldDic[arg.outKey] = oDic[arg.outKey]
-                            oDic[arg.outKey] = O()
-                        }
-                        guard fi0 + 1 < fi1,
-                            let foDic = foDic(Array(ts[(fi0 + 1) ..< fi1]).filter({
-                                switch $0 {
-                                case .string(let s): s != "|"
-                                default: true
-                                }
-                              }),
-                                              &oldDic)
-                            else { return O(OError("Function syntax error".localized)) }
-                        let foTemps = fi1 + 1 < ts.count ?
-                            Array(ts[(fi1 + 1)...]) : []
-                        let fos = os(from: foTemps)
-                        
-                        for (key, value) in oldDic { oDic[key] = value }
-                        
-                        return O(F(precedence: option.prece ?? F.defaultPrecedence,
-                                   associativity: option.asso,
-                                   left: option.leftVs,
-                                   right: option.rightVs,
-                                   foDic, os: fos).with(isBlock: true))
-                    }
-                } else {
-                    if fi0 == ts.startIndex {//(| a)
-                        let foTemps = fi0 + 1 < ts.count ?
-                            Array(ts[(fi0 + 1)...]) : []
-                        return O(F(os(from: foTemps)).with(isBlock: true))
-                    } else if let option = fOption(Array(ts[..<fi0]),
-                                                   isNoname: true) {
-                        var oldDic = [OKey: O?]()
-                        
-                        for arg in option.leftVs {
-                            oldDic[arg.outKey] = oDic[arg.outKey]
-                            oDic[arg.outKey] = O()
-                        }
-                        for arg in option.rightVs {
-                            oldDic[arg.outKey] = oDic[arg.outKey]
-                            oDic[arg.outKey] = O()
-                        }
-                        let foTemps = fi0 + 1 < ts.count ?
-                            Array(ts[(fi0 + 1)...]) : []
-                        let fos = os(from: foTemps)
-                        
-                        for (key, value) in oldDic { oDic[key] = value }
-                        
-                        return O(F(precedence: option.prece ?? F.defaultPrecedence,
-                                   associativity: option.asso,
-                                   left: option.leftVs,
-                                   right: option.rightVs,
-                                   [:], os: fos).with(isBlock: true))
-                    } else {
-                        var oldDic = [OKey: O?]()
-                        
-                        guard let foDic = foDic(Array(ts[..<fi0]),
-                                                &oldDic)
-                            else { return O(OError("Function syntax error".localized)) }
-                        if foDic.isEmpty {
-                            return O(F(os(from: ts.filter({
-                                switch $0 {
-                                case .string(let s): s != "|"
-                                default: true
-                                }
-                              }))))
-                        } else {
-                            let foTemps = fi0 + 1 < ts.count ?
-                                Array(ts[(fi0 + 1)...]) : []
-                            let fos = os(from: foTemps)
-                            
-                            for (key, value) in oldDic { oDic[key] = value }
-                            
-                            return O(foDic.isEmpty ? F(fos) : F(foDic, os: fos))
-                        }
-                    }
-                }
-            } else {//(a)
-                return O(F(os(from: ts)))
-            }
-        }
-        self = o(from: trees, isDic: isDictionary)
+}
+
+extension O: CustomStringConvertible {
+    var description: String {
+        return displayString()
     }
-    
-    private struct Analyzed: CustomStringConvertible {
-        enum AnalyzedType: String {
-            case start, end, endStart
-            case leftLiteral, rightLiteral, centerLiteral
-            case string, leftString, rightString, centerString
-            case stringBracketError, bracketError
-        }
-        var type: AnalyzedType, string: Substring
-        
-        init(_ type: AnalyzedType, _ string: Substring) {
-            self.type = type
-            self.string = string
-        }
-        var isLeftUnion: Bool {
-            type == .leftLiteral || type == .centerLiteral
-        }
-        var isRightUnion: Bool {
-            type == .rightLiteral || type == .centerLiteral
-        }
-        var description: String {
-            "\(type.rawValue): \(string)"
-        }
+    var name: String {
+        return displayString(fromLength: 12, isFirstAndLastBrackets: false)
     }
-    private static func analyzed(from text: Text, range: Range<String.Index>,
-                                 stringBracket: Character = "\"",
-                                 separator: Character = " ") -> [Analyzed] {
-        let str = text.string[range]
-        guard !str.isEmpty else { return [] }
-        
-        let string = String(str)
-        let typesetter = Text(string: string).typesetter
-        var vs = [(strs: [Substring], isWhitespace: Bool,
-                   tabIntIndexes: [Int], i: Int, isMatrix: Bool)]()
-        for typeline in typesetter.typelines {
-            var j = 0, minI = typeline.range.lowerBound, ni: String.Index?
-            var nsi = typeline.range.lowerBound
-            typelinesLoop: while nsi < typeline.range.upperBound {
-                let c = string[nsi]
-                switch c {
-                case "\t": j += 8
-                default:
-                    minI = nsi
-                    ni = nsi
-                    break typelinesLoop
-                }
-                nsi = string.index(after: nsi)
-            }
-            if j != 0 && ni == nil {
-                ni = typeline.range.upperBound
-                minI = typeline.range.upperBound
-            }
-            
-            nsi = typeline.range.lowerBound
-            var isWhitespace = true
-            while nsi < typeline.range.upperBound {
-                let c = string[nsi]
-                if !c.isWhitespace {
-                    isWhitespace = false
-                }
-                nsi = string.index(after: nsi)
-            }
-            
-            var tabIntIndexes = [Int]()
-            if minI < typeline.range.upperBound {
-                let nextI = string.index(after: minI)
-                if nextI < typeline.range.upperBound {
-                    var isTab = false
-                    var nsk = nextI
-                    while nsk < typeline.range.upperBound {
-                        switch string[nsk] {
-                        case "\t": isTab = true
-                        default:
-                            if isTab {
-                                let ni = string.distance(from: typeline.range.lowerBound,
-                                                         to: nsk)
-                                tabIntIndexes.append(ni)
-                                isTab = false
-                            }
-                        }
-                        nsk = string.index(after: nsk)
-                    }
-                    if isTab {
-                        let nsk = typeline.range.upperBound
-                        let ni = string.distance(from: typeline.range.lowerBound,
-                                                 to: nsk)
-                        tabIntIndexes.append(ni)
+    static func removeFirstAndLastBrackets(_ s: String) -> String {
+        if s.count > 2 && s.first == "(" && s.last == ")" {
+            var i = s.startIndex, d = 0, count = 0
+            while i < s.endIndex {
+                if s[i] == "(" {
+                    d += 1
+                } else if s[i] == ")" {
+                    d -= 1
+                    if d == 0 {
+                        count += 1
                     }
                 }
+                i = s.index(after: i)
             }
-            
-            let intRange = string.intRange(from: typeline.range)
-            let isi = str.index(str.startIndex, offsetBy: intRange.lowerBound)
-            let iei = str.index(str.startIndex, offsetBy: intRange.upperBound)
-            let nstr = str[isi ..< iei]
-            let nstrs = [nstr]
-            if typeline.range.lowerBound == minI {
-                vs.append((nstrs, isWhitespace, tabIntIndexes, 0, false))
-            } else {
-                vs.append((nstrs, isWhitespace, tabIntIndexes, j, false))
+            if count == 1 {
+                var s = s
+                s.removeFirst()
+                s.removeLast()
+                return s
             }
         }
-        
-        if !vs.isEmpty {
-            let lis = vs.reduce(into: Set<Int>()) {
-                if $1.i > 0 {
-                    $0.insert($1.i)
-                }
-            }
-            var nvs = [(f: Int, l: Int, i:Int)]()
-            for li in lis {
-                let ns = vs.enumerated().map { $0 }
-                    .split { li > $0.element.i }
-                for n in ns {
-                    if let si = n.first?.offset, let ei = n.last?.offset,
-                        let minI = n.min(by: { $0.element.i < $1.element.i }),
-                        minI.element.i == li {
-                        
-                        nvs.append((si, ei, li))
-                    }
-                }
-            }
-            
-            for (i, v) in vs.enumerated() {
-                if v.isWhitespace {
-                    let fstr = v.strs[.first]
-                    let si = fstr.startIndex
-                    vs[i].strs.insert(fstr.substring("|", si ... si),
-                                      at: v.strs.startIndex)
-                } else if !v.tabIntIndexes.isEmpty {
-                    let s = v.strs[.first]
-                    var oi = s.startIndex
-                    var nstrs = [Substring]()
-                    for i in v.tabIntIndexes {
-                        let ni = s.index(s.startIndex, offsetBy: i)
-                        nstrs.append(s[oi ..< ni])
-                        if ni < s.endIndex {
-                            nstrs.append(s.substring(",", ni ... ni))
-                        }
-                        oi = ni
-                    }
-                    if oi < s.endIndex {
-                        nstrs.append(s[oi...])
-                    }
-                    vs[i].strs = nstrs
-                    
-                    for nv in nvs {
-                        if nv.i == v.i && i >= nv.f && i <= nv.l {
-                            vs[nv.f].isMatrix = true
-                            break
-                        }
-                    }
-                }
-                
-                if !v.tabIntIndexes.isEmpty {
-                    let fstr = vs[i].strs[.first]
-                    let lstr = vs[i].strs[.last]
-                    let si = fstr.startIndex
-                    let ei = lstr.index(before: lstr.endIndex)
-                    vs[i].strs.insert(fstr.substring("(", si ... si),
-                                      at: vs[i].strs.startIndex)
-                    vs[i].strs.append(lstr.substring(")", ei ... ei))
-                }
-            }
-            
-            for (fi, li, _) in nvs {
-                let fstr = vs[fi].strs[.first]
-                let lstr = vs[li].strs[.last]
-                let si = fstr.startIndex
-                let ei = lstr.index(before: lstr.endIndex)
-                vs[fi].strs.insert(fstr.substring("(", si ... si),
-                                   at: vs[fi].strs.startIndex)
-                vs[li].strs.append(lstr.substring(")", ei ... ei))
-                
-                if vs[fi].isMatrix {
-                    vs[fi].strs.insert(fstr.substring("(", si ... si),
-                                       at: vs[fi].strs.startIndex)
-                    vs[li].strs.append(lstr.substring(";", ei ... ei))
-                    vs[li].strs.append(lstr.substring(")", ei ... ei))
-                }
-            }
-        }
-        
-        let strs = vs.flatMap { $0.strs }
-        
-        struct StringResult {
-            var isString: Bool, v: Substring
-            var isWhitespaceLeft = false, isWhitespaceRight = false
-        }
-        var nss = [StringResult]()
-        for str in strs {
-            var issvs = [StringResult]()
-            var si = str.startIndex, isS = false, lastBI: String.Index?
-            for i in str.indices {
-                let c = str[i]
-                guard c == stringBracket else { continue }
-                lastBI = i
-                guard str.startIndex == i
-                    || (str.startIndex < i && str[str.index(before: i)] != "\\") else { continue }
-                if isS {
-                    let ei = str.index(after: i)
-                    let isWhitespaceLeft, isWhitespaceRight: Bool
-                    if si == str.startIndex {
-                        isWhitespaceLeft = true
-                    } else {
-                        let sc = str[str.index(before: si)]
-                        isWhitespaceLeft = sc.isWhitespace || sc == "("
-                    }
-                    if ei == str.endIndex {
-                        isWhitespaceRight = true
-                    } else {
-                        let sc = str[ei]
-                        isWhitespaceRight = sc.isWhitespace || sc == ")"
-                    }
-                    issvs.append(StringResult(isString: true, v: str[si ..< ei],
-                                              isWhitespaceLeft: isWhitespaceLeft,
-                                              isWhitespaceRight: isWhitespaceRight))
-                    si = ei
-                } else {
-                    if si < i {
-                        issvs.append(StringResult(isString: false, v: str[si ..< i]))
-                        si = i
-                    }
-                }
-                isS = !isS
-            }
-            if si < str.endIndex {
-                issvs.append(StringResult(isString: false, v: str[si ..< str.endIndex]))
-            }
-            for issv in issvs {
-                if issv.isString {
-                    nss.append(issv)
-                } else {
-                    let splited = issv.v.split(whereSeparator: { $0.isWhitespace })
-                    for nv in splited {
-                        if !nv.isEmpty {
-                            nss.append(StringResult(isString: false, v: nv))
-                        }
-                    }
-                }
-            }
-            if isS {
-                if let bi = lastBI {
-                    return [Analyzed(.stringBracketError, str[bi ... bi])]
-                } else {
-                    return [Analyzed(.stringBracketError, str)]
-                }
-            }
-        }
-        
-        var srs = [Analyzed]()
-        var iStack = [(i: Int, isC: Bool)]()
-        for ns in nss {
-            if ns.isString {
-                if ns.isWhitespaceLeft {
-                    if ns.isWhitespaceRight {
-                        srs.append(Analyzed(.string, ns.v))
-                    } else {
-                        srs.append(Analyzed(.leftString, ns.v))
-                    }
-                } else {
-                    if ns.isWhitespaceRight {
-                        srs.append(Analyzed(.rightString, ns.v))
-                    } else {
-                        srs.append(Analyzed(.centerString, ns.v))
-                    }
-                }
-            } else if ns.v.contains("(") || ns.v.contains(")") || ns.v.contains(",") {
-                let nvs = ns.v.unionSplit(separator: "(,)")
-                for (i, v) in nvs.enumerated() {
-                    if v == "(" {
-                        let right = i > 0 && nvs[i - 1] == ")"
-                        srs.append(Analyzed(right ? .endStart : .start, v))
-                        
-                        iStack.append((srs.count - 1, false))
-                    } else if v == ")" {
-                        if let (oi, isC) = iStack.last {
-                            if isC {
-                                srs.insert(Analyzed(.start, srs[oi].string),
-                                           at: oi + 1)
-                                srs.append(Analyzed(.end, v))
-                            }
-                            iStack.removeLast()
-                        } else {
-                            return [Analyzed(.bracketError, v)]
-                        }
-                        
-                        let left = i < nvs.count - 1 && nvs[i + 1] == "("
-                        if !left {
-                            srs.append(Analyzed(.end, v))
-                        }
-                    } else if v == "," {
-                        if !iStack.isEmpty {
-                            iStack[.last].isC = true
-                        }
-                        let vi = v.startIndex
-                        srs.append(Analyzed(.end, v.substring(")", vi ... vi)))
-                        srs.append(Analyzed(.start, v.substring("(", vi ... vi)))
-                    } else {
-                        let left = i < nvs.count - 1 && nvs[i + 1] == "("
-                        let right = i > 0 && nvs[i - 1] == ")"
-                        if left {
-                            if right {
-                                srs.append(Analyzed(.centerLiteral, v))
-                            } else {
-                                srs.append(Analyzed(.leftLiteral, v))
-                            }
-                        } else if right {
-                            srs.append(Analyzed(.rightLiteral, v))
-                        } else {
-                            srs.append(Analyzed(.string, v))
-                        }
-                    }
-                }
-            } else {
-                srs.append(Analyzed(.string, ns.v))
-            }
-        }
-        if !iStack.isEmpty {
-            return [Analyzed(.bracketError, str)]
-        }
-        
-        for (i, sr) in srs.enumerated() {
-            if (sr.type == .leftString || sr.type == .centerString)
-                && i < srs.count - 1 {
-                
-                if srs[i + 1].type == .leftLiteral {
-                    srs[i + 1].type = .centerLiteral
-                } else if srs[i + 1].type == .string {
-                    srs[i + 1].type = .rightLiteral
-                }
-            }
-            if (sr.type == .rightString || sr.type == .centerString)
-                && i > 0 {
-                
-                if srs[i - 1].type == .rightLiteral {
-                    srs[i - 1].type = .centerLiteral
-                } else if srs[i - 1].type == .string {
-                    srs[i - 1].type = .leftLiteral
-                }
-            }
-        }
-        return srs
+        return s
     }
-    
-    static let defaultLiteralSeparator = "!#%&-=^~|@:;,.{}[]<>+*/_"
-    private static func literalO(from cs: [Temp],
-                                 _ text: Text, _ typesetter: Typesetter,
-                                 separator: String = O.defaultLiteralSeparator,
-                                 _ oDic: inout [OKey: O]) -> O {
-        func rect(at i: Substring.Index, _ str: Substring) -> Rect? {
-            typesetter.characterBounds(at: i)
+    func displayString(fromLength l: Int = 1000,
+                       isFirstAndLastBrackets: Bool = true) -> String {
+        var s = asString
+        if isFirstAndLastBrackets {
+            s = O.removeFirstAndLastBrackets(s)
         }
-        func rect(_ str: Substring) -> Rect? {
-            return str.indices.reduce(into: Rect?.none) {
-                if let r = rect(at: $1, str) {
-                    $0 = $0 == nil ? r : $0! + r
-                }
-            }
-        }
-        func v(_ str: Substring, isInactivity: Bool = false) -> ID {
-            if let r = rect(str) {
-                return ID(String(str), isInactivity: isInactivity,
-                          typesetter.typobute,
-                          r + text.origin)
-            } else {
-                return ID(String(str),
-                          isInactivity: isInactivity, typesetter.typobute)
-            }
-        }
-        func v(_ nstr: String, in str: Substring) -> ID {
-            if !str.isEmpty, var r = rect(at: str.startIndex, str) {
-                r.size.width = 0
-                return ID(nstr, typesetter.typobute, r + text.origin)
-            } else {
-                return ID(nstr, typesetter.typobute)
-            }
-        }
-        func substring(from temps: [Temp]) -> Substring? {
-            if temps.count == 1, case .uncal(let c)? = temps.first {
-                return c
-            } else {
-                return nil
-            }
-        }
-        
-        if let str = substring(from: cs) {
-            if str.contains("$") && oDic[OKey(str)] != nil {
-                return O(v(str))
-            } else if str.count >= 2 && str.last == ":" {
-                var nstr = str
-                nstr.removeLast()
-                let lo = literalO(from: [.uncal(nstr)],
-                                  text, typesetter, &oDic)
-                if case .id(let id) = lo {
-                    return O(OLabel(O(id.key.string)))
-                } else {
-                    return O(F([lo, O(ID(":"))]))
-                }
-            } else if str.count >= 2 && str.first == "\"" && str.last == "\"" {
-                let si = str.index(str.startIndex, offsetBy: 1)
-                let ei = str.index(str.endIndex, offsetBy: -1)
-                return O(String(str[si ..< ei]))
-            }
-        }
-        
-        enum IDType {
-            case int, real, o, string, id, subID, pow, separator, none
-        }
-        enum CurrentType {
-            case none
-            case integral, dot, decimal
-            case separator, o, string, s, subS, superS
-            var idType: IDType {
-                switch self {
-                case .none: .none
-                case .integral: .int
-                case .dot: .none
-                case .decimal: .real
-                case .separator: .separator
-                case .o: .o
-                case .string: .string
-                case .s: .id
-                case .subS: .subID
-                case .superS: .pow
-                }
-            }
-        }
-        
-        var os = [O]()
-        var to = O(), ts: Substring = "", isSelect = false
-        var tmpsi = ts.startIndex, tmpei = ts.startIndex
-        var currentType = CurrentType.none
-        var isPreviousOneValue = false
-        
-        func append() {
-            if case id(var id)? = os.last, id.key == OKey(".") {
-                if isSelect {
-                    id.key = OKey("/.")
-                    os[.last] = O(id)
-                }
-            }
-            let tss = ts[tmpsi ..< tmpei]
-            switch currentType.idType {
-            case .int:
-                if let i = Int(tss) {
-                    os.append(O(i))
-                } else if let d = Double(tss) {
-                    os.append(O(d))
-                } else {
-                    os.append(O(OError(String(format: "'%1$@' is unknown literal".localized, "\(tss)"))))
-                }
-                isPreviousOneValue = true
-            case .real:
-                if let i = Int(tss) {
-                    os.append(O(i))
-                } else if let d = Double(tss) {
-                    os.append(O(d))
-                } else {
-                    os.append(O(OError(String(format: "'%1$@' is unknown literal".localized, "\(tss)"))))
-                }
-                isPreviousOneValue = true
-            case .o:
-                if isPreviousOneValue {
-                    os.append(O(v("*", in: tss)))
-                }
-                os.append(to)
-                isPreviousOneValue = true
-            case .string:
-                os.append(to)
-                isPreviousOneValue = false
-            case .id:
-                if let g = G(rawValue: String(tss)) {
-                    os.append(O(g))
-                } else if tss == "false" {
-                    os.append(O(false))
-                } else if tss == "true" {
-                    os.append(O(true))
-                } else if tss == "nil" {
-                    os.append(O(OArray([])))
-                } else if tss == "∞" {
-                    os.append(O(Double.infinity))
-                } else if case id(let id)? = os.last, id.key == OKey(".") {
-                    if let i = Int(tss) {
-                        os.append(O(i))
-                    } else {
-                        os.append(O(String(tss)))
-                    }
-                    isPreviousOneValue = false
-                } else if case id(let id)? = os.last, id.key == OKey("/.") {
-                    if let i = Int(tss) {
-                        os.append(O(i))
-                    } else {
-                        os.append(O(String(tss)))
-                    }
-                    isSelect = true
-                    isPreviousOneValue = false
-                } else if oDic[OKey(tss)] != nil {
-                    if tss.count > 1 && !tss.contains(where: { oDic[OKey($0)] == nil }) {
-                        os.append(O(OError(String(format: "'%1$@' overlaps with multiplication by multiple single character variables".localized, "\(tss)"))))
-                        isPreviousOneValue = false
-                    } else {
-                        if isPreviousOneValue {
-                            os.append(O(v("*", in: tss)))
-                        }
-                        os.append(O(v(tss)))
-                        isPreviousOneValue = tss.count == 1
-                    }
-                } else {
-                    var isMul = !os.isEmpty && isPreviousOneValue
-                    var nos = [O](), isP = false
-                    for noi in tss.indices {
-                        let ntss = tss[noi ... noi]
-                        if oDic[OKey(ntss)] != nil {
-                            if isMul {
-                                nos.append(O(v("*", in: tss)))
-                            } else {
-                                isMul = true
-                            }
-                            nos.append(O((v(ntss))))
-                            if tss.index(after: noi) == tss.endIndex {
-                                isP = true
-                            }
-                        } else {
-                            nos = [O(v(tss))]
-                            break
-                        }
-                    }
-                    isPreviousOneValue = isP
-                    os += nos
-                }
-            case .subID:
-                if oDic[OKey(tss)] != nil {
-                    if isPreviousOneValue {
-                        os.append(O(v("*", in: tss)))
-                    }
-                    os.append(O(v(tss)))
-                } else {
-                    os.append(O(OError(String(format: "'%1$@' is unknown literal".localized, "\(tss)"))))
-                }
-                isPreviousOneValue = true
-            case .pow:
-                var nt = text
-                let a = tss.reduce(into: "") { $0.append($1.fromSuperscript ?? $1) }
-                nt.string.replaceSubrange(tss.startIndex ..< tss.endIndex, with: a)
-                
-                let i = nt.string.intIndex(from: tss.startIndex)
-                let ns = nt.string.index(fromInt: i)
-                let ne = nt.string.index(fromInt: i + tss.count)
-                
-                let o = O(nt, range: ns ..< ne,
-                          isDictionary: false, &oDic)
-                os.append(O(v(powName, in: tss)))
-                os.append(o)
-                isPreviousOneValue = true
-            case .separator:
-                os.append(O(v(tss)))
-                isPreviousOneValue = false
-            case .none:
-                os.append(O(OError(String(format: "'%1$@' is unknown literal".localized, "\(tss)"))))
-                isPreviousOneValue = false
-            }
-            tmpsi = tmpei
-        }
-        enum SType {
-            case num, separator, s, subS, superS
-            
-            init(_ n: Character, separator: String) {
-                if "0123456789".contains(n) {
-                    self = .num
-                } else if separator.contains(n) {
-                    self = .separator
-                } else if n.isSubscript || n == "'" {
-                    self = .subS
-                } else if n.isSuperscript {
-                    self = .superS
-                } else {
-                    self = .s
-                }
-            }
-        }
-        var isDot = false
-        func analyzeLiteral(from s: Character, _ sType: SType) {
-            if isDot {
-                if (s == "." && currentType == .dot) || (s != "." && sType != .num) {
-                    isDot = false
-                }
-            } else {
-                if s == "." && currentType != .integral {
-                    isDot = true
-                }
-            }
-            switch currentType {
-            case .none:
-                switch sType {
-                case .num: currentType = .integral
-                case .separator: currentType = .separator
-                case .s: currentType = .s
-                case .subS: currentType = .none
-                case .superS: currentType = .none
-                }
-            case .integral:
-                switch sType {
-                case .num: break
-                case .separator:
-                    if s == "." {
-                        var ni = ts.index(after: tmpei), isSplit = false
-                        if ni < ts.endIndex && ts[ni] == "." {
-                            append()
-                            currentType = .separator
-                        } else {
-                            if  ni == ts.endIndex || isDot {
-                                isSplit = true
-                            } else {
-                                while ni != ts.endIndex {
-                                    let ns = ts[ni]
-                                    let sType = SType(ns, separator: separator)
-                                    if sType != .num {
-                                        if ns == "." {
-                                            isSplit = true
-                                        }
-                                        break
-                                    }
-                                    ni = ts.index(after: ni)
-                                }
-                            }
-                            if isSplit {
-                                isDot = true
-                                append()
-                                currentType = .separator
-                            } else {
-                                currentType = .dot
-                            }
-                        }
-                    } else {
-                        append()
-                        currentType = .separator
-                    }
-                case .s:
-                    append()
-                    currentType = .s
-                case .subS:
-                    append()
-                    currentType = .none
-                case .superS:
-                    append()
-                    currentType = .superS
-                }
-            case .dot:
-                switch sType {
-                case .num:
-                    currentType = .decimal
-                case .separator:
-                    currentType = .none
-                    append()
-                    currentType = .separator
-                case .s:
-                    currentType = .none
-                    append()
-                    currentType = .s
-                case .subS, .superS:
-                    currentType = .none
-                    append()
-                    currentType = .none
-                }
-            case .decimal:
-                switch sType {
-                case .num: break
-                case .separator:
-                    append()
-                    currentType = .separator
-                case .s:
-                    append()
-                    currentType = .s
-                case .subS:
-                    append()
-                    currentType = .none
-                case .superS:
-                    append()
-                    currentType = .superS
-                }
-            case .separator:
-                switch sType {
-                case .num:
-                    append()
-                    currentType = .integral
-                case .separator: break
-                case .s:
-                    append()
-                    currentType = .s
-                case .subS, .superS:
-                    append()
-                    currentType = .none
-                }
-            case .o:
-                switch sType {
-                case .num:
-                    append()
-                    currentType = .integral
-                case .separator:
-                    append()
-                    currentType = .separator
-                case .s:
-                    append()
-                    currentType = .s
-                case .subS:
-                    append()
-                    currentType = .subS
-                case .superS:
-                    append()
-                    currentType = .superS
-                }
-            case .string:
-                switch sType {
-                case .num:
-                    append()
-                    currentType = .integral
-                case .separator:
-                    append()
-                    currentType = .separator
-                case .s:
-                    append()
-                    currentType = .s
-                case .subS:
-                    append()
-                    currentType = .subS
-                case .superS:
-                    append()
-                    currentType = .superS
-                }
-            case .s:
-                switch sType {
-                case .num: break
-                case .separator:
-                    append()
-                    currentType = .separator
-                case .s: break
-                case .subS:
-                    if tmpsi < tmpei {
-                        let ni = ts.index(before: tmpei)
-                        if tmpsi < ni {
-                            let oi = tmpei
-                            tmpei = ni
-                            append()
-                            tmpei = oi
-                        }
-                    }
-                    currentType = .subS
-                case .superS:
-                    append()
-                    currentType = .superS
-                }
-            case .subS:
-                switch sType {
-                case .num:
-                    append()
-                    currentType = .none
-                case .separator:
-                    append()
-                    currentType = .separator
-                case .s:
-                    append()
-                    currentType = .s
-                case .subS: break
-                case .superS:
-                    append()
-                    currentType = .superS
-                }
-            case .superS:
-                switch sType {
-                case .num:
-                    append()
-                    currentType = .none
-                case .separator:
-                    append()
-                    currentType = .separator
-                case .s:
-                    append()
-                    currentType = .s
-                case .subS:
-                    append()
-                    currentType = .none
-                case .superS: break
-                }
-            }
-        }
-        for e in cs {
-            switch e {
-            case .o(let o, let s):
-                switch currentType {
-                case .none: break
-                case .integral, .decimal,
-                     .separator, .o, .string, .s, .subS, .superS:
-                    append()
-                case .dot:
-                    currentType = .none
-                    append()
-                }
-                to = o
-                ts = s
-                tmpsi = s.startIndex
-                tmpei = s.endIndex
-                currentType = .o
-            case .uncal(let ns):
-                if ns.count >= 2 && ns.first == "\"" && ns.last == "\"" {
-                    let si = ns.index(ns.startIndex, offsetBy: 1)
-                    let ei = ns.index(ns.endIndex, offsetBy: -1)
-                    let o = O(String(ns[si ..< ei]))
-                    switch currentType {
-                    case .none: break
-                    case .integral, .decimal,
-                         .separator, .o, .string, .s, .subS, .superS:
-                        append()
-                    case .dot:
-                        currentType = .none
-                        append()
-                    }
-                    to = o
-                    ts = ns
-                    tmpsi = ns.startIndex
-                    tmpei = ns.endIndex
-                    currentType = .string
-                } else {
-                    ts = ns
-                    tmpsi = ns.startIndex
-                    tmpei = ns.startIndex
-                    for i in ns.indices {
-                        let n = ns[i]
-                        let sType = SType(n, separator: separator)
-                        analyzeLiteral(from: n, sType)
-                        tmpei = ns.index(after: i)
-                    }
-                }
-            }
-        }
-        append()
-        if os.count == 1 {
-            return os[0]
+        let cs = "...C\(s.count - l)"
+        if s.count - cs.count > l {
+            let si = s.startIndex
+            let ei = s.index(s.startIndex, offsetBy: l)
+            return "\(s[si ..< ei])\(cs)"
         } else {
-            for o in os {
-                if case .error = o {
-                    return o
-                }
-            }
-            return O(F(os))
-        }
-    }
-}
-extension O {
-    static func rpn(_ os: [O], _ oDic: inout [OKey: O]) -> RPN {
-        enum FVA {
-            case fv(ID), f(F), arg([O])
-        }
-        func rootV(from ov: ID, _ oDic: inout [OKey: O]) -> ID {
-            var v = ov, vSet = Set<ID>()
-            while true {
-                let preV = v
-                if let o = oDic[v.key] {
-                    switch o {
-                    case .id(let nv): v = nv
-                    default: return v.with(ov.typobute,
-                                           typoBounds: ov.typoBounds)
-                    }
-                }
-                vSet.insert(preV)
-                guard !vSet.contains(v) else {
-                    return v.with(ov.typobute, typoBounds: ov.typoBounds)
-                }
-            }
-        }
-        
-        var fvas = [FVA](), args = [O]()
-        for o in os {
-            switch o {
-            case .id(let ov):
-                let v = rootV(from: ov, &oDic)
-                if oDic[v.key] != nil {
-//                    if let o = oDic[v.key], case .f = o {//
-//                        args.append(o)
-//                    } else {
-                        args.append(O(v))
-//                    }
-                } else {
-                    if !args.isEmpty {
-                        fvas.append(.arg(args))
-                        args = []
-                    }
-                    fvas.append(.fv(v))
-                }
-            case .f(let f):
-                if f.isBlock || f.type == .empty {
-                    args.append(o)
-                } else {
-                    if !args.isEmpty {
-                        fvas.append(.arg(args))
-                        args = []
-                    }
-                    fvas.append(.f(f))
-                }
-            default:
-                args.append(o)
-            }
-        }
-        if !args.isEmpty {
-            fvas.append(.arg(args))
-            args = []
-        }
-        
-        func keywordString(from os: [O]) -> String {
-            let s = os.reduce(into: "") {
-                switch $1 {
-//                case .f(let f):
-//                    if f.os.count == 2,
-//                        case .string(let s) = f.os[0],
-//                        case .id(let id) = f.os[1], id.key.string == "::" {
-//
-//                        $0 += "$" + s
-//                    } else {
-//                        $0 += "$"
-//                    }
-                case .label(let label):
-                    switch label.o {
-                    case .string(let s): $0 += "$" + s
-                    case .id(let s): $0 += "$" + s.key.string
-                    default: $0 += "$"
-                    }
-                default: $0 += "$"
-                }
-            }
             return s
         }
-        func keyString(from fva: FVA) -> String {
-            switch fva {
-            case .fv, .f: "$"
-            case .arg(let os): keywordString(from: os)
-            }
-        }
-        
-        var nOIDFs = [OIDF](), indexes = [Int]()
-        var idfBStack = Stack<IDF>(), idfLStack = Stack<IDF>()
-        var sos = [OIDF]()
-        func append(_ idf: IDF) {
-            if idf.f.isShortCircuit && !indexes.isEmpty {
-                let i = indexes.last!
-                let ods = Array(nOIDFs[i...])
-                nOIDFs.removeSubrange(i...)
-                let f = F(RPN(oidfs: ods), isBlock: true)
-                nOIDFs.append(.oOrBlockO(O(f)))
-            }
-            
-            indexes.append(nOIDFs.count)
-            nOIDFs.append(.calculateVN1(idf))
-            
-            let count = idf.f.outKeys.count + 1
-            let noCount = indexes.count - count
-            if !indexes.isEmpty && noCount >= 0 {
-                let minI = indexes[noCount]
-                indexes.removeLast(count)
-                indexes.append(minI)
-            }
-        }
-        func appendFromType(_ idf: IDF) {
-            if !sos.isEmpty && idf.f.type != .empty {
-                (0 ..< sos.count).forEach { indexes.append(nOIDFs.count + $0) }
-                nOIDFs += sos
-                
-                sos = []
-                while let nf = idfLStack.pop() { append(nf) }
-            }
-            switch idf.f.type {
-            case .empty:
-                if idf.f.isBlock {
-                    sos.append(.oOrBlockO(O(idf.f)))
-                } else {
-                    sos.append(.calculateON0(idf.f))
-                }
-//            case .left: idfLStack.push(idf)
-//            case .right:
-//                if !idfLStack.isEmpty {
-//                    idfLStack.removeAll()
-//                }
-//                append(idf)
-//            case .binary:
-            case .left, .right, .binary:
-                if !idfLStack.isEmpty {
-                    idfLStack.removeAll()
-                }
-                while !idfBStack.isEmpty {
-                    let oldF = idfBStack.elements.last!
-                    if idf.f.associativity == .right
-                        && oldF.key == idf.key { break }
-                    if oldF.f.type == .left && idf.f.type == .left { break }
-                    if oldF.f.precedence < idf.f.precedence { break }
-                    append(idfBStack.pop()!)
-                }
-                idfBStack.push(idf)
-            }
-        }
-        for (i, fva) in fvas.enumerated() {
-            switch fva {
-            case .fv(let v):
-                func idfAndO(from key: OKey) -> IDF? {
-                    guard let o = oDic[key],
-                        case .f(let f) = o else { return nil }
-                    return IDF(key: key, f: f, v: v)
-                }
-                let ls = i > 0 ? "$" : ""
-                let rs = i < fvas.count - 1 ?
-                    keyString(from: fvas[i + 1]) : ""
-                guard let idf = idfAndO(from: OKey(ls + v.key.string + rs))
-                    ?? idfAndO(from: OKey(v.key.string + rs))
-                    ?? idfAndO(from: OKey(ls + v.key.string)) else {
-                    
-                    indexes.append(nOIDFs.count)
-                    if oDic.keys.contains(where: { $0.baseString == v.key.string }) {
-                        nOIDFs.append(.oOrBlockO(O(OError(String(format: "The same function name as '%1$@' exists, but the arguments do not match".localized, v.key.string)))))
-                    } else {
-                        nOIDFs.append(.oOrBlockO(O(OError(String(format: "'%1$@' is unknown literal".localized, v.key.string)))))
-                    }
-                     
-                    break
-                }
-                if idf.v?.isInactivity ?? false {
-                    indexes.append(nOIDFs.count)
-                    nOIDFs.append(.oOrBlockO(O(idf.f)))
-                } else {
-                    appendFromType(idf)
-                }
-            case .f(let f):
-                if f.isBlock {
-                    indexes.append(nOIDFs.count)
-                    nOIDFs.append(.oOrBlockO(O(f)))
-                } else {
-                    appendFromType(IDF(key: OKey(), f: f, v: nil))
-                }
-            case .arg(let args):
-                sos += args.map {
-                    switch $0 {
-                    case .id(let v): .calculateVN0(v)
-                    case .f(let f):
-                        if f.isBlock {
-                            .oOrBlockO($0)
-                        } else if f.type == .empty {
-                            .calculateON0(f)
-                        } else {
-                            .oOrBlockO($0)
-                        }
-                    default: .oOrBlockO($0)
-                    }
-                }
-            }
-        }
-        
-        if !sos.isEmpty {
-            (0 ..< sos.count).forEach { indexes.append(nOIDFs.count + $0) }
-            nOIDFs += sos
-            
-            while let nf = idfLStack.pop() { append(nf) }
-        }
-        while let idf = idfBStack.pop() { append(idf) }
-        
-        if nOIDFs.contains(where: {
-            switch $0 {
-            case .calculateVN1: true
-            default: false
-            }
-        }) {
-            nOIDFs = nOIDFs.filter {
-                switch $0 {
-                case .oOrBlockO(let o):
-                    switch o {
-                    case .label: false
-                    default: true
-                    }
-                default: true
-                }
-            }
-        }
-        return RPN(oidfs: nOIDFs)
     }
 }
+
 extension O {
-    typealias Handler = (ID?, O) -> (Bool)
-    static let stopped = O(OError("Stopped"))
-    static let maxStackCount = 100000
-    static let stackOverflow = O(OError(String(format: "Stack has exceeded the limit %d".localized, maxStackCount)))
-    static func asyncCalculate(_ o: O, _ oDic: [OKey: O],
-                               _ handler: Handler) async -> (o: O, id: ID?) {
-        calculate(o, oDic, handler)
-    }
-    static func calculate(_ o: O, _ oDic: [OKey: O], _ handler: Handler) -> (o: O, id: ID?) {
-        var oDic = oDic, memoRPN = [UUID: RPN]()
-        switch o {
-        case .f(let f):
-            if f.outKeys.isEmpty {
-                return calculate(f, nil, args: [], &oDic, &memoRPN, handler)
+    var asInt: Int? {
+        switch self {
+        case .bool(let a): return Int(a)
+        case .int(let a): return a
+        case .rational(let a): return a.isInteger ? Int(a) : nil
+        case .double(let a): return a.isInteger ? Int(exactly: a) : nil
+        case .string(let a):
+            switch a {//
+            case "x": return 0
+            case "y": return 1
+            case "z": return 2
+            case "w": return 3
+            default: return Int(a)
             }
-        default: break
+        default: return nil
         }
-        return (o, nil)
     }
-    static func calculate(_ ff: F, _ fid: ID?, args fargs: [O],
-                          _ oDic: inout [OKey: O],
-                          _ memoRPN: inout [UUID: RPN],
-                          _ handler: Handler) -> (o: O, id: ID?) {
-        enum Loop {
-            case first(_ f: F, _ id: ID?, args: [O])
-            case l0(_ id: ID?)
-            case l1(_ id: ID?, oldDic: [OKey: O], _ f: F, _ key: OKey, i: Dictionary<OKey, F>.Index)
-            case l2(_ id: ID?, oldDic: [OKey: O], _ oidfs: [OIDF], _ oStack: [O], oj: Int)
+    
+    var asDouble: Double? {
+        switch self {
+        case .bool(let a): return Double(a)
+        case .int(let a): return Double(a)
+        case .rational(let a): return Double(a)
+        case .double(let a): return a
+        default: return nil
         }
-        var returnStack = Stack<O>(), loopStack = Stack<Loop>()
-        loopStack.push(.first(ff, fid, args: fargs))
-        loop: while true {
-            let o: O, nid: ID?
-            switch loopStack.pop()! {
-            case .first(let f, let id, let args):
-                if loopStack.elements.count == maxStackCount { return (.stackOverflow, id) }
-                
-                if let oo = f.run(args) {
-                    o = oo
-                } else {
-                    switch f.runType {
-                    case .send:
-                        let oo = args[0], oso = args[1]
-                        if case .f(let subF) = oo {
-                            let os = oso.asArray
-                            guard os.count == subF.outKeys.count
-                            else {
-                                let o = sendArgsErrorO(withCount: subF.outKeys.count,
-                                                       notCount: os.count)
-                                if case .error = o {
-                                    return (o, id)
-                                }
-                                guard handler(id, o) else { return (.stopped, nil) }
-                                if loopStack.isEmpty {
-                                    return (o, id)
-                                } else {
-                                    returnStack.push(o)
-                                    continue loop
-                                }
-                            }
-                            loopStack.push(.l0(id))
-                            loopStack.push(.first(subF, nil, args: oso.asArray))
-                            continue loop
-                        } else {
-                            o = oo
-                        }
-                    case .custom:
-                        var oldDic = [OKey: O]()
-                        oldDic.reserveCapacity(f.outKeys.count + f.definitions.count)
-                        for (i, key) in f.outKeys.enumerated() {
-                            oldDic[key] = oDic[key]
-                            oDic[key] = args[i]
-                        }
-                        for (key, value) in f.definitions {
-                            oldDic[key] = oDic[key]
-                            oDic[key] = O(value)
-                        }
-                        for i in f.definitions.indices {
-                            let (key, value) = f.definitions[i]
-                            if value.type == .empty && !value.isBlock {
-                                let j = f.definitions.index(after: i)
-                                loopStack.push(.l1(id, oldDic: oldDic, f, key, i: j))
-                                loopStack.push(.first(value, id, args: []))
-                                continue loop
-                            }
-                        }
-                        
-                        let nRPN: RPN
-                        if let rpn = f.rpn ?? memoRPN[f.id] {
-                            nRPN = rpn
-                        } else {
-                            let rpn = O.rpn(f.os, &oDic)
-                            memoRPN[f.id] = rpn
-                            nRPN = rpn
-                        }
-                        let oidfs = nRPN.oidfs
-                        var oStack = [O]()
-                        for (oi, oidf) in oidfs.enumerated() {
-                            switch oidf {
-                            case .oOrBlockO(let o):
-                                oStack.append(o)
-                            case .calculateON0(let f):
-                                loopStack.push(.l2(id, oldDic: oldDic, oidfs, oStack, oj: oi + 1))
-                                loopStack.push(.first(f, nil, args: []))
-                                continue loop
-                            case .calculateVN0(let v):
-                                let o = oDic[v.key] ?? O(v)
-                                if case .f(let subF) = o, subF.type == .empty && !subF.isBlock {
-                                    loopStack.push(.l2(id, oldDic: oldDic, oidfs, oStack, oj: oi + 1))
-                                    loopStack.push(.first(subF, nil, args: []))
-                                    continue loop
-                                } else {
-                                    oStack.append(o)
-                                }
-                            case .calculateVN1(let idf):
-                                let subF = idf.f
-                                let count = subF.outKeys.count
-                                let noCount = oStack.count - count
-                                guard noCount >= 0 else {
-                                    let o = argsErrorO(withCount: count, notCount: oStack.count)
-                                    if case .error = o {
-                                        return (o, id)
-                                    }
-                                    guard handler(id, o) else { return (.stopped, nil) }
-                                    if loopStack.isEmpty {
-                                        return (o, id)
-                                    } else {
-                                        returnStack.push(o)
-                                        continue loop
-                                    }
-                                }
-                                let nos = (0 ..< count).map { oStack[noCount + $0] }
-                                oStack.removeLast(count)
-                                loopStack.push(.l2(id, oldDic: oldDic, oidfs, oStack, oj: oi + 1))
-                                loopStack.push(.first(subF, idf.v, args: nos))
-                                continue loop
-                            }
-                        }
-                        
-                        for (key, value) in oldDic { oDic[key] = value }
-                        
-                        o = O.union(from: oStack)
-                    default:
-                        o = operateSpecial(f.runType, id, args: args, &oDic, &memoRPN, handler)
-                    }
-                }
-                
-                nid = id
-            case .l0(let id):
-                o = returnStack.pop()!
-                nid = id
-            case .l1(let id, let oldDic, let f, let key, let k):
-                oDic[key] = returnStack.pop()!
-                
-                var i = k
-                while i < f.definitions.endIndex {
-                    let (key, value) = f.definitions[i]
-                    if value.type == .empty && !value.isBlock {
-                        let j = f.definitions.index(after: i)
-                        loopStack.push(.l1(id, oldDic: oldDic, f, key, i: j))
-                        loopStack.push(.first(value, fid, args: []))
-                        continue loop
-                    }
-                    i = f.definitions.index(after: i)
-                }
-                
-                let nRPN: RPN
-                if let rpn = f.rpn ?? memoRPN[f.id] {
-                    nRPN = rpn
-                } else {
-                    let rpn = O.rpn(f.os, &oDic)
-                    memoRPN[f.id] = rpn
-                    nRPN = rpn
-                }
-                let oidfs = nRPN.oidfs
-                var oStack = [O]()
-                for (oi, oidf) in oidfs.enumerated() {
-                    switch oidf {
-                    case .oOrBlockO(let o):
-                        oStack.append(o)
-                    case .calculateON0(let f):
-                        loopStack.push(.l2(id, oldDic: oldDic, oidfs, oStack, oj: oi + 1))
-                        loopStack.push(.first(f, nil, args: []))
-                        continue loop
-                    case .calculateVN0(let v):
-                        let o = oDic[v.key] ?? O(v)
-                        if case .f(let subF) = o, subF.type == .empty && !subF.isBlock {
-                            loopStack.push(.l2(id, oldDic: oldDic, oidfs, oStack, oj: oi + 1))
-                            loopStack.push(.first(subF, nil, args: []))
-                            continue loop
-                        } else {
-                            oStack.append(o)
-                        }
-                    case .calculateVN1(let idf):
-                        let subF = idf.f
-                        let count = subF.outKeys.count
-                        let noCount = oStack.count - count
-                        guard noCount >= 0 else {
-                            let o = argsErrorO(withCount: count, notCount: oStack.count)
-                            if case .error = o {
-                                return (o, id)
-                            }
-                            guard handler(id, o) else { return (.stopped, nil) }
-                            if loopStack.isEmpty {
-                                return (o, id)
-                            } else {
-                                returnStack.push(o)
-                                continue loop
-                            }
-                        }
-                        let nos = (0 ..< count).map { oStack[noCount + $0] }
-                        oStack.removeLast(count)
-                        loopStack.push(.l2(id, oldDic: oldDic, oidfs, oStack, oj: oi + 1))
-                        loopStack.push(.first(subF, idf.v, args: nos))
-                        continue loop
-                    }
-                }
-                
-                for (key, value) in oldDic { oDic[key] = value }
-                
-                o = O.union(from: oStack)
-                nid = id
-            case .l2(let id, let oldDic, let oidfs, var oStack, let oj):
-                oStack.append(returnStack.pop()!)
-                
-                for oi in oj ..< oidfs.count {
-                    let oidf = oidfs[oi]
-                    switch oidf {
-                    case .oOrBlockO(let o):
-                        oStack.append(o)
-                    case .calculateON0(let f):
-                        loopStack.push(.l2(id, oldDic: oldDic, oidfs, oStack, oj: oi + 1))
-                        loopStack.push(.first(f, nil, args: []))
-                        continue loop
-                    case .calculateVN0(let v):
-                        let o = oDic[v.key] ?? O(v)
-                        if case .f(let subF) = o, subF.type == .empty && !subF.isBlock {
-                            loopStack.push(.l2(id, oldDic: oldDic, oidfs, oStack, oj: oi + 1))
-                            loopStack.push(.first(subF, nil, args: []))
-                            continue loop
-                        } else {
-                            oStack.append(o)
-                        }
-                    case .calculateVN1(let idf):
-                        let subF = idf.f
-                        let count = subF.outKeys.count
-                        let noCount = oStack.count - count
-                        guard noCount >= 0 else {
-                            let o = argsErrorO(withCount: count, notCount: oStack.count)
-                            if case .error = o {
-                                return (o, id)
-                            }
-                            guard handler(id, o) else { return (.stopped, nil) }
-                            if loopStack.isEmpty {
-                                return (o, id)
-                            } else {
-                                returnStack.push(o)
-                                continue loop
-                            }
-                        }
-                        let nos = (0 ..< count).map { oStack[noCount + $0] }
-                        oStack.removeLast(count)
-                        loopStack.push(.l2(id, oldDic: oldDic, oidfs, oStack, oj: oi + 1))
-                        loopStack.push(.first(subF, idf.v, args: nos))
-                        continue loop
-                    }
-                }
-                
-                for (key, value) in oldDic { oDic[key] = value }
-                
-                o = O.union(from: oStack)
-                nid = id
-            }
-            
-            if case .error = o {
-                return (o, nid)
-            }
-            guard handler(nid, o) else { return (.stopped, nil) }
-            
-            if loopStack.isEmpty {
-                return (o, nid)
+    }
+    
+    var asPoint: Point? {
+        switch self {
+        case .array(let a):
+            if a.count == 2, let x = a[0].asDouble, let y = a[1].asDouble {
+                return Point(x, y)
             } else {
-                returnStack.push(o)
-                continue loop
+                return nil
             }
+        default: return nil
         }
     }
-    private static func calculateS(_ f: F, _ id: ID?, args: [O],
-                                   _ oDic: inout [OKey: O],
-                                   _ memoRPN: inout [UUID: RPN],
-                                   _ handler: Handler) -> O {
-        if let o = f.run(args) {
-            guard handler(id, o) else { return .stopped }
-            return o
+    
+    var asArray: [O] {
+        switch self {
+        case .array(let a): return a.value
+        default: return [self]
+        }
+    }
+    
+    var asPoints: [Point] {
+        switch self {
+        case .array(let a): return a.compactMap { $0.asPoint }
+        default: return []
+        }
+    }
+    
+    var asOrientation: Orientation? {
+        guard case .string(let str) = self else { return nil }
+        return Orientation(rawValue: str)
+    }
+    
+    var asTextBasedString: String {
+        if case .string(let s) = self {
+            return s
+                .replacingOccurrences(of: "\\\"", with: "\"")
+                .replacingOccurrences(of: "\\n", with: "\n")
         } else {
-            switch f.runType {
-            case .send:
-                let o = args[0], oso = args[1]
-                if case .f(let subF) = o {
-                    let os = oso.asArray
-                    guard os.count == subF.outKeys.count
-                    else {
-                        let o = sendArgsErrorO(withCount: subF.outKeys.count,
-                                               notCount: os.count)
-                        guard handler(id, o) else { return .stopped }
-                        return o
-                    }
-                    let o = calculateS(subF, nil, args: os, &oDic, &memoRPN, handler)
-                    guard handler(id, o) else { return .stopped }
-                    return o
-                } else {
-                    guard handler(id, o) else { return .stopped }
-                    return o
-                }
-            case .custom:
-                var oldDic = [OKey: O]()
-                oldDic.reserveCapacity(f.outKeys.count + f.definitions.count)
-                for (i, key) in f.outKeys.enumerated() {
-                    oldDic[key] = oDic[key]
-                    oDic[key] = args[i]
-                }
-                for (key, value) in f.definitions {
-                    oldDic[key] = oDic[key]
-                    oDic[key] = O(value)
-                }
-                for (key, value) in f.definitions {
-                    if value.type == .empty && !value.isBlock {
-                        oDic[key] = calculateS(value, id, args: [], &oDic, &memoRPN, handler)
-                    }
-                }
-                
-                let nRPN: RPN
-                if let rpn = f.rpn ?? memoRPN[f.id] {
-                    nRPN = rpn
-                } else {
-                    let rpn = O.rpn(f.os, &oDic)
-                    memoRPN[f.id] = rpn
-                    nRPN = rpn
-                }
-                let oidfs = nRPN.oidfs
-                var oStack = [O]()
-                for oidf in oidfs {
-                    switch oidf {
-                    case .oOrBlockO(let o):
-                        oStack.append(o)
-                    case .calculateON0(let f):
-                        oStack.append(calculateS(f, nil, args: [], &oDic, &memoRPN, handler))
-                    case .calculateVN0(let v):
-                        let o = oDic[v.key] ?? O(v)
-                        if case .f(let subF) = o, subF.type == .empty && !subF.isBlock {
-                            let o = calculateS(subF, nil, args: [], &oDic, &memoRPN, handler)
-                            oStack.append(o)
-                        } else {
-                            oStack.append(o)
-                        }
-                    case .calculateVN1(let idf):
-                        let subF = idf.f
-                        let count = subF.outKeys.count
-                        let noCount = oStack.count - count
-                        guard noCount >= 0 else {
-                            let o = argsErrorO(withCount: count, notCount: oStack.count)
-                            guard handler(id, o) else { return .stopped }
-                            return o
-                        }
-                        let nos = (0 ..< count).map { oStack[noCount + $0] }
-                        oStack.removeLast(count)
-                        oStack.append(calculateS(subF, idf.v, args: nos, &oDic, &memoRPN, handler))
-                    }
-                }
-                
-                for (key, value) in oldDic { oDic[key] = value }
-                
-                let o = O.union(from: oStack)
-                guard handler(id, o) else { return .stopped }
-                return o
-            default:
-                let o = operateSpecial(f.runType, id, args: args, &oDic, &memoRPN, handler)
-                guard handler(id, o) else { return .stopped }
-                return o
-            }
+            return asString
         }
     }
     
-    static func argsErrorO(withCount count: Int, notCount: Int) -> O {
-        O(OError(String(format: "Arguments count should be %1$d, not %2$d".localized, count, notCount)))
-    }
-    static func sendArgsErrorO(withCount count: Int, notCount: Int) -> O {
-        O(OError(String(format: "Arguments count for argument $1 must be %1$d, not %2$d".localized, count, notCount)))
-    }
-    static func arrayArgsErrorO(withCount count: Int, notCount: Int) -> O {
-        O(OError(String(format: "Array count for argument $1 must be %1$d, not %2$d".localized, count, notCount)))
+    var asText: Text? {
+        switch self {
+        case .dic(let a):
+            if a.count == 4,
+               let string = a[O(O.stringName)]?.asTextBasedString,
+               let orientation = a[O(O.orientationName)]?.asOrientation,
+               let size = a[O(O.sizeName)]?.asDouble,
+               let origin = a[O(O.originName)]?.asPoint {
+                
+                return Text(string: string, orientation: orientation,
+                            size: size, origin: origin)
+            } else {
+                return nil
+            }
+        default: return nil
+        }
     }
     
-    private static func union(from os: [O]) -> O {
-        guard os.count != 1 else { return os[0] }
-        for o in os {
-            switch o {
-            case .error: return o
+    var asLineControl: Line.Control? {
+        switch self {
+        case .dic(let a):
+            if a.count == 3,
+               let point = a[O(O.pointName)]?.asPoint,
+               let weight = a[O(O.weightName)]?.asDouble,
+               let pressure = a[O(O.pressureName)]?.asDouble {
+                
+                return Line.Control(point: point,
+                                    weight: weight,
+                                    pressure: pressure)
+            } else {
+                return nil
+            }
+        default: return nil
+        }
+    }
+    
+    var asLine: Line? {
+        switch self {
+        case .array(let a):
+            var cs = [Line.Control]()
+            cs.reserveCapacity(a.count)
+            for i in 0 ..< a.count {
+                guard let lc = a[i].asLineControl else {
+                    return nil
+                }
+                cs.append(lc)
+            }
+            return Line(controls: cs)
+        default: return nil
+        }
+    }
+    
+    var asSheet: Sheet? {
+        switch self {
+        case .sheet(let a): return a.value
+        case .dic(let a):
+            if let oLines = a[O(O.linesName)]?.asArray,
+               let oTexts = a[O(O.textsName)]?.asArray {
+                
+                var lines = [Line]()
+                lines.reserveCapacity(oLines.count)
+                for i in 0 ..< oLines.count {
+                    guard let l = oLines[i].asLine else {
+                        return nil
+                    }
+                    lines.append(l)
+                }
+                
+                var texts = [Text]()
+                texts.reserveCapacity(oTexts.count)
+                for i in 0 ..< oTexts.count {
+                    guard let t = oTexts[i].asText else {
+                        return nil
+                    }
+                    texts.append(t)
+                }
+                
+                let keyframe = Keyframe(picture: Picture(lines: lines,
+                                                         planes: []))
+                return Sheet(animation: Animation(keyframes: [keyframe]),
+                             texts: texts)
+            } else {
+                return nil
+            }
+        default: return nil
+        }
+    }
+}
+
+extension O {
+    static let piName = "π"
+    static let pi = O(Double.pi)
+    
+    static let nilName = "nil"
+    static let nilV = O(OArray([]))
+}
+extension O {
+    static let powName = "**"
+    static func ** (ao: O, bo: O) -> O {
+        if ao == O(1) || bo == O(0) {
+            return O(1)
+        }
+        switch ao {
+        case .bool(let a):
+            switch bo {
+            case .bool(let b):
+                if a {
+                    if b {
+                        return O(true)
+                    } else {
+                        return O(true)
+                    }
+                } else {
+                    if b {
+                        return O(false)
+                    } else {
+                        return O(true)
+                    }
+                }
+            case .int(let b): return O(Int.overPow(Int(a), b))
+            case .rational(let b): return O(Double(a) ** Double(b))
+            case .double(let b): return O(Double(a) ** b)
+            case .error: return bo
+            default: break
+            }
+        case .int(let a):
+            if a < 0 {
+                return O(OError.undefined(with: "\(ao.name) \(powName) \(bo.name)"))//
+            }
+            switch bo {
+            case .bool(let b): return O(Int.overPow(a, Int(b)))
+            case .int(let b): return O(Int.overPow(a, b))
+            case .rational(let b): return O(Double(a) ** Double(b))
+            case .double(let b): return O(Double(a) ** b)
+            case .error: return bo
+            default: break
+            }
+        case .rational(let a):
+            if a < 0 {
+                return O(OError.undefined(with: "\(ao.name) \(powName) \(bo.name)"))//
+            }
+            switch bo {
+            case .bool(let b): return O(Rational.overPow(a, Int(b)))
+            case .int(let b): return O(Rational.overPow(a, b))
+            case .rational(let b): return O(Double(a) ** Double(b))
+            case .double(let b): return O(Double(a) ** b)
+            case .error: return bo
+            default: break
+            }
+        case .double(let a):
+            if a < 0 {
+                return O(OError.undefined(with: "\(ao.name) \(powName) \(bo.name)"))//
+            }
+            switch bo {
+            case .bool(let b): return O(a ** Double(b))
+            case .int(let b): return O(a ** Double(b))
+            case .rational(let b): return O(a ** Double(b))
+            case .double(let b): return O(a ** b)
+            case .error: return bo
+            default: break
+            }
+        case .error: return ao
+        default:
+            switch bo {
+            case .error: return bo
             default: break
             }
         }
-        if os.contains(where: {
-            switch $0 {
-            case .label: true
-            default: false
+        return O(OError.undefined(with: "\(ao.name) \(powName) \(bo.name)"))
+    }
+    
+    static let apowName = "*/"
+    static func apow(_ ao: O, _ bo: O) -> O {
+        if bo < O(0) || bo == O(1) {
+            return O(OError.undefined(with: "\(ao.name) \(apowName) \(bo.name)"))//
+        }
+        switch ao {
+        case .bool(let a):
+            switch bo {
+            case .bool(let b): return O(.apow(Double(a), Double(b)))
+            case .int(let b): return O(.apow(Double(a), Double(b)))
+            case .rational(let b): return O(.apow(Double(a), Double(b)))
+            case .double(let b): return O(.apow(Double(a), b))
+            case .error: return bo
+            default: break
             }
-        }) {
-            var i = 0, oldLabel: OLabel?, oDic = [O: O]()
-            for o in os {
-                switch o {
-                case .label(let label): oldLabel = label
-                default:
-                    if let nLabel = oldLabel {
-                        oDic[nLabel.o] = o
-                        oldLabel = nil
-                    } else {
-                        oDic[O("$\(i)")] = o
-                        i += 1
+        case .int(let a):
+            switch bo {
+            case .bool(let b): return O(.apow(Double(a), Double(b)))
+            case .int(let b): return O(.apow(Double(a), Double(b)))
+            case .rational(let b): return O(.apow(Double(a), Double(b)))
+            case .double(let b): return O(.apow(Double(a), b))
+            case .error: return bo
+            default: break
+            }
+        case .rational(let a):
+            switch bo {
+            case .bool(let b): return O(.apow(Double(a), Double(b)))
+            case .int(let b): return O(.apow(Double(a), Double(b)))
+            case .rational(let b): return O(.apow(Double(a), Double(b)))
+            case .double(let b): return O(.apow(Double(a), b))
+            case .error: return bo
+            default: break
+            }
+        case .double(let a):
+            switch bo {
+            case .bool(let b): return O(.apow(a, Double(b)))
+            case .int(let b): return O(.apow(a, Double(b)))
+            case .rational(let b): return O(.apow(a, Double(b)))
+            case .double(let b): return O(.apow(a, b))
+            case .error: return bo
+            default: break
+            }
+        case .error: return ao
+        default:
+            switch bo {
+            case .error: return bo
+            default: break
+            }
+        }
+        return O(OError.undefined(with: "\(ao.name) \(apowName) \(bo.name)"))
+    }
+    
+    static let multiplyName = "*"
+    static func * (ao: O, bo: O) -> O {
+        switch ao {
+        case .bool(let a):
+            switch bo {
+            case .bool(let b): return O(a && b)
+            case .int(let b): return O(Int.overMulti(Int(a), b))
+            case .rational(let b): return O(Rational.overMulti(Rational(a), b))
+            case .double(let b):
+                if b.isInfinite && !a {
+                    return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
+                }
+                return O(Double(a) * b)
+            case .error: return bo
+            default: break
+            }
+        case .int(let a):
+            switch bo {
+            case .bool(let b): return O(Int.overMulti(a, Int(b)))
+            case .int(let b): return O(Int.overMulti(a, b))
+            case .rational(let b): return O(Rational.overMulti(Rational(a), b))
+            case .double(let b):
+                if b.isInfinite && a == 0 {
+                    return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
+                }
+                return O(Double(a) * b)
+            case .error: return bo
+            default: break
+            }
+        case .rational(let a):
+            switch bo {
+            case .bool(let b): return O(Rational.overMulti(a, Rational(b)))
+            case .int(let b): return O(Rational.overMulti(a, Rational(b)))
+            case .rational(let b): return O(Rational.overMulti(a, b))
+            case .double(let b):
+                if b.isInfinite && a == 0 {
+                    return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
+                }
+                return O(Double(a) * b)
+            case .error: return bo
+            default: break
+            }
+        case .double(let a):
+            switch bo {
+            case .bool(let b):
+                if a.isInfinite && !b {
+                    return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
+                }
+                return O(a * Double(b))
+            case .int(let b):
+                if a.isInfinite && b == 0 {
+                    return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
+                }
+                return O(a * Double(b))
+            case .rational(let b):
+                if a.isInfinite && b == 0 {
+                    return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
+                }
+                return O(a * Double(b))
+            case .double(let b):
+                if a.isInfinite || b.isInfinite {
+                    if (a.isInfinite && b == 0) || (a == 0 && b.isInfinite) {
+                        return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
                     }
                 }
+                return O(a * b)
+            case .error: return bo
+            default: break
             }
-            return O(oDic)
+        case .array(let a):
+            switch bo {
+            case .array(let b):
+                guard a.dimension == b.dimension else {
+                    return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
+                }
+                let aColumnCount = a.nextCount
+                let aRowCount = a.count
+
+                let bColumnCount = b.nextCount
+                let bRowCount = b.count
+
+                guard aColumnCount == bRowCount else {
+                    return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
+                }
+                let m = aColumnCount, n = aRowCount, p = bColumnCount
+
+                var ns = [O]()
+                ns.reserveCapacity(n)
+                for i in 0 ..< n {
+                    var nj = [O]()
+                    nj.reserveCapacity(p)
+                    let ai = a[i]
+                    for j in 0 ..< p {
+                        var ne = O(0)
+                        for k in 0 ..< m {
+                            let ne0 = ne + ai[k] * b[k][j]
+                            switch ne0 {
+                            case .error: return ne0
+                            default: ne = ne0
+                            }
+                        }
+                        nj.append(ne)
+                    }
+                    ns.append(O(OArray(union: nj)))
+                }
+                return O(OArray(ns, dimension: a.dimension, nextCount: p))
+            case .error: return bo
+            default: break
+            }
+        case .error: return ao
+        default:
+            switch bo {
+            case .error: return bo
+            default: break
+            }
+        }
+        return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
+    }
+    static func *= (lhs: inout O, rhs: O) {
+        lhs = lhs * rhs
+    }
+    
+    static let divisionName = "/"
+    static func / (ao: O, bo: O) -> O {
+        if ao == O(0) && bo == O(0) {
+            return O(OError("0/0"))
+        }
+        switch ao {
+        case .bool(let a):
+            switch bo {
+            case .bool(let b):
+                if a {
+                    if b {
+                        return O(true)
+                    } else {
+                        return O(Double.infinity)
+                    }
+                } else {
+                    if b {
+                        return O(false)
+                    } else {
+                        return O(OError.undefined(with: "\(ao.name) \(divisionName) \(bo.name)"))
+                    }
+                }
+            case .int(let b):
+                return b == 0 ?
+                    O(Double(a) / Double(b)) :
+                    O(Rational(Int(a), b))
+            case .rational(let b):
+                return b == 0 ?
+                    O(Double(a) / Double(b)) :
+                    O(Rational.overDiv(Rational(a), b))
+            case .double(let b): return O(Double(a) / b)
+            case .error: return bo
+            default: break
+            }
+        case .int(let a):
+            switch bo {
+            case .bool(let b):
+                return !b ?
+                    O(Double(a) / Double(b)) :
+                    O(Rational(a, Int(b)))
+            case .int(let b):
+                return b == 0 ?
+                    O(Double(a) / Double(b)) :
+                    O(Rational(a, b))
+            case .rational(let b):
+                return b == 0 ?
+                    O(Double(a) / Double(b)) :
+                    O(Rational.overDiv(Rational(a), b))
+            case .double(let b): return O(Double(a) / b)
+            case .error: return bo
+            default: break
+            }
+        case .rational(let a):
+            switch bo {
+            case .bool(let b):
+                return !b ?
+                    O(Double(a) / Double(b)) :
+                    O(Rational.overDiv(a, Rational(b)))
+            case .int(let b):
+                return b == 0 ?
+                    O(Double(a) / Double(b)) :
+                    O(Rational.overDiv(a, Rational(b)))
+            case .rational(let b):
+                return b == 0 ?
+                    O(Double(a) / Double(b)) :
+                    O(Rational.overDiv(a, b))
+            case .double(let b): return O(Double(a) / b)
+            case .error: return bo
+            default: break
+            }
+        case .double(let a):
+            switch bo {
+            case .bool(let b): return O(a / Double(b))
+            case .int(let b): return O(a / Double(b))
+            case .rational(let b): return O(a / Double(b))
+            case .double(let b):
+                if a.isInfinite && b.isInfinite {
+                    return O(OError.undefined(with: "\(ao.name) \(divisionName) \(bo.name)"))
+                }
+                return O(a / b)
+            case .error: return bo
+            default: break
+            }
+        case .error: return ao
+        default:
+            switch bo {
+            case .error: return bo
+            default: break
+            }
+        }
+        return O(OError.undefined(with: "\(ao.name) \(divisionName) \(bo.name)"))
+    }
+    static func /= (lhs: inout O, rhs: O) {
+        lhs = lhs / rhs
+    }
+    
+    static let moduloName = "%"
+    static func % (ao: O, bo: O) -> O {
+        if bo == O(0) {
+            return O(OError("%0"))
+        }
+        switch ao {
+        case .bool(let a):
+            switch bo {
+            case .bool(let b):
+                if a {
+                    if b {
+                        return O(false)
+                    } else {
+                        return O(OError.undefined(with: "\(ao.name) \(moduloName) \(bo.name)"))
+                    }
+                } else {
+                    if b {
+                        return O(false)
+                    } else {
+                        return O(OError.undefined(with: "\(ao.name) \(moduloName) \(bo.name)"))
+                    }
+                }
+            case .int(let b): return O(Int.overMod(Int(a), b))
+            case .rational(let b): return O(Rational.overMod(Rational(a), b))
+            case .double(let b): return O(Double(a).truncatingRemainder(dividingBy: b))
+            case .error: return bo
+            default: break
+            }
+        case .int(let a):
+            switch bo {
+            case .bool(let b): return O(Int.overMod(a, Int(b)))
+            case .int(let b): return O(Int.overMod(a, b))
+            case .rational(let b): return O(Rational.overMod(Rational(a), b))
+            case .double(let b):
+                return O(Double(a).truncatingRemainder(dividingBy: b))
+            case .error: return bo
+            default: break
+            }
+        case .rational(let a):
+            switch bo {
+            case .bool(let b): return O(Rational.overMod(a, Rational(b)))
+            case .int(let b): return O(Rational.overMod(a, Rational(b)))
+            case .rational(let b): return O(Rational.overMod(a, b))
+            case .double(let b):
+                return O(Double(a).truncatingRemainder(dividingBy: b))
+            case .error: return bo
+            default: break
+            }
+        case .double(let a):
+            switch bo {
+            case .bool(let b):
+                return O(a.truncatingRemainder(dividingBy: Double(b)))
+            case .int(let b):
+                return O(a.truncatingRemainder(dividingBy: Double(b)))
+            case .rational(let b):
+                return O(a.truncatingRemainder(dividingBy: Double(b)))
+            case .double(let b):
+                if a.isInfinite && b.isInfinite {
+                    return O(OError.undefined(with: "\(ao.name) \(moduloName) \(bo.name)"))
+                }
+                return O(a.truncatingRemainder(dividingBy: b))
+            case .error: return bo
+            default: break
+            }
+        case .error: return ao
+        default:
+            switch bo {
+            case .error: return bo
+            default: break
+            }
+        }
+        return O(OError.undefined(with: "\(ao.name) \(moduloName) \(bo.name)"))
+    }
+    
+    static let additionName = "+"
+    static func + (ao: O, bo: O) -> O {
+        switch ao {
+        case .bool(let a):
+            switch bo {
+            case .bool(let b): return O(a != b)
+            case .int(let b): return O(Int.overAdd(Int(a), b))
+            case .rational(let b): return O(Rational.overAdd(Rational(a), b))
+            case .double(let b): return O(Double(a) + b)
+            case .error: return bo
+            default: break
+            }
+        case .int(let a):
+            switch bo {
+            case .bool(let b): return O(Int.overAdd(a, Int(b)))
+            case .int(let b): return O(Int.overAdd(a, b))
+            case .rational(let b): return O(Rational.overAdd(Rational(a), b))
+            case .double(let b): return O(Double(a) + b)
+            case .error: return bo
+            default: break
+            }
+        case .rational(let a):
+            switch bo {
+            case .bool(let b): return O(Rational.overAdd(a, Rational(b)))
+            case .int(let b): return O(Rational.overAdd(a, Rational(b)))
+            case .rational(let b): return O(Rational.overAdd(a, b))
+            case .double(let b): return O(Double(a) + b)
+            case .error: return bo
+            default: break
+            }
+        case .double(let a):
+            switch bo {
+            case .bool(let b): return O(a + Double(b))
+            case .int(let b): return O(a + Double(b))
+            case .rational(let b): return O(a + Double(b))
+            case .double(let b):
+                if a.isInfinite && b.isInfinite {
+                    if (a < 0 && b > 0) || (a > 0 && b < 0) {
+                        return O(OError.undefined(with: "\(ao.name) \(additionName) \(bo.name)"))
+                    }
+                }
+                return O(a + b)
+            case .error: return bo
+            default: break
+            }
+        case .array(let a):
+            switch bo {
+            case .array(let b):
+                if a.isEqualDimension(b) {
+                    var n = [O]()
+                    n.reserveCapacity(a.count)
+                    for (i, ae) in a.enumerated() {
+                        let ne = ae + b[i]
+                        switch ne {
+                        case .error: return ne
+                        default: n.append(ne)
+                        }
+                    }
+                    return O(a.with(n))
+                } else {
+                    return O(OError.undefined(with: "\(ao.name) \(additionName) \(bo.name)"))
+                }
+            case .error: return bo
+            default: break
+            }
+        case .dic(let a):
+            switch bo {
+            case .dic(let b):
+                if a.count == b.count {
+                    var n = [O: O]()
+                    n.reserveCapacity(a.count)
+                    for (aKey, ae) in a {
+                        guard let be = b[aKey] else {
+                            return O(OError.undefined(with: "\(ao.name) \(additionName) \(bo.name)"))
+                        }
+                        let ne = ae + be
+                        switch ne {
+                        case .error: return ne
+                        default: n[aKey] = ne
+                        }
+                    }
+                    return O(n)
+                } else {
+                    return O(OError.undefined(with: "\(ao.name) \(additionName) \(bo.name)"))
+                }
+            case .error: return bo
+            default: break
+            }
+        case .error: return ao
+        default:
+            switch bo {
+            case .error: return bo
+            default: break
+            }
+        }
+        return O(OError.undefined(with: "\(ao.name) \(additionName) \(bo.name)"))
+    }
+    static func += (lhs: inout O, rhs: O) {
+        lhs = lhs + rhs
+    }
+    
+    static let subtractionName = "-"
+    static func - (ao: O, bo: O) -> O {
+        switch ao {
+        case .bool(let a):
+            switch bo {
+            case .bool(let b):
+                if a {
+                    if b {
+                        return O(false)
+                    } else {
+                        return O(true)
+                    }
+                } else {
+                    if b {
+                        return O(true)
+                    } else {
+                        return O(false)
+                    }
+                }
+            case .int(let b): return O(Int.overDiff(Int(a), b))
+            case .rational(let b): return O(Rational.overDiff(Rational(a), b))
+            case .double(let b): return O(Double(a) - b)
+            case .error: return bo
+            default: break
+            }
+        case .int(let a):
+            switch bo {
+            case .bool(let b): return O(Int.overDiff(a, Int(b)))
+            case .int(let b): return O(Int.overDiff(a, b))
+            case .rational(let b): return O(Rational.overDiff(Rational(a), b))
+            case .double(let b): return O(Double(a) - b)
+            case .error: return bo
+            default: break
+            }
+        case .rational(let a):
+            switch bo {
+            case .bool(let b): return O(Rational.overDiff(a, Rational(b)))
+            case .int(let b): return O(Rational.overDiff(a, Rational(b)))
+            case .rational(let b): return O(Rational.overDiff(a, b))
+            case .double(let b): return O(Double(a) - b)
+            case .error: return bo
+            default: break
+            }
+        case .double(let a):
+            switch bo {
+            case .bool(let b): return O(a - Double(b))
+            case .int(let b): return O(a - Double(b))
+            case .rational(let b): return O(a - Double(b))
+            case .double(let b):
+                if a.isInfinite && b.isInfinite {
+                    if (a > 0 && b > 0) || (a < 0 && b < 0) {
+                        return O(OError.undefined(with: "\(ao.name) \(subtractionName) \(bo.name)"))
+                    }
+                }
+                return O(a - b)
+            case .error: return bo
+            default: break
+            }
+        case .array(let a):
+            switch bo {
+            case .array(let b):
+                if a.isEqualDimension(b) {
+                    var n = [O]()
+                    n.reserveCapacity(a.count)
+                    for (i, ae) in a.enumerated() {
+                        let ne = ae - b[i]
+                        switch ne {
+                        case .error: return ne
+                        default: n.append(ne)
+                        }
+                    }
+                    return O(a.with(n))
+                } else {
+                    return O(OError.undefined(with: "\(ao.name) \(subtractionName) \(bo.name)"))
+                }
+            case .error: return bo
+            default: break
+            }
+        case .dic(let a):
+            switch bo {
+            case .dic(let b):
+                if a.count == b.count {
+                    var n = [O: O]()
+                    n.reserveCapacity(a.count)
+                    for (aKey, ae) in a {
+                        guard let be = b[aKey] else {
+                            return O(OError.undefined(with: "\(ao.name) \(subtractionName) \(bo.name)"))
+                        }
+                        let ne = ae - be
+                        switch ne {
+                        case .error: return ne
+                        default: n[aKey] = ne
+                        }
+                    }
+                    return O(n)
+                } else {
+                    return O(OError.undefined(with: "\(ao.name) \(subtractionName) \(bo.name)"))
+                }
+            case .error: return bo
+            default: break
+            }
+        case .error: return ao
+        default:
+            switch bo {
+            case .error: return bo
+            default: break
+            }
+        }
+        return O(OError.undefined(with: "\(ao.name) \(subtractionName) \(bo.name)"))
+    }
+    static func -= (lhs: inout O, rhs: O) {
+        lhs = lhs - rhs
+    }
+    
+    static let andName = "&&"
+    static func and(_ ao: O, _ bo: O) -> O {
+        switch ao {
+        case .bool(let a):
+            switch bo {
+            case .bool(let b): return O(a && b)
+            case .error: return bo
+            default: break
+            }
+        case .error: return ao
+        default:
+            switch bo {
+            case .error: return bo
+            default: break
+            }
+        }
+        return O(OError.undefined(with: "\(ao.name) \(andName) \(bo.name)"))
+    }
+    static let orName = "||"
+    static func or(_ ao: O, _ bo: O) -> O {
+        switch ao {
+        case .bool(let a):
+            switch bo {
+            case .bool(let b): return O(a || b)
+            case .error: return bo
+            default: break
+            }
+        case .error: return ao
+        default:
+            switch bo {
+            case .error: return bo
+            default: break
+            }
+        }
+        return O(OError.undefined(with: "\(ao.name) \(orName) \(bo.name)"))
+    }
+}
+
+extension O: Equatable {
+    static func == (lhs: O, rhs: O) -> Bool {
+        return equal(lhs, rhs)
+    }
+    static func equal(_ lhs: O, _ rhs: O) -> Bool {//
+        switch lhs {
+        case .bool(let a):
+            switch rhs {
+            case .bool(let b): return a == b
+            case .int(let b): return Int(a) == b
+            case .rational(let b): return Rational(a) == b
+            case .double(let b): return Double(a) == b
+            default: return false
+            }
+        case .int(let a):
+            switch rhs {
+            case .bool(let b): return a == Int(b)
+            case .int(let b): return a == b
+            case .rational(let b): return Rational(a) == b
+            case .double(let b): return Double(a) == b
+            default: return false
+            }
+        case .rational(let a):
+            switch rhs {
+            case .bool(let b): return a == Rational(b)
+            case .int(let b): return a == Rational(b)
+            case .rational(let b): return a == b
+            case .double(let b): return Double(a) == b
+            default: return false
+            }
+        case .double(let a):
+            switch rhs {
+            case .bool(let b): return a == Double(b)
+            case .int(let b): return a == Double(b)
+            case .rational(let b): return a == Double(b)
+            case .double(let b): return a == b
+            default: return false
+            }
+        case .array(let a):
+            switch rhs {
+            case .array(let b): return a == b
+            default: return false
+            }
+        case .range(let a):
+            switch rhs {
+            case .range(let b): return a == b
+            default: return false
+            }
+        case .dic(let a):
+            switch rhs {
+            case .dic(let b): return a == b
+            default: return false
+            }
+        case .string:
+            return lhs.asString == rhs.asString
+        case .sheet(let a):
+            switch rhs {
+            case .sheet(let b): return a == b
+            default: return false
+            }
+        case .selected(let a):
+            switch rhs {
+            case .selected(let b): return a == b
+            default: return false
+            }
+        case .g(let a):
+            switch rhs {
+            case .g(let b): return a == b
+            default: return false
+            }
+        case .generics(let a):
+            switch rhs {
+            case .generics(let b): return a == b
+            default: return false
+            }
+        case .f(let a):
+            switch rhs {
+            case .f(let b): return a == b
+            default: return false
+            }
+        case .label(let a):
+            switch rhs {
+            case .label(let b): return a == b
+            default: return false
+            }
+        case .id(let a):
+            switch rhs {
+            case .id(let b): return a == b
+            default: return false
+            }
+        case .error(let a):
+            switch rhs {
+            case .error(let b): return a == b
+            default: return false
+            }
+        }
+    }
+    static func notEqual(_ lhs: O, _ rhs: O) -> Bool {
+        return !equal(lhs, rhs)
+    }
+    static let equalName = "=="
+    static func equalO(_ ao: O, _ bo: O) -> O {
+        switch ao {
+        case .error: return ao
+        default: break
+        }
+        switch bo {
+        case .error: return bo
+        default: break
+        }
+        return O(equal(ao, bo))
+    }
+    static let notEqualName = "!="
+    static func notEqualO(_ ao: O, _ bo: O) -> O {
+        switch ao {
+        case .error: return ao
+        default: break
+        }
+        switch bo {
+        case .error: return bo
+        default: break
+        }
+        return O(notEqual(ao, bo))
+    }
+}
+extension O: Comparable {
+    static func < (lhs: O, rhs: O) -> Bool {
+        return less(lhs, rhs) ?? false
+    }
+    static func less(_ lhs: O, _ rhs: O) -> Bool? {
+        switch lhs {
+        case .bool(let a):
+            switch rhs {
+            case .int(let b): return Int(a) < b
+            case .rational(let b): return Rational(a) < b
+            case .double(let b): return Double(a) < b
+            default: return nil
+            }
+        case .int(let a):
+            switch rhs {
+            case .bool(let b): return a < Int(b)
+            case .int(let b): return a < b
+            case .rational(let b): return Rational(a) < b
+            case .double(let b): return Double(a) < b
+            default: return nil
+            }
+        case .rational(let a):
+            switch rhs {
+            case .bool(let b): return a < Rational(b)
+            case .int(let b): return a < Rational(b)
+            case .rational(let b): return a < b
+            case .double(let b): return Double(a) < b
+            default: return nil
+            }
+        case .double(let a):
+            switch rhs {
+            case .bool(let b): return a < Double(b)
+            case .int(let b): return a < Double(b)
+            case .rational(let b): return a < Double(b)
+            case .double(let b): return a < b
+            default: return nil
+            }
+        case .string:
+            return lhs.asString < rhs.asString
+        default: return nil
+        }
+    }
+    static func greater(_ lhs: O, _ rhs: O) -> Bool? {
+        if equal(lhs, rhs) {
+            return false
+        } else if let bool0 = less(lhs, rhs) {
+            return !bool0
         } else {
-            return O(OArray(os))
+            return nil
+        }
+    }
+    static func lessEqual(_ lhs: O, _ rhs: O) -> Bool? {
+        if let bool = less(lhs, rhs), bool {
+            return true
+        }
+        return equal(lhs, rhs)
+    }
+    static func greaterEqual(_ lhs: O, _ rhs: O) -> Bool? {
+        if let bool = less(lhs, rhs), !bool {
+            return true
+        }
+        return equal(lhs, rhs)
+    }
+    
+    static let lessName = "<"
+    static func lessO(_ ao: O, _ bo: O) -> O {
+        switch ao {
+        case .error: return ao
+        default: break
+        }
+        switch bo {
+        case .error: return bo
+        default: break
+        }
+        if let bool = less(ao, bo) {
+            return O(bool)
+        } else {
+            return O(OError.undefined(with: "\(ao.name) \(lessName) \(bo.name)"))
+        }
+    }
+    static let greaterName = ">"
+    static func greaterO(_ ao: O, _ bo: O) -> O {
+        switch ao {
+        case .error: return ao
+        default: break
+        }
+        switch bo {
+        case .error: return bo
+        default: break
+        }
+        if let bool = greater(ao, bo) {
+            return O(bool)
+        } else {
+            return O(OError.undefined(with: "\(ao.name) \(greaterName) \(bo.name)"))
+        }
+    }
+    static let lessEqualName = "<="
+    static func lessEqualO(_ ao: O, _ bo: O) -> O {
+        switch ao {
+        case .error: return ao
+        default: break
+        }
+        switch bo {
+        case .error: return bo
+        default: break
+        }
+        if let bool = lessEqual(ao, bo) {
+            return O(bool)
+        } else {
+            return O(OError.undefined(with: "\(ao.name) \(lessEqualName) \(bo.name)"))
+        }
+    }
+    static let greaterEqualName = ">="
+    static func greaterEqualO(_ ao: O, _ bo: O) -> O {
+        switch ao {
+        case .error: return ao
+        default: break
+        }
+        switch bo {
+        case .error: return bo
+        default: break
+        }
+        if let bool = greaterEqual(ao, bo) {
+            return O(bool)
+        } else {
+            return O(OError.undefined(with: "\(ao.name) \(greaterEqualName) \(bo.name)"))
+        }
+    }
+}
+extension O: Hashable {
+    func hash(into hasher: inout Hasher) {
+        switch self {
+        case .bool(let a): hasher.combine(Double(a))
+        case .int(let a): hasher.combine(Double(a))
+        case .rational(let a): hasher.combine(Double(a))
+        case .double(let a): hasher.combine(a)
+        case .array(let a): hasher.combine(a)
+        case .range(let a): hasher.combine(a)
+        case .dic(let a): hasher.combine(a)
+        case .string(let a): hasher.combine(a)
+        case .sheet(let a): hasher.combine(a)
+        case .selected(let a): hasher.combine(a)
+        case .g(let a): hasher.combine(a)
+        case .generics(let a): hasher.combine(a)
+        case .f(let a): hasher.combine(a)
+        case .label(let a): hasher.combine(a)
+        case .id(let a): hasher.combine(a)
+        case .error(let a): hasher.combine(a)
+        }
+    }
+}
+
+extension O {
+    static let notName = "!"
+    prefix static func !(ao: O) -> O {
+        switch ao {
+        case .bool(let a): return O(!a)
+        case .int(let a):
+            return O(Int.overDiff(1, a))
+        case .rational(let a):
+            return O(Rational.overDiff(1, a))
+        case .double(let a):
+            return O(1 - a)
+        case .array(let a):
+            var n = [O]()
+            n.reserveCapacity(a.count)
+            for e in a {
+                let ne = !e
+                switch ne {
+                case .error: return ne
+                default: n.append(ne)
+                }
+            }
+            return O(a.with(n))
+        case .dic(let a):
+            var n = [O: O]()
+            n.reserveCapacity(a.count)
+            for (key, e) in a {
+                let ne = !e
+                switch ne {
+                case .error: return ne
+                default: n[key] = ne
+                }
+            }
+            return O(n)
+        case .error: return ao
+        default: return O(OError.undefined(with: "\(notName)\(ao.name)"))
+        }
+    }
+}
+
+extension Array where Element == O {
+    func rounded(_ rule: FloatingPointRoundingRule = .toNearestOrAwayFromZero) -> [O] {
+        return map { $0.rounded(rule) }
+    }
+}
+extension Dictionary where Key == O, Value == O {
+    func rounded(_ rule: FloatingPointRoundingRule = .toNearestOrAwayFromZero) -> [O: O] {
+        return mapValues { $0.rounded(rule) }
+    }
+}
+extension O {
+    func rounded(_ rule: FloatingPointRoundingRule = .toNearestOrAwayFromZero) -> O {
+        switch self {
+        case .bool: return self
+        case .int: return self
+        case .rational(let a): return O(a.rounded(rule))
+        case .double(let a): return O(a.rounded(rule))
+        case .array(let a): return O(a.rounded(rule))
+        case .range(let a): return O(a.rounded(rule))
+        case .dic(let a): return O(a.rounded(rule))
+        case .string: return self
+        case .sheet(let a): return O(a.rounded(rule))
+        case .g: return self
+        case .generics(let a): return O(a.rounded(rule))
+        case .selected(let a): return O(a.rounded(rule))
+        case .f(let a): return O(a.rounded(rule))
+        case .label(let a): return O(a.rounded(rule))
+        case .id: return self
+        case .error: return self
+        }
+    }
+    static let floorName = "floor"
+    var floor: O {
+        return rounded(.down)
+    }
+    static let roundName = "round"
+    var round: O {
+        return rounded()
+    }
+    static let ceilName = "ceil"
+    var ceil: O {
+        return rounded(.up)
+    }
+}
+
+extension O {
+    static let absName = "abs"
+    var absV: O {
+        switch self {
+        case .bool(let a): return O(a)
+        case .int(let a): return O(abs(a))
+        case .rational(let a): return O(abs(a))
+        case .double(let a): return O(abs(a))
+        case .array(let a):
+            var n = O(0)
+            for e in a {
+                let ne = n + e * e
+                switch ne {
+                case .error: return ne
+                default: n = ne
+                }
+            }
+            return n.sqrt
+        case .dic(let a):
+            var n = O(0)
+            for e in a.values {
+                let ne = n + e * e
+                switch ne {
+                case .error: return ne
+                default: n = ne
+                }
+            }
+            return n.sqrt
+        case .sheet(let a): return O(a.value).absV
+        case .error: return self
+        default: return O(OError.undefined(with: "\(O.absName) \(name)"))
         }
     }
     
-    static let sendName = "send"
-    private static func operateSpecial(_ runType: F.RunType, _ id: ID?, args: [O],
-                                       _ oDic: inout [OKey: O],
-                                       _ memoRPN: inout [UUID: RPN],
-                                       _ handler: Handler) -> O {
-        switch runType {
-        case .flip: flip(args[0], &oDic)
-        case .showAllDefinitions: showAllDefinitions(args[0], &oDic)
-        case .drawAxes: drawAxes(base: args[0], args[1], args[2], &oDic)
-        case .plot: plot(base: args[0], args[1], &oDic)
-        case .draw: draw(args[0], &oDic)
-        case .map://再帰バグ
-            O.map(args[0], args[1]) { calculate($0, id, args: [$1], &oDic, &memoRPN, handler).o }
-        case .filter:
-            O.filter(args[0], args[1]) { calculate($0, id, args: [$1], &oDic, &memoRPN, handler).o }
-        case .reduce:
-            O.reduce(args[0], args[1], args[2]) { calculate($0, id, args: [$1, $2], &oDic, &memoRPN, handler).o }
-        default: fatalError()
+    static let sqrtName = "sqrt"
+    var sqrt: O {
+        switch self {
+        case .bool(let a): return O(a)
+        case .int(let a):
+            if a < 0 {
+                return O(OError.undefined(with: "\(O.sqrtName) \(name)"))
+            }
+            return O(Double(a).squareRoot())
+        case .rational(let a):
+            if a < 0 {
+                return O(OError.undefined(with: "\(O.sqrtName) \(name)"))
+            }
+            return O(Double(a).squareRoot())
+        case .double(let a):
+            if a < 0 {
+                return O(OError.undefined(with: "\(O.sqrtName) \(name)"))
+            }
+            return O(a.squareRoot())
+        case .error: return self
+        default: return O(OError.undefined(with: "\(O.sqrtName) \(name)"))
         }
+    }
+    
+    static let sinName = "sin"
+    var sin: O {
+        switch self {
+        case .bool(let a): return O(.sin(Double(a)))
+        case .int(let a): return O(.sin(Double(a)))
+        case .rational(let a): return O(.sin(Double(a)))
+        case .double(let a):
+            if a.isInfinite {
+                return O(OError.undefined(with: "\(O.sinName) \(name)"))
+            }
+            return O(.sin(a))
+        case .error: return self
+        default: return O(OError.undefined(with: "\(O.sinName) \(name)"))
+        }
+    }
+    static let cosName = "cos"
+    var cos: O {
+        switch self {
+        case .bool(let a): return O(.cos(Double(a)))
+        case .int(let a): return O(.cos(Double(a)))
+        case .rational(let a): return O(.cos(Double(a)))
+        case .double(let a):
+            if a.isInfinite {
+                return O(OError.undefined(with: "\(O.cosName) \(name)"))
+            }
+            return O(.cos(a))
+        case .error: return self
+        default: return O(OError.undefined(with: "\(O.cosName) \(name)"))
+        }
+    }
+    static let tanName = "tan"
+    var tan: O {
+        switch self {
+        case .bool(let a): return O(.tan(Double(a)))
+        case .int(let a): return O(.tan(Double(a)))
+        case .rational(let a): return O(.tan(Double(a)))
+        case .double(let a):
+            if a.isInfinite {
+                return O(OError.undefined(with: "\(O.tanName) \(name)"))
+            }
+            return O(.tan(a))
+        case .error: return self
+        default: return O(OError.undefined(with: "\(O.tanName) \(name)"))
+        }
+    }
+    static let asinName = "asin"
+    var asin: O {
+        switch self {
+        case .bool(let a): return O(.asin(Double(a)))
+        case .int(let a):
+            if a < -1 || a > 1 {
+                return O(OError.undefined(with: "\(O.asinName) \(name)"))
+            }
+            return O(.asin(Double(a)))
+        case .rational(let a):
+            if a < -1 || a > 1 {
+                return O(OError.undefined(with: "\(O.asinName) \(name)"))
+            }
+            return O(.asin(Double(a)))
+        case .double(let a):
+            if a < -1 || a > 1 {
+                return O(OError.undefined(with: "\(O.asinName) \(name)"))
+            }
+            return O(.asin(a))
+        case .error: return self
+        default: return O(OError.undefined(with: "\(O.asinName) \(name)"))
+        }
+    }
+    static let acosName = "acos"
+    var acos: O {
+        switch self {
+        case .bool(let a): return O(.acos(Double(a)))
+        case .int(let a):
+            if a < -1 || a > 1 {
+                return O(OError.undefined(with: "\(O.acosName) \(name)"))
+            }
+            return O(.acos(Double(a)))
+        case .rational(let a):
+            if a < -1 || a > 1 {
+                return O(OError.undefined(with: "\(O.acosName) \(name)"))
+            }
+            return O(.acos(Double(a)))
+        case .double(let a):
+            if a < -1 || a > 1 {
+                return O(OError.undefined(with: "\(O.acosName) \(name)"))
+            }
+            return O(.acos(a))
+        case .error: return self
+        default: return O(OError.undefined(with: "\(O.acosName) \(name)"))
+        }
+    }
+    static let atanName = "atan"
+    var atan: O {
+        switch self {
+        case .bool(let a): return O(.atan(Double(a)))
+        case .int(let a): return O(.atan(Double(a)))
+        case .rational(let a): return O(.atan(Double(a)))
+        case .double(let a): return O(.atan(a))
+        case .error: return self
+        default: return O(OError.undefined(with: "\(O.atanName) \(name)"))
+        }
+    }
+    static let atan2Name = "atan2"
+    var atan2: O {
+        if let p = asPoint {
+            return O(.atan2(y: p.y, x: p.x))
+        } else {
+            return O(OError.undefined(with: "\(O.atan2Name) \(name)"))
+        }
+    }
+}
+extension O {
+    static let plusName = "+"
+    prefix static func + (ao: O) -> O {
+        return ao
+    }
+    static let minusName = "-"
+    prefix static func - (ao: O) -> O {
+        switch ao {
+        case .bool(let a): return O(a)
+        case .int(let a): return O(-a)
+        case .rational(let a): return O(-a)
+        case .double(let a): return O(-a)
+        case .array(let a):
+            var n = [O]()
+            n.reserveCapacity(a.count)
+            for e in a {
+                let ne = -e
+                switch ne {
+                case .error: return ne
+                default: n.append(ne)
+                }
+            }
+            return O(a.with(n))
+        case .dic(let a):
+            var n = [O: O]()
+            n.reserveCapacity(a.count)
+            for (key, e) in a {
+                let ne = -e
+                switch ne {
+                case .error: return ne
+                default: n[key] = ne
+                }
+            }
+            return O(n)
+        case .sheet(let a): return -O(a.value)
+        case .error: return ao
+        default: return O(OError.undefined(with: "\(minusName)\(ao.name)"))
+        }
+    }
+}
+
+extension O {
+    static func rangeError(_ ao: O, _ str: String, _ bo: O) -> O {
+        return O(OError(String(format: "'%1$@' %2$@ '%3$@' is false".localized,
+                               ao.name, str, bo.name)))
+    }
+    static let filiZName = "..."
+    static let filoZName = "..<"
+    static let foliZName = "<.."
+    static let foloZName = "<.<"
+    static let filiRName = "~~~"
+    static let filoRName = "~~<"
+    static let foliRName = "<~~"
+    static let foloRName = "<~<"
+    static func rangeO(_ type: ORange.RangeType, isSmooth: Bool) -> O {
+        switch type {
+        case .fili(let ao, let bo):
+            ao <= bo ?
+                O(ORange(type, delta: O(isSmooth ? 0 : 1))) :
+                rangeError(ao, isSmooth ? filiRName : filiZName, bo)
+        case .filo(let ao, let bo):
+            ao <= bo ?
+                O(ORange(type, delta: O(isSmooth ? 0 : 1))) :
+                rangeError(ao, isSmooth ? filoRName : filoZName, bo)
+        case .foli(let ao, let bo):
+            ao < bo ?
+                O(ORange(type, delta: O(isSmooth ? 0 : 1))) :
+                rangeError(ao, isSmooth ? foliRName : foliZName, bo)
+        case .folo(let ao, let bo):
+            ao < bo ?
+                O(ORange(type, delta: O(isSmooth ? 0 : 1))) :
+                rangeError(ao, isSmooth ? foloRName : foloZName, bo)
+        default:
+            O(ORange(type, delta: O(isSmooth ? 0 : 1)))
+        }
+    }
+}
+
+extension O {
+    var startIndex: Int {
+        switch self {
+        case .range(let a):
+            switch a.type {
+            case .fili(let f, _): f.rounded(.up).asInt ?? 0
+            case .filo(let f, _): f.rounded(.up).asInt ?? 0
+            case .foli(let f, _): (f.rounded(.up).asInt ?? 0) + 1
+            case .folo(let f, _): (f.rounded(.up).asInt ?? 0) + 1
+            case .fi(let f): f.rounded(.up).asInt ?? 0
+            case .fo(let f): (f.rounded(.up).asInt ?? 0) + 1
+            case .li: 0
+            case .lo: 0
+            case .all: 0
+            }
+        case .array(let a): a.startIndex
+        default: 0
+        }
+    }
+    var endIndex: Int {
+        switch self {
+        case .range(let a):
+            switch a.type {
+            case .fili(_, let l): (l.rounded(.up).asInt ?? 0) + 1
+            case .filo(_, let l): l.rounded(.up).asInt ?? 0
+            case .foli(_, let l): (l.rounded(.up).asInt ?? 0) + 1
+            case .folo(_, let l): l.rounded(.up).asInt ?? 0
+            case .fi: 0
+            case .fo: 0
+            case .li(let l): l.rounded(.up).asInt ?? 0
+            case .lo(let l): (l.rounded(.up).asInt ?? 0) + 1
+            case .all: 0
+            }
+        case .array(let a): a.endIndex
+        default: count
+        }
+    }
+    var endReal: Double {
+        switch self {
+        case .range(let a):
+            switch a.type {
+            case .fili(_, let l): l.asDouble ?? 0
+            case .filo(_, let l): l.asDouble ?? 0
+            case .foli(_, let l): l.asDouble ?? 0
+            case .folo(_, let l): l.asDouble ?? 0
+            case .fi: 0
+            case .fo: 0
+            case .li(let l): l.asDouble ?? 0
+            case .lo(let l): l.asDouble ?? 0
+            case .all: 0
+            }
+        case .array(let a): Double(a.endIndex)
+        default: Double(count)
+        }
+    }
+    var count: Int {
+        switch self {
+        case .bool(_): return 1
+        case .int(_): return 1
+        case .rational(_): return 1
+        case .double(_): return 1
+        case .string(let a): return a.count
+        case .range(let a):
+            let dlo = a.delta
+            if dlo == O(1) {
+                return endIndex - startIndex
+            } else {
+                let d = endIndex - startIndex
+                switch dlo {
+                case .int(let a): return a == 0 ? 0 : d / a
+                case .rational(let a): return Int(a == 0 ? 0 : Rational(d) / a)
+                case .double(let a): return Int(a == 0 ? 0 : Double(d) / a)
+                default: return 0
+                }
+            }
+        case .array(let a): return a.count
+        case .g(let a):
+            switch a {
+            case .b: return 2
+            default: return 0
+            }
+        case .dic(let a): return a.count
+        default: return 1
+        }
+    }
+    static let countaName = "counta"
+    var counta: O {
+        switch self {
+        case .g(let a):
+            switch a {
+            case .b: return O(2)
+            default: return O(.infinity)
+            }
+        case .error: return self
+        default: return O(count)
+        }
+    }
+    
+    struct Elements: Sequence, IteratorProtocol {
+        private let o: O
+        let underestimatedCount: Int, endIndex: Int, endV: Double
+        
+        private var i = 0, realI = 0.0, delta = 1, realDelta: Double?
+        private var containsLast = true
+        mutating func next() -> O? {
+            if let realDelta = realDelta {
+                if containsLast ? realI <= endV : realI < endV {
+                    defer { realI += realDelta }
+                    return O(realI)
+                } else {
+                    return nil
+                }
+            } else {
+                if containsLast ? i <= endIndex : i < endIndex {
+                    defer { i += delta }
+                    return o.at(i)
+                } else {
+                    return nil
+                }
+            }
+        }
+        
+        init(_ o: O) {
+            self.o = o
+            
+            switch o {
+            case .range(let a):
+                let containsLast: Bool
+                switch a.type {
+                case .fili(let f, let l):
+                    i = f.asInt ?? 0
+                    realI = f.asDouble ?? 0
+                    endIndex = l.rounded(.down).asInt ?? 0
+                    endV = l.asDouble ?? 0
+                    containsLast = true
+                case .filo(let f, let l):
+                    i = f.asInt ?? 0
+                    realI = f.asDouble ?? 0
+                    endIndex = l.rounded(.up).asInt ?? 0
+                    endV = l.asDouble ?? 0
+                    containsLast = false
+                case .foli(let f, let l):
+                    i = f.asInt ?? 0
+                    realI = f.asDouble ?? 0
+                    endIndex = l.rounded(.down).asInt ?? 0
+                    endV = l.asDouble ?? 0
+                    containsLast = true
+                case .folo(let f, let l):
+                    i = f.asInt ?? 0
+                    realI = f.asDouble ?? 0
+                    endIndex = l.rounded(.up).asInt ?? 0
+                    endV = l.asDouble ?? 0
+                    containsLast = false
+                default:
+                    endIndex = 0
+                    endV = 0
+                    containsLast = false
+                }
+                
+                switch a.delta {
+                case .int(let a):
+                    delta = a
+                    if delta == 0 {
+                        underestimatedCount = 0
+                    } else {
+                        let s = (endV - realI).truncatingRemainder(dividingBy: Double(delta))
+                        underestimatedCount
+                            = (s == 0 && !containsLast ? -1 : 0)
+                            + (Int(exactly: (endV - realI) / Double(delta)) ?? 0)
+                    }
+                case .double(let a):
+                    realDelta = a
+                    let s = (endV - realI).truncatingRemainder(dividingBy: a)
+                    underestimatedCount
+                        = (s == 0 && !containsLast ? -1 : 0)
+                        + (Int(exactly: (endV - realI) / a) ?? 0)
+                default:
+                    underestimatedCount = 0
+                }
+                self.containsLast = containsLast
+            case .array(let a):
+                i = a.startIndex
+                endIndex = a.endIndex
+                endV = Double(endIndex)
+                underestimatedCount = a.count
+                containsLast = false
+                delta = 1
+            default:
+                endIndex = 0
+                endV = 0
+                underestimatedCount = 0
+            }
+        }
+    }
+    var elements: Elements {
+        Elements(self)
+    }
+    
+    subscript(i: Int) -> O {
+        get {
+            at(i)
+        }
+    }
+    
+    func at(_ i: Int) -> O {
+        switch self {
+        case .range: O(i)
+        case .string(let a): O(String(a[a.index(fromInt: i)]))
+        case .array(let a): a[i]
+        case .dic(let a): a[a.index(a.startIndex, offsetBy: i)].value
+        default: self
+        }
+    }
+    
+    static let atName = "."
+    static func at(_ ao: O, _ bo: O) -> O {
+        switch ao {
+        case .dic(let a):
+            switch bo {
+            case .error: return bo
+            default:
+                guard let n = a[bo] else { return O(OError(String(format: "'%1$@' is out of bounds dictionary range".localized, bo.name))) }
+                return n
+            }
+        case .sheet(let a):
+            switch bo {
+            case .string(let b):
+                switch b {
+                case linesName: return O(a.value.picture.lines)
+                case textsName: return O(a.value.texts)
+                default: break
+                }
+            case .error: return bo
+            default: break
+            }
+            return O(OError(String(format: "'%1$@' is out of bounds dictionary range".localized, bo.name)))
+        case .error: return ao
+        default:
+            switch bo {
+            case .error: return bo
+            default: break
+            }
+            let oi = bo.asInt
+            guard let i = oi else { return O(OError.undefined(with: "\(ao.name)\(atName)\(bo.name)")) }
+            let count = ao.count
+            guard i >= 0 && i < count else { return O(OError(String(format: "'%1$d' is out of bounds array range 0 ..< %2$d".localized, i, count))) }
+            return ao.at(i)
+        }
+    }
+    
+    static let selectName = "/."
+    static func select(_ ao: O, _ bo: O) -> O {
+        switch ao {
+        case .selected(var a):
+            switch bo {
+            case .error: return bo
+            default: break
+            }
+            a.ranges.append(bo)
+            return O(a)
+        case .error: return ao
+        default:
+            switch bo {
+            case .error: return bo
+            default: break
+            }
+            return O(Selected(ao, ranges: [bo]))
+        }
+    }
+    
+    static func set(_ bo: O, in ao: O, at io: O,
+                    _ errorHandler: () -> (O)) -> O {
+        switch ao {
+        case .error: return ao
+        default: break
+        }
+        switch bo {
+        case .error: return bo
+        default: break
+        }
+        switch io {
+        case .error: return io
+        default: break
+        }
+        
+        switch ao {
+        case .dic(var a):
+            a[io] = bo
+            return O(a)
+        case .sheet(var a):
+            switch io {
+            case .string(let i):
+                switch i {
+                case linesName:
+                    switch bo {
+                    case .array(let b):
+                        let ls = b.compactMap { $0.asLine }
+                        if b.count != ls.count {
+                            return O([O(linesName): bo,
+                                      O(textsName): O(a.value.texts)])
+                        } else {
+                            guard !ls.isEmpty else { break }
+                            a.removeLines(at: Array(0 ..< a.value.picture.lines.count))
+                            a.append(ls)
+                            return O(a)
+                        }
+                    case .dic:
+                        if let l = bo.asLine {
+                            a.removeLines(at: Array(0 ..< a.value.picture.lines.count))
+                            a.append([l])
+                            return O(a)
+                        }
+                    default: break
+                    }
+                case textsName:
+                    switch bo {
+                    case .array(let b):
+                        let ts = b.compactMap { $0.asText }
+                        if b.count != ts.count {
+                            return O([O(linesName): O(a.value.picture.lines),
+                                      O(textsName): bo])
+                        } else {
+                            guard !ts.isEmpty else { break }
+                            a.removeTexts(at: Array(0 ..< a.value.texts.count))
+                            a.append(ts)
+                            return O(a)
+                        }
+                    case .dic:
+                        if let t = bo.asText {
+                            a.removeTexts(at: Array(0 ..< a.value.picture.lines.count))
+                            a.append([t])
+                            return O(a)
+                        }
+                    default: break
+                    }
+                default: break
+                }
+                let n = O(a.value)
+                return set(bo, in: n, at: io, errorHandler)
+            default: break
+            }
+            return O(OError(String(format: "'%1$@' is out of bounds dictionary range".localized, bo.name)))
+        default:
+            switch ao {
+            case .range(let a):
+                switch a.type {
+                case .fi, .fo, .li, .lo, .all:
+                    return errorHandler()
+                default: break
+                }
+            default: break
+            }
+            if let i = io.asInt {
+                switch ao {
+                case .array(var a):
+                    guard i >= 0 && i < a.count else { return O(OError(String(format: "'%1$d' is out of bounds array range 0 ..< %2$d".localized, i, a.count))) }
+                    a[i] = bo
+                    return O(a)
+                default:
+                    let count = ao.count
+                    guard i >= 0 && i < count else { return O(OError(String(format: "'%1$d' is out of bounds array range 0 ..< %2$d".localized, i, count))) }
+                    
+                    switch ao {
+                    case .range:
+                        return errorHandler()
+                    case .string(var a):
+                        if case .string(let r) = bo, r.count == 1 {
+                            let si = a.index(a.startIndex, offsetBy: i)
+                            a.replaceSubrange(si ... si, with: r)
+                            return O(a)
+                        }
+                    default:
+                        return bo
+                    }
+                    var nos = ao.elements.map { $0 }
+                    nos[i] = bo
+                    return ao.with(nos)
+                }
+            }
+        }
+        return errorHandler()
+    }
+    
+    static let setName = "<-"
+    static func set(_ ao: O, _ bo: O) -> O {
+        switch ao {
+        case .error: return ao
+        default: break
+        }
+        switch bo {
+        case .error: return bo
+        default: break
+        }
+        
+        guard case .selected(let aao) = ao else { return bo }
+        let nao = aao.o
+        let ios = aao.ranges
+        guard ios.count > 0 else {
+            return O(OError.undefined(with: "\(ao.name) \(O.setName) \(bo.name)"))
+        }
+        
+        var no = nao
+        var oss = [(o: O, i: O)]()
+        oss.reserveCapacity(ios.count)
+        iosLoop: for (i, io) in ios.enumerated() {
+            if case .sheet(var ss) = no,
+               case .string(let str) = io, i < ios.count - 1 {
+                
+                if str == linesName {
+                    if let li = ios[i + 1].asInt, li < ss.value.picture.lines.count {
+                        if i + 1 == ios.count - 1 {
+                            if let line = bo.asLine {
+                                ss.replace([IndexValue(value: line, index: li)])
+                                if oss.isEmpty {
+                                    return O(ss)
+                                } else {
+                                    oss[.last].i = O(ss)
+                                }
+                                break iosLoop
+                            }
+                        } else if i + 2 == ios.count - 1,
+                                  let lci = ios[i + 2].asInt, lci < ss.value.picture.lines[li].controls.count {
+                            
+                            if let lc = bo.asLineControl {
+                                var line = ss.value.picture.lines[li]
+                                line.controls[lci] = lc
+                                ss.replace([IndexValue(value: line, index: li)])
+                                if oss.isEmpty {
+                                    return O(ss)
+                                } else {
+                                    oss[.last].i = O(ss)
+                                }
+                                break iosLoop
+                            }
+                        } else if i + 3 == ios.count - 1,
+                                  let lci = ios[i + 2].asInt, lci < ss.value.picture.lines[li].controls.count,
+                                  case .string(let lcci) = ios[i + 3] {
+                            
+                            switch lcci {
+                            case "point":
+                                if let origin = bo.asPoint {
+                                    var line = ss.value.picture.lines[li]
+                                    line.controls[lci].point = origin
+                                    ss.replace([IndexValue(value: line, index: li)])
+                                    if oss.isEmpty {
+                                        return O(ss)
+                                    } else {
+                                        oss[.last].i = O(ss)
+                                    }
+                                    break iosLoop
+                                }
+                            case "weight":
+                                if let weight = bo.asDouble {
+                                    var line = ss.value.picture.lines[li]
+                                    line.controls[lci].weight = weight
+                                    ss.replace([IndexValue(value: line, index: li)])
+                                    if oss.isEmpty {
+                                        return O(ss)
+                                    } else {
+                                        oss[.last].i = O(ss)
+                                    }
+                                    break iosLoop
+                                }
+                            case "pressure":
+                                if let pressure = bo.asDouble {
+                                    var line = ss.value.picture.lines[li]
+                                    line.controls[lci].pressure = pressure
+                                    ss.replace([IndexValue(value: line, index: li)])
+                                    if oss.isEmpty {
+                                        return O(ss)
+                                    } else {
+                                        oss[.last].i = O(ss)
+                                    }
+                                    break iosLoop
+                                }
+                            default: break
+                            }
+                        } else if i + 4 == ios.count - 1,
+                                  let lci = ios[i + 2].asInt,
+                                  case .string(let lcci) = ios[i + 3], lcci == "point",
+                                  let lccpi = ios[i + 4].asInt {
+                            
+                            switch lccpi {
+                            case 0:
+                                if let v = bo.asDouble {
+                                    var line = ss.value.picture.lines[li]
+                                    line.controls[lci].point.x = v
+                                    ss.replace([IndexValue(value: line, index: li)])
+                                    if oss.isEmpty {
+                                        return O(ss)
+                                    } else {
+                                        oss[.last].i = O(ss)
+                                    }
+                                    break iosLoop
+                                }
+                            case 1:
+                                if let v = bo.asDouble {
+                                    var line = ss.value.picture.lines[li]
+                                    line.controls[lci].point.y = v
+                                    ss.replace([IndexValue(value: line, index: li)])
+                                    if oss.isEmpty {
+                                        return O(ss)
+                                    } else {
+                                        oss[.last].i = O(ss)
+                                    }
+                                    break iosLoop
+                                }
+                            default: break
+                            }
+                        }
+                    }
+                } else if str == "texts" {
+                    if let ti = ios[i + 1].asInt, ti < ss.value.texts.count {
+                        if i + 1 == ios.count - 1 {
+                            if let text = bo.asText {
+                                ss.replace([IndexValue(value: text, index: ti)])
+                                if oss.isEmpty {
+                                    return O(ss)
+                                } else {
+                                    oss[.last].i = O(ss)
+                                }
+                                break iosLoop
+                            }
+                        } else if i + 2 == ios.count - 1 {
+                            switch ios[i + 2] {
+                            case O("string"):
+                                if case .string(let str) = bo {
+                                    var text = ss.value.texts[ti]
+                                    text.string = str
+                                    ss.replace([IndexValue(value: text, index: ti)])
+                                    if oss.isEmpty {
+                                        return O(ss)
+                                    } else {
+                                        oss[.last].i = O(ss)
+                                    }
+                                    break iosLoop
+                                } else {
+                                    return O(OError(String(format: "'%1$@' is not '%2$@'".localized, bo.name, G.string.rawValue)))
+                                }
+                            case O("orientation"):
+                                if let orientation = bo.asOrientation {
+                                    var text = ss.value.texts[ti]
+                                    text.orientation = orientation
+                                    ss.replace([IndexValue(value: text, index: ti)])
+                                    if oss.isEmpty {
+                                        return O(ss)
+                                    } else {
+                                        oss[.last].i = O(ss)
+                                    }
+                                    break iosLoop
+                                } else {
+                                    return O(OError(String(format: "'%1$d' is not '%2$d'".localized, bo.name, "Orientation".localized)))
+                                }
+                            case O("size"):
+                                if let size = bo.asDouble {
+                                    var text = ss.value.texts[ti]
+                                    text.size = size
+                                    ss.replace([IndexValue(value: text, index: ti)])
+                                    if oss.isEmpty {
+                                        return O(ss)
+                                    } else {
+                                        oss[.last].i = O(ss)
+                                    }
+                                    break iosLoop
+                                } else {
+                                    return O(OError("'' is not ''"))
+                                }
+                            case O("origin"):
+                                if let origin = bo.asPoint {
+                                    var text = ss.value.texts[ti]
+                                    text.origin = origin
+                                    ss.replace([IndexValue(value: text, index: ti)])
+                                    if oss.isEmpty {
+                                        return O(ss)
+                                    } else {
+                                        oss[.last].i = O(ss)
+                                    }
+                                    break iosLoop
+                                }
+                            default: break
+                            }
+                        } else if i + 3 == ios.count - 1,
+                                  ios[i + 2] == O("string"),
+                                  let ttsi = ios[i + 3].asInt, ttsi < ss.value.texts[ti].string.count {
+                            
+                            if case .string(let str) = bo, str.count == 1 {
+                                var text = ss.value.texts[ti]
+                                let si = text.string.index(text.string.startIndex, offsetBy: ttsi)
+                                text.string.replaceSubrange(si ... si, with: str)
+                                ss.replace([IndexValue(value: text, index: ti)])
+                                if oss.isEmpty {
+                                    return O(ss)
+                                } else {
+                                    oss[.last].i = O(ss)
+                                }
+                                break iosLoop
+                            }
+                        } else if i + 3 == ios.count - 1,
+                                  ios[i + 2] == O("origin"),
+                                  let ttoi = ios[i + 3].asInt {
+                            
+                            switch ttoi {
+                            case 0:
+                                if let v = bo.asDouble {
+                                    var text = ss.value.texts[ti]
+                                    text.origin.x = v
+                                    ss.replace([IndexValue(value: text, index: ti)])
+                                    if oss.isEmpty {
+                                        return O(ss)
+                                    } else {
+                                        oss[.last].i = O(ss)
+                                    }
+                                    break iosLoop
+                                }
+                            case 1:
+                                if let v = bo.asDouble {
+                                    var text = ss.value.texts[ti]
+                                    text.origin.y = v
+                                    ss.replace([IndexValue(value: text, index: ti)])
+                                    if oss.isEmpty {
+                                        return O(ss)
+                                    } else {
+                                        oss[.last].i = O(ss)
+                                    }
+                                    break iosLoop
+                                }
+                            default: break
+                            }
+                        }
+                    }
+                }
+            }
+            
+            oss.append((no, io))
+            no = O.at(no, io)
+        }
+        no = bo
+        for os in oss.reversed() {
+            no = set(no, in: os.o, at: os.i) { O(OError.undefined(with: "\(ao.name) \(O.setName) \(bo.name)")) }
+        }
+        return no
+    }
+    
+    static let insertName = "++"
+    static func insert(_ ao: O, _ bo: O) -> O {
+        switch ao {
+        case .error: return ao
+        default: break
+        }
+        switch bo {
+        case .error: return bo
+        default: break
+        }
+        
+        let nao: O, ios: [O]
+        if case .selected(let aao) = ao {
+            nao = aao.o
+            ios = aao.ranges
+        } else {
+            nao = ao
+            ios = [ao.counta]
+        }
+        guard ios.count > 0 else {
+            return O(OError.undefined(with: "\(ao.name) \(O.insertName) \(bo.name)"))
+        }
+        
+        func insert(_ sbo: O, in sao: O, at io: O) -> O {
+            switch sao {
+            case .error(_): return sao
+            default: break
+            }
+            
+            switch sao {
+            case .range(let a):
+                switch a.type {
+                case .fi, .fo, .li, .lo, .all:
+                    return O(OError.undefined(with: "\(ao.name) \(O.insertName) \(bo.name)"))
+                default: break
+                }
+            default: break
+            }
+            
+            if let i = io.asInt {
+                switch sao {
+                case .array(var a):
+                    guard i >= 0 && i <= a.count else { return O(OError(String(format: "'%1$d' is out of bounds array range 0 ... %2$d".localized, i, a.count))) }
+                    a.value.insert(bo, at: i)
+                    return O(a)
+                default:
+                    let count = sao.count
+                    guard i >= 0 && i <= count else { return O(OError(String(format: "'%1$d' is out of bounds array range 0 ..< %2$d".localized, i, count))) }
+                    
+                    switch sao {
+                    case .range:
+                        return O(OError.undefined(with: "\(ao.name) \(O.insertName) \(bo.name)"))
+                    case .string(var a):
+                        if case .string(let r) = sbo, r.count == 1 {
+                            let si = a.index(a.startIndex, offsetBy: i)
+                            a.insert(contentsOf: r, at: si)
+                            return O(a)
+                        }
+                    case .dic:
+                        return O(OError.undefined(with: "\(ao.name) \(O.insertName) \(bo.name)"))
+                    default: break
+                    }
+                    var nos = sao.elements.map { $0 }
+                    guard i >= 0 && i <= nos.count else { return O(OError(String(format: "'%1$d' is out of bounds array range 0 ..< %2$d".localized, i, nos.count))) }
+                    nos.insert(bo, at: i)
+                    return sao.with(nos)
+                }
+            }
+            return O(OError.undefined(with: "\(ao.name) \(O.insertName) \(bo.name)"))
+        }
+        
+        var no = nao
+        var oss = [(o: O, i: O)]()
+        oss.reserveCapacity(ios.count)
+        iosLoop: for (i, io) in ios.enumerated() {
+            
+            if case .sheet(var ss) = no,
+               case .string(let str) = io, i < ios.count - 1 {
+                
+                if str == linesName {
+                    if let li = ios[i + 1].asInt {
+                        if i + 1 == ios.count - 1 {
+                            if let line = bo.asLine, li <= ss.value.picture.lines.count {
+                                ss.insert([IndexValue(value: line, index: li)])
+                                if oss.isEmpty {
+                                    return O(ss)
+                                } else {
+                                    oss[.last].i = O(ss)
+                                }
+                                break iosLoop
+                            }
+                        } else if i + 2 == ios.count - 1,
+                                  let lci = ios[i + 2].asInt, li < ss.value.picture.lines.count, lci <= ss.value.picture.lines[li].controls.count {
+                            
+                            if let lc = bo.asLineControl {
+                                var line = ss.value.picture.lines[li]
+                                line.controls.insert(lc, at: lci)
+                                ss.replace([IndexValue(value: line, index: li)])
+                                if oss.isEmpty {
+                                    return O(ss)
+                                } else {
+                                    oss[.last].i = O(ss)
+                                }
+                                break iosLoop
+                            }
+                        }
+                    }
+                } else if str == textsName {
+                    if let ti = ios[i + 1].asInt {
+                        if i + 1 == ios.count - 1 {
+                            if let text = bo.asText, ti <= ss.value.texts.count {
+                                ss.insert([IndexValue(value: text, index: ti)])
+                                if oss.isEmpty {
+                                    return O(ss)
+                                } else {
+                                    oss[.last].i = O(ss)
+                                }
+                                break iosLoop
+                            }
+                        } else if i + 3 == ios.count - 1, ti < ss.value.texts.count,
+                                  case .string(let tti) = ios[i + 2], tti == stringName,
+                                  let ttsi = ios[i + 3].asInt, ttsi <= ss.value.texts[ti].string.count {
+                            
+                            if case .string(let str) = bo, str.count == 1 {
+                                var text = ss.value.texts[ti]
+                                let si = text.string.index(text.string.startIndex, offsetBy: ttsi)
+                                text.string.insert(contentsOf: str, at: si)
+                                ss.replace([IndexValue(value: text, index: ti)])
+                                if oss.isEmpty {
+                                    return O(ss)
+                                } else {
+                                    oss[.last].i = O(ss)
+                                }
+                                break iosLoop
+                            }
+                        }
+                    }
+                }
+            }
+            
+            oss.append((no, io))
+            no = O.at(no, io)
+        }
+        no = bo
+        guard let lo = oss.last else { return no }
+        no = insert(no, in: lo.o, at: lo.i)
+        oss.removeLast()
+        for os in oss.reversed() {
+            no = set(no, in: os.o, at: os.i) { O(OError.undefined(with: "\(ao.name) \(O.insertName) \(bo.name)")) }
+        }
+        return no
+    }
+    
+    static let removeName = "--"
+    static func remove(_ ao: O) -> O {
+        switch ao {
+        case .error: return ao
+        default: break
+        }
+        
+        guard case .selected(let aao) = ao else { return .empty }
+        let nao = aao.o
+        let ios = aao.ranges
+        guard ios.count > 0 else {
+            return O(OError.undefined(with: "\(ao.name) \(O.removeName)"))
+        }
+        
+        func remove(in sao: O, at io: O) -> O {
+            switch sao {
+            case .error(_): return sao
+            default: break
+            }
+            
+            switch sao {
+            case .range(let a):
+                switch a.type {
+                case .fi, .fo, .li, .lo, .all:
+                    return O(OError.undefined(with: "\(ao.name) \(O.removeName)"))
+                default: break
+                }
+            default: break
+            }
+            
+            if let i = io.asInt {
+                switch sao {
+                case .array(var a):
+                    guard i >= 0 && i <= a.count else { return O(OError(String(format: "'%1$d' is out of bounds array range 0 ... %2$d".localized, i, a.count))) }
+                    a.value.remove(at: i)
+                    return O(a)
+                default:
+                    let count = sao.count
+                    guard i >= 0 && i <= count else { return O(OError(String(format: "'%1$d' is out of bounds array range 0 ..< %2$d".localized, i, count))) }
+                    
+                    switch sao {
+                    case .range:
+                        return O(OError.undefined(with: "\(ao.name) \(O.removeName)"))
+                    case .string(var a):
+                        let si = a.index(a.startIndex, offsetBy: i)
+                        a.remove(at: si)
+                        return O(a)
+                    case .dic:
+                        return O(OError.undefined(with: "\(ao.name) \(O.removeName)"))
+                    default: break
+                    }
+                    var nos = sao.elements.map { $0 }
+                    nos.remove(at: i)
+                    return sao.with(nos)
+                }
+            } else {
+                switch sao {
+                case .dic(var a):
+                    guard a[io] != nil else { return O(OError(String(format: "'%1$@' is out of bounds dictionary range".localized, io.name))) }
+                    a[io] = nil
+                    return O(a)
+                case .sheet(let a):
+                    switch io {
+                    case .string(let i):
+                        switch i {
+                        case linesName:
+                            return O([O(textsName): O(a.value.texts)])
+                        case textsName:
+                            return O([O(linesName): O(a.value.picture.lines)])
+                        default:
+                            return O(OError(String(format: "'%1$@' is out of bounds dictionary range".localized, io.name)))
+                        }
+                    default: break
+                    }
+                default: break
+                }
+            }
+            return O(OError.undefined(with: "\(ao.name) \(O.removeName)"))
+        }
+        
+        var no = nao
+        var oss = [(o: O, i: O)]()
+        oss.reserveCapacity(ios.count)
+        iosLoop: for (i, io) in ios.enumerated() {
+            
+            if case .sheet(var ss) = no,
+               case .string(let str) = io, i < ios.count - 1 {
+                
+                if str == linesName {
+                    if let li = ios[i + 1].asInt, li < ss.value.picture.lines.count {
+                        if i + 1 == ios.count - 1 {
+                            ss.removeLines(at: [li])
+                            if oss.isEmpty {
+                                return O(ss)
+                            } else {
+                                oss[.last].i = O(ss)
+                            }
+                            break iosLoop
+                        } else if i + 2 == ios.count - 1,
+                                  let lci = ios[i + 2].asInt, lci < ss.value.picture.lines[li].controls.count {
+                            
+                            var line = ss.value.picture.lines[li]
+                            line.controls.remove(at: lci)
+                            ss.replace([IndexValue(value: line, index: li)])
+                            if oss.isEmpty {
+                                return O(ss)
+                            } else {
+                                oss[.last].i = O(ss)
+                            }
+                            break iosLoop
+                        }
+                    }
+                } else if str == textsName {
+                    if let ti = ios[i + 1].asInt, ti < ss.value.texts.count {
+                        if i + 1 == ios.count - 1 {
+                            ss.removeText(at: ti)
+                            if oss.isEmpty {
+                                return O(ss)
+                            } else {
+                                oss[.last].i = O(ss)
+                            }
+                            break iosLoop
+                        } else if i + 3 == ios.count - 1,
+                                  case .string(let tti) = ios[i + 2], tti == stringName,
+                                  let ttsi = ios[i + 3].asInt, ttsi < ss.value.texts[ti].string.count {
+                            
+                            var text = ss.value.texts[ti]
+                            let si = text.string.index(text.string.startIndex, offsetBy: ttsi)
+                            text.string.remove(at: si)
+                            ss.replace([IndexValue(value: text, index: ti)])
+                            if oss.isEmpty {
+                                return O(ss)
+                            } else {
+                                oss[.last].i = O(ss)
+                            }
+                            break iosLoop
+                        }
+                    }
+                }
+            }
+            
+            oss.append((no, io))
+            no = O.at(no, io)
+        }
+        guard let lo = oss.last else { return no }
+        no = remove(in: lo.o, at: lo.i)
+        oss.removeLast()
+        for os in oss.reversed() {
+            no = set(no, in: os.o, at: os.i) { O(OError.undefined(with: "\(ao.name) \(O.removeName)")) }
+        }
+        return no
+    }
+}
+
+extension O {
+    var isEmpty: Bool {
+        switch self {
+        case .array(let a): return a.isEmpty
+        case .range: return count == 0
+        case .dic(let a): return a.isEmpty
+        case .g(let a): return a == .empty
+        default: return false
+        }
+    }
+    var isEmptyO: O {
+        return O(isEmpty)
+    }
+    var isBool: O {
+        switch self {
+        case .bool: return O(true)
+        case .int(let a): return O(a == 0 || a == 1)
+        case .rational(let a): return O(a == 0 || a == 1)
+        case .double(let a): return O(a == 0 || a == 1)
+        default: return O(false)
+        }
+    }
+    var isNatural0: O {
+        if let i = asInt {
+            return O(i >= 0)
+        } else {
+            switch self {
+            case .error: return self
+            default: return O(false)
+            }
+        }
+    }
+    var isNatural1: O {
+        if let i = asInt {
+            return O(i >= 1)
+        } else {
+            switch self {
+            case .error: return self
+            default: return O(false)
+            }
+        }
+    }
+    var isInt: Bool {
+        switch self {
+        case .bool: return true
+        case .int: return true
+        case .rational(let a): return a.isInteger
+        case .double(let a): return a.isInteger
+        default: return false
+        }
+    }
+    var isIntO: O {
+        switch self {
+        case .bool: return O(true)
+        case .int: return O(true)
+        case .rational(let a): return O(a.isInteger)
+        case .double(let a): return O(a.isInteger)
+        case .error: return self
+        default: return O(false)
+        }
+    }
+    var isRational: O {
+        switch self {
+        case .bool: return O(true)
+        case .int: return O(true)
+        case .rational: return O(true)
+        case .double: return O(true)
+        case .error: return self
+        default: return O(false)
+        }
+    }
+    var isDouble: O {
+        switch self {
+        case .bool: return O(true)
+        case .int: return O(true)
+        case .rational: return O(true)
+        case .double: return O(true)
+        case .error: return self
+        default: return O(false)
+        }
+    }
+    var isString: O {
+        switch self {
+        case .string: return O(true)
+        default: return O(false)
+        }
+    }
+    var isF: O {
+        switch self {
+        case .f: return O(true)
+        default: return O(false)
+        }
+    }
+    var isArray: O {
+        return O(count > 1)
+    }
+    var isDic: O {
+        switch self {
+        case .dic: return O(true)
+        default: return O(false)
+        }
+    }
+    static let isName = "is"
+    static func isO(_ ao: O, _ bo: O) -> O {
+        switch bo {
+        case .range(let b):
+            let dlo = b.delta
+            switch b.type {
+            case .fili(let fio, let lio):
+                if dlo == O(0) {
+                    return O(ao >= fio && ao <= lio)
+                } else {
+                    return O((ao + fio) % dlo == O(0) && ao >= fio && ao <= lio)
+                }
+            case .filo(let fio, let lio):
+                if dlo == O(0) {
+                    return O(ao >= fio && ao < lio)
+                } else {
+                    return O((ao + fio) % dlo == O(0) && ao >= fio && ao < lio)
+                }
+            case .foli(let fio, let lio):
+                if dlo == O(0) {
+                    return O(ao > fio && ao <= lio)
+                } else {
+                    return O((ao + fio) % dlo == O(0) && ao > fio && ao <= lio)
+                }
+            case .folo(let fio, let lio):
+                if dlo == O(0) {
+                    return O(ao > fio && ao < lio)
+                } else {
+                    return O((ao + fio) % dlo == O(0) && ao > fio && ao < lio)
+                }
+            case .fi(let fio):
+                if dlo == O(0) {
+                    return O(ao >= fio)
+                } else {
+                    return O((ao + fio) % dlo == O(0) && ao >= fio)
+                }
+            case .fo(let fio):
+                if dlo == O(0) {
+                    return O(ao > fio)
+                } else {
+                    return O((ao + fio) % dlo == O(0) && ao > fio)
+                }
+            case .li(let lio):
+                if dlo == O(0) {
+                    return O(ao <= lio)
+                } else {
+                    return O(ao % dlo == O(0) && ao <= lio)
+                }
+            case .lo(let lio):
+                if dlo == O(0) {
+                    return O(ao < lio)
+                } else {
+                    return O(ao % dlo == O(0) && ao < lio)
+                }
+            case .all:
+                if dlo == O(0) {
+                    return O(true)
+                } else {
+                    return O(ao % dlo == O(0))
+                }
+            }
+        case .g(let b):
+            switch b {
+            case .empty: return ao.isEmptyO
+            case .b: return ao.isBool
+            case .n0: return ao.isNatural0
+            case .n1: return ao.isNatural1
+            case .z: return ao.isIntO
+            case .q: return ao.isRational
+            case .r: return ao.isDouble
+            case .f: return ao.isF
+            case .string: return ao.isString
+            case .array: return ao.isArray
+            case .dic: return ao.isDic
+            case .all: return O(true)
+            }
+        case .generics(let b):
+            switch b {
+            case .customArray(let bb):
+                for (i, ao) in ao.elements.enumerated() {
+                    guard i < bo.count else {
+                        return O(false)
+                    }
+                    if O.isO(ao, bb[i]) == O(false) {
+                        return O(false)
+                    }
+                }
+                return O(true)
+            case .customDic(let bb):
+                switch ao {
+                case .dic(let aa):
+                    if aa.count != bb.count {
+                        return O(false)
+                    }
+                    for (aaKey, aaValue) in aa {
+                        if let bbo = bb[aaKey] {
+                            if O.isO(aaValue, bbo) == O(false) {
+                                return O(false)
+                            }
+                        } else {
+                            return O(false)
+                        }
+                    }
+                    return O(true)
+                default:
+                    return O(false)
+                }
+            case .array(let bb):
+                return O(!ao.elements.contains(where: { O.isO($0, bb) == O(false) }))
+            case .dic(let bbKey, let bbValue):
+                switch ao {
+                case .dic(let aa):
+                    if aa.keys.contains(where: { O.isO($0, bbKey) == O(false) }) {
+                        return O(false)
+                    }
+                    if aa.values.contains(where: { O.isO($0, bbValue) == O(false) }) {
+                        return O(false)
+                    }
+                    return O(true)
+                default:
+                    return O(false)
+                }
+            }
+        case .array(let b):
+            return O(b.contains(ao))
+        case .dic(let b):
+            switch ao {
+            case .dic(let a):
+                for (aKey, bvo) in b {
+                    if let avo = a[aKey] {
+                        if O.isO(avo, bvo) == O(false) {
+                            return O(false)
+                        }
+                    }
+                }
+                return O(true)
+            default: return O(b.contains(where: { $1 == ao }))
+            }
+        default:
+            return O.equalO(ao, bo)
+        }
+    }
+}
+
+extension O {
+    static let mapName = "map"
+    static func map(_ ao: O, _ bo: O, _ fun: ((F, O) -> (O))) -> O {
+        switch ao {
+        case .error: return ao
+        default: break
+        }
+        switch bo {
+        case .error: return bo
+        default: break
+        }
+        
+        guard case .f(let f) = bo else { return arrayArgsError(withCount: 1, notCount: 0)  }
+        let nf = f.with(isBlock: false)
+        guard nf.outKeys.count == 1 else { return arrayArgsError(withCount: 1, notCount: nf.outKeys.count) }
+        
+        switch ao {
+        case .range(let a):
+            switch a.type {
+            case .fi, .fo, .li, .lo, .all:
+                return O(OError.undefined(with: "\(ao.name) \(mapName) \(bo.name)"))
+            default: break
+            }
+        default: break
+        }
+        switch ao {
+        case .error(_): return ao
+        default:
+            var os = [O]()
+            os.reserveCapacity(ao.count)
+            for eo in ao.elements {
+                let o = fun(nf, eo)
+                if case .error = o {
+                    return o
+                } else {
+                    os.append(o)
+                }
+            }
+            return ao.with(os)
+        }
+    }
+    static let filterName = "filter"
+    static func filter(_ ao: O, _ bo: O, _ fun: ((F, O) -> (O))) -> O {
+        switch ao {
+        case .error: return ao
+        default: break
+        }
+        switch bo {
+        case .error: return bo
+        default: break
+        }
+        
+        guard case .f(let f) = bo else { return arrayArgsError(withCount: 1, notCount: 0)  }
+        let nf = f.with(isBlock: false)
+        guard nf.outKeys.count == 1 else { return arrayArgsError(withCount: 1, notCount: nf.outKeys.count) }
+        
+        switch ao {
+        case .range(let a):
+            switch a.type {
+            case .fi, .fo, .li, .lo, .all:
+                return O(OError.undefined(with: "\(ao.name) \(filterName) \(bo.name)"))
+            default: break
+            }
+        default: break
+        }
+        switch ao {
+        case .error(_): return ao
+        default:
+            var os = [O]()
+            os.reserveCapacity(ao.count)
+            for eo in ao.elements {
+                let no = fun(nf, eo)
+                switch no {
+                case .bool(let b):
+                    if b {
+                        os.append(eo)
+                    }
+                case .error(_): return no
+                default:
+                    return O(OError("Return value is not bool".localized))
+                }
+            }
+            return ao.with(os)
+        }
+    }
+    static let reduceName = "reduce"
+    static func reduce(_ ao: O, _ firstO: O, _ bo: O,
+                       _ fun: ((F, O, O) -> (O))) -> O {
+        switch ao {
+        case .error: return ao
+        default: break
+        }
+        switch bo {
+        case .error: return bo
+        default: break
+        }
+        
+        guard case .f(let f) = bo else { return arrayArgsError(withCount: 2, notCount: 0)  }
+        let nf = f.with(isBlock: false)
+        guard nf.outKeys.count == 2 else { return arrayArgsError(withCount: 2, notCount: nf.outKeys.count) }
+        
+        switch ao {
+        case .range(let a):
+            switch a.type {
+            case .fi, .fo, .li, .lo, .all:
+                return O(OError.undefined(with: "\(ao.name) \(reduceName) \(firstO.name) \(bo.name)"))
+            default: break
+            }
+        default: break
+        }
+        switch ao {
+        case .error(_): return ao
+        default:
+            var no = firstO
+            for eo in ao.elements {
+                let nno = fun(nf, no, eo)
+                if case .error = nno {
+                    return nno
+                } else {
+                    no = nno
+                }
+            }
+            return no
+        }
+    }
+    
+    static let makeMatrixName = ";"
+    static func makeMatrix(_ ao: O) -> O {
+        switch ao {
+        case .array(let a):
+            O(OArray(union: a.value))
+        default:
+            O(OArray([ao]))
+        }
+    }
+    static let releaseMatrixName = ";-"
+    static func releaseMatrix(_ ao: O) -> O {
+        switch ao {
+        case .array(let a):
+            O(OArray(a.value, dimension: 1, nextCount: 1))
+        default:
+            ao
+        }
+    }
+    func with(_ value: [O]) -> O {
+        switch self {
+        case .array(let a):
+            O(OArray(union: value, currentDimension: a.dimension))
+        default:
+            O(OArray(value))
+        }
+    }
+}
+
+extension O {
+    private enum InOut {
+        case `in`, out
+    }
+    private static func random(in range: ClosedRange<Int>, _ inOut: InOut,
+                               delta: Double, _ o: O) -> O {
+        if delta == 1 {
+            let f = inOut == .out ?
+                range.lowerBound + 1 : range.lowerBound
+            let l = range.upperBound
+            guard f <= l else { return rangeError(O(f), "<=", O(l)) }
+            return O(Int.random(in: f ... l))
+        } else {
+            let f = inOut == .out ?
+                (Double(range.lowerBound) + (delta > 0 ? delta : .ulpOfOne)) :
+                Double(range.lowerBound)
+            let l = Double(range.upperBound)
+            guard f <= l else { return rangeError(O(f), "<=", O(l)) }
+            guard !f.isInfinite && !l.isInfinite else { return O(OError.undefined(with: "\(o.name) \(randomName)")) }
+            if delta == 0 {
+                return O(Double.random(in: f ... l))
+            } else if delta > 0 {
+                let v = Double.random(in: f ... l)
+                return O((v - f).interval(scale: delta) + f)
+            } else {
+                fatalError()
+            }
+        }
+    }
+    private static func random(in range: ClosedRange<Rational>, _ inOut: InOut,
+                               delta: Double, _ o: O) -> O {
+        let f = inOut == .out ?
+            (Double(range.lowerBound) + (delta > 0 ? delta : .ulpOfOne)) :
+            Double(range.lowerBound)
+        let l = Double(range.upperBound)
+        guard f <= l else { return rangeError(O(f), "<=", O(l)) }
+        guard !f.isInfinite && !l.isInfinite else { return O(OError.undefined(with: "\(o.name) \(randomName)")) }
+        if delta == 0 {
+            return O(Double.random(in: f ... l))
+        } else if delta > 0 {
+            let v = Double.random(in: f ... l)
+            return O((v - f).interval(scale: delta) + f)
+        } else {
+            fatalError()
+        }
+    }
+    private static func random(in range: ClosedRange<Double>, _ inOut: InOut,
+                               delta: Double, _ o: O) -> O {
+        let f = inOut == .out ?
+            (range.lowerBound + (delta > 0 ? delta : .ulpOfOne)) :
+            range.lowerBound
+        let l = range.upperBound
+        guard f <= l else { return rangeError(O(f), "<=", O(l)) }
+        guard !f.isInfinite && !l.isInfinite else { return O(OError.undefined(with: "\(o.name) \(randomName)")) }
+        let v = Double.random(in: f ... l)
+        if delta == 0 {
+            return O(v)
+        } else if delta > 0 {
+            return O((v - range.lowerBound).interval(scale: delta)
+                        + range.lowerBound)
+        } else {
+            fatalError()
+        }
+    }
+    private static func random(in range: Range<Int>, _ inOut: InOut,
+                               delta: Double, _ o: O) -> O {
+        if delta == 1 {
+            let f = inOut == .out ?
+                range.lowerBound + 1 : range.lowerBound
+            let l = range.upperBound
+            guard f < l else { return rangeError(O(f), "<", O(l)) }
+            return O(Int.random(in: f ..< l))
+        } else {
+            let f = inOut == .out ?
+                (Double(range.lowerBound) + (delta > 0 ? delta : .ulpOfOne)) :
+                Double(range.lowerBound)
+            let l = Double(range.upperBound)
+            guard f < l else { return rangeError(O(f), "<", O(l)) }
+            guard !f.isInfinite && !l.isInfinite else { return O(OError.undefined(with: "\(o.name) \(randomName)")) }
+            if delta == 0 {
+                return O(Double.random(in: f ..< l))
+            } else if delta > 0 {
+                let v = Double.random(in: f ..< l)
+                return O((v - f).interval(scale: delta) + f)
+            } else {
+                fatalError()
+            }
+        }
+    }
+    private static func random(in range: Range<Rational>, _ inOut: InOut,
+                               delta: Double, _ o: O) -> O {
+        let f = inOut == .out ?
+            (Double(range.lowerBound) + (delta > 0 ? delta : .ulpOfOne)) :
+            Double(range.lowerBound)
+        let l = Double(range.upperBound)
+        guard f < l else { return rangeError(O(f), "<", O(l)) }
+        guard !f.isInfinite && !l.isInfinite else { return O(OError.undefined(with: "\(o.name) \(randomName)")) }
+        if delta == 0 {
+            return O(Double.random(in: f ..< l))
+        } else if delta > 0 {
+            let v = Double.random(in: f ..< l)
+            return O((v - f).interval(scale: delta) + f)
+        } else {
+            fatalError()
+        }
+    }
+    private static func random(in range: Range<Double>, _ inOut: InOut,
+                               delta: Double, _ o: O) -> O {
+        let f = inOut == .out ?
+            (range.lowerBound + (delta > 0 ? delta : .ulpOfOne)) :
+            range.lowerBound
+        let l = range.upperBound
+        guard f < l else { return rangeError(O(f), "<", O(l)) }
+        guard !f.isInfinite && !l.isInfinite else { return O(OError.undefined(with: "\(o.name) \(randomName)")) }
+        let v = Double.random(in: f ..< l)
+        if delta == 0 {
+            return O(v)
+        } else if delta > 0 {
+            return O((v - range.lowerBound).interval(scale: delta)
+                        + range.lowerBound)
+        } else {
+            fatalError()
+        }
+    }
+    static let randomName = "random"
+    var random: O {
+        switch self {
+        case .range(let range):
+            let d = range.delta.asDouble ?? 0
+            switch range.type {
+            case .fili(let ao, let bo):
+                switch ao {
+                case .bool(let a):
+                    switch bo {
+                    case .bool:
+                        return O(Bool.random())
+                    case .int(let b):
+                        return .random(in: Int(a) ... b, .in, delta: d, self)
+                    case .rational(let b):
+                        return .random(in: Rational(a) ... b, .in, delta: d, self)
+                    case .double(let b):
+                        return .random(in: Double(a) ... b, .in, delta: d, self)
+                    default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
+                    }
+                case .int(let a):
+                    switch bo {
+                    case .bool(let b):
+                        return .random(in: a ... Int(b), .in, delta: d, self)
+                    case .int(let b):
+                        return .random(in: a ... b, .in, delta: d, self)
+                    case .rational(let b):
+                        return .random(in: Rational(a) ... b, .in, delta: d, self)
+                    case .double(let b):
+                        return .random(in: Double(a) ... b, .in, delta: d, self)
+                    default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
+                    }
+                case .rational(let a):
+                    switch bo {
+                    case .bool(let b):
+                        return .random(in: a ... Rational(b), .in, delta: d, self)
+                    case .int(let b):
+                        return .random(in: a ... Rational(b), .in, delta: d, self)
+                    case .rational(let b):
+                        return .random(in: a ... b, .in, delta: d, self)
+                    case .double(let b):
+                        return .random(in: Double(a) ... b, .in, delta: d, self)
+                    default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
+                    }
+                case .double(let a):
+                    switch bo {
+                    case .bool(let b):
+                        return .random(in: a ... Double(b), .in, delta: d, self)
+                    case .int(let b):
+                        return .random(in: a ... Double(b), .in, delta: d, self)
+                    case .rational(let b):
+                        return .random(in: a ... Double(b), .in, delta: d, self)
+                    case .double(let b):
+                        return .random(in: a ... b, .in, delta: d, self)
+                    default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
+                    }
+                default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
+                }
+            case .filo(let ao, let bo):
+                switch ao {
+                case .bool(let a):
+                    switch bo {
+                    case .bool: return O(false)
+                    case .int(let b):
+                        return .random(in: Int(a) ..< b, .in, delta: d, self)
+                    case .rational(let b):
+                        return .random(in: Rational(a) ..< b, .in, delta: d, self)
+                    case .double(let b):
+                        return .random(in: Double(a) ..< b, .in, delta: d, self)
+                    default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
+                    }
+                case .int(let a):
+                    switch bo {
+                    case .bool(let b):
+                        return .random(in: a ..< Int(b), .in, delta: d, self)
+                    case .int(let b):
+                        return .random(in: a ..< b, .in, delta: d, self)
+                    case .rational(let b):
+                        return .random(in: Rational(a) ..< b, .in, delta: d, self)
+                    case .double(let b):
+                        return .random(in: Double(a) ..< b, .in, delta: d, self)
+                    default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
+                    }
+                case .rational(let a):
+                    switch bo {
+                    case .bool(let b):
+                        return .random(in: a ..< Rational(b), .in, delta: d, self)
+                    case .int(let b):
+                        return .random(in: a ..< Rational(b), .in, delta: d, self)
+                    case .rational(let b):
+                        return .random(in: a ..< b, .in, delta: d, self)
+                    case .double(let b):
+                        return .random(in: Double(a) ..< b, .in, delta: d, self)
+                    default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
+                    }
+                case .double(let a):
+                    switch bo {
+                    case .bool(let b):
+                        return .random(in: a ..< Double(b), .in, delta: d, self)
+                    case .int(let b):
+                        return .random(in: a ..< Double(b), .in, delta: d, self)
+                    case .rational(let b):
+                        return .random(in: a ..< Double(b), .in, delta: d, self)
+                    case .double(let b):
+                        return .random(in: a ..< b, .in, delta: d, self)
+                    default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
+                    }
+                default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
+                }
+            case .foli(let ao, let bo):
+                switch ao {
+                case .bool(let a):
+                    switch bo {
+                    case .bool: return O(true)
+                    case .int(let b):
+                        return .random(in: Int(a) ... b, .out, delta: d, self)
+                    case .rational(let b):
+                        return .random(in: Rational(a) ... b, .out, delta: d, self)
+                    case .double(let b):
+                        return .random(in: Double(a) ... b, .out, delta: d, self)
+                    default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
+                    }
+                case .int(let a):
+                    switch bo {
+                    case .bool(let b):
+                        return .random(in: a ... Int(b), .out, delta: d, self)
+                    case .int(let b):
+                        return .random(in: a ... b, .out, delta: d, self)
+                    case .rational(let b):
+                        return .random(in: Rational(a) ... b, .out, delta: d, self)
+                    case .double(let b):
+                        return .random(in: Double(a) ... b, .out, delta: d, self)
+                    default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
+                    }
+                case .rational(let a):
+                    switch bo {
+                    case .bool(let b):
+                        return .random(in: a ... Rational(b), .out, delta: d, self)
+                    case .int(let b):
+                        return .random(in: a ... Rational(b), .out, delta: d, self)
+                    case .rational(let b):
+                        return .random(in: a ... b, .out, delta: d, self)
+                    case .double(let b):
+                        return .random(in: Double(a) ... b, .out, delta: d, self)
+                    default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
+                    }
+                case .double(let a):
+                    switch bo {
+                    case .bool(let b):
+                        return .random(in: a ... Double(b), .out, delta: d, self)
+                    case .int(let b):
+                        return .random(in: a ... Double(b), .out, delta: d, self)
+                    case .rational(let b):
+                        return .random(in: a ... Double(b), .out, delta: d, self)
+                    case .double(let b):
+                        return .random(in: a ... b, .out, delta: d, self)
+                    default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
+                    }
+                default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
+                }
+            case .folo(let ao, let bo):
+                switch ao {
+                case .bool(let a):
+                    switch bo {
+                    case .bool: return O(true)
+                    case .int(let b):
+                        return .random(in: Int(a) ..< b, .out, delta: d, self)
+                    case .rational(let b):
+                        return .random(in: Rational(a) ..< b, .out, delta: d, self)
+                    case .double(let b):
+                        return .random(in: Double(a) ..< b, .out, delta: d, self)
+                    default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
+                    }
+                case .int(let a):
+                    switch bo {
+                    case .bool(let b):
+                        return .random(in: a ..< Int(b), .out, delta: d, self)
+                    case .int(let b):
+                        return .random(in: a ..< b, .out, delta: d, self)
+                    case .rational(let b):
+                        return .random(in: Rational(a) ..< b, .out, delta: d, self)
+                    case .double(let b):
+                        return .random(in: Double(a) ..< b, .out, delta: d, self)
+                    default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
+                    }
+                case .rational(let a):
+                    switch bo {
+                    case .bool(let b):
+                        return .random(in: a ..< Rational(b), .out, delta: d, self)
+                    case .int(let b):
+                        return .random(in: a ..< Rational(b), .out, delta: d, self)
+                    case .rational(let b):
+                        return .random(in: a ..< b, .out, delta: d, self)
+                    case .double(let b):
+                        return .random(in: Double(a) ..< b, .out, delta: d, self)
+                    default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
+                    }
+                case .double(let a):
+                    switch bo {
+                    case .bool(let b):
+                        return .random(in: a ..< Double(b), .out, delta: d, self)
+                    case .int(let b):
+                        return .random(in: a ..< Double(b), .out, delta: d, self)
+                    case .rational(let b):
+                        return .random(in: a ..< Double(b), .out, delta: d, self)
+                    case .double(let b):
+                        return .random(in: a ..< b, .out, delta: d, self)
+                    default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
+                    }
+                default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
+                }
+            case .fi(let ao):
+                switch ao {
+                case .bool(let a):
+                    return O(a ? true : Bool.random())
+                case .int(let a):
+                    return O.random(in: Double(a) ... .infinity, .in, delta: d, self).rounded()
+                case .rational(let a):
+                    let n = O.random(in: Double(a) ... .infinity, .in, delta: d, self)
+                    if case .double(let r) = n, let nn = Rational(exactly: r) {
+                        return O(nn)
+                    } else {
+                        return n
+                    }
+                case .double(let a):
+                    return .random(in: a ... .infinity, .in, delta: d, self)
+                default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
+                }
+            case .fo(let ao):
+                switch ao {
+                case .bool(let a):
+                    return a ? .empty : O(true)
+                case .int(let a):
+                    return O.random(in: Double(a) ... .infinity, .out, delta: d, self).rounded()
+                case .rational(let a):
+                    let n = O.random(in: Double(a) ... .infinity, .out, delta: d, self)
+                    if case .double(let r) = n, let nn = Rational(exactly: r) {
+                        return O(nn)
+                    } else {
+                        return n
+                    }
+                case .double(let a):
+                    return .random(in: a ... .infinity, .out, delta: d, self)
+                default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
+                }
+            case .li(let ao):
+                switch ao {
+                case .bool(let a):
+                    return O(a ? Bool.random() : false)
+                case .int(let a):
+                    return O.random(in: -.infinity ... Double(a), .in, delta: d, self).rounded()
+                case .rational(let a):
+                    let n = O.random(in: -.infinity ... Double(a), .in, delta: d, self)
+                    if case .double(let r) = n, let nn = Rational(exactly: r) {
+                        return O(nn)
+                    } else {
+                        return n
+                    }
+                case .double(let a):
+                    return .random(in: -.infinity ... a, .in, delta: d, self)
+                default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
+                }
+            case .lo(let ao):
+                switch ao {
+                case .bool(let a):
+                    return a ? O(false) : .empty
+                case .int(let a):
+                    return O.random(in: -.infinity ..< Double(a), .in, delta: d, self).rounded()
+                case .rational(let a):
+                    let n = O.random(in: -.infinity ..< Double(a), .in, delta: d, self)
+                    if case .double(let r) = n, let nn = Rational(exactly: r) {
+                        return O(nn)
+                    } else {
+                        return n
+                    }
+                case .double(let a):
+                    return .random(in: -.infinity ..< a, .in, delta: d, self)
+                default: return O(OError.undefined(with: "\(self) \(O.randomName)"))
+                }
+            case .all:
+                return .random(in: -.infinity ..< .infinity, .in, delta: d, self)
+            }
+        case .array(let os):
+            return os.randomElement() ?? .empty
+        case .error: return self
+        default: return self
+        }
+    }
+}
+
+extension O {
+    static let horizontalName = "horizontal"
+    static let verticalName = "vertical"
+    
+    static let sheetDicName = "sheetDic"
+    static let sheetName = "sheet"
+    static let sheetSizeName = "sheetSize"
+    static let cursorPName = "cursorP"
+    static let printPName = "printP"
+}
+extension O {
+    static let showAboutRunName = "showAboutRun"
+    static func showAboutRun(_ ao: O) -> O {
+        guard case .sheet(var sheet) = ao else { return O(OError(String(format: "Argument $0 must be sheet, not '%1$@'".localized, ao.name))) }
+        
+        let b = sheet.bounds
+        let lPadding = 20.0
+        
+        var p = Point(0, -lPadding), allSize = Size()
+        
+        var t0 = Text(string: "About Run".localized, size: 20, origin: p)
+        let size0 = t0.typesetter.typoBounds?.size ?? Size()
+        p.y -= size0.height + lPadding / 4
+        allSize.width = max(allSize.width, size0.width)
+        
+        var t1 = Text(string: "To show all definitions, run the following statement".localized, origin: p)
+        let size2 = t1.typesetter.typoBounds?.size ?? Size()
+        p.y -= size2.height * 2
+        
+        var t2 = Text(string: "sheet showAllDefinitions =", origin: p)
+        let size3 = t2.typesetter.typoBounds?.size ?? Size()
+        p.y -= size3.height + lPadding * 2
+        
+        let s0 = """
+\("Bool".localized)
+    false
+    true
+
+\("Rational number".localized)
+    0
+    1
+    +3
+    -20
+    1/2
+
+\("Real number".localized)
+    0.0
+    1.3
+    +1.02
+    -20.0
+
+\("Infinity".localized)
+    ∞ -∞ +∞ (\("Key input".localized): ⌥ 5)
+
+\("String".localized)
+    "A AA" -> A AA
+    "AA\"A" -> AA"A
+    "AAAAA\\nAA" ->
+        AAAAA
+        AA
+
+\("Array".localized)
+    a b c
+    (a b c)
+    (a b (c d))
+
+\("Dictionary".localized)
+    (a: d  b: e  c: f)
+    = ((\"a\"): d  (\"b\"): e  (\"c\"): f)
+
+\("Function".localized)
+    (1 + 2) = 3
+    (a: 1  b: 2  c: 3 | a + b + c) = 6
+    (a(b c): b + c | a 1 2 + 3) = 6
+    ((b)a(c): b + c | 1 a 2 + 3) = 6
+    ((b)a(c: d): b + d | 1 a c: 2 + 3) = 6
+    ((b)a(c)100: b + c | 2 a 2 * 3 + 1) = 9
+        \("Precedence".localized): 100  \("Associaticity".localized): \("Left".localized)
+    ((b)a(c)150r: b / c | 1 a 2 a 3 + 1) = 5 / 2
+        \("Precedence".localized): 150  \("Associaticity".localized): \("Right".localized)
+
+\("Block function".localized)
+    (| 1 + 2) send () = 3
+    (| a: 1  b: 2  c: 3 | a + b + c) send () = 6
+    (a b c | a + b + c) send (1 2 3) = 6
+    (a b c | d: a + b | d + c) send (1 2 3) = 6
+
+\("Conditional function".localized)
+        1 == 2
+        -> 3
+        -! 4
+    = 4,
+        1 == 2
+        -> 3
+        -!
+        4 * 5
+        case 10      -> 100
+        case 10 + 10 -> 200
+        -! 300
+    = 200,
+        "a"
+        case "a" -> 1
+        case "b" -> 2
+        case "c" -> 3
+    = 1
+"""
+        // Issue?: if 1 == 2
+        // switch "a"
+        
+        let t3 = Text(string: s0, origin: p)
+        let size4 = t3.typesetter.typoBounds?.size ?? Size()
+        
+        let setS = G.allCases.reduce(into: "") {
+            $0 += ($0.isEmpty ? "" : "\n\t") + $1.rawValue + ": " + $1.displayString
+        }
+        let s1 = """
+\("Set".localized)
+    \(setS)
+
+\("Lines bracket".localized)
+    a + b +
+        c +
+            d + e
+    = a + b + (c + (d + e))
+
+\("Split".localized)
+    (a + b, b + c, c) = ((a + b) (b + c) (c))
+
+\("Separator".localized) (\("Separator character".localized) \(O.defaultLiteralSeparator)):
+    abc12+3 = abc12 + 3
+    abc12++3 = abc12 ++ 3
+
+\("Union".localized)
+    a + b+c = a + (b + c)
+    a+b*c + d/e = (a + b * c) + (d / e)
+
+\("Omit multiplication sign".localized)
+    3a + b = 3 * a + b
+    3a\("12".toSubscript)c\("3".toSubscript) + b = 3 * a\("12".toSubscript) * c\("3".toSubscript) + b
+    a\("2".toSubscript)''b\("2".toSubscript)c'd = a\("2".toSubscript)'' * b\("2".toSubscript) * c' * d
+    (x + 1)(x - 1) = (x + 1) * (x - 1)
+
+\("Pow".localized)
+    x\("1+2".toSuperscript) = x ** (1 + 2)
+
+\("Get".localized)
+    a.b.c = a . "b" . "c"
+
+\("Select".localized)
+    a/.b.c = a /. "b" /. "c"
+
+\("xyzw".localized)
+    a is Array -> a.x = a . 0
+    a is Array -> a.y = a . 1
+    a is Array -> a.z = a . 2
+    a is Array -> a.w = a . 3
+
+\("Sheet bond".localized)
+    \("Put '+' string beside the frame of the sheet you want to connect.".localized)
+""" // + xxxx -> border bond
+        
+        let t4 = Text(string: s1, origin: p + Point(size4.width + lPadding * 2, 0))
+        let size5 = t4.typesetter.typoBounds?.size ?? Size()
+        
+        p.y -= max(size4.height, size5.height) + lPadding
+        allSize.width = size4.width + size5.width + lPadding * 2
+        
+        t0.origin.x = (allSize.width - size0.width) / 2
+        t1.origin.x = (allSize.width - size2.width) / 2
+        t2.origin.x = (allSize.width - size3.width) / 2
+        
+        let w = allSize.width, h = -p.y
+        let ts = [t0, t1, t2, t3, t4]
+        
+        let size = Size(width: w + lPadding * 2,
+                        height: h + lPadding * 2)
+        let scale = min(1, b.width / size.width, b.height / size.height)
+        let dx = (b.width - size.width * scale) / 2
+        let t = Transform(scale: scale)
+            * Transform(translation: b.minXMaxYPoint + Point(lPadding * scale + dx, -lPadding * scale))
+        let nts = ts.map { $0 * t }
+        
+        sheet.removeAll()
+        sheet.append(nts)
+        return O(sheet)
+    }
+    
+    static let showAllDefinitionsName = "showAllDefinitions"
+    static func showAllDefinitions(_ ao: O, _ oDic: inout [OKey: O],
+                                   enableCustom: Bool = true) -> O {
+        guard case .sheet(var sheet) = ao else { return O(OError(String(format: "Argument $0 must be sheet, not '%1$@'".localized, ao.name))) }
+        let b = sheet.bounds
+        
+        let customGroup = OKeyInfo.Group(name: "Custom".localized, index: -1)
+        
+        var os = [OKeyInfo.Group: [OKey: O]]()
+        for (key, value) in oDic {
+            if let info = key.info {
+                if os[info.group] != nil {
+                    os[info.group]?[key] = value
+                } else {
+                    os[info.group] = [key: value]
+                }
+            } else if enableCustom {
+                if os[customGroup] != nil {
+                    os[customGroup]?[key] = value
+                } else {
+                    os[customGroup] = [key: value]
+                }
+            }
+        }
+        
+        let nnos = os.reduce(into: [OKeyInfo.Group: [(key: OKey, value: O)]]()) {
+            $0[$1.key] = $1.value
+                .sorted { $0.key.info?.index ?? 0 < $1.key.info?.index ?? 0 }
+        }
+        let nos = nnos.sorted { $0.key.index < $1.key.index }
+        
+        struct Cell {
+            var string: String
+            var size: Size
+            init(_ s: String) {
+                string = s
+                size = Text(string: s)
+                    .typesetter.typoBounds?.size ?? Size()
+            }
+        }
+        struct Table {
+            var y = 0.0
+            var groupCell: Cell
+            var nameCell: Cell, precedenceCell: Cell
+            var associaticityCell: Cell, descriptionCell: Cell
+            var height: Double {
+                max(groupCell.size.height,
+                    nameCell.size.height,
+                    precedenceCell.size.height,
+                    associaticityCell.size.height,
+                    descriptionCell.size.height)
+            }
+        }
+        
+        let lPadding = 24.0
+        let padding = 10.0
+        
+        var y = 0.0, tables = [Table]()
+        let nameS = "Definition name".localized
+        let preceS = "Precedence".localized
+        let assoS = "Associaticity".localized
+        let descS = "Description ($0: zeroth argument, $1: First argument, ...)".localized
+        var table = Table(y: y, groupCell: Cell(""),
+                          nameCell: Cell(nameS),
+                          precedenceCell: Cell(preceS),
+                          associaticityCell: Cell(assoS),
+                          descriptionCell: Cell(descS))
+        let typeH = table.height
+        table.y = typeH + lPadding
+        tables.append(table)
+        for (group, oDic) in nos {
+            for (i, v) in oDic.enumerated() {
+                let (key, value) = v
+                let groupName = i == 0 ? (group.name + ":") : ""
+                let name = key.description
+                let precedence: String
+                switch value {
+                case .f(let f): precedence = "\(f.precedence)"
+                default: precedence = "0"
+                }
+                let associativity: String
+                switch value {
+                case .f(let f):
+                    switch f.associativity {
+                    case .left: associativity = "Left".localized
+                    case .right: associativity = "Right".localized
+                    }
+                default: associativity = "None".localized
+                }
+                let s = key.info?.description ?? "None".localized
+                let description = s.isEmpty ? "None".localized : s
+                let table = Table(y: y, groupCell: Cell(groupName),
+                                  nameCell: Cell(name),
+                                  precedenceCell: Cell(precedence),
+                                  associaticityCell: Cell(associativity),
+                                  descriptionCell: Cell(description))
+                tables.append(table)
+                y -= table.height + padding
+            }
+            y += padding
+            y -= lPadding
+        }
+        y += lPadding
+        
+        var ts = [Text]()
+        var x = 0.0
+        var groupW = 0.0
+        for table in tables {
+            if !table.groupCell.string.isEmpty {
+                groupW = max(groupW, table.groupCell.size.width)
+                let t = Text(string: table.groupCell.string,
+                             origin: Point(-table.groupCell.size.width - lPadding, table.y))
+                ts.append(t)
+            }
+        }
+        var dw = 0.0
+        for table in tables {
+            dw = max(dw, table.nameCell.size.width)
+            let t = Text(string: table.nameCell.string,
+                         origin: Point(x, table.y))
+            ts.append(t)
+        }
+        x += dw + lPadding
+        dw = 0
+        for table in tables {
+            dw = max(dw, table.precedenceCell.size.width)
+        }
+        for table in tables {
+            let t = Text(string: table.precedenceCell.string,
+                         origin: Point(x + dw - table.precedenceCell.size.width, table.y))
+            ts.append(t)
+        }
+        x += dw + lPadding
+        dw = 0
+        for table in tables {
+            dw = max(dw, table.associaticityCell.size.width)
+            let t = Text(string: table.associaticityCell.string,
+                         origin: Point(x, table.y))
+            ts.append(t)
+        }
+        x += dw + lPadding
+        dw = 0
+        for table in tables {
+            dw = max(dw, table.descriptionCell.size.width)
+            let t = Text(string: table.descriptionCell.string,
+                         origin: Point(x, table.y))
+            ts.append(t)
+        }
+        x += dw
+        
+        let h = -y + typeH + lPadding
+        let w = x + groupW + lPadding
+        
+        let size = Size(width: w + lPadding * 2, height: h + lPadding * 2)
+        let scale = min(1, b.width / size.width, b.height / size.height)
+        let dx = (b.width - size.width * scale) / 2
+        let t = Transform(scale: scale)
+            * Transform(translation: b.minXMaxYPoint + Point((groupW + lPadding * 2) * scale + dx, -(typeH + lPadding * 2) * scale))
+        ts = ts.map { $0 * t }
+        
+        var line = Line(edge: Edge(Point(-groupW - lPadding, (typeH + lPadding) / 2), Point(w - groupW, (typeH + lPadding) / 2))) * t
+        line.size *= scale
+        
+        sheet.removeAll()
+        sheet.append(line)
+        sheet.append(ts)
+        return O(sheet)
+    }
+    
+    static let drawName = "draw"
+    static func draw(_ ao: O, _ oDic: inout [OKey: O]) -> O {
+        switch ao {
+        case .error: return ao
+        default:
+            let ps = ao.asPoints
+            if ps.count == 1 {
+                return drawPoint(ps[0], &oDic)
+            } else {
+                let line = Line(controls: ps.map { Line.Control(point: $0) })
+                return drawLine(line, &oDic)
+            }
+        }
+    }
+    
+    static let drawAxesName = "drawAxes"
+    static func drawAxes(base bo: O, _ xo: O, _ yo: O,
+                         _ oDic: inout [OKey: O]) -> O {
+        guard let base = bo.asDouble, base > 0 else { return O(OError(String(format: "'%1$@' is not positive real".localized, bo.name))) }
+        guard case .sheet(var sheet)? = oDic[OKey(sheetName)] else { return O(OError(String(format: "'%1$@' does not exist".localized, sheetName))) }
+        let xName = xo.asTextBasedString, yName = yo.asTextBasedString
+        
+        let b = sheet.bounds
+        let cp = b.centerPoint, r = 200.0, d = 5.0
+        let ex = Edge(cp + Point(-r, 0), cp + Point(r, 0))
+        let ey = Edge(cp + Point(0, -r), cp + Point(0, r))
+        
+        let ax = ex.reversed().angle(), ay = ey.reversed().angle()
+        let xArrow0 = Line(edge: Edge(ex.p1.movedWith(distance: d,
+                                                      angle: ax - .pi / 6),
+                                      ex.p1))
+        let xArrow1 = Line(edge: Edge(ex.p1,
+                                      ex.p1.movedWith(distance: d,
+                                                      angle: ax + .pi / 6)))
+        let yArrow0 = Line(edge: Edge(ey.p1.movedWith(distance: d,
+                                                      angle: ay - .pi / 6),
+                                      ey.p1))
+        let yArrow1 = Line(edge: Edge(ey.p1,
+                                      ey.p1.movedWith(distance: d,
+                                                      angle: ay + .pi / 6)))
+        let xAxis = Line(edge: ex), yAxis = Line(edge: ey)
+        let ys = Text(string: yName)
+            .typesetter.typoBounds?.size ?? Size()
+        let x = Text(string: xName, origin: ex.p1 + Point(5, 0))
+        let y = Text(string: yName, origin: ey.p1 + Point(-ys.width / 2,
+                                                          ys.height / 2 + 5))
+        
+        let baseP = Point(180, 0) + Point(256, 362)
+        let baseLine = Line(edge: Edge(Point(baseP.x, baseP.y - 5),
+                                       Point(baseP.x, baseP.y + 5)))
+        let baseName = String(intBased: base)
+        let bs = Text(string: baseName)
+            .typesetter.typoBounds?.size ?? Size()
+        let baseS = Text(string: baseName,
+                         origin: baseP + Point(-bs.width / 2, -bs.height - 5))
+        
+        let texts = [x, y, baseS].filter { !$0.isEmpty }
+        sheet.append([xAxis, xArrow0, xArrow1,
+                      yAxis, yArrow0, yArrow1, baseLine])
+        sheet.append(texts)
+        return O(sheet)
+    }
+    
+    static let plotName = "plot"
+    static func plot(base bo: O, _ ao: O, _ oDic: inout [OKey: O]) -> O {
+        guard let base = bo.asDouble, base > 0 else { return O(OError(String(format: "'%1$@' is not positive real".localized, bo.name))) }
+        
+        switch ao {
+        case .error: return ao
+        default:
+            let ps = ao.asPoints
+            let s = 180 / base
+            if ps.count == 1 {
+                let np = ps[0] * s + Point(256, 362)
+                return drawPoint(np, name: ao.name, &oDic)
+            } else {
+                let line = Line(controls: ps.map {
+                    let np = $0 * s + Point(256, 362)
+                    return Line.Control(point: np)
+                })
+                return drawLine(line, &oDic)
+            }
+        }
+    }
+    static func drawPoint(_ np: Point, name: String? = nil,
+                          _ oDic: inout [OKey: O]) -> O {
+        guard case .sheet(var sheet)? = oDic[OKey(sheetName)] else { return O(OError(String(format: "'%1$@' does not exist".localized, sheetName))) }
+        
+        let b = sheet.bounds
+        let xs = String(intBased: np.x), ys = String(intBased: np.y)
+        if b.inset(by: Line.defaultLineWidth).contains(np) {
+            let line = Line.circle(centerPosition: np, radius: 1)
+            let t = Text(string: name ?? "(\(xs) \(ys))",
+                         origin: np + Point(7, 0))
+            sheet.append(line)
+            sheet.append(t)
+            return O(sheet)
+        }
+        return drawEqual(String(format: "'%1$@' is out of bounds".localized,
+                                "(\(xs) \(ys))"), &oDic)
+    }
+    static func drawLine(_ l: Line, _ oDic: inout [OKey: O]) -> O {
+        guard case .sheet(var sheet)? = oDic[OKey(sheetName)] else { return O(OError(String(format: "'%1$@' does not exist".localized, sheetName))) }
+        
+        if l.controls.count >= 2 {
+            let l = l.controls.count > 10000 ? Line(controls: Array(l.controls[0 ..< 10000])) : l
+            let b = sheet.bounds
+            let newLines = Sheet.clipped([l],
+                                         in: b.inset(by: Line.defaultLineWidth))
+            if !newLines.isEmpty {
+                sheet.append(newLines)
+                return O(sheet)
+            }
+        }
+        return drawEqual("Line is out of bounds".localized,  &oDic)
+    }
+    static func drawText(_ t: Text, _ oDic: inout [OKey: O]) -> O {
+        guard case .sheet(var sheet)? = oDic[OKey(sheetName)] else { return O(OError(String(format: "'%1$@' does not exist".localized, sheetName))) }
+        
+        let b = sheet.bounds
+        if let frame = t.frame, b.intersects(frame) {
+            sheet.append(t)
+            return O(sheet)
+        }
+        return drawEqual("Text is out of bounds".localized, &oDic)
+    }
+    static func drawEqual(_ s: String, _ oDic: inout [OKey: O]) -> O {
+        guard case .sheet(var sheet)? = oDic[OKey(sheetName)] else { return O(OError(String(format: "'%1$@' does not exist".localized, sheetName))) }
+        guard let p = oDic[OKey(printPName)]?.asPoint else { return O(OError(String(format: "'%1$@' does not exist".localized, printPName))) }
+        
+        let nt = Text(string: "= " + s, origin: p)
+        sheet.append(nt)
+        return O(sheet)
+    }
+    
+    static let flipName = "flip"
+    static func flip(_ orientationO: O, _ oDic: inout [OKey: O]) -> O {
+        guard case .string(let oString) = orientationO else { return O(OError(String(format: "'%1$@' is not string".localized, orientationO.name))) }
+        let orientation: Orientation
+        if oString == horizontalName {
+            orientation = .horizontal
+        } else if oString == verticalName {
+            orientation = .vertical
+        } else {
+            return O(OError(String(format: "'%1$@' is not horizontal or vertical".localized, orientationO.name)))
+        }
+        
+        guard case .sheet(var sheet)? = oDic[OKey(sheetName)] else { return O(OError(String(format: "'%1$@' does not exist".localized, sheetName))) }
+        let lines = sheet.value.picture.lines
+        sheet.removeLines(at: Array(0 ..< lines.count))
+        switch orientation {
+        case .horizontal:
+            var t = Transform.identity
+            t.translate(by: -sheet.bounds.centerPoint)
+            t.scaleBy(x: -1, y: 1)
+            t.translate(by: sheet.bounds.centerPoint)
+            sheet.append(lines.map { $0 * t })
+        case .vertical:
+            var t = Transform.identity
+            t.translate(by: -sheet.bounds.centerPoint)
+            t.scaleBy(x: 1, y: -1)
+            t.translate(by: sheet.bounds.centerPoint)
+            sheet.append(lines.map { $0 * t })
+        }
+        return O(sheet)
+    }
+}
+
+extension O {
+    static let asLabelName = ":"
+    var asLabel: O {
+        switch self {
+        case .error: self
+        default: O(OLabel(self))
+        }
+    }
+}
+
+extension O {
+    static let asStringName = "\\"
+    var asString: String {
+        func lineStr(_ a: Line) -> String {
+            let s = a.controls.reduce(into: "") {
+                var ns = ""
+                ns += ns.isEmpty ? "" : " "
+                ns += "("
+                ns += "point: ((\(String(intBased: $1.point.x)) \(String(intBased: $1.point.y)))\n"
+                ns += "weight: \(String(intBased: $1.weight))\n"
+                ns += "pressure: \(String(intBased: $1.pressure))\n"
+                ns += ")"
+                $0 += ns
+            }
+            return "(\(s))"
+        }
+        func textStr(_ a: Text) -> String {
+            let s = a.string
+                .replacingOccurrences(of: "\"", with: "\\\"")
+                .replacingOccurrences(of: "\n", with: "\\n")
+            var ns = ""
+            ns += ns.isEmpty ? "" : " "
+            ns += "("
+            ns += "string: \"\(s)\"\n"
+            ns += "orientation: \(a.orientation.rawValue)\n"
+            ns += "size: \(String(intBased: a.size))\n"
+            ns += "origin: (\(String(intBased: a.origin.x)) \(String(intBased: a.origin.y)))"
+            ns += ")"
+            return ns
+        }
+        
+        switch self {
+        case .bool(let a): return String(a)
+        case .int(let a): return String(a)
+        case .rational(let a): return String(a)
+        case .double(let a): return String(oBased: a)
+        case .array(let a):
+            let bs = a.reduce(into: "") {
+                let s = $1.asString
+                $0 += $0.isEmpty ? s : (s.count > 10 ? "\n" : " ") + s
+            }
+            return a.dimension > 1 ?
+                "((" + bs + ") ;)" :
+                "(" + bs + ")"
+        case .range(let a):
+            let d = a.delta
+            switch a.type {
+            case .fili(let f, let l):
+                return d == O(0) ? "\(f)~~~\(l)" :
+                    (d == O(1) ? "\(f) ... \(l)" : "\(f) ... \(l) __ \(d)")
+            case .filo(let f, let l):
+                return d == O(0) ? "\(f)~~<\(l)" :
+                    (d == O(1) ? "\(f) ..< \(l)" : "\(f) ..< \(l) __ \(d)")
+            case .foli(let f, let l):
+                return d == O(0) ? "\(f)<~~\(l)" :
+                    (d == O(1) ? "\(f) <.. \(l)" : "\(f) <..\(l) __ \(d)")
+            case .folo(let f, let l):
+                return d == O(0) ? "\(f)<~<\(l)" :
+                    (d == O(1) ? "\(f)<.<\(l)" : "\(f)<.<\(l)_\(d)")
+            case .fi(let f):
+                return d == O(0) ? "\(f)~~~" :
+                    (d == O(1) ? "\(f)..." : "\(f)..._\(d)")
+            case .fo(let f):
+                return d == O(0) ? "\(f)<~~" :
+                    (d == O(1) ? "\(f)<.." : "\(f)<.._\(d)")
+            case .li(let l):
+                return d == O(0) ? "~~~\(l)" :
+                    (d == O(1) ? "...\(l)" : "...\(l)_\(d)")
+            case .lo(let l):
+                return d == O(0) ? "~~<\(l)" :
+                    (d == O(1) ? "..<\(l)" : "..<\(l) __ \(d)")
+            case .all:
+                return d == O(0) ? "R" :
+                    (d == O(1) ? "Z" : "Z_\(d)")
+            }
+        case .dic(let a):
+            func dicString(key: O, value: O) -> String {
+                switch key {
+                case .string(let s):
+                    return s + ": " + value.asString
+                default:
+                    return key.asString + ": " + value.asString
+                }
+            }
+            let bs = a.reduce(into: "") {
+                $0 += $0.isEmpty ?
+                    dicString(key: $1.key, value: $1.value) :
+                    "  " + dicString(key: $1.key, value: $1.value)
+            }
+            return "(" + bs + ")"
+        case .string(let a):
+            let s = a
+                .replacingOccurrences(of: "\"", with: "\\\"")
+                .replacingOccurrences(of: "\n", with: "\\n")
+            return "\"\(s)\""
+        case .sheet(let ss):
+            var s = ""
+            if !ss.value.picture.lines.isEmpty {
+                var ns = ""
+                for line in ss.value.picture.lines {
+                    ns += ns.isEmpty ? "" : "\n"
+                    ns += lineStr(line)
+                }
+                s += "lines: " + "(" + ns + ")"
+            }
+            if !ss.value.texts.isEmpty {
+                s += s.isEmpty ? "" : "\n"
+                var ns = ""
+                for text in ss.value.texts {
+                    ns += ns.isEmpty ? "" : "\n"
+                    ns += textStr(text)
+                }
+                s += "texts: " + "(" + ns + ")"
+            }
+            return "(" + s + ")"
+        case .g(let a): return a.rawValue
+        case .generics(let a): return a.description
+        case .selected(let a):
+            if a.ranges.count == 1 {
+                return a.o.asString + "/." + a.ranges[0].asString
+            } else {
+                let bs = a.ranges.reduce(into: "") {
+                    let s = $1.asString
+                    $0 += $0.isEmpty ? s : (s.count > 10 ? "\n" : " ") + s
+                }
+                let rangeStr = "(" + bs + ")"
+                return a.o.asString + "/." + rangeStr
+            }
+        case .f(let a): return a.description
+        case .label(let a): return a.description
+        case .id(let a): return a.description
+        case .error(let a): return a.description
+        }
+    }
+    var asStringO: O {
+        O(asString)
+    }
+}
+
+extension O {
+    static let asErrorName = "?"
+    var asError: O {
+        switch self {
+        case .string(let a): O(OError(a))
+        case .error: self
+        default: O(OError(description))
+        }
+    }
+    
+    var isError: Bool {
+        switch self {
+        case .error: true
+        default: false
+        }
+    }
+    static let isErrorName = "?"
+    var isErrorO: O {
+        switch self {
+        case .error: O(true)
+        default: O(false)
+        }
+    }
+    
+    static let errorCoalescingName = "???"
+    static func errorCoalescing(_ ao: O, _ bo: O) -> O {
+        ao.isError ? bo : ao
+    }
+    
+    static let nilCoalescingName = "??"
+    static func nilCoalescing(_ ao: O, _ bo: O) -> O {
+        ao == O.nilV ? bo : ao
     }
 }
