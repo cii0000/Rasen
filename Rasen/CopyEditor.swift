@@ -1690,6 +1690,9 @@ final class CopyEditor: Editor {
                 selectingLineNode.lineType = .color(.border)
             }
             
+            let lw = rootView.screenToWorldScale < 0.5 ? rootView.screenToWorldScale * 2 : 1
+            selectingLineNode.lineWidth = lw
+            
             if let sheetView = sheetView,
                let (textView, _, _, _) = sheetView.textTuple(at: sheetView.convertFromWorld(p)),
                let x = textView.typesetter.warpCursorOffset(at: textView.convertFromWorld(p))?.offset,
@@ -1712,27 +1715,27 @@ final class CopyEditor: Editor {
                                                   with: sb)
             switch oldBorder.orientation {
             case .horizontal:
-                func append(_ p0: Point, _ p1: Point, lw: Double = 1) {
+                func append(_ p0: Point, _ p1: Point, lw: Double) {
                     paths.append(Path(Rect(x: p0.x, y: p0.y - lw / 2,
                                            width: p1.x - p0.x, height: lw)))
                 }
                 for value in values {
                     append(Point(sb.minX, sb.minY + value),
-                           Point(sb.maxX, sb.minY + value))
+                           Point(sb.maxX, sb.minY + value), lw: lw * 1.5)
                 }
                 append(Point(sb.minX, sb.minY + oldBorder.location),
-                       Point(sb.maxX, sb.minY + oldBorder.location), lw: 0.5)
+                       Point(sb.maxX, sb.minY + oldBorder.location), lw: lw * 0.5)
             case .vertical:
-                func append(_ p0: Point, _ p1: Point, lw: Double = 1) {
+                func append(_ p0: Point, _ p1: Point, lw: Double) {
                     paths.append(Path(Rect(x: p0.x - lw / 2, y: p0.y,
                                            width: lw, height: p1.y - p0.y)))
                 }
                 for value in values {
                     append(Point(sb.minX + value, sb.minY),
-                           Point(sb.minX + value, sb.maxY))
+                           Point(sb.minX + value, sb.maxY), lw: lw * 1.5)
                 }
                 append(Point(sb.minX + oldBorder.location, sb.minY),
-                       Point(sb.minX + oldBorder.location, sb.maxY), lw: 0.5)
+                       Point(sb.minX + oldBorder.location, sb.maxY), lw: lw * 0.5)
             }
             snapLineNode.children = paths.map {
                 Node(path: $0, fillType: .color(.subSelected))

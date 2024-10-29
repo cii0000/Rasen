@@ -118,17 +118,6 @@ protocol SpectrgramView: TimelineView {
     var spectrgramY: Double { get }
 }
 
-struct ScoreLayout {
-    static let pitchHeight = 2.5
-    static let noteHeight = 2.0
-    static let tonePadding = 2.0
-    static let evenY = 1.0
-    static let overtoneHeight = 2.0
-    static let spectlopeHeight = 16.0
-    static let reverbHeight = 0.5
-    static let isShownSpectrogramHeight = 6.0
-}
-
 final class ScoreView: TimelineView, @unchecked Sendable {
     typealias Model = Score
     typealias Binder = SheetBinder
@@ -229,7 +218,7 @@ final class ScoreView: TimelineView, @unchecked Sendable {
     }
 }
 extension ScoreView {
-    var pitchHeight: Double { ScoreLayout.pitchHeight }
+    var pitchHeight: Double { Sheet.pitchHeight }
     
     func updateWithModel() {
         updateTimeline()
@@ -339,7 +328,7 @@ extension ScoreView {
     }
     
     var pitchStartY: Double {
-        timelineCenterY + Sheet.timelineHalfHeight + ScoreLayout.isShownSpectrogramHeight
+        timelineCenterY + Sheet.timelineHalfHeight + Sheet.isShownSpectrogramHeight
     }
     func pitch(atY y: Double, interval: Rational) -> Rational {
         Rational((y - pitchStartY) / pitchHeight, intervalScale: interval)
@@ -596,9 +585,9 @@ extension ScoreView {
                                                width: lw, height: rulerH)))
         }
         
-        let sprH = ContentLayout.isShownSpectrogramHeight
+        let sprH = Sheet.isShownSpectrogramHeight
         let sprKnobW = knobH, sprKbobH = knobW
-        let np = Point(ContentLayout.spectrogramX + sx, ey)
+        let np = Point(Sheet.spectrogramX + sx, ey)
         contentPathlines.append(Pathline(Rect(x: np.x - 1 / 2,
                                               y: np.y + 1,
                                               width: 1,
@@ -849,9 +838,9 @@ extension ScoreView {
         
         let toneY = toneY(from: note)
         let overtoneHalfH = 0.25
-        let spectlopeH = ScoreLayout.spectlopeHeight, overtoneH = ScoreLayout.overtoneHeight
+        let spectlopeH = Sheet.spectlopeHeight, overtoneH = Sheet.overtoneHeight
         let overtoneY = 0.0
-        let evenY = ScoreLayout.evenY + toneY
+        let evenY = Sheet.evenY + toneY
         let spectlopeY = overtoneY + overtoneH + toneY
         
         var linePath, mainLinePath, evenLinePath: Path,
@@ -1661,7 +1650,7 @@ extension ScoreView {
     func hitTestPoint(_ p: Point, scale: Double) -> (noteI: Int, result: PointHitResult)? {
         let maxD = Sheet.knobEditDistance * scale
         let maxDSq = maxD * maxD
-        let toneMaxD = min(ScoreLayout.tonePadding - ScoreLayout.noteHeight / 2,
+        let toneMaxD = min(Sheet.tonePadding - Sheet.noteHeight / 2,
                            Sheet.knobEditDistance * scale)
         let toneMaxDSq = toneMaxD * toneMaxD
         var minDSq = Double.infinity, minResult: (noteI: Int, result: PointHitResult)?
@@ -1777,7 +1766,7 @@ extension ScoreView {
     func hitTestColor(_ p: Point, scale: Double) -> (noteI: Int, result: ColorHitResult)? {
         let maxD = Sheet.knobEditDistance * scale
         let maxDSq = maxD * maxD
-        let toneMaxD = min(ScoreLayout.tonePadding - ScoreLayout.noteHeight / 2,
+        let toneMaxD = min(Sheet.tonePadding - Sheet.noteHeight / 2,
                            Sheet.knobEditDistance * scale)
         let toneMaxDSq = toneMaxD * toneMaxD
         var minDSq = Double.infinity, minResult: (noteI: Int, result: ColorHitResult)?
@@ -1789,7 +1778,7 @@ extension ScoreView {
                     let containsTone = toneFrame.contains(p)
                     let overtoneY = overtoneY(from: note)
                     if note.pits.count == 1 {
-                        let evenY = overtoneY + ScoreLayout.evenY
+                        let evenY = overtoneY + Sheet.evenY
                         let dSq = p.y.distanceSquared(evenY)
                         if dSq < minDSq {
                             minDSq = dSq
@@ -1809,7 +1798,7 @@ extension ScoreView {
                         if nMinResult != nil {
                             minResult = nMinResult
                         } else {
-                            let evenY = overtoneY + ScoreLayout.evenY
+                            let evenY = overtoneY + Sheet.evenY
                             let dSq = p.y.distanceSquared(evenY)
                             if dSq < minDSq {
                                 minDSq = dSq
@@ -1852,7 +1841,7 @@ extension ScoreView {
                                 for (sprolI, sprol) in spectlope.sprols.enumerated() {
                                     let ny = sprol.pitch.clipped(min: Score.doubleMinPitch,
                                                                  max: Score.doubleMaxPitch,
-                                                                 newMin: 0, newMax: ScoreLayout.spectlopeHeight)
+                                                                 newMin: 0, newMax: Sheet.spectlopeHeight)
                                     let sprolY = ny + spectlopeY
                                     let dSq = p.y.distanceSquared(sprolY)
                                     if dSq < minDSq {
@@ -2036,7 +2025,7 @@ extension ScoreView {
         noteH(from: model.notes[noteI])
     }
     func noteH(from note: Note) -> Double {
-        note.isOneOvertone ? 1.0 : (note.isFullNoise ? 2.5 : ScoreLayout.noteHeight)
+        note.isOneOvertone ? 1.0 : (note.isFullNoise ? 2.5 : Sheet.noteHeight)
     }
     func noteMainH(from note: Note) -> Double {
         note.isOneOvertone ? 0.125 : (note.isFullNoise ? 1 : 0.5)
@@ -2091,7 +2080,7 @@ extension ScoreView {
         return minPitI
     }
     func toneY(from note: Note) -> Double {
-        y(fromPitch: (note.pits.maxValue { $0.pitch } ?? 0) + note.pitch) + ScoreLayout.tonePadding
+        y(fromPitch: (note.pits.maxValue { $0.pitch } ?? 0) + note.pitch) + Sheet.tonePadding
     }
     func toneY(at noteI: Int) -> Double {
         toneY(from: model.notes[noteI])
@@ -2104,11 +2093,11 @@ extension ScoreView {
         overtoneY(from: model.notes[noteI])
     }
     func evenPosition(atPit pitI: Int, from note: Note) -> Point {
-        .init(pitX(atPit: pitI, from: note), overtoneY(from: note) + ScoreLayout.evenY)
+        .init(pitX(atPit: pitI, from: note), overtoneY(from: note) + Sheet.evenY)
     }
     
     func spectlopeY(from note: Note) -> Double {
-        toneY(from: note) + ScoreLayout.overtoneHeight
+        toneY(from: note) + Sheet.overtoneHeight
     }
     func spectlopeY(at noteI: Int) -> Double {
         spectlopeY(from: model.notes[noteI])
@@ -2133,7 +2122,7 @@ extension ScoreView {
         let nx = x(atBeat: note.beatRange.start)
         let nw = width(atDurBeat: max(note.beatRange.length, Sheet.fullEditBeatInterval))
         return .init(x: nx, y: toneY,
-                     width: nw, height: ScoreLayout.overtoneHeight + ScoreLayout.spectlopeHeight)
+                     width: nw, height: Sheet.overtoneHeight + Sheet.spectlopeHeight)
     }
     func toneFrame(at noteI: Int) -> Rect? {
         toneFrame(from: model.notes[noteI])
@@ -2142,15 +2131,15 @@ extension ScoreView {
         let toneY = toneY(from: note)
         let nx = x(atBeat: note.beatRange.start)
         let nw = width(atDurBeat: max(note.beatRange.length, Sheet.fullEditBeatInterval))
-        return .init(x: nx, y: toneY + ScoreLayout.overtoneHeight,
-                     width: nw, height: ScoreLayout.spectlopeHeight)
+        return .init(x: nx, y: toneY + Sheet.overtoneHeight,
+                     width: nw, height: Sheet.spectlopeHeight)
     }
     func spectlopeFrame(at noteI: Int) -> Rect {
         spectlopeFrame(from: model.notes[noteI])
     }
     func pitIAndSprolI(at p: Point, at noteI: Int) -> (pitI: Int, sprolI: Int)? {
         let toneY = toneY(at: noteI)
-        guard p.y > toneY && p.y <= toneY + ScoreLayout.spectlopeHeight else { return nil }
+        guard p.y > toneY && p.y <= toneY + Sheet.spectlopeHeight else { return nil }
         
         let score = model
         let note = score.notes[noteI]
@@ -2177,7 +2166,7 @@ extension ScoreView {
         let sprol = note.pits[pitI].tone.spectlope.sprols[sprolI]
         let ny = sprol.pitch.clipped(min: Score.doubleMinPitch,
                                      max: Score.doubleMaxPitch,
-                                     newMin: 0, newMax: ScoreLayout.spectlopeHeight)
+                                     newMin: 0, newMax: Sheet.spectlopeHeight)
         let pitP = pitPosition(atPit: pitI, from: note)
         return .init(pitP.x, ny + spectlopeY(from: note))
     }
@@ -2186,14 +2175,14 @@ extension ScoreView {
     }
     func spectlopePitch(at p: Point, at noteI: Int) -> Double {
         let spectlopeY = spectlopeY(at: noteI)
-        return p.y.clipped(min: spectlopeY, max: spectlopeY + ScoreLayout.spectlopeHeight,
+        return p.y.clipped(min: spectlopeY, max: spectlopeY + Sheet.spectlopeHeight,
                            newMin: Score.doubleMinPitch, newMax: Score.doubleMaxPitch)
     }
     func nearestSprol(at p: Point, at noteI: Int) -> Sprol {
         let note = model.notes[noteI]
         let spectlopeY = spectlopeY(from: note)
         let tone = note.pitResult(atBeat: beat(atX: p.x) - .init(note.beatRange.start)).tone
-        let pitch = p.y.clipped(min: spectlopeY, max: spectlopeY + ScoreLayout.spectlopeHeight,
+        let pitch = p.y.clipped(min: spectlopeY, max: spectlopeY + Sheet.spectlopeHeight,
                                 newMin: Score.doubleMinPitch, newMax: Score.doubleMaxPitch)
         return tone.spectlope.sprol(atPitch: pitch)
     }
@@ -2268,13 +2257,13 @@ extension ScoreView {
     func reverbFrame(from note: Note) -> Rect {
         let lastP = noteLastPosition(from: note)
         let durReverbP = durReverbPosition(from: note)
-        let reverbHalfH = ScoreLayout.reverbHeight / 2
+        let reverbHalfH = Sheet.reverbHeight / 2
         return .init(x: lastP.x, y: lastP.y - reverbHalfH,
                      width: durReverbP.x - lastP.x, height: reverbHalfH * 2)
     }
     
     static var spectrogramHeight: Double {
-        ScoreLayout.pitchHeight * (Score.doubleMaxPitch - Score.doubleMinPitch)
+        Sheet.pitchHeight * (Score.doubleMaxPitch - Score.doubleMinPitch)
     }
     func updateSpectrogram() {
         spectrogramNode?.removeFromParent()
@@ -2342,16 +2331,16 @@ extension ScoreView {
     }
     
     func containsIsShownSpectrogram(_ p: Point, scale: Double) -> Bool {
-        Rect(x: x(atBeat: model.beatRange.start) + ContentLayout.spectrogramX - Sheet.knobHeight / 2,
+        Rect(x: x(atBeat: model.beatRange.start) + Sheet.spectrogramX - Sheet.knobHeight / 2,
                  y: timelineCenterY + Sheet.timelineHalfHeight,
                  width: Sheet.knobHeight,
-                 height: ContentLayout.isShownSpectrogramHeight)
+             height: Sheet.isShownSpectrogramHeight)
             .outset(by: scale * 3)
             .contains(p)
     }
     
     func isShownSpectrogram(at p :Point) -> Bool {
-        p.y > timelineCenterY + Sheet.timelineHalfHeight + ContentLayout.isShownSpectrogramHeight / 2
+        p.y > timelineCenterY + Sheet.timelineHalfHeight + Sheet.isShownSpectrogramHeight / 2
     }
     var isShownSpectrogram: Bool {
         get {

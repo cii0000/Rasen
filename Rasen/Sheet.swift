@@ -2217,6 +2217,13 @@ extension Sheet {
     static let timelineY = 18.0
     static let fullEditPitchInterval = Rational(1, 12), pitchInterval = Rational(1)
     static let fullEditBeatInterval = Rational(1, 144), beatInterval = Rational(1, 12)
+    static let pitchHeight = 2.5
+    static let noteHeight = 2.0
+    static let tonePadding = 2.0
+    static let evenY = 1.0, overtoneHeight = 2.0
+    static let spectlopeHeight = 16.0
+    static let reverbHeight = 0.5
+    static let spectrogramX = 10.0, isShownSpectrogramHeight = 6.0
 }
 extension Sheet {
     var picture: Picture {

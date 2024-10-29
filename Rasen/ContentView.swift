@@ -19,10 +19,6 @@
     static let shared = MovieActor()
 }
 
-struct ContentLayout {
-    static let spectrogramX = 10.0, isShownSpectrogramHeight = 6.0
-}
-
 final class ContentView<T: BinderProtocol>: SpectrgramView, @unchecked Sendable {
     typealias Model = Content
     typealias Binder = T
@@ -57,7 +53,7 @@ final class ContentView<T: BinderProtocol>: SpectrgramView, @unchecked Sendable 
     }
     func updateFromPeakVolm() {
         guard model.type != .movie, let node = currentPeakVolmNode, let frame = timelineFrame else { return }
-        let y = isShownSpectrogram ? frame.height + Self.spectrogramHeight + ContentLayout.isShownSpectrogramHeight : frame.height
+        let y = isShownSpectrogram ? frame.height + Self.spectrogramHeight + Sheet.isShownSpectrogramHeight : frame.height
         node.path = Path([Point(), Point(0, y)])
         if peakVolm < Audio.headroomVolm {
             node.lineType = .color(Color(lightness: (1 - peakVolm) * 100))
@@ -79,13 +75,13 @@ final class ContentView<T: BinderProtocol>: SpectrgramView, @unchecked Sendable 
             node = Node(children: [timelineNode, clippingNode],
                         attitude: Attitude(position: binder[keyPath: keyPath].origin),
                         path: Path(Rect(origin:binder[keyPath: keyPath].timeOption == nil ?
-                            .init() : .init(0, Sheet.timelineHalfHeight + ContentLayout.isShownSpectrogramHeight),
+                            .init() : .init(0, Sheet.timelineHalfHeight + Sheet.isShownSpectrogramHeight),
                             size: binder[keyPath: keyPath].size)),
                         fillType: .texture(texture))
         } else if binder[keyPath: keyPath].type == .movie {
             node = Node(children: [timelineNode, clippingNode],
                         attitude: Attitude(position: binder[keyPath: keyPath].origin),
-                        path: Path(Rect(origin: .init(0, Sheet.timelineHalfHeight + ContentLayout.isShownSpectrogramHeight),
+                        path: Path(Rect(origin: .init(0, Sheet.timelineHalfHeight + Sheet.isShownSpectrogramHeight),
                                         size: binder[keyPath: keyPath].size)))
         } else {
             node = Node(children: [timelineNode, clippingNode],
@@ -155,7 +151,7 @@ extension ContentView {
             self.currentPeakVolmNode = volmNode
             
             if model.type == .movie || model.type == .image {
-                node.path = .init(Rect(origin: .init(0, Sheet.timelineHalfHeight + ContentLayout.isShownSpectrogramHeight),
+                node.path = .init(Rect(origin: .init(0, Sheet.timelineHalfHeight + Sheet.isShownSpectrogramHeight),
                                        size: model.size))
             }
         } else if !timelineNode.children.isEmpty {
@@ -306,7 +302,7 @@ extension ContentView {
         if let f = model.imageFrame {
             f + Point(0,
                       model.timeOption == nil ?
-                      0 : Sheet.timelineHalfHeight + ContentLayout.isShownSpectrogramHeight)
+                      0 : Sheet.timelineHalfHeight + Sheet.isShownSpectrogramHeight)
         } else {
             nil
         }
@@ -354,7 +350,7 @@ extension ContentView {
         let ex = self.x(atBeat: eBeat)
         
         let lw = 1.0
-        let noteHeight = ScoreLayout.noteHeight
+        let noteHeight = Sheet.noteHeight
         let knobW = Sheet.knobWidth, knobH = Sheet.knobHeight
         let rulerH = Sheet.rulerHeight
         let timelineHalfHeight = Sheet.timelineHalfHeight
@@ -449,15 +445,15 @@ extension ContentView {
         
         if content.type.isAudio {
             if content.isShownSpectrogram {
-                makeBeatPathlines(in: timeOption.beatRange, sy: ey + ContentLayout.isShownSpectrogramHeight, ey: ey + ContentLayout.isShownSpectrogramHeight + Self.spectrogramHeight,
+                makeBeatPathlines(in: timeOption.beatRange, sy: ey + Sheet.isShownSpectrogramHeight, ey: ey + Sheet.isShownSpectrogramHeight + Self.spectrogramHeight,
                                   subBorderPathlines: &subBorderPathlines,
                                   fullEditBorderPathlines: &fullEditBorderPathlines,
                                   borderPathlines: &borderPathlines)
             }
             
-            let sprH = ContentLayout.isShownSpectrogramHeight
+            let sprH = Sheet.isShownSpectrogramHeight
             let sprKnobW = knobH, sprKbobH = knobW
-            let np = Point(ContentLayout.spectrogramX + sx, ey)
+            let np = Point(Sheet.spectrogramX + sx, ey)
             contentPathlines.append(Pathline(Rect(x: np.x - 1 / 2,
                                                   y: np.y + 1,
                                                   width: 1,
@@ -540,7 +536,7 @@ extension ContentView {
     }
     
     static var spectrogramHeight: Double {
-        ScoreLayout.pitchHeight * (Score.doubleMaxPitch - Score.doubleMinPitch)
+        Sheet.pitchHeight * (Score.doubleMaxPitch - Score.doubleMinPitch)
     }
     func updateSpectrogram() {
         spectrogramNode?.removeFromParent()
@@ -553,7 +549,7 @@ extension ContentView {
         let sm = Spectrogram(pcmBuffer, secRange: .init(contentSecRange))
         let firstX = x(atBeat: timeOption.beatRange.start + max(timeOption.localStartBeat, 0))
         spectrogramDeltaX = width(atDurBeat: -min(timeOption.localStartBeat, 0))
-        let y = timelineCenterY + Sheet.timelineHalfHeight + ContentLayout.isShownSpectrogramHeight
+        let y = timelineCenterY + Sheet.timelineHalfHeight + Sheet.isShownSpectrogramHeight
         let allW = width(atDurSec: contentSecRange.length)
         var nodes = [Node](), maxH = 0.0
         func spNode(width: Int, at xi: Int) -> Node? {
@@ -614,7 +610,7 @@ extension ContentView {
         if let timeNode = timeNode, let frame = timelineFrame {
             let x = self.x(atSec: sec)
             if x >= frame.minX && x < frame.maxX {
-                timeNode.path = Path([Point(), Point(0, isShownSpectrogram ? frame.height + Self.spectrogramHeight + ContentLayout.isShownSpectrogramHeight : frame.height)])
+                timeNode.path = Path([Point(), Point(0, isShownSpectrogram ? frame.height + Self.spectrogramHeight + Sheet.isShownSpectrogramHeight : frame.height)])
                 timeNode.attitude.position = Point(x, frame.minY)
                 updateFromPeakVolm()
             } else {
@@ -686,10 +682,10 @@ extension ContentView {
     
     func containsIsShownSpectrogram(_ p: Point, scale: Double) -> Bool {
         if model.type.isAudio, let timeOption = model.timeOption {
-            Rect(x: x(atBeat: timeOption.beatRange.start) + ContentLayout.spectrogramX - Sheet.knobHeight / 2,
+            Rect(x: x(atBeat: timeOption.beatRange.start) + Sheet.spectrogramX - Sheet.knobHeight / 2,
                  y: Sheet.timelineHalfHeight,
                  width: Sheet.knobHeight,
-                 height: ContentLayout.isShownSpectrogramHeight)
+                 height: Sheet.isShownSpectrogramHeight)
             .outset(by: scale * 3)
             .contains(p)
         } else {
@@ -705,7 +701,7 @@ extension ContentView {
     
     func isShownSpectrogram(at p :Point) -> Bool {
         if model.type.isAudio {
-            p.y > Sheet.timelineHalfHeight + ContentLayout.isShownSpectrogramHeight / 2
+            p.y > Sheet.timelineHalfHeight + Sheet.isShownSpectrogramHeight / 2
         } else {
             false
         }

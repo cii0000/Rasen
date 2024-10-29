@@ -185,7 +185,7 @@ final class AnimationSlider: DragEditor {
                 
                 switch type {
                 case .all:
-                    let nh = ScoreLayout.pitchHeight
+                    let nh = Sheet.pitchHeight
                     let np = beganTimelineX + sheetP - beganSheetP
                     let py = ((beganAnimationOption?.timelineY ?? 0) + sheetP.y - beganSheetP.y).interval(scale: nh)
                         .clipped(min: Sheet.timelineY, max: sheetView.bounds.height - Sheet.timelineY)
@@ -651,7 +651,7 @@ final class ScoreSlider: DragEditor {
                         }
                     }
                 case .allBeat:
-                    let nh = ScoreLayout.pitchHeight
+                    let nh = Sheet.pitchHeight
                     let np = beganBeatX + sheetP - beganSheetP
                     let py = ((beganScoreOption?.timelineY ?? 0) + sheetP.y - beganSheetP.y).interval(scale: nh)
                         .clipped(min: Sheet.timelineY, max: sheetView.bounds.height - Sheet.timelineY)
@@ -862,7 +862,7 @@ final class ContentSlider: DragEditor {
                 
                 switch type {
                 case .all:
-                    let nh = ScoreLayout.pitchHeight
+                    let nh = Sheet.pitchHeight
                     let np = beganContent.origin + sheetP - beganInP
                     let interval = rootView.currentBeatInterval
                     let beat = max(min(sheetView.animationView.beat(atX: np.x, interval: interval),
@@ -1345,8 +1345,8 @@ final class LineSlider: DragEditor {
                             nv[nap.key] = (score.notes[nap.key], pit, pitDic)
                         }
                         
-                        let vs = score.noteIAndPits(atBeat: pit.beat + note.beatRange.start,
-                                                    in: Set(beganNotePits.keys).sorted())
+                        let vs = score.noteIAndNormarizedPits(atBeat: pit.beat + note.beatRange.start,
+                                                              in: Set(beganNotePits.keys).sorted())
                         playerBeatNoteIndexes = vs.map { $0.noteI }
                         
                         updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
@@ -1625,7 +1625,7 @@ final class LineSlider: DragEditor {
                                     let note = scoreView[noteI]
                                     let pBeat = note.pits[pitI].beat + note.beatRange.start
                                     notePlayer?.notes = playerBeatNoteIndexes.map {
-                                        scoreView.pitResult(atBeat: pBeat, at: $0)
+                                        scoreView.normarizedPitResult(atBeat: pBeat, at: $0)
                                     }
                                     
                                     oldPitch = pitch

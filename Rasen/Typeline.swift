@@ -85,8 +85,8 @@ struct Font {
     static let krCascadeNames = [krName, jpName, cnName, hkName, twName]
     static let twCascadeNames = [twName, jpName, cnName, hkName, krName]
     
-    static let smallSize = 8.0
-    static let defaultSize = 12.0
+    static let smallSize = 10.0
+    static let defaultSize = 14.0
     static let largeSize = 16.0
     static let maxSize = 1000000.0
     static let proportionalScale = 1.4
