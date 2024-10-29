@@ -1342,10 +1342,11 @@ extension CPUNode {
             return image(in: bounds, size: size, backgroundColor: backgroundColor, .sRGB)
         }
         guard let oImage = image(in: bounds, size: size * 2, backgroundColor: backgroundColor,
-                                 colorSpace, isAntialias: false, isDrawLine: false, isDrawFill: true)?
+                                 colorSpace, isAntialias: false,
+                                 isDrawFillAntialias: true)?
             .resize(with: size) else { return nil }
         guard let nImage = image(in: bounds, size: size, backgroundColor: nil, colorSpace,
-                                 isDrawLine: true, isDrawFill: false) else { return nil }
+                                 isDrawFillAntialias: false) else { return nil }
         return oImage.drawn(nImage, in: Rect(size: size))
     }
     func imageInBounds(size: Size? = nil,
@@ -1362,21 +1363,21 @@ extension CPUNode {
                size: Size,
                backgroundColor: Color? = nil, _ colorSpace: ColorSpace,
                isAntialias: Bool = true,
-               isGray: Bool = false, isDrawLine: Bool = true, isDrawFill: Bool = true) -> Image? {
+               isGray: Bool = false, isDrawFillAntialias: Bool = false) -> Image? {
         let transform = Transform(translation: -bounds.origin)
             * Transform(scaleX: size.width / bounds.width,
                         y: size.height / bounds.height)
         return image(size: size, transform: transform,
                      backgroundColor: backgroundColor, colorSpace,
-                     isAntialias: isAntialias, isGray: isGray, isDrawLine: isDrawLine, isDrawFill: isDrawFill)
+                     isAntialias: isAntialias, isGray: isGray, isDrawFillAntialias: isDrawFillAntialias)
     }
     func image(size: Size, transform: Transform,
                backgroundColor: Color? = nil, _ colorSpace: ColorSpace,
                isAntialias: Bool = true,
-               isGray: Bool = false, isDrawLine: Bool = true, isDrawFill: Bool = true) -> Image? {
+               isGray: Bool = false, isDrawFillAntialias: Bool = false) -> Image? {
         let ctx = context(size: size, transform: transform, backgroundColor: backgroundColor,
                           colorSpace, isAntialias: isAntialias, isGray: isGray,
-                          isDrawLine: isDrawLine, isDrawFill: isDrawFill)
+                          isDrawFillAntialias: isDrawFillAntialias)
         guard let cgImage = ctx?.makeImage() else { return nil }
         return Image(cgImage: cgImage)
     }
@@ -1397,7 +1398,7 @@ extension CPUNode {
     private func context(size: Size, transform: Transform,
                          backgroundColor: Color? = nil, _ colorSpace: ColorSpace,
                          isAntialias: Bool = true,
-                         isGray: Bool = false, isDrawLine: Bool = true, isDrawFill: Bool = true) -> CGContext? {
+                         isGray: Bool = false, isDrawFillAntialias: Bool = false) -> CGContext? {
         guard let space = isGray ? CGColorSpaceCreateDeviceGray() : colorSpace.cg else { return nil }
         let ctx: CGContext
         if colorSpace.isHDR {
@@ -1422,13 +1423,13 @@ extension CPUNode {
         if let backgroundColor = backgroundColor {
             ctx.setFillColor(backgroundColor.cg)
             ctx.fill(Rect(origin: Point(), size: size).cg)
-        } else if isDrawFill, case .color(let backgroundColor)? = fillType {
+        } else if isDrawFillAntialias, case .color(let backgroundColor)? = fillType {
             ctx.setFillColor(backgroundColor.cg)
             ctx.fill(Rect(origin: Point(), size: size).cg)
         }
         ctx.setShouldAntialias(isAntialias)
         ctx.concatenate(nt.cg)
-        render(in: ctx, isDrawLine: isDrawLine, isDrawFill: isDrawFill)
+        render(in: ctx, isDrawFillAntialias: isDrawFillAntialias)
         ctx.restoreGState()
         return ctx
     }
@@ -1442,21 +1443,21 @@ extension CPUNode {
                         y: size.height / bounds.height)
         render(transform: transform, in: ctx)
     }
-    func render(transform: Transform, in ctx: CGContext, isDrawLine: Bool = true, isDrawFill: Bool = true) {
+    func render(transform: Transform, in ctx: CGContext, isDrawFillAntialias: Bool = false) {
         let nt = localTransform.inverted() * transform
         ctx.saveGState()
         ctx.concatenate(nt.cg)
-        render(in: ctx, isDrawLine: isDrawLine, isDrawFill: isDrawFill)
+        render(in: ctx, isDrawFillAntialias: isDrawFillAntialias)
         ctx.restoreGState()
     }
-    func render(in ctx: CGContext, isDrawLine: Bool = true, isDrawFill: Bool = true) {
+    func render(in ctx: CGContext, isDrawFillAntialias: Bool = false) {
         guard !isHidden else { return }
         if !isIdentityFromLocal {
             ctx.saveGState()
             ctx.concatenate(localTransform.cg)
         }
         if let typesetter = path.typesetter, let b = bounds {
-            if isDrawLine {
+            if !isDrawFillAntialias {
                 switch lineType {
                 case .color(let color):
                     ctx.saveGState()
@@ -1468,8 +1469,6 @@ extension CPUNode {
                     ctx.restoreGState()
                 case .gradient, .none: break
                 }
-            }
-            if isDrawFill {
                 switch fillType {
                 case .color(let color):
                     typesetter.draw(in: b, fillColor: color, in: ctx)
@@ -1478,7 +1477,7 @@ extension CPUNode {
                 }
             }
         } else if !path.isEmpty {
-            if isDrawFill, let fillType {
+            if isDrawFillAntialias, let fillType {
                 switch fillType {
                 case .color(let color):
                     let cgPath = CGMutablePath()
@@ -1548,7 +1547,7 @@ extension CPUNode {
                     }
                 }
             }
-            if isDrawLine, let lineType {
+            if !isDrawFillAntialias, let lineType {
                 switch lineType {
                 case .color(let color):
                     ctx.setFillColor(color.cg)
@@ -1598,7 +1597,7 @@ extension CPUNode {
                 }
             }
         }
-        children.forEach { $0.render(in: ctx, isDrawLine: isDrawLine, isDrawFill: isDrawFill) }
+        children.forEach { $0.render(in: ctx, isDrawFillAntialias: isDrawFillAntialias) }
         if !isIdentityFromLocal {
             ctx.restoreGState()
         }

@@ -1652,6 +1652,8 @@ extension O {
             }
         case .array(let a):
             switch bo {
+            case .bool, .int, .rational, .double:
+                return O(OArray(a.map { $0 * bo }))
             case .array(let b):
                 guard a.dimension == b.dimension else {
                     return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
