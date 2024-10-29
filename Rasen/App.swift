@@ -887,7 +887,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             case .ok:
                 let progressPanel = ProgressPanel(message: "Clearing Root History".localized)
                 self.rootView.node.show(progressPanel)
-                let task = Task.detached {
+                let task = Task.detached(priority: .high) {
                     await self.rootView.clearHistory { (progress, isStop) in
                         if Task.isCancelled {
                             isStop = true
@@ -931,7 +931,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         
         let progressPanel = ProgressPanel(message: String(format: "Replacing %@".localized, System.dataName))
         rootView.node.show(progressPanel)
-        let task = Task.detached {
+        let task = Task.detached(priority: .high) {
             do {
                 try replace(to: toURL) { (progress, isStop) in
                     if Task.isCancelled {
@@ -1026,7 +1026,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 
                 let progressPanel = ProgressPanel(message: String(format: "Exporting %@".localized, System.dataName))
                 rootView.node.show(progressPanel)
-                let task = Task.detached {
+                let task = Task.detached(priority: .high) {
                     do {
                         try await export { (progress, isStop) in
                             if Task.isCancelled {
@@ -1083,7 +1083,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 
                 let progressPanel = ProgressPanel(message: String(format: "Resetting %@".localized, System.dataName))
                 self.rootView.node.show(progressPanel)
-                let task = Task.detached {
+                let task = Task.detached(priority: .high) {
                     do {
                         try reset(in: url) { (progress, isStop) in
                             if Task.isCancelled {

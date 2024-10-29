@@ -659,7 +659,7 @@ final class HistoryCleaner: InputKeyEditor {
                     case .ok:
                         let progressPanel = ProgressPanel(message: "Clearing Historys".localized)
                         self.rootView.node.show(progressPanel)
-                        let task = Task.detached {
+                        let task = Task.detached(priority: .high) {
                             do {
                                 try self.rootView.clearHistorys(from: shps) { (progress, isStop) in
                                     if Task.isCancelled {

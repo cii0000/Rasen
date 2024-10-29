@@ -324,7 +324,7 @@ extension RunEditor {
         let xoDic = oDic
         Task { @MainActor in
             let clock = SuspendingClock.now
-            let task = Task.detached {
+            let task = Task.detached(priority: .high) {
                 Calculator.calculate(xo, xoDic) { _,_ in !Task.isCancelled }
             }
             self.task = task

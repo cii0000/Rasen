@@ -1373,7 +1373,7 @@ final class RootView: View, @unchecked Sendable {
                 let progressPanel = ProgressPanel(message: "Replacing sheets".localized)
                 node.show(progressPanel)
                 let shps = Array(findingChildNodeDic.keys)
-                let task = Task.detached {
+                let task = Task.detached(priority: .high) {
                     let progress = ActorProgress(total: shps.count)
                     for shp in shps {
                         Task { @MainActor in
@@ -1990,8 +1990,6 @@ final class RootView: View, @unchecked Sendable {
             shps.append(leshp)
         }
         
-        let utilitySHPs = Set(aroundShps.compactMap { $0.isCorner ? $0.shp : nil })
-        
         var nshps = sheetViewValues
         let oshps = nshps
         for shp in shps {
@@ -2000,9 +1998,7 @@ final class RootView: View, @unchecked Sendable {
         nshps.forEach { readAndClose(.none, priority: .medium, at: $0.value.sheetID, $0.key) }
         for nshp in shps {
             if oshps[nshp] == nil, let sid = sheetID(at: nshp) {
-                readAndClose(.sheet,
-                             priority: nshp == shp ? .high : (utilitySHPs.contains(nshp) ? .low : .medium),
-                             at: sid, nshp)
+                readAndClose(.sheet, priority: nshp == shp ? .high : .medium, at: sid, nshp)
             }
         }
         
@@ -2073,7 +2069,8 @@ final class RootView: View, @unchecked Sendable {
             return
         }
         
-        let task = Task.detached {
+        let task = Task.detached(priority: .high) {
+            if Task.isCancelled { return }
             guard let block = try? Texture.block(from: thumbnailRecord, isMipmapped: true) else { return }
             Task { @MainActor in
                 try Task.checkCancellation()

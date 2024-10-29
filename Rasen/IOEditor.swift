@@ -357,7 +357,7 @@ final class IOEditor: Editor {
                     let content = Content(directoryName: sheetView.id.uuidString,
                                           name: name, origin: rootView.roundedPoint(from: np))
                     if content.type == .movie {
-                        Task.detached {
+                        Task.detached(priority: .high) {
                             if let size = try? await Movie.size(from: content.url),
                                let durSec = try? await Movie.durSec(from: content.url),
                                let frameRate = try? await Movie.frameRate(from: content.url) {
@@ -985,7 +985,7 @@ final class IOEditor: Editor {
                     }
                 }
                 
-                let task = Task.detached {
+                let task = Task.detached(priority: .high) {
                     do {
                         try export { (progress, isStop) in
                             if Task.isCancelled {
@@ -1066,7 +1066,7 @@ final class IOEditor: Editor {
             do {
                 try ioResult.remove()
                 
-                let task = Task.detached {
+                let task = Task.detached(priority: .high) {
                     do {
                         try export { (progress, isStop) in
                             if Task.isCancelled {
@@ -1146,7 +1146,7 @@ final class IOEditor: Editor {
         do {
             try ioResult.remove()
             
-            let task = Task.detached {
+            let task = Task.detached(priority: .high) {
                 do {
                     try export { (progress, isStop) in
                         if Task.isCancelled {
@@ -1340,7 +1340,7 @@ final class IOEditor: Editor {
         do {
             try ioResult.remove()
             
-            let task = Task.detached {
+            let task = Task.detached(priority: .high) {
                 await export(progressHandler: { (progress, isStop) in
                     if Task.isCancelled {
                         isStop = true
@@ -1428,7 +1428,7 @@ final class IOEditor: Editor {
         do {
             try ioResult.remove()
             
-            let task = Task.detached {
+            let task = Task.detached(priority: .high) {
                 export(progressHandler: { (progress, isStop) in
                     if Task.isCancelled {
                         isStop = true
@@ -1549,7 +1549,7 @@ final class IOEditor: Editor {
         } else {
             let progressPanel = ProgressPanel(message: "Exporting Document".localized)
             rootView.node.show(progressPanel)
-            let task = Task.detached {
+            let task = Task.detached(priority: .high) {
                 do {
                     try export { (progress, isStop) in
                         if Task.isCancelled {
