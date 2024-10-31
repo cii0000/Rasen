@@ -1617,14 +1617,14 @@ final class SheetView: BindableView, @unchecked Sendable {
         }
         animationView.movePreviousInterKeyframe()
     }
-    func moveNextFrame() {
+    func goNextFrame() {
         if isPlaying {
             stop()
         }
         let deltaTime = Rational(1, animationView.frameRate)
         self.rootBeat = Rational.saftyAdd(rootBeat, deltaTime)
     }
-    func movePreviousFrame() {
+    func goPreviousFrame() {
         if isPlaying {
             stop()
         }

@@ -216,12 +216,12 @@ final class RootEditor: Editor {
         case .selectByRange: RangeSelector(self)
         case .changeLightness: LightnessChanger(self)
         case .changeTint: TintChanger(self)
-        case .slide: MoveEditor(self)
+        case .slide: SlideEditor(self)
         case .selectFrame: FrameSelecter(self)
-            
-        case .moveLinePoint, .fnMoveLinePoint: LineSlider(self)
-        case .moveLineZ: LineZSlider(self)
         case .selectVersion: VersionSelector(self)
+        case .move: MoveEditor(self)
+        case .moveLinePoint: LineSlider(self)
+        case .moveLineZ: LineZSlider(self)
         default: nil
         }
     }
@@ -299,11 +299,11 @@ final class RootEditor: Editor {
         case .cutDraft: DraftCutter(self)
         case .makeFaces: FacesMaker(self)
         case .cutFaces: FacesCutter(self)
-        case .play, .sPlay: Player(self)
-        case .movePreviousKeyframe: KeyframePreviousMover(self)
-        case .moveNextKeyframe: KeyframeNextMover(self)
-        case .movePreviousFrame: FramePreviousMover(self)
-        case .moveNextFrame: FrameNextMover(self)
+        case .play: Player(self)
+        case .goPrevious: KeyframePreviousMover(self)
+        case .goNext: KeyframeNextMover(self)
+        case .goPreviousFrame: FramePreviousMover(self)
+        case .goNextFrame: FrameNextMover(self)
         case .insertKeyframe: KeyframeInserter(self)
         case .addScore: ScoreAdder(self)
         case .interpolate: Interpolater(self)

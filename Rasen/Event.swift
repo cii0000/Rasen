@@ -320,73 +320,71 @@ extension Quasimode {
     }
 }
 extension Quasimode {
-    static let drawLine = Quasimode(.drag)
-    static let drawStraightLine = Quasimode(modifier: [.shift], .drag)
+    static let drawLine = Self(.drag)
+    static let drawStraightLine = Self(modifier: [.shift], .drag)
     
-    static let lassoCut = Quasimode(modifier: [.command], .drag)
-    static let selectByRange = Quasimode(modifier: [.shift, .command], .drag)
+    static let lassoCut = Self(modifier: [.command], .drag)
+    static let selectByRange = Self(modifier: [.shift, .command], .drag)
     
-    static let changeLightness = Quasimode(modifier: [.option], .drag)
-    static let changeTint = Quasimode(modifier: [.shift, .option], .drag)
+    static let changeLightness = Self(modifier: [.option], .drag)
+    static let changeTint = Self(modifier: [.shift, .option], .drag)
     
-    static let slide = Quasimode(modifier: [.control], .drag)
-    static let selectVersion = Quasimode(modifier: [.control, .shift], .drag)
+    static let slide = Self(modifier: [.control], .drag)//
+    static let selectFrame = Self(modifier: [.control, .option], .drag)
+    static let selectVersion = Self(modifier: [.control, .shift], .drag)
     
-    static let movePreviousKeyframe = Quasimode(modifier: [.control], .z)
-    static let moveNextKeyframe = Quasimode(modifier: [.control], .x)
-    static let movePreviousFrame = Quasimode(modifier: [.control, .option], .z)
-    static let moveNextFrame = Quasimode(modifier: [.control, .option], .x)
-    static let selectFrame = Quasimode(modifier: [.control, .option], .drag)
+    static let goPrevious = Self(modifier: [.control], .z)
+    static let goNext = Self(modifier: [.control], .x)
+    static let goPreviousFrame = Self(modifier: [.control, .option], .z)//
+    static let goNextFrame = Self(modifier: [.control, .option], .x)//
     
-    static let fnMove = Quasimode(modifier: [.function], .drag)
-    static let fnMoveLinePoint = Quasimode(modifier: [.shift, .function], .drag)
-    static let moveLinePoint = Quasimode(modifier: [.option, .command], .drag)
-    static let moveLineZ = Quasimode(modifier: [.control, .command], .drag)
+    static let move = Self(modifier: [.function], .drag)
+    static let moveLinePoint = Self(modifier: [.option, .command], .drag)
+    static let moveLineZ = Self(modifier: [.control, .command], .drag)
     
-    static let play = Quasimode(modifier: [.control], .click)
-    static let sPlay = Quasimode(modifier: [.control], .s)
-    static let showTone = Quasimode(modifier: [.command], .click)
-    static let run = Quasimode(.click)
-    static let openMenu = Quasimode(.subClick)
-    static let lookUp = Quasimode(.lookUpTap)
-    static let stop = Quasimode(.escape)
+    static let play = Self(modifier: [.control], .click)
+    static let showTone = Self(modifier: [.command], .click)
+    static let run = Self(.click)
+    static let openMenu = Self(.subClick)
+    static let lookUp = Self(.lookUpTap)
+    static let stop = Self(.escape)
     
-    static let inputCharacter = Quasimode(.keyInput)
-    static let newWrap = Quasimode(modifier: [.shift], .enter)
-    static let deleteWrap = Quasimode(modifier: [.shift], .delete)
+    static let inputCharacter = Self(.keyInput)
+    static let newWrap = Self(modifier: [.shift], .enter)
+    static let deleteWrap = Self(modifier: [.shift], .delete)
     
-    static let zoom = Quasimode(.pinch)
-    static let rotate = Quasimode(.rotate)
-    static let scroll = Quasimode(.scroll)
+    static let zoom = Self(.pinch)
+    static let rotate = Self(.rotate)
+    static let scroll = Self(.scroll)
     
-    static let undo = Quasimode(modifier: [.command], .z)
-    static let redo = Quasimode(modifier: [.shift, .command], .z)
+    static let undo = Self(modifier: [.command], .z)
+    static let redo = Self(modifier: [.shift, .command], .z)
     
-    static let cut = Quasimode(modifier: [.command], .x)
-    static let copy = Quasimode(modifier: [.command], .c)
-    static let copyLineColor = Quasimode(modifier: [.option, .command], .c)
-    static let paste = Quasimode(modifier: [.command], .v)
-    static let scalingPaste = Quasimode(modifier: [.command], .vPinch)
+    static let cut = Self(modifier: [.command], .x)
+    static let copy = Self(modifier: [.command], .c)
+    static let copyLineColor = Self(modifier: [.option, .command], .c)
+    static let paste = Self(modifier: [.command], .v)
+    static let scalingPaste = Self(modifier: [.command], .vPinch)
     
-    static let find = Quasimode(modifier: [.command], .f)
+    static let find = Self(modifier: [.command], .f)
     
-    static let changeToDraft = Quasimode(modifier: [.command], .d)
-    static let cutDraft = Quasimode(modifier: [.shift, .command], .d)
+    static let changeToDraft = Self(modifier: [.command], .d)
+    static let cutDraft = Self(modifier: [.shift, .command], .d)
     
-    static let makeFaces = Quasimode(modifier: [.command], .b)
-    static let cutFaces = Quasimode(modifier: [.shift, .command], .b)
+    static let makeFaces = Self(modifier: [.command], .b)
+    static let cutFaces = Self(modifier: [.shift, .command], .b)
     
-    static let changeToSuperscript = Quasimode(modifier: [.command], .up)
-    static let changeToSubscript = Quasimode(modifier: [.command], .down)
+    static let changeToSuperscript = Self(modifier: [.command], .up)
+    static let changeToSubscript = Self(modifier: [.command], .down)
     
-    static let changeToVerticalText = Quasimode(modifier: [.command], .l)
-    static let changeToHorizontalText = Quasimode(modifier: [.command, .shift], .l)
+    static let changeToVerticalText = Self(modifier: [.command], .l)
+    static let changeToHorizontalText = Self(modifier: [.command, .shift], .l)
     
-    static let insertKeyframe = Quasimode(modifier: [.command], .e)
-    static let addScore = Quasimode(modifier: [.command, .shift], .e)
+    static let insertKeyframe = Self(modifier: [.command], .e)
+    static let addScore = Self(modifier: [.command, .shift], .e)
     
-    static let interpolate = Quasimode(modifier: [.command], .s)
-    static let crossErase = Quasimode(modifier: [.shift, .command], .s)
+    static let interpolate = Self(modifier: [.command], .s)
+    static let crossErase = Self(modifier: [.shift, .command], .s)
 }
 
 protocol Event {

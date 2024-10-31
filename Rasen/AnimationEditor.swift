@@ -1140,7 +1140,9 @@ final class Player: InputKeyEditor {
                 } else if !(rootEditor.containsAllTimelines(with: event)
                     || (!cSheetView.model.enabledAnimation && cSheetView.model.enabledMusic)) {
                     
-                    cSheetView.play()
+                    if cSheetView.model.enabledTimeline {
+                        cSheetView.play()
+                    }
                 } else {
                     let sheetP = cSheetView.convertFromWorld(p)
                     var ids = Set<UUID>()
