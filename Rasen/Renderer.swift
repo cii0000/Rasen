@@ -119,6 +119,9 @@ final class Renderstate {
         
         let opaqueColorD = MTLRenderPipelineDescriptor()
         opaqueColorD.vertexFunction = library.makeFunction(name: "basicVertex")
+        opaqueColorD.vertexBuffers[0].mutability = .immutable
+        opaqueColorD.vertexBuffers[1].mutability = .immutable
+        opaqueColorD.vertexBuffers[2].mutability = .immutable
         opaqueColorD.fragmentFunction = library.makeFunction(name: "basicFragment")
         opaqueColorD.colorAttachments[0].pixelFormat = pixelFormat
         opaqueColorD.stencilAttachmentPixelFormat = .stencil8
@@ -127,6 +130,9 @@ final class Renderstate {
         
         let alphaColorD = MTLRenderPipelineDescriptor()
         alphaColorD.vertexFunction = library.makeFunction(name: "basicVertex")
+        alphaColorD.vertexBuffers[0].mutability = .immutable
+        alphaColorD.vertexBuffers[1].mutability = .immutable
+        alphaColorD.vertexBuffers[2].mutability = .immutable
         alphaColorD.fragmentFunction = library.makeFunction(name: "basicFragment")
         alphaColorD.colorAttachments[0].isBlendingEnabled = true
         alphaColorD.colorAttachments[0].rgbBlendOperation = .add
@@ -142,6 +148,9 @@ final class Renderstate {
         
         let alphaColorsD = MTLRenderPipelineDescriptor()
         alphaColorsD.vertexFunction = library.makeFunction(name: "colorsVertex")
+        alphaColorsD.vertexBuffers[0].mutability = .immutable
+        alphaColorsD.vertexBuffers[1].mutability = .immutable
+        alphaColorsD.vertexBuffers[2].mutability = .immutable
         alphaColorsD.fragmentFunction = library.makeFunction(name: "basicFragment")
         alphaColorsD.colorAttachments[0].isBlendingEnabled = true
         alphaColorsD.colorAttachments[0].rgbBlendOperation = .add
@@ -157,6 +166,9 @@ final class Renderstate {
         
         let maxColorsD = MTLRenderPipelineDescriptor()
         maxColorsD.vertexFunction = library.makeFunction(name: "colorsVertex")
+        maxColorsD.vertexBuffers[0].mutability = .immutable
+        maxColorsD.vertexBuffers[1].mutability = .immutable
+        maxColorsD.vertexBuffers[2].mutability = .immutable
         maxColorsD.fragmentFunction = library.makeFunction(name: "basicFragment")
         maxColorsD.colorAttachments[0].isBlendingEnabled = true
         maxColorsD.colorAttachments[0].rgbBlendOperation = .min
@@ -172,6 +184,9 @@ final class Renderstate {
         
         let opaqueTextureD = MTLRenderPipelineDescriptor()
         opaqueTextureD.vertexFunction = library.makeFunction(name: "textureVertex")
+        opaqueTextureD.vertexBuffers[0].mutability = .immutable
+        opaqueTextureD.vertexBuffers[1].mutability = .immutable
+        opaqueTextureD.vertexBuffers[2].mutability = .immutable
         opaqueTextureD.fragmentFunction = library.makeFunction(name: "textureFragment")
         opaqueTextureD.colorAttachments[0].pixelFormat = pixelFormat
         opaqueTextureD.stencilAttachmentPixelFormat = .stencil8
@@ -180,6 +195,10 @@ final class Renderstate {
         
         let alphaTextureD = MTLRenderPipelineDescriptor()
         alphaTextureD.vertexFunction = library.makeFunction(name: "textureVertex")
+        alphaTextureD.vertexFunction = library.makeFunction(name: "textureVertex")
+        alphaTextureD.vertexBuffers[0].mutability = .immutable
+        alphaTextureD.vertexBuffers[1].mutability = .immutable
+        alphaTextureD.vertexBuffers[2].mutability = .immutable
         alphaTextureD.fragmentFunction = library.makeFunction(name: "textureFragment")
         alphaTextureD.colorAttachments[0].isBlendingEnabled = true
         alphaTextureD.colorAttachments[0].rgbBlendOperation = .add
@@ -196,6 +215,8 @@ final class Renderstate {
         let stencilD = MTLRenderPipelineDescriptor()
         stencilD.isAlphaToCoverageEnabled = true
         stencilD.vertexFunction = library.makeFunction(name: "stencilVertex")
+        stencilD.vertexBuffers[0].mutability = .immutable
+        stencilD.vertexBuffers[1].mutability = .immutable
         stencilD.fragmentFunction = nil
         stencilD.colorAttachments[0].pixelFormat = pixelFormat
         stencilD.colorAttachments[0].writeMask = []
@@ -206,6 +227,8 @@ final class Renderstate {
         let stencilBezierD = MTLRenderPipelineDescriptor()
         stencilBezierD.isAlphaToCoverageEnabled = true
         stencilBezierD.vertexFunction = library.makeFunction(name: "stencilBVertex")
+        stencilBezierD.vertexBuffers[0].mutability = .immutable
+        stencilBezierD.vertexBuffers[1].mutability = .immutable
         stencilBezierD.fragmentFunction = library.makeFunction(name: "stencilBFragment")
         stencilBezierD.colorAttachments[0].pixelFormat = pixelFormat
         stencilBezierD.colorAttachments[0].writeMask = []
@@ -961,6 +984,9 @@ struct Texture {
         
         var items: [Item]
         var isMipmapped: Bool { items.count > 1 }
+    }
+    static func asyncBlock(from record: Record<Image>, isMipmapped: Bool = false) async throws -> Block {
+        try block(from: record, isMipmapped: isMipmapped)
     }
     static func block(from record: Record<Image>, isMipmapped: Bool = false) throws -> Block {
         if let image = record.value {

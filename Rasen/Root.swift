@@ -15,7 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
-import Dispatch
 import struct Foundation.UUID
 import struct Foundation.Data
 import struct Foundation.URL
@@ -88,9 +87,6 @@ extension MultiSelection {
     }
     func intersects(_ line: Line) -> Bool {
         selections.contains { line.intersects($0.rect) }
-    }
-    func intersects(_ lineView: SheetLineView) -> Bool {
-        selections.contains { lineView.intersects($0.rect) }
     }
     func contains(_ p : Point) -> Bool {
         selections.contains { $0.rect.contains(p) }

@@ -1752,14 +1752,14 @@ final class RootView: View, @unchecked Sendable {
         var type: Model.ThumbnailType?
         let sheetID: SheetID
         var node: Node?
-        var task: Task<(), Never>?
+        var task: Task<(), any Error>?
     }
     private(set) var thumbnailNodeValues = [Sheetpos: ThumbnailNodeValue]()
     
     struct SheetViewValue: @unchecked Sendable {
         let sheetID: SheetID
         var sheetView: SheetView?
-        var task: Task<(), Never>?
+        var task: Task<(), any Error>?
     }
     private(set) var sheetViewValues = [Sheetpos: SheetViewValue]()
     
@@ -1995,7 +1995,7 @@ final class RootView: View, @unchecked Sendable {
         for shp in shps {
             nshps[shp] = nil
         }
-        nshps.forEach { readAndClose(.none, priority: .medium, at: $0.value.sheetID, $0.key) }
+        nshps.forEach { readAndClose(.none, at: $0.value.sheetID, $0.key) }
         for nshp in shps {
             if oshps[nshp] == nil, let sid = sheetID(at: nshp) {
                 readAndClose(.sheet, priority: nshp == shp ? .high : .medium, at: sid, nshp)
@@ -2069,14 +2069,11 @@ final class RootView: View, @unchecked Sendable {
             return
         }
         
-        let task = Task.detached(priority: .high) {
-            if Task.isCancelled { return }
-            guard let block = try? Texture.block(from: thumbnailRecord, isMipmapped: true) else { return }
-            Task { @MainActor in
-                try Task.checkCancellation()
-                let thumbnailTexture = try Texture(block: block)
-                thumbnailNode.fillType = .texture(thumbnailTexture)
-            }
+        let task = Task { @MainActor in
+            try Task.checkCancellation()
+            let block = try await Texture.asyncBlock(from: thumbnailRecord, isMipmapped: true)
+            try Task.checkCancellation()
+            thumbnailNode.fillType = .texture(try .init(block: block))
         }
         
         thumbnailNodeValues[shp]?.node?.removeFromParent()
@@ -2121,7 +2118,7 @@ final class RootView: View, @unchecked Sendable {
         }
     }
     struct ReadingError: Error {}
-    private func readAndClose(_ type: NodeType, priority: TaskPriority = .medium,
+    private func readAndClose(_ type: NodeType, priority: TaskPriority = .high,
                               at sid: SheetID, _ shp: Sheetpos) {
         switch type {
         case .none:
@@ -2174,13 +2171,17 @@ final class RootView: View, @unchecked Sendable {
             let frame = self.sheetFrame(with: shp)
             let screenToWorldScale = self.screenToWorldScale
             let task = Task.detached(priority: priority) {
+                try Task.checkCancellation()
                 let sheetRecord = sheetRecorder.sheetRecord
-                let sheet = sheetRecord.decodedValue ?? Sheet(message: "Failed to load".localized)
+                let sheet = sheetRecord.decodedValue ?? .init(message: "Failed to load".localized)
+                try Task.checkCancellation()
                 let historyRecord = sheetRecorder.sheetHistoryRecord
                 let history = historyRecord.decodedValue
+                try Task.checkCancellation()
                 
                 let sheetBinder = RecordBinder(value: sheet, record: sheetRecord)
                 let sheetView = SheetView(binder: sheetBinder, keyPath: \SheetBinder.value)
+                try Task.checkCancellation()
                 sheetView.screenToWorldScale = screenToWorldScale
                 sheetView.id = sid
                 if let history {
@@ -2188,15 +2189,22 @@ final class RootView: View, @unchecked Sendable {
                 }
                 sheetView.bounds = Rect(size: frame.size)
                 sheetView.node.attitude.position = frame.origin
-                sheetView.node.allChildrenAndSelf { $0.updateDatas() }
+                try Task.checkCancellation()
+                try sheetView.node.allChildrenAndSelf {
+                    $0.updateDatas()
+                    try Task.checkCancellation()
+                }
+                try Task.checkCancellation()
                 do {
                     guard let thumbnail = sheetRecorder.thumbnail1024Record.decodedValue else { throw ReadingError() }
+                    try Task.checkCancellation()
                     let block = try Texture.block(from: thumbnail, isMipmapped: true)
+                    try Task.checkCancellation()
                     Task { @MainActor in
                         sheetView.node.cacheTexture = try .init(block: block)
                     }
                 } catch {
-                    //                    sheetView.enableCache = true
+//                    sheetView.enableCache = true
                 }
                 
                 Task { @MainActor in
@@ -2204,8 +2212,9 @@ final class RootView: View, @unchecked Sendable {
                     guard self.sheetID(at: shp) == sid,
                           self.sheetViewValues[shp] != nil else { return }
                     self.updateWithIsFullEdit(in: sheetView)
-                    sheetRecord.willwriteClosure = { [weak sheetView, weak self, weak historyRecord] (record) in
-                        if let sheetView = sheetView {
+                    sheetRecord.willwriteClosure = { [weak sheetView, weak self,
+                                                      weak historyRecord] (record) in
+                        if let sheetView {
                             record.value = sheetView.model
                             historyRecord?.value = sheetView.history
                             historyRecord?.isPreparedWrite = true

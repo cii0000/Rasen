@@ -1128,7 +1128,16 @@ final class Player: InputKeyEditor {
                     cSheetView.topSheetView = aSheetView
                 }
                 
-                if !(rootEditor.containsAllTimelines(with: event)
+                let sheetP = cSheetView.convertFromWorld(p)
+                if let (_, contentView) = cSheetView.contentIndexAndView(at: sheetP,
+                                                    scale: rootView.screenToWorldScale),
+                   contentView.model.type == .movie,
+                   !contentView.containsTimeline(contentView.convertFromWorld(p),
+                                                 scale: rootView.screenToWorldScale) {
+                    
+                    let sec = contentView.model.sec(fromBeat: contentView.model.beat)
+                    cSheetView.play(atSec: sec, inSec: nil, otherTimelineIDs: [])
+                } else if !(rootEditor.containsAllTimelines(with: event)
                     || (!cSheetView.model.enabledAnimation && cSheetView.model.enabledMusic)) {
                     
                     cSheetView.play()
@@ -1158,14 +1167,6 @@ final class Player: InputKeyEditor {
                         if secRange != nil {
                             cSheetView.previousSheetView = nil
                             cSheetView.nextSheetView = nil
-                        }
-                    } else if let ci = cSheetView.contentIndex(at: sheetP,
-                                                               scale: rootView.screenToWorldScale) {
-                        let contentView = cSheetView.contentsView.elementViews[ci]
-                        if contentView.model.type == .movie
-                            && !contentView.containsTimeline(contentView.convertFromWorld(p),
-                                                             scale: rootView.screenToWorldScale) {
-                            sec = contentView.model.sec(fromBeat: contentView.model.beat)
                         }
                     }
                     cSheetView.play(atSec: sec, inSec: secRange, otherTimelineIDs: ids)

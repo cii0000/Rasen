@@ -872,12 +872,12 @@ extension Node {
 }
 
 extension Node {
-    func allChildrenAndSelf(_ closure: (Node) -> ()) {
-        func allChildrenRecursion(_ child: Node, _ closure: (Node) -> Void) {
-            child.backingChildren.forEach { allChildrenRecursion($0, closure) }
-            closure(child)
+    func allChildrenAndSelf(_ closure: (Node) throws -> ()) rethrows {
+        func allChildrenRecursion(_ child: Node, _ closure: (Node) throws -> Void) rethrows {
+            try child.backingChildren.forEach { try allChildrenRecursion($0, closure) }
+            try closure(child)
         }
-        allChildrenRecursion(self, closure)
+        try allChildrenRecursion(self, closure)
     }
     func allChildren(_ closure: (Node) -> ()) {
         func allChildrenRecursion(_ child: Node, _ closure: (Node) -> Void) {

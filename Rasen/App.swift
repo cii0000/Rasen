@@ -77,6 +77,8 @@ final class SubNSApplication: NSApplication {
         Renderer.shared.appendColorBuffer(with: subSelectedColor)
     }
     
+    func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
+    
     func applicationWillFinishLaunching(_ notification: Notification) {
         view = SubMTKView(url: URL.library)
         view.frame = NSRect(origin: NSPoint(),

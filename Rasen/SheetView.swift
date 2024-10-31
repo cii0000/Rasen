@@ -1137,7 +1137,16 @@ final class SheetView: BindableView, @unchecked Sendable {
         playingTimer?.cancel()
         playingTimer = nil
         
-        audioPauseTimer.cancel()
+        if sequencer != nil {
+            sequencer?.beginPause()
+            audioPauseTask = Task {
+                try await Task.sleep(sec: Waveclip.releaseSec + 0.01)
+                try Task.checkCancellation()
+                Task { @MainActor in
+                    sequencer?.pause()
+                }
+            }
+        }
     }
     
     func updateWithModel() {
@@ -1641,7 +1650,7 @@ final class SheetView: BindableView, @unchecked Sendable {
     private var willPlaySec: Rational?, playingOtherTimelineIDs = Set<UUID>()
     private var playingFrameRate: Rational = 24, firstDeltaSec: Rational = 0
     private var waringClock: SuspendingClock.Instant?
-    private var audioPauseTimer = OneshotTimer()
+    private var audioPauseTask: Task<(), any Error>?
     let frameRate = Keyframe.defaultFrameRate
     var isPlaying = false {
         didSet {
@@ -1650,7 +1659,7 @@ final class SheetView: BindableView, @unchecked Sendable {
         }
     }
     private func updateWithIsPlaying() {
-        audioPauseTimer.cancel()
+        audioPauseTask?.cancel()
         playingTimer?.cancel()
         playingTimer = nil
         animationView.isPlaying = isPlaying
@@ -1804,7 +1813,7 @@ final class SheetView: BindableView, @unchecked Sendable {
                     self.sequencer = sequencer
                 }
             } else {
-                sequencer?.update([])
+                sequencer = nil
             }
             
             sequencer?.startSec = Double(deltaSec)
@@ -1863,12 +1872,15 @@ final class SheetView: BindableView, @unchecked Sendable {
             
             updatePreviousNext()
         
-            sequencer?.beginPause()
-            audioPauseTimer.start(afterTime: Waveclip.releaseSec + 0.01, dispatchQueue: .main) {
-            } waitClosure: {
-            } cancelClosure: {
-            } endClosure: { [weak self] in
-                self?.sequencer?.pause()
+            if sequencer != nil {
+                sequencer?.beginPause()
+                audioPauseTask = Task {
+                    try await Task.sleep(sec: Waveclip.releaseSec + 0.01)
+                    try Task.checkCancellation()
+                    Task { @MainActor in
+                        sequencer?.pause()
+                    }
+                }
             }
             
 //            sequencer?.endEngine()
