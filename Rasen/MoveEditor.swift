@@ -17,7 +17,7 @@
 
 import struct Foundation.UUID
 
-final class MoveEditor: DragEditor {
+final class MoveEditor: DragEventEditor {
     let rootEditor: RootEditor, rootView: RootView
     
     init(_ rootEditor: RootEditor) {
@@ -26,22 +26,22 @@ final class MoveEditor: DragEditor {
     }
     
     enum MoveType {
-        case animation(AnimationSlider)
-        case score(ScoreSlider)
-        case content(ContentSlider)
-        case text(TextSlider)
-        case tempo(TempoSlider)
+        case animation(MoveAnimationEditor)
+        case score(MoveScoreEditor)
+        case content(MoveContentEditor)
+        case text(MoveTextEditor)
+        case tempo(MoveTempoEditor)
         case none
     }
     private var type = MoveType.none
     
     func updateNode() {
         switch type {
-        case .animation(let keyframeDurationSlider): keyframeDurationSlider.updateNode()
-        case .score(let scoreSlider): scoreSlider.updateNode()
-        case .content(let contentSlider): contentSlider.updateNode()
-        case .text(let textSlider): textSlider.updateNode()
-        case .tempo(let tempoSlider): tempoSlider.updateNode()
+        case .animation(let editor): editor.updateNode()
+        case .score(let editor): editor.updateNode()
+        case .content(let editor): editor.updateNode()
+        case .text(let editor): editor.updateNode()
+        case .tempo(let editor): editor.updateNode()
         case .none: break
         }
     }
@@ -54,33 +54,33 @@ final class MoveEditor: DragEditor {
             if let sheetView = rootView.sheetView(at: p) {
                 let inP = sheetView.convertFromWorld(p)
                 if sheetView.containsTempo(inP, maxDistance: rootView.worldKnobEditDistance * 0.5) {
-                    type = .tempo(TempoSlider(rootEditor))
+                    type = .tempo(MoveTempoEditor(rootEditor))
                 } else if let ci = sheetView.contentIndex(at: inP, scale: rootView.screenToWorldScale),
                           sheetView.model.contents[ci].timeOption != nil {
-                    type = .content(ContentSlider(rootEditor))
+                    type = .content(MoveContentEditor(rootEditor))
                 } else if let ti = sheetView.textIndex(at: inP, scale: rootView.screenToWorldScale),
                            sheetView.model.texts[ti].timeOption != nil {
-                    type = .text(TextSlider(rootEditor))
+                    type = .text(MoveTextEditor(rootEditor))
                 } else if sheetView.scoreView.contains(sheetView.scoreView.convertFromWorld(p),
                                                        scale: rootView.screenToWorldScale) {
-                    type = .score(ScoreSlider(rootEditor))
+                    type = .score(MoveScoreEditor(rootEditor))
                 } else if sheetView.animationView.containsTimeline(inP, scale: rootView.screenToWorldScale) {
-                    type = .animation(AnimationSlider(rootEditor))
+                    type = .animation(MoveAnimationEditor(rootEditor))
                 }
             }
         }
         
         switch type {
-        case .animation(let keyframeDurationSlider):
-            keyframeDurationSlider.send(event)
-        case .score(let scoreSlider):
-            scoreSlider.send(event)
-        case .content(let contentSlider):
-            contentSlider.send(event)
-        case .text(let textSlider):
-            textSlider.send(event)
-        case .tempo(let tempoSlider):
-            tempoSlider.send(event)
+        case .animation(let editor):
+            editor.send(event)
+        case .score(let editor):
+            editor.send(event)
+        case .content(let editor):
+            editor.send(event)
+        case .text(let editor):
+            editor.send(event)
+        case .tempo(let editor):
+            editor.send(event)
         case .none:
             switch event.phase {
             case .began:
@@ -93,7 +93,7 @@ final class MoveEditor: DragEditor {
     }
 }
 
-final class SlideEditor: DragEditor {
+final class SlideEditor: DragEventEditor {
     let rootEditor: RootEditor, rootView: RootView
     
     init(_ rootEditor: RootEditor) {
@@ -102,12 +102,12 @@ final class SlideEditor: DragEditor {
     }
     
     enum SlideType {
-        case keyframe(KeyframeSlider)
-        case animation(AnimationSlider)
-        case score(ScoreSlider)
-        case content(ContentSlider)
-        case text(TextSlider)
-        case tempo(TempoSlider)
+        case keyframe(SlideKeyframeEditor)
+        case animation(MoveAnimationEditor)
+        case score(MoveScoreEditor)
+        case content(MoveContentEditor)
+        case text(MoveTextEditor)
+        case tempo(MoveTempoEditor)
         case none
     }
     private var type = SlideType.none
@@ -133,23 +133,23 @@ final class SlideEditor: DragEditor {
             if let sheetView = rootView.sheetView(at: p) {
                 let inP = sheetView.convertFromWorld(p)
                 if sheetView.containsTempo(inP, maxDistance: rootView.worldKnobEditDistance * 0.5) {
-                    type = .tempo(TempoSlider(rootEditor))
+                    type = .tempo(MoveTempoEditor(rootEditor))
                 } else if let ci = sheetView.contentIndex(at: inP, scale: rootView.screenToWorldScale),
                           sheetView.model.contents[ci].timeOption != nil {
-                    type = .content(ContentSlider(rootEditor))
+                    type = .content(MoveContentEditor(rootEditor))
                 } else if let ti = sheetView.textIndex(at: inP, scale: rootView.screenToWorldScale),
                            sheetView.model.texts[ti].timeOption != nil {
-                    type = .text(TextSlider(rootEditor))
+                    type = .text(MoveTextEditor(rootEditor))
                 } else if sheetView.scoreView.contains(sheetView.scoreView.convertFromWorld(p),
                                                        scale: rootView.screenToWorldScale) {
-                    type = .score(ScoreSlider(rootEditor))
+                    type = .score(MoveScoreEditor(rootEditor))
                 } else if sheetView.animationView.containsTimeline(inP, scale: rootView.screenToWorldScale) {
-                    type = .animation(AnimationSlider(rootEditor))
+                    type = .animation(MoveAnimationEditor(rootEditor))
                 } else {
-                    type = .keyframe(KeyframeSlider(rootEditor))
+                    type = .keyframe(SlideKeyframeEditor(rootEditor))
                 }
             } else {
-                type = .keyframe(KeyframeSlider(rootEditor))
+                type = .keyframe(SlideKeyframeEditor(rootEditor))
             }
         }
         
@@ -171,7 +171,7 @@ final class SlideEditor: DragEditor {
     }
 }
 
-final class AnimationSlider: DragEditor {
+final class MoveAnimationEditor: DragEventEditor {
     let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
@@ -381,7 +381,7 @@ final class AnimationSlider: DragEditor {
     }
 }
 
-final class ScoreSlider: DragEditor {
+final class MoveScoreEditor: DragEventEditor {
     let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
@@ -841,7 +841,7 @@ final class ScoreSlider: DragEditor {
     }
 }
 
-final class ContentSlider: DragEditor {
+final class MoveContentEditor: DragEventEditor {
     let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
@@ -1030,7 +1030,7 @@ final class ContentSlider: DragEditor {
     }
 }
 
-final class TextSlider: DragEditor {
+final class MoveTextEditor: DragEventEditor {
     let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
@@ -1157,7 +1157,7 @@ final class TextSlider: DragEditor {
     }
 }
 
-final class TempoSlider: DragEditor {
+final class MoveTempoEditor: DragEventEditor {
     let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
@@ -1296,7 +1296,7 @@ final class TempoSlider: DragEditor {
     }
 }
 
-final class LineSlider: DragEditor {
+final class MoveLinePointEditor: DragEventEditor {
     let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
@@ -1939,7 +1939,7 @@ final class LineSlider: DragEditor {
     }
 }
 
-final class LineZSlider: DragEditor {
+final class MoveLineZEditor: DragEventEditor {
     let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     

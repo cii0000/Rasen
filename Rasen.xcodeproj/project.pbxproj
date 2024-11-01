@@ -17,7 +17,7 @@
 		2346B2A726ECC125008AA04C /* SheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2346B2A626ECC124008AA04C /* SheetView.swift */; };
 		234ED98822AB80D30012B057 /* History.swift in Sources */ = {isa = PBXBuildFile; fileRef = 234ED98722AB80D30012B057 /* History.swift */; };
 		234ED98C22AE484E0012B057 /* Protobuf.pb.swift in Sources */ = {isa = PBXBuildFile; fileRef = 234ED98B22AE484E0012B057 /* Protobuf.pb.swift */; };
-		234F2A522382798A00107A1D /* UndoEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 234F2A512382798A00107A1D /* UndoEditor.swift */; };
+		234F2A522382798A00107A1D /* VersionEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 234F2A512382798A00107A1D /* VersionEditor.swift */; };
 		2359E7AC2CCB996500925D48 /* IOEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2359E7AB2CCB996500925D48 /* IOEditor.swift */; };
 		235BF0CC21771B0F00EEFABE /* Shaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = 235BF0CB21771B0F00EEFABE /* Shaders.metal */; };
 		236195A42B7C7EBB00CF0B2F /* ScoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 236195A32B7C7EBB00CF0B2F /* ScoreView.swift */; };
@@ -25,7 +25,7 @@
 		2362827021905D1E0080C224 /* Arc.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2362826F21905D1E0080C224 /* Arc.swift */; };
 		236855F32295106000958469 /* Sheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 236855F22295106000958469 /* Sheet.swift */; };
 		237AEFA62214285E004EE702 /* Picture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 237AEFA52214285E004EE702 /* Picture.swift */; };
-		237EC77822467E9500AA634F /* CopyEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 237EC77722467E9500AA634F /* CopyEditor.swift */; };
+		237EC77822467E9500AA634F /* PastableEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 237EC77722467E9500AA634F /* PastableEditor.swift */; };
 		23910BA32BA1D7750064CB62 /* Spectrogram.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23910BA22BA1D7750064CB62 /* Spectrogram.swift */; };
 		239757A92513666D00BCA7E8 /* Numerics in Frameworks */ = {isa = PBXBuildFile; productRef = 239757A82513666D00BCA7E8 /* Numerics */; };
 		2399F01626E11B81005CD031 /* AnimationEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2399F01526E11B81005CD031 /* AnimationEditor.swift */; };
@@ -99,7 +99,7 @@
 		234ED98722AB80D30012B057 /* History.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = History.swift; sourceTree = "<group>"; };
 		234ED98922AE2BB10012B057 /* Protobuf.proto */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.protobuf; path = Protobuf.proto; sourceTree = "<group>"; };
 		234ED98B22AE484E0012B057 /* Protobuf.pb.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Protobuf.pb.swift; sourceTree = "<group>"; };
-		234F2A512382798A00107A1D /* UndoEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UndoEditor.swift; sourceTree = "<group>"; };
+		234F2A512382798A00107A1D /* VersionEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionEditor.swift; sourceTree = "<group>"; };
 		2359E7AB2CCB996500925D48 /* IOEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOEditor.swift; sourceTree = "<group>"; };
 		235BF0CB21771B0F00EEFABE /* Shaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Shaders.metal; sourceTree = "<group>"; };
 		236195A32B7C7EBB00CF0B2F /* ScoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreView.swift; sourceTree = "<group>"; };
@@ -108,7 +108,7 @@
 		236855F22295106000958469 /* Sheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sheet.swift; sourceTree = "<group>"; };
 		2379E032219C54910092892E /* License.md */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = net.daringfireball.markdown; path = License.md; sourceTree = "<group>"; };
 		237AEFA52214285E004EE702 /* Picture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Picture.swift; sourceTree = "<group>"; };
-		237EC77722467E9500AA634F /* CopyEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CopyEditor.swift; sourceTree = "<group>"; };
+		237EC77722467E9500AA634F /* PastableEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PastableEditor.swift; sourceTree = "<group>"; };
 		238DA81D21F443EF00691A3A /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		23910BA22BA1D7750064CB62 /* Spectrogram.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Spectrogram.swift; sourceTree = "<group>"; };
 		2399F01526E11B81005CD031 /* AnimationEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimationEditor.swift; sourceTree = "<group>"; };
@@ -222,8 +222,8 @@
 				2359E7AB2CCB996500925D48 /* IOEditor.swift */,
 				23A72899216CF265000A7350 /* LineEditor.swift */,
 				239A799A22D99A9800876D43 /* TextEditor.swift */,
-				237EC77722467E9500AA634F /* CopyEditor.swift */,
-				234F2A512382798A00107A1D /* UndoEditor.swift */,
+				237EC77722467E9500AA634F /* PastableEditor.swift */,
+				234F2A512382798A00107A1D /* VersionEditor.swift */,
 				2309F289216F9FBD00A6ACF0 /* ColorEditor.swift */,
 				23D0D3EB2CCEA11E006631C4 /* MoveEditor.swift */,
 				2399F01526E11B81005CD031 /* AnimationEditor.swift */,
@@ -395,7 +395,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				23A728C0216CF269000A7350 /* Orientation.swift in Sources */,
-				237EC77822467E9500AA634F /* CopyEditor.swift in Sources */,
+				237EC77822467E9500AA634F /* PastableEditor.swift in Sources */,
 				23B50CFE2997C21E002CA640 /* Loudness.swift in Sources */,
 				23910BA32BA1D7750064CB62 /* Spectrogram.swift in Sources */,
 				23C8C6D525E21CCB009FEA85 /* Typeline.swift in Sources */,
@@ -404,7 +404,7 @@
 				23A728C2216CF26A000A7350 /* Precedence.swift in Sources */,
 				239A799B22D99A9800876D43 /* TextEditor.swift in Sources */,
 				23D0D3F02CCF214F006631C4 /* Root.swift in Sources */,
-				234F2A522382798A00107A1D /* UndoEditor.swift in Sources */,
+				234F2A522382798A00107A1D /* VersionEditor.swift in Sources */,
 				23A728CF216CF26A000A7350 /* Interpolation.swift in Sources */,
 				23A728DC216CF26A000A7350 /* RootView.swift in Sources */,
 				2309F28A216F9FBD00A6ACF0 /* ColorEditor.swift in Sources */,

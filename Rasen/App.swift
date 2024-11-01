@@ -1134,7 +1134,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     @objc func importDocument(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = Importer(rootEditor)
+        let editor = ImportEditor(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1143,7 +1143,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     @objc func exportAsImage(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = ImageExporter(rootEditor)
+        let editor = ExportAsImageEditor(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1151,7 +1151,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func exportAsImage4K(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = Image4KExporter(rootEditor)
+        let editor = ExportAs4KImageEditor(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1159,7 +1159,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func exportAsPDF(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = PDFExporter(rootEditor)
+        let editor = ExportAsPDFEditor(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1167,7 +1167,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func exportAsGIF(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = GIFExporter(rootEditor)
+        let editor = ExportAsGIFEditor(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1175,7 +1175,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func exportAsMovie(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = MovieExporter(rootEditor)
+        let editor = ExportAsMovieEditor(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1183,7 +1183,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func exportAsMovie4K(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = Movie4KExporter(rootEditor)
+        let editor = ExportAs4KMovieEditor(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1191,7 +1191,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func exportAsSound(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = SoundExporter(rootEditor)
+        let editor = ExportAsSoundEditor(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1199,7 +1199,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func exportAsLinearPCM(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = LinearPCMExporter(rootEditor)
+        let editor = ExportAsLinearPCMEditor(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1208,7 +1208,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     @objc func exportAsDocument(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = DocumentWithoutHistoryExporter(rootEditor)
+        let editor = ExportAsDocumentEditor(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1216,7 +1216,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func exportAsDocumentWithHistory(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = DocumentExporter(rootEditor)
+        let editor = ExportAsDocumentWithHistoryEditor(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1225,7 +1225,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     @objc func clearHistory(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = HistoryCleaner(rootEditor)
+        let editor = ClearHistoryEditor(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1234,7 +1234,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     @objc func undo(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = Undoer(rootEditor)
+        let editor = UndoEditor(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1242,7 +1242,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func redo(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = Redoer(rootEditor)
+        let editor = RedoEditor(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1250,7 +1250,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func cut(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = Cutter(rootEditor)
+        let editor = CutEditor(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1258,7 +1258,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func copy(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = Copier(rootEditor)
+        let editor = CopyEditor(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1266,7 +1266,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func paste(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = Paster(rootEditor)
+        let editor = PasteEditor(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1274,7 +1274,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func find(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = Finder(rootEditor)
+        let editor = FindEditor(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1282,7 +1282,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func changeToDraft(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = DraftChanger(rootEditor)
+        let editor = ChangeToDraftEditor(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1290,7 +1290,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func cutDraft(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = DraftCutter(rootEditor)
+        let editor = CutDraftEditor(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1298,7 +1298,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func makeFaces(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = FacesMaker(rootEditor)
+        let editor = MakeFacesEditor(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1306,7 +1306,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func cutFaces(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = FacesCutter(rootEditor)
+        let editor = CutFacesEditor(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1314,7 +1314,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func changeToVerticalText(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = VerticalTextChanger(rootEditor)
+        let editor = ChangeToVerticalTextEditor(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1322,7 +1322,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     @objc func changeToHorizontalText(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = HorizontalTextChanger(rootEditor)
+        let editor = ChangeToHorizontalTextEditor(rootEditor)
         editor.send(inputKeyEventWith(.began))
         Sleep.start()
         editor.send(inputKeyEventWith(.ended))
@@ -1700,7 +1700,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         beganSubDragEvent = nil
     }
     
-    private var menuEditor: Exporter?
+    private var menuEditor: StartExportEditor?
     func showMenu(_ nsEvent: NSEvent) {
         guard window?.sheets.isEmpty ?? false else { return }
         guard window?.isMainWindow ?? false else { return }
@@ -1711,92 +1711,85 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         if menuEditor != nil {
             menuEditor?.editor.end()
         }
-        menuEditor = Exporter(rootEditor)
+        menuEditor = StartExportEditor(rootEditor)
         menuEditor?.send(event)
         menu.delegate = self
         menu.addItem(SubNSMenuItem(title: "Import...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = Importer(self.rootEditor)
+            let editor = ImportEditor(self.rootEditor)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(SubNSMenuItem(title: "Export as Image...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = ImageExporter(self.rootEditor)
+            let editor = ExportAsImageEditor(self.rootEditor)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(SubNSMenuItem(title: "Export as 4K Image...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = Image4KExporter(self.rootEditor)
+            let editor = ExportAs4KImageEditor(self.rootEditor)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(SubNSMenuItem(title: "Export as PDF...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = PDFExporter(self.rootEditor)
+            let editor = ExportAsPDFEditor(self.rootEditor)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(SubNSMenuItem(title: "Export as GIF...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = GIFExporter(self.rootEditor)
+            let editor = ExportAsGIFEditor(self.rootEditor)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(SubNSMenuItem(title: "Export as Movie...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = MovieExporter(self.rootEditor)
+            let editor = ExportAsMovieEditor(self.rootEditor)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(SubNSMenuItem(title: "Export as 4K Movie...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = Movie4KExporter(self.rootEditor)
+            let editor = ExportAs4KMovieEditor(self.rootEditor)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(SubNSMenuItem(title: "Export as Sound...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = SoundExporter(self.rootEditor)
+            let editor = ExportAsSoundEditor(self.rootEditor)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(SubNSMenuItem(title: "Export as Linear PCM...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = LinearPCMExporter(self.rootEditor)
+            let editor = ExportAsLinearPCMEditor(self.rootEditor)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(SubNSMenuItem(title: "Export as Document...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = DocumentWithoutHistoryExporter(self.rootEditor)
+            let editor = ExportAsDocumentEditor(self.rootEditor)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(SubNSMenuItem(title: "Export as Document with History...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = DocumentExporter(self.rootEditor)
+            let editor = ExportAsDocumentWithHistoryEditor(self.rootEditor)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(SubNSMenuItem(title: "Clear History...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = HistoryCleaner(self.rootEditor)
+            let editor = ClearHistoryEditor(self.rootEditor)
             editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
             editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
-        
-//        menu.addItem(SubNSMenuItem(title: "test".localized, closure: { [weak self] in
-//            guard let self else { return }
-//            self.isEnabledPinch = !self.isEnabledPinch
-//            self.isEnabledScroll = !self.isEnabledScroll
-//            self.isEnabledRotate = !self.isEnabledRotate
-//        }))
         
         rootEditor.stopAllEvents()
         NSMenu.popUpContextMenu(menu, with: nsEvent, for: self)
@@ -2209,11 +2202,11 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             if isEnabledPlay && isPreparePlay {
                 var event = inputKeyEventWith(event, .click, .began)
                 event.inputKeyType = .control
-                let player = Player(rootEditor)
-                player.send(event)
+                let playEditor = PlayEditor(rootEditor)
+                playEditor.send(event)
                 Sleep.start()
                 event.phase = .ended
-                player.send(event)
+                playEditor.send(event)
             }
         }
         

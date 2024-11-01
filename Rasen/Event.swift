@@ -329,12 +329,14 @@ extension Quasimode {
     static let changeLightness = Self(modifier: [.option], .drag)
     static let changeTint = Self(modifier: [.shift, .option], .drag)
     
-    static let slide = Self(modifier: [.control], .drag)//
-    static let selectFrame = Self(modifier: [.control, .option], .drag)
+    static let selectFrame = Self(modifier: [.control], .drag)
     static let selectVersion = Self(modifier: [.control, .shift], .drag)
     
     static let goPrevious = Self(modifier: [.control], .z)
     static let goNext = Self(modifier: [.control], .x)
+    static let controlCopy = Self(modifier: [.control], .c)
+    static let controlInterpolate = Self(modifier: [.control], .s)
+    static let slide = Self(modifier: [.control, .option], .drag)//
     static let goPreviousFrame = Self(modifier: [.control, .option], .z)//
     static let goNextFrame = Self(modifier: [.control, .option], .x)//
     
@@ -343,7 +345,7 @@ extension Quasimode {
     static let moveLineZ = Self(modifier: [.control, .command], .drag)
     
     static let play = Self(modifier: [.control], .click)
-    static let showTone = Self(modifier: [.command], .click)
+    static let showNoteTone = Self(modifier: [.command], .click)
     static let run = Self(.click)
     static let openMenu = Self(.subClick)
     static let lookUp = Self(.lookUpTap)

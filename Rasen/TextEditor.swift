@@ -17,7 +17,7 @@
 
 import struct Foundation.UUID
 
-final class Finder: InputKeyEditor {
+final class FindEditor: InputKeyEventEditor {
     let rootEditor: RootEditor, rootView: RootView
     
     init(_ rootEditor: RootEditor) {
@@ -74,7 +74,7 @@ final class Finder: InputKeyEditor {
     }
 }
 
-final class Looker: InputKeyEditor {
+final class LookUpEditor: InputKeyEventEditor {
     let rootEditor: RootEditor, rootView: RootView
     
     init(_ rootEditor: RootEditor) {
@@ -274,7 +274,7 @@ final class Looker: InputKeyEditor {
     }
 }
 
-final class VerticalTextChanger: InputKeyEditor {
+final class ChangeToVerticalTextEditor: InputKeyEventEditor {
     let editor: TextOrientationEditor
     
     init(_ rootEditor: RootEditor) {
@@ -288,7 +288,7 @@ final class VerticalTextChanger: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class HorizontalTextChanger: InputKeyEditor {
+final class ChangeToHorizontalTextEditor: InputKeyEventEditor {
     let editor: TextOrientationEditor
     
     init(_ rootEditor: RootEditor) {
@@ -405,7 +405,7 @@ final class TextOrientationEditor: Editor {
     }
 }
 
-final class SuperscriptChanger: InputKeyEditor {
+final class ChangeToSuperscriptEditor: InputKeyEventEditor {
     let editor: TextScriptEditor
     
     init(_ rootEditor: RootEditor) {
@@ -419,7 +419,7 @@ final class SuperscriptChanger: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class SubscriptChanger: InputKeyEditor {
+final class ChangeToSubscriptEditor: InputKeyEventEditor {
     let editor: TextScriptEditor
     
     init(_ rootEditor: RootEditor) {

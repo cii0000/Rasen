@@ -19,7 +19,7 @@ import Dispatch
 import struct Foundation.UUID
 import struct Foundation.URL
 
-final class Stopper: InputKeyEditor {
+final class StopEditor: InputKeyEventEditor {
     let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
@@ -48,7 +48,7 @@ final class Stopper: InputKeyEditor {
     }
 }
 
-final class RunEditor: InputKeyEditor {
+final class RunEditor: InputKeyEventEditor {
     let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
@@ -319,7 +319,7 @@ extension RunEditor {
             }
         }
         
-        rootEditor.runners.insert(self)
+        rootEditor.runEditors.insert(self)
         
         let xoDic = oDic
         Task { @MainActor in
@@ -334,7 +334,7 @@ extension RunEditor {
             calculatingTimer?.cancel()
             calculatingTimer = nil
             
-            rootEditor.runners.remove(self)
+            rootEditor.runEditors.remove(self)
             
             calculatingNode.removeFromParent()
             

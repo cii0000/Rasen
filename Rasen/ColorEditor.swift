@@ -17,7 +17,7 @@
 
 import struct Foundation.UUID
 
-final class LightnessChanger: DragEditor {
+final class ChangeLightnessEditor: DragEventEditor {
     let editor: ColorEditor
     
     init(_ rootEditor: RootEditor) {
@@ -31,7 +31,7 @@ final class LightnessChanger: DragEditor {
         editor.updateNode()
     }
 }
-final class TintChanger: DragEditor {
+final class ChangeTintEditor: DragEventEditor {
     let editor: ColorEditor
     
     init(_ rootEditor: RootEditor) {

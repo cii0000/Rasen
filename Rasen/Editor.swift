@@ -24,22 +24,22 @@ extension Editor {
     func updateNode() {}
 }
 
-protocol PinchEditor: Editor {
+protocol PinchEventEditor: Editor {
     func send(_ event: PinchEvent)
 }
-protocol RotateEditor: Editor {
+protocol RotateEventEditor: Editor {
     func send(_ event: RotateEvent)
 }
-protocol ScrollEditor: Editor {
+protocol ScrollEventEditor: Editor {
     func send(_ event: ScrollEvent)
 }
-protocol SwipeEditor: Editor {
+protocol SwipeEventEditor: Editor {
     func send(_ event: SwipeEvent)
 }
-protocol DragEditor: Editor {
+protocol DragEventEditor: Editor {
     func send(_ event: DragEvent)
 }
-protocol InputKeyEditor: Editor {
+protocol InputKeyEventEditor: Editor {
     func send(_ event: InputKeyEvent)
 }
 
@@ -55,7 +55,7 @@ final class RootEditor: Editor {
     }
     
     func cancelTasks() {
-        runners.forEach { $0.cancel() }
+        runEditors.forEach { $0.cancel() }
         
         textEditor.cancelTasks()
         
@@ -92,140 +92,140 @@ final class RootEditor: Editor {
         textEditor.moveEndInputKey(isStopFromMarkedText: true)
     }
     
-    private(set) var oldPinchEvent: PinchEvent?, zoomer: Zoomer?
+    private(set) var oldPinchEvent: PinchEvent?, zoomEditor: ZoomEditor?
     func pinch(_ event: PinchEvent) {
         switch event.phase {
         case .began:
-            zoomer = Zoomer(self)
-            zoomer?.send(event)
+            zoomEditor = ZoomEditor(self)
+            zoomEditor?.send(event)
             oldPinchEvent = event
         case .changed:
-            zoomer?.send(event)
+            zoomEditor?.send(event)
             oldPinchEvent = event
         case .ended:
             oldPinchEvent = nil
-            zoomer?.send(event)
-            zoomer = nil
+            zoomEditor?.send(event)
+            zoomEditor = nil
         }
     }
     
-    private(set) var oldScrollEvent: ScrollEvent?, scroller: Scroller?
+    private(set) var oldScrollEvent: ScrollEvent?, scrollEditor: ScrollEditor?
     func scroll(_ event: ScrollEvent) {
         textEditor.moveEndInputKey()
         switch event.phase {
         case .began:
-            scroller = Scroller(self)
-            scroller?.send(event)
+            scrollEditor = ScrollEditor(self)
+            scrollEditor?.send(event)
             oldScrollEvent = event
         case .changed:
-            scroller?.send(event)
+            scrollEditor?.send(event)
             oldScrollEvent = event
         case .ended:
             oldScrollEvent = nil
-            scroller?.send(event)
-            scroller = nil
+            scrollEditor?.send(event)
+            scrollEditor = nil
         }
     }
     
-    private(set) var oldSwipeEvent: SwipeEvent?, swiper: KeyframeSwiper?
+    private(set) var oldSwipeEvent: SwipeEvent?, swipeEditor: SlideKeyframeEditor?
     func swipe(_ event: SwipeEvent) {
         textEditor.moveEndInputKey()
         switch event.phase {
         case .began:
-            swiper = KeyframeSwiper(self)
-            swiper?.send(event)
+            swipeEditor = SlideKeyframeEditor(self)
+            swipeEditor?.send(event)
             oldSwipeEvent = event
         case .changed:
-            swiper?.send(event)
+            swipeEditor?.send(event)
             oldSwipeEvent = event
         case .ended:
             oldSwipeEvent = nil
-            swiper?.send(event)
-            swiper = nil
+            swipeEditor?.send(event)
+            swipeEditor = nil
         }
     }
     
-    private(set) var oldRotateEvent: RotateEvent?, rotater: Rotater?
+    private(set) var oldRotateEvent: RotateEvent?, rotateEditor: RotateEditor?
     func rotate(_ event: RotateEvent) {
         switch event.phase {
         case .began:
-            rotater = Rotater(self)
-            rotater?.send(event)
+            rotateEditor = RotateEditor(self)
+            rotateEditor?.send(event)
             oldRotateEvent = event
         case .changed:
-            rotater?.send(event)
+            rotateEditor?.send(event)
             oldRotateEvent = event
         case .ended:
             oldRotateEvent = nil
-            rotater?.send(event)
-            rotater = nil
+            rotateEditor?.send(event)
+            rotateEditor = nil
         }
     }
     
     func strongDrag(_ event: DragEvent) {}
     
-    private(set) var oldSubDragEvent: DragEvent?, subDragEditor: (any DragEditor)?
+    private(set) var oldSubDragEvent: DragEvent?, subDragEventEditor: (any DragEventEditor)?
     func subDrag(_ event: DragEvent) {
         switch event.phase {
         case .began:
             updateLastEditedIntPoint(from: event)
             stopInputTextEvent()
-            subDragEditor = RangeSelector(self)
-            subDragEditor?.send(event)
+            subDragEventEditor = SelectByRangeEditor(self)
+            subDragEventEditor?.send(event)
             oldSubDragEvent = event
             rootView.textCursorNode.isHidden = true
             rootView.textMaxTypelineWidthNode.isHidden = true
         case .changed:
-            subDragEditor?.send(event)
+            subDragEventEditor?.send(event)
             oldSubDragEvent = event
         case .ended:
             oldSubDragEvent = nil
-            subDragEditor?.send(event)
-            subDragEditor = nil
+            subDragEventEditor?.send(event)
+            subDragEventEditor = nil
             rootView.cursorPoint = event.screenPoint
         }
     }
     
-    private(set) var oldMiddleDragEvent: DragEvent?, middleDragEditor: (any DragEditor)?
+    private(set) var oldMiddleDragEvent: DragEvent?, middleDragEventEditor: (any DragEventEditor)?
     func middleDrag(_ event: DragEvent) {
         switch event.phase {
         case .began:
             updateLastEditedIntPoint(from: event)
             stopInputTextEvent()
-            middleDragEditor = LassoCutter(self)
-            middleDragEditor?.send(event)
+            middleDragEventEditor = LassoCutEditor(self)
+            middleDragEventEditor?.send(event)
             oldMiddleDragEvent = event
             rootView.textCursorNode.isHidden = true
             rootView.textMaxTypelineWidthNode.isHidden = true
         case .changed:
-            middleDragEditor?.send(event)
+            middleDragEventEditor?.send(event)
             oldMiddleDragEvent = event
         case .ended:
             oldMiddleDragEvent = nil
-            middleDragEditor?.send(event)
-            middleDragEditor = nil
+            middleDragEventEditor?.send(event)
+            middleDragEventEditor = nil
             rootView.cursorPoint = event.screenPoint
         }
     }
     
-    private func dragEditor(with quasimode: Quasimode) -> (any DragEditor)? {
+    private func dragEditor(with quasimode: Quasimode) -> (any DragEventEditor)? {
         switch quasimode {
-        case .drawLine: LineDrawer(self)
-        case .drawStraightLine: StraightLineDrawer(self)
-        case .lassoCut: LassoCutter(self)
-        case .selectByRange: RangeSelector(self)
-        case .changeLightness: LightnessChanger(self)
-        case .changeTint: TintChanger(self)
-        case .slide: SlideEditor(self)
-        case .selectFrame: FrameSelecter(self)
-        case .selectVersion: VersionSelector(self)
+        case .drawLine: DrawLineEditor(self)
+        case .drawStraightLine: DrawStraightLineEditor(self)
+        case .lassoCut: LassoCutEditor(self)
+        case .selectByRange: SelectByRangeEditor(self)
+        case .changeLightness: ChangeLightnessEditor(self)
+        case .changeTint: ChangeTintEditor(self)
+        case .selectFrame: SelectFrameEditor(self)
+        case .selectVersion: SelectVersionEditor(self)
+        case .slide: SlideKeyframeEditor(self)
         case .move: MoveEditor(self)
-        case .moveLinePoint: LineSlider(self)
-        case .moveLineZ: LineZSlider(self)
+        case .moveLinePoint: MoveLinePointEditor(self)
+        case .moveLineZ: MoveLineZEditor(self)
         default: nil
         }
     }
-    private(set) var oldDragEvent: DragEvent?, dragEditor: (any DragEditor)?
+    private(set) var oldDragEvent: DragEvent?, dragEditor: (any DragEventEditor)?
     func drag(_ event: DragEvent) {
         switch event.phase {
         case .began:
@@ -274,47 +274,47 @@ final class RootEditor: Editor {
         }
     }
     
-    var runners = Set<RunEditor>() {
+    var runEditors = Set<RunEditor>() {
         didSet {
-            rootView.updateRunners(fromWorldPrintOrigins: runners.map { $0.worldPrintOrigin })
+            rootView.updateRunEditorNodes(fromWorldPrintOrigins: runEditors.map { $0.worldPrintOrigin })
         }
     }
     
-    private func inputKeyEditor(with quasimode: Quasimode) -> (any InputKeyEditor)? {
+    private func inputKeyEditor(with quasimode: Quasimode) -> (any InputKeyEventEditor)? {
         switch quasimode {
-        case .cut: Cutter(self)
-        case .copy: Copier(self)
-        case .copyLineColor: LineColorCopier(self)
-        case .paste: Paster(self)
-        case .undo: Undoer(self)
-        case .redo: Redoer(self)
-        case .find: Finder(self)
-        case .lookUp: Looker(self)
-        case .changeToVerticalText: VerticalTextChanger(self)
-        case .changeToHorizontalText: HorizontalTextChanger(self)
-        case .changeToSuperscript: SuperscriptChanger(self)
-        case .changeToSubscript: SubscriptChanger(self)
+        case .cut: CutEditor(self)
+        case .copy, .controlCopy: CopyEditor(self)
+        case .copyLineColor: CopyLineColorEditor(self)
+        case .paste: PasteEditor(self)
+        case .undo: UndoEditor(self)
+        case .redo: RedoEditor(self)
+        case .find: FindEditor(self)
+        case .lookUp: LookUpEditor(self)
+        case .changeToVerticalText: ChangeToVerticalTextEditor(self)
+        case .changeToHorizontalText: ChangeToHorizontalTextEditor(self)
+        case .changeToSuperscript: ChangeToSuperscriptEditor(self)
+        case .changeToSubscript: ChangeToSubscriptEditor(self)
         case .run: RunEditor(self)
-        case .changeToDraft: DraftChanger(self)
-        case .cutDraft: DraftCutter(self)
-        case .makeFaces: FacesMaker(self)
-        case .cutFaces: FacesCutter(self)
-        case .play: Player(self)
-        case .goPrevious: KeyframePreviousMover(self)
-        case .goNext: KeyframeNextMover(self)
-        case .goPreviousFrame: FramePreviousMover(self)
-        case .goNextFrame: FrameNextMover(self)
-        case .insertKeyframe: KeyframeInserter(self)
-        case .addScore: ScoreAdder(self)
-        case .interpolate: Interpolater(self)
-        case .crossErase: CrossEraser(self)
-        case .showTone: ToneShower(self)
-        case .stop: Stopper(self)
+        case .changeToDraft: ChangeToDraftEditor(self)
+        case .cutDraft: CutDraftEditor(self)
+        case .makeFaces: MakeFacesEditor(self)
+        case .cutFaces: CutFacesEditor(self)
+        case .play: PlayEditor(self)
+        case .goPrevious: GoPreviousEditor(self)
+        case .goNext: GoNextEditor(self)
+        case .goPreviousFrame: GoPreviousFrameEditor(self)
+        case .goNextFrame: GoNextFrameEditor(self)
+        case .insertKeyframe: InsertKeyframeEditor(self)
+        case .addScore: AddScoreEditor(self)
+        case .interpolate, .controlInterpolate: InterpolateEditor(self)
+        case .crossErase: CrossEraseEditor(self)
+        case .showNoteTone: ShowNoteToneEditor(self)
+        case .stop: StopEditor(self)
         default: nil
         }
     }
     private(set) var oldInputKeyEvent: InputKeyEvent?
-    private(set) var inputKeyEditor: (any InputKeyEditor)?
+    private(set) var inputKeyEditor: (any InputKeyEventEditor)?
     func inputKey(_ event: InputKeyEvent) {
         switch event.phase {
         case .began:
@@ -393,31 +393,31 @@ final class RootEditor: Editor {
         modifierKeys = []
     }
     func stopPinchEvent() {
-        if var event = oldPinchEvent, let pinchEditor = zoomer {
+        if var event = oldPinchEvent, let zoomEditor {
             event.phase = .ended
-            self.zoomer = nil
+            self.zoomEditor = nil
             oldPinchEvent = nil
-            pinchEditor.send(event)
+            zoomEditor.send(event)
         }
     }
     func stopScrollEvent() {
-        if var event = oldScrollEvent, let scrollEditor = scroller {
+        if var event = oldScrollEvent, let scrollEditor {
             event.phase = .ended
-            self.scroller = nil
+            self.scrollEditor = nil
             oldScrollEvent = nil
             scrollEditor.send(event)
         }
     }
     func stopSwipeEvent() {
-        if var event = oldSwipeEvent, let swiper {
+        if var event = oldSwipeEvent, let swipeEditor {
             event.phase = .ended
-            self.swiper = nil
+            self.swipeEditor = nil
             oldSwipeEvent = nil
-            swiper.send(event)
+            swipeEditor.send(event)
         }
     }
     func stopDragEvent() {
-        if var event = oldDragEvent, let dragEditor = dragEditor {
+        if var event = oldDragEvent, let dragEditor {
             event.phase = .ended
             self.dragEditor = nil
             oldDragEvent = nil
@@ -429,7 +429,7 @@ final class RootEditor: Editor {
         textEditor.stopInputKey(isEndEdit: isEndEdit)
     }
     func stopInputKeyEvent() {
-        if var event = oldInputKeyEvent, let inputKeyEditor = inputKeyEditor {
+        if var event = oldInputKeyEvent, let inputKeyEditor {
             event.phase = .ended
             self.inputKeyEditor = nil
             oldInputKeyEvent = nil
@@ -437,15 +437,15 @@ final class RootEditor: Editor {
         }
     }
     func updateEditorNode() {
-        zoomer?.updateNode()
-        scroller?.updateNode()
-        swiper?.updateNode()
+        zoomEditor?.updateNode()
+        scrollEditor?.updateNode()
+        swipeEditor?.updateNode()
         dragEditor?.updateNode()
         inputKeyEditor?.updateNode()
     }
 }
 
-final class Zoomer: PinchEditor {
+final class ZoomEditor: PinchEventEditor {
     let rootEditor: RootEditor, rootView: RootView
     
     init(_ rootEditor: RootEditor) {
@@ -483,7 +483,7 @@ final class Zoomer: PinchEditor {
     }
 }
 
-final class Rotater: RotateEditor {
+final class RotateEditor: RotateEventEditor {
     let rootEditor: RootEditor, rootView: RootView
     
     init(_ rootEditor: RootEditor) {
@@ -533,7 +533,7 @@ final class Rotater: RotateEditor {
     }
 }
 
-final class Scroller: ScrollEditor {
+final class ScrollEditor: ScrollEventEditor {
     let rootEditor: RootEditor, rootView: RootView
     
     init(_ rootEditor: RootEditor) {
@@ -547,9 +547,7 @@ final class Scroller: ScrollEditor {
     private let correction = 1.0
     private let updateSpeed = 1000.0
     private var isHighSpeed = false, oldTime = 0.0, oldDeltaPoint = Point()
-    private var oldSpeedTime = 0.0, oldSpeedDistance = 0.0,
-                oldSpeed = 0.0
-    private var isMoveTime = false, timeMover: FrameSelecter?
+    private var oldSpeedTime = 0.0, oldSpeedDistance = 0.0, oldSpeed = 0.0
     func send(_ event: ScrollEvent) {
         switch event.phase {
         case .began:
@@ -597,7 +595,228 @@ final class Scroller: ScrollEditor {
     }
 }
 
-final class DraftChanger: InputKeyEditor {
+final class SelectByRangeEditor: DragEventEditor {
+    let rootEditor: RootEditor, rootView: RootView
+    
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+    }
+    
+    private var firstP = Point(), multiSelectFrameEditor: MultiSelectFrameEditor?
+    let snappedDistance = 4.0
+    
+    func send(_ event: DragEvent) {
+        let p = rootView.convertScreenToWorld(event.screenPoint)
+        switch event.phase {
+        case .began:
+            if let sheetView = rootView.sheetView(at: p),
+               sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p),
+                                                        scale: rootView.screenToWorldScale) {
+                
+                multiSelectFrameEditor = .init(rootEditor)
+                multiSelectFrameEditor?.send(event)
+                return
+            }
+            
+            rootView.cursor = .arrow
+            rootView.selections.append(Selection(rect: Rect(Edge(p, p)),
+                                             rectCorner: .maxXMinY))
+            firstP = p
+        case .changed:
+            if let multiSelectFrameEditor {
+                multiSelectFrameEditor.send(event)
+                return
+            }
+//            guard firstP.distance(p) >= snappedDistance * rootView.screenToWorldScale else {
+//                rootView.selections = []
+//                return
+//            }
+            let orientation: RectCorner
+            if firstP.x < p.x {
+                if firstP.y < p.y {
+                    orientation = .maxXMaxY
+                } else {
+                    orientation = .maxXMinY
+                }
+            } else {
+                if firstP.y < p.y {
+                    orientation = .minXMaxY
+                } else {
+                    orientation = .minXMinY
+                }
+            }
+            if rootView.selections.isEmpty {
+                rootView.selections = [Selection(rect: Rect(Edge(p, p)),
+                                                 rectCorner: .maxXMinY)]
+            } else {
+                rootView.selections[.last] = Selection(rect: Rect(Edge(firstP, p)),
+                                                        rectCorner: orientation)
+            }
+            
+        case .ended:
+            if let multiSelectFrameEditor {
+                multiSelectFrameEditor.send(event)
+                return
+            }
+            rootView.cursor = rootView.defaultCursor
+        }
+    }
+}
+final class MultiSelectFrameEditor: DragEventEditor {
+    let rootEditor: RootEditor, rootView: RootView
+    let isEditingSheet: Bool
+    
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+        isEditingSheet = rootView.isEditingSheet
+    }
+    
+    private var sheetView: SheetView?
+    private var beganRootBeatPosition = Animation.RootBeatPosition(),
+                movedBeganRootBeatPosition = Animation.RootBeatPosition(),
+                beganSelectedRootBeat = Rational(0),
+                beganSelectedFrameIndexes = [Int]()
+    private var lastRootBeats = [(sec: Double, rootBeat: Rational)](capacity: 128)
+    private var minLastSec = 1 / 12.0
+    
+    private func updateSelected(fromRootBeeat nRootBeat: Rational,
+                                in animationView: AnimationView) {
+        var isSelects = [Bool](repeating: false, count: animationView.model.keyframes.count)
+        let beganRootIndex = animationView.model.nearestRootIndex(atRootBeat: beganSelectedRootBeat)
+        let ni = animationView.model.nearestRootIndex(atRootBeat: nRootBeat)
+        let range = beganRootIndex <= ni ? beganRootIndex ... ni : ni ... beganRootIndex
+        for i in range {
+            let ki = animationView.model.index(atRoot: i)
+            isSelects[ki] = true
+        }
+        beganSelectedFrameIndexes.forEach { isSelects[$0] = true }
+        let fis = isSelects.enumerated().compactMap { $0.element ? $0.offset : nil }
+        animationView.selectedFrameIndexes = fis
+    }
+    
+    func send(_ event: DragEvent) {
+        guard isEditingSheet else {
+            rootEditor.keepOut(with: event)
+            return
+        }
+        if rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
+        }
+        
+        let p = rootView.convertScreenToWorld(event.screenPoint)
+        switch event.phase {
+        case .began:
+            rootView.cursor = .arrow
+            if let sheetView = rootView.sheetView(at: p),
+               sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p),
+                                                        scale: rootView.screenToWorldScale) {
+                self.sheetView = sheetView
+                let animationView = sheetView.animationView
+                beganRootBeatPosition = sheetView.rootBeatPosition
+                
+                var rbp = movedBeganRootBeatPosition
+                rbp.beat = animationView.beat(atX: sheetView.convertFromWorld(p).x)
+                let nRootBeat = animationView.model.rootBeat(at: rbp)
+                if animationView.rootBeat != nRootBeat {
+                    sheetView.rootBeat = nRootBeat
+                    rootEditor.updateEditorNode()
+                    rootView.updateSelects()
+                }
+                animationView.shownInterTypeKeyframeIndex = animationView.model.index
+                
+                movedBeganRootBeatPosition = sheetView.rootBeatPosition
+                beganSelectedFrameIndexes = animationView.selectedFrameIndexes
+                beganSelectedRootBeat = nRootBeat
+                lastRootBeats.append((event.time, beganSelectedRootBeat))
+                var isSelects = [Bool](repeating: false, count: animationView.model.keyframes.count)
+                let beganRootIndex = animationView.model.nearestRootIndex(atRootBeat: beganSelectedRootBeat)
+                let ni = animationView.model.nearestRootIndex(atRootBeat: nRootBeat)
+                let range = beganRootIndex <= ni ? beganRootIndex ... ni : ni ... beganRootIndex
+                
+                for i in range {
+                    let ki = animationView.model.index(atRoot: i)
+                    isSelects[ki] = true
+                }
+                beganSelectedFrameIndexes.forEach { isSelects[$0] = true }
+                let fis = isSelects.enumerated().compactMap { $0.element ? $0.offset : nil }
+                animationView.selectedFrameIndexes = fis
+            }
+        case .changed:
+            if let sheetView {
+                let animationView = sheetView.animationView
+                let oldKI = animationView.model.index
+                var bp = movedBeganRootBeatPosition
+                bp.beat = animationView.beat(atX: sheetView.convertFromWorld(p).x)
+                let nRootBeat = animationView.model.rootBeat(at: bp)
+                
+                if sheetView.rootBeat != nRootBeat {
+                    sheetView.rootBeat = nRootBeat
+                    rootEditor.updateEditorNode()
+                    rootView.updateSelects()
+                    
+                    lastRootBeats.append((event.time, nRootBeat))
+                    for (i, v) in lastRootBeats.enumerated().reversed() {
+                        if event.time - v.sec > minLastSec {
+                            if i > 0 {
+                                lastRootBeats.removeFirst(i - 1)
+                            }
+                            break
+                        }
+                    }
+                    
+                    if oldKI != animationView.model.index {
+                        animationView.shownInterTypeKeyframeIndex = animationView.model.index
+                        
+                        updateSelected(fromRootBeeat: nRootBeat, in: animationView)
+                    }
+                }
+            }
+        case .ended:
+            if let sheetView {
+                let animationView = sheetView.animationView
+                animationView.shownInterTypeKeyframeIndex = nil
+                
+                sheetView.rootBeatPosition = beganRootBeatPosition
+                
+                for (sec, rootBeat) in lastRootBeats.reversed() {
+                    if event.time - sec > minLastSec {
+                        let animationView = sheetView.animationView
+                        updateSelected(fromRootBeeat: rootBeat, in: animationView)
+                        break
+                    }
+                }
+            }
+            
+            rootView.cursor = rootView.defaultCursor
+        }
+    }
+}
+final class UnselectEditor: InputKeyEventEditor {
+    let rootEditor: RootEditor, rootView: RootView
+    
+    init(_ rootEditor: RootEditor) {
+        self.rootEditor = rootEditor
+        rootView = rootEditor.rootView
+    }
+    
+    func send(_ event: InputKeyEvent) {
+        switch event.phase {
+        case .began:
+            rootView.cursor = .arrow
+            
+            rootView.closeLookingUp()
+            rootView.selections = []
+        case .changed:
+            break
+        case .ended:
+            rootView.cursor = rootView.defaultCursor
+        }
+    }
+}
+
+final class ChangeToDraftEditor: InputKeyEventEditor {
     let editor: DraftEditor
     
     init(_ rootEditor: RootEditor) {
@@ -611,7 +830,7 @@ final class DraftChanger: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class DraftCutter: InputKeyEditor {
+final class CutDraftEditor: InputKeyEventEditor {
     let editor: DraftEditor
     
     init(_ rootEditor: RootEditor) {
@@ -828,7 +1047,7 @@ final class DraftEditor: Editor {
     }
 }
 
-final class FacesMaker: InputKeyEditor {
+final class MakeFacesEditor: InputKeyEventEditor {
     let editor: FaceEditor
     
     init(_ rootEditor: RootEditor) {
@@ -842,7 +1061,7 @@ final class FacesMaker: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class FacesCutter: InputKeyEditor {
+final class CutFacesEditor: InputKeyEventEditor {
     let editor: FaceEditor
     
     init(_ rootEditor: RootEditor) {
@@ -1030,7 +1249,7 @@ final class FaceEditor: Editor {
     }
 }
 
-final class ScoreAdder: InputKeyEditor {
+final class AddScoreEditor: InputKeyEventEditor {
     let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
@@ -1074,7 +1293,7 @@ final class ScoreAdder: InputKeyEditor {
     }
 }
 
-final class ToneShower: InputKeyEditor {
+final class ShowNoteToneEditor: InputKeyEventEditor {
     let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     

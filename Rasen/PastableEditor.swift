@@ -503,11 +503,11 @@ extension PastableObject {
     }
 }
 
-final class Cutter: InputKeyEditor {
-    let editor: CopyEditor
+final class CutEditor: InputKeyEventEditor {
+    let editor: PastableEditor
     
     init(_ rootEditor: RootEditor) {
-        editor = CopyEditor(rootEditor)
+        editor = PastableEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -517,11 +517,11 @@ final class Cutter: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class Copier: InputKeyEditor {
-    let editor: CopyEditor
+final class CopyEditor: InputKeyEventEditor {
+    let editor: PastableEditor
     
     init(_ rootEditor: RootEditor) {
-        editor = CopyEditor(rootEditor)
+        editor = PastableEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -531,11 +531,11 @@ final class Copier: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class Paster: InputKeyEditor {
-    let editor: CopyEditor
+final class PasteEditor: InputKeyEventEditor {
+    let editor: PastableEditor
     
     init(_ rootEditor: RootEditor) {
-        editor = CopyEditor(rootEditor)
+        editor = PastableEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -545,7 +545,7 @@ final class Paster: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class CopyEditor: Editor {
+final class PastableEditor: Editor {
     let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     
@@ -1773,7 +1773,7 @@ final class CopyEditor: Editor {
                     let nxs = xs.sorted(), nys = ys.sorted()
                     let width = nxs[1] - nxs[0], height = nys[1] - nys[0]
                     let nString = nBorder.location.string(digitsCount: 1, enabledZeroInteger: false)
-                    rootView.cursor = rootView.cursor(from: "\(nString) (\(Looker.sizeString(from: .init(width: width, height: height))))")
+                    rootView.cursor = rootView.cursor(from: "\(nString) (\(LookUpEditor.sizeString(from: .init(width: width, height: height))))")
                 } else {
                     let nString = nBorder.location.string(digitsCount: 1, enabledZeroInteger: false)
                     rootView.cursor = switch nBorder.orientation {
@@ -2805,10 +2805,10 @@ final class CopyEditor: Editor {
         let sp = rootView.selectedScreenPositionNoneCursor
             ?? event.screenPoint
         let p = rootView.convertScreenToWorld(sp)
-        for runner in rootEditor.runners {
-            if runner.containsCalculating(p) {
-                Pasteboard.shared.copiedObjects = [.string(runner.calculatingString)]
-                runner.cancel()
+        for runEditor in rootEditor.runEditors {
+            if runEditor.containsCalculating(p) {
+                Pasteboard.shared.copiedObjects = [.string(runEditor.calculatingString)]
+                runEditor.cancel()
                 return
             }
         }
@@ -3174,7 +3174,7 @@ final class CopyEditor: Editor {
     }
 }
 
-final class LineColorCopier: InputKeyEditor {
+final class CopyLineColorEditor: InputKeyEventEditor {
     let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
     

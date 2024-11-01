@@ -641,7 +641,7 @@ final class RootView: View, @unchecked Sendable {
                       in: screenBounds)
         updateGrid(with: screenToWorldTransform, in: screenBounds)
         updateNodeNotifications.forEach { $0(self) }
-        updateRunnerNodesPosition()
+        updateRunEditorNodesPosition()
         updateSheetViewsWithCamera()
 //        updateCursorNode()
     }
@@ -686,50 +686,50 @@ final class RootView: View, @unchecked Sendable {
     var sheetLineWidth: Double { Line.defaultLineWidth }
     var sheetTextSize: Double { camera.logScale > 2 ? 100.0 : Font.defaultSize }
     
-    var runnerNodes = [(origin: Point, node: Node)]()
-    var runnersNode: Node?
-    func updateRunners(fromWorldPrintOrigins wpos: [Point]) {
-        runnerNodes.forEach { $0.node.removeFromParent() }
-        runnerNodes = wpos.map {
+    var runEditorNodes = [(origin: Point, node: Node)]()
+    var runEditorsNode: Node?
+    func updateRunEditorNodes(fromWorldPrintOrigins wpos: [Point]) {
+        runEditorNodes.forEach { $0.node.removeFromParent() }
+        runEditorNodes = wpos.map {
             let text = Text(string: "Calculating".localized)
             let textNode = text.node
-            let runnerNode = Node(children: [textNode], isHidden: true,
+            let runEditorNode = Node(children: [textNode], isHidden: true,
                                   path: Path(textNode.bounds?.inset(by: -10) ?? Rect(),
                                              cornerRadius: 8),
                                   lineWidth: 1, lineType: .color(.border),
                                   fillType: .color(.background))
-            return ($0, runnerNode)
+            return ($0, runEditorNode)
         }
-        runnerNodes.forEach { node.append(child: $0.node) }
+        runEditorNodes.forEach { node.append(child: $0.node) }
         
-        updateRunnerNodesPosition()
+        updateRunEditorNodesPosition()
     }
-    func updateRunnerNodesPosition() {
-        guard !runnerNodes.isEmpty else { return }
+    func updateRunEditorNodesPosition() {
+        guard !runEditorNodes.isEmpty else { return }
         let b = screenBounds.inset(by: 5)
-        for (p, runnerNode) in runnerNodes {
+        for (p, runEditorNode) in runEditorNodes {
             let sp = convertWorldToScreen(p)
             if !b.contains(sp) || worldToScreenScale < 0.25 {
-                runnerNode.isHidden = false
+                runEditorNode.isHidden = false
                 
                 let fp = b.centerPoint
                 let ps = b.intersection(Edge(fp, sp))
-                if !ps.isEmpty, let cvb = runnerNode.bounds {
+                if !ps.isEmpty, let cvb = runEditorNode.bounds {
                     let np = ps[0]
                     let cvf = Rect(x: np.x - cvb.width / 2,
                                    y: np.y - cvb.height / 2,
                                    width: cvb.width, height: cvb.height)
                     let nf = screenBounds.inset(by: 5).clipped(cvf)
-                    runnerNode.attitude.position = convertScreenToWorld(nf.origin - cvb.origin)
+                    runEditorNode.attitude.position = convertScreenToWorld(nf.origin - cvb.origin)
                 } else {
-                    runnerNode.attitude.position = p
+                    runEditorNode.attitude.position = p
                 }
-                runnerNode.attitude.scale = Size(square: 1 / worldToScreenScale)
+                runEditorNode.attitude.scale = Size(square: 1 / worldToScreenScale)
                 if camera.rotation != 0 {
-                    runnerNode.attitude.rotation = camera.rotation
+                    runEditorNode.attitude.rotation = camera.rotation
                 }
             } else {
-                runnerNode.isHidden = true
+                runEditorNode.isHidden = true
             }
         }
     }

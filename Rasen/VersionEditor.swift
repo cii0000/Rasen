@@ -17,11 +17,11 @@
 
 import struct Foundation.Date
 
-final class Undoer: InputKeyEditor {
-    let editor: UndoEditor
+final class UndoEditor: InputKeyEventEditor {
+    let editor: VersionEditor
     
     init(_ rootEditor: RootEditor) {
-        editor = UndoEditor(rootEditor)
+        editor = VersionEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -31,11 +31,11 @@ final class Undoer: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class Redoer: InputKeyEditor {
-    let editor: UndoEditor
+final class RedoEditor: InputKeyEventEditor {
+    let editor: VersionEditor
     
     init(_ rootEditor: RootEditor) {
-        editor = UndoEditor(rootEditor)
+        editor = VersionEditor(rootEditor)
     }
     
     func send(_ event: InputKeyEvent) {
@@ -45,11 +45,11 @@ final class Redoer: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class VersionSelector: DragEditor {
-    let editor: UndoEditor
+final class SelectVersionEditor: DragEventEditor {
+    let editor: VersionEditor
     
     init(_ rootEditor: RootEditor) {
-        editor = UndoEditor(rootEditor)
+        editor = VersionEditor(rootEditor)
     }
     
     func send(_ event: DragEvent) {
@@ -59,7 +59,7 @@ final class VersionSelector: DragEditor {
         editor.updateNode()
     }
 }
-final class UndoEditor: Editor {
+final class VersionEditor: Editor {
     let rootEditor: RootEditor, rootView: RootView
     
     init(_ rootEditor: RootEditor) {
@@ -588,7 +588,7 @@ extension RootView {
     }
 }
 
-final class HistoryCleaner: InputKeyEditor {
+final class ClearHistoryEditor: InputKeyEventEditor {
     let rootEditor: RootEditor, rootView: RootView
     
     init(_ rootEditor: RootEditor) {

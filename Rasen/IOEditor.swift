@@ -19,7 +19,7 @@ import struct Foundation.UUID
 import struct Foundation.Data
 import struct Foundation.URL
 
-final class Importer: InputKeyEditor {
+final class ImportEditor: InputKeyEventEditor {
     let editor: IOEditor
     
     init(_ rootEditor: RootEditor) {
@@ -33,7 +33,7 @@ final class Importer: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class Exporter: InputKeyEditor {
+final class StartExportEditor: InputKeyEventEditor {
     let editor: IOEditor
     
     init(_ rootEditor: RootEditor) {
@@ -47,7 +47,7 @@ final class Exporter: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class ImageExporter: InputKeyEditor {
+final class ExportAsImageEditor: InputKeyEventEditor {
     let editor: IOEditor
     
     init(_ rootEditor: RootEditor) {
@@ -61,7 +61,7 @@ final class ImageExporter: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class Image4KExporter: InputKeyEditor {
+final class ExportAs4KImageEditor: InputKeyEventEditor {
     let editor: IOEditor
     
     init(_ rootEditor: RootEditor) {
@@ -75,7 +75,7 @@ final class Image4KExporter: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class PDFExporter: InputKeyEditor {
+final class ExportAsPDFEditor: InputKeyEventEditor {
     let editor: IOEditor
     
     init(_ rootEditor: RootEditor) {
@@ -89,7 +89,7 @@ final class PDFExporter: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class GIFExporter: InputKeyEditor {
+final class ExportAsGIFEditor: InputKeyEventEditor {
     let editor: IOEditor
     
     init(_ rootEditor: RootEditor) {
@@ -103,7 +103,7 @@ final class GIFExporter: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class MovieExporter: InputKeyEditor {
+final class ExportAsMovieEditor: InputKeyEventEditor {
     let editor: IOEditor
     
     init(_ rootEditor: RootEditor) {
@@ -118,7 +118,7 @@ final class MovieExporter: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class Movie4KExporter: InputKeyEditor {
+final class ExportAs4KMovieEditor: InputKeyEventEditor {
     let editor: IOEditor
     
     init(_ rootEditor: RootEditor) {
@@ -132,7 +132,7 @@ final class Movie4KExporter: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class SoundExporter: InputKeyEditor {
+final class ExportAsSoundEditor: InputKeyEventEditor {
     let editor: IOEditor
     
     init(_ rootEditor: RootEditor) {
@@ -146,7 +146,7 @@ final class SoundExporter: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class LinearPCMExporter: InputKeyEditor {
+final class ExportAsLinearPCMEditor: InputKeyEventEditor {
     let editor: IOEditor
     
     init(_ rootEditor: RootEditor) {
@@ -160,21 +160,7 @@ final class LinearPCMExporter: InputKeyEditor {
         editor.updateNode()
     }
 }
-final class DocumentExporter: InputKeyEditor {
-    let editor: IOEditor
-    
-    init(_ rootEditor: RootEditor) {
-        editor = IOEditor(rootEditor)
-    }
-    
-    func send(_ event: InputKeyEvent) {
-        editor.exportFile(with: event, .documentWithHistory)
-    }
-    func updateNode() {
-        editor.updateNode()
-    }
-}
-final class DocumentWithoutHistoryExporter: InputKeyEditor {
+final class ExportAsDocumentEditor: InputKeyEventEditor {
     let editor: IOEditor
     
     init(_ rootEditor: RootEditor) {
@@ -183,6 +169,20 @@ final class DocumentWithoutHistoryExporter: InputKeyEditor {
     
     func send(_ event: InputKeyEvent) {
         editor.exportFile(with: event, .document)
+    }
+    func updateNode() {
+        editor.updateNode()
+    }
+}
+final class ExportAsDocumentWithHistoryEditor: InputKeyEventEditor {
+    let editor: IOEditor
+    
+    init(_ rootEditor: RootEditor) {
+        editor = IOEditor(rootEditor)
+    }
+    
+    func send(_ event: InputKeyEvent) {
+        editor.exportFile(with: event, .documentWithHistory)
     }
     func updateNode() {
         editor.updateNode()
@@ -1577,7 +1577,7 @@ final class IOEditor: Editor {
     }
 }
 
-final class ToMP4MovieEditor: InputKeyEditor {
+final class ToMP4MovieEditor: InputKeyEventEditor {
     let rootEditor: RootEditor, rootView: RootView
     
     init(_ rootEditor: RootEditor) {

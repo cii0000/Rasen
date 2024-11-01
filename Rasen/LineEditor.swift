@@ -17,98 +17,7 @@
 
 import Dispatch
 
-final class RangeSelector: DragEditor {
-    let rootEditor: RootEditor, rootView: RootView
-    
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
-    }
-    
-    private var firstP = Point(), multiFrameSlider: MultiFrameSlider?
-    let snappedDistance = 4.0
-    
-    func send(_ event: DragEvent) {
-        let p = rootView.convertScreenToWorld(event.screenPoint)
-        switch event.phase {
-        case .began:
-            if let sheetView = rootView.sheetView(at: p),
-               sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p),
-                                                        scale: rootView.screenToWorldScale) {
-                
-                multiFrameSlider = MultiFrameSlider(rootEditor)
-                multiFrameSlider?.send(event)
-                return
-            }
-            
-            rootView.cursor = .arrow
-            rootView.selections.append(Selection(rect: Rect(Edge(p, p)),
-                                             rectCorner: .maxXMinY))
-            firstP = p
-        case .changed:
-            if let multiFrameSlider {
-                multiFrameSlider.send(event)
-                return
-            }
-//            guard firstP.distance(p) >= snappedDistance * rootView.screenToWorldScale else {
-//                rootView.selections = []
-//                return
-//            }
-            let orientation: RectCorner
-            if firstP.x < p.x {
-                if firstP.y < p.y {
-                    orientation = .maxXMaxY
-                } else {
-                    orientation = .maxXMinY
-                }
-            } else {
-                if firstP.y < p.y {
-                    orientation = .minXMaxY
-                } else {
-                    orientation = .minXMinY
-                }
-            }
-            if rootView.selections.isEmpty {
-                rootView.selections = [Selection(rect: Rect(Edge(p, p)),
-                                                 rectCorner: .maxXMinY)]
-            } else {
-                rootView.selections[.last] = Selection(rect: Rect(Edge(firstP, p)),
-                                                        rectCorner: orientation)
-            }
-            
-        case .ended:
-            if let multiFrameSlider {
-                multiFrameSlider.send(event)
-                return
-            }
-            rootView.cursor = rootView.defaultCursor
-        }
-    }
-}
-final class Unselector: InputKeyEditor {
-    let rootEditor: RootEditor, rootView: RootView
-    
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
-    }
-    
-    func send(_ event: InputKeyEvent) {
-        switch event.phase {
-        case .began:
-            rootView.cursor = .arrow
-            
-            rootView.closeLookingUp()
-            rootView.selections = []
-        case .changed:
-            break
-        case .ended:
-            rootView.cursor = rootView.defaultCursor
-        }
-    }
-}
-
-final class LineDrawer: DragEditor {
+final class DrawLineEditor: DragEventEditor {
     let editor: LineEditor
     
     init(_ rootEditor: RootEditor) {
@@ -122,7 +31,7 @@ final class LineDrawer: DragEditor {
         editor.updateNode()
     }
 }
-final class StraightLineDrawer: DragEditor {
+final class DrawStraightLineEditor: DragEventEditor {
     let editor: LineEditor
     
     init(_ rootEditor: RootEditor) {
@@ -136,7 +45,7 @@ final class StraightLineDrawer: DragEditor {
         editor.updateNode()
     }
 }
-final class LassoCutter: DragEditor {
+final class LassoCutEditor: DragEventEditor {
     let editor: LineEditor
     
     init(_ rootEditor: RootEditor) {
@@ -150,7 +59,7 @@ final class LassoCutter: DragEditor {
         editor.updateNode()
     }
 }
-final class LassoCopier: DragEditor {
+final class LassoCopyEditor: DragEventEditor {
     let editor: LineEditor
     
     init(_ rootEditor: RootEditor) {
