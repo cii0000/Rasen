@@ -320,27 +320,7 @@ final class TextOrientationEditor: Editor {
     }
     func changeTextOrientation(_ orientation: Orientation, with event: InputKeyEvent) {
         guard isEditingSheet else {
-            switch event.phase {
-            case .began:
-                rootView.cursor = .arrow
-                
-                let p = rootView.convertScreenToWorld(event.screenPoint)
-                var shp = rootView.sheetPosition(at: p)
-                let isRight = orientation == .horizontal
-                if let sid = rootView.sheetID(at: shp),
-                   shp.isRight != isRight {
-                   
-                    shp.isRight = isRight
-                    rootView.history.newUndoGroup()
-                    rootView.removeSheets(at: [shp])
-                    rootView.append([shp: sid])
-                }
-            case .changed:
-                break
-            case .ended:
-                rootView.cursor = rootView.defaultCursor
-            }
-            
+            rootEditor.keepOut(with: event)
             return
         }
         switch event.phase {

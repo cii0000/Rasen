@@ -990,7 +990,7 @@ extension O {
     init(_ p: Point) {
         self = .array(OArray([O(p.x), O(p.y)]))
     }
-    init(_ shp: Sheetpos) {
+    init(_ shp: IntPoint) {
         self = .array(OArray([O(shp.x), O(shp.y)]))
     }
     static let pointName = "point"

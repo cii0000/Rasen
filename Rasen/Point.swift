@@ -27,6 +27,26 @@ struct IntPoint {
         self.y = y
     }
 }
+extension IntPoint: Protobuf {
+    init(_ pb: PBIntPoint) throws {
+        x = .init(pb.x)
+        y = .init(pb.y)
+    }
+    var pb: PBIntPoint {
+        .with {
+            $0.x = .init(x)
+            $0.y = .init(y)
+        }
+    }
+}
+extension Array where Element == IntPoint {
+    init(_ pb: PBIntPointArray) throws {
+        self = try pb.value.map { try .init($0) }
+    }
+    var pb: PBIntPointArray {
+        .with { $0.value = map { $0.pb } }
+    }
+}
 extension IntPoint: Hashable {}
 extension IntPoint: Codable {
     init(from decoder: any Decoder) throws {

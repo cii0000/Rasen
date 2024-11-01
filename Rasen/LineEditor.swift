@@ -206,7 +206,7 @@ final class LineEditor: Editor {
     var lastSnapStraightTime = 0.0
     
     var centerOrigin = Point(), centerBounds = Rect(), clipBounds = Rect()
-    var centerSHP = Sheetpos(), nearestShps = [Sheetpos]()
+    var centerSHP = IntPoint(), nearestShps = [IntPoint]()
     var tempLine = Line()
     
     func updateNode() {
@@ -229,10 +229,8 @@ final class LineEditor: Editor {
         }
     }
     func updateClipBoundsAndIndexRange(at p: Point) {
-        let ip = rootView.intPosition(at: p)
-        let shp = rootView.sheetPosition(at: ip)
-        let aroundShps = rootView.aroundSheetpos(atCenter: ip).map { $0.shp }
-        nearestShps = [shp] + aroundShps
+        let shp = rootView.sheetPosition(at: p)
+        nearestShps = [shp] + rootView.aroundSheetPositions(atCenter: shp)
         
         let nearestB = nearestShps.reduce(into: rootView.sheetFrame(with: shp)) {
             $0.formUnion(rootView.sheetFrame(with: $1))
@@ -1693,7 +1691,7 @@ final class LineEditor: Editor {
     var rectNode: Node?
     
     struct Value {
-        var shp: Sheetpos, frame: Rect
+        var shp: IntPoint, frame: Rect
     }
     func values(with line: Line) -> [Value] {
         guard let rect = line.bounds else { return [] }

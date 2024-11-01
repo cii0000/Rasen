@@ -1072,18 +1072,16 @@ final class Player: InputKeyEditor {
             rootView.cursor = .arrow
             
             sheetView = rootView.sheetView(at: p)
-            let cip = rootView.intPosition(at: p)
-            let cshp = rootView.sheetPosition(at: cip)
-            if let cSheetView = rootView.sheetView(at: cshp) {
+            let cShp = rootView.sheetPosition(at: p)
+            if let cSheetView = rootView.sheetView(at: cShp) {
                 for (_, v) in rootView.sheetViewValues {
                     if cSheetView != v.sheetView {
                         v.sheetView?.stop()
                     }
                 }
                 
-                var filledShps = Set<Sheetpos>()
-                func sheetView(at ip: IntPoint) -> SheetView? {
-                    let shp = rootView.sheetPosition(at: ip)
+                var filledShps = Set<IntPoint>()
+                func sheetView(at shp: IntPoint) -> SheetView? {
                     if !filledShps.contains(shp),
                        let aSheetView = rootView.sheetView(at: shp),
                        aSheetView.model.enabledTimeline {
@@ -1095,36 +1093,30 @@ final class Player: InputKeyEditor {
                     }
                 }
                 
-                let preX = cshp == rootView.world.sheetpos(at: .init(cip.x - 1, cip.y))
-                ? cip.x - 2 : cip.x - 1
-                
-                let nextX = cshp == rootView.world.sheetpos(at: .init(cip.x + 1, cip.y))
-                ? cip.x + 2 : cip.x + 1
-                
-                if let aSheetView = sheetView(at: .init(preX, cip.y)) {
+                if let aSheetView = sheetView(at: .init(cShp.x - 1, cShp.y)) {
                     cSheetView.previousSheetView = aSheetView
                     
-                    if let aaSheetView = sheetView(at: .init(preX, cip.y - 1)) {
+                    if let aaSheetView = sheetView(at: .init(cShp.x - 1, cShp.y - 1)) {
                         aSheetView.bottomSheetView = aaSheetView
                     }
-                    if let aaSheetView = sheetView(at: .init(preX, cip.y + 1)) {
+                    if let aaSheetView = sheetView(at: .init(cShp.x - 1, cShp.y + 1)) {
                         aSheetView.topSheetView = aaSheetView
                     }
                 }
-                if let aSheetView = sheetView(at: .init(nextX, cip.y)) {
+                if let aSheetView = sheetView(at: .init(cShp.x + 1, cShp.y)) {
                     cSheetView.nextSheetView = aSheetView
                     
-                    if let aaSheetView = sheetView(at: .init(nextX, cip.y - 1)) {
+                    if let aaSheetView = sheetView(at: .init(cShp.x + 1, cShp.y - 1)) {
                         aSheetView.bottomSheetView = aaSheetView
                     }
-                    if let aaSheetView = sheetView(at: .init(nextX, cip.y + 1)) {
+                    if let aaSheetView = sheetView(at: .init(cShp.x + 1, cShp.y + 1)) {
                         aSheetView.topSheetView = aaSheetView
                     }
                 }
-                if let aSheetView = sheetView(at: .init(cip.x, cip.y - 1)) {
+                if let aSheetView = sheetView(at: .init(cShp.x, cShp.y - 1)) {
                     cSheetView.bottomSheetView = aSheetView
                 }
-                if let aSheetView = sheetView(at: .init(cip.x, cip.y + 1)) {
+                if let aSheetView = sheetView(at: .init(cShp.x, cShp.y + 1)) {
                     cSheetView.topSheetView = aSheetView
                 }
                 

@@ -573,7 +573,7 @@ final class UndoEditor: Editor {
 }
 
 extension RootView {
-    func clearHistorys(from shps: [Sheetpos], progressHandler: (Double, inout Bool) -> ()) throws {
+    func clearHistorys(from shps: [IntPoint], progressHandler: (Double, inout Bool) -> ()) throws {
         var isStop = false
         for (j, shp) in shps.enumerated() {
             if let sheetView = sheetView(at: shp) {

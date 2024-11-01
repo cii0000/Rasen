@@ -920,19 +920,19 @@ struct Reverb: Hashable, Codable {
 }
 extension Reverb: Protobuf {
     init(_ pb: PBReverb) throws {
-        earlySec = max(0, ((try? pb.earlyRsec.notNaN()) ?? 0))
-        earlyVolm = ((try? pb.earlyRvolm.notNaN()) ?? 0).clipped(min: 0, max: 1)
-        lateSec = max(0, ((try? pb.lateRsec.notNaN()) ?? 0))
-        lateVolm = ((try? pb.lateRvolm.notNaN()) ?? 0).clipped(min: 0, max: 1)
+        earlySec = max(0, ((try? pb.earlySec.notNaN()) ?? 0))
+        earlyVolm = ((try? pb.earlyVolm.notNaN()) ?? 0).clipped(min: 0, max: 1)
+        lateSec = max(0, ((try? pb.lateSec.notNaN()) ?? 0))
+        lateVolm = ((try? pb.lateVolm.notNaN()) ?? 0).clipped(min: 0, max: 1)
         releaseSec = max(0, ((try? pb.releaseSec.notNaN()) ?? 0))
         seedID = (try? .init(pb.seedID)) ?? .init()
     }
     var pb: PBReverb {
         .with {
-            $0.earlyRsec = earlySec
-            $0.earlyRvolm = earlyVolm
-            $0.lateRsec = lateSec
-            $0.lateRvolm = lateVolm
+            $0.earlySec = earlySec
+            $0.earlyVolm = earlyVolm
+            $0.lateSec = lateSec
+            $0.lateVolm = lateVolm
             $0.releaseSec = releaseSec
             $0.seedID = seedID.pb
         }

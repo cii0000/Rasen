@@ -24,12 +24,12 @@ struct ColorPathValue {
 
 struct CopiedSheetsValue: Equatable {
     var deltaPoint = Point()
-    var sheetIDs = [Sheetpos: SheetID]()
+    var sheetIDs = [IntPoint: SheetID]()
 }
 extension CopiedSheetsValue: Protobuf {
     init(_ pb: PBCopiedSheetsValue) throws {
         deltaPoint = try Point(pb.deltaPoint)
-        sheetIDs = try [Sheetpos: SheetID](pb.sheetIds)
+        sheetIDs = try [IntPoint: SheetID](pb.sheetIds)
     }
     var pb: PBCopiedSheetsValue {
         .with {
@@ -1975,8 +1975,8 @@ final class CopyEditor: Editor {
         let shp = rootView.sheetPosition(at: p)
         
         var isRootNewUndoGroup = true
-        var isUpdateUndoGroupSet = Set<Sheetpos>()
-        func updateUndoGroup(with nshp: Sheetpos) {
+        var isUpdateUndoGroupSet = Set<IntPoint>()
+        func updateUndoGroup(with nshp: IntPoint) {
             if !isUpdateUndoGroupSet.contains(nshp),
                let sheetView = rootView.sheetView(at: nshp) {
                 
@@ -2025,12 +2025,11 @@ final class CopyEditor: Editor {
             let rx = min(maxXMinYSHP.x, shp.x + 1)
             let by = max(minXMinYSHP.y, shp.y - 1)
             let ty = min(minXMaxYSHP.y, shp.y + 1)
-            var filledShps = Set<Sheetpos>()
+            var filledShps = Set<IntPoint>()
             if lx <= rx && by <= ty {
                 for xi in lx ... rx {
                     for yi in by ... ty {
-                        let nshp = rootView
-                            .sheetPosition(at: IntPoint(xi, yi))
+                        let nshp = IntPoint(xi, yi)
                         guard !filledShps.contains(nshp) else { continue }
                         filledShps.insert(nshp)
                         
@@ -2076,12 +2075,11 @@ final class CopyEditor: Editor {
             let rx = min(maxXMinYSHP.x, shp.x + 1)
             let by = max(minXMinYSHP.y, shp.y - 1)
             let ty = min(minXMaxYSHP.y, shp.y + 1)
-            var filledShps = Set<Sheetpos>()
+            var filledShps = Set<IntPoint>()
             if lx <= rx && by <= ty {
                 for xi in lx ... rx {
                     for yi in by ... ty {
-                        let nshp = rootView
-                            .sheetPosition(at: IntPoint(xi, yi))
+                        let nshp = IntPoint(xi, yi)
                         guard !filledShps.contains(nshp) else { continue }
                         filledShps.insert(nshp)
                         
@@ -2968,7 +2966,7 @@ final class CopyEditor: Editor {
     }
     
     struct Value {
-        var shp: Sheetpos, frame: Rect
+        var shp: IntPoint, frame: Rect
     }
     func values(at p: Point, isCut: Bool) -> [Value] {
         if rootView.isSelectSelectedNoneCursor(at: p), !rootView.isSelectedText {
@@ -3045,13 +3043,12 @@ final class CopyEditor: Editor {
         rootView.cursorPoint = sp
         let p = rootView.convertScreenToWorld(sp)
         if case .copiedSheetsValue(let csv) = pasteObject {
-            var nIndexes = [Sheetpos: SheetID]()
-            var removeIndexes = [Sheetpos]()
+            var nIndexes = [IntPoint: SheetID]()
+            var removeIndexes = [IntPoint]()
             for (shp, sid) in csv.sheetIDs {
                 var sf = rootView.sheetFrame(with: shp)
                 sf.origin += p - csv.deltaPoint
-                var nshp = rootView.sheetPosition(at: Point(Sheet.width / 2, Sheet.height / 2) + sf.origin)
-                nshp.isRight = shp.isRight
+                let nshp = rootView.sheetPosition(at: Point(Sheet.width / 2, Sheet.height / 2) + sf.origin)
                 
                 if rootView.sheetID(at: nshp) != nil {
                     removeIndexes.append(nshp)

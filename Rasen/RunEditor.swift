@@ -221,13 +221,13 @@ extension RunEditor: Hashable {
 extension RunEditor {
     func send(_ currentP: Point,
               from text: Text, ti: Int,
-              _ shp: Sheetpos, _ sheetView: SheetView) {
+              _ shp: IntPoint, _ sheetView: SheetView) {
         runText = text
         runTypobute = text.typobute
         let sf = rootView.sheetFrame(with: shp)
         let shpp = sf.origin
-        var ssDic = [O: O](), tsss = [([Text], Sheetpos, Sheet)]()
-        var shps = Set<Sheetpos>(), shpStack = Stack<Sheetpos>()
+        var ssDic = [O: O](), tsss = [([Text], IntPoint, Sheet)]()
+        var shps = Set<IntPoint>(), shpStack = Stack<IntPoint>()
         shps.insert(shp)
         shpStack.push(shp)
         while let nshp = shpStack.pop() {
@@ -241,16 +241,16 @@ extension RunEditor {
             var nTexts = [Text]()
             nTexts.reserveCapacity(texts.count)
             for t in texts {
-                func shpFromPlus(at t: Text) -> Sheetpos? {
+                func shpFromPlus(at t: Text) -> IntPoint? {
                     guard t.string == "+", let f = t.frame else { return nil }
                     let s = max(f.width, f.height), p = f.centerPoint
                     guard !sheetBounds.inset(by: s).contains(p),
                         let lrtb = sheetBounds.lrtb(at: p) else { return nil }
                     return switch lrtb {
-                    case .left: .init(x: nshp.x - 1, y: nshp.y)
-                    case .right: .init(x: nshp.x + 1, y: nshp.y)
-                    case .top: .init(x: nshp.x, y: nshp.y + 1)
-                    case .bottom: .init(x: nshp.x, y: nshp.y - 1)
+                    case .left: .init(nshp.x - 1, nshp.y)
+                    case .right: .init(nshp.x + 1, nshp.y)
+                    case .top: .init(nshp.x, nshp.y + 1)
+                    case .bottom: .init(nshp.x, nshp.y - 1)
                     }
                 }
                 if let nnshp = shpFromPlus(at: t) {
@@ -372,16 +372,16 @@ extension RunEditor {
     }
     
     func draw(_ o: O, _ id: ID?, from text: Text, time: Double,
-              in sheetView: SheetView, _ shp: Sheetpos) {
+              in sheetView: SheetView, _ shp: IntPoint) {
         switch o {
         case .dic(let a):
-            var ssDic = [Sheetpos: OSheet]()
+            var ssDic = [IntPoint: OSheet]()
             for (key, value) in a {
                 if case .array(let idxs) = key, idxs.count == 2,
                     case .int(let x) = idxs[0], case .int(let y) = idxs[1],
                     case .sheet(let sheet) = value {
                     
-                    let nshp = Sheetpos(x: x, y: y) + shp
+                    let nshp = IntPoint(x, y) + shp
                     ssDic[nshp] = sheet
                 }
             }
@@ -404,7 +404,7 @@ extension RunEditor {
             drawTime(time, from: text, in: sheetView, shp)
         }
     }
-    func draw(_ ss: OSheet, from text: Text, at shp: Sheetpos) {
+    func draw(_ ss: OSheet, from text: Text, at shp: IntPoint) {
         guard let sheetView = rootView.readSheetView(at: shp) else { return }
         sheetView.newUndoGroup()
         func lineCount(_ line: Line) -> Int {
@@ -467,7 +467,7 @@ extension RunEditor {
     }
     func drawTime(_ t: Double, from text: Text,
                   isNewUndoGroup: Bool = true,
-                  in sheetView: SheetView, _ shp: Sheetpos) {
+                  in sheetView: SheetView, _ shp: IntPoint) {
         let size = text.typesetter.typoBounds?.size ?? Size()
         let padding = runTypobute.font.size * 2 * 2 / 3
         let p = Point(text.origin.x + padding + size.width,

@@ -217,10 +217,10 @@ final class IOEditor: Editor {
         }
         rootView.updateSelectedColor(isMain: true)
     }
-    func name(from shp: Sheetpos) -> String {
+    func name(from shp: IntPoint) -> String {
         return "\(shp.x)_\(shp.y)"
     }
-    func name(from shps: [Sheetpos]) -> String {
+    func name(from shps: [IntPoint]) -> String {
         if shps.isEmpty {
             return "Empty"
         } else if shps.count == 1 {
@@ -260,7 +260,7 @@ final class IOEditor: Editor {
         }
     }
     
-    @discardableResult func beginImportFile(at sp: Point) -> Sheetpos {
+    @discardableResult func beginImportFile(at sp: Point) -> IntPoint {
         fp = rootView.convertScreenToWorld(sp)
         selectingLineNode.lineWidth = rootView.worldLineWidth
         selectingLineNode.fillType = .color(.subSelected)
@@ -277,9 +277,9 @@ final class IOEditor: Editor {
         
         return shp
     }
-    func importFile(from urls: [URL], at shp: Sheetpos) {
+    func importFile(from urls: [URL], at shp: IntPoint) {
         var mshp = shp
-        var onSHPs = [Sheetpos](), willremoveSHPs = [Sheetpos]()
+        var onSHPs = [IntPoint](), willremoveSHPs = [IntPoint]()
         for url in urls {
             let importedDocument = Document(url, isLoadOnly: true)
             let world = importedDocument.world()
@@ -339,7 +339,7 @@ final class IOEditor: Editor {
         
         let contentURLs = urls.filter { Content.type(from: $0) != .none }
         if !contentURLs.isEmpty {
-            var dshp = Sheetpos()
+            var dshp = IntPoint()
             let xCount = max(1, Int(Double(contentURLs.count).squareRoot()))
             for url in contentURLs {
                 if let sheetView = rootView.madeSheetView(at: shp + dshp) {
@@ -476,9 +476,9 @@ final class IOEditor: Editor {
             }
         }
     }
-    func loadFile(from urls: [URL], at shp: Sheetpos) {
+    func loadFile(from urls: [URL], at shp: IntPoint) {
         var mshp = shp
-        var nSIDs = [Sheetpos: SheetID](), willremoveSHPs = [Sheetpos]()
+        var nSIDs = [IntPoint: SheetID](), willremoveSHPs = [IntPoint]()
         var resetSIDs = Set<SheetID>()
         for url in urls {
             let importedDocument = Document(url, isLoadOnly: true)
@@ -498,7 +498,7 @@ final class IOEditor: Editor {
                 nSIDs[nshp] = rootView.appendSheet(from: osrr)
                 
                 if nshp.x > maxX {
-                    maxX = nshp.x + (oshp.isRight ? 1 : 0)
+                    maxX = nshp.x
                 }
             }
             mshp.x = maxX + 2
@@ -545,7 +545,7 @@ final class IOEditor: Editor {
     }
     
     struct SelectingValue {
-        var shp: Sheetpos, bounds: Rect
+        var shp: IntPoint, bounds: Rect
     }
     
     enum ExportType {
@@ -763,7 +763,7 @@ final class IOEditor: Editor {
             documentRecorders = []
         case .gif, .movie, .movie4K, .sound, .linearPCM:
             renderings = nvs.map {
-                var filledShps = Set<Sheetpos>()
+                var filledShps = Set<IntPoint>()
                 
                 var bottomItems = [Rendering.Item]()
                 var shp = $0.shp
@@ -813,7 +813,7 @@ final class IOEditor: Editor {
             }
             documentRecorders = []
         case .document, .documentWithHistory:
-            let sids = nvs.reduce(into: [Sheetpos: SheetID]()) {
+            let sids = nvs.reduce(into: [IntPoint: SheetID]()) {
                 $0[$1.shp] = rootView.sheetID(at: $1.shp)
             }
             let csv = CopiedSheetsValue(deltaPoint: Point(), sheetIDs: sids)
@@ -1469,7 +1469,7 @@ final class IOEditor: Editor {
         @Sendable func export(progressHandler: (Double, inout Bool) -> ()) throws {
             try ioResult.remove()
             
-            let sids = vs.reduce(into: [Sheetpos: SheetID]()) {
+            let sids = vs.reduce(into: [IntPoint: SheetID]()) {
                 $0[$1.shp - shp0] = rootView.sheetID(at: $1.shp)
             }
             let csv = CopiedSheetsValue(deltaPoint: Point(), sheetIDs: sids)

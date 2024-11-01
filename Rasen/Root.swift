@@ -200,8 +200,8 @@ extension Road {
 }
 
 enum WorldUndoItem {
-    case insertSheets(_ sids: [Sheetpos: SheetID])
-    case removeSheets(_ shps: [Sheetpos])
+    case insertSheets(_ sids: [IntPoint: SheetID])
+    case removeSheets(_ shps: [IntPoint])
 }
 extension WorldUndoItem: UndoItem {
     var type: UndoItemType {
@@ -226,9 +226,9 @@ extension WorldUndoItem: Protobuf {
         }
         switch value {
         case .insertSheets(let sids):
-            self = .insertSheets(try [Sheetpos: SheetID](sids))
+            self = .insertSheets(try [IntPoint: SheetID](sids))
         case .removeSheets(let shps):
-            self = .removeSheets(try [Sheetpos](shps))
+            self = .removeSheets(try [IntPoint](shps))
         }
     }
     var pb: PBWorldUndoItem {
@@ -252,9 +252,9 @@ extension WorldUndoItem: Codable {
         let key = try container.decode(CodingTypeKey.self)
         switch key {
         case .insertSheets:
-            self = .insertSheets(try container.decode([Sheetpos: SheetID].self))
+            self = .insertSheets(try container.decode([IntPoint: SheetID].self))
         case .removeSheets:
-            self = .removeSheets(try container.decode([Sheetpos].self))
+            self = .removeSheets(try container.decode([IntPoint].self))
         }
     }
     func encode(to encoder: any Encoder) throws {
@@ -270,18 +270,18 @@ extension WorldUndoItem: Codable {
     }
 }
 
-extension Dictionary where Key == SheetID, Value == Sheetpos {
-    init(_ pb: PBSheetposStringDic) throws {
-        var shps = [SheetID: Sheetpos]()
+extension Dictionary where Key == SheetID, Value == IntPoint {
+    init(_ pb: PBIntPointStringDic) throws {
+        var shps = [SheetID: IntPoint]()
         for e in pb.value {
             if let sid = SheetID(uuidString: e.key) {
-                shps[sid] = try Sheetpos(e.value)
+                shps[sid] = try IntPoint(e.value)
             }
         }
         self = shps
     }
-    var pb: PBSheetposStringDic {
-        var pbips = [String: PBSheetpos]()
+    var pb: PBIntPointStringDic {
+        var pbips = [String: PBIntPoint]()
         for (sid, shp) in self {
             pbips[sid.uuidString] = shp.pb
         }
@@ -290,9 +290,9 @@ extension Dictionary where Key == SheetID, Value == Sheetpos {
         }
     }
 }
-extension Dictionary where Key == Sheetpos, Value == SheetID {
+extension Dictionary where Key == IntPoint, Value == SheetID {
     init(_ pb: PBStringIntPointDic) throws {
-        var sids = [Sheetpos: SheetID]()
+        var sids = [IntPoint: SheetID]()
         for e in pb.value {
             sids[try .init(e.key)] = SheetID(uuidString: e.value)
         }
@@ -312,60 +312,13 @@ extension Dictionary where Key == Sheetpos, Value == SheetID {
     }
 }
 
-struct Sheetpos: Hashable, Codable {
-    var x = 0, y = 0, isRight = false
-}
-extension Sheetpos: Protobuf {
-    init(_ pb: PBSheetpos) throws {
-        x = Int(pb.x)
-        y = Int(pb.y)
-        isRight = pb.isRight
-    }
-    var pb: PBSheetpos {
-        .with {
-            $0.x = Int64(x)
-            $0.y = Int64(y)
-            $0.isRight = isRight
-        }
-    }
-}
-extension Sheetpos {
-    func int() -> IntPoint {
-        .init(x, y)
-    }
-    func double() -> Point {
-        .init(x, y)
-    }
-    func cross(_ other: Self) -> Int {
-        x * other.y - y * other.x
-    }
-    static func + (lhs: Self, rhs: Self) -> Self {
-        .init(x: lhs.x + rhs.x, y: lhs.y + rhs.y, isRight: lhs.isRight)
-    }
-    static func - (lhs: Self, rhs: Self) -> Self {
-        .init(x: lhs.x - rhs.x, y: lhs.y - rhs.y, isRight: lhs.isRight)
-    }
-    func distanceSquared(_ other: Self) -> Int {
-        let x = self.x - other.x, y = self.y - other.y
-        return x * x + y * y
-    }
-}
-extension Array where Element == Sheetpos {
-    init(_ pb: PBSheetposArray) throws {
-        self = try pb.value.map { try Sheetpos($0) }
-    }
-    var pb: PBSheetposArray {
-        .with { $0.value = map { $0.pb } }
-    }
-}
-
 struct World {
-    var sheetIDs = [Sheetpos: SheetID]()
-    var sheetPositions = [SheetID: Sheetpos]()
+    var sheetIDs = [IntPoint: SheetID]()
+    var sheetPositions = [SheetID: IntPoint]()
 }
 extension World: Protobuf {
     init(_ pb: PBWorld) throws {
-        let shps = try [SheetID: Sheetpos](pb.sheetPositions)
+        let shps = try [SheetID: IntPoint](pb.sheetPositions)
         self.sheetIDs = World.sheetIDs(with: shps)
         self.sheetPositions = shps
     }
@@ -378,46 +331,30 @@ extension World: Protobuf {
 extension World: Codable {}
 extension World {
     func sheetID(at p: IntPoint) -> SheetID? {
-        let leftShp = Sheetpos(x: p.x - 1, y: p.y, isRight: true)
-        return if let sid = sheetIDs[leftShp] {
-            sid
-        } else {
-            sheetIDs[Sheetpos(x: p.x, y: p.y, isRight: true)]
-            ?? sheetIDs[Sheetpos(x: p.x, y: p.y, isRight: false)]
-        }
-    }
-    func sheetpos(at p: IntPoint) -> Sheetpos {
-        let leftShp = Sheetpos(x: p.x - 1, y: p.y, isRight: true)
-        if sheetIDs[leftShp] != nil {
-            return leftShp
-        } else {
-            let rightShp = Sheetpos(x: p.x, y: p.y, isRight: true)
-            return Sheetpos(x: p.x, y: p.y,
-                            isRight: sheetIDs[rightShp] != nil)
-        }
+        sheetIDs[IntPoint(p.x, p.y)]
     }
     
-    static func sheetIDs(with shps: [SheetID: Sheetpos]) -> [Sheetpos: SheetID] {
-        var sids = [Sheetpos: SheetID]()
+    static func sheetIDs(with shps: [SheetID: IntPoint]) -> [IntPoint: SheetID] {
+        var sids = [IntPoint: SheetID]()
         sids.reserveCapacity(shps.count)
         for (sid, shp) in shps {
             sids[shp] = sid
         }
         return sids
     }
-    static func sheetPositions(with sids: [Sheetpos: SheetID]) -> [SheetID: Sheetpos] {
-        var shps = [SheetID: Sheetpos]()
+    static func sheetPositions(with sids: [IntPoint: SheetID]) -> [SheetID: IntPoint] {
+        var shps = [SheetID: IntPoint]()
         shps.reserveCapacity(sids.count)
         for (shp, sid) in sids {
             shps[sid] = shp
         }
         return shps
     }
-    init(_ sids: [Sheetpos: SheetID] = [:]) {
+    init(_ sids: [IntPoint: SheetID] = [:]) {
         self.sheetIDs = sids
         self.sheetPositions = World.sheetPositions(with: sids)
     }
-    init(_ shps: [SheetID: Sheetpos] = [:]) {
+    init(_ shps: [SheetID: IntPoint] = [:]) {
         self.sheetIDs = World.sheetIDs(with: shps)
         self.sheetPositions = shps
     }

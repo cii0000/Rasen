@@ -76,8 +76,8 @@ final class RootEditor: Editor {
         if let sheetView = rootView.sheetView(at: p), sheetView.isPlaying {
             return true
         }
-        for shp in rootView.aroundSheetpos(atCenter: rootView.intPosition(at: p)) {
-            if let sheetView = rootView.sheetView(at: shp.shp), sheetView.isPlaying {
+        for shp in rootView.aroundSheetPositions(atCenter: rootView.sheetPosition(at: p)) {
+            if let sheetView = rootView.sheetView(at: shp), sheetView.isPlaying {
                 return true
             }
         }
@@ -168,7 +168,7 @@ final class RootEditor: Editor {
     func subDrag(_ event: DragEvent) {
         switch event.phase {
         case .began:
-            updateLastEditedSheetpos(from: event)
+            updateLastEditedIntPoint(from: event)
             stopInputTextEvent()
             subDragEditor = RangeSelector(self)
             subDragEditor?.send(event)
@@ -190,7 +190,7 @@ final class RootEditor: Editor {
     func middleDrag(_ event: DragEvent) {
         switch event.phase {
         case .began:
-            updateLastEditedSheetpos(from: event)
+            updateLastEditedIntPoint(from: event)
             stopInputTextEvent()
             middleDragEditor = LassoCutter(self)
             middleDragEditor?.send(event)
@@ -229,7 +229,7 @@ final class RootEditor: Editor {
     func drag(_ event: DragEvent) {
         switch event.phase {
         case .began:
-            updateLastEditedSheetpos(from: event)
+            updateLastEditedIntPoint(from: event)
             stopInputTextEvent()
             let quasimode = Quasimode(modifier: modifierKeys, .drag)
             if quasimode != .selectFrame {
@@ -263,7 +263,7 @@ final class RootEditor: Editor {
     func inputText(_ event: InputTextEvent) {
         switch event.phase {
         case .began:
-            updateLastEditedSheetpos(from: event)
+            updateLastEditedIntPoint(from: event)
             oldInputTextKeys.insert(event.inputKeyType)
             textEditor.send(event)
         case .changed:
@@ -318,7 +318,7 @@ final class RootEditor: Editor {
     func inputKey(_ event: InputKeyEvent) {
         switch event.phase {
         case .began:
-            updateLastEditedSheetpos(from: event)
+            updateLastEditedIntPoint(from: event)
             guard inputKeyEditor == nil else { return }
             let quasimode = Quasimode(modifier: modifierKeys,
                                       event.inputKeyType)
@@ -349,8 +349,8 @@ final class RootEditor: Editor {
         }
     }
     
-    func updateLastEditedSheetpos(from event: any Event) {
-        rootView.updateLastEditedSheetpos(fromScreen: event.screenPoint)
+    func updateLastEditedIntPoint(from event: any Event) {
+        rootView.updateLastEditedIntPoint(fromScreen: event.screenPoint)
     }
     
     func keepOut(with event: any Event) {
