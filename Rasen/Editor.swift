@@ -218,7 +218,6 @@ final class RootEditor: Editor {
         case .changeTint: ChangeTintEditor(self)
         case .selectFrame: SelectFrameEditor(self)
         case .selectVersion: SelectVersionEditor(self)
-        case .slide: SelectKeyframeEditor(self)
         case .move: MoveEditor(self)
         case .moveLinePoint: MoveLinePointEditor(self)
         case .moveLineZ: MoveLineZEditor(self)

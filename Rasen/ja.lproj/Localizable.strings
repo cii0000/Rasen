@@ -58,6 +58,8 @@
 "Slide" = "スライド";
 "Select Frame" = "フレームを選択";
 "Play" = "再生";
+
+"Move" = "移動";
 "Move Line Point" = "線点を移動";
 "Move Line Z" = "線の高さを変更";
 

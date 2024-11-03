@@ -324,26 +324,24 @@ extension Quasimode {
     static let drawStraightLine = Self(modifier: [.shift], .drag)
     
     static let lassoCut = Self(modifier: [.command], .drag)
-    static let selectByRange = Self(modifier: [.shift, .command], .drag)
+    static let selectVersion = Self(modifier: [.command, .shift], .drag)
     
     static let changeLightness = Self(modifier: [.option], .drag)
     static let changeTint = Self(modifier: [.shift, .option], .drag)
     
-    static let selectFrame = Self(modifier: [.control], .drag)
-    static let selectVersion = Self(modifier: [.control, .shift], .drag)
-    
+    static let selectFrame = Self(modifier: [.command, .control], .drag)
     static let goPrevious = Self(modifier: [.control], .z)
     static let goNext = Self(modifier: [.control], .x)
     static let controlCopy = Self(modifier: [.control], .c)
     static let controlInterpolate = Self(modifier: [.control], .s)
-    static let slide = Self(modifier: [.control, .option], .drag)//
     static let goPreviousFrame = Self(modifier: [.control, .option], .z)//
     static let goNextFrame = Self(modifier: [.control, .option], .x)//
     
-    static let move = Self(modifier: [.function], .drag)
-    static let moveLinePoint = Self(modifier: [.option, .command], .drag)
-    static let moveLineZ = Self(modifier: [.control, .command], .drag)
+    static let move = Self(modifier: [.control], .drag)
+    static let moveLinePoint = Self(modifier: [.control, .shift], .drag)
+    static let moveLineZ = Self(modifier: [.control, .option], .drag)
     
+    static let selectByRange = Self(.subDrag)
     static let play = Self(modifier: [.control], .click)
     static let showNoteTone = Self(modifier: [.command], .click)
     static let run = Self(.click)

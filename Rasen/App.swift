@@ -2165,10 +2165,16 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                                          phase: .began))
                     self.swipePosition = swipePosition + deltaP
                 } else if isBeganSwipe {
+                    let minD = 4.0, maxD = 10.0, newMaxD = 20.0
+                    let absX = abs(deltaP.x), absY = abs(deltaP.y)
+                    let sdx = absX < minD ? deltaP.x : deltaP.x.signValue * absX
+                        .clipped(min: minD, max: maxD, newMin: minD, newMax: newMaxD)
+                    let sdy = absY < minD ? deltaP.y : deltaP.x.signValue * absY
+                        .clipped(min: minD, max: maxD, newMin: minD, newMax: newMaxD)
                     rootEditor.swipe(.init(screenPoint: screenPoint(with: event).my,
-                                         time: event.timestamp,
-                                         scrollDeltaPoint: deltaP,
-                                         phase: .changed))
+                                           time: event.timestamp,
+                                           scrollDeltaPoint: .init(sdx, sdy),
+                                           phase: .changed))
                     self.swipePosition = swipePosition + deltaP
                 }
             }

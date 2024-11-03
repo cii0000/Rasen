@@ -186,205 +186,6 @@ final class GoNextEditor: InputKeyEventEditor {
     }
 }
 
-final class SelectKeyframeEditor: SwipeEventEditor, DragEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
-    let isEditingSheet: Bool
-    
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
-        isEditingSheet = rootView.isEditingSheet
-    }
-    
-    private let indexInterval = 10.0
-    
-    private var sheetView: SheetView?, contentIndex: Int?
-    private var contentView: SheetContentView? {
-        guard let sheetView, let contentIndex,
-              contentIndex < sheetView.contentsView.elementViews.count else { return nil }
-        return sheetView.contentsView.elementViews[contentIndex]
-    }
-    private var beganContentBeat: Rational = 0, oldContentBeat: Rational = 0
-    private var interpolatedNode = Node(), interpolatedRootIndex: Int?
-    private var oldDeltaI: Int?
-    private var beganSP = Point(), preSP = Point(),
-                beganRootBeat = Rational(0), beganRootInterIndex = 0,
-                beganRootIndex = 0, beganSelectedFrameIndexes = [Int](),
-                beganEventTime = 0.0
-    private var allDp = Point()
-    private var snapInterRootIndex: Int?, snapEventTime: Double?
-    private var lastRootIs = [(sec: Double, rootI: Int)](capacity: 128)
-    private var minLastSec = 1 / 24.0
-    
-    func send(_ event: DragEvent) {
-        if event.phase == .began {
-            preSP = event.screenPoint
-        }
-        send(SwipeEvent(screenPoint: event.screenPoint, time: event.time,
-                        scrollDeltaPoint: event.screenPoint - preSP, phase: event.phase))
-        preSP = event.screenPoint
-    }
-    func send(_ event: SwipeEvent) {
-        guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
-            return
-        }
-        if rootEditor.isPlaying(with: event) {
-            rootEditor.stopPlaying(with: event)
-        }
-        
-        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
-            ?? event.screenPoint
-        let p = rootView.convertScreenToWorld(sp)
-        switch event.phase {
-        case .began:
-            beganSP = event.screenPoint
-            beganEventTime = event.time
-            sheetView = rootView.sheetView(at: p)
-            if let sheetView {
-                if let contentIndex = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
-                                                             scale: rootView.screenToWorldScale),
-                   sheetView.contentsView.elementViews[contentIndex].model.type == .movie {
-                    self.contentIndex = contentIndex
-                    if let contentView {
-                        beganContentBeat = contentView.model.beat
-                        oldContentBeat = beganContentBeat
-                        rootView.cursor = rootView.cursor(from: contentView.currentTimeString(isInter: true))
-                    }
-                }
-                
-                if contentIndex == nil {
-                    let animationView = sheetView.animationView
-                    beganRootBeat = animationView.rootBeat
-                    beganRootInterIndex = animationView.model.rootInterIndex
-                    beganRootIndex = animationView.model.rootIndex
-                    lastRootIs.append((event.time, beganRootIndex))
-                    beganSelectedFrameIndexes = animationView.selectedFrameIndexes
-                    animationView.shownInterTypeKeyframeIndex = animationView.model.index
-                    oldDeltaI = nil
-                    
-                    rootView.cursor = rootView.cursor(from: sheetView.currentTimeString())
-                }
-            } else {
-                rootView.cursor = rootView.cursor(from: Animation.timeString(fromTime: 0, frameRate: 0))
-            }
-            
-            sheetView?.showOtherTimeNodeFromMainBeat()
-        case .changed:
-            if let sheetView {
-                allDp += event.scrollDeltaPoint * 0.5
-                let dp = allDp
-                let deltaI = Int((dp.x / indexInterval).rounded())
-                
-                if let contentView {
-                    if deltaI != oldDeltaI {
-                        oldDeltaI = deltaI
-                        
-                        let nBeat = (beganContentBeat + .init(deltaI, 12))
-                            .loop(start: 0, end: contentView.model.timeOption?.beatRange.length ?? 0)
-                            .interval(scale: .init(1, 12))
-                        if nBeat != oldContentBeat {
-                            oldContentBeat = nBeat
-                            
-                            contentView.beat = nBeat
-                            
-                            rootView.cursor = .circle(string: contentView.currentTimeString(isInter: true))
-                        }
-                    }
-                    return
-                }
-                
-                let animationView = sheetView.animationView
-                
-                let ni = beganRootInterIndex.addingReportingOverflow(deltaI).partialValue
-                let nRootI = animationView.model.rootIndex(atRootInter: ni)
-                
-                let ii = Double(beganRootInterIndex) + (dp.x - indexInterval / 2) / indexInterval
-                let iit = ii - ii.rounded(.down)
-                let si = nRootI
-                let ei = animationView.model.rootIndex(atRootInter: ni + 1)
-                if abs(ei - si) <= 1 {
-                    interpolatedNode.children = []
-                } else {
-                    let nni = Int.linear(si, ei, t: iit)
-                    if nni != interpolatedRootIndex {
-                        interpolatedRootIndex = nni
-                        let nnni = animationView.model.index(atRoot: nni)
-                        if !animationView.model.keyframes[nnni].isKeyWhereAllLines {
-                            let node = animationView.elementViews[nnni].linesView.node.clone
-                            node.children.forEach { $0.lineType = .color(.subInterpolated) }
-                            interpolatedNode.children = [node]
-                            if interpolatedNode.parent == nil {
-                                sheetView.node.append(child: interpolatedNode)
-                            }
-                        } else {
-                            interpolatedNode.children = []
-                        }
-                    }
-                }
-                
-                if deltaI != oldDeltaI {
-                    oldDeltaI = deltaI
-                    
-                    let oldKI = animationView.model.index
-                    let oldRI = animationView.model.rootIndex
-                    if nRootI != animationView.model.rootIndex {
-                        if sheetView.isPlaying {
-                            sheetView.stop()
-                        }
-                        sheetView.rootKeyframeIndex = nRootI
-                        
-                        if (oldKI < animationView.model.index && oldRI > nRootI) || (oldKI > animationView.model.index && oldRI < nRootI) {
-                            Feedback.performAlignment()
-                        }
-                        
-                        lastRootIs.append((event.time, nRootI))
-                        for (i, v) in lastRootIs.enumerated().reversed() {
-                            if event.time - v.sec > minLastSec {
-                                if i > 0 {
-                                    lastRootIs.removeFirst(i - 1)
-                                }
-                                break
-                            }
-                        }
-                        
-                        sheetView.showOtherTimeNodeFromMainBeat()
-                        
-                        rootEditor.updateEditorNode()
-                        rootView.updateSelects()
-                        if oldKI != animationView.model.index {
-                            animationView.shownInterTypeKeyframeIndex = animationView.model.index
-                        }
-                        
-                        rootView.cursor = rootView.cursor(from: sheetView.currentTimeString())
-                    }
-                }
-            }
-        case .ended:
-            rootView.cursor = rootView.defaultCursor
-            
-            interpolatedNode.removeFromParent()
-            if let sheetView {
-                let animationView = sheetView.animationView
-                animationView.shownInterTypeKeyframeIndex = nil
-                
-                sheetView.hideOtherTimeNode()
-                
-                for (sec, rootI) in lastRootIs.reversed() {
-                    if event.time - sec > minLastSec {
-                        if abs(sheetView.rootKeyframeIndex - rootI) == 1 {
-                            sheetView.rootKeyframeIndex = rootI
-                            rootEditor.updateEditorNode()
-                            rootView.updateSelects()
-                        }
-                        break
-                    }
-                }
-            }
-        }
-    }
-}
-
 final class GoPreviousFrameEditor: InputKeyEventEditor {
     let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
@@ -576,7 +377,7 @@ final class SelectFrameEditor: SwipeEventEditor, DragEventEditor {
                 beganRootI = 0, beganBeat = Rational(0),
                 beganSelectedFrameIndexes = [Int](), beganEventTime = 0.0
     private var preMoveEventTime: Double?
-    private var allDp = Point()
+    private var allDX = 0.0
     private var snapRootBeat: Rational?, snapEventTime: Double?
     private var lastRootIs = [(sec: Double, rootI: Int)](capacity: 128)
     private var minLastSec = 1 / 24.0
@@ -586,10 +387,14 @@ final class SelectFrameEditor: SwipeEventEditor, DragEventEditor {
             preSP = event.screenPoint
         }
         send(SwipeEvent(screenPoint: event.screenPoint, time: event.time,
-                        scrollDeltaPoint: event.screenPoint - preSP, phase: event.phase))
+                        scrollDeltaPoint: event.screenPoint - preSP, phase: event.phase),
+             isDrag: true)
         preSP = event.screenPoint
     }
     func send(_ event: SwipeEvent) {
+        send(event, isDrag: false)
+    }
+    func send(_ event: SwipeEvent, isDrag: Bool) {
         guard isEditingSheet else {
             rootEditor.keepOut(with: event)
             return
@@ -637,11 +442,10 @@ final class SelectFrameEditor: SwipeEventEditor, DragEventEditor {
             sheetView?.showOtherTimeNodeFromMainBeat()
         case .changed:
             if let sheetView {
-                allDp += event.scrollDeltaPoint * 0.5
-                let dp = allDp
-                let deltaI = Int((dp.x / indexInterval).rounded())
+                allDX += event.scrollDeltaPoint.x
                 
                 if let contentView {
+                    let deltaI = Int((allDX / indexInterval).rounded())
                     if deltaI != oldDeltaI {
                         oldDeltaI = deltaI
                         
@@ -660,8 +464,22 @@ final class SelectFrameEditor: SwipeEventEditor, DragEventEditor {
                 } else {
                     if sheetView.model.enabledAnimation {
                         let animationView = sheetView.animationView
+                        let animation = animationView.model
                         
-                        let nRootI = beganRootI.addingReportingOverflow(deltaI).partialValue
+                        let widths = animation.keyframes.count.range.map {
+                            let durBeat = Double(animation.keyframeDurBeat(at: $0))
+                            return min(animation.keyframes[$0].isKey ? max(durBeat, 0.5) : durBeat, 1) * 40
+                        }
+                        
+                        let beganI = animation.index(atRoot: beganRootI)
+                        var x = widths[beganI] / 2, nRootI = beganRootI
+                        while abs(x) < abs(allDX) {
+                            nRootI = allDX < 0 ?
+                            nRootI.subtractingReportingOverflow(1).partialValue :
+                            nRootI.addingReportingOverflow(1).partialValue
+                            let i = animation.index(atRoot: nRootI)
+                            x += widths[i]
+                        }
                         
                         let oldKI = animationView.model.index
                         let oldRI = animationView.model.rootIndex
@@ -680,11 +498,19 @@ final class SelectFrameEditor: SwipeEventEditor, DragEventEditor {
                             rootEditor.updateEditorNode()
                             rootView.updateSelects()
                             
-                            if (oldKI < animationView.model.index && oldRI - 1 > nRootI)
-                                || (oldKI > animationView.model.index && oldRI + 1 < nRootI)
-                                || animationView.model.index == 0 {
-                                
-                                Feedback.performAlignment()
+                            if !isDrag {
+                                if (oldKI < animationView.model.index && oldRI - 1 > nRootI)
+                                    || (oldKI > animationView.model.index && oldRI + 1 < nRootI)
+                                    || animationView.model.index == 0 {
+                                    
+                                    Feedback.performAlignment()
+                                } else if abs(event.scrollDeltaPoint.x) < 4
+                                            && ((animationView.currentKeyframe.isKey
+                                                 && (!animationView.model.keyframe(atRoot: nRootI - 1).isKey
+                                                     || !animationView.model.keyframe(atRoot: nRootI + 1).isKey))
+                                                || animationView.model.currentDurBeat > Sheet.beatInterval) {
+                                    Feedback.performAlignment()
+                                }
                             }
                             
                             lastRootIs.append((event.time, nRootI))
