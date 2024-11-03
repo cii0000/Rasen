@@ -102,7 +102,7 @@ final class SlideEditor: DragEventEditor {
     }
     
     enum SlideType {
-        case keyframe(SlideKeyframeEditor)
+        case keyframe(SelectKeyframeEditor)
         case animation(MoveAnimationEditor)
         case score(MoveScoreEditor)
         case content(MoveContentEditor)
@@ -146,10 +146,10 @@ final class SlideEditor: DragEventEditor {
                 } else if sheetView.animationView.containsTimeline(inP, scale: rootView.screenToWorldScale) {
                     type = .animation(MoveAnimationEditor(rootEditor))
                 } else {
-                    type = .keyframe(SlideKeyframeEditor(rootEditor))
+                    type = .keyframe(SelectKeyframeEditor(rootEditor))
                 }
             } else {
-                type = .keyframe(SlideKeyframeEditor(rootEditor))
+                type = .keyframe(SelectKeyframeEditor(rootEditor))
             }
         }
         

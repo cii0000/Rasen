@@ -1420,7 +1420,7 @@ final class SheetView: BindableView, @unchecked Sendable {
     func currentTimeString() -> String {
         Animation.timeString(fromTime: model.animation.localBeat,
                              frameRate: Rational(frameRate))
-        + (model.animation.currentKeyframe.isKey ? "" : " i")
+        + (model.animation.currentKeyframe.isKey ? "" : "i")
     }
     func currentTimeNodes() -> [Node] {
         Self.timeNodes(duration: model.animation.currentDurBeat,
@@ -4216,15 +4216,16 @@ final class SheetView: BindableView, @unchecked Sendable {
         set(redoItem)
     }
     
-    func set(_ kvs: [IndexValue<[IndexValue<InterOption>]>]) {
-        let lines = model.picture.lines
-        let okvs = kvs.map {
-            IndexValue(value: $0.value.map {
-                IndexValue(value: lines[$0.index].interOption, index: $0.index)
-            }, index: $0.index)
+    func set(_ values: [IndexValue<[IndexValue<InterOption>]>]) {
+        guard !values.isEmpty else { return }
+        
+        let ovs: [IndexValue<[IndexValue<InterOption>]>] = values.map { kv in
+            let lines = model.animation.keyframes[kv.index].picture.lines
+            return .init(value: kv.value.map { .init(value: lines[$0.index].interOption, index: $0.index) },
+                         index: kv.index)
         }
-        let undoItem = SheetUndoItem.setLineIDs(okvs)
-        let redoItem = SheetUndoItem.setLineIDs(kvs)
+        let undoItem = SheetUndoItem.setLineIDs(ovs)
+        let redoItem = SheetUndoItem.setLineIDs(values)
         append(undo: undoItem, redo: redoItem)
         set(redoItem)
     }

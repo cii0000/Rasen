@@ -57,17 +57,15 @@ extension ActionList {
                        Action(name: "Select Version".localized,
                               quasimode: .selectVersion)],
                       
-                      [
-//                        Action(name: "Move".localized,
-//                              quasimode: .move,
-//                              isEnableRoot: false),
+                      [Action(name: "Move".localized,
+                              quasimode: .move,
+                              isEnableRoot: false),
                        Action(name: "Move Line Z".localized,
                               quasimode: .moveLineZ,
                               isEnableRoot: false),
                        Action(name: "Move Line Point".localized,
                               quasimode: .moveLinePoint,
-                              isEnableRoot: false)
-                      ],
+                              isEnableRoot: false)],
                       
                       [Action(name: "Play".localized,
                               quasimode: .play,

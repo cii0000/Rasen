@@ -127,12 +127,12 @@ final class RootEditor: Editor {
         }
     }
     
-    private(set) var oldSwipeEvent: SwipeEvent?, swipeEditor: SlideKeyframeEditor?
+    private(set) var oldSwipeEvent: SwipeEvent?, swipeEditor: SelectFrameEditor?
     func swipe(_ event: SwipeEvent) {
         textEditor.moveEndInputKey()
         switch event.phase {
         case .began:
-            swipeEditor = SlideKeyframeEditor(self)
+            swipeEditor = SelectFrameEditor(self)
             swipeEditor?.send(event)
             oldSwipeEvent = event
         case .changed:
@@ -218,7 +218,7 @@ final class RootEditor: Editor {
         case .changeTint: ChangeTintEditor(self)
         case .selectFrame: SelectFrameEditor(self)
         case .selectVersion: SelectVersionEditor(self)
-        case .slide: SlideKeyframeEditor(self)
+        case .slide: SelectKeyframeEditor(self)
         case .move: MoveEditor(self)
         case .moveLinePoint: MoveLinePointEditor(self)
         case .moveLineZ: MoveLineZEditor(self)
