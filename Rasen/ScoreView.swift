@@ -408,7 +408,7 @@ extension ScoreView {
         notesNode.children.insert(noivs)
         tonesNode.children.insert(toivs)
         reverbsNode.children.insert(reivs)
-        spectlopesNode.children.replace(seivs)
+        spectlopesNode.children.insert(seivs)
         octaveNode.children.insert(noivs.enumerated().map { .init(value: octaveNode(fromPitch: nivs[$0.offset].value.firstPitch, $0.element.value.children[0].clone), index: $0.element.index) })
         updateChord()
         scoreTrackItem?.insert(nivs, with: model)
@@ -449,10 +449,11 @@ extension ScoreView {
         let noivs = vs.map { IndexValue(value: $0.value.node, index: $0.index) }
         let toivs = vs.map { IndexValue(value: $0.value.toneNode, index: $0.index) }
         let reivs = vs.map { IndexValue(value: $0.value.reverbNode, index: $0.index) }
+        let seivs = vs.map { IndexValue(value: $0.value.spectlopeNode, index: $0.index) }
         notesNode.children.replace(noivs)
         tonesNode.children.replace(toivs)
         reverbsNode.children.replace(reivs)
-        spectlopesNode.children.replace(reivs)
+        spectlopesNode.children.replace(seivs)
         octaveNode.children.replace(noivs.enumerated().map { .init(value: octaveNode(fromPitch: nivs[$0.offset].value.firstPitch, $0.element.value.children[0].clone), index: $0.element.index) })
         
         scoreTrackItem?.replace(eivs)
