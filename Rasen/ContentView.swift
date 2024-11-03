@@ -242,7 +242,6 @@ extension ContentView {
             
             Task { @MainActor in
                 if let texture = try? Texture(image: image, isOpaque: false, .sRGB, isBGR: true) {
-                    try Task.checkCancellation()
                     self.node.fillType = .texture(texture)
                 }
             }

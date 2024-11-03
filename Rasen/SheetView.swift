@@ -1139,12 +1139,11 @@ final class SheetView: BindableView, @unchecked Sendable {
         
         if sequencer != nil {
             sequencer?.beginPause()
-            audioPauseTask = Task {
+            audioPauseTask = Task { @MainActor in
+                try Task.checkCancellation()
                 try await Task.sleep(sec: Waveclip.releaseSec + 0.01)
                 try Task.checkCancellation()
-                Task { @MainActor in
-                    sequencer?.pause()
-                }
+                sequencer?.pause()
             }
         }
     }
@@ -1874,12 +1873,11 @@ final class SheetView: BindableView, @unchecked Sendable {
         
             if sequencer != nil {
                 sequencer?.beginPause()
-                audioPauseTask = Task {
+                audioPauseTask = Task { @MainActor in
+                    try Task.checkCancellation()
                     try await Task.sleep(sec: Waveclip.releaseSec + 0.01)
                     try Task.checkCancellation()
-                    Task { @MainActor in
-                        sequencer?.pause()
-                    }
+                    sequencer?.pause()
                 }
             }
             

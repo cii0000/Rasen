@@ -2186,9 +2186,9 @@ final class RootView: View, @unchecked Sendable {
                 } catch {
 //                    sheetView.enableCache = true
                 }
+                try Task.checkCancellation()
                 
                 Task { @MainActor in
-                    try Task.checkCancellation()
                     guard self.sheetID(at: shp) == sid,
                           self.sheetViewValues[shp] != nil else { return }
                     self.updateWithIsFullEdit(in: sheetView)
