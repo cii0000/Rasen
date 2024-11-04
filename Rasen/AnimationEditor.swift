@@ -499,17 +499,28 @@ final class SelectFrameEditor: SwipeEventEditor, DragEventEditor {
                             rootView.updateSelects()
                             
                             if !isDrag {
-                                if (oldKI < animationView.model.index && oldRI - 1 > nRootI)
-                                    || (oldKI > animationView.model.index && oldRI + 1 < nRootI)
-                                    || animationView.model.index == 0 {
-                                    
-                                    Feedback.performAlignment()
-                                } else if abs(event.scrollDeltaPoint.x) < 4
-                                            && ((animationView.currentKeyframe.isKey
-                                                 && (!animationView.model.keyframe(atRoot: nRootI - 1).isKey
-                                                     || !animationView.model.keyframe(atRoot: nRootI + 1).isKey))
-                                                || animationView.model.currentDurBeat > Sheet.beatInterval) {
-                                    Feedback.performAlignment()
+                                let isZero = (oldKI < animationView.model.index && oldRI - 1 > nRootI)
+                                || (oldKI > animationView.model.index && oldRI + 1 < nRootI)
+                                || animationView.model.index == 0
+                                if isZero
+                                    || ((animationView.currentKeyframe.isKey
+                                         && (!animationView.model.keyframe(atRoot: nRootI - 1).isKey
+                                             || !animationView.model.keyframe(atRoot: nRootI + 1).isKey))
+                                        || !animationView.currentKeyframe.containsInterpolated) {
+                                    let lw = rootView.worldLineWidth * (isZero ? 4 : 2)
+                                    let node = Node(path: .init(circleRadius: lw * 2.5, position: p),
+                                                    lineWidth: lw, lineType: .color(.content))
+                                    rootView.node.append(child: node)
+                                    Task {
+                                        try await Task.sleep(sec: 0.04)
+                                        node.path = .init(circleRadius: lw * 3.5, position: p)
+                                        try await Task.sleep(sec: 0.04)
+                                        node.path = .init(circleRadius: lw * 4.5, position: p)
+                                        try await Task.sleep(sec: 0.04)
+                                        node.path = .init(circleRadius: lw * 4.75, position: p)
+                                        try await Task.sleep(sec: 0.04)
+                                        node.removeFromParent()
+                                    }
                                 }
                             }
                             

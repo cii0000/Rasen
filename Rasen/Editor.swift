@@ -452,7 +452,7 @@ final class ZoomEditor: PinchEventEditor {
         rootView = rootEditor.rootView
     }
     
-    let correction = 3.0
+    let correction = 4.0
     func send(_ event: PinchEvent) {
         guard event.magnification != 0 else { return }
         let oldIsEditingSheet = rootView.isEditingSheet
