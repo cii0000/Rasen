@@ -594,7 +594,7 @@ extension Rendnote {
             let overtone = pitbend.firstOvertone
             let isAll = overtone.isAll,
                 oddScale = Volm.amp(fromVolm: overtone.oddVolm),
-                evenScale = -Volm.amp(fromVolm: overtone.evenVolm)
+                evenScale = -overtone.evenAmp
             if isFullNoise {
                 let (noiseSpectrum, mainNoiseSpectrum) = aNoiseSpectrum(fromNoise: pitbend.firstSpectlope,
                                                                         fq: fq,
@@ -764,7 +764,7 @@ extension Rendnote {
                     let fq = fq * pitbend.fqScale(atSec: sec)
                     let overtone = pitbend.overtone(atSec: sec)
                     let oddScale = overtone.isAll ? 1 : Volm.amp(fromVolm: overtone.oddVolm)
-                    let evenScale = overtone.isAll ? -1 : -Volm.amp(fromVolm: overtone.evenVolm)
+                    let evenScale = overtone.isAll ? -1 : -overtone.evenAmp
                     let (noiseSpectrum, mainNoiseSpectrum) = aNoiseSpectrum(fromNoise: spectlope, fq: fq,
                                                                       oddScale: oddScale,
                                                                       evenScale: -evenScale)
@@ -807,14 +807,14 @@ extension Rendnote {
                 let isEqualAllOvertone = pitbend.isEqualAllOvertone,
                     isAll = firstOvertone.isAll,
                     oddScale = Volm.amp(fromVolm: firstOvertone.oddVolm),
-                    evenScale = -Volm.amp(fromVolm: firstOvertone.evenVolm)
+                    evenScale = -firstOvertone.evenAmp
                 var oddScales = [Double](capacity: sampleCount)
                 var evenScales = [Double](capacity: sampleCount)
                 for i in sampleCount.range {
                     let sec = Double(i) * rSampleRate
                     let overtone = pitbend.overtone(atSec: sec)
                     oddScales.append(Volm.amp(fromVolm: overtone.oddVolm))
-                    evenScales.append(-Volm.amp(fromVolm: overtone.evenVolm))
+                    evenScales.append(-overtone.evenAmp)
                 }
                 
                 let maxSinCount = frames.maxValue { $0.sinCount }!

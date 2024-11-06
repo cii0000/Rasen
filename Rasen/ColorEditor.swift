@@ -45,6 +45,20 @@ final class ChangeTintEditor: DragEventEditor {
         editor.updateNode()
     }
 }
+final class ChangeOpacityEditor: DragEventEditor {
+    let editor: ColorEditor
+    
+    init(_ rootEditor: RootEditor) {
+        editor = ColorEditor(rootEditor)
+    }
+    
+    func send(_ event: DragEvent) {
+        editor.changeOpacity(with: event)
+    }
+    func updateNode() {
+        editor.updateNode()
+    }
+}
 final class ColorEditor: Editor {
     let rootEditor: RootEditor, rootView: RootView
     let isEditingSheet: Bool
@@ -115,20 +129,18 @@ final class ColorEditor: Editor {
         let rCount = 1 / Double(count)
         return (0 ... count).map {
             let t = Double($0) * rCount
-            return Point(-opaqueWidth * t - opaqueWidth, 0)
+            return Point(0, maxLightnessHeight * t)
         }
     }
-    private func opacityGradientWith(color: Color,
-                                     splitCount count: Int = 100) -> [Color] {
+    private func opacityGradientWith(color: Color, splitCount count: Int = 100) -> [Color] {
         let rCount = 1 / Double(count)
         return (0 ... count).map {
-            let color0 = color.with(opacity: 1 - Double($0) * rCount)
-            let color1 = $0 % 2 == 0 ? Color(white: 0.4) : Color(white: 0.6)
+            let color0 = color.with(opacity: Double($0) * rCount)
+            let color1 = $0 % 2 == 0 ? Color(white: 0.4) : Color(white: 0.8)
             return color1.alphaBlend(color0)
         }
     }
     let opacityWidth = 100.0, opaqueWidth = 10.0
-    let opacityNode = Node(lineWidth: 2)
     var opacityNodeX: Double {
         editingUUColor.value.opacity
             .clipped(min: 0, max: 1,
@@ -149,15 +161,15 @@ final class ColorEditor: Editor {
                 let color = firstUUColor.value
                 
                 if isEditableOpacity {
-                    opacityNode.lineType = .gradient(opacityGradientWith(color: color))
-                    lightnessNode.append(child: opacityNode)
+                    let gradient = opacityGradientWith(color: color)
+                    lightnessNode.lineType = .gradient(gradient)
+                } else {
+                    let gradient = lightnessGradientWith(chroma: color.chroma,
+                                                         hue: color.hue,
+                                                         splitCount: Int(maxLightnessHeight),
+                                                         isReversed: isReversedLightness)
+                    lightnessNode.lineType = .gradient(gradient)
                 }
-                
-                let gradient = lightnessGradientWith(chroma: color.chroma,
-                                                     hue: color.hue,
-                                                     splitCount: Int(maxLightnessHeight), 
-                                                     isReversed: isReversedLightness)
-                lightnessNode.lineType = .gradient(gradient)
                 rootView.node.append(child: lightnessNode)
                 if isEditableMaxLightness {
                     whiteLineNode.path = Path(Edge(Point(-0.5, whiteLightnessHeight),
@@ -179,11 +191,17 @@ final class ColorEditor: Editor {
     }
     var lightnessWorldPosition: Point {
         let sfp = rootView.convertWorldToScreen(firstLightnessPosition)
-        let t = oldEditingLightness.clipped(min: Color.minLightness,
-                                            max: maxLightness,
-                                            newMin: 0, newMax: 1)
-        let dp = Point(0, maxLightnessHeight * t)
-        return rootView.convertScreenToWorld(sfp - dp)
+        if isEditableOpacity {
+            let t = oldEditingLightness
+            let dp = Point(0, maxLightnessHeight * t)
+            return rootView.convertScreenToWorld(sfp - dp)
+        } else {
+            let t = oldEditingLightness.clipped(min: Color.minLightness,
+                                                max: maxLightness,
+                                                newMin: 0, newMax: 1)
+            let dp = Point(0, maxLightnessHeight * t)
+            return rootView.convertScreenToWorld(sfp - dp)
+        }
     }
     var isSnappedLightness = true {
         didSet {
@@ -197,15 +215,16 @@ final class ColorEditor: Editor {
     var oldEditingLightness = 0.0
     var editingLightness = 0.0 {
         didSet {
-            let t = editingLightness.clipped(min: Color.minLightness,
-                                             max: maxLightness,
-                                             newMin: 0, newMax: 1)
-            let p = Point(0, maxLightnessHeight * t)
-            colorPointNode.attitude.position = p
-            
             if isEditableOpacity {
-                opacityNode.attitude.position = p
-                opacityNode.lineType = .gradient(opacityGradientWith(color: editingUUColor.value))
+                let t = editingLightness
+                let p = Point(0, maxLightnessHeight * t)
+                colorPointNode.attitude.position = p
+            } else {
+                let t = editingLightness.clipped(min: Color.minLightness,
+                                                 max: maxLightness,
+                                                 newMin: 0, newMax: 1)
+                let p = Point(0, maxLightnessHeight * t)
+                colorPointNode.attitude.position = p
             }
         }
     }
@@ -476,8 +495,8 @@ final class ColorEditor: Editor {
                         beganVolm = score.notes[noteI].pits[pitI].stereo.volm
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .stereo)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
-                    case .evenVolm(let pitI):
-                        beganVolm = score.notes[noteI].pits[pitI].tone.overtone.evenVolm
+                    case .evenAmp(let pitI):
+                        beganVolm = score.notes[noteI].pits[pitI].tone.overtone.evenAmp
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .tone)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
                     case .oddVolm(let pitI):
@@ -485,7 +504,7 @@ final class ColorEditor: Editor {
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .tone)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
                     case .allEven:
-                        beganVolm = scoreView.evenVolm(atX: scoreP.x, from: score.notes[noteI])
+                        beganVolm = scoreView.evenAmp(atX: scoreP.x, from: score.notes[noteI])
                         updatePitsWithSelection(noteI: noteI, pitI: nil, sprolI: nil, .tone)
                         beganBeat = scoreView.beat(atX: scoreP.x)
                     case .sprol(let pitI, let sprolI):
@@ -582,7 +601,7 @@ final class ColorEditor: Editor {
                     }
                     let nivs = nvs.map { IndexValue(value: $0.value, index: $0.key) }
                     scoreView.replace(nivs)
-                case .evenVolm, .allEven:
+                case .evenAmp, .allEven:
                     var nvs = [Int: Note]()
                     for (_, v) in beganNotePits {
                         for (noteI, nv) in v.dic {
@@ -590,8 +609,8 @@ final class ColorEditor: Editor {
                                 nvs[noteI] = nv.note
                             }
                             nv.pits.forEach { (pitI, beganPit) in
-                                let nVolm = newVolm(from: beganPit.pit.tone.overtone[.evenVolm])
-                                nvs[noteI]?.pits[pitI].tone.overtone[.evenVolm] = nVolm
+                                let nVolm = newVolm(from: beganPit.pit.tone.overtone[.evenAmp])
+                                nvs[noteI]?.pits[pitI].tone.overtone[.evenAmp] = nVolm
                                 nvs[noteI]?.pits[pitI].tone.id = v.nid
                             }
                         }
@@ -635,7 +654,7 @@ final class ColorEditor: Editor {
                 }
                 
                 switch scoreResult {
-                case .sprol, .allSprol, .oddVolm, .evenVolm, .allEven:
+                case .sprol, .allSprol, .oddVolm, .evenAmp, .allEven:
                     notePlayer?.notes = playerBeatNoteIndexes.map {
                         scoreView.normarizedPitResult(atBeat: beganBeat, at: $0)
                     }
@@ -896,7 +915,7 @@ final class ColorEditor: Editor {
                         beganStereo = note.pits[pitI].stereo
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .stereo)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
-                    case .evenVolm, .oddVolm, .allEven: return
+                    case .evenAmp, .oddVolm, .allEven: return
                     case .allSprol(let sprolI, let sprol):
                         let volm = sprol.volm
                         beganNoise = sprol.noise
@@ -1131,6 +1150,289 @@ final class ColorEditor: Editor {
         }
     }
     
+    func changeEvenVolm(with event: DragEvent) {
+        guard isEditingSheet else {
+            rootEditor.keepOut(with: event)
+            return
+        }
+        
+        let sp = event.screenPoint
+        switch event.phase {
+        case .began:
+            rootView.cursor = .arrow
+            
+            if rootEditor.isPlaying(with: event) {
+                rootEditor.stopPlaying(with: event)
+            }
+            
+            beganSP = sp
+            let p = rootView.convertScreenToWorld(sp)
+            if let sheetView = rootView.sheetView(at: p) {
+                self.sheetView = sheetView
+                
+                func updateContentsWithSelections() {
+                    let fs = rootView.selections
+                        .map { $0.rect }
+                        .map { sheetView.convertFromWorld($0) }
+                    if !fs.isEmpty {
+                        beganContents = sheetView.contentsView.elementViews.enumerated().reduce(into: [Int: Content]()) { (dic, v) in
+                            if fs.contains(where: { v.element.transformedTimelineFrame?.intersects($0) ?? false }),
+                                v.element.model.type.isAudio {
+                                
+                                dic[v.offset] = v.element.model
+                            }
+                        }
+                    }
+                }
+                
+                func updatePlayer(from vs: [Note.PitResult], in sheetView: SheetView) {
+                    if let notePlayer = sheetView.notePlayer {
+                        self.notePlayer = notePlayer
+                        notePlayer.notes = vs
+                    } else {
+                        notePlayer = try? NotePlayer(notes: vs)
+                        sheetView.notePlayer = notePlayer
+                    }
+                    notePlayer?.play()
+                }
+                
+                func updatePitsWithSelection(noteI: Int, pitI: Int?, sprolI: Int?, _ type: PitIDType) {
+                    var noteAndPitIs: [Int: [Int: Set<Int>]]
+                    if let sprolI {
+                        if rootView.isSelect(at: p) {
+                            noteAndPitIs = sheetView.noteAndPitAndSprolIs(from: rootView.selections)
+                        } else {
+                            let id = pitI != nil ? score.notes[noteI].pits[pitI!][type] : nil
+                            noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) {
+                                $0[$1.offset] = $1.element.pits.enumerated().reduce(into: [Int: Set<Int>]()) { (v, ip) in
+                                    if id == nil || ip.element[type] == id {
+                                        v[ip.offset] = sprolI < ip.element.tone.spectlope.count ? [sprolI] : []
+                                    }
+                                }
+                            }
+                        }
+                    } else if rootView.isSelect(at: p) {
+                        let aNoteAndPitIs = sheetView.noteAndPitIndexes(from: rootView.selections)
+                        noteAndPitIs = [:]
+                        for (noteI, v) in aNoteAndPitIs {
+                            noteAndPitIs[noteI] = v.reduce(into: [Int: Set<Int>]()) {
+                                $0[$1] = []
+                            }
+                        }
+                        if let pitI {
+                            if noteAndPitIs[noteI] != nil {
+                                if noteAndPitIs[noteI]![pitI] != nil {
+                                    noteAndPitIs[noteI]?[pitI] = []
+                                }
+                            } else {
+                                noteAndPitIs[noteI] = [pitI: []]
+                            }
+                        }
+                    } else {
+                        if let pitI {
+                            let id = score.notes[noteI].pits[pitI][type]
+                            noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) {
+                                $0[$1.offset] = $1.element.pits.enumerated().reduce(into: [Int: Set<Int>]()) { (v, ip) in
+                                    if ip.element[type] == id {
+                                        v[ip.offset] = []
+                                    }
+                                }
+                            }
+                        } else {
+                            let note = score.notes[noteI]
+                            if note.pits.count == 1 {
+                                let id = note.firstPit[type]
+                                noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) {
+                                    $0[$1.offset] = $1.element.pits.enumerated().reduce(into: [Int: Set<Int>]()) { (v, ip) in
+                                        if ip.element[type] == id {
+                                            v[ip.offset] = []
+                                        }
+                                    }
+                                }
+                            } else {
+                                noteAndPitIs = [noteI: score.notes[noteI].pits.count.range.reduce(into: [Int: Set<Int>]()) { $0[$1] = [] }]
+                            }
+                        }
+                    }
+                    
+                    beganNotePits = noteAndPitIs.reduce(into: .init()) {
+                        for (pitI, sprolIs) in $1.value {
+                            let pit = score.notes[$1.key].pits[pitI]
+                            let id = pit[type]
+                            if $0[id] != nil {
+                                if $0[id]!.dic[$1.key] != nil {
+                                    $0[id]!.dic[$1.key]!.pits[pitI] = (pit, sprolIs)
+                                } else {
+                                    $0[id]!.dic[$1.key] = (score.notes[$1.key], [pitI: (pit, sprolIs)])
+                                }
+                            } else {
+                                $0[id] = (UUID(), [$1.key: (score.notes[$1.key], [pitI: (pit, sprolIs)])])
+                            }
+                        }
+                    }
+                }
+                
+                let scoreP = sheetView.scoreView.convertFromWorld(p)
+                let scoreView = sheetView.scoreView
+                let score = scoreView.model
+                
+                if let (noteI, result) = scoreView
+                    .hitTestColor(scoreP, scale: rootView.screenToWorldScale) {
+                    
+                    let note = score.notes[noteI]
+                    
+                    self.scoreResult = result
+                    switch result {
+                    case .note:
+                        beganVolm = scoreView.evenAmp(atX: scoreP.x, from: note)
+                        updatePitsWithSelection(noteI: noteI, pitI: nil, sprolI: nil, .stereo)
+                        beganBeat = scoreView.beat(atX: scoreP.x)
+                    case .pit(let pitI):
+                        beganVolm = score.notes[noteI].pits[pitI].tone.overtone.evenAmp
+                        updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .stereo)
+                        beganBeat = note.pits[pitI].beat + note.beatRange.start
+                    default: break
+                    }
+                    
+                    let noteIsSet = Set(beganNotePits.values.flatMap { $0.dic.keys }).sorted()
+                    let vs = score.noteIAndNormarizedPits(atBeat: beganBeat, in: noteIsSet)
+                    playerBeatNoteIndexes = vs.map { $0.noteI }
+                    
+                    updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
+                }
+                
+                let (minV, maxV) = (0.0, 1.0)
+                updateNode()
+                fp = event.screenPoint
+                isReversedLightness = true
+                let g = lightnessGradientWith(chroma: 0, hue: 0, isReversed: isReversedLightness)
+                lightnessNode.lineType = .gradient(g)
+                lightnessNode.path = Path([Pathline(lightnessPointsWith(splitCount: Int(maxLightnessHeight)))])
+                oldEditingLightness = beganVolm.clipped(min: minV, max: maxV, newMin: 0, newMax: 100)
+                editingLightness = oldEditingLightness
+                firstLightnessPosition = rootView.convertScreenToWorld(fp)
+                isEditingLightness = true
+            }
+        case .changed:
+            guard let sheetView else { return }
+            
+            let wp = rootView.convertScreenToWorld(event.screenPoint)
+            let p = lightnessNode.convertFromWorld(wp)
+            let t = (p.y / maxLightnessHeight).clipped(min: 0, max: 1)
+            let volm = Double.linear(0, 1, t: t)
+            let volmScale = beganVolm == 0 ? 0 : volm / beganVolm
+            func newVolm(from otherVolm: Double) -> Double {
+                if beganVolm == otherVolm {
+                    volm
+                } else {
+                    (otherVolm * volmScale).clipped(Volm.volmRange)
+                }
+            }
+            
+            let scoreView = sheetView.scoreView
+            
+            if let scoreResult {
+                switch scoreResult {
+                case .note, .pit:
+                    var nvs = [Int: Note]()
+                    for (_, v) in beganNotePits {
+                        for (noteI, nv) in v.dic {
+                            if nvs[noteI] == nil {
+                                nvs[noteI] = nv.note
+                            }
+                            nv.pits.forEach { (pitI, beganPit) in
+                                nvs[noteI]?.pits[pitI].tone.overtone.evenAmp = newVolm(from: beganPit.pit.tone.overtone.evenAmp)
+                                nvs[noteI]?.pits[pitI].tone.id = v.nid
+                            }
+                        }
+                    }
+                    let nivs = nvs.map { IndexValue(value: $0.value, index: $0.key) }
+                    scoreView.replace(nivs)
+                default: break
+                }
+                
+                switch scoreResult {
+                case .note, .pit:
+                    notePlayer?.notes = playerBeatNoteIndexes.map {
+                        scoreView.normarizedPitResult(atBeat: beganBeat, at: $0)
+                    }
+                default: break
+                }
+            }
+            
+            editingLightness = volm.clipped(min: 0, max: 1, newMin: 0, newMax: 100)
+        case .ended:
+            notePlayer?.stop()
+            
+            if let sheetView {
+                var isNewUndoGroup = false
+                func updateUndoGroup() {
+                    if !isNewUndoGroup {
+                        sheetView.newUndoGroup()
+                        isNewUndoGroup = true
+                    }
+                }
+                
+                if !beganNotePits.isEmpty {
+                    let scoreView = sheetView.scoreView
+                    let score = scoreView.model
+                    var noteIVs = [IndexValue<Note>](), oldNoteIVs = [IndexValue<Note>]()
+                    
+                    let beganNoteIAndNotes = beganNotePits.reduce(into: [Int: Note]()) {
+                        for (noteI, v) in $1.value.dic {
+                            $0[noteI] = v.note
+                        }
+                    }
+                    for (noteI, beganNote) in beganNoteIAndNotes {
+                        guard noteI < score.notes.count else { continue }
+                        let note = scoreView.model.notes[noteI]
+                        if beganNote != note {
+                            noteIVs.append(.init(value: note, index: noteI))
+                            oldNoteIVs.append(.init(value: beganNote, index: noteI))
+                        }
+                    }
+                    if !noteIVs.isEmpty {
+                        updateUndoGroup()
+                        sheetView.capture(noteIVs, old: oldNoteIVs)
+                    }
+                }
+                
+                if !beganNotes.isEmpty {
+                    let scoreView = sheetView.scoreView
+                    let score = scoreView.model
+                    var noteIVs = [IndexValue<Note>](), oldNoteIVs = [IndexValue<Note>]()
+                    for (notei, beganNote) in beganNotes.sorted(by: { $0.key < $1.key }) {
+                        guard notei < score.notes.count else { continue }
+                        let note = score.notes[notei]
+                        if beganNote != note {
+                            noteIVs.append(.init(value: note, index: notei))
+                            oldNoteIVs.append(.init(value: beganNote, index: notei))
+                        }
+                    }
+                    if !noteIVs.isEmpty {
+                        updateUndoGroup()
+                        sheetView.capture(noteIVs, old: oldNoteIVs)
+                    }
+                }
+                
+                if !beganContents.isEmpty {
+                    for (ci, beganContent) in beganContents {
+                        guard ci < sheetView.contentsView.elementViews.count else { continue }
+                        let content = sheetView.contentsView.elementViews[ci].model
+                        if content != beganContent {
+                            updateUndoGroup()
+                            sheetView.capture(content, old: beganContent, at: ci)
+                        }
+                    }
+                }
+            }
+            
+            isEditingLightness = false
+            lightnessNode.removeFromParent()
+            rootView.cursor = rootView.defaultCursor
+        }
+    }
+    
     func changeLightness(with event: DragEvent) {
         guard isEditingSheet else {
             rootEditor.keepOut(with: event)
@@ -1211,8 +1513,6 @@ final class ColorEditor: Editor {
                                           hue: firstUUColor.value.hue)
             lightnessNode.lineType = .gradient(g)
             lightnessNode.path = Path([Pathline(lightnessPointsWith(splitCount: Int(maxLightnessHeight)))])
-            opacityNode.lineType = .gradient(opacityGradientWith(color: firstUUColor.value))
-            opacityNode.path = Path([Pathline(opacityPointsWith())])
             oldEditingLightness = firstUUColor.value.lightness
             editingLightness = oldEditingLightness
             firstLightnessPosition = rootView.convertScreenToWorld(fp)
@@ -1406,6 +1706,79 @@ final class ColorEditor: Editor {
             lightnessNode.removeFromParent()
             tintNode.removeFromParent()
             tintBorderNode.removeFromParent()
+            
+            rootView.cursor = rootView.defaultCursor
+        }
+    }
+    
+    func changeOpacity(with event: DragEvent) {
+        guard isEditingSheet else {
+            rootEditor.keepOut(with: event)
+            return
+        }
+        if rootEditor.isPlaying(with: event) {
+            rootEditor.stopPlaying(with: event)
+        }
+        
+        if isChangeVolm {
+            changeEvenVolm(with: event)
+            return
+        }
+        if event.phase == .began {
+            let p = rootView.convertScreenToWorld(event.screenPoint)
+            if let sheetView = rootView.sheetView(at: p) {
+                if sheetView.model.score.enabled {
+                    isChangeVolm = true
+                    changeEvenVolm(with: event)
+                    return
+                } else if let ci = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
+                                                          scale: rootView.screenToWorldScale),
+                   sheetView.model.contents[ci].type.isAudio {
+                    isChangeVolm = true
+                    changeEvenVolm(with: event)
+                    return
+                }
+            }
+        }
+        
+        func updateLightness() {
+            let wp = rootView.convertScreenToWorld(event.screenPoint)
+            let p = lightnessNode.convertFromWorld(wp)
+            let t = (p.y / maxLightnessHeight).clipped(min: 0, max: 1)
+            let opacity = Double.linear(0, 1, t: t)
+            
+            var uuColor = firstUUColor
+            uuColor.value.opacity = opacity
+            
+            editingUUColor = uuColor
+            colorOwners.forEach { $0.uuColor = uuColor }
+            
+            editingLightness = opacity
+        }
+        switch event.phase {
+        case .began:
+            rootView.cursor = .arrow
+            
+            isEditableOpacity = true
+            updateNode()
+            updateOwners(with: event)
+            fp = event.screenPoint
+            lightnessNode.lineType = .gradient(opacityGradientWith(color: firstUUColor.value))
+            lightnessNode.path = Path([Pathline(opacityPointsWith())])
+            oldEditingLightness = firstUUColor.value.opacity
+            editingLightness = oldEditingLightness
+            firstLightnessPosition = rootView.convertScreenToWorld(fp)
+            editingUUColor = firstUUColor
+            isEditingLightness = true
+        case .changed:
+            updateLightness()
+        case .ended:
+            capture()
+            colorOwners = []
+            isEditingLightness = false
+            lightnessNode.removeFromParent()
+            tintBorderNode.removeFromParent()
+            tintNode.removeFromParent()
             
             rootView.cursor = rootView.defaultCursor
         }

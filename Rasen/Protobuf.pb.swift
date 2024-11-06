@@ -932,7 +932,7 @@ struct PBOvertone: Sendable {
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var evenVolm: Double = 0
+  var evenAmp: Double = 0
 
   var oddVolm: Double = 0
 
@@ -1190,11 +1190,6 @@ struct PBNote: @unchecked Sendable {
   var hasID: Bool {return _storage._id != nil}
   /// Clears the value of `id`. Subsequent reads from it will return its default value.
   mutating func clearID() {_uniqueStorage()._id = nil}
-
-  var isShownTone: Bool {
-    get {return _storage._isShownTone}
-    set {_uniqueStorage()._isShownTone = newValue}
-  }
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1862,20 +1857,6 @@ struct PBKeyframeOption: Sendable {
   fileprivate var _beat: PBRational? = nil
 }
 
-struct PBBoolIndexValue: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  var value: Bool = false
-
-  var index: Int64 = 0
-
-  var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  init() {}
-}
-
 struct PBIntIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -2506,18 +2487,6 @@ struct PBInterOptionIndexValueArrayIndexValueArray: Sendable {
   init() {}
 }
 
-struct PBBoolIndexValueArray: Sendable {
-  // SwiftProtobuf.Message conformance is added in an extension below. See the
-  // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
-  // methods supported on all messages.
-
-  var value: [PBBoolIndexValue] = []
-
-  var unknownFields = SwiftProtobuf.UnknownStorage()
-
-  init() {}
-}
-
 struct PBPlaneIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
@@ -2993,14 +2962,6 @@ struct PBSheetUndoItem: Sendable {
     set {value = .removeDraftNotes(newValue)}
   }
 
-  var setIsShownTones: PBBoolIndexValueArray {
-    get {
-      if case .setIsShownTones(let v)? = value {return v}
-      return PBBoolIndexValueArray()
-    }
-    set {value = .setIsShownTones(newValue)}
-  }
-
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   enum OneOf_Value: Equatable, Sendable {
@@ -3052,7 +3013,6 @@ struct PBSheetUndoItem: Sendable {
     case setScoreOption(PBScoreOption)
     case insertDraftNotes(PBNoteIndexValueArray)
     case removeDraftNotes(PBInt64Array)
-    case setIsShownTones(PBBoolIndexValueArray)
 
   }
 
@@ -4785,7 +4745,7 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
 extension PBOvertone: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBOvertone"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "evenVolm"),
+    1: .same(proto: "evenAmp"),
     2: .same(proto: "oddVolm"),
   ]
 
@@ -4795,7 +4755,7 @@ extension PBOvertone: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
       // allocates stack space for every case branch when no optimizations are
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
-      case 1: try { try decoder.decodeSingularDoubleField(value: &self.evenVolm) }()
+      case 1: try { try decoder.decodeSingularDoubleField(value: &self.evenAmp) }()
       case 2: try { try decoder.decodeSingularDoubleField(value: &self.oddVolm) }()
       default: break
       }
@@ -4803,8 +4763,8 @@ extension PBOvertone: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.evenVolm.bitPattern != 0 {
-      try visitor.visitSingularDoubleField(value: self.evenVolm, fieldNumber: 1)
+    if self.evenAmp.bitPattern != 0 {
+      try visitor.visitSingularDoubleField(value: self.evenAmp, fieldNumber: 1)
     }
     if self.oddVolm.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.oddVolm, fieldNumber: 2)
@@ -4813,7 +4773,7 @@ extension PBOvertone: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
   }
 
   static func ==(lhs: PBOvertone, rhs: PBOvertone) -> Bool {
-    if lhs.evenVolm != rhs.evenVolm {return false}
+    if lhs.evenAmp != rhs.evenAmp {return false}
     if lhs.oddVolm != rhs.oddVolm {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
@@ -5176,7 +5136,6 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
     3: .same(proto: "beatRange"),
     7: .same(proto: "envelope"),
     9: .same(proto: "id"),
-    10: .same(proto: "isShownTone"),
   ]
 
   fileprivate class _StorageClass {
@@ -5185,7 +5144,6 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
     var _beatRange: PBRationalRange? = nil
     var _envelope: PBEnvelope? = nil
     var _id: PBUUID? = nil
-    var _isShownTone: Bool = false
 
     #if swift(>=5.10)
       // This property is used as the initial default value for new instances of the type.
@@ -5205,7 +5163,6 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
       _beatRange = source._beatRange
       _envelope = source._envelope
       _id = source._id
-      _isShownTone = source._isShownTone
     }
   }
 
@@ -5229,7 +5186,6 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
         case 3: try { try decoder.decodeSingularMessageField(value: &_storage._beatRange) }()
         case 7: try { try decoder.decodeSingularMessageField(value: &_storage._envelope) }()
         case 9: try { try decoder.decodeSingularMessageField(value: &_storage._id) }()
-        case 10: try { try decoder.decodeSingularBoolField(value: &_storage._isShownTone) }()
         default: break
         }
       }
@@ -5257,9 +5213,6 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
       try { if let v = _storage._id {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
       } }()
-      if _storage._isShownTone != false {
-        try visitor.visitSingularBoolField(value: _storage._isShownTone, fieldNumber: 10)
-      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -5274,7 +5227,6 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
         if _storage._beatRange != rhs_storage._beatRange {return false}
         if _storage._envelope != rhs_storage._envelope {return false}
         if _storage._id != rhs_storage._id {return false}
-        if _storage._isShownTone != rhs_storage._isShownTone {return false}
         return true
       }
       if !storagesAreEqual {return false}
@@ -6495,44 +6447,6 @@ extension PBKeyframeOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   static func ==(lhs: PBKeyframeOption, rhs: PBKeyframeOption) -> Bool {
     if lhs._beat != rhs._beat {return false}
     if lhs.previousNext != rhs.previousNext {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
-extension PBBoolIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = "PBBoolIndexValue"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "value"),
-    2: .same(proto: "index"),
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeSingularBoolField(value: &self.value) }()
-      case 2: try { try decoder.decodeSingularInt64Field(value: &self.index) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if self.value != false {
-      try visitor.visitSingularBoolField(value: self.value, fieldNumber: 1)
-    }
-    if self.index != 0 {
-      try visitor.visitSingularInt64Field(value: self.index, fieldNumber: 2)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: PBBoolIndexValue, rhs: PBBoolIndexValue) -> Bool {
-    if lhs.value != rhs.value {return false}
-    if lhs.index != rhs.index {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -7878,38 +7792,6 @@ extension PBInterOptionIndexValueArrayIndexValueArray: SwiftProtobuf.Message, Sw
   }
 }
 
-extension PBBoolIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
-  static let protoMessageName: String = "PBBoolIndexValueArray"
-  static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
-    1: .same(proto: "value"),
-  ]
-
-  mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.value) }()
-      default: break
-      }
-    }
-  }
-
-  func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    if !self.value.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.value, fieldNumber: 1)
-    }
-    try unknownFields.traverse(visitor: &visitor)
-  }
-
-  static func ==(lhs: PBBoolIndexValueArray, rhs: PBBoolIndexValueArray) -> Bool {
-    if lhs.value != rhs.value {return false}
-    if lhs.unknownFields != rhs.unknownFields {return false}
-    return true
-  }
-}
-
 extension PBPlaneIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBPlaneIndexValueArray"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
@@ -8185,7 +8067,6 @@ extension PBSheetUndoItem: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
     49: .same(proto: "setScoreOption"),
     50: .same(proto: "insertDraftNotes"),
     51: .same(proto: "removeDraftNotes"),
-    52: .same(proto: "setIsShownTones"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -8798,19 +8679,6 @@ extension PBSheetUndoItem: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
           self.value = .removeDraftNotes(v)
         }
       }()
-      case 52: try {
-        var v: PBBoolIndexValueArray?
-        var hadOneofValue = false
-        if let current = self.value {
-          hadOneofValue = true
-          if case .setIsShownTones(let m) = current {v = m}
-        }
-        try decoder.decodeSingularMessageField(value: &v)
-        if let v = v {
-          if hadOneofValue {try decoder.handleConflictingOneOf()}
-          self.value = .setIsShownTones(v)
-        }
-      }()
       default: break
       }
     }
@@ -9013,10 +8881,6 @@ extension PBSheetUndoItem: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
     case .removeDraftNotes?: try {
       guard case .removeDraftNotes(let v)? = self.value else { preconditionFailure() }
       try visitor.visitSingularMessageField(value: v, fieldNumber: 51)
-    }()
-    case .setIsShownTones?: try {
-      guard case .setIsShownTones(let v)? = self.value else { preconditionFailure() }
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 52)
     }()
     case nil: break
     }

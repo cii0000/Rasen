@@ -45,6 +45,18 @@ fragment float4 basicFragment(BasicVertex vertexIn [[stage_in]]) {
     return vertexIn.color;
 }
 
+fragment float4 checkerboardFragment(BasicVertex vertexIn [[stage_in]]) {
+    uint2 p = uint2(vertexIn.position.x / 40, vertexIn.position.y / 40);
+    float a = vertexIn.color[3];
+    return (p.x ^ p.y) & 1 ?
+    float4(1 * (1 - a) + vertexIn.color[0] * a,
+           1 * (1 - a) + vertexIn.color[1] * a,
+           1 * (1 - a) + vertexIn.color[2] * a, 1.0) :
+    float4(0.975 * (1 - a) + vertexIn.color[0] * a,
+           0.975 * (1 - a) + vertexIn.color[1] * a,
+           0.975 * (1 - a) + vertexIn.color[2] * a, 1.0);
+}
+
 struct TextureVertex {
     float4 position [[position]];
     float2 cordinate;

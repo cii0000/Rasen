@@ -1590,23 +1590,7 @@ final class RootView: View, @unchecked Sendable {
             sheetView.unselectKeyframes()
         }
         
-        closeAllTonePanel(at: p)
-        
         finding = Finding()
-    }
-    
-    func closeAllTonePanel(at p: Point) {
-        guard let sheetView = sheetView(at: p) else { return }
-        let scoreView = sheetView.scoreView
-        guard sheetView.scoreView.model.enabled,
-              !scoreView.containsShownToneNote(scoreView.convertFromWorld(p), scale: screenToWorldScale) else { return }
-        let toneIs = scoreView.model.notes.enumerated().compactMap {
-            $0.element.isShownTone ? $0.offset : nil
-        }
-        if !toneIs.isEmpty {
-            sheetView.newUndoGroup()
-            sheetView.setIsShownTones(toneIs.map { .init(value: false, index: $0) })
-        }
     }
     
     func endSeqencer() {

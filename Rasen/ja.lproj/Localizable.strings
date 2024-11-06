@@ -7,18 +7,21 @@
 "Indicate" = "指し示す";
 "Drag" = "ドラッグ";
 "SubDrag" = "副ドラッグ";
-"Scroll" = "スクロール";
-"Pinch" = "ピンチ";
-"Rotate" = "回転";
 "LookUpOperate" = "調べる操作";
-"Zoom" = "ズーム";
-"Scroll" = "スクロール";
+"2FingersScroll" = "２本指スクロール";
+"3FingersScroll" = "３本指スクロール";
+"2FingersPinch" = "２本指ピンチ";
+"2FingersRotate" = "２本指回転";
 
 "V Pinch" = "V ピンチ";
 "Resize Paste" = "リサイズペースト";
 
 "Draw Line" = "線を引く";
 "Draw Straight Line" = "直線を引く";
+
+"Scroll" = "スクロール";
+"Zoom" = "ズーム";
+"Rotate" = "回転";
 
 "Change to Draft" = "下書きに変更";
 "Cut Draft" = "下書きをカット";
@@ -43,9 +46,8 @@
 "Unselect" = "選択解除";
 "Cut" = "カット";
 "Copy" = "コピー";
-"Paste" = "ペースト";
 "Copy Line Color" = "線色をコピー";
-"Copy Note Tone" = "音符トーンをコピー";
+"Paste" = "ペースト";
 
 "Undo" = "取り消す";
 "Redo" = "やり直す";

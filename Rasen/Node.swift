@@ -329,6 +329,7 @@ final class Node: @unchecked Sendable {
     
     enum FillType: Equatable {
         case color(Color)
+        case checkerboard(Color)
         case gradient([Color])
         case maxGradient([Color])
         case texture(Texture)
@@ -359,7 +360,7 @@ final class Node: @unchecked Sendable {
     private func updateFillColorBuffer() {
         if let fillType = fillType {
             switch fillType {
-            case .color(let color):
+            case .color(let color), .checkerboard(let color):
                 fillColorBuffer = Renderer.shared.colorBuffer(with: color)
                 fillColorsBuffer = nil
                 fillTextureBuffer = nil
@@ -744,7 +745,9 @@ extension Node {
         if let fillPathBuffer = fillPathBuffer {
             if path.isPolygon {
                 if let fillColorBuffer = fillColorBuffer {
-                    if isFillOpaque {
+                    if case .checkerboard = fillType {
+                        ctx.setCheckerboardColorPipeline()
+                    } else if isFillOpaque {
                         ctx.setOpaqueColorPipeline()
                     } else {
                         ctx.setAlphaColorPipeline()

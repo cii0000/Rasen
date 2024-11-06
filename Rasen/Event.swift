@@ -236,10 +236,10 @@ struct EventType {
     static let drag = EventType(name: "Drag".localized)
     static let subDrag = EventType(name: "SubDrag".localized)
     static let otherDrag = EventType(name: "OtherDrag".localized)
-    static let scroll = EventType(name: "Scroll".localized)
-    static let swipe = EventType(name: "Swipe".localized)
-    static let pinch = EventType(name: "Pinch".localized)
-    static let rotate = EventType(name: "Rotate".localized)
+    static let scroll = EventType(name: "2FingersScroll".localized)
+    static let swipe = EventType(name: "3FingersScroll".localized)
+    static let pinch = EventType(name: "2FingersPinch".localized)
+    static let rotate = EventType(name: "2FingersRotate".localized)
     static let keyInput = EventType(name: "KeyInput".localized)
     static let vPinch = EventType(name: "V Pinch".localized)
     
@@ -328,6 +328,7 @@ extension Quasimode {
     
     static let changeLightness = Self(modifier: [.option], .drag)
     static let changeTint = Self(modifier: [.shift, .option], .drag)
+    static let changeOpacity = Self(modifier: [.control, .option, .shift], .drag)
     
     static let selectFrame = Self(modifier: [.command, .control], .drag)
     static let goPrevious = Self(modifier: [.control], .z)
@@ -343,7 +344,6 @@ extension Quasimode {
     
     static let selectByRange = Self(.subDrag)
     static let play = Self(modifier: [.control], .click)
-    static let showNoteTone = Self(modifier: [.command], .click)
     static let run = Self(.click)
     static let openMenu = Self(.subClick)
     static let lookUp = Self(.lookUpTap)

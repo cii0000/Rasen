@@ -298,45 +298,45 @@ extension Stereo: MonoInterpolatable {
 }
 
 struct Overtone: Hashable, Codable {
-    var evenVolm = 1.0, oddVolm = 1.0
+    var evenAmp = 1.0, oddVolm = 1.0
 }
 extension Overtone {
     var isAll: Bool {
-        evenVolm == 1 && oddVolm == 1
+        evenAmp == 1 && oddVolm == 1
     }
     var isOne: Bool {
-        evenVolm == 0 && oddVolm == 0
+        evenAmp == 0 && oddVolm == 0
     }
     func volm(at i: Int) -> Double {
-        i == 1 ? 1 : (i % 2 == 0 ? evenVolm : oddVolm)
+        i == 1 ? 1 : (i % 2 == 0 ? evenAmp : oddVolm)
     }
 }
 extension Overtone: Protobuf {
     init(_ pb: PBOvertone) throws {
-        evenVolm = ((try? pb.evenVolm.notNaN()) ?? 0).clipped(min: 0, max: 1)
+        evenAmp = ((try? pb.evenAmp.notNaN()) ?? 0).clipped(min: 0, max: 1)
         oddVolm = ((try? pb.oddVolm.notNaN()) ?? 0).clipped(min: 0, max: 1)
     }
     var pb: PBOvertone {
         .with {
-            $0.evenVolm = evenVolm
+            $0.evenAmp = evenAmp
             $0.oddVolm = oddVolm
         }
     }
 }
 enum OvertoneType: Int, Hashable, Codable, CaseIterable {
-    case evenVolm, oddVolm
+    case evenAmp, oddVolm
 }
 extension Overtone {
     subscript(type: OvertoneType) -> Double {
         get {
             switch type {
-            case .evenVolm: evenVolm
+            case .evenAmp: evenAmp
             case .oddVolm: oddVolm
             }
         }
         set {
             switch type {
-            case .evenVolm: evenVolm = newValue
+            case .evenAmp: evenAmp = newValue
             case .oddVolm: oddVolm = newValue
             }
         }
@@ -344,37 +344,37 @@ extension Overtone {
 }
 extension Overtone: MonoInterpolatable {
     static func linear(_ f0: Self, _ f1: Self, t: Double) -> Self {
-        .init(evenVolm: .linear(f0.evenVolm, f1.evenVolm, t: t),
+        .init(evenAmp: .linear(f0.evenAmp, f1.evenAmp, t: t),
               oddVolm: .linear(f0.oddVolm, f1.oddVolm, t: t))
     }
     static func firstSpline(_ f1: Self,
                             _ f2: Self, _ f3: Self, t: Double) -> Self {
-        .init(evenVolm: .firstSpline(f1.evenVolm, f2.evenVolm, f3.evenVolm, t: t),
+        .init(evenAmp: .firstSpline(f1.evenAmp, f2.evenAmp, f3.evenAmp, t: t),
               oddVolm: .firstSpline(f1.oddVolm, f2.oddVolm, f3.oddVolm, t: t))
     }
     static func spline(_ f0: Self, _ f1: Self,
                        _ f2: Self, _ f3: Self, t: Double) -> Self {
-        .init(evenVolm: .spline(f0.evenVolm, f1.evenVolm, f2.evenVolm, f3.evenVolm, t: t),
+        .init(evenAmp: .spline(f0.evenAmp, f1.evenAmp, f2.evenAmp, f3.evenAmp, t: t),
               oddVolm: .spline(f0.oddVolm, f1.oddVolm, f2.oddVolm, f3.oddVolm, t: t))
     }
     static func lastSpline(_ f0: Self, _ f1: Self,
                            _ f2: Self, t: Double) -> Self {
-        .init(evenVolm: .lastSpline(f0.evenVolm, f1.evenVolm, f2.evenVolm, t: t),
+        .init(evenAmp: .lastSpline(f0.evenAmp, f1.evenAmp, f2.evenAmp, t: t),
               oddVolm: .lastSpline(f0.oddVolm, f1.oddVolm, f2.oddVolm, t: t))
     }
     static func firstMonospline(_ f1: Self,
                                 _ f2: Self, _ f3: Self, with ms: Monospline) -> Self {
-        .init(evenVolm: .firstMonospline(f1.evenVolm, f2.evenVolm, f3.evenVolm, with: ms),
+        .init(evenAmp: .firstMonospline(f1.evenAmp, f2.evenAmp, f3.evenAmp, with: ms),
               oddVolm: .firstMonospline(f1.oddVolm, f2.oddVolm, f3.oddVolm, with: ms))
     }
     static func monospline(_ f0: Self, _ f1: Self,
                            _ f2: Self, _ f3: Self, with ms: Monospline) -> Self {
-        .init(evenVolm: .monospline(f0.evenVolm, f1.evenVolm, f2.evenVolm, f3.evenVolm, with: ms),
+        .init(evenAmp: .monospline(f0.evenAmp, f1.evenAmp, f2.evenAmp, f3.evenAmp, with: ms),
               oddVolm: .monospline(f0.oddVolm, f1.oddVolm, f2.oddVolm, f3.oddVolm, with: ms))
     }
     static func lastMonospline(_ f0: Self, _ f1: Self,
                                _ f2: Self, with ms: Monospline) -> Self {
-        .init(evenVolm: .lastMonospline(f0.evenVolm, f1.evenVolm, f2.evenVolm, with: ms),
+        .init(evenAmp: .lastMonospline(f0.evenAmp, f1.evenAmp, f2.evenAmp, with: ms),
               oddVolm: .lastMonospline(f0.oddVolm, f1.oddVolm, f2.oddVolm, with: ms))
     }
 }
@@ -809,7 +809,7 @@ extension Tone: Protobuf {
 }
 extension Tone {
     static func empty() -> Self {
-        Self.init(overtone: .init(evenVolm: 0, oddVolm: 0),
+        Self.init(overtone: .init(evenAmp: 0, oddVolm: 0),
                   spectlope: .init(sprols: [.init(pitch: 0, volm: 1, noise: 0)]))
     }
     
@@ -1043,7 +1043,6 @@ struct Note {
     var pits = [Pit()]
     var envelope = Envelope()
     var id = UUID()
-    var isShownTone = false
 }
 extension Note: Protobuf {
     init(_ pb: PBNote) throws {
@@ -1055,7 +1054,6 @@ extension Note: Protobuf {
         }
         envelope = (try? Envelope(pb.envelope)) ?? .init()
         id = (try? UUID(pb.id)) ?? UUID()
-        isShownTone = pb.isShownTone
     }
     var pb: PBNote {
         .with {
@@ -1064,7 +1062,6 @@ extension Note: Protobuf {
             $0.pits = pits.map { $0.pb }
             $0.envelope = envelope.pb
             $0.id = id.pb
-            $0.isShownTone = isShownTone
         }
     }
 }
@@ -1269,7 +1266,7 @@ extension Note {
         pits.contains(where: { $0.tone.spectlope.sprols.contains(where: { $0.noise > 0 }) })
     }
     var containsNoOneEven: Bool {
-        pits.contains(where: { $0.tone.overtone.evenVolm != 1 })
+        pits.contains(where: { $0.tone.overtone.evenAmp != 1 })
     }
     var isFullNoise: Bool {
         pits.allSatisfy { $0.tone.spectlope.isFullNoise }

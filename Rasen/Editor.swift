@@ -216,6 +216,7 @@ final class RootEditor: Editor {
         case .selectByRange: SelectByRangeEditor(self)
         case .changeLightness: ChangeLightnessEditor(self)
         case .changeTint: ChangeTintEditor(self)
+        case .changeOpacity: ChangeOpacityEditor(self)
         case .selectFrame: SelectFrameEditor(self)
         case .selectVersion: SelectVersionEditor(self)
         case .move: MoveEditor(self)
@@ -307,7 +308,6 @@ final class RootEditor: Editor {
         case .addScore: AddScoreEditor(self)
         case .interpolate, .controlInterpolate: InterpolateEditor(self)
         case .crossErase: CrossEraseEditor(self)
-        case .showNoteTone: ShowNoteToneEditor(self)
         case .stop: StopEditor(self)
         default: nil
         }
@@ -1127,7 +1127,8 @@ final class FaceEditor: Editor {
                                     spectlope.sprols[.first].volm = 0
                                     spectlope.sprols[.last].volm = 0
                                 }
-                                let tone = Tone(spectlope: spectlope)
+                                let tone = Tone(overtone: .init(evenAmp: .random(in: 0 ..< 1)),
+                                                spectlope: spectlope)
                                 tones[pit.tone.id] = tone
                                 note.pits[pi].tone = tone
                             }
@@ -1287,66 +1288,6 @@ final class AddScoreEditor: InputKeyEventEditor {
         case .changed:
             break
         case .ended:
-            rootView.cursor = rootView.defaultCursor
-        }
-    }
-}
-
-final class ShowNoteToneEditor: InputKeyEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
-    let isEditingSheet: Bool
-    
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
-        isEditingSheet = rootView.isEditingSheet
-    }
-    
-    func send(_ event: InputKeyEvent) {
-        guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
-            return
-        }
-        if rootEditor.isPlaying(with: event) {
-            rootEditor.stopPlaying(with: event)
-        }
-        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
-            ?? event.screenPoint
-        let p = rootView.convertScreenToWorld(sp)
-        switch event.phase {
-        case .began:
-            rootView.cursor = .arrow
-            
-            if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled {
-                if rootView.isSelectSelectedNoneCursor(at: p), !rootView.isSelectedText {
-                    let scoreView = sheetView.scoreView
-                    let toneIs = sheetView.noteIndexes(from: rootView.selections).filter {
-                        !scoreView.model.notes[$0].isShownTone
-                    }
-                    if !toneIs.isEmpty {
-                        sheetView.newUndoGroup()
-                        sheetView.setIsShownTones(toneIs.map { .init(value: true, index: $0) })
-                    }
-                } else {
-                    let inP = sheetView.scoreView.convertFromWorld(p)
-                    if let (noteI, _) = sheetView.scoreView.noteAndPitIEnabledNote(at: inP, scale: rootView.screenToWorldScale) {
-                        
-                        let oldToneIs = sheetView.scoreView.model.notes.enumerated().compactMap {
-                            $0.element.isShownTone && noteI != $0.offset ? $0.offset : nil
-                        }
-                        let toneIVs: [IndexValue<Bool>] = oldToneIs.map { .init(value: false, index: $0) }
-                        + (!sheetView.scoreView.model.notes[noteI].isShownTone ? [.init(value: true, index: noteI)] : [])
-                        if !toneIVs.isEmpty {
-                            sheetView.newUndoGroup()
-                            sheetView.setIsShownTones(toneIVs)
-                        }
-                    }
-                }
-            }
-        case .changed:
-            break
-        case .ended:
-            
             rootView.cursor = rootView.defaultCursor
         }
     }

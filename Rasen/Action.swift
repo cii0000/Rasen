@@ -66,9 +66,7 @@ extension ActionList {
                               isEnableRoot: false),
                        Action(name: "Play".localized,
                               quasimode: .play,
-                              isEnableRoot: false),
-                       Action(name: "Show Note Tone".localized,
-                              quasimode: .showNoteTone)],
+                              isEnableRoot: false)],
                       
                       [Action(name: "Select by Range".localized,
                               quasimode: .selectByRange),

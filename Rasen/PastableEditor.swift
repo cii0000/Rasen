@@ -968,18 +968,18 @@ final class PastableEditor: Editor {
             case .even(let pitI):
                 let note = score.notes[noteI]
                 let tone = note.pits[pitI].tone
-                let volm = tone.overtone.evenVolm
+                let volm = tone.overtone.evenAmp
                 if isSendPasteboard {
                     Pasteboard.shared.copiedObjects = [.normalizationValue(volm)]
                 }
                 let ps = score.notes.flatMap { note in
                     note.pits.enumerated().compactMap {
                         $0.element.tone.id == tone.id ?
-                        scoreView.evenPosition(atPit: $0.offset, from: note) : nil
+                        scoreView.pitPosition(atPit: $0.offset, from: note) : nil
                     }
                 }
                 show(ps)
-            case .sprol(let pitI, _):
+            case .sprol(let pitI, _, _):
                 let tone = score.notes[noteI].pits[pitI].tone
                 if isSendPasteboard {
                     Pasteboard.shared.copiedObjects = [.tone(tone)]
@@ -987,7 +987,7 @@ final class PastableEditor: Editor {
                 let ps = score.notes.flatMap { note in
                     note.pits.enumerated().compactMap {
                         $0.element.tone.id == tone.id ?
-                        scoreView.evenPosition(atPit: $0.offset, from: note) : nil
+                        scoreView.pitPosition(atPit: $0.offset, from: note) : nil
                     }
                 }
                 show(ps)
@@ -1339,7 +1339,7 @@ final class PastableEditor: Editor {
                 
                 sheetView.updatePlaying()
                 return true
-            case .sprol(let pitI, let sprolI):
+            case .sprol(let pitI, let sprolI, _):
                 let oldTone = score.notes[noteI].pits[pitI].tone
                 var tone = oldTone
                 if tone.spectlope.count <= 1 {

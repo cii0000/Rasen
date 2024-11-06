@@ -1201,7 +1201,7 @@ final class SheetView: BindableView, @unchecked Sendable {
     }
     private func updateBackground() {
         if model.backgroundUUColor != Sheet.defalutBackgroundUUColor {
-            node.fillType = .color(model.backgroundUUColor.value)
+            node.fillType = model.backgroundUUColor.value.opacity != 1 ? .checkerboard(model.backgroundUUColor.value) : .color(model.backgroundUUColor.value)
         } else {
             node.fillType = nil
         }
@@ -3376,21 +3376,6 @@ final class SheetView: BindableView, @unchecked Sendable {
             if isMakeRect {
                 return (scoreView.mainFrame, [])
             }
-        case .setIsShownTones(let isivs):
-            stop()
-            if isMakeRect {
-                var rect: Rect?
-                for niv in isivs {
-                    rect += scoreView.noteFrame(at: niv.index)
-                }
-                setIsShownTonesNode(isivs)
-                for niv in isivs {
-                    rect += scoreView.noteFrame(at: niv.index)
-                }
-                return (rect, [])
-            } else {
-                setIsShownTonesNode(isivs)
-            }
         }
         return (nil, [])
     }
@@ -3557,9 +3542,6 @@ final class SheetView: BindableView, @unchecked Sendable {
     }
     private func removeNotesNode(at noteIndexes: [Int]) {
         scoreView.remove(at: noteIndexes)
-    }
-    private func setIsShownTonesNode(_ isivs: [IndexValue<Bool>]) {
-        scoreView.setIsShownTones(isivs)
     }
     
     private func insertDraftNode(_ nivs: [IndexValue<Note>]) {
@@ -3841,12 +3823,6 @@ final class SheetView: BindableView, @unchecked Sendable {
     func replace(_ values: [IndexValue<Note>]) {
         let undoItem = SheetUndoItem.replaceNotes(values.map { IndexValue(value: model.score.notes[$0.index], index: $0.index) })
         let redoItem = SheetUndoItem.replaceNotes(values)
-        append(undo: undoItem, redo: redoItem)
-        set(redoItem)
-    }
-    func setIsShownTones(_ values: [IndexValue<Bool>]) {
-        let undoItem = SheetUndoItem.setIsShownTones(values.map { IndexValue(value: model.score.notes[$0.index].isShownTone, index: $0.index) })
-        let redoItem = SheetUndoItem.setIsShownTones(values)
         append(undo: undoItem, redo: redoItem)
         set(redoItem)
     }
@@ -5036,22 +5012,6 @@ final class SheetView: BindableView, @unchecked Sendable {
                 history[result.version].values[result.valueIndex]
                     .saveUndoItemValue?.set(.setScoreOption(oldOption), type: reversedType)
             }
-        case .setIsShownTones(let isivs):
-            updateFirstReverse()
-            func error() {
-                history[result.version].values[result.valueIndex].error()
-            }
-            let notes = model.score.notes
-            for niv in isivs {
-                if niv.index >= notes.count {
-                    error()
-                    break
-                }
-                if niv.value != notes[niv.index].isShownTone {
-                    error()
-                    break
-                }
-            }
         }
         
         guard let nuiv = history[result.version].values[result.valueIndex]
@@ -6002,33 +5962,6 @@ final class SheetView: BindableView, @unchecked Sendable {
                 history[result.version].values[result.valueIndex]
                     .undoItemValue?.undoItem = .setScoreOption(oldOption)
             }
-        case .setIsShownTones(let isivs):
-            updateFirstReverse()
-            var isError = false
-            func error() {
-                history[result.version].values[result.valueIndex].error()
-                isError = true
-            }
-            let notes = model.score.notes
-            var oldNIVs = [IndexValue<Bool>]()
-            for niv in isivs {
-                if niv.index >= notes.count {
-                    error()
-                    break
-                }
-                oldNIVs.append(IndexValue(value: notes[niv.index].isShownTone,
-                                          index: niv.index))
-            }
-            if !isError {
-                switch result.type {
-                case .undo:
-                    history[result.version].values[result.valueIndex]
-                        .undoItemValue?.redoItem = .setIsShownTones(oldNIVs)
-                case .redo:
-                    history[result.version].values[result.valueIndex]
-                        .undoItemValue?.undoItem = .setIsShownTones(oldNIVs)
-                }
-            }
         }
     }
     
@@ -6141,14 +6074,18 @@ final class SheetView: BindableView, @unchecked Sendable {
             .map { scoreView.convertFromWorld($0) }
         return scoreView.model.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) { (n, v) in
             let noteI = v.offset, note = v.element
-            n[noteI] = note.pits.enumerated().reduce(into: .init()) { (v, ip) in
-                let pitI = ip.offset, pit = ip.element
-                for sprolI in pit.tone.spectlope.sprols.count.range {
-                    if fs.contains(where: { $0.contains(scoreView.sprolPosition(atSprol: sprolI, atPit: pitI, at: noteI)) }) {
-                        if v[pitI] != nil {
-                            v[pitI]?.insert(sprolI)
-                        } else {
-                            v[pitI] = [sprolI]
+            
+            let toneFrames = scoreView.toneFrames(from: note)
+            n[noteI] = toneFrames.reduce(into: .init()) { (v, tf) in
+                tf.pitIs.forEach { pitI in
+                    let pit = note.pits[pitI]
+                    for sprolI in pit.tone.spectlope.sprols.count.range {
+                        if fs.contains(where: { $0.contains(scoreView.sprolPosition(atSprol: sprolI, atPit: pitI, at: noteI, atY: tf.frame.minY)) }) {
+                            if v[pitI] != nil {
+                                v[pitI]?.insert(sprolI)
+                            } else {
+                                v[pitI] = [sprolI]
+                            }
                         }
                     }
                 }

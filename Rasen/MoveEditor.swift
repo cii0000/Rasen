@@ -1249,7 +1249,7 @@ final class MoveLinePointEditor: DragEventEditor {
     private var beganNotePits = [Int: (note: Note, pit: Pit, pits: [Int: Pit])]()
     private var beganStartBeat = Rational(0), octaveNode: Node?
     private var beganTone = Tone(), beganOvertone = Overtone(), beganEnvelope = Envelope()
-    private var sprolI: Int?, beganSprol = Sprol()
+    private var sprolI: Int?, beganSprol = Sprol(), beganSprolPitch = 0.0, beganSpectlopeY = 0.0
     private var beganNotes = [Int: Note]()
     private var beganNoteSprols = [UUID: (nid: UUID, dic: [Int: (note: Note, pits: [Int: (pit: Pit, sprolIs: Set<Int>)])])]()
     
@@ -1449,12 +1449,15 @@ final class MoveLinePointEditor: DragEventEditor {
                             }
                             nv[nap.key] = (score.notes[nap.key], pit, pitDic)
                         }
-                    case .sprol(let pitI, let sprolI):
+                    case .sprol(let pitI, let sprolI, let spectlopeY):
                         type = .sprol
                         
                         beganTone = score.notes[noteI].pits[pitI].tone
                         self.sprolI = sprolI
-                        self.beganSprol = scoreView.nearestSprol(at: scoreP, at: noteI)
+                        self.beganSpectlopeY = spectlopeY
+                        self.beganSprol = beganTone.spectlope.sprols[sprolI]
+//                        self.beganSprol = scoreView.nearestSprol(at: scoreP, at: noteI)
+                        self.beganSprolPitch = scoreView.spectlopePitch(at: scoreP, at: noteI, y: spectlopeY)
                         self.noteI = noteI
                         self.pitI = pitI
                         
@@ -1734,8 +1737,8 @@ final class MoveLinePointEditor: DragEventEditor {
                            let pitI, pitI < score.notes[noteI].pits.count,
                            let sprolI, sprolI < score.notes[noteI].pits[pitI].tone.spectlope.count {
                            
-                            let pitch = scoreView.spectlopePitch(at: scoreP, at: noteI)
-                            let dPitch = pitch - beganSprol.pitch
+                            let pitch = scoreView.spectlopePitch(at: scoreP, at: noteI, y: beganSpectlopeY)
+                            let dPitch = pitch - beganSprolPitch
                             let nPitch = (beganTone.spectlope.sprols[sprolI].pitch + dPitch)
                                 .clipped(min: Score.doubleMinPitch, max: Score.doubleMaxPitch)
                             
@@ -1941,7 +1944,7 @@ final class MoveLineZEditor: DragEventEditor {
                     let line = sheetView.scoreView.pointline(from: sheetView.scoreView.model.notes[li])
                     let noteH = sheetView.scoreView.noteH(from: sheetView.scoreView.model.notes[li])
                     if let lb = noteNode.path.bounds?.outset(by: noteH / 2) {
-                        let toneFrame = sheetView.scoreView.toneFrame(at: li)
+                        let toneFrames = sheetView.scoreView.toneFrames(at: li)
                         crossIndexes = sheetView.scoreView.model.notes.enumerated().compactMap {
                             let nNoteH = sheetView.scoreView.noteH(from: sheetView.scoreView.model.notes[$0.offset])
                             let nLine = sheetView.scoreView.pointline(from: $0.element)
@@ -1951,9 +1954,10 @@ final class MoveLineZEditor: DragEventEditor {
                                       nb.outset(by: noteH / 2).intersects(lb) {
                                 nLine.minDistanceSquared(line) < (noteH / 2 + nNoteH / 2).squared ?
                                 $0.offset : nil
-                            } else if let toneFrame,
-                                      let otherToneFrame = sheetView.scoreView.toneFrame(at: $0.offset),
-                                      toneFrame.intersects(otherToneFrame) {
+                            } else if !toneFrames.isEmpty,
+                                      sheetView.scoreView.toneFrames(at: $0.offset).contains(where: { v0 in toneFrames.contains { v1 in
+                                          v0.frame.intersects(v1.frame)
+                                      } }) {
                                 $0.offset
                             } else {
                                 nil

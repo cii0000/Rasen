@@ -861,7 +861,7 @@ final class InsertKeyframeEditor: InputKeyEventEditor {
                         let score = scoreView.model
                         let scoreP = scoreView.convertFromWorld(p)
                         if let (pitI, _) = scoreView.pitIAndSprolI(at: scoreP, at: noteI) {
-                            let sprol = scoreView.nearestSprol(at: scoreP, at: noteI)
+                            let (_, sprol) = scoreView.nearestSprol(at: scoreP, at: noteI)
                             let oldTone = score.notes[noteI].pits[pitI].tone
                             var tone = oldTone
                             let i = tone.spectlope.sprols.enumerated().reversed()
