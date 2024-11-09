@@ -1312,6 +1312,26 @@ final class PastableEditor: Editor {
                     
                     sheetView.updatePlaying()
                     return true
+                } else {
+                    let scoreView = sheetView.scoreView
+                    let score = scoreView.model
+                    let scoreP = scoreView.convertFromWorld(p)
+                    
+                    let pitchInterval = rootView.currentPitchInterval
+                    let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
+                    let beatInterval = rootView.currentBeatInterval
+                    let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
+                    var note = score.notes[noteI]
+                    note.pitch -= pitch
+                    note.beatRange.start -= beat
+                    
+                    Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [note]))]
+                    
+                    sheetView.newUndoGroup()
+                    sheetView.removeNote(at: noteI)
+                    
+                    sheetView.updatePlaying()
+                    return true
                 }
             case .even(let pitI):
                 if !scoreView.model.notes[noteI].isEmpty {

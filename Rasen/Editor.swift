@@ -452,7 +452,7 @@ final class ZoomEditor: PinchEventEditor {
         rootView = rootEditor.rootView
     }
     
-    let correction = 4.0
+    let correction = 3.25
     func send(_ event: PinchEvent) {
         guard event.magnification != 0 else { return }
         let oldIsEditingSheet = rootView.isEditingSheet
@@ -603,7 +603,7 @@ final class SelectByRangeEditor: DragEventEditor {
     }
     
     private var firstP = Point(), multiSelectFrameEditor: MultiSelectFrameEditor?
-    let snappedDistance = 4.0
+    let snappedDistance = 3.5
     
     func send(_ event: DragEvent) {
         let p = rootView.convertScreenToWorld(event.screenPoint)

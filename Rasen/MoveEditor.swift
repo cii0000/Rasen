@@ -1376,8 +1376,6 @@ final class MoveLinePointEditor: DragEventEditor {
                         beganNotes[noteI] = score.notes[noteI]
                         
                         beganEnvelope = score.notes[noteI].envelope
-                        
-                        rootView.cursor = .circle(string: String(format: "%.3f s", beganEnvelope.reverb.earlySec))
                     case .reverbEarlyAndLateRSec:
                         type = .reverbEarlyAndLateRSec
                         
@@ -1395,8 +1393,6 @@ final class MoveLinePointEditor: DragEventEditor {
                         beganNotes[noteI] = score.notes[noteI]
                         
                         beganEnvelope = score.notes[noteI].envelope
-                        
-                        rootView.cursor = .circle(string: String(format: "%.3f s", beganEnvelope.reverb.earlyLateSec))
                     case .reverbDurSec:
                         type = .reverbDurSec
                         
@@ -1414,8 +1410,6 @@ final class MoveLinePointEditor: DragEventEditor {
                         beganNotes[noteI] = score.notes[noteI]
                         
                         beganEnvelope = score.notes[noteI].envelope
-                        
-                        rootView.cursor = .circle(string: String(format: "%.3f s", beganEnvelope.reverb.durSec))
                     case .even(let pitI):
                         type = .even
                         
@@ -1639,7 +1633,7 @@ final class MoveLinePointEditor: DragEventEditor {
                     case .reverbEarlyRSec:
                         let dBeat = scoreView.durBeat(atWidth: sheetP.x - beganSheetP.x)
                         let sec = (beganEnvelope.reverb.earlySec + score.sec(fromBeat: dBeat))
-                            .clipped(min: 0, max: 10)
+                            .clipped(min: 0.02, max: 10)
                         
                         let nid = UUID()
                         var eivs = [IndexValue<Envelope>](capacity: beganNotes.count)
@@ -1652,8 +1646,6 @@ final class MoveLinePointEditor: DragEventEditor {
                             eivs.append(.init(value: envelope, index: noteI))
                         }
                         scoreView.replace(eivs)
-                        
-                        rootView.cursor = .circle(string: String(format: "%.3f s", sec))
                     case .reverbEarlyAndLateRSec:
                         let dBeat = scoreView.durBeat(atWidth: sheetP.x - beganSheetP.x)
                         let sec = (beganEnvelope.reverb.lateSec + score.sec(fromBeat: dBeat))
@@ -1670,8 +1662,6 @@ final class MoveLinePointEditor: DragEventEditor {
                             eivs.append(.init(value: envelope, index: noteI))
                         }
                         scoreView.replace(eivs)
-                        
-                        rootView.cursor = .circle(string: String(format: "%.3f s", beganEnvelope.reverb.earlySec + sec))
                     case .reverbDurSec:
                         let dBeat = scoreView.durBeat(atWidth: sheetP.x - beganSheetP.x)
                         let sec = (beganEnvelope.reverb.releaseSec + score.sec(fromBeat: dBeat))
@@ -1688,8 +1678,6 @@ final class MoveLinePointEditor: DragEventEditor {
                             eivs.append(.init(value: envelope, index: noteI))
                         }
                         scoreView.replace(eivs)
-                        
-                        rootView.cursor = .circle(string: String(format: "%.3f s", beganEnvelope.reverb.earlyLateSec + sec))
                     case .even:
                         if let noteI, noteI < score.notes.count, let pitI {
                             let note = score.notes[noteI]

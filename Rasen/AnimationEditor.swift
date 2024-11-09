@@ -378,23 +378,17 @@ final class SelectFrameEditor: SwipeEventEditor, DragEventEditor {
                 beganSelectedFrameIndexes = [Int](), beganEventTime = 0.0
     private var preMoveEventTime: Double?
     private var allDX = 0.0
-    private var snapRootBeat: Rational?, snapEventTime: Double?
-    private var lastRootIs = [(sec: Double, rootI: Int)](capacity: 128)
-    private var minLastSec = 1 / 24.0
+    private var snapEventTime: Double?
     
     func send(_ event: DragEvent) {
         if event.phase == .began {
             preSP = event.screenPoint
         }
         send(SwipeEvent(screenPoint: event.screenPoint, time: event.time,
-                        scrollDeltaPoint: event.screenPoint - preSP, phase: event.phase),
-             isDrag: true)
+                        scrollDeltaPoint: event.screenPoint - preSP, phase: event.phase))
         preSP = event.screenPoint
     }
     func send(_ event: SwipeEvent) {
-        send(event, isDrag: false)
-    }
-    func send(_ event: SwipeEvent, isDrag: Bool) {
         guard isEditingSheet else {
             rootEditor.keepOut(with: event)
             return
@@ -427,7 +421,6 @@ final class SelectFrameEditor: SwipeEventEditor, DragEventEditor {
                     if sheetView.model.enabledAnimation {
                         let animationView = sheetView.animationView
                         beganRootI = animationView.rootKeyframeIndex
-                        lastRootIs.append((event.time, beganRootI))
                         beganBeat = animationView.model.localBeat
                         beganSelectedFrameIndexes = animationView.selectedFrameIndexes
                         animationView.shownInterTypeKeyframeIndex = animationView.model.index
@@ -442,9 +435,8 @@ final class SelectFrameEditor: SwipeEventEditor, DragEventEditor {
             sheetView?.showOtherTimeNodeFromMainBeat()
         case .changed:
             if let sheetView {
-                allDX += event.scrollDeltaPoint.x
-                
                 if let contentView {
+                    allDX += event.scrollDeltaPoint.x
                     let deltaI = Int((allDX / indexInterval).rounded())
                     if deltaI != oldDeltaI {
                         oldDeltaI = deltaI
@@ -462,13 +454,28 @@ final class SelectFrameEditor: SwipeEventEditor, DragEventEditor {
                         }
                     }
                 } else {
+                    if let snapEventTime {
+                        if event.time - snapEventTime > 0.25 {
+                            self.snapEventTime = nil
+                        } else {
+                            return
+                        }
+                    }
+                    allDX += event.scrollDeltaPoint.x
                     if sheetView.model.enabledAnimation {
                         let animationView = sheetView.animationView
                         let animation = animationView.model
                         
                         let widths = animation.keyframes.count.range.map {
                             let durBeat = Double(animation.keyframeDurBeat(at: $0))
-                            return min(animation.keyframes[$0].isKey ? max(durBeat, 0.5) : durBeat, 1) * 40
+                            return min(animation.keyframes[$0].isKey ? max(durBeat, 0.5) : durBeat, 1) * 60
+                        }
+                        
+                        if let preMoveEventTime {
+                            if event.time - preMoveEventTime > 0.25 {
+                                snapEventTime = event.time
+                                self.preMoveEventTime = nil
+                            }
                         }
                         
                         let beganI = animation.index(atRoot: beganRootI)
@@ -482,57 +489,16 @@ final class SelectFrameEditor: SwipeEventEditor, DragEventEditor {
                         }
                         
                         let oldKI = animationView.model.index
-                        let oldRI = animationView.model.rootIndex
                         if animationView.rootKeyframeIndex != nRootI {
                             if sheetView.isPlaying {
                                 sheetView.stop()
                             }
-                            if let preMoveEventTime {
-                                if event.time - preMoveEventTime > 0.25 {
-                                    snapRootBeat = animationView.rootBeat
-                                    snapEventTime = event.time
-                                }
-                            }
-                            preMoveEventTime = event.time
                             sheetView.rootKeyframeIndex = nRootI
+                            
+                            preMoveEventTime = event.time
+                            
                             rootEditor.updateEditorNode()
                             rootView.updateSelects()
-                            
-                            if !isDrag {
-                                let isZero = (oldKI < animationView.model.index && oldRI - 1 > nRootI)
-                                || (oldKI > animationView.model.index && oldRI + 1 < nRootI)
-                                || animationView.model.index == 0
-                                if isZero
-                                    || ((animationView.currentKeyframe.isKey
-                                         && (!animationView.model.keyframe(atRoot: nRootI - 1).isKey
-                                             || !animationView.model.keyframe(atRoot: nRootI + 1).isKey))
-                                        || !animationView.currentKeyframe.containsInterpolated) {
-                                    let lw = rootView.worldLineWidth * (isZero ? 4 : 2)
-                                    let node = Node(path: .init(circleRadius: lw * 2.5, position: p),
-                                                    lineWidth: lw, lineType: .color(.content))
-                                    rootView.node.append(child: node)
-                                    Task {
-                                        try await Task.sleep(sec: 0.04)
-                                        node.path = .init(circleRadius: lw * 3.5, position: p)
-                                        try await Task.sleep(sec: 0.04)
-                                        node.path = .init(circleRadius: lw * 4.5, position: p)
-                                        try await Task.sleep(sec: 0.04)
-                                        node.path = .init(circleRadius: lw * 4.75, position: p)
-                                        try await Task.sleep(sec: 0.04)
-                                        node.removeFromParent()
-                                    }
-                                }
-                            }
-                            
-                            lastRootIs.append((event.time, nRootI))
-                            for (i, v) in lastRootIs.enumerated().reversed() {
-                                if event.time - v.sec > minLastSec {
-                                    if i > 0 {
-                                        lastRootIs.removeFirst(i - 1)
-                                    }
-                                    break
-                                }
-                            }
                             
                             if oldKI != animationView.model.index {
                                 animationView.shownInterTypeKeyframeIndex = animationView.model.index
@@ -552,17 +518,6 @@ final class SelectFrameEditor: SwipeEventEditor, DragEventEditor {
                 animationView.shownInterTypeKeyframeIndex = nil
                 
                 sheetView.hideOtherTimeNode()
-                    
-                for (sec, rootI) in lastRootIs.reversed() {
-                    if event.time - sec > minLastSec {
-                        if abs(sheetView.rootKeyframeIndex - rootI) == 1 {
-                            sheetView.rootKeyframeIndex = rootI
-                            rootEditor.updateEditorNode()
-                            rootView.updateSelects()
-                        }
-                        break
-                    }
-                }
             }
         }
     }
@@ -857,7 +812,8 @@ final class InsertKeyframeEditor: InputKeyEventEditor {
                     let scoreView = sheetView.scoreView
                     let scoreP = sheetView.scoreView.convertFromWorld(p)
                     if let noteI = sheetView.scoreView.noteIndex(at: scoreP,
-                                                                 scale: rootView.screenToWorldScale) {
+                                                                 scale: rootView.screenToWorldScale,
+                                                                 enabledTone: true) {
                         let score = scoreView.model
                         let scoreP = scoreView.convertFromWorld(p)
                         if let (pitI, _) = scoreView.pitIAndSprolI(at: scoreP, at: noteI) {

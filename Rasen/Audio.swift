@@ -774,12 +774,13 @@ final class ScoreNoder: ObjectHashable {
                 let loopStartI = (frameStartI / maxCount) * maxCount
                 let loopedFrameRange = loopedFrameStartI ..< loopedFrameStartI + frameCount
                 let preLoopedFrameRange = loopedFrameRange - maxCount
-                let isLooped = type == .loop && frameStartI >= maxCount
+                let isLooped = type == .loop && frameStartI >= maxCount - frameCount
                 
-                let biganPauseI = endSampleTime != nil ? Int(endSampleTime! - startSampleTime) + seqStartI : nil
+                let beganPauseI = endSampleTime != nil ? Int(endSampleTime! - startSampleTime) + seqStartI : nil
                 
                 for rendnote in scoreTrackItem.rendnotes {
                     let loopedNoteRange = rendnote.releasedRange(sampleRate: sampleRate, startSec: startSec)
+                    if let beganPauseI, beganPauseI < loopedNoteRange.lowerBound + loopStartI { continue }
                     
                     let preLoopedNoteRange = loopedNoteRange - maxCount
                     let cLoopedNoteRange = loopedNoteRange.clamped(to: 0 ..< maxCount)
@@ -801,17 +802,17 @@ final class ScoreNoder: ObjectHashable {
                     && noteRange.lowerBound != seqStartI && noteRange.contains(seqStartI) ?
                     Double(seqStartI) * rSampleRate : nil
                     
-                    let playingReleaseStartSec = biganPauseI != nil
-                    && (noteRange.lowerBound != biganPauseI && noteRange.contains(biganPauseI!)) ?
-                    Double(biganPauseI!) * rSampleRate : nil
+                    let playingReleaseStartSec = beganPauseI != nil
+                    && (noteRange.lowerBound != beganPauseI && noteRange.contains(beganPauseI!)) ?
+                    Double(beganPauseI!) * rSampleRate : nil
                     
                     let preNoteRange = noteRange - maxCount
                     
-                    let prePlayingReleaseStartSec = biganPauseI != nil
-                    && (preNoteRange.lowerBound != biganPauseI && preNoteRange.contains(biganPauseI!)) ?
-                    Double(biganPauseI!) * rSampleRate : nil
-                    guard !(biganPauseI != nil && noteRange.lowerBound >= biganPauseI!)
-                            || !(biganPauseI != nil && preNoteRange.lowerBound >= biganPauseI!) else { continue }
+                    let prePlayingReleaseStartSec = beganPauseI != nil
+                    && (preNoteRange.lowerBound != beganPauseI && preNoteRange.contains(beganPauseI!)) ?
+                    Double(beganPauseI!) * rSampleRate : nil
+                    guard !(beganPauseI != nil && noteRange.lowerBound >= beganPauseI!)
+                            || !(beganPauseI != nil && preNoteRange.lowerBound >= beganPauseI!) else { continue }
                     
                     guard let notewave = scoreTrackItem.notewave(from: rendnote) else { continue }
                     contains = true
@@ -853,7 +854,7 @@ final class ScoreNoder: ObjectHashable {
                                playingReleaseStartSec: playingReleaseStartSec,
                                range: cLoopedNoteRange, startI: loopedNoteRange.start)
                     }
-                    if type == .loop,
+                    if type == .loop && isLooped,
                        cPreLoopedNoteRange.intersects(loopedFrameRange)
                         || cPreLoopedNoteRange.intersects(preLoopedFrameRange) {
                         update(notewave: notewave,

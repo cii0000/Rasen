@@ -920,7 +920,7 @@ struct Reverb: Hashable, Codable {
 }
 extension Reverb: Protobuf {
     init(_ pb: PBReverb) throws {
-        earlySec = max(0, ((try? pb.earlySec.notNaN()) ?? 0))
+        earlySec = max(0.02, ((try? pb.earlySec.notNaN()) ?? 0))
         earlyVolm = ((try? pb.earlyVolm.notNaN()) ?? 0).clipped(min: 0, max: 1)
         lateSec = max(0, ((try? pb.lateSec.notNaN()) ?? 0))
         lateVolm = ((try? pb.lateVolm.notNaN()) ?? 0).clipped(min: 0, max: 1)
@@ -959,7 +959,6 @@ extension Reverb {
         let durSec = durSec
         let count = Int((durSec * sampleRate).rounded(.up))
         var fir = [Double](repeating: 0, count: count)
-        fir[0] = 1
         
         let seed = seedID.uInt64Values.value0
         var random = Random(seed: seed)
@@ -1007,6 +1006,7 @@ extension Reverb {
         for i in nxi ..< count {
             update(i: i)
         }
+        fir[0] = 1
         return fir
     }
 }

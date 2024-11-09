@@ -1285,11 +1285,11 @@ final class ColorEditor: Editor {
                     switch result {
                     case .note:
                         beganVolm = scoreView.evenAmp(atX: scoreP.x, from: note)
-                        updatePitsWithSelection(noteI: noteI, pitI: nil, sprolI: nil, .stereo)
+                        updatePitsWithSelection(noteI: noteI, pitI: nil, sprolI: nil, .tone)
                         beganBeat = scoreView.beat(atX: scoreP.x)
                     case .pit(let pitI):
                         beganVolm = score.notes[noteI].pits[pitI].tone.overtone.evenAmp
-                        updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .stereo)
+                        updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .tone)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
                     default: break
                     }
@@ -1633,8 +1633,7 @@ final class ColorEditor: Editor {
             let p = rootView.convertScreenToWorld(event.screenPoint)
             if let sheetView = rootView.sheetView(at: p) {
                 let sheetP = sheetView.convertFromWorld(p)
-                if sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
-                                                 scale: rootView.screenToWorldScale) != nil {
+                if sheetView.model.score.enabled {
                     isChangePan = true
                     changePan(with: event)
                     return

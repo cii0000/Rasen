@@ -1649,7 +1649,7 @@ extension ScoreView {
     func containsNote(_ p: Point, scale: Double) -> Bool {
         noteIndex(at: p, scale: scale) != nil
     }
-    func noteIndex(at p: Point, scale: Double, enabledRelease: Bool = false) -> Int? {
+    func noteIndex(at p: Point, scale: Double, enabledTone: Bool = false, enabledRelease: Bool = false) -> Int? {
         let hnh = pitchHeight / 2
         var minDS = Double.infinity, minI: Int?
         for (noteI, note) in model.notes.enumerated().reversed() {
@@ -1668,13 +1668,15 @@ extension ScoreView {
                 }
             }
             
-            for (_, toneFrame) in toneFrames(from: note) {
-                let maxD = Sheet.knobEditDistance * scale
-                let maxDS = maxD * maxD
-                
-                let ds = toneFrame.distanceSquared(p)
-                if ds < minDS && ds < maxDS {
-                    return noteI
+            if enabledTone {
+                for (_, toneFrame) in toneFrames(from: note) {
+                    let maxD = Sheet.knobEditDistance * scale
+                    let maxDS = maxD * maxD
+                    
+                    let ds = toneFrame.distanceSquared(p)
+                    if ds < minDS && ds < maxDS {
+                        return noteI
+                    }
                 }
             }
             
@@ -1750,6 +1752,7 @@ extension ScoreView {
         }
         
         let hnh = pitchHeight / 2
+        var containsNote = false
         for (noteI, note) in model.notes.enumerated().reversed() {
             let noteD = noteH(from: note) / 2
             let maxPitD = Sheet.knobEditDistance * scale + noteD
@@ -1758,37 +1761,43 @@ extension ScoreView {
             let ods = nf.distanceSquared(p)
             if ods < maxPitDS {
                 let ds = pointline(from: note).minDistanceSquared(at: p)
-                if ds < noteD * noteD { break }
+                if ds < noteD * noteD {
+                    containsNote = true
+                    break
+                }
             }
-            
-            let reverbFrame = reverbFrame(from: note)
-            let dSq = reverbFrame.distanceSquared(p)
-            if dSq < minDSq && dSq < toneMaxDSq {
-                let containsReverb = reverbFrame.contains(p)
-                
-                let earlyReverbP = earlyReverbPosition(from: note)
-                let lateReverbP = lateReverbPosition(from: note)
-                var dSq = earlyReverbP.distanceSquared(p)
-                if dSq < minDSq && (earlyReverbP.x == lateReverbP.x ? p.x < earlyReverbP.x : true) {
-                    minDSq = dSq
-                    minResult = (noteI, .reverbEarlyRSec)
-                }
-                
-                dSq = lateReverbP.distanceSquared(p)
-                if dSq < minDSq && (earlyReverbP.x == lateReverbP.x ? p.x > earlyReverbP.x : true) {
-                    minDSq = dSq
-                    minResult = (noteI, .reverbEarlyAndLateRSec)
-                }
-                
-                let durReverbP = durReverbPosition(from: note)
-                dSq = durReverbP.distanceSquared(p)
-                if dSq <= minDSq && (lateReverbP.x == durReverbP.x ? p.x > lateReverbP.x : true) {
-                    minDSq = dSq
-                    minResult = (noteI, .reverbDurSec)
-                }
-                
-                if containsReverb {
-                    return minResult
+        }
+        if !containsNote {
+            for (noteI, note) in model.notes.enumerated().reversed() {
+                let reverbFrame = reverbFrame(from: note)
+                let dSq = reverbFrame.distanceSquared(p)
+                if dSq < minDSq && dSq < toneMaxDSq {
+                    let containsReverb = reverbFrame.contains(p)
+                    
+                    let earlyReverbP = earlyReverbPosition(from: note)
+                    let lateReverbP = lateReverbPosition(from: note)
+                    var dSq = earlyReverbP.distanceSquared(p)
+                    if dSq < minDSq && (earlyReverbP.x == lateReverbP.x ? p.x < earlyReverbP.x : true) {
+                        minDSq = dSq
+                        minResult = (noteI, .reverbEarlyRSec)
+                    }
+                    
+                    dSq = lateReverbP.distanceSquared(p)
+                    if dSq < minDSq && (earlyReverbP.x == lateReverbP.x ? p.x > earlyReverbP.x : true) {
+                        minDSq = dSq
+                        minResult = (noteI, .reverbEarlyAndLateRSec)
+                    }
+                    
+                    let durReverbP = durReverbPosition(from: note)
+                    dSq = durReverbP.distanceSquared(p)
+                    if dSq <= minDSq && (lateReverbP.x == durReverbP.x ? p.x > lateReverbP.x : true) {
+                        minDSq = dSq
+                        minResult = (noteI, .reverbDurSec)
+                    }
+                    
+                    if containsReverb {
+                        return minResult
+                    }
                 }
             }
         }
@@ -2241,7 +2250,7 @@ extension ScoreView {
                 for (sprolI, sprol) in pit.tone.spectlope.sprols.enumerated() {
                     let psp = sprolPosition(atSprol: sprolI, atPit: pitI, at: noteI, atY: toneFrame.minY)
                     let ds = p.distanceSquared(psp)
-                    if sprol.pitch == Score.doubleMinPitch ? ds >= minDS : ds < minDS {
+                    if ds < minDS {
                         minDS = ds
                         minPitI = pitI
                         minSprolI = sprolI
