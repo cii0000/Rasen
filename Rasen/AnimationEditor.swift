@@ -468,7 +468,7 @@ final class SelectFrameEditor: SwipeEventEditor, DragEventEditor {
                         
                         let widths = animation.keyframes.count.range.map {
                             let durBeat = Double(animation.keyframeDurBeat(at: $0))
-                            return min(animation.keyframes[$0].isKey ? max(durBeat, 0.5) : durBeat, 1) * 60
+                            return min(animation.keyframes[$0].isKey ? max(durBeat, 0.35) : durBeat, 0.5) * 60
                         }
                         
                         if let preMoveEventTime {

@@ -754,7 +754,7 @@ final class RootView: View, @unchecked Sendable {
     private(set) var selectedClippedFrame: Rect?, selectedClippedNode: Node?
     private(set) var selectedLinesNode: Node?,
                      selectedLineNodes = [Line: Node]()
-    private(set) var selectedNotesNode: Node?,
+    private(set) var selectedNotesNode: Node?, selectedPointsNode: Node?,
                      selectedNoteNodes = [Pointline: Node]()
     private(set) var isOldSelectedSheet = false, isSelectedText = false
     func updateWithSelections(oldValue: [Selection]) {
@@ -782,6 +782,10 @@ final class RootView: View, @unchecked Sendable {
                 selectedNotesNode = snNode
                 node.append(child: snNode)
                 
+                let pNode = Node()
+                selectedPointsNode = pNode
+                node.append(child: pNode)
+                
                 let ssNode = Node(lineWidth: Line.defaultLineWidth,
                                   lineType: .color(.selected),
                                   fillType: .color(.subSelected))
@@ -800,12 +804,14 @@ final class RootView: View, @unchecked Sendable {
                 selectedFramesNode?.removeFromParent()
                 selectedLinesNode?.removeFromParent()
                 selectedNotesNode?.removeFromParent()
+                selectedPointsNode?.removeFromParent()
                 selectedClippedNode?.removeFromParent()
                 selectedNode = nil
                 selectedOrientationNode = nil
                 selectedFramesNode = nil
                 selectedLinesNode = nil
                 selectedNotesNode = nil
+                selectedPointsNode = nil
                 selectedClippedNode = nil
             }
         }
@@ -825,6 +831,7 @@ final class RootView: View, @unchecked Sendable {
         var sLines = [Line](), sPointlines = [Pointline]()
         var addedLineIndexes = Set<IntPoint>()
         var cr: Rect?, oldRect: Rect?
+        var ps = [Point]()
         for selection in selections {
             let rect = selection.rect
             if isEditingSheet {
@@ -901,6 +908,15 @@ final class RootView: View, @unchecked Sendable {
                                 var nLine = scoreView.pointline(from: score.notes[ni])
                                 nLine = scoreView.convertToWorld(nLine)
                                 sPointlines.append(nLine)
+                            }
+                        }
+                        if nis.count == 1 {
+                            let note = score.notes[nis[0]]
+                            if note.pits.count > 1 {
+                                ps += note.pits.count.range.compactMap {
+                                    let p = scoreView.convertToWorld(scoreView.pitPosition(atPit: $0, from: note))
+                                    return selections.contains(where: { $0.rect.contains(p) }) ? p : nil
+                                }
                             }
                         }
                     }
@@ -993,6 +1009,10 @@ final class RootView: View, @unchecked Sendable {
                 selectedNoteNodes[sPointline] = selectedNoteNode
                 selectedNotesNode?.append(child: selectedNoteNode)
             }
+        }
+        
+        selectedPointsNode?.children = ps.map {
+            Node(path: .init(circleRadius: 0.5, position: $0), fillType: .color(.selected))
         }
         
         selectedFrames = rects

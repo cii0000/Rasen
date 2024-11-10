@@ -705,6 +705,57 @@ final class PastableEditor: Editor {
                 
                 let scoreView = sheetView.scoreView
                 let nis = sheetView.noteIndexes(from: rootView.selections)
+                if nis.count == 1 {
+                    let note = scoreView.model.notes[nis[0]]
+                    let pitIs = note.pits.count.range.filter {
+                        let p = scoreView.convertToWorld(scoreView.pitPosition(atPit: $0, from: note))
+                        return rootView.selections.contains(where: { $0.rect.contains(p) })
+                    }
+                    if !pitIs.isEmpty && note.pits.count > 1 {
+                        var currentBeat: Rational = 0, nPits = [Pit]()
+                        for pitI in pitIs {
+                            let pit = note.pits[pitI]
+                            let dBeat = (pitI + 1 < note.pits.count ?
+                                         note.pits[pitI + 1].beat : note.beatRange.length) - pit.beat
+                            nPits.append(.init(beat: currentBeat, pitch: pit.pitch, stereo: pit.stereo,
+                                               tone: pit.tone, lyric: pit.lyric))
+                            currentBeat += dBeat
+                        }
+                        let startBeat = note.pits[pitIs[0]].beat + note.beatRange.start
+                        var nNote = Note(beatRange: startBeat ..< (startBeat + currentBeat),
+                                         pitch: note.pitch, pits: nPits,
+                                         envelope: note.envelope, id: .init())
+                        
+                        let scoreP = scoreView.convertFromWorld(p)
+                        let pitchInterval = rootView.currentPitchInterval
+                        let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
+                        let beatInterval = rootView.currentBeatInterval
+                        let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
+                        nNote.pitch -= pitch
+                        nNote.beatRange.start -= beat
+                        
+                        if isSendPasteboard {
+                            Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [nNote]))]
+                        }
+                        let rects = rootView.isSelectedText ?
+                        rootView.selectedFrames :
+                        rootView.selections.map { $0.rect } + rootView.selectedFrames
+                        let lw = Line.defaultLineWidth * 2 / rootView.worldToScreenScale
+                        selectingLineNode.children = rects.map {
+                            Node(path: Path($0),
+                                 lineWidth: lw,
+                                 lineType: .color(.selected),
+                                 fillType: .color(.subSelected))
+                        } + note.pits.count.range.compactMap {
+                            let p = scoreView.convertToWorld(scoreView.pitPosition(atPit: $0, from: note))
+                            return rootView.selections.contains(where: { $0.rect.contains(p) }) ?
+                            Node(path: .init(circleRadius: 1, position: p), fillType: .color(.selected)) :
+                            nil
+                        }
+                        
+                        return true
+                    }
+                }
                 if !nis.isEmpty {
                     let scoreP = scoreView.convertFromWorld(p)
                     let pitchInterval = rootView.currentPitchInterval
@@ -1138,6 +1189,62 @@ final class PastableEditor: Editor {
                     let pitchInterval = rootView.currentPitchInterval
                     let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
                     let nis = sheetView.noteIndexes(from: rootView.selections)
+                    if nis.count == 1 {
+                        let noteI = nis[0]
+                        let note = scoreView.model.notes[noteI]
+                        let pitIs = note.pits.count.range.filter {
+                            let p = scoreView.convertToWorld(scoreView.pitPosition(atPit: $0, from: note))
+                            return rootView.selections.contains(where: { $0.rect.contains(p) })
+                        }
+                        if !pitIs.isEmpty && note.pits.count > 1 && pitIs.count != note.pits.count {
+                            var currentBeat: Rational = 0, nPits = [Pit]()
+                            for pitI in pitIs {
+                                let pit = note.pits[pitI]
+                                let dBeat = (pitI + 1 < note.pits.count ?
+                                             note.pits[pitI + 1].beat : note.beatRange.length) - pit.beat
+                                nPits.append(.init(beat: currentBeat, pitch: pit.pitch, stereo: pit.stereo,
+                                                   tone: pit.tone, lyric: pit.lyric))
+                                currentBeat += dBeat
+                            }
+                            let startBeat = note.pits[pitIs[0]].beat + note.beatRange.start
+                            var nNote = Note(beatRange: startBeat ..< (startBeat + currentBeat),
+                                             pitch: note.pitch, pits: nPits,
+                                             envelope: note.envelope, id: .init())
+                            
+                            let scoreP = scoreView.convertFromWorld(p)
+                            let pitchInterval = rootView.currentPitchInterval
+                            let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
+                            let beatInterval = rootView.currentBeatInterval
+                            let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
+                            nNote.pitch -= pitch
+                            nNote.beatRange.start -= beat
+                            
+                            Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [nNote]))]
+                            
+                            let pitISet = Set(pitIs)
+                            var pits = note.pits
+                            let lastPitI = pits.count.range.reversed().first(where: { !pitISet.contains($0) }) ?? 0
+                            let lastBeat = (lastPitI + 1 < note.pits.count ?
+                                            note.pits[lastPitI + 1].beat : note.beatRange.length)
+                            pits.remove(at: pitIs)
+                            let fBeat = pits[0].beat
+                            for i in pits.count.range {
+                                pits[i].beat -= fBeat
+                            }
+                            var nnNote = note
+                            nnNote.beatRange = (nnNote.beatRange.start + fBeat) ..< (nnNote.beatRange.start + lastBeat)
+                            nnNote.pits = pits
+                            
+                            sheetView.newUndoGroup()
+                            sheetView.replace(nnNote, at: noteI)
+                            
+                            sheetView.updatePlaying()
+                            
+                            rootView.selections = []
+                            return true
+                        }
+                    }
+                    
                     if !nis.isEmpty {
                         let beatInterval = rootView.currentBeatInterval
                         let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)

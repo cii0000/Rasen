@@ -217,10 +217,9 @@ final class RootEditor: Editor {
         case .changeLightness: ChangeLightnessEditor(self)
         case .changeTint: ChangeTintEditor(self)
         case .changeOpacity: ChangeOpacityEditor(self)
-        case .selectFrame: SelectFrameEditor(self)
+        case .keySelectFrame: SelectFrameEditor(self)
         case .selectVersion: SelectVersionEditor(self)
         case .move: MoveEditor(self)
-        case .moveLinePoint: MoveLinePointEditor(self)
         case .moveLineZ: MoveLineZEditor(self)
         default: nil
         }
@@ -299,7 +298,7 @@ final class RootEditor: Editor {
         case .cutDraft: CutDraftEditor(self)
         case .makeFaces: MakeFacesEditor(self)
         case .cutFaces: CutFacesEditor(self)
-        case .play: PlayEditor(self)
+        case .keyPlay: PlayEditor(self)
         case .goPrevious: GoPreviousEditor(self)
         case .goNext: GoNextEditor(self)
         case .goPreviousFrame: GoPreviousFrameEditor(self)

@@ -7,76 +7,70 @@
 "Indicate" = "指し示す";
 "Drag" = "ドラッグ";
 "SubDrag" = "副ドラッグ";
-"LookUpOperate" = "調べる操作";
+"3FingersTap" = "３本指タップ";
+"4FingersTap" = "４本指タップ";
 "2FingersScroll" = "２本指スクロール";
 "3FingersScroll" = "３本指スクロール";
 "2FingersPinch" = "２本指ピンチ";
 "2FingersRotate" = "２本指回転";
-
 "V Pinch" = "V ピンチ";
 "Resize Paste" = "リサイズペースト";
 
 "Draw Line" = "線を引く";
 "Draw Straight Line" = "直線を引く";
 
+"Lasso Cut" = "囲みカット";
+"Select Version" = "バージョンを選択";
+
+"Change Lightness" = "輝度を変更";
+"Change Tint" = "色合いを変更";
+"Change Opacity" = "透明度を変更";
+
+"Move" = "移動";
+"Move Line Point" = "線点を移動";
+"Move Line Z" = "線の高さを変更";
+
+"Select Frame" = "フレームを選択";
+"Play" = "再生";
+
+"Select by Range" = "範囲選択";
+"Run" = "実行";
+"Run / Close" = "実行 / 閉じる";
+"Look Up" = "調べる";
+"Open Menu" = "メニューを開く";
+"Input Character" = "文字を入力";
+
 "Scroll" = "スクロール";
 "Zoom" = "ズーム";
 "Rotate" = "回転";
+
+"Undo" = "取り消す";
+"Redo" = "やり直す";
+
+"Cut" = "カット";
+"Copy" = "コピー";
+"Copy Line Color" = "線色をコピー";
+"Paste" = "ペースト";
+
+"Find" = "検索";
 
 "Change to Draft" = "下書きに変更";
 "Cut Draft" = "下書きをカット";
 
 "Make Faces" = "面を作成";
 "Cut Faces" = "面をカット";
-"Change Lightness" = "輝度を変更";
-"Change Tint" = "色合いを変更";
 
-"Input Character" = "文字を入力";
-"New Wrap" = "新規折り返し";
-"Delete Wrap" = "折り返しを削除";
-"Look Up" = "調べる";
 "Change to Superscript" = "上付き文字に変更";
 "Change to Subscript" = "下付き文字に変更";
+
 "Change to Vertical Text" = "縦書きに変更";
 "Change to Horizontal Text" = "横書きに変更";
 
-"Find" = "検索";
-"Lasso Cut" = "囲みカット";
-"Select by Range" = "範囲選択";
-"Unselect" = "選択解除";
-"Cut" = "カット";
-"Copy" = "コピー";
-"Copy Line Color" = "線色をコピー";
-"Paste" = "ペースト";
-
-"Undo" = "取り消す";
-"Redo" = "やり直す";
-"Select Version" = "バージョンを選択";
-
-"Run" = "実行";
-"Run / Close" = "実行 / 閉じる";
-"Open Menu" = "メニューを開く";
-
-"Slide" = "スライド";
-"Select Frame" = "フレームを選択";
-"Play" = "再生";
-
-"Move" = "移動";
-"Move Line Point" = "線点を移動";
-"Move Line Z" = "線の高さを変更";
-
-"Show Note Tone" = "音色を表示";
-
 "Insert Keyframe" = "キーフレームを追加";
-"Cut Keyframe" = "キーフレームをカット";
+"Add Score" = "楽譜を追加";
 
 "Interpolate" = "補間";
 "Cross Erase" = "交差消去";
-
-"Add Score" = "楽譜を追加";
-
-"Score" = "楽譜";
-"Music Scale" = "音階";
 
 "Making Faces" = "面を作成中";
 "Stopping Task" = "タスクを停止中";
@@ -87,11 +81,13 @@
 "Border" = "ボーダー";
 "Face" = "面";
 "Area" = "面積";
+"Score" = "楽譜";
 "Sheet" = "シート";
 "Root" = "全体";
 "Size" = "サイズ";
 "File Size" = "ファイルサイズ";
 
+"Music Scale" = "音階";
 "Major" = "メジャー";
 "Minor" = "マイナー";
 "Hexa Major" = "ヘキサメジャー";
@@ -164,6 +160,8 @@
 "Do you want to replace the \"%2$@\" written on the %1$d sheets with the \"%3$@\"?" = "%1$d枚のシートに書き込まれた「%2$@」を「%3$@」に置換えますか？";
 "This operation can be undone for each sheet, but not for all sheets at once." = "この操作はそれぞれのシートでは取り消せますが、一括では取り消せません。";
 "Replacing sheets" = "シートを置き換え中";
+
+"MOV (HEVC with Alpha)" = "MOV (透過HEVC)";
 
 "Import" = "読み込む";
 "Export As" = "書き出し名";

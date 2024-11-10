@@ -430,6 +430,11 @@ extension Pointline {
         }
         return minDSquared
     }
+    func minDistanceSquared(_ rect: Rect) -> Double {
+        let pls = rect.edges.map { Pointline(controls: [.init(point: $0.p0), .init(point: $0.p1)]) }
+        return controls.contains(where: { rect.contains($0.point) }) ?
+        0 : pls.minValue { minDistanceSquared($0) } ?? .infinity
+    }
     
     var edges: [Edge] {
         guard controls.count >= 2 else { return [] }

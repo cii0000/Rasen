@@ -804,8 +804,8 @@ extension ScoreView {
                                                                                       spectlopeNode: Node) {
         guard note.beatRange.length > 0 else {
             return (.init(children: [.init(path: Path(Rect(.init(x(atBeat: note.beatRange.start),
-                                                                y(fromPitch: note.pitch)),
-                                                          distance: 1)),
+                                                                 y(fromPitch: note.firstPitch)),
+                                                           distance: 0).outsetBy(dx: 0.5, dy: 1)),
                                            fillType: .color(color != nil ? color! : .content))]),
                     .init(), .init(), .init())
         }
@@ -829,7 +829,7 @@ extension ScoreView {
         var stereoLinePath, mainLinePath: Path, mainEvenLinePath: Path?, lyricLinePathlines = [Pathline]()
         var spectlopeFqLinePathlines = [Pathline](), spectlopeLinePathlines = [Pathline]()
         var spectlopeTonePanelNodes = [Node](), backSpectlopeNodes = [Node]()
-        let knobR = 0.5, sprolR = 0.125
+        let knobR = 0.25, sprolR = 0.125
         
         let lyricNodes: [Node] = note.pits.enumerated().compactMap { (pitI, pit) in
             let p = pitPosition(atPit: pitI, from: note)
@@ -1613,7 +1613,7 @@ extension ScoreView {
     func contains(_ p : Point, scale: Double) -> Bool {
         containsTimeline(p, scale: scale)
         || containsIsShownSpectrogram(p, scale: scale)
-        || noteIndex(at: p, scale: scale) != nil
+        || mainFrame.contains(p)
     }
     func containsMainFrame(_ p: Point) -> Bool {
         model.enabled ? mainFrame.contains(p) : false
@@ -2247,7 +2247,7 @@ extension ScoreView {
             guard toneFrame.contains(p) else { continue }
             for pitI in pitIs {
                 let pit = note.pits[pitI]
-                for (sprolI, sprol) in pit.tone.spectlope.sprols.enumerated() {
+                for (sprolI, _) in pit.tone.spectlope.sprols.enumerated() {
                     let psp = sprolPosition(atSprol: sprolI, atPit: pitI, at: noteI, atY: toneFrame.minY)
                     let ds = p.distanceSquared(psp)
                     if ds < minDS {

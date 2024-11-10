@@ -661,8 +661,8 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     
                     let p = r.centerPoint
                     let sp = self.rootView.convertWorldToScreen(p)
-                    self.rootEditor.inputKey(self.inputKeyEventWith(at: sp, .lookUpTap, .began))
-                    self.rootEditor.inputKey(self.inputKeyEventWith(at: sp, .lookUpTap, .ended))
+                    self.rootEditor.inputKey(self.inputKeyEventWith(at: sp, .threeFingersTap, .began))
+                    self.rootEditor.inputKey(self.inputKeyEventWith(at: sp, .threeFingersTap, .ended))
                 }
             }
             trackpadView.addSubview(lookUpButton)
@@ -1832,7 +1832,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     let scrollEndSec = 0.1
     private var scrollTask: Task<(), any Error>?
     override func scrollWheel(with nsEvent: NSEvent) {
-        guard !isEnabledScroll else { return }
+        guard !isEnabledCustomTrackpad else { return }
         
         func beginEvent() -> Phase {
             if scrollTask != nil {
@@ -1931,16 +1931,12 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     var oldTouchPoints = [TouchID: Point]()
     var touchedIDs = [TouchID]()
     
-    var isEnabledScroll = true
-    var isEnabledPinch = true
-    var isEnabledRotate = true
-    var isEnabledSwipe = true
-    var isEnabledPlay = true
+    var isEnabledCustomTrackpad = true
     
     var isBeganScroll = false, oldScrollPosition: Point?, allScrollPosition = Point()
     var isBeganPinch = false, oldPinchDistance: Double?
     var isBeganRotate = false, oldRotateAngle: Double?
-    var isPreparePlay = false
+    var isPrepare3FingersTap = false, isPrepare4FingersTap = false
     var scrollVs = [(dp: Point, time: Double)]()
     var pinchVs = [(d: Double, time: Double)]()
     var rotateVs = [(d: Double, time: Double)]()
@@ -1977,6 +1973,8 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         }
     }
     override func touchesBegan(with event: NSEvent) {
+        guard isEnabledCustomTrackpad else { return }
+        
         let ps = touchPoints(with: event)
         oldTouchPoints = ps
         touchedIDs = Array(ps.keys)
@@ -2002,21 +2000,23 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             
             isBeganSwipe = false
             swipePosition = Point()
+            isPrepare3FingersTap = true
         } else if ps.count == 4 {
             oldPinchDistance = nil
             oldRotateAngle = nil
             oldScrollPosition = nil
             
             oldScrollPosition = (0 ..< 4).map { ps[touchedIDs[$0]]! }.mean()!
-            isPreparePlay = true
+            isPrepare4FingersTap = true
         }
     }
     override func touchesMoved(with event: NSEvent) {
+        guard isEnabledCustomTrackpad else { return }
+        
         let ps = touchPoints(with: event)
         if ps.count == 2 {
             if touchedIDs.count == 2,
-                isEnabledPinch || isEnabledScroll,
-                let oldPinchDistance, let oldRotateAngle,
+               let oldPinchDistance, let oldRotateAngle,
                 let oldScrollPosition,
                 let ps0 = ps[touchedIDs[0]],
                 let ps1 = ps[touchedIDs[1]],
@@ -2027,8 +2027,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 let nPinchDistance = nps0.distance(nps1)
                 let nRotateAngle = nps0.angle(nps1)
                 let nScrollPosition = nps0.mid(nps1)
-                if isEnabledPinch
-                    && !isBeganScroll && !isBeganPinch && !isBeganRotate
+                if !isBeganScroll && !isBeganPinch && !isBeganRotate
                     && abs(Edge(ops0, ps0).angle(Edge(ops1, ps1))) > .pi / 2
                     && abs(nPinchDistance - oldPinchDistance) > 6
                     && nScrollPosition.distance(oldScrollPosition) <= 5 {
@@ -2055,7 +2054,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     pinchVs.append((magnification, event.timestamp))
                     self.oldPinchDistance = nPinchDistance
                     lastMagnification = magnification
-                } else if isEnabledScroll && !(isSubDrag && isSubTouth)
+                } else if !(isSubDrag && isSubTouth)
                             && !isBeganScroll && !isBeganPinch
                             && !isBeganRotate
                             && abs(nPinchDistance - oldPinchDistance) <= 6
@@ -2115,8 +2114,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     scrollVs.append((scrollDeltaPosition, event.timestamp))
                     self.oldScrollPosition = nScrollPosition
                     lastScrollDeltaPosition = scrollDeltaPosition
-                } else if isEnabledRotate
-                            && !isBeganScroll && !isBeganPinch && !isBeganRotate
+                } else if !isBeganScroll && !isBeganPinch && !isBeganRotate
                             && nPinchDistance > 120
                             && abs(nPinchDistance - oldPinchDistance) <= 6
                             && nScrollPosition.distance(oldScrollPosition) <= 5
@@ -2146,7 +2144,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             }
         } else if ps.count == 3 {
             if touchedIDs.count == 3,
-               isEnabledSwipe, let swipePosition,
+               let swipePosition,
                let ps0 = ps[touchedIDs[0]],
                let ops0 = oldTouchPoints[touchedIDs[0]],
                let ps1 = ps[touchedIDs[1]],
@@ -2158,6 +2156,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 
                 if !isBeganSwipe && abs(deltaP.x) > abs(deltaP.y) {
                     isBeganSwipe = true
+                    isPrepare3FingersTap = false
                     
                     rootEditor.swipe(.init(screenPoint: screenPoint(with: event).my,
                                          time: event.timestamp,
@@ -2176,14 +2175,30 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                                            scrollDeltaPoint: .init(sdx, sdy),
                                            phase: .changed))
                     self.swipePosition = swipePosition + deltaP
+                } else {
+                    let vs = (0 ..< 3).compactMap { ps[touchedIDs[$0]] }
+                    if let oldScrollPosition, vs.count == 3 {
+                        let np = vs.mean()!
+                        if np.distance(oldScrollPosition) > 5 {
+                            isPrepare3FingersTap = false
+                        }
+                    }
+                }
+            } else if touchedIDs.count == 3 {
+                let vs = (0 ..< 3).compactMap { ps[touchedIDs[$0]] }
+                if let oldScrollPosition, vs.count == 3 {
+                    let np = vs.mean()!
+                    if np.distance(oldScrollPosition) > 5 {
+                        isPrepare3FingersTap = false
+                    }
                 }
             }
-        } else if ps.count == 4 {
+        } else if ps.count == 4 && touchedIDs.count == 4 {
             let vs = (0 ..< 4).compactMap { ps[touchedIDs[$0]] }
             if let oldScrollPosition, vs.count == 4 {
                 let np = vs.mean()!
                 if np.distance(oldScrollPosition) > 5 {
-                    isPreparePlay = false
+                    isPrepare4FingersTap = false
                 }
             }
         } else {
@@ -2204,15 +2219,25 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         oldTouchPoints = ps
     }
     override func touchesEnded(with event: NSEvent) {
-        if oldTouchPoints.count == 4 {
-            if isEnabledPlay && isPreparePlay {
-                var event = inputKeyEventWith(event, .click, .began)
-                event.inputKeyType = .control
-                let playEditor = PlayEditor(rootEditor)
-                playEditor.send(event)
+        guard isEnabledCustomTrackpad else { return }
+        
+        if oldTouchPoints.count == 3 {
+            if isPrepare3FingersTap {
+                var event = inputKeyEventWith(event, .threeFingersTap, .began)
+                let editor = LookUpEditor(rootEditor)
+                editor.send(event)
                 Sleep.start()
                 event.phase = .ended
-                playEditor.send(event)
+                editor.send(event)
+            }
+        } else if oldTouchPoints.count == 4 {
+            if isPrepare4FingersTap {
+                var event = inputKeyEventWith(event, .fourFingersTap, .began)
+                let editor = PlayEditor(rootEditor)
+                editor.send(event)
+                Sleep.start()
+                event.phase = .ended
+                editor.send(event)
             }
         }
         
@@ -2401,6 +2426,8 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         oldRotateAngle = nil
     }
     override func touchesCancelled(with event: NSEvent) {
+        guard isEnabledCustomTrackpad else { return }
+        
         if swipePosition != nil {
             rootEditor.swipe(.init(screenPoint: screenPoint(with: event).my,
                                  time: event.timestamp,
@@ -2423,7 +2450,8 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     private var blockGesture = TouchGesture.none
     override func magnify(with nsEvent: NSEvent) {
-        guard !isEnabledPinch else { return }
+        guard !isEnabledCustomTrackpad else { return }
+        
         if nsEvent.phase.contains(.began) {
             blockGesture = .pinch
             pinchVs = []
@@ -2443,7 +2471,8 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     private var rotatedValue: Float = 0.0
     private let blockRotationValue: Float = 4.0
     override func rotate(with nsEvent: NSEvent) {
-        guard !isEnabledRotate else { return }
+        guard !isEnabledCustomTrackpad else { return }
+        
         if nsEvent.phase.contains(.began) {
             if blockGesture != .pinch {
                 isBlockedRotation = false
@@ -2477,11 +2506,13 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     
     override func quickLook(with nsEvent: NSEvent) {
+        guard !isEnabledCustomTrackpad else { return }
+        
         guard window?.sheets.isEmpty ?? false else { return }
         
-        rootEditor.inputKey(inputKeyEventWith(nsEvent, .lookUpTap, .began))
+        rootEditor.inputKey(inputKeyEventWith(nsEvent, .threeFingersTap, .began))
         Sleep.start()
-        rootEditor.inputKey(inputKeyEventWith(nsEvent, .lookUpTap, .ended))
+        rootEditor.inputKey(inputKeyEventWith(nsEvent, .threeFingersTap, .ended))
     }
     
     func windowLevel() -> Int {

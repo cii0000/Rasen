@@ -138,8 +138,8 @@ final class Movie {
         case mov, mp4
         var name: String {
             switch self {
-            case .mov: "MOV"
-            case .mp4: "MP4"
+            case .mov: "MOV (HEVC with Alpha)".localized
+            case .mp4: "MP4 (H.264)"
             }
         }
         var utType: UTType {
@@ -167,7 +167,7 @@ final class Movie {
                                      code: AVError.Code.exportFailed.rawValue)
     
     let url: URL
-    let fileType = AVFileType.mp4, codec: AVVideoCodecType
+    let fileType: AVFileType, codec: AVVideoCodecType
     let renderSize: Size, isHDR: Bool
     let sampleRate = Audio.defaultSampleRate, audioChannelCount = 2
     private let colorSpace: CGColorSpace, colorSpaceProfile: CFData
@@ -175,23 +175,29 @@ final class Movie {
     private let videoInput: AVAssetWriterInput
     private let audioInput: AVAssetWriterInput
     private let pbAdaptor: AVAssetWriterInputPixelBufferAdaptor
+    let isAlphaChannel: Bool
     
     private var //currentTime = Rational(0),
                 lastCMTime = CMTime(value: 0, timescale: 60), append = false, stop = false
     private var deltaTime = Rational(0)
     private var settings = [Setting]()
     
-    init(url: URL, renderSize: Size, isLinearPCM: Bool, _ colorSpace: ColorSpace) throws {
+    init(url: URL, renderSize: Size, isAlphaChannel: Bool, isLinearPCM: Bool, _ colorSpace: ColorSpace) throws {
         self.url = url
         self.renderSize = renderSize
         
         isHDR = colorSpace.isHDR
-        codec = isHDR ? AVVideoCodecType.hevc : AVVideoCodecType.h264
-        guard let colorSpace = isHDR ?
+        fileType = isAlphaChannel ? AVFileType.mov : AVFileType.mp4
+        codec = isAlphaChannel ?
+        AVVideoCodecType.hevcWithAlpha :
+        (isHDR ? AVVideoCodecType.hevc : AVVideoCodecType.h264)
+        
+         guard let colorSpace = isHDR ?
                 CGColorSpace.itur2020HLGColorSpace : CGColorSpace.sRGBColorSpace,
               let colorSpaceProfile = colorSpace.copyICCData() else { throw Self.exportError }
         self.colorSpace = colorSpace
         self.colorSpaceProfile = colorSpaceProfile
+        self.isAlphaChannel = isAlphaChannel
         
         let fileManager = FileManager.default
         if fileManager.fileExists(atPath: url.path) {
@@ -214,6 +220,7 @@ final class Movie {
                AVVideoColorPropertiesKey: [AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,
                                            AVVideoTransferFunctionKey: AVVideoTransferFunction_ITU_R_709_2,
                                            AVVideoYCbCrMatrixKey: AVVideoYCbCrMatrix_ITU_R_709_2]]
+        
         videoInput = AVAssetWriterInput(mediaType: .video,
                                          outputSettings: setting)
         videoInput.expectsMediaDataInRealTime = true
@@ -259,6 +266,12 @@ final class Movie {
                 CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault,
                                                    bufferPool, &pixelBuffer)
                 if let pb = pixelBuffer {
+                    if isAlphaChannel {
+                        CVBufferSetAttachment(pb,
+                                              kCVImageBufferAlphaChannelModeKey,
+                                              kCVImageBufferAlphaChannelMode_PremultipliedAlpha,
+                                              .shouldPropagate)
+                    }
                     CVBufferSetAttachment(pb,
                                           kCVImageBufferICCProfileKey,
                                           colorSpaceProfile,
@@ -283,7 +296,9 @@ final class Movie {
                                         bytesPerRow: CVPixelBufferGetBytesPerRow(pb),
                                         space: colorSpace,
                                         bitmapInfo: bitmapInfo.rawValue) {
-
+                            if isAlphaChannel {
+                                ctx.clear(.init(x: 0, y: 0, width: ctx.width, height: ctx.height))
+                            }
                             if let image = imageHandler(it) {
                                 ctx.draw(image.cg,
                                          in: CGRect(x: 0, y: 0,

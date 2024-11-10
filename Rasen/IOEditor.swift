@@ -730,18 +730,6 @@ final class IOEditor: Editor {
             return
         }
         
-        let fType: any FileTypeProtocol = switch type {
-        case .image: nvs.count > 1 && unionFrame == nil ? Image.FileType.pngs : Image.FileType.png
-        case .image4K: nvs.count > 1 && unionFrame == nil ? Image.FileType.pngs : Image.FileType.png
-        case .pdf: PDF.FileType.pdf
-        case .gif: Image.FileType.gif
-        case .movie, .movie4K: Movie.FileType.mp4
-        case .sound: Content.FileType.m4a
-        case .linearPCM: Content.FileType.wav
-        case .document: Document.FileType.rasendoc
-        case .documentWithHistory: Document.FileType.rasendoch
-        }
-        
         let colorSpace = ColorSpace.export
         
         let renderings: [Rendering], documentRecorders: [Document.SheetRecorder]
@@ -821,13 +809,26 @@ final class IOEditor: Editor {
             documentRecorders = csv.sheetIDs.compactMap { rootView.model.sheetRecorders[$0.value] }
         }
         
+        let isAlphaChannel = (rootView.sheetView(at: p)?.model.backgroundUUColor.value.opacity ?? 1) != 1
+        
+        let fType: any FileTypeProtocol = switch type {
+        case .image: nvs.count > 1 && unionFrame == nil ? Image.FileType.pngs : Image.FileType.png
+        case .image4K: nvs.count > 1 && unionFrame == nil ? Image.FileType.pngs : Image.FileType.png
+        case .pdf: PDF.FileType.pdf
+        case .gif: Image.FileType.gif
+        case .movie, .movie4K: isAlphaChannel ? Movie.FileType.mov : Movie.FileType.mp4
+        case .sound: Content.FileType.m4a
+        case .linearPCM: Content.FileType.wav
+        case .document: Document.FileType.rasendoc
+        case .documentWithHistory: Document.FileType.rasendoch
+        }
+        
         let fileSize: @Sendable () -> (Int?) = {
             switch type {
             case .image:
                 if renderings.count == 1, let node = renderings[0].renderableMainSheetNode() {
                     let nSize = size * 4
-                    let image = node.renderedAntialiasFillImage(in: renderings[0].bounds, to: nSize,
-                                                                backgroundColor: .background, colorSpace)
+                    let image = node.renderedAntialiasFillImage(in: renderings[0].bounds, to: nSize, colorSpace)
                     return image?.data(.png)?.count ?? 0
                 } else {
                     return nil
@@ -837,8 +838,7 @@ final class IOEditor: Editor {
                     let nSize = size.width > size.height ?
                     size.snapped(Size(width: 3840, height: 2160)).rounded() :
                     size.snapped(Size(width: 2160, height: 3840)).rounded()
-                    let image = node.renderedAntialiasFillImage(in: renderings[0].bounds, to: nSize,
-                                                                backgroundColor: .background, colorSpace)
+                    let image = node.renderedAntialiasFillImage(in: renderings[0].bounds, to: nSize, colorSpace)
                     return image?.data(.png)?.count ?? 0
                 } else {
                     return nil
@@ -904,12 +904,14 @@ final class IOEditor: Editor {
                     let nSize = size.width > size.height ?
                     size.snapped(Size(width: 1920, height: 1080).rounded()) :
                     size.snapped(Size(width: 1200, height: 1920).rounded())
-                    exportMovie(from: renderings, is4K: false, colorSpace, size: nSize, at: ioResult)
+                    exportMovie(from: renderings, is4K: false, isAlphaChannel: isAlphaChannel,
+                                colorSpace, size: nSize, at: ioResult)
                 case .movie4K:
                     let nSize = size.width > size.height ?
                     size.snapped(Size(width: 3840, height: 2160)).rounded() :
                     size.snapped(Size(width: 2160, height: 3840)).rounded()
-                    exportMovie(from: renderings, is4K: true, colorSpace, size: nSize, at: ioResult)
+                    exportMovie(from: renderings, is4K: true, isAlphaChannel: isAlphaChannel,
+                                colorSpace, size: nSize, at: ioResult)
                 case .sound:
                     exportSound(from: renderings, isLinearPCM: false, at: ioResult)
                 case .linearPCM:
@@ -942,8 +944,7 @@ final class IOEditor: Editor {
                     for rendering in renderings {
                         let origin = rendering.mainItem.frame.origin - unionFrame.origin
                         if let node = rendering.renderableMainSheetNode(),
-                           let image = node.renderedAntialiasFillImage(in: rendering.bounds, to: size,
-                                                                       backgroundColor: .background, colorSpace) {
+                           let image = node.renderedAntialiasFillImage(in: rendering.bounds, to: size, colorSpace) {
                             nImage = nImage?.drawn(image,
                                                    in: (rendering.bounds + origin)
                                                    * Transform(scaleX: scaleX, y: scaleY))
@@ -952,8 +953,7 @@ final class IOEditor: Editor {
                     try nImage?.write(.png, to: ioResult.url)
                 } else {
                     if let node = renderings[0].renderableMainSheetNode() {
-                        let image = node.renderedAntialiasFillImage(in: renderings[0].bounds, to: size,
-                                                                    backgroundColor: .background, colorSpace)
+                        let image = node.renderedAntialiasFillImage(in: renderings[0].bounds, to: size, colorSpace)
                         try image?.write(.png, to: ioResult.url)
                     }
                 }
@@ -974,8 +974,7 @@ final class IOEditor: Editor {
                     var isStop = false
                     for (j, rendering) in renderings.enumerated() {
                         if let node = rendering.renderableMainSheetNode() {
-                            let image = node.renderedAntialiasFillImage(in: rendering.bounds, to: size,
-                                                                        backgroundColor: .background, colorSpace)
+                            let image = node.renderedAntialiasFillImage(in: rendering.bounds, to: size, colorSpace)
                             let subIOResult = ioResult.sub(name: "\(j).png")
                             try image?.write(.png, to: subIOResult.url)
                             try subIOResult.setAttributes()
@@ -1177,14 +1176,14 @@ final class IOEditor: Editor {
         }
     }
     
-    func exportMovie(from renderings: [Rendering], is4K: Bool,
+    func exportMovie(from renderings: [Rendering], is4K: Bool, isAlphaChannel: Bool,
                      _ colorSpace: ColorSpace,
                      size: Size, at ioResult: IOResult) {
         let isMainFrame = !rootView.isEditingSheet
         @Sendable func export(progressHandler: (Double, inout Bool) -> (),
                               completionHandler handler: @escaping (Bool, (any Error)?) -> ()) async {
             do {
-                let movie = try Movie(url: ioResult.url, renderSize: size,
+                let movie = try Movie(url: ioResult.url, renderSize: size, isAlphaChannel: isAlphaChannel,
                                       isLinearPCM: is4K, colorSpace)
                 var isStop = false, t = 0.0
                 for rendering in renderings {
@@ -1246,13 +1245,7 @@ final class IOEditor: Editor {
                                                   in: sheetBounds)
                             }
                            
-                            if let image = node.renderedAntialiasFillImage(in: b, to: size,
-                                                                           backgroundColor: .background,
-                                                                           colorSpace) {
-                                return image
-                            } else {
-                                return nil
-                            }
+                            return node.renderedAntialiasFillImage(in: b, to: size, colorSpace)
                         } progressHandler: { (d, stop) in
                             t = ot + d / Double(renderings.count)
                             progressHandler(t * 0.7, &isStop)

@@ -1384,8 +1384,12 @@ extension CPUNode {
         ctx.restoreGState()
     }
     
-    func renderedAntialiasFillImage(in bounds: Rect, to size: Size,
-                                    backgroundColor: Color, _ colorSpace: ColorSpace) -> Image? {
+    func renderedAntialiasFillImage(in bounds: Rect, to size: Size, _ colorSpace: ColorSpace) -> Image? {
+        let backgroundColor = if case .color(let color) = fillType {
+            color
+        } else {
+            Color.background
+        }
         guard children.contains(where: { $0.fillType != nil }) else {
             return image(in: bounds, size: size, backgroundColor: backgroundColor, .sRGB)
         }
@@ -1776,14 +1780,12 @@ struct Image {
     }
     
     func drawn(_ image: Image, in rect: Rect) -> Image? {
-        let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.noneSkipLast.rawValue)
         guard let ctx = CGContext(data: nil,
                                   width: cg.width, height: cg.height,
-                                  bitsPerComponent: 8, bytesPerRow: 0, space: cg.colorSpace ?? .default,
-                                  bitmapInfo: bitmapInfo.rawValue) else { return nil }
-        ctx.draw(cg, in: CGRect(x: 0, y: 0,
-                                width: cg.width,
-                                height: cg.height))
+                                  bitsPerComponent: cg.bitsPerComponent, bytesPerRow: cg.bytesPerRow,
+                                  space: cg.colorSpace ?? .default,
+                                  bitmapInfo: cg.bitmapInfo.rawValue) else { return nil }
+        ctx.draw(cg, in: CGRect(x: 0, y: 0, width: cg.width, height: cg.height))
         ctx.draw(image.cg, in: rect.cg)
         guard let nImage = ctx.makeImage() else { return nil }
         return Image(cgImage: nImage)

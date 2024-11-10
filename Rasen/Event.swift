@@ -22,9 +22,8 @@ enum Phase: Int8, Codable {
 struct InputKeyType {
     static let click = InputKeyType(name: "Click".localized)
     static let subClick = InputKeyType(name: "SubClick".localized)
-    static let topSubClick = InputKeyType(name: "TopSubClick".localized)
-    static let lookUpTap = InputKeyType(name: "LookUpOperate".localized)
-    static let fourFingers = InputKeyType(name: "FourFingers".localized)
+    static let threeFingersTap = InputKeyType(name: "3FingersTap".localized)
+    static let fourFingersTap = InputKeyType(name: "4FingersTap".localized)
     
     static let a = InputKeyType(name: "Ａ"), b = InputKeyType(name: "Ｂ")
     static let c = InputKeyType(name: "Ｃ"), d = InputKeyType(name: "Ｄ")
@@ -181,7 +180,7 @@ extension InputKeyType: Hashable {}
 extension InputKeyType {
     var isText: Bool {
         switch self {
-        case .click, .subClick, .lookUpTap,
+        case .click, .subClick, .threeFingersTap, .fourFingersTap,
              .space, .enter, .tab, .delete,
              .escape, .command, .shift, .option, .control, .function,
              .up, .down, .left, .right,
@@ -196,7 +195,7 @@ extension InputKeyType {
     }
     var isTextEdit: Bool {
         switch self {
-        case .click, .subClick, .lookUpTap,
+        case .click, .subClick, .threeFingersTap, .fourFingersTap,
                 .escape, .command, .shift, .option, .control, .function,
                 .f1, .f2, .f3, .f4, .f5, .f6, .f7, .f8, .f9, .f10,
                 .f11, .f12, .f13, .f14, .f15, .f16, .f17, .f18, .f19, .f20,
@@ -209,7 +208,7 @@ extension InputKeyType {
     }
     var isInputText: Bool {
         switch self {
-        case .click, .subClick, .lookUpTap,
+        case .click, .subClick, .threeFingersTap, .fourFingersTap,
              .escape, .command, .shift, .option, .control, .function,
              .up, .down, .left, .right,
              .f1, .f2, .f3, .f4, .f5, .f6, .f7, .f8, .f9, .f10,
@@ -263,17 +262,17 @@ extension ModifierKeys {
         if contains(.shift) {
             str.append("⇧")
         }
-        if contains(.option) {
-            str.append("⌥")
+        if contains(.function) {
+            str.append("🌐︎")
         }
         if contains(.control) {
             str.append("⌃")
         }
+        if contains(.option) {
+            str.append("⌥")
+        }
         if contains(.command) {
             str.append("⌘")
-        }
-        if contains(.function) {
-            str.append("🌐︎")
         }
         return str
     }
@@ -324,38 +323,40 @@ extension Quasimode {
     static let drawStraightLine = Self(modifier: [.shift], .drag)
     
     static let lassoCut = Self(modifier: [.command], .drag)
-    static let selectVersion = Self(modifier: [.command, .shift], .drag)
+    static let selectVersion = Self(modifier: [.shift, .command], .drag)
     
     static let changeLightness = Self(modifier: [.option], .drag)
     static let changeTint = Self(modifier: [.shift, .option], .drag)
-    static let changeOpacity = Self(modifier: [.control, .option, .shift], .drag)
+    static let changeOpacity = Self(modifier: [.control, .option], .drag)
     
-    static let selectFrame = Self(modifier: [.command, .control], .drag)
-    static let goPrevious = Self(modifier: [.control], .z)
-    static let goNext = Self(modifier: [.control], .x)
-    static let controlCopy = Self(modifier: [.control], .c)
-    static let controlInterpolate = Self(modifier: [.control], .s)
+    static let move = Self(modifier: [.control], .drag)
+    static let moveLineZ = Self(modifier: [.shift, .control], .drag)
+    
+    static let selectFrame = Self(.swipe)
+    static let play = Self(.fourFingersTap)
+    static let keySelectFrame = Self(modifier: [.control, .command], .drag)
+    static let keyPlay = Self(modifier: [.control, .command], .click)
+    
+    static let goPrevious = Self(modifier: [.control], .z)//
+    static let goNext = Self(modifier: [.control], .x)//
+    static let controlCopy = Self(modifier: [.control], .c)//
+    static let controlInterpolate = Self(modifier: [.control], .s)//
     static let goPreviousFrame = Self(modifier: [.control, .option], .z)//
     static let goNextFrame = Self(modifier: [.control, .option], .x)//
     
-    static let move = Self(modifier: [.control], .drag)
-    static let moveLinePoint = Self(modifier: [.control, .shift], .drag)
-    static let moveLineZ = Self(modifier: [.control, .option], .drag)
+    static let zoom = Self(.pinch)
+    static let rotate = Self(.rotate)
+    static let scroll = Self(.scroll)
     
+    static let lookUp = Self(.threeFingersTap)
     static let selectByRange = Self(.subDrag)
-    static let play = Self(modifier: [.control], .click)
     static let run = Self(.click)
     static let openMenu = Self(.subClick)
-    static let lookUp = Self(.lookUpTap)
     static let stop = Self(.escape)
     
     static let inputCharacter = Self(.keyInput)
     static let newWrap = Self(modifier: [.shift], .enter)
     static let deleteWrap = Self(modifier: [.shift], .delete)
-    
-    static let zoom = Self(.pinch)
-    static let rotate = Self(.rotate)
-    static let scroll = Self(.scroll)
     
     static let undo = Self(modifier: [.command], .z)
     static let redo = Self(modifier: [.shift, .command], .z)
@@ -378,10 +379,10 @@ extension Quasimode {
     static let changeToSubscript = Self(modifier: [.command], .down)
     
     static let changeToVerticalText = Self(modifier: [.command], .l)
-    static let changeToHorizontalText = Self(modifier: [.command, .shift], .l)
+    static let changeToHorizontalText = Self(modifier: [.shift, .command], .l)
     
     static let insertKeyframe = Self(modifier: [.command], .e)
-    static let addScore = Self(modifier: [.command, .shift], .e)
+    static let addScore = Self(modifier: [.shift, .command], .e)
     
     static let interpolate = Self(modifier: [.command], .s)
     static let crossErase = Self(modifier: [.shift, .command], .s)
