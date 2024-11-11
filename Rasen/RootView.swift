@@ -2182,7 +2182,7 @@ final class RootView: View, @unchecked Sendable {
                 do {
                     guard let thumbnail = sheetRecorder.thumbnail1024Record.decodedValue else { throw ReadingError() }
                     try Task.checkCancellation()
-                    let block = try Texture.block(from: thumbnail, isMipmapped: true)
+                    let block = try await Texture.asyncBlock(from: thumbnail, isMipmapped: true)
                     try Task.checkCancellation()
                     Task { @MainActor in
                         sheetView.node.cacheTexture = try .init(block: block)

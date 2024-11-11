@@ -1078,6 +1078,7 @@ final class SheetView: BindableView, @unchecked Sendable {
     var id = SheetID()
     
     let node: Node
+    let opacityNode = Node()
     let animationView: AnimationView
     var keyframeView: KeyframeView {
         animationView.elementViews[model.animation.index]
@@ -1117,7 +1118,8 @@ final class SheetView: BindableView, @unchecked Sendable {
         bordersView = ArrayView(binder: binder,
                                 keyPath: keyPath.appending(path: \Model.borders))
         
-        node = Node(children: [animationView.previousNextNode,
+        node = Node(children: [opacityNode,
+                               animationView.previousNextNode,
                                scoreView.node,
                                contentsView.node,
                                animationView.node,
@@ -1200,9 +1202,20 @@ final class SheetView: BindableView, @unchecked Sendable {
         }
     }
     private func updateBackground() {
-        if model.backgroundUUColor != Sheet.defalutBackgroundUUColor {
-            node.fillType = model.backgroundUUColor.value.opacity != 1 ? .checkerboard(model.backgroundUUColor.value) : .color(model.backgroundUUColor.value)
+        let backgroundUUColor = backgroundUUColor
+        if backgroundUUColor != Sheet.defalutBackgroundUUColor {
+            if backgroundUUColor.value.opacity != 1 {
+                let color0 = Color(white: 1), color1 = Color(white: 0.975)
+                opacityNode.path = .init([Rect].checkerboard(with: .init(square: 8), in: bounds)
+                    .map { Pathline($0) })
+                opacityNode.fillType = .color(color0.alphaBlend(backgroundUUColor.value))
+                node.fillType = .color(color1.alphaBlend(backgroundUUColor.value))
+            } else {
+                opacityNode.path = .init()
+                node.fillType = .color(backgroundUUColor.value)
+            }
         } else {
+            opacityNode.path = .init()
             node.fillType = nil
         }
         animationView.backgroundColor = model.backgroundUUColor.value

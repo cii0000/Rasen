@@ -2169,7 +2169,7 @@ extension Sheet: Protobuf {
 }
 extension Sheet: Hashable, Codable {}
 extension Sheet {
-    static let width = 512.0, height = 724.0
+    static let width = 512.0, height = 720.0
     static let defaultBounds = Rect(width: width, height: height)
     static let defalutBackgroundUUColor = UU(Color.background, id: .zero)
     static let textPadding = Size(width: 16, height: 15)

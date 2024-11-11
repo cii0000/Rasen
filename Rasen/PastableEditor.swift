@@ -966,9 +966,7 @@ final class PastableEditor: Editor {
             let score = scoreView.model
             
             func show(_ ps: [Point]) {
-                let scale = 1 / rootView.worldToScreenScale
-                let lw = Line.defaultLineWidth
-                let nlw = max(lw * 1.5, lw * 2.5 * scale, 1 * scale)
+                let nlw = max(0.5, 10 * rootView.screenToWorldScale)
                 
                 let node = Node(attitude: .init(position: scoreView.node.convertToWorld(Point())),
                                 path: Path(ps.map { Pathline(circleRadius: nlw, position: $0) }),

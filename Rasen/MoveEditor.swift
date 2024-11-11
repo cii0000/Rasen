@@ -1830,27 +1830,31 @@ final class MoveLineZEditor: DragEventEditor {
                     self.noteNode = noteNode
                     noteNode.isHidden = true
                     
-                    let line = sheetView.scoreView.pointline(from: sheetView.scoreView.model.notes[li])
-                    let noteH = sheetView.scoreView.noteH(from: sheetView.scoreView.model.notes[li])
-                    if let lb = noteNode.path.bounds?.outset(by: noteH / 2) {
-                        let toneFrames = sheetView.scoreView.toneFrames(at: li)
-                        crossIndexes = sheetView.scoreView.model.notes.enumerated().compactMap {
-                            let nNoteH = sheetView.scoreView.noteH(from: sheetView.scoreView.model.notes[$0.offset])
-                            let nLine = sheetView.scoreView.pointline(from: $0.element)
-                            return if $0.offset == li {
-                                li
-                            } else if let nb = sheetView.scoreView.notesNode.children[$0.offset].path.bounds,
-                                      nb.outset(by: noteH / 2).intersects(lb) {
-                                nLine.minDistanceSquared(line) < (noteH / 2 + nNoteH / 2).squared ?
-                                $0.offset : nil
-                            } else if !toneFrames.isEmpty,
-                                      sheetView.scoreView.toneFrames(at: $0.offset).contains(where: { v0 in toneFrames.contains(where: { v1 in v0.frame.intersects(v1.frame) })
-                                          || nLine.minDistanceSquared(v0.frame) < (noteH / 2 + nNoteH / 2).squared
-                                      }) {
-                                $0.offset
-                            } else {
-                                nil
+                    let noteI0 = li, noteNode0 = noteNode
+                    let line0 = sheetView.scoreView.pointline(from: sheetView.scoreView.model.notes[noteI0])
+                    let noteH0 = sheetView.scoreView.noteH(from: sheetView.scoreView.model.notes[noteI0])
+                    if let noteB0 = noteNode0.path.bounds?.outset(by: noteH0 / 2) {
+                        let toneFrames0 = sheetView.scoreView.toneFrames(at: noteI0)
+                        let maxB0 = toneFrames0.reduce(noteB0) { $0 + $1.frame }
+                        crossIndexes = sheetView.scoreView.model.notes.enumerated().compactMap { (noteI1, note1) in
+                            if noteI0 == noteI1 {
+                                return noteI0
                             }
+                            let noteNode1 = sheetView.scoreView.notesNode.children[noteI1]
+                            let line1 = sheetView.scoreView.pointline(from: note1)
+                            let noteH1 = sheetView.scoreView.noteH(from: note1)
+                            guard let noteB1 = noteNode1.path.bounds?.outset(by: noteH1 / 2) else { return nil }
+                            let toneFrames1 = sheetView.scoreView.toneFrames(at: noteI1)
+                            let maxB1 = toneFrames1.reduce(noteB1) { $0 + $1.frame }
+                            guard maxB0.intersects(maxB1) else { return nil }
+                            
+                            if line0.minDistanceSquared(line1) < (noteH0 / 2 + noteH1 / 2).squared
+                                || toneFrames0.contains(where: { line1.minDistanceSquared($0.frame) < (noteH1 / 2).squared })
+                                || toneFrames1.contains(where: { line0.minDistanceSquared($0.frame) < (noteH0 / 2).squared })
+                                || toneFrames0.contains(where: { v0 in toneFrames1.contains(where: { v1 in v0.frame.intersects(v1.frame) }) }) {
+                                return noteI1
+                            }
+                            return nil
                         }
                         if let lastI = crossIndexes.last {
                             crossIndexes.append(lastI + 1)

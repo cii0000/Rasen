@@ -70,7 +70,7 @@ final class SubNSApplication: NSApplication {
         Color.selected = selectedColor
         Renderer.shared.appendColorBuffer(with: selectedColor)
         
-        var subSelectedColor = Color(NSColor.selectedControlColor.cgColor)
+        var subSelectedColor = Color(NSColor.selectedTextBackgroundColor.cgColor)
         subSelectedColor.white = Color.subSelectedWhite
         subSelectedColor.opacity = Color.subSelectedOpacity
         Color.subSelected = subSelectedColor

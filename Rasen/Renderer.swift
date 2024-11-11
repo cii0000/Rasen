@@ -96,7 +96,6 @@ final class Renderstate {
     let opaqueColorRenderPipelineState: any MTLRenderPipelineState
     let alphaColorRenderPipelineState: any MTLRenderPipelineState
     let colorsRenderPipelineState: any MTLRenderPipelineState
-    let checkerboardColorRenderPipelineState: any MTLRenderPipelineState
     let maxColorsRenderPipelineState: any MTLRenderPipelineState
     let opaqueTextureRenderPipelineState: any MTLRenderPipelineState
     let alphaTextureRenderPipelineState: any MTLRenderPipelineState
@@ -182,24 +181,6 @@ final class Renderstate {
         maxColorsD.stencilAttachmentPixelFormat = .stencil8
         maxColorsD.rasterSampleCount = sampleCount
         maxColorsRenderPipelineState = try device.makeRenderPipelineState(descriptor: maxColorsD)
-        
-        let checkerboardColorD = MTLRenderPipelineDescriptor()
-        checkerboardColorD.vertexFunction = library.makeFunction(name: "basicVertex")
-        checkerboardColorD.vertexBuffers[0].mutability = .immutable
-        checkerboardColorD.vertexBuffers[1].mutability = .immutable
-        checkerboardColorD.vertexBuffers[2].mutability = .immutable
-        checkerboardColorD.fragmentFunction = library.makeFunction(name: "checkerboardFragment")
-        checkerboardColorD.colorAttachments[0].isBlendingEnabled = true
-        checkerboardColorD.colorAttachments[0].rgbBlendOperation = .add
-        checkerboardColorD.colorAttachments[0].alphaBlendOperation = .add
-        checkerboardColorD.colorAttachments[0].sourceRGBBlendFactor = .one
-        checkerboardColorD.colorAttachments[0].sourceAlphaBlendFactor = .one
-        checkerboardColorD.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-        checkerboardColorD.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
-        checkerboardColorD.colorAttachments[0].pixelFormat = pixelFormat
-        checkerboardColorD.stencilAttachmentPixelFormat = .stencil8
-        checkerboardColorD.rasterSampleCount = sampleCount
-        checkerboardColorRenderPipelineState = try device.makeRenderPipelineState(descriptor: checkerboardColorD)
         
         let opaqueTextureD = MTLRenderPipelineDescriptor()
         opaqueTextureD.vertexFunction = library.makeFunction(name: "textureVertex")
@@ -370,9 +351,6 @@ final class Context {
     }
     func setColorsPipeline() {
         encoder.setRenderPipelineState(rs.colorsRenderPipelineState)
-    }
-    func setCheckerboardColorPipeline() {
-        encoder.setRenderPipelineState(rs.checkerboardColorRenderPipelineState)
     }
     func setMaxColorsPipeline() {
         encoder.setRenderPipelineState(rs.maxColorsRenderPipelineState)
@@ -770,7 +748,7 @@ extension Node {
         } else if !path.isEmpty {
             if let fillType = fillType {
                 switch fillType {
-                case .color(let color), .checkerboard(let color):
+                case .color(let color):
                     let cgPath = CGMutablePath()
                     for pathline in path.pathlines {
                         let polygon = pathline.polygon()
@@ -1009,6 +987,9 @@ struct Texture {
     }
     static func asyncBlock(from record: Record<Image>, isMipmapped: Bool = false) async throws -> Block {
         try block(from: record, isMipmapped: isMipmapped)
+    }
+    static func asyncBlock(from image: Image, isMipmapped: Bool = false) async throws -> Block {
+        try block(from: image, isMipmapped: isMipmapped)
     }
     static func block(from record: Record<Image>, isMipmapped: Bool = false) throws -> Block {
         if let image = record.value {
@@ -1531,7 +1512,7 @@ extension CPUNode {
         } else if !path.isEmpty {
             if isDrawFillAntialias, let fillType {
                 switch fillType {
-                case .color(let color), .checkerboard(let color):
+                case .color(let color):
                     let cgPath = CGMutablePath()
                     for pathline in path.pathlines {
                         let polygon = pathline.polygon()
