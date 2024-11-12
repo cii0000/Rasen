@@ -1555,7 +1555,7 @@ extension ScoreView {
         Color(lightness: lightness(fromScale: scale))
     }
     static func color(fromScale scale: Double, noise: Double) -> Color {
-        color(fromLightness: lightness(fromScale: scale * 0.5), noise: noise)
+        color(fromLightness: lightness(fromScale: scale * 0.65), noise: noise)
     }
     static func color(fromLightness l: Double, noise: Double) -> Color {
         let br = Double(Color(lightness: l, opacity: 0.1).rgba.r)

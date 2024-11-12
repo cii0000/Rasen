@@ -275,7 +275,7 @@ final class RootEditor: Editor {
     
     var runEditors = Set<RunEditor>() {
         didSet {
-            rootView.updateRunEditorNodes(fromWorldPrintOrigins: runEditors.map { $0.worldPrintOrigin })
+            rootView.updateRunningNodes(fromWorldPrintOrigins: runEditors.map { $0.worldPrintOrigin })
         }
     }
     
