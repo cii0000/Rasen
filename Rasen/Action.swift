@@ -589,6 +589,7 @@ final class ScrollAction: ScrollEventAction {
         case .ended:
             if !rootView.isUpdateWithCursorPosition {
                 rootView.isUpdateWithCursorPosition = true
+                rootView.updateWithCursorPosition()
             }
             break
         }

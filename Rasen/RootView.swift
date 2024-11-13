@@ -2053,11 +2053,13 @@ final class RootView: View, @unchecked Sendable {
             return
         }
         
-        let task = Task { @MainActor in
+        let task = Task.detached(priority: .high) {
             try Task.checkCancellation()
-            let block = try await Texture.asyncBlock(from: thumbnailRecord, isMipmapped: true)
+            let block = try Texture.block(from: thumbnailRecord, isMipmapped: true)
             try Task.checkCancellation()
-            thumbnailNode.fillType = .texture(try .init(block: block))
+            Task { @MainActor in
+                thumbnailNode.fillType = .texture(try .init(block: block))
+            }
         }
         
         thumbnailNodeValues[shp]?.node?.removeFromParent()
@@ -2182,7 +2184,7 @@ final class RootView: View, @unchecked Sendable {
                 do {
                     guard let thumbnail = sheetRecorder.thumbnail1024Record.decodedValue else { throw ReadingError() }
                     try Task.checkCancellation()
-                    let block = try await Texture.asyncBlock(from: thumbnail, isMipmapped: true)
+                    let block = try Texture.block(from: thumbnail, isMipmapped: true)
                     try Task.checkCancellation()
                     Task { @MainActor in
                         sheetView.node.cacheTexture = try .init(block: block)

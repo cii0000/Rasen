@@ -985,12 +985,6 @@ struct Texture {
         var items: [Item]
         var isMipmapped: Bool { items.count > 1 }
     }
-    static func asyncBlock(from record: Record<Image>, isMipmapped: Bool = false) async throws -> Block {
-        try block(from: record, isMipmapped: isMipmapped)
-    }
-    static func asyncBlock(from image: Image, isMipmapped: Bool = false) async throws -> Block {
-        try block(from: image, isMipmapped: isMipmapped)
-    }
     static func block(from record: Record<Image>, isMipmapped: Bool = false) throws -> Block {
         if let image = record.value {
             try Self.block(from: image, isMipmapped: isMipmapped)
