@@ -17,55 +17,55 @@
 
 import struct Foundation.UUID
 
-final class ChangeLightnessEditor: DragEventEditor {
-    let editor: ColorEditor
+final class ChangeLightnessAction: DragEventAction {
+    let action: ColorAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = ColorEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = ColorAction(rootAction)
     }
     
-    func send(_ event: DragEvent) {
-        editor.changeLightness(with: event)
+    func flow(with event: DragEvent) {
+        action.changeLightness(with: event)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class ChangeTintEditor: DragEventEditor {
-    let editor: ColorEditor
+final class ChangeTintAction: DragEventAction {
+    let action: ColorAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = ColorEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = ColorAction(rootAction)
     }
     
-    func send(_ event: DragEvent) {
-        editor.changeTint(with: event)
+    func flow(with event: DragEvent) {
+        action.changeTint(with: event)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class ChangeOpacityEditor: DragEventEditor {
-    let editor: ColorEditor
+final class ChangeOpacityAction: DragEventAction {
+    let action: ColorAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = ColorEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = ColorAction(rootAction)
     }
     
-    func send(_ event: DragEvent) {
-        editor.changeOpacity(with: event)
+    func flow(with event: DragEvent) {
+        action.changeOpacity(with: event)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class ColorEditor: Editor {
-    let rootEditor: RootEditor, rootView: RootView
+final class ColorAction: Action {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
@@ -321,7 +321,7 @@ final class ColorEditor: Editor {
     
     func changeVolm(with event: DragEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
         
@@ -330,8 +330,8 @@ final class ColorEditor: Editor {
         case .began:
             rootView.cursor = .arrow
             
-            if rootEditor.isPlaying(with: event) {
-                rootEditor.stopPlaying(with: event)
+            if rootAction.isPlaying(with: event) {
+                rootAction.stopPlaying(with: event)
             }
             
             beganSP = sp
@@ -772,7 +772,7 @@ final class ColorEditor: Editor {
     private var beganNoise = 0.0, oldNoise = 0.0
     func changePan(with event: DragEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
         
@@ -781,8 +781,8 @@ final class ColorEditor: Editor {
         case .began:
             rootView.cursor = .arrow
             
-            if rootEditor.isPlaying(with: event) {
-                rootEditor.stopPlaying(with: event)
+            if rootAction.isPlaying(with: event) {
+                rootAction.stopPlaying(with: event)
             }
             
             beganSP = sp
@@ -1152,7 +1152,7 @@ final class ColorEditor: Editor {
     
     func changeEvenVolm(with event: DragEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
         
@@ -1161,8 +1161,8 @@ final class ColorEditor: Editor {
         case .began:
             rootView.cursor = .arrow
             
-            if rootEditor.isPlaying(with: event) {
-                rootEditor.stopPlaying(with: event)
+            if rootAction.isPlaying(with: event) {
+                rootAction.stopPlaying(with: event)
             }
             
             beganSP = sp
@@ -1435,11 +1435,11 @@ final class ColorEditor: Editor {
     
     func changeLightness(with event: DragEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
-        if rootEditor.isPlaying(with: event) {
-            rootEditor.stopPlaying(with: event)
+        if rootAction.isPlaying(with: event) {
+            rootAction.stopPlaying(with: event)
         }
         
         if isChangeVolm {
@@ -1618,11 +1618,11 @@ final class ColorEditor: Editor {
     var lastTintSnapTime: Double?
     func changeTint(with event: DragEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
-        if rootEditor.isPlaying(with: event) {
-            rootEditor.stopPlaying(with: event)
+        if rootAction.isPlaying(with: event) {
+            rootAction.stopPlaying(with: event)
         }
         
         if isChangePan {
@@ -1712,11 +1712,11 @@ final class ColorEditor: Editor {
     
     func changeOpacity(with event: DragEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
-        if rootEditor.isPlaying(with: event) {
-            rootEditor.stopPlaying(with: event)
+        if rootAction.isPlaying(with: event) {
+            rootAction.stopPlaying(with: event)
         }
         
         if isChangeVolm {

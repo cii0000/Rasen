@@ -17,15 +17,15 @@
 
 import struct Foundation.UUID
 
-final class FindEditor: InputKeyEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
+final class FindAction: InputKeyEventAction {
+    let rootAction: RootAction, rootView: RootView
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
     }
     
-    func send(_ event: InputKeyEvent) {
+    func flow(with event: InputKeyEvent) {
         switch event.phase {
         case .began:
             rootView.cursor = .arrow
@@ -74,15 +74,15 @@ final class FindEditor: InputKeyEventEditor {
     }
 }
 
-final class LookUpEditor: InputKeyEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
+final class LookUpAction: InputKeyEventAction {
+    let rootAction: RootAction, rootView: RootView
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
     }
     
-    func send(_ event: InputKeyEvent) {
+    func flow(with event: InputKeyEvent) {
         switch event.phase {
         case .began:
             rootView.cursor = .arrow
@@ -274,41 +274,41 @@ final class LookUpEditor: InputKeyEventEditor {
     }
 }
 
-final class ChangeToVerticalTextEditor: InputKeyEventEditor {
-    let editor: TextOrientationEditor
+final class ChangeToVerticalTextAction: InputKeyEventAction {
+    let action: TextOrientationAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = TextOrientationEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = TextOrientationAction(rootAction)
     }
     
-    func send(_ event: InputKeyEvent) {
-        editor.changeToVerticalText(with: event)
+    func flow(with event: InputKeyEvent) {
+        action.changeToVerticalText(with: event)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class ChangeToHorizontalTextEditor: InputKeyEventEditor {
-    let editor: TextOrientationEditor
+final class ChangeToHorizontalTextAction: InputKeyEventAction {
+    let action: TextOrientationAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = TextOrientationEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = TextOrientationAction(rootAction)
     }
     
-    func send(_ event: InputKeyEvent) {
-        editor.changeToHorizontalText(with: event)
+    func flow(with event: InputKeyEvent) {
+        action.changeToHorizontalText(with: event)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class TextOrientationEditor: Editor {
-    let rootEditor: RootEditor, rootView: RootView
+final class TextOrientationAction: Action {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
@@ -320,7 +320,7 @@ final class TextOrientationEditor: Editor {
     }
     func changeTextOrientation(_ orientation: Orientation, with event: InputKeyEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
         switch event.phase {
@@ -355,14 +355,14 @@ final class TextOrientationEditor: Editor {
                     }
                 }
             } else if !rootView.isNoneCursor {
-                rootEditor.textEditor.begin(atScreen: event.screenPoint)
+                rootAction.textAction.begin(atScreen: event.screenPoint)
                 
                 guard let sheetView = rootView.sheetView(at: p) else { return }
-                if let aTextView = rootEditor.textEditor.editingTextView,
+                if let aTextView = rootAction.textAction.editingTextView,
                    !aTextView.isHiddenSelectedRange,
                    let i = sheetView.textsView.elementViews.firstIndex(of: aTextView) {
                     
-                    rootEditor.textEditor.endInputKey(isUnmarkText: true, isRemoveText: false)
+                    rootAction.textAction.endInputKey(isUnmarkText: true, isRemoveText: false)
                     let textView = aTextView
                     var text = textView.model
                     if text.orientation != orientation {
@@ -388,7 +388,7 @@ final class TextOrientationEditor: Editor {
                     }
                 } else {
                     let inP = sheetView.convertFromWorld(p)
-                    rootEditor.textEditor.appendEmptyText(screenPoint: event.screenPoint,
+                    rootAction.textAction.appendEmptyText(screenPoint: event.screenPoint,
                                                     at: inP,
                                                     orientation: orientation,
                                                     in: sheetView)
@@ -405,47 +405,47 @@ final class TextOrientationEditor: Editor {
     }
 }
 
-final class ChangeToSuperscriptEditor: InputKeyEventEditor {
-    let editor: TextScriptEditor
+final class ChangeToSuperscriptAction: InputKeyEventAction {
+    let action: TextScriptAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = TextScriptEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = TextScriptAction(rootAction)
     }
     
-    func send(_ event: InputKeyEvent) {
-        editor.changeScripst(true, with: event)
+    func flow(with event: InputKeyEvent) {
+        action.changeScripst(true, with: event)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class ChangeToSubscriptEditor: InputKeyEventEditor {
-    let editor: TextScriptEditor
+final class ChangeToSubscriptAction: InputKeyEventAction {
+    let action: TextScriptAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = TextScriptEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = TextScriptAction(rootAction)
     }
     
-    func send(_ event: InputKeyEvent) {
-        editor.changeScripst(false, with: event)
+    func flow(with event: InputKeyEvent) {
+        action.changeScripst(false, with: event)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class TextScriptEditor: Editor {
-    let rootEditor: RootEditor, rootView: RootView
+final class TextScriptAction: Action {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
     func changeScripst(_ isSuper: Bool, with event: InputKeyEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
         func moveCharacter(isSuper: Bool, from c: Character) -> Character? {
@@ -517,14 +517,14 @@ final class TextScriptEditor: Editor {
                     }
                 }
             } else {
-                rootEditor.textEditor.begin(atScreen: event.screenPoint)
+                rootAction.textAction.begin(atScreen: event.screenPoint)
                 
                 guard let sheetView = rootView.sheetView(at: p) else { return }
-                if let aTextView = rootEditor.textEditor.editingTextView,
+                if let aTextView = rootAction.textAction.editingTextView,
                    !aTextView.isHiddenSelectedRange,
                    let ai = sheetView.textsView.elementViews.firstIndex(of: aTextView) {
                     
-                    rootEditor.textEditor.endInputKey(isUnmarkText: true, isRemoveText: true)
+                    rootAction.textAction.endInputKey(isUnmarkText: true, isRemoveText: true)
                     guard let ati = aTextView.selectedRange?.lowerBound,
                           ati > aTextView.model.string.startIndex else { return }
                     let textView = aTextView
@@ -559,12 +559,12 @@ final class TextScriptEditor: Editor {
     }
 }
 
-final class TextEditor: Editor {
-    let rootEditor: RootEditor, rootView: RootView
+final class TextAction: InputTextEventAction {
+    let rootAction: RootAction, rootView: RootView
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
     }
     
     func cancelTasks() {
@@ -617,7 +617,7 @@ final class TextEditor: Editor {
         }
     }
     
-    func send(_ event: InputTextEvent) {
+    func flow(with event: InputTextEvent) {
         switch event.phase {
         case .began:
             beginInputKey(event)
@@ -628,7 +628,7 @@ final class TextEditor: Editor {
         }
     }
     func sendEnd() {
-        if rootEditor.oldInputTextKeys.isEmpty && !Cursor.isHidden {
+        if rootAction.oldInputTextKeys.isEmpty && !Cursor.isHidden {
             rootView.cursor = rootView.defaultCursor
         }
     }
@@ -639,7 +639,7 @@ final class TextEditor: Editor {
     }
     func beginInputKey(_ event: InputTextEvent) {
         guard rootView.isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
         
@@ -664,8 +664,8 @@ final class TextEditor: Editor {
                     lyric += key
                 }
                 if lyric != note.pits[pitI].lyric {
-                    if rootEditor.isPlaying(with: event) {
-                        rootEditor.stopPlaying(with: event)
+                    if rootAction.isPlaying(with: event) {
+                        rootAction.stopPlaying(with: event)
                     }
                     
                     note.replace(lyric: lyric, at: pitI, tempo: scoreView.model.tempo)
@@ -1211,7 +1211,7 @@ final class TextEditor: Editor {
             inputType = .insert
         }
         
-        if rootEditor.modifierKeys == .shift {
+        if rootAction.modifierKeys == .shift {
             if let textView = editingTextView {
                 let d = textView.selectedLineLocation
                 let count = (d / textView.model.size)
@@ -1248,7 +1248,7 @@ final class TextEditor: Editor {
             inputType = .remove
         }
         
-        if rootEditor.modifierKeys == .shift {
+        if rootAction.modifierKeys == .shift {
             if let textView = editingTextView {
                 if textView.binder[keyPath: textView.keyPath]
                     .widthCount != Typobute.defaultWidthCount {

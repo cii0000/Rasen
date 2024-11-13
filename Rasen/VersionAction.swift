@@ -17,54 +17,54 @@
 
 import struct Foundation.Date
 
-final class UndoEditor: InputKeyEventEditor {
-    let editor: VersionEditor
+final class UndoAction: InputKeyEventAction {
+    let action: VersionAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = VersionEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = VersionAction(rootAction)
     }
     
-    func send(_ event: InputKeyEvent) {
-        editor.undo(with: event)
+    func flow(with event: InputKeyEvent) {
+        action.undo(with: event)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class RedoEditor: InputKeyEventEditor {
-    let editor: VersionEditor
+final class RedoAction: InputKeyEventAction {
+    let action: VersionAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = VersionEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = VersionAction(rootAction)
     }
     
-    func send(_ event: InputKeyEvent) {
-        editor.redo(with: event)
+    func flow(with event: InputKeyEvent) {
+        action.redo(with: event)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class SelectVersionEditor: DragEventEditor {
-    let editor: VersionEditor
+final class SelectVersionAction: DragEventAction {
+    let action: VersionAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = VersionEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = VersionAction(rootAction)
     }
     
-    func send(_ event: DragEvent) {
-        editor.selectVersion(with: event)
+    func flow(with event: DragEvent) {
+        action.selectVersion(with: event)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class VersionEditor: Editor {
-    let rootEditor: RootEditor, rootView: RootView
+final class VersionAction: Action {
+    let rootAction: RootAction, rootView: RootView
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
     }
     
     enum UndoType {
@@ -588,12 +588,12 @@ extension RootView {
     }
 }
 
-final class ClearHistoryEditor: InputKeyEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
+final class ClearHistoryAction: InputKeyEventAction {
+    let rootAction: RootAction, rootView: RootView
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
     }
     
     let selectingLineNode = Node(lineWidth: 1.5)
@@ -608,7 +608,7 @@ final class ClearHistoryEditor: InputKeyEventEditor {
         rootView.updateSelectedColor(isMain: true)
     }
     
-    func send(_ event: InputKeyEvent) {
+    func flow(with event: InputKeyEvent) {
         let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor ?? event.screenPoint
         let p = rootView.convertScreenToWorld(sp)
         switch event.phase {

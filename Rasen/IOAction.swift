@@ -19,182 +19,182 @@ import struct Foundation.UUID
 import struct Foundation.Data
 import struct Foundation.URL
 
-final class ImportEditor: InputKeyEventEditor {
-    let editor: IOEditor
+final class ImportAction: InputKeyEventAction {
+    let action: IOAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = IOEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = IOAction(rootAction)
     }
     
-    func send(_ event: InputKeyEvent) {
-        editor.importFile(with: event)
+    func flow(with event: InputKeyEvent) {
+        action.importFile(with: event)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class StartExportEditor: InputKeyEventEditor {
-    let editor: IOEditor
+final class StartExportAction: InputKeyEventAction {
+    let action: IOAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = IOEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = IOAction(rootAction)
     }
     
-    func send(_ event: InputKeyEvent) {
-        editor.exportFile(with: event, .image)
+    func flow(with event: InputKeyEvent) {
+        action.exportFile(with: event, .image)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class ExportAsImageEditor: InputKeyEventEditor {
-    let editor: IOEditor
+final class ExportAsImageAction: InputKeyEventAction {
+    let action: IOAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = IOEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = IOAction(rootAction)
     }
     
-    func send(_ event: InputKeyEvent) {
-        editor.exportFile(with: event, .image)
+    func flow(with event: InputKeyEvent) {
+        action.exportFile(with: event, .image)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class ExportAs4KImageEditor: InputKeyEventEditor {
-    let editor: IOEditor
+final class ExportAs4KImageAction: InputKeyEventAction {
+    let action: IOAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = IOEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = IOAction(rootAction)
     }
     
-    func send(_ event: InputKeyEvent) {
-        editor.exportFile(with: event, .image4K)
+    func flow(with event: InputKeyEvent) {
+        action.exportFile(with: event, .image4K)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class ExportAsPDFEditor: InputKeyEventEditor {
-    let editor: IOEditor
+final class ExportAsPDFAction: InputKeyEventAction {
+    let action: IOAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = IOEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = IOAction(rootAction)
     }
     
-    func send(_ event: InputKeyEvent) {
-        editor.exportFile(with: event, .pdf)
+    func flow(with event: InputKeyEvent) {
+        action.exportFile(with: event, .pdf)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class ExportAsGIFEditor: InputKeyEventEditor {
-    let editor: IOEditor
+final class ExportAsGIFAction: InputKeyEventAction {
+    let action: IOAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = IOEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = IOAction(rootAction)
     }
     
-    func send(_ event: InputKeyEvent) {
-        editor.exportFile(with: event, .gif)
+    func flow(with event: InputKeyEvent) {
+        action.exportFile(with: event, .gif)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class ExportAsMovieEditor: InputKeyEventEditor {
-    let editor: IOEditor
+final class ExportAsMovieAction: InputKeyEventAction {
+    let action: IOAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = IOEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = IOAction(rootAction)
     }
     
-    func send(_ event: InputKeyEvent) {
+    func flow(with event: InputKeyEvent) {
         
-        editor.exportFile(with: event, .movie)
+        action.exportFile(with: event, .movie)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class ExportAs4KMovieEditor: InputKeyEventEditor {
-    let editor: IOEditor
+final class ExportAs4KMovieAction: InputKeyEventAction {
+    let action: IOAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = IOEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = IOAction(rootAction)
     }
     
-    func send(_ event: InputKeyEvent) {
-        editor.exportFile(with: event, .movie4K)
+    func flow(with event: InputKeyEvent) {
+        action.exportFile(with: event, .movie4K)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class ExportAsSoundEditor: InputKeyEventEditor {
-    let editor: IOEditor
+final class ExportAsSoundAction: InputKeyEventAction {
+    let action: IOAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = IOEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = IOAction(rootAction)
     }
     
-    func send(_ event: InputKeyEvent) {
-        editor.exportFile(with: event, .sound)
+    func flow(with event: InputKeyEvent) {
+        action.exportFile(with: event, .sound)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class ExportAsLinearPCMEditor: InputKeyEventEditor {
-    let editor: IOEditor
+final class ExportAsLinearPCMAction: InputKeyEventAction {
+    let action: IOAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = IOEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = IOAction(rootAction)
     }
     
-    func send(_ event: InputKeyEvent) {
-        editor.exportFile(with: event, .linearPCM)
+    func flow(with event: InputKeyEvent) {
+        action.exportFile(with: event, .linearPCM)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class ExportAsDocumentEditor: InputKeyEventEditor {
-    let editor: IOEditor
+final class ExportAsDocumentAction: InputKeyEventAction {
+    let action: IOAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = IOEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = IOAction(rootAction)
     }
     
-    func send(_ event: InputKeyEvent) {
-        editor.exportFile(with: event, .document)
+    func flow(with event: InputKeyEvent) {
+        action.exportFile(with: event, .document)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class ExportAsDocumentWithHistoryEditor: InputKeyEventEditor {
-    let editor: IOEditor
+final class ExportAsDocumentWithHistoryAction: InputKeyEventAction {
+    let action: IOAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = IOEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = IOAction(rootAction)
     }
     
-    func send(_ event: InputKeyEvent) {
-        editor.exportFile(with: event, .documentWithHistory)
+    func flow(with event: InputKeyEvent) {
+        action.exportFile(with: event, .documentWithHistory)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class IOEditor: Editor {
-    let rootEditor: RootEditor, rootView: RootView
+final class IOAction: Action {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
@@ -1570,15 +1570,15 @@ final class IOEditor: Editor {
     }
 }
 
-final class ToMP4MovieEditor: InputKeyEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
+final class ToMP4MovieAction: InputKeyEventAction {
+    let rootAction: RootAction, rootView: RootView
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
     }
     
-    func send(_ event: InputKeyEvent) {
+    func flow(with event: InputKeyEvent) {
         Task { @MainActor in
             let result = await URL.load(prompt: "Import".localized,
                                         fileTypes: [Movie.FileType.mp4, Movie.FileType.mov])

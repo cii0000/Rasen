@@ -339,10 +339,10 @@ final class SubNSApplication: NSApplication {
                 self.view.replaceDatabase(from: urls[0])
             } else {
                 guard !urls.isEmpty else { return }
-                let editor = IOEditor(self.view.rootEditor)
+                let action = IOAction(self.view.rootAction)
                 let sp =  self.view.bounds.my.centerPoint
-                let shp = editor.beginImportFile(at: sp)
-                editor.importFile(from: urls, at: shp)
+                let shp = action.beginImportFile(at: sp)
+                action.importFile(from: urls, at: shp)
                 self.urls = []
             }
         }
@@ -371,18 +371,18 @@ final class SubNSApplication: NSApplication {
         view.update()
     }
     func windowWillBeginSheet(_ notification: Notification) {
-        view.rootEditor.stopAllEvents()
+        view.rootAction.stopAllEvents()
         view.draw()
     }
     func windowDidEndSheet(_ notification: Notification) {
         updateDocumentFromWindow()
     }
     func windowDidResignKey(_ notification: Notification) {
-        view.rootEditor.stopAllEvents(isEnableText: false)
+        view.rootAction.stopAllEvents(isEnableText: false)
         view.rootView.endSeqencer()
     }
     func updateDocumentFromWindow() {
-        view.rootEditor.stopAllEvents(isEnableText: false)
+        view.rootAction.stopAllEvents(isEnableText: false)
         view.rootView.cursorPoint = view.screenPointFromCursor.my
         view.rootView.updateTextCursor()
     }
@@ -465,7 +465,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     static let enabledAnimationKey = "enabledAnimation"
     static let isHiddenActionListKey = "isHiddenActionList"
     static let isShownTrackpadAlternativeKey = "isShownTrackpadAlternative"
-    private(set) var rootEditor: RootEditor
+    private(set) var rootAction: RootAction
     private(set) var rootView: RootView
     let renderstate = Renderstate.sampleCount4!
     
@@ -517,7 +517,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     required init(url: URL, frame: NSRect = NSRect()) {
         let rootView = RootView(url: url)
         self.rootView = rootView
-        self.rootEditor = .init(rootView)
+        self.rootAction = .init(rootView)
         
         super.init(frame: frame, device: Renderer.shared.device)
         delegate = self
@@ -561,7 +561,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         scrollTimer = nil
         pinchTimer?.cancel()
         pinchTimer = nil
-        rootEditor.cancelTasks()
+        rootAction.cancelTasks()
     }
     
     override func viewDidChangeEffectiveAppearance() {
@@ -661,8 +661,8 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     
                     let p = r.centerPoint
                     let sp = self.rootView.convertWorldToScreen(p)
-                    self.rootEditor.inputKey(self.inputKeyEventWith(at: sp, .threeFingersTap, .began))
-                    self.rootEditor.inputKey(self.inputKeyEventWith(at: sp, .threeFingersTap, .ended))
+                    self.rootAction.inputKey(with: self.inputKeyEventWith(at: sp, .threeFingersTap, .began))
+                    self.rootAction.inputKey(with: self.inputKeyEventWith(at: sp, .threeFingersTap, .ended))
                 }
             }
             trackpadView.addSubview(lookUpButton)
@@ -677,7 +677,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                                          phase: event.phase,
                                          touchPhase: nil,
                                          momentumPhase: nil)
-                self.rootEditor.scroll(nEvent)
+                self.rootAction.scroll(with: nEvent)
             }
             trackpadView.addSubview(scrollButton)
             self.scrollButton = scrollButton
@@ -689,7 +689,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                                         time: event.time,
                                         magnification: -dp.y / 100,
                                         phase: event.phase)
-                self.rootEditor.pinch(nEvent)
+                self.rootAction.pinch(with: nEvent)
             }
             trackpadView.addSubview(zoomButton)
             self.zoomButton = zoomButton
@@ -701,7 +701,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                                          time: event.time,
                                          rotationQuantity: -dp.x / 10,
                                          phase: event.phase)
-                self.rootEditor.rotate(nEvent)
+                self.rootAction.rotate(with: nEvent)
             }
             trackpadView.addSubview(rotateButton)
             self.rotateButton = rotateButton
@@ -1134,198 +1134,198 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     @objc func importDocument(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = ImportEditor(rootEditor)
-        editor.send(inputKeyEventWith(.began))
+        let action = ImportAction(rootAction)
+        action.flow(with: inputKeyEventWith(.began))
         Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
+        action.flow(with: inputKeyEventWith(.ended))
         rootView.isNoneCursor = false
     }
     
     @objc func exportAsImage(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = ExportAsImageEditor(rootEditor)
-        editor.send(inputKeyEventWith(.began))
+        let action = ExportAsImageAction(rootAction)
+        action.flow(with: inputKeyEventWith(.began))
         Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
+        action.flow(with: inputKeyEventWith(.ended))
         rootView.isNoneCursor = false
     }
     @objc func exportAsImage4K(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = ExportAs4KImageEditor(rootEditor)
-        editor.send(inputKeyEventWith(.began))
+        let action = ExportAs4KImageAction(rootAction)
+        action.flow(with: inputKeyEventWith(.began))
         Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
+        action.flow(with: inputKeyEventWith(.ended))
         rootView.isNoneCursor = false
     }
     @objc func exportAsPDF(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = ExportAsPDFEditor(rootEditor)
-        editor.send(inputKeyEventWith(.began))
+        let action = ExportAsPDFAction(rootAction)
+        action.flow(with: inputKeyEventWith(.began))
         Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
+        action.flow(with: inputKeyEventWith(.ended))
         rootView.isNoneCursor = false
     }
     @objc func exportAsGIF(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = ExportAsGIFEditor(rootEditor)
-        editor.send(inputKeyEventWith(.began))
+        let action = ExportAsGIFAction(rootAction)
+        action.flow(with: inputKeyEventWith(.began))
         Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
+        action.flow(with: inputKeyEventWith(.ended))
         rootView.isNoneCursor = false
     }
     @objc func exportAsMovie(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = ExportAsMovieEditor(rootEditor)
-        editor.send(inputKeyEventWith(.began))
+        let action = ExportAsMovieAction(rootAction)
+        action.flow(with: inputKeyEventWith(.began))
         Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
+        action.flow(with: inputKeyEventWith(.ended))
         rootView.isNoneCursor = false
     }
     @objc func exportAsMovie4K(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = ExportAs4KMovieEditor(rootEditor)
-        editor.send(inputKeyEventWith(.began))
+        let action = ExportAs4KMovieAction(rootAction)
+        action.flow(with: inputKeyEventWith(.began))
         Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
+        action.flow(with: inputKeyEventWith(.ended))
         rootView.isNoneCursor = false
     }
     @objc func exportAsSound(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = ExportAsSoundEditor(rootEditor)
-        editor.send(inputKeyEventWith(.began))
+        let action = ExportAsSoundAction(rootAction)
+        action.flow(with: inputKeyEventWith(.began))
         Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
+        action.flow(with: inputKeyEventWith(.ended))
         rootView.isNoneCursor = false
     }
     @objc func exportAsLinearPCM(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = ExportAsLinearPCMEditor(rootEditor)
-        editor.send(inputKeyEventWith(.began))
+        let action = ExportAsLinearPCMAction(rootAction)
+        action.flow(with: inputKeyEventWith(.began))
         Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
+        action.flow(with: inputKeyEventWith(.ended))
         rootView.isNoneCursor = false
     }
     
     @objc func exportAsDocument(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = ExportAsDocumentEditor(rootEditor)
-        editor.send(inputKeyEventWith(.began))
+        let action = ExportAsDocumentAction(rootAction)
+        action.flow(with: inputKeyEventWith(.began))
         Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
+        action.flow(with: inputKeyEventWith(.ended))
         rootView.isNoneCursor = false
     }
     @objc func exportAsDocumentWithHistory(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = ExportAsDocumentWithHistoryEditor(rootEditor)
-        editor.send(inputKeyEventWith(.began))
+        let action = ExportAsDocumentWithHistoryAction(rootAction)
+        action.flow(with: inputKeyEventWith(.began))
         Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
+        action.flow(with: inputKeyEventWith(.ended))
         rootView.isNoneCursor = false
     }
     
     @objc func clearHistory(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = ClearHistoryEditor(rootEditor)
-        editor.send(inputKeyEventWith(.began))
+        let action = ClearHistoryAction(rootAction)
+        action.flow(with: inputKeyEventWith(.began))
         Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
+        action.flow(with: inputKeyEventWith(.ended))
         rootView.isNoneCursor = false
     }
     
     @objc func undo(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = UndoEditor(rootEditor)
-        editor.send(inputKeyEventWith(.began))
+        let action = UndoAction(rootAction)
+        action.flow(with: inputKeyEventWith(.began))
         Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
+        action.flow(with: inputKeyEventWith(.ended))
         rootView.isNoneCursor = false
     }
     @objc func redo(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = RedoEditor(rootEditor)
-        editor.send(inputKeyEventWith(.began))
+        let action = RedoAction(rootAction)
+        action.flow(with: inputKeyEventWith(.began))
         Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
+        action.flow(with: inputKeyEventWith(.ended))
         rootView.isNoneCursor = false
     }
     @objc func cut(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = CutEditor(rootEditor)
-        editor.send(inputKeyEventWith(.began))
+        let action = CutAction(rootAction)
+        action.flow(with: inputKeyEventWith(.began))
         Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
+        action.flow(with: inputKeyEventWith(.ended))
         rootView.isNoneCursor = false
     }
     @objc func copy(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = CopyEditor(rootEditor)
-        editor.send(inputKeyEventWith(.began))
+        let action = CopyAction(rootAction)
+        action.flow(with: inputKeyEventWith(.began))
         Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
+        action.flow(with: inputKeyEventWith(.ended))
         rootView.isNoneCursor = false
     }
     @objc func paste(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = PasteEditor(rootEditor)
-        editor.send(inputKeyEventWith(.began))
+        let action = PasteAction(rootAction)
+        action.flow(with: inputKeyEventWith(.began))
         Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
+        action.flow(with: inputKeyEventWith(.ended))
         rootView.isNoneCursor = false
     }
     @objc func find(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = FindEditor(rootEditor)
-        editor.send(inputKeyEventWith(.began))
+        let action = FindAction(rootAction)
+        action.flow(with: inputKeyEventWith(.began))
         Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
+        action.flow(with: inputKeyEventWith(.ended))
         rootView.isNoneCursor = false
     }
     @objc func changeToDraft(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = ChangeToDraftEditor(rootEditor)
-        editor.send(inputKeyEventWith(.began))
+        let action = ChangeToDraftAction(rootAction)
+        action.flow(with: inputKeyEventWith(.began))
         Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
+        action.flow(with: inputKeyEventWith(.ended))
         rootView.isNoneCursor = false
     }
     @objc func cutDraft(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = CutDraftEditor(rootEditor)
-        editor.send(inputKeyEventWith(.began))
+        let action = CutDraftAction(rootAction)
+        action.flow(with: inputKeyEventWith(.began))
         Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
+        action.flow(with: inputKeyEventWith(.ended))
         rootView.isNoneCursor = false
     }
     @objc func makeFaces(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = MakeFacesEditor(rootEditor)
-        editor.send(inputKeyEventWith(.began))
+        let action = MakeFacesAction(rootAction)
+        action.flow(with: inputKeyEventWith(.began))
         Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
+        action.flow(with: inputKeyEventWith(.ended))
         rootView.isNoneCursor = false
     }
     @objc func cutFaces(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = CutFacesEditor(rootEditor)
-        editor.send(inputKeyEventWith(.began))
+        let action = CutFacesAction(rootAction)
+        action.flow(with: inputKeyEventWith(.began))
         Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
+        action.flow(with: inputKeyEventWith(.ended))
         rootView.isNoneCursor = false
     }
     @objc func changeToVerticalText(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = ChangeToVerticalTextEditor(rootEditor)
-        editor.send(inputKeyEventWith(.began))
+        let action = ChangeToVerticalTextAction(rootAction)
+        action.flow(with: inputKeyEventWith(.began))
         Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
+        action.flow(with: inputKeyEventWith(.ended))
         rootView.isNoneCursor = false
     }
     @objc func changeToHorizontalText(_ sender: Any) {
         rootView.isNoneCursor = true
-        let editor = ChangeToHorizontalTextEditor(rootEditor)
-        editor.send(inputKeyEventWith(.began))
+        let action = ChangeToHorizontalTextAction(rootAction)
+        action.flow(with: inputKeyEventWith(.began))
         Sleep.start()
-        editor.send(inputKeyEventWith(.ended))
+        action.flow(with: inputKeyEventWith(.ended))
         rootView.isNoneCursor = false
     }
     
@@ -1440,7 +1440,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     override func mouseEntered(with event: NSEvent) {}
     override func mouseExited(with event: NSEvent) {
-        rootEditor.stopScrollEvent()
+        rootAction.stopScrollEvent()
     }
     private var trackingArea: NSTrackingArea?
     override func updateTrackingAreas() {
@@ -1540,18 +1540,18 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     private var isOneFlag = false, oneFlagTime: Double?
     override func flagsChanged(with nsEvent: NSEvent) {
-        let oldModifierKeys = rootEditor.modifierKeys
+        let oldModifierKeys = rootAction.modifierKeys
         
-        rootEditor.modifierKeys = nsEvent.modifierKeys
+        rootAction.modifierKeys = nsEvent.modifierKeys
         
-        if oldModifierKeys.isEmpty && rootEditor.modifierKeys.isOne {
+        if oldModifierKeys.isEmpty && rootAction.modifierKeys.isOne {
             isOneFlag = true
             oneFlagTime = nsEvent.timestamp
         } else if let oneKey = oldModifierKeys.oneInputKeyTYpe,
-                  rootEditor.modifierKeys.isEmpty && isOneFlag,
+                  rootAction.modifierKeys.isEmpty && isOneFlag,
             let oneFlagTime, nsEvent.timestamp - oneFlagTime < 0.175 {
-            rootEditor.inputKey(inputKeyEventWith(nsEvent, oneKey, .began))
-            rootEditor.inputKey(inputKeyEventWith(nsEvent, oneKey, .ended))
+            rootAction.inputKey(with: inputKeyEventWith(nsEvent, oneKey, .began))
+            rootAction.inputKey(with: inputKeyEventWith(nsEvent, oneKey, .ended))
             isOneFlag = false
         } else {
             isOneFlag = false
@@ -1559,12 +1559,12 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     
     override func mouseMoved(with nsEvent: NSEvent) {
-        rootEditor.indicate(with: dragEventWith(indicate: nsEvent))
+        rootAction.indicate(with: dragEventWith(indicate: nsEvent))
         
-        if let oldEvent = rootEditor.oldInputKeyEvent,
-           let editor = rootEditor.inputKeyEditor {
+        if let oldEvent = rootAction.oldInputKeyEvent,
+           let action = rootAction.inputKeyAction {
             
-            editor.send(inputKeyEventWith(nsEvent, oldEvent.inputKeyType, .changed))
+            action.flow(with: inputKeyEventWith(nsEvent, oldEvent.inputKeyType, .changed))
         }
     }
     
@@ -1573,26 +1573,24 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         guard let key = nsEvent.key else { return }
         let phase: Phase = nsEvent.isARepeat ? .changed : .began
         if key.isTextEdit
-            && !rootEditor.modifierKeys.contains(.command)
-            && rootEditor.modifierKeys != .control
-            && rootEditor.modifierKeys != [.control, .option]
-            && !rootEditor.modifierKeys.contains(.function) {
+            && !rootAction.modifierKeys.contains(.command)
+            && rootAction.modifierKeys != .control
+            && rootAction.modifierKeys != [.control, .option]
+            && !rootAction.modifierKeys.contains(.function) {
             
-            rootEditor.inputText(inputTextEventWith(nsEvent, key, phase))
+            rootAction.inputText(with: inputTextEventWith(nsEvent, key, phase))
         } else {
-            rootEditor.inputKey(inputKeyEventWith(nsEvent, key,
-                                                isRepeat: nsEvent.isARepeat,
-                                                phase))
+            rootAction.inputKey(with: inputKeyEventWith(nsEvent, key, isRepeat: nsEvent.isARepeat, phase))
         }
     }
     override func keyUp(with nsEvent: NSEvent) {
         guard let key = nsEvent.key else { return }
         let textEvent = inputTextEventWith(nsEvent, key, .ended)
-        if rootEditor.oldInputTextKeys.contains(textEvent.inputKeyType) {
-            rootEditor.inputText(textEvent)
+        if rootAction.oldInputTextKeys.contains(textEvent.inputKeyType) {
+            rootAction.inputText(with: textEvent)
         }
-        if rootEditor.oldInputKeyEvent?.inputKeyType == key {
-            rootEditor.inputKey(inputKeyEventWith(nsEvent, key, .ended))
+        if rootAction.oldInputKeyEvent?.inputKeyType == key {
+            rootAction.inputKey(with: inputKeyEventWith(nsEvent, key, .ended))
         }
     }
     
@@ -1620,25 +1618,25 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             isDrag = true
             if oldPressureStage == 2 {
                 isStrongDrag = true
-                rootEditor.strongDrag(beganDragEvent)
+                rootAction.strongDrag(with: beganDragEvent)
             } else {
-                rootEditor.drag(beganDragEvent)
+                rootAction.drag(with: beganDragEvent)
             }
         }
         if isStrongDrag {
-            rootEditor.strongDrag(dragEventWith(nsEvent, .changed))
+            rootAction.strongDrag(with: dragEventWith(nsEvent, .changed))
         } else {
-            rootEditor.drag(dragEventWith(nsEvent, .changed))
+            rootAction.drag(with: dragEventWith(nsEvent, .changed))
         }
     }
     override func mouseUp(with nsEvent: NSEvent) {
         let endedDragEvent = dragEventWith(nsEvent, .ended)
         if isDrag {
             if isStrongDrag {
-                rootEditor.strongDrag(endedDragEvent)
+                rootAction.strongDrag(with: endedDragEvent)
                 isStrongDrag = false
             } else {
-                rootEditor.drag(endedDragEvent)
+                rootAction.drag(with: endedDragEvent)
             }
             isDrag = false
         } else {
@@ -1647,12 +1645,12 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             } else {
                 guard let beganDragEvent = beganDragEvent else { return }
                 if isMovedDrag {
-                    rootEditor.drag(beganDragEvent)
-                    rootEditor.drag(endedDragEvent)
+                    rootAction.drag(with: beganDragEvent)
+                    rootAction.drag(with: endedDragEvent)
                 } else {
-                    rootEditor.inputKey(inputKeyEventWith(beganDragEvent, .began))
+                    rootAction.inputKey(with: inputKeyEventWith(beganDragEvent, .began))
                     Sleep.start()
-                    rootEditor.inputKey(inputKeyEventWith(beganDragEvent, .ended))
+                    rootAction.inputKey(with: inputKeyEventWith(beganDragEvent, .ended))
                 }
             }
         }
@@ -1675,20 +1673,20 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         guard let beganDragEvent = beganSubDragEvent else { return }
         if !isSubDrag {
             isSubDrag = true
-            rootEditor.subDrag(beganDragEvent)
+            rootAction.subDrag(with: beganDragEvent)
         }
-        rootEditor.subDrag(dragEventWith(nsEvent, .changed))
+        rootAction.subDrag(with: dragEventWith(nsEvent, .changed))
     }
     override func rightMouseUp(with nsEvent: NSEvent) {
         let endedDragEvent = dragEventWith(nsEvent, .ended)
         if isSubDrag {
-            rootEditor.subDrag(endedDragEvent)
+            rootAction.subDrag(with: endedDragEvent)
             isSubDrag = false
         } else {
             guard let beganDragEvent = beganSubDragEvent else { return }
             if beganDragEvent.screenPoint != endedDragEvent.screenPoint {
-                rootEditor.subDrag(beganDragEvent)
-                rootEditor.subDrag(endedDragEvent)
+                rootAction.subDrag(with: beganDragEvent)
+                rootAction.subDrag(with: endedDragEvent)
             } else {
                 showMenu(nsEvent)
             }
@@ -1700,103 +1698,103 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         beganSubDragEvent = nil
     }
     
-    private var menuEditor: StartExportEditor?
+    private var menuAction: StartExportAction?
     func showMenu(_ nsEvent: NSEvent) {
         guard window?.sheets.isEmpty ?? false else { return }
         guard window?.isMainWindow ?? false else { return }
         
         let event = inputKeyEventWith(drag: nsEvent, .began)
-        rootEditor.updateLastEditedIntPoint(from: event)
+        rootAction.updateLastEditedIntPoint(from: event)
         let menu = NSMenu()
-        if menuEditor != nil {
-            menuEditor?.editor.end()
+        if menuAction != nil {
+            menuAction?.action.end()
         }
-        menuEditor = StartExportEditor(rootEditor)
-        menuEditor?.send(event)
+        menuAction = StartExportAction(rootAction)
+        menuAction?.flow(with: event)
         menu.delegate = self
         menu.addItem(SubNSMenuItem(title: "Import...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = ImportEditor(self.rootEditor)
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
+            let action = ImportAction(self.rootAction)
+            action.flow(with: self.inputKeyEventWith(drag: nsEvent, .began))
+            action.flow(with: self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(SubNSMenuItem(title: "Export as Image...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = ExportAsImageEditor(self.rootEditor)
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
+            let action = ExportAsImageAction(self.rootAction)
+            action.flow(with: self.inputKeyEventWith(drag: nsEvent, .began))
+            action.flow(with: self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(SubNSMenuItem(title: "Export as 4K Image...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = ExportAs4KImageEditor(self.rootEditor)
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
+            let action = ExportAs4KImageAction(self.rootAction)
+            action.flow(with: self.inputKeyEventWith(drag: nsEvent, .began))
+            action.flow(with: self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(SubNSMenuItem(title: "Export as PDF...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = ExportAsPDFEditor(self.rootEditor)
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
+            let action = ExportAsPDFAction(self.rootAction)
+            action.flow(with: self.inputKeyEventWith(drag: nsEvent, .began))
+            action.flow(with: self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(SubNSMenuItem(title: "Export as GIF...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = ExportAsGIFEditor(self.rootEditor)
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
+            let action = ExportAsGIFAction(self.rootAction)
+            action.flow(with: self.inputKeyEventWith(drag: nsEvent, .began))
+            action.flow(with: self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(SubNSMenuItem(title: "Export as Movie...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = ExportAsMovieEditor(self.rootEditor)
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
+            let action = ExportAsMovieAction(self.rootAction)
+            action.flow(with: self.inputKeyEventWith(drag: nsEvent, .began))
+            action.flow(with: self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(SubNSMenuItem(title: "Export as 4K Movie...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = ExportAs4KMovieEditor(self.rootEditor)
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
+            let action = ExportAs4KMovieAction(self.rootAction)
+            action.flow(with: self.inputKeyEventWith(drag: nsEvent, .began))
+            action.flow(with: self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(SubNSMenuItem(title: "Export as Sound...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = ExportAsSoundEditor(self.rootEditor)
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
+            let action = ExportAsSoundAction(self.rootAction)
+            action.flow(with: self.inputKeyEventWith(drag: nsEvent, .began))
+            action.flow(with: self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(SubNSMenuItem(title: "Export as Linear PCM...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = ExportAsLinearPCMEditor(self.rootEditor)
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
+            let action = ExportAsLinearPCMAction(self.rootAction)
+            action.flow(with: self.inputKeyEventWith(drag: nsEvent, .began))
+            action.flow(with: self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(SubNSMenuItem(title: "Export as Document...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = ExportAsDocumentEditor(self.rootEditor)
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
+            let action = ExportAsDocumentAction(self.rootAction)
+            action.flow(with: self.inputKeyEventWith(drag: nsEvent, .began))
+            action.flow(with: self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(SubNSMenuItem(title: "Export as Document with History...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = ExportAsDocumentWithHistoryEditor(self.rootEditor)
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
+            let action = ExportAsDocumentWithHistoryAction(self.rootAction)
+            action.flow(with: self.inputKeyEventWith(drag: nsEvent, .began))
+            action.flow(with: self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(SubNSMenuItem(title: "Clear History...".localized, closure: { [weak self] in
             guard let self else { return }
-            let editor = ClearHistoryEditor(self.rootEditor)
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .began))
-            editor.send(self.inputKeyEventWith(drag: nsEvent, .ended))
+            let action = ClearHistoryAction(self.rootAction)
+            action.flow(with: self.inputKeyEventWith(drag: nsEvent, .began))
+            action.flow(with: self.inputKeyEventWith(drag: nsEvent, .ended))
         }))
         
-        rootEditor.stopAllEvents()
+        rootAction.stopAllEvents()
         NSMenu.popUpContextMenu(menu, with: nsEvent, for: self)
     }
     func menuDidClose(_ menu: NSMenu) {
-        menuEditor?.editor.end()
-        menuEditor = nil
+        menuAction?.action.end()
+        menuAction = nil
     }
     
     private var beganMiddleDragEvent: DragEvent?, isMiddleDrag = false
@@ -1810,20 +1808,20 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         guard let beganDragEvent = beganMiddleDragEvent else { return }
         if !isMiddleDrag {
             isMiddleDrag = true
-            rootEditor.middleDrag(beganDragEvent)
+            rootAction.middleDrag(with: beganDragEvent)
         }
-        rootEditor.middleDrag(dragEventWith(nsEvent, .changed))
+        rootAction.middleDrag(with: dragEventWith(nsEvent, .changed))
     }
     override func otherMouseUp(with nsEvent: NSEvent) {
         let endedDragEvent = dragEventWith(nsEvent, .ended)
         if isMiddleDrag {
-            rootEditor.middleDrag(endedDragEvent)
+            rootAction.middleDrag(with: endedDragEvent)
             isMiddleDrag = false
         } else {
             guard let beganDragEvent = beganSubDragEvent else { return }
             if beganDragEvent.screenPoint != endedDragEvent.screenPoint {
-                rootEditor.middleDrag(beganDragEvent)
-                rootEditor.middleDrag(endedDragEvent)
+                rootAction.middleDrag(with: beganDragEvent)
+                rootAction.middleDrag(with: endedDragEvent)
             }
         }
         beganMiddleDragEvent = nil
@@ -1851,16 +1849,16 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 var event = scrollEventWith(nsEvent, .ended, touchPhase: nil, momentumPhase: nil)
                 event.screenPoint = screenPointFromCursor.my
                 event.time += scrollEndSec
-                rootEditor.scroll(event)
+                rootAction.scroll(with: event)
                 
                 scrollTask = nil
             }
         }
         if nsEvent.phase.contains(.began) {
             allScrollPosition = .init()
-            rootEditor.scroll(scrollEventWith(nsEvent, beginEvent(), touchPhase: .began, momentumPhase: nil))
+            rootAction.scroll(with: scrollEventWith(nsEvent, beginEvent(), touchPhase: .began, momentumPhase: nil))
         } else if nsEvent.phase.contains(.ended) {
-            rootEditor.scroll(scrollEventWith(nsEvent, .changed, touchPhase: .ended, momentumPhase: nil))
+            rootAction.scroll(with: scrollEventWith(nsEvent, .changed, touchPhase: .ended, momentumPhase: nil))
             endEvent()
         } else if nsEvent.phase.contains(.changed) {
             var event = scrollEventWith(nsEvent, .changed,
@@ -1885,7 +1883,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             }
             event.scrollDeltaPoint = dp
             
-            rootEditor.scroll(event)
+            rootAction.scroll(with: event)
         } else {
             if nsEvent.momentumPhase.contains(.began) {
                 var event = scrollEventWith(nsEvent, beginEvent(),
@@ -1898,7 +1896,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 case .none: break
                 }
                 event.scrollDeltaPoint = dp
-                rootEditor.scroll(event)
+                rootAction.scroll(with: event)
             } else if nsEvent.momentumPhase.contains(.ended) {
                 var event = scrollEventWith(nsEvent, .changed,
                                             touchPhase: nil,
@@ -1910,7 +1908,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 case .none: break
                 }
                 event.scrollDeltaPoint = dp
-                rootEditor.scroll(event)
+                rootAction.scroll(with: event)
                 endEvent()
             } else if nsEvent.momentumPhase.contains(.changed) {
                 var event = scrollEventWith(nsEvent, .changed,
@@ -1923,7 +1921,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 case .none: break
                 }
                 event.scrollDeltaPoint = dp
-                rootEditor.scroll(event)
+                rootAction.scroll(with: event)
             }
         }
     }
@@ -2038,19 +2036,19 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     scrollTimer = nil
                     pinchTimer?.cancel()
                     pinchTimer = nil
-                    rootEditor.pinch(.init(screenPoint: screenPoint(with: event).my,
-                                         time: event.timestamp,
-                                         magnification: 0,
-                                         phase: .began))
+                    rootAction.pinch(with: .init(screenPoint: screenPoint(with: event).my,
+                                                 time: event.timestamp,
+                                                 magnification: 0,
+                                                 phase: .began))
                     pinchVs.append((0, event.timestamp))
                     self.oldPinchDistance = nPinchDistance
                     lastMagnification = 0
                 } else if isBeganPinch {
                     let magnification = (nPinchDistance - oldPinchDistance) * 0.0125
-                    rootEditor.pinch(.init(screenPoint: screenPoint(with: event).my,
-                                         time: event.timestamp,
-                                         magnification: magnification.mid(lastMagnification),
-                                         phase: .changed))
+                    rootAction.pinch(with: .init(screenPoint: screenPoint(with: event).my,
+                                                 time: event.timestamp,
+                                                 magnification: magnification.mid(lastMagnification),
+                                                 phase: .changed))
                     pinchVs.append((magnification, event.timestamp))
                     self.oldPinchDistance = nPinchDistance
                     lastMagnification = magnification
@@ -2065,12 +2063,12 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     scrollTimer = nil
                     pinchTimer?.cancel()
                     pinchTimer = nil
-                    rootEditor.scroll(.init(screenPoint: screenPoint(with: event).my,
-                                          time: event.timestamp,
-                                          scrollDeltaPoint: .init(),
-                                          phase: .began,
-                                          touchPhase: .began,
-                                          momentumPhase: nil))
+                    rootAction.scroll(with: .init(screenPoint: screenPoint(with: event).my,
+                                                  time: event.timestamp,
+                                                  scrollDeltaPoint: .init(),
+                                                  phase: .began,
+                                                  touchPhase: .began,
+                                                  momentumPhase: nil))
                     scrollVs.append((.init(), event.timestamp))
                     self.oldScrollPosition = nScrollPosition
                     lastScrollDeltaPosition = .init()
@@ -2105,12 +2103,12 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     let scrollDeltaPosition = Point()
                         .movedWith(distance: length, angle: angle)
                     
-                    rootEditor.scroll(.init(screenPoint: screenPoint(with: event).my,
-                                          time: event.timestamp,
-                                          scrollDeltaPoint: scrollDeltaPosition.mid(lastScrollDeltaPosition),
-                                          phase: .changed,
-                                          touchPhase: .changed,
-                                          momentumPhase: nil))
+                    rootAction.scroll(with: .init(screenPoint: screenPoint(with: event).my,
+                                                  time: event.timestamp,
+                                                  scrollDeltaPoint: scrollDeltaPosition.mid(lastScrollDeltaPosition),
+                                                  phase: .changed,
+                                                  touchPhase: .changed,
+                                                  momentumPhase: nil))
                     scrollVs.append((scrollDeltaPosition, event.timestamp))
                     self.oldScrollPosition = nScrollPosition
                     lastScrollDeltaPosition = scrollDeltaPosition
@@ -2126,18 +2124,18 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     scrollTimer = nil
                     pinchTimer?.cancel()
                     pinchTimer = nil
-                    rootEditor.rotate(.init(screenPoint: screenPoint(with: event).my,
-                                         time: event.timestamp,
-                                         rotationQuantity: 0,
-                                         phase: .began))
+                    rootAction.rotate(with: .init(screenPoint: screenPoint(with: event).my,
+                                                  time: event.timestamp,
+                                                  rotationQuantity: 0,
+                                                  phase: .began))
                     self.oldRotateAngle = nRotateAngle
                     lastRotationQuantity = 0
                 } else if isBeganRotate {
                     let rotationQuantity = nRotateAngle.differenceRotation(oldRotateAngle) * 80
-                    rootEditor.rotate(.init(screenPoint: screenPoint(with: event).my,
-                                          time: event.timestamp,
-                                          rotationQuantity: rotationQuantity.mid(lastRotationQuantity),
-                                          phase: .changed))
+                    rootAction.rotate(with: .init(screenPoint: screenPoint(with: event).my,
+                                                  time: event.timestamp,
+                                                  rotationQuantity: rotationQuantity.mid(lastRotationQuantity),
+                                                  phase: .changed))
                     self.oldRotateAngle = nRotateAngle
                     lastRotationQuantity = rotationQuantity
                 }
@@ -2158,10 +2156,10 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     isBeganSwipe = true
                     isPrepare3FingersTap = false
                     
-                    rootEditor.swipe(.init(screenPoint: screenPoint(with: event).my,
-                                         time: event.timestamp,
-                                         scrollDeltaPoint: Point(),
-                                         phase: .began))
+                    rootAction.swipe(with: .init(screenPoint: screenPoint(with: event).my,
+                                                 time: event.timestamp,
+                                                 scrollDeltaPoint: Point(),
+                                                 phase: .began))
                     self.swipePosition = swipePosition + deltaP
                 } else if isBeganSwipe {
                     let minD = 4.0, maxD = 10.0, newMaxD = 20.0
@@ -2170,10 +2168,10 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                         .clipped(min: minD, max: maxD, newMin: minD, newMax: newMaxD)
                     let sdy = absY < minD ? deltaP.y : deltaP.x.signValue * absY
                         .clipped(min: minD, max: maxD, newMin: minD, newMax: newMaxD)
-                    rootEditor.swipe(.init(screenPoint: screenPoint(with: event).my,
-                                           time: event.timestamp,
-                                           scrollDeltaPoint: .init(sdx, sdy),
-                                           phase: .changed))
+                    rootAction.swipe(with: .init(screenPoint: screenPoint(with: event).my,
+                                                 time: event.timestamp,
+                                                 scrollDeltaPoint: .init(sdx, sdy),
+                                                 phase: .changed))
                     self.swipePosition = swipePosition + deltaP
                 } else {
                     let vs = (0 ..< 3).compactMap { ps[touchedIDs[$0]] }
@@ -2203,10 +2201,10 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             }
         } else {
             if swipePosition != nil, isBeganSwipe {
-                rootEditor.swipe(.init(screenPoint: screenPoint(with: event).my,
-                                     time: event.timestamp,
-                                     scrollDeltaPoint: Point(),
-                                     phase: .ended))
+                rootAction.swipe(with: .init(screenPoint: screenPoint(with: event).my,
+                                             time: event.timestamp,
+                                             scrollDeltaPoint: Point(),
+                                             phase: .ended))
                 swipePosition = nil
                 isBeganSwipe = false
             }
@@ -2224,28 +2222,28 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         if oldTouchPoints.count == 3 {
             if isPrepare3FingersTap {
                 var event = inputKeyEventWith(event, .threeFingersTap, .began)
-                let editor = LookUpEditor(rootEditor)
-                editor.send(event)
+                let action = LookUpAction(rootAction)
+                action.flow(with: event)
                 Sleep.start()
                 event.phase = .ended
-                editor.send(event)
+                action.flow(with: event)
             }
         } else if oldTouchPoints.count == 4 {
             if isPrepare4FingersTap {
                 var event = inputKeyEventWith(event, .fourFingersTap, .began)
-                let editor = PlayEditor(rootEditor)
-                editor.send(event)
+                let action = PlayAction(rootAction)
+                action.flow(with: event)
                 Sleep.start()
                 event.phase = .ended
-                editor.send(event)
+                action.flow(with: event)
             }
         }
         
         if swipePosition != nil {
-            rootEditor.swipe(.init(screenPoint: screenPoint(with: event).my,
-                                 time: event.timestamp,
-                                 scrollDeltaPoint: Point(),
-                                 phase: .ended))
+            rootAction.swipe(with: .init(screenPoint: screenPoint(with: event).my,
+                                         time: event.timestamp,
+                                         scrollDeltaPoint: Point(),
+                                         phase: .ended))
             swipePosition = nil
             isBeganSwipe = false
         }
@@ -2279,10 +2277,10 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         let minTV = 0.01
         let sv = tv / (tv - minTV)
         if tv.isNaN || v < 0.04 || a == 0 {
-            rootEditor.pinch(.init(screenPoint: screenPoint(with: event).my,
-                                 time: event.timestamp,
-                                 magnification: 0,
-                                 phase: .ended))
+            rootAction.pinch(with: .init(screenPoint: screenPoint(with: event).my,
+                                         time: event.timestamp,
+                                         magnification: 0,
+                                         phase: .ended))
         } else {
             pinchTimeValue = tv
             let screenPoint = screenPoint(with: event).my, time = event.timestamp
@@ -2296,16 +2294,16 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                         self.pinchTimer = nil
                         self.pinchTimeValue = 0
                         
-                        self.rootEditor.pinch(.init(screenPoint: screenPoint,
-                                              time: time,
-                                              magnification: 0,
-                                              phase: .ended))
+                        self.rootAction.pinch(with: .init(screenPoint: screenPoint,
+                                                          time: time,
+                                                          magnification: 0,
+                                                          phase: .ended))
                     } else {
                         let m = timeInterval * (ntv - minTV) * sv * sign
-                        self.rootEditor.pinch(.init(screenPoint: screenPoint,
-                                              time: time,
-                                              magnification: m,
-                                              phase: .changed))
+                        self.rootAction.pinch(with: .init(screenPoint: screenPoint,
+                                                          time: time,
+                                                          magnification: m,
+                                                          phase: .changed))
                     }
                 }
             }
@@ -2317,10 +2315,10 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         isBeganRotate = false
         guard rotateVs.count >= 2 else { return }
         
-        rootEditor.rotate(.init(screenPoint: screenPoint(with: event).my,
-                             time: event.timestamp,
-                             rotationQuantity: 0,
-                             phase: .ended))
+        rootAction.rotate(with: .init(screenPoint: screenPoint(with: event).my,
+                                      time: event.timestamp,
+                                      rotationQuantity: 0,
+                                      phase: .ended))
     }
     func endScroll(with event: NSEvent,
                    timeInterval: Double = 1 / 60) {
@@ -2345,19 +2343,19 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         let minTV = 100.0
         let sv = tv / (tv - minTV)
         if tv.isNaN || v < 5 || a == 0 {
-            rootEditor.scroll(.init(screenPoint: screenPoint(with: event).my,
-                                  time: event.timestamp,
-                                  scrollDeltaPoint: .init(),
-                                  phase: .ended,
-                                  touchPhase: .ended,
-                                  momentumPhase: nil))
+            rootAction.scroll(with: .init(screenPoint: screenPoint(with: event).my,
+                                          time: event.timestamp,
+                                          scrollDeltaPoint: .init(),
+                                          phase: .ended,
+                                          touchPhase: .ended,
+                                          momentumPhase: nil))
         } else {
-            rootEditor.scroll(.init(screenPoint: screenPoint(with: event).my,
-                                  time: event.timestamp,
-                                  scrollDeltaPoint: .init(),
-                                  phase: .changed,
-                                  touchPhase: .ended,
-                                  momentumPhase: .began))
+            rootAction.scroll(with: .init(screenPoint: screenPoint(with: event).my,
+                                          time: event.timestamp,
+                                          scrollDeltaPoint: .init(),
+                                          phase: .changed,
+                                          touchPhase: .ended,
+                                          momentumPhase: .began))
             
             scrollTimeValue = tv
             let screenPoint = screenPoint(with: event).my, time = event.timestamp
@@ -2373,17 +2371,17 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                         self.scrollTimer = nil
                         self.scrollTimeValue = 0
                         
-                        self.rootEditor.scroll(.init(screenPoint: screenPoint,
-                                              time: time,
-                                              scrollDeltaPoint: .init(),
-                                              phase: .ended,
-                                              touchPhase: nil, momentumPhase: .ended))
+                        self.rootAction.scroll(with: .init(screenPoint: screenPoint,
+                                                           time: time,
+                                                           scrollDeltaPoint: .init(),
+                                                           phase: .ended,
+                                                           touchPhase: nil, momentumPhase: .ended))
                     } else {
-                        self.rootEditor.scroll(.init(screenPoint: screenPoint,
-                                              time: time,
-                                              scrollDeltaPoint: sdp,
-                                              phase: .changed,
-                                              touchPhase: nil, momentumPhase: .changed))
+                        self.rootAction.scroll(with: .init(screenPoint: screenPoint,
+                                                           time: time,
+                                                           scrollDeltaPoint: sdp,
+                                                           phase: .changed,
+                                                           touchPhase: nil, momentumPhase: .changed))
                     }
                 }
             }
@@ -2396,12 +2394,12 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         
         guard isBeganScroll else { return }
         isBeganScroll = false
-        rootEditor.scroll(.init(screenPoint: screenPoint(with: event).my,
-                              time: event.timestamp,
-                              scrollDeltaPoint: .init(),
-                              phase: .ended,
-                              touchPhase: .ended,
-                              momentumPhase: nil))
+        rootAction.scroll(with: .init(screenPoint: screenPoint(with: event).my,
+                                      time: event.timestamp,
+                                      scrollDeltaPoint: .init(),
+                                      phase: .ended,
+                                      touchPhase: .ended,
+                                      momentumPhase: nil))
         oldScrollPosition = nil
     }
     func cancelPinch(with event: NSEvent) {
@@ -2410,29 +2408,29 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         
         guard isBeganPinch else { return }
         isBeganPinch = false
-        rootEditor.pinch(.init(screenPoint: screenPoint(with: event).my,
-                             time: event.timestamp,
-                             magnification: 0,
-                             phase: .ended))
+        rootAction.pinch(with: .init(screenPoint: screenPoint(with: event).my,
+                                     time: event.timestamp,
+                                     magnification: 0,
+                                     phase: .ended))
         oldPinchDistance = nil
     }
     func cancelRotatte(with event: NSEvent) {
         guard isBeganRotate else { return }
         isBeganRotate = false
-        rootEditor.rotate(.init(screenPoint: screenPoint(with: event).my,
-                             time: event.timestamp,
-                              rotationQuantity: 0,
-                             phase: .ended))
+        rootAction.rotate(with: .init(screenPoint: screenPoint(with: event).my,
+                                      time: event.timestamp,
+                                      rotationQuantity: 0,
+                                      phase: .ended))
         oldRotateAngle = nil
     }
     override func touchesCancelled(with event: NSEvent) {
         guard isEnabledCustomTrackpad else { return }
         
         if swipePosition != nil {
-            rootEditor.swipe(.init(screenPoint: screenPoint(with: event).my,
-                                 time: event.timestamp,
-                                 scrollDeltaPoint: .init(),
-                                 phase: .ended))
+            rootAction.swipe(with: .init(screenPoint: screenPoint(with: event).my,
+                                         time: event.timestamp,
+                                         scrollDeltaPoint: .init(),
+                                         phase: .ended))
             swipePosition = nil
             isBeganSwipe = false
         }
@@ -2455,14 +2453,14 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         if nsEvent.phase.contains(.began) {
             blockGesture = .pinch
             pinchVs = []
-            rootEditor.pinch(pinchEventWith(nsEvent, .began))
+            rootAction.pinch(with: pinchEventWith(nsEvent, .began))
         } else if nsEvent.phase.contains(.ended) {
             blockGesture = .none
-            rootEditor.pinch(pinchEventWith(nsEvent, .ended))
+            rootAction.pinch(with: pinchEventWith(nsEvent, .ended))
             pinchVs = []
         } else if nsEvent.phase.contains(.changed) {
             pinchVs.append((Double(nsEvent.magnification), nsEvent.timestamp))
-            rootEditor.pinch(pinchEventWith(nsEvent, .changed))
+            rootAction.pinch(with: pinchEventWith(nsEvent, .changed))
         }
     }
     
@@ -2485,7 +2483,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             if !isBlockedRotation {
                 if !isFirstStoppedRotation {
                     isFirstStoppedRotation = true
-                    rootEditor.rotate(rotateEventWith(nsEvent, .ended))
+                    rootAction.rotate(with: rotateEventWith(nsEvent, .ended))
                 }
             } else {
                 isBlockedRotation = false
@@ -2496,9 +2494,9 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 if rotatedValue > blockRotationValue {
                     if isFirstStoppedRotation {
                         isFirstStoppedRotation = false
-                        rootEditor.rotate(rotateEventWith(nsEvent, .began))
+                        rootAction.rotate(with: rotateEventWith(nsEvent, .began))
                     } else {
-                        rootEditor.rotate(rotateEventWith(nsEvent, .changed))
+                        rootAction.rotate(with: rotateEventWith(nsEvent, .changed))
                     }
                 }
             }
@@ -2510,9 +2508,9 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         
         guard window?.sheets.isEmpty ?? false else { return }
         
-        rootEditor.inputKey(inputKeyEventWith(nsEvent, .threeFingersTap, .began))
+        rootAction.inputKey(with: inputKeyEventWith(nsEvent, .threeFingersTap, .began))
         Sleep.start()
-        rootEditor.inputKey(inputKeyEventWith(nsEvent, .threeFingersTap, .ended))
+        rootAction.inputKey(with: inputKeyEventWith(nsEvent, .threeFingersTap, .ended))
     }
     
     func windowLevel() -> Int {
@@ -2522,10 +2520,10 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         [.markedClauseSegment, .glyphInfo]
     }
     func hasMarkedText() -> Bool {
-        rootEditor.rootView.editingTextView?.isMarked ?? false
+        rootAction.rootView.editingTextView?.isMarked ?? false
     }
     func markedRange() -> NSRange {
-        if let textView = rootEditor.rootView.editingTextView,
+        if let textView = rootAction.rootView.editingTextView,
            let range = textView.markedRange {
             return textView.model.string.nsRange(from: range)
                 ?? NSRange(location: NSNotFound, length: 0)
@@ -2534,7 +2532,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         }
     }
     func selectedRange() -> NSRange {
-        if let textView = rootEditor.rootView.editingTextView,
+        if let textView = rootAction.rootView.editingTextView,
            let range = textView.selectedRange {
             return textView.model.string.nsRange(from: range)
                 ?? NSRange(location: NSNotFound, length: 0)
@@ -2543,7 +2541,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         }
     }
     func attributedString() -> NSAttributedString {
-        if let text = rootEditor.rootView.editingTextView?.model {
+        if let text = rootAction.rootView.editingTextView?.model {
             return NSAttributedString(string: text.string.nsBased,
                                       attributes: text.typobute.attributes())
         } else {
@@ -2562,13 +2560,13 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     func fractionOfDistanceThroughGlyph(for point: NSPoint) -> CGFloat {
         let p = convertFromTopScreen(point).my
-        let d = rootEditor.textEditor.characterRatio(for: p)
+        let d = rootAction.textAction.characterRatio(for: p)
         return CGFloat(d ?? 0)
     }
     func characterIndex(for nsP: NSPoint) -> Int {
         let p = convertFromTopScreen(nsP).my
-        if let i = rootEditor.textEditor.characterIndex(for: p),
-           let string = rootEditor.rootView.editingTextView?.model.string {
+        if let i = rootAction.textAction.characterIndex(for: p),
+           let string = rootAction.rootView.editingTextView?.model.string {
             
             return string.nsIndex(from: i)
         } else {
@@ -2577,18 +2575,18 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     func firstRect(forCharacterRange nsRange: NSRange,
                    actualRange: NSRangePointer?) -> NSRect {
-        if let string = rootEditor.rootView.editingTextView?.model.string,
+        if let string = rootAction.rootView.editingTextView?.model.string,
            let range = string.range(fromNS: nsRange),
-           let rect = rootEditor.textEditor.firstRect(for: range) {
+           let rect = rootAction.textAction.firstRect(for: range) {
             return convertToTopScreen(rect.cg)
         } else {
             return NSRect()
         }
     }
     func baselineDeltaForCharacter(at nsI: Int) -> CGFloat {
-        if let string = rootEditor.rootView.editingTextView?.model.string,
+        if let string = rootAction.rootView.editingTextView?.model.string,
            let i = string.index(fromNS: nsI),
-           let d = rootEditor.textEditor.baselineDelta(at: i) {
+           let d = rootAction.textAction.baselineDelta(at: i) {
             
             return CGFloat(d)
         } else {
@@ -2596,7 +2594,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         }
     }
     func drawsVerticallyForCharacter(at nsI: Int) -> Bool {
-        if let o = rootEditor.rootView.editingTextView?.textOrientation {
+        if let o = rootAction.rootView.editingTextView?.textOrientation {
             return o == .vertical
         } else {
             return false
@@ -2604,18 +2602,18 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     
     func unmarkText() {
-        rootEditor.textEditor.unmark()
+        rootAction.textAction.unmark()
     }
     
     func setMarkedText(_ str: Any,
                        selectedRange selectedNSRange: NSRange,
                        replacementRange replacementNSRange: NSRange) {
-        guard let string = rootEditor.rootView.editingTextView?.model.string else { return }
+        guard let string = rootAction.rootView.editingTextView?.model.string else { return }
         let range = string.range(fromNS: replacementNSRange)
         
         func mark(_ mStr: String) {
             if let markingRange = mStr.range(fromNS: selectedNSRange) {
-                rootEditor.textEditor.mark(mStr, markingRange: markingRange, at: range)
+                rootAction.textAction.mark(mStr, markingRange: markingRange, at: range)
             }
         }
         if let attString = str as? NSAttributedString {
@@ -2625,43 +2623,43 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         }
     }
     func insertText(_ str: Any, replacementRange: NSRange) {
-        guard let string = rootEditor.rootView.editingTextView?.model.string else { return }
+        guard let string = rootAction.rootView.editingTextView?.model.string else { return }
         let range = string.range(fromNS: replacementRange)
         
         if let attString = str as? NSAttributedString {
-            rootEditor.textEditor.insert(attString.string.swiftBased, at: range)
+            rootAction.textAction.insert(attString.string.swiftBased, at: range)
         } else if let nsString = str as? NSString {
-            rootEditor.textEditor.insert((nsString as String).swiftBased, at: range)
+            rootAction.textAction.insert((nsString as String).swiftBased, at: range)
         }
     }
     
 //    // control return
 //    override func insertLineBreak(_ sender: Any?) {}
 //    // option return
-//    override func insertNewlineIgnoringFieldEditor(_ sender: Any?) {}
+//    override func insertNewlineIgnoringFieldAction(_ sender: Any?) {}
     override func insertNewline(_ sender: Any?) {
-        rootEditor.textEditor.insertNewline()
+        rootAction.textAction.insertNewline()
     }
     override func insertTab(_ sender: Any?) {
-        rootEditor.textEditor.insertTab()
+        rootAction.textAction.insertTab()
     }
     override func deleteBackward(_ sender: Any?) {
-        rootEditor.textEditor.deleteBackward()
+        rootAction.textAction.deleteBackward()
     }
     override func deleteForward(_ sender: Any?) {
-        rootEditor.textEditor.deleteForward()
+        rootAction.textAction.deleteForward()
     }
     override func moveLeft(_ sender: Any?) {
-        rootEditor.textEditor.moveLeft()
+        rootAction.textAction.moveLeft()
     }
     override func moveRight(_ sender: Any?) {
-        rootEditor.textEditor.moveRight()
+        rootAction.textAction.moveRight()
     }
     override func moveUp(_ sender: Any?) {
-        rootEditor.textEditor.moveUp()
+        rootAction.textAction.moveUp()
     }
     override func moveDown(_ sender: Any?) {
-        rootEditor.textEditor.moveDown()
+        rootAction.textAction.moveDown()
     }
 }
 extension SubMTKView {

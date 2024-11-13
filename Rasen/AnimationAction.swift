@@ -19,13 +19,13 @@ import struct Foundation.UUID
 import struct Foundation.URL
 import struct Foundation.Data
 
-final class GoPreviousEditor: InputKeyEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
+final class GoPreviousAction: InputKeyEventAction {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
@@ -36,13 +36,13 @@ final class GoPreviousEditor: InputKeyEventEditor {
         return sheetView.contentsView.elementViews[contentIndex]
     }
     
-    func send(_ event: InputKeyEvent) {
+    func flow(with event: InputKeyEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
-        if rootEditor.isPlaying(with: event) {
-            rootEditor.stopPlaying(with: event)
+        if rootAction.isPlaying(with: event) {
+            rootAction.stopPlaying(with: event)
         }
         
         let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
@@ -97,18 +97,18 @@ final class GoPreviousEditor: InputKeyEventEditor {
     
     func move(from sheetView: SheetView?, at sp: Point) {
         sheetView?.movePreviousInterKeyframe()
-        rootEditor.updateEditorNode()
+        rootAction.updateActionNode()
         rootView.updateSelects()
     }
 }
 
-final class GoNextEditor: InputKeyEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
+final class GoNextAction: InputKeyEventAction {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
@@ -119,13 +119,13 @@ final class GoNextEditor: InputKeyEventEditor {
         return sheetView.contentsView.elementViews[contentIndex]
     }
     
-    func send(_ event: InputKeyEvent) {
+    func flow(with event: InputKeyEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
-        if rootEditor.isPlaying(with: event) {
-            rootEditor.stopPlaying(with: event)
+        if rootAction.isPlaying(with: event) {
+            rootAction.stopPlaying(with: event)
         }
         
         let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
@@ -181,18 +181,18 @@ final class GoNextEditor: InputKeyEventEditor {
     
     func move(from sheetView: SheetView?, at sp: Point) {
         sheetView?.moveNextInterKeyframe()
-        rootEditor.updateEditorNode()
+        rootAction.updateActionNode()
         rootView.updateSelects()
     }
 }
 
-final class GoPreviousFrameEditor: InputKeyEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
+final class GoPreviousFrameAction: InputKeyEventAction {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
@@ -203,13 +203,13 @@ final class GoPreviousFrameEditor: InputKeyEventEditor {
         return sheetView.contentsView.elementViews[contentIndex]
     }
     
-    func send(_ event: InputKeyEvent) {
+    func flow(with event: InputKeyEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
-        if rootEditor.isPlaying(with: event) {
-            rootEditor.stopPlaying(with: event)
+        if rootAction.isPlaying(with: event) {
+            rootAction.stopPlaying(with: event)
         }
         
         let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
@@ -264,18 +264,18 @@ final class GoPreviousFrameEditor: InputKeyEventEditor {
     
     func move(from sheetView: SheetView?, at sp: Point) {
         sheetView?.movePreviousKeyframe()
-        rootEditor.updateEditorNode()
+        rootAction.updateActionNode()
         rootView.updateSelects()
     }
 }
 
-final class GoNextFrameEditor: InputKeyEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
+final class GoNextFrameAction: InputKeyEventAction {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
@@ -286,13 +286,13 @@ final class GoNextFrameEditor: InputKeyEventEditor {
         return sheetView.contentsView.elementViews[contentIndex]
     }
     
-    func send(_ event: InputKeyEvent) {
+    func flow(with event: InputKeyEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
-        if rootEditor.isPlaying(with: event) {
-            rootEditor.stopPlaying(with: event)
+        if rootAction.isPlaying(with: event) {
+            rootAction.stopPlaying(with: event)
         }
         
         let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
@@ -348,18 +348,18 @@ final class GoNextFrameEditor: InputKeyEventEditor {
     
     func move(from sheetView: SheetView?, at sp: Point) {
         sheetView?.moveNextKeyframe()
-        rootEditor.updateEditorNode()
+        rootAction.updateActionNode()
         rootView.updateSelects()
     }
 }
 
-final class SelectFrameEditor: SwipeEventEditor, DragEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
+final class SelectFrameAction: SwipeEventAction, DragEventAction {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
@@ -380,21 +380,21 @@ final class SelectFrameEditor: SwipeEventEditor, DragEventEditor {
     private var allDX = 0.0
     private var snapEventTime: Double?
     
-    func send(_ event: DragEvent) {
+    func flow(with event: DragEvent) {
         if event.phase == .began {
             preSP = event.screenPoint
         }
-        send(SwipeEvent(screenPoint: event.screenPoint, time: event.time,
+        flow(with: SwipeEvent(screenPoint: event.screenPoint, time: event.time,
                         scrollDeltaPoint: event.screenPoint - preSP, phase: event.phase))
         preSP = event.screenPoint
     }
-    func send(_ event: SwipeEvent) {
+    func flow(with event: SwipeEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
-        if rootEditor.isPlaying(with: event) {
-            rootEditor.stopPlaying(with: event)
+        if rootAction.isPlaying(with: event) {
+            rootAction.stopPlaying(with: event)
         }
         
         let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
@@ -497,7 +497,7 @@ final class SelectFrameEditor: SwipeEventEditor, DragEventEditor {
                             
                             preMoveEventTime = event.time
                             
-                            rootEditor.updateEditorNode()
+                            rootAction.updateActionNode()
                             rootView.updateSelects()
                             
                             if oldKI != animationView.model.index {
@@ -523,22 +523,22 @@ final class SelectFrameEditor: SwipeEventEditor, DragEventEditor {
     }
 }
 
-final class PlayEditor: InputKeyEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
+final class PlayAction: InputKeyEventAction {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
     private var sheetView: SheetView?
     private var isEndStop = false
     
-    func send(_ event: InputKeyEvent) {
+    func flow(with event: InputKeyEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
         let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
@@ -606,7 +606,7 @@ final class PlayEditor: InputKeyEventEditor {
                     
                     let sec = contentView.model.sec(fromBeat: contentView.model.beat)
                     cSheetView.play(atSec: sec, inSec: nil, otherTimelineIDs: [])
-                } else if !(rootEditor.containsAllTimelines(with: event)
+                } else if !(rootAction.containsAllTimelines(with: event)
                     || (!cSheetView.model.enabledAnimation && cSheetView.model.enabledMusic)) {
                     
                     if cSheetView.model.enabledTimeline {
@@ -654,25 +654,25 @@ final class PlayEditor: InputKeyEventEditor {
     }
 }
 
-final class InsertKeyframeEditor: InputKeyEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
+final class InsertKeyframeAction: InputKeyEventAction {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
     private var linesNode = Node()
     
-    func send(_ event: InputKeyEvent) {
+    func flow(with event: InputKeyEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
-        if rootEditor.isPlaying(with: event) {
-            rootEditor.stopPlaying(with: event)
+        if rootAction.isPlaying(with: event) {
+            rootAction.stopPlaying(with: event)
         }
         let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
@@ -738,7 +738,7 @@ final class InsertKeyframeEditor: InputKeyEventEditor {
                     }
                     
                     sheetView.rootBeat = animationView.model.localDurBeat * count + beat
-                    rootEditor.updateEditorNode()
+                    rootAction.updateActionNode()
                     rootView.updateSelects()
                 } else if sheetView.animationView.containsTimeline(inP, scale: rootView.screenToWorldScale) {
                     sheetView.selectedFrameIndexes = []
@@ -908,7 +908,7 @@ final class InsertKeyframeEditor: InputKeyEventEditor {
                     sheetView.set(option)
                 }
                 
-                rootEditor.updateEditorNode()
+                rootAction.updateActionNode()
                 rootView.updateSelects()
             }
         case .changed:
@@ -921,25 +921,25 @@ final class InsertKeyframeEditor: InputKeyEventEditor {
     }
 }
 
-final class InterpolateEditor: InputKeyEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
+final class InterpolateAction: InputKeyEventAction {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
     private var linesNode = Node()
     
-    func send(_ event: InputKeyEvent) {
+    func flow(with event: InputKeyEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
-        if rootEditor.isPlaying(with: event) {
-            rootEditor.stopPlaying(with: event)
+        if rootAction.isPlaying(with: event) {
+            rootAction.stopPlaying(with: event)
         }
         let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
@@ -1115,7 +1115,7 @@ final class InterpolateEditor: InputKeyEventEditor {
 //                        }
 //                    }
 //                    sheetView.rootBeat = animationView.model.localDurBeat * count + beat
-//                    rootEditor.updateEditorNode()
+//                    rootAction.updateActionNode()
 //                    rootView.updateSelects()
 //                }
                 
@@ -1550,25 +1550,25 @@ extension SheetView {
     }
 }
 
-final class CrossEraseEditor: InputKeyEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
+final class CrossEraseAction: InputKeyEventAction {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
     private var linesNode = Node()
     
-    func send(_ event: InputKeyEvent) {
+    func flow(with event: InputKeyEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
-        if rootEditor.isPlaying(with: event) {
-            rootEditor.stopPlaying(with: event)
+        if rootAction.isPlaying(with: event) {
+            rootAction.stopPlaying(with: event)
         }
         let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
             ?? event.screenPoint
@@ -1792,7 +1792,7 @@ final class CrossEraseEditor: InputKeyEventEditor {
                     linesNode.children = nodes
                     rootView.node.append(child: linesNode)
                     
-                    rootEditor.updateEditorNode()
+                    rootAction.updateActionNode()
                     rootView.updateSelects()
                 } else if ids.count >= 1 {
                     let keyframes = sheetView.model.animation.keyframes
@@ -1856,7 +1856,7 @@ final class CrossEraseEditor: InputKeyEventEditor {
                     linesNode.children = nodes
                     rootView.node.append(child: linesNode)
                     
-                    rootEditor.updateEditorNode()
+                    rootAction.updateActionNode()
                     rootView.updateSelects()
                 }
             }

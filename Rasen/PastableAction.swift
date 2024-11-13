@@ -503,55 +503,55 @@ extension PastableObject {
     }
 }
 
-final class CutEditor: InputKeyEventEditor {
-    let editor: PastableEditor
+final class CutAction: InputKeyEventAction {
+    let action: PastableAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = PastableEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = PastableAction(rootAction)
     }
     
-    func send(_ event: InputKeyEvent) {
-        editor.cut(with: event)
+    func flow(with event: InputKeyEvent) {
+        action.cut(with: event)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class CopyEditor: InputKeyEventEditor {
-    let editor: PastableEditor
+final class CopyAction: InputKeyEventAction {
+    let action: PastableAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = PastableEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = PastableAction(rootAction)
     }
     
-    func send(_ event: InputKeyEvent) {
-        editor.copy(with: event)
+    func flow(with event: InputKeyEvent) {
+        action.copy(with: event)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class PasteEditor: InputKeyEventEditor {
-    let editor: PastableEditor
+final class PasteAction: InputKeyEventAction {
+    let action: PastableAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = PastableEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = PastableAction(rootAction)
     }
     
-    func send(_ event: InputKeyEvent) {
-        editor.paste(with: event)
+    func flow(with event: InputKeyEvent) {
+        action.paste(with: event)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class PastableEditor: Editor {
-    let rootEditor: RootEditor, rootView: RootView
+final class PastableAction: Action {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
@@ -785,7 +785,7 @@ final class PastableEditor: Editor {
                 }
             } else {
                 if isSendPasteboard {
-                    let se = LineEditor(rootEditor)
+                    let se = LineAction(rootAction)
                     se.updateClipBoundsAndIndexRange(at: p)
                     if let r = rootView.selections.map({ $0.rect }).union() {
                         se.tempLine = Line(r) * Transform(translation: -se.centerOrigin)
@@ -1226,7 +1226,7 @@ final class PastableEditor: Editor {
             Pasteboard.shared.copiedObjects = [.animation(Animation(keyframes: kfs))]
         } else if rootView.isSelectSelectedNoneCursor(at: p), !rootView.selections.isEmpty {
             if rootView.isSelectedText, rootView.selections.count == 1 {
-                rootEditor.textEditor.cut(from: rootView.selections[0], at: p)
+                rootAction.textAction.cut(from: rootView.selections[0], at: p)
             } else {
                 if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled,
                    sheetView.scoreView
@@ -1270,7 +1270,7 @@ final class PastableEditor: Editor {
                         sheetView.updatePlaying()
                     }
                 } else {
-                    let se = LineEditor(rootEditor)
+                    let se = LineAction(rootAction)
                     se.updateClipBoundsAndIndexRange(at: p)
                     if let r = rootView.selections.map({ $0.rect }).union() {
                         se.tempLine = Line(r) * Transform(translation: -se.centerOrigin)
@@ -1667,7 +1667,7 @@ final class PastableEditor: Editor {
             var isAppend = false
             
             var textView: SheetTextView?, sri: String.Index?
-            if let aTextView = rootEditor.textEditor.editingTextView,
+            if let aTextView = rootAction.textAction.editingTextView,
                !aTextView.isHiddenSelectedRange {
                 
                 if let asri = aTextView.selectedRange?.lowerBound {
@@ -1874,7 +1874,7 @@ final class PastableEditor: Editor {
                     let nxs = xs.sorted(), nys = ys.sorted()
                     let width = nxs[1] - nxs[0], height = nys[1] - nys[0]
                     let nString = nBorder.location.string(digitsCount: 1, enabledZeroInteger: false)
-                    rootView.cursor = rootView.cursor(from: "\(nString) (\(LookUpEditor.sizeString(from: .init(width: width, height: height))))")
+                    rootView.cursor = rootView.cursor(from: "\(nString) (\(LookUpAction.sizeString(from: .init(width: width, height: height))))")
                 } else {
                     let nString = nBorder.location.string(digitsCount: 1, enabledZeroInteger: false)
                     rootView.cursor = switch nBorder.orientation {
@@ -2282,12 +2282,12 @@ final class PastableEditor: Editor {
             var text = text
             var isAppend = false
             
-            rootEditor.textEditor.begin(atScreen: sp)
-            if let textView = rootEditor.textEditor.editingTextView,
+            rootAction.textAction.begin(atScreen: sp)
+            if let textView = rootAction.textAction.editingTextView,
                !textView.isHiddenSelectedRange,
                let i = sheetView.textsView.elementViews.firstIndex(of: textView) {
                 
-                rootEditor.textEditor.endInputKey(isUnmarkText: true,
+                rootAction.textAction.endInputKey(isUnmarkText: true,
                                                 isRemoveText: false)
                 if rootView.findingNode(at: p) != nil,
                     rootView.finding.string != text.string {
@@ -2640,7 +2640,7 @@ final class PastableEditor: Editor {
             sheetView.newUndoGroup()
             sheetView.insert(kivs)
             sheetView.rootKeyframeIndex = sheetView.model.animation.keyframes.count * count + ni
-            rootEditor.updateEditorNode()
+            rootAction.updateActionNode()
             rootView.updateSelects()
         case .ids(let idv):
             let ids = idv.ids
@@ -2939,10 +2939,10 @@ final class PastableEditor: Editor {
         let sp = rootView.selectedScreenPositionNoneCursor
             ?? event.screenPoint
         let p = rootView.convertScreenToWorld(sp)
-        for runEditor in rootEditor.runEditors {
-            if runEditor.containsCalculating(p) {
-                Pasteboard.shared.copiedObjects = [.string(runEditor.calculatingString)]
-                runEditor.cancel()
+        for runAction in rootAction.runActions {
+            if runAction.containsCalculating(p) {
+                Pasteboard.shared.copiedObjects = [.string(runAction.calculatingString)]
+                runAction.cancel()
                 return
             }
         }
@@ -3015,9 +3015,9 @@ final class PastableEditor: Editor {
             ?? event.screenPoint
         switch event.phase {
         case .began:
-            if let textView = rootEditor.textEditor.editingTextView,
+            if let textView = rootAction.textAction.editingTextView,
                !textView.isHiddenSelectedRange,
-               let sheetView = rootEditor.textEditor.editingSheetView,
+               let sheetView = rootAction.textAction.editingSheetView,
                let i = sheetView.textsView.elementViews
                 .firstIndex(of: textView),
                let o = Pasteboard.shared.copiedObjects.first {
@@ -3029,7 +3029,7 @@ final class PastableEditor: Editor {
                 default: str = nil
                 }
                 if let str = str {
-                    rootEditor.textEditor.endInputKey(isUnmarkText: true, isRemoveText: false)
+                    rootAction.textAction.endInputKey(isUnmarkText: true, isRemoveText: false)
                     guard let ti = textView.selectedRange?.lowerBound,
                           ti >= textView.model.string.startIndex else { return }
                     let text = textView.model
@@ -3310,13 +3310,13 @@ final class PastableEditor: Editor {
     }
 }
 
-final class CopyLineColorEditor: InputKeyEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
+final class CopyLineColorAction: InputKeyEventAction {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
@@ -3338,7 +3338,7 @@ final class CopyLineColorEditor: InputKeyEventEditor {
         }
     }
     
-    func send(_ event: InputKeyEvent) {
+    func flow(with event: InputKeyEvent) {
         guard isEditingSheet else {
             return
         }

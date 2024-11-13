@@ -17,38 +17,38 @@
 
 import struct Foundation.UUID
 
-final class MoveEditor: DragEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
+final class MoveAction: DragEventAction {
+    let rootAction: RootAction, rootView: RootView
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
     }
     
     enum MoveType {
-        case animation(MoveAnimationEditor)
-        case line(MoveLineEditor)
-        case score(MoveScoreEditor)
-        case content(MoveContentEditor)
-        case text(MoveTextEditor)
-        case tempo(MoveTempoEditor)
+        case animation(MoveAnimationAction)
+        case line(MoveLineAction)
+        case score(MoveScoreAction)
+        case content(MoveContentAction)
+        case text(MoveTextAction)
+        case tempo(MoveTempoAction)
         case none
     }
     private var type = MoveType.none
     
     func updateNode() {
         switch type {
-        case .animation(let editor): editor.updateNode()
-        case .line(let editor): editor.updateNode()
-        case .score(let editor): editor.updateNode()
-        case .content(let editor): editor.updateNode()
-        case .text(let editor): editor.updateNode()
-        case .tempo(let editor): editor.updateNode()
+        case .animation(let action): action.updateNode()
+        case .line(let action): action.updateNode()
+        case .score(let action): action.updateNode()
+        case .content(let action): action.updateNode()
+        case .text(let action): action.updateNode()
+        case .tempo(let action): action.updateNode()
         case .none: break
         }
     }
     
-    func send(_ event: DragEvent) {
+    func flow(with event: DragEvent) {
         if event.phase == .began {
             let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor ?? event.screenPoint
             let p = rootView.convertScreenToWorld(sp)
@@ -56,37 +56,37 @@ final class MoveEditor: DragEventEditor {
             if let sheetView = rootView.sheetView(at: p) {
                 let sheetP = sheetView.convertFromWorld(p)
                 if sheetView.containsTempo(sheetP, maxDistance: rootView.worldKnobEditDistance * 0.5) {
-                    type = .tempo(MoveTempoEditor(rootEditor))
+                    type = .tempo(MoveTempoAction(rootAction))
                 } else if sheetView.contentIndex(at: sheetP, scale: rootView.screenToWorldScale) != nil {
-                    type = .content(MoveContentEditor(rootEditor))
+                    type = .content(MoveContentAction(rootAction))
                 } else if sheetView.textIndex(at: sheetP, scale: rootView.screenToWorldScale) != nil {
-                    type = .text(MoveTextEditor(rootEditor))
+                    type = .text(MoveTextAction(rootAction))
                 } else if sheetView.scoreView.contains(sheetView.scoreView.convertFromWorld(p),
                                                        scale: rootView.screenToWorldScale) {
-                    type = .score(MoveScoreEditor(rootEditor))
+                    type = .score(MoveScoreAction(rootAction))
                 } else if sheetView.lineTuple(at: sheetP,
                                               isSmall: false,
                                               scale: rootView.screenToWorldScale) != nil {
-                    type = .line(MoveLineEditor(rootEditor))
+                    type = .line(MoveLineAction(rootAction))
                 } else if sheetView.animationView.containsTimeline(sheetP, scale: rootView.screenToWorldScale) {
-                    type = .animation(MoveAnimationEditor(rootEditor))
+                    type = .animation(MoveAnimationAction(rootAction))
                 }
             }
         }
         
         switch type {
-        case .animation(let editor):
-            editor.send(event)
-        case .line(let editor):
-            editor.send(event)
-        case .score(let editor):
-            editor.send(event)
-        case .content(let editor):
-            editor.send(event)
-        case .text(let editor):
-            editor.send(event)
-        case .tempo(let editor):
-            editor.send(event)
+        case .animation(let action):
+            action.flow(with: event)
+        case .line(let action):
+            action.flow(with: event)
+        case .score(let action):
+            action.flow(with: event)
+        case .content(let action):
+            action.flow(with: event)
+        case .text(let action):
+            action.flow(with: event)
+        case .tempo(let action):
+            action.flow(with: event)
         case .none:
             switch event.phase {
             case .began:
@@ -99,13 +99,13 @@ final class MoveEditor: DragEventEditor {
     }
 }
 
-final class MoveAnimationEditor: DragEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
+final class MoveAnimationAction: DragEventAction {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
@@ -124,13 +124,13 @@ final class MoveAnimationEditor: DragEventEditor {
     private var beganAnimationOption: AnimationOption?
     private var minLastSec = 1 / 12.0
     
-    func send(_ event: DragEvent) {
+    func flow(with event: DragEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
-        if rootEditor.isPlaying(with: event) {
-            rootEditor.stopPlaying(with: event)
+        if rootAction.isPlaying(with: event) {
+            rootAction.stopPlaying(with: event)
         }
         
         let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
@@ -309,13 +309,13 @@ final class MoveAnimationEditor: DragEventEditor {
     }
 }
 
-final class MoveScoreEditor: DragEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
+final class MoveScoreAction: DragEventAction {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
@@ -349,9 +349,9 @@ final class MoveScoreEditor: DragEventEditor {
     private var beganSprolPitch = 0.0, beganSpectlopeY = 0.0
     private var beganNoteSprols = [UUID: (nid: UUID, dic: [Int: (note: Note, pits: [Int: (pit: Pit, sprolIs: Set<Int>)])])]()
     
-    func send(_ event: DragEvent) {
+    func flow(with event: DragEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
         
@@ -362,8 +362,8 @@ final class MoveScoreEditor: DragEventEditor {
         case .began:
             rootView.cursor = .arrow
             
-            if rootEditor.isPlaying(with: event) {
-                rootEditor.stopPlaying(with: event)
+            if rootAction.isPlaying(with: event) {
+                rootAction.stopPlaying(with: event)
             }
             
             if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled {
@@ -1196,13 +1196,13 @@ final class MoveScoreEditor: DragEventEditor {
     }
 }
 
-final class MoveContentEditor: DragEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
+final class MoveContentAction: DragEventAction {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
@@ -1225,9 +1225,9 @@ final class MoveContentEditor: DragEventEditor {
     
     private var beganIsShownSpectrogram = false
     
-    func send(_ event: DragEvent) {
+    func flow(with event: DragEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
         let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
@@ -1237,8 +1237,8 @@ final class MoveContentEditor: DragEventEditor {
         case .began:
             rootView.cursor = Cursor.arrow
             
-            if rootEditor.isPlaying(with: event) {
-                rootEditor.stopPlaying(with: event)
+            if rootAction.isPlaying(with: event) {
+                rootAction.stopPlaying(with: event)
             }
             
             if let sheetView = rootView.sheetView(at: p),
@@ -1363,13 +1363,13 @@ final class MoveContentEditor: DragEventEditor {
     }
 }
 
-final class MoveTextEditor: DragEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
+final class MoveTextAction: DragEventAction {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
@@ -1381,9 +1381,9 @@ final class MoveTextEditor: DragEventEditor {
     private var type = SlideType.all
     private var beganSP = Point(), beganInP = Point(), beganTextEndP = Point()
     
-    func send(_ event: DragEvent) {
+    func flow(with event: DragEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
         let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
@@ -1498,13 +1498,13 @@ final class MoveTextEditor: DragEventEditor {
     }
 }
 
-final class MoveTempoEditor: DragEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
+final class MoveTempoAction: DragEventAction {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
@@ -1518,13 +1518,13 @@ final class MoveTempoEditor: DragEventEditor {
                 beganContents = [Int: Content](),
                 beganTexts = [Int: Text]()
     
-    func send(_ event: DragEvent) {
+    func flow(with event: DragEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
-        if rootEditor.isPlaying(with: event) {
-            rootEditor.stopPlaying(with: event)
+        if rootAction.isPlaying(with: event) {
+            rootAction.stopPlaying(with: event)
         }
         
         let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
@@ -1637,13 +1637,13 @@ final class MoveTempoEditor: DragEventEditor {
     }
 }
 
-final class MoveLineEditor: DragEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
+final class MoveLineAction: DragEventAction {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
@@ -1652,13 +1652,13 @@ final class MoveLineEditor: DragEventEditor {
     private var pressures = [(time: Double, pressure: Double)]()
     private var node = Node()
     
-    func send(_ event: DragEvent) {
+    func flow(with event: DragEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
-        if rootEditor.isPlaying(with: event) {
-            rootEditor.stopPlaying(with: event)
+        if rootAction.isPlaying(with: event) {
+            rootAction.stopPlaying(with: event)
         }
 
         let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
@@ -1753,13 +1753,13 @@ final class MoveLineEditor: DragEventEditor {
     }
 }
 
-final class MoveLineZEditor: DragEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
+final class MoveLineZAction: DragEventAction {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
@@ -1768,13 +1768,13 @@ final class MoveLineZEditor: DragEventEditor {
     lineIndex = 0, lineView: SheetLineView?, oldSP = Point(),
                 isNote = false, noteNode: Node?
     
-    func send(_ event: DragEvent) {
+    func flow(with event: DragEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
-        if rootEditor.isPlaying(with: event) {
-            rootEditor.stopPlaying(with: event)
+        if rootAction.isPlaying(with: event) {
+            rootAction.stopPlaying(with: event)
         }
 
         let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor

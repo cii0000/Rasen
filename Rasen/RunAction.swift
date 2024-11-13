@@ -19,17 +19,17 @@ import Dispatch
 import struct Foundation.UUID
 import struct Foundation.URL
 
-final class StopEditor: InputKeyEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
+final class StopAction: InputKeyEventAction {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
-    func send(_ event: InputKeyEvent) {
+    func flow(with event: InputKeyEvent) {
         switch event.phase {
         case .began:
             rootView.cursor = .arrow
@@ -37,8 +37,8 @@ final class StopEditor: InputKeyEventEditor {
             let p = rootView.convertScreenToWorld(event.screenPoint)
             rootView.closeAllPanels(at: p)
             
-            if rootEditor.isPlaying(with: event) {
-                rootEditor.stopPlaying(with: event)
+            if rootAction.isPlaying(with: event) {
+                rootAction.stopPlaying(with: event)
                 return
             }
         case .changed: break
@@ -48,8 +48,8 @@ final class StopEditor: InputKeyEventEditor {
     }
 }
 
-final class RunEditor: InputKeyEventEditor {
-    let rootEditor: RootEditor, rootView: RootView
+final class RunAction: InputKeyEventAction {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
     private(set) var worldPrintOrigin = Point()
@@ -65,26 +65,26 @@ final class RunEditor: InputKeyEventEditor {
     private var task: Task<(o: O, id: ID?), Never>?
     private var firstErrorNode: Node?
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
-    func send(_ event: InputKeyEvent) {
+    func flow(with event: InputKeyEvent) {
         let sp = event.screenPoint
         let p = rootView.convertScreenToWorld(sp)
         if event.phase == .began && rootView.closePanel(at: p) { return }
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             
             if event.phase == .began {
                 rootView.closeAllPanels(at: p)
             }
             return
         }
-        if rootEditor.isPlaying(with: event) {
-            rootEditor.stopPlaying(with: event)
+        if rootAction.isPlaying(with: event) {
+            rootAction.stopPlaying(with: event)
             return
         }
         
@@ -210,15 +210,15 @@ final class RunEditor: InputKeyEventEditor {
         }
     }
 }
-extension RunEditor: Hashable {
-    nonisolated static func == (lhs: RunEditor, rhs: RunEditor) -> Bool {
+extension RunAction: Hashable {
+    nonisolated static func == (lhs: RunAction, rhs: RunAction) -> Bool {
         lhs === rhs
     }
     nonisolated func hash(into hasher: inout Hasher) {
         hasher.combine(ObjectIdentifier(self))
     }
 }
-extension RunEditor {
+extension RunAction {
     func send(_ currentP: Point,
               from text: Text, ti: Int,
               _ shp: IntPoint, _ sheetView: SheetView) {
@@ -319,7 +319,7 @@ extension RunEditor {
             }
         }
         
-        rootEditor.runEditors.insert(self)
+        rootAction.runActions.insert(self)
         
         let xoDic = oDic
         Task { @MainActor in
@@ -334,7 +334,7 @@ extension RunEditor {
             calculatingTimer?.cancel()
             calculatingTimer = nil
             
-            rootEditor.runEditors.remove(self)
+            rootAction.runActions.remove(self)
             
             calculatingNode.removeFromParent()
             

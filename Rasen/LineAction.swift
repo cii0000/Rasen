@@ -17,72 +17,72 @@
 
 import Dispatch
 
-final class DrawLineEditor: DragEventEditor {
-    let editor: LineEditor
+final class DrawLineAction: DragEventAction {
+    let action: LineAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = LineEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = LineAction(rootAction)
     }
     
-    func send(_ event: DragEvent) {
-        editor.drawLine(with: event)
+    func flow(with event: DragEvent) {
+        action.drawLine(with: event)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class DrawStraightLineEditor: DragEventEditor {
-    let editor: LineEditor
+final class DrawStraightLineAction: DragEventAction {
+    let action: LineAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = LineEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = LineAction(rootAction)
     }
     
-    func send(_ event: DragEvent) {
-        editor.drawStraightLine(with: event)
+    func flow(with event: DragEvent) {
+        action.drawStraightLine(with: event)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class LassoCutEditor: DragEventEditor {
-    let editor: LineEditor
+final class LassoCutAction: DragEventAction {
+    let action: LineAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = LineEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = LineAction(rootAction)
     }
     
-    func send(_ event: DragEvent) {
-        editor.lassoCut(with: event)
+    func flow(with event: DragEvent) {
+        action.lassoCut(with: event)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
-final class LassoCopyEditor: DragEventEditor {
-    let editor: LineEditor
+final class LassoCopyAction: DragEventAction {
+    let action: LineAction
     
-    init(_ rootEditor: RootEditor) {
-        editor = LineEditor(rootEditor)
+    init(_ rootAction: RootAction) {
+        action = LineAction(rootAction)
     }
     
-    func send(_ event: DragEvent) {
-        editor.lassoCopy(with: event)
+    func flow(with event: DragEvent) {
+        action.lassoCopy(with: event)
     }
     func updateNode() {
-        editor.updateNode()
+        action.updateNode()
     }
 }
 enum LassoType {
     case cut, copy, makeFaces, cutFaces, changeDraft, cutDraft
 }
-final class LineEditor: Editor {
-    let rootEditor: RootEditor, rootView: RootView
+final class LineAction: Action {
+    let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
-    init(_ rootEditor: RootEditor) {
-        self.rootEditor = rootEditor
-        rootView = rootEditor.rootView
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
         isEditingSheet = rootView.isEditingSheet
     }
     
@@ -251,7 +251,7 @@ final class LineEditor: Editor {
                     }
                 }
                 
-                let speed = (LineEditor.speed(from: temps, at: i) * scale).clipped(min: minSpeed, max: maxSpeed)
+                let speed = (LineAction.speed(from: temps, at: i) * scale).clipped(min: minSpeed, max: maxSpeed)
                 let t = ((speed - minSpeed) / (maxSpeed - minSpeed)) ** (1 / exp)
                 let maxD = minDistance + (maxDistance - minDistance) * t
                 
@@ -755,7 +755,7 @@ final class LineEditor: Editor {
                 if abs(dp.x) > abs(dp.y) {
                     let dx = abs(dp.x * wtsScale).clipped(min: 0, max: maxD,
                                                                 newMin: 0, newMax: maxAxisD)
-                    if abs(dp.y) * wtsScale < dx && LineEditor.speed(from: temps, at: temps.count - 1) * wtsScale < snapSpeed, time - firstChangedTime > 0.1 {
+                    if abs(dp.y) * wtsScale < dx && LineAction.speed(from: temps, at: temps.count - 1) * wtsScale < snapSpeed, time - firstChangedTime > 0.1 {
                         llp = Point(lp.x, fp.y)
                         isSnapStraight = true
                         lastSnapStraightTime = time
@@ -768,7 +768,7 @@ final class LineEditor: Editor {
                 } else {
                     let dy = abs(dp.y * wtsScale).clipped(min: 0, max: maxD,
                                                                 newMin: 0, newMax: maxAxisD)
-                    if abs(dp.x) * wtsScale < dy && LineEditor.speed(from: temps, at: temps.count - 1) * wtsScale < snapSpeed, time - firstChangedTime > 0.1 {
+                    if abs(dp.x) * wtsScale < dy && LineAction.speed(from: temps, at: temps.count - 1) * wtsScale < snapSpeed, time - firstChangedTime > 0.1 {
                         llp = Point(fp.x, lp.y)
                         isSnapStraight = true
                         lastSnapStraightTime = time
@@ -887,13 +887,13 @@ final class LineEditor: Editor {
                 noteI: Int?, noteStartBeat: Rational?, notePlayer: NotePlayer?
     func drawNote(with event: DragEvent, isStraight: Bool = false) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
         switch event.phase {
         case .began:
-            if rootEditor.isPlaying(with: event) {
-                rootEditor.stopPlaying(with: event)
+            if rootAction.isPlaying(with: event) {
+                rootAction.stopPlaying(with: event)
             }
             
             let p = rootView.convertScreenToWorld(event.screenPoint)
@@ -1029,8 +1029,8 @@ final class LineEditor: Editor {
                 lasso.intersects(scoreView.pointline(from: scoreView.model.notes[i])) ? i : nil
             }
             if !nis.isEmpty {
-                if rootEditor.isPlaying(with: event) {
-                    rootEditor.stopPlaying(with: event)
+                if rootAction.isPlaying(with: event) {
+                    rootAction.stopPlaying(with: event)
                 }
                 
                 let pitch = scoreView.pitch(atY: scoreP.y, interval: rootView.currentPitchInterval)
@@ -1055,7 +1055,7 @@ final class LineEditor: Editor {
     
     func drawLine(with event: DragEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
         
@@ -1072,8 +1072,8 @@ final class LineEditor: Editor {
             }
         }
         
-        if isStopPlaying || rootEditor.isPlaying(with: event) {
-            rootEditor.stopPlaying(with: event)
+        if isStopPlaying || rootAction.isPlaying(with: event) {
+            rootAction.stopPlaying(with: event)
             isStopPlaying = true
             return
         }
@@ -1081,7 +1081,7 @@ final class LineEditor: Editor {
     }
     func drawStraightLine(with event: DragEvent) {
         guard isEditingSheet else {
-            rootEditor.keepOut(with: event)
+            rootAction.keepOut(with: event)
             return
         }
         
@@ -1098,8 +1098,8 @@ final class LineEditor: Editor {
             }
         }
         
-        if isStopPlaying || rootEditor.isPlaying(with: event) {
-            rootEditor.stopPlaying(with: event)
+        if isStopPlaying || rootAction.isPlaying(with: event) {
+            rootAction.stopPlaying(with: event)
             isStopPlaying = true
             return
         }
@@ -1274,8 +1274,8 @@ final class LineEditor: Editor {
             
             let isScore = rootView.sheetView(at: p)?.model.score.enabled ?? false
             
-            if !isScore && rootEditor.isPlaying(with: event) {
-                rootEditor.stopPlaying(with: event)
+            if !isScore && rootAction.isPlaying(with: event) {
+                rootAction.stopPlaying(with: event)
                 return
             }
             if isEditingSheet {
