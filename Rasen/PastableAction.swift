@@ -592,48 +592,20 @@ final class PastableAction: Action {
     
     func snappableBorderLocations(from orientation: Orientation,
                                   with sb: Rect) -> [Double] {
-        if sb.width < sb.height {
-            switch orientation {
-            case .horizontal:
-                 [206,
-                  219,
-                  232,
-                  245,
-                  sb.height - 206,
-                  sb.height - 219,
-                  sb.height - 232,
-                  sb.height - 245,
-                  (sb.height / 4).rounded(),
-                  (sb.height / 2).rounded(),
-                  (3 * sb.height / 4).rounded()].sorted()
-            case .vertical:
-                 [48,
-                  sb.width - 48,
-                  (sb.width / 4).rounded(),
-                  (sb.width / 2).rounded(),
-                  (3 * sb.width / 4).rounded()].sorted()
-            }
-        } else {
-            switch orientation {
-            case .horizontal:
-                 [62,
-                  87,
-                  112,
-                  137,
-                  sb.height - 62,
-                  sb.height - 87,
-                  sb.height - 112,
-                  sb.height - 137,
-                  (sb.height / 4).rounded(),
-                  (sb.height / 2).rounded(),
-                  (3 * sb.height / 4).rounded()].sorted()
-            case .vertical:
-                 [112,
-                  sb.width - 112,
-                  (sb.width / 4).rounded(),
-                  (sb.width / 2).rounded(),
-                  (3 * sb.width / 4).rounded()].sorted()
-            }
+        switch orientation {
+        case .horizontal:
+             [204, sb.height - 204,
+              217, sb.height - 217,
+              230, sb.height - 230,
+              243, sb.height - 243,
+              (1 * sb.height / 4).rounded(),
+              (2 * sb.height / 4).rounded(),
+              (3 * sb.height / 4).rounded()].sorted()
+        case .vertical:
+             [48, sb.width - 48,
+              (1 * sb.width / 4).rounded(),
+              (2 * sb.width / 4).rounded(),
+              (3 * sb.width / 4).rounded()].sorted()
         }
     }
     func borderSnappedPoint(_ p: Point, with sb: Rect, distance d: Double,
