@@ -458,16 +458,16 @@ final class ZoomAction: PinchEventAction {
         guard event.magnification != 0 else { return }
         let oldIsEditingSheet = rootView.isEditingSheet
         
-        var transform = rootView.camera.transform
+        var transform = rootView.pov.transform
         let p = event.screenPoint * rootView.screenToWorldTransform
         let log2Scale = transform.log2Scale
         let newLog2Scale = (log2Scale - (event.magnification * correction))
-            .clipped(min: RootView.minCameraLog2Scale,
-                     max: RootView.maxCameraLog2Scale) - log2Scale
+            .clipped(min: RootView.minPOVLog2Scale,
+                     max: RootView.maxPOVLog2Scale) - log2Scale
         transform.translate(by: -p)
         transform.scale(byLog2Scale: newLog2Scale)
         transform.translate(by: p)
-        rootView.camera = RootView.clippedCamera(from: Camera(transform))
+        rootView.pov = RootView.clippedPOV(from: .init(transform))
         
         if oldIsEditingSheet != rootView.isEditingSheet {
             rootAction.textAction.moveEndInputKey()
@@ -499,7 +499,7 @@ final class RotateAction: RotateEventAction {
         default: break
         }
         guard !isClipped && event.rotationQuantity != 0 else { return }
-        var transform = rootView.camera.transform
+        var transform = rootView.pov.transform
         let p = event.screenPoint * rootView.screenToWorldTransform
         let r = transform.angle
         let rotation = r - event.rotationQuantity * correction
@@ -516,15 +516,15 @@ final class RotateAction: RotateEventAction {
         transform.translate(by: -p)
         transform.rotate(by: nr - r)
         transform.translate(by: p)
-        var camera = RootView.clippedCamera(from: Camera(transform))
+        var pov = RootView.clippedPOV(from: .init(transform))
         if isClipped {
-            camera.rotation = 0
-            rootView.camera = camera
+            pov.rotation = 0
+            rootView.pov = pov
         } else {
-            rootView.camera = camera
+            rootView.pov = pov
         }
-        if rootView.camera.rotation != 0 {
-            rootView.defaultCursor = Cursor.rotate(rotation: -rootView.camera.rotation + .pi / 2)
+        if rootView.pov.rotation != 0 {
+            rootView.defaultCursor = Cursor.rotate(rotation: -rootView.pov.rotation + .pi / 2)
             rootView.cursor = rootView.defaultCursor
         } else {
             rootView.defaultCursor = .drawLine
@@ -560,8 +560,8 @@ final class ScrollAction: ScrollEventAction {
             guard !event.scrollDeltaPoint.isEmpty else { return }
             let dt = event.time - oldTime
             var dp = event.scrollDeltaPoint.mid(oldDeltaPoint)
-            if rootView.camera.rotation != 0 {
-                dp = dp * Transform(rotation: rootView.camera.rotation)
+            if rootView.pov.rotation != 0 {
+                dp = dp * Transform(rotation: rootView.pov.rotation)
             }
             
             oldDeltaPoint = event.scrollDeltaPoint
@@ -569,14 +569,14 @@ final class ScrollAction: ScrollEventAction {
             let length = dp.length()
             let lengthDt = length / dt
             
-            var transform = rootView.camera.transform
+            var transform = rootView.pov.transform
             let newPoint = dp * correction * transform.absXScale
             
             let oldPosition = transform.position
-            let newP = RootView.clippedCameraPosition(from: oldPosition - newPoint) - oldPosition
+            let newP = RootView.clippedPOVPosition(from: oldPosition - newPoint) - oldPosition
             
             transform.translate(by: newP)
-            rootView.camera = Camera(transform)
+            rootView.pov = .init(transform)
             
             rootView.isUpdateWithCursorPosition = lengthDt < updateSpeed / 2
             rootView.updateWithCursorPosition()

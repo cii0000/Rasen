@@ -478,8 +478,8 @@ final class IOAction: Action {
     }
     func loadFile(from urls: [URL], at shp: IntPoint) {
         var mshp = shp
-        var nSIDs = [IntPoint: SheetID](), willremoveSHPs = [IntPoint]()
-        var resetSIDs = Set<SheetID>()
+        var nSIDs = [IntPoint: UUID](), willremoveSHPs = [IntPoint]()
+        var resetSIDs = Set<UUID>()
         for url in urls {
             let importedDocument = Document(url, isLoadOnly: true)
             let world = importedDocument.world()
@@ -801,7 +801,7 @@ final class IOAction: Action {
             }
             documentRecorders = []
         case .document, .documentWithHistory:
-            let sids = nvs.reduce(into: [IntPoint: SheetID]()) {
+            let sids = nvs.reduce(into: [IntPoint: UUID]()) {
                 $0[$1.shp] = rootView.sheetID(at: $1.shp)
             }
             let csv = CopiedSheetsValue(deltaPoint: Point(), sheetIDs: sids)
@@ -1462,7 +1462,7 @@ final class IOAction: Action {
         @Sendable func export(progressHandler: (Double, inout Bool) -> ()) throws {
             try ioResult.remove()
             
-            let sids = vs.reduce(into: [IntPoint: SheetID]()) {
+            let sids = vs.reduce(into: [IntPoint: UUID]()) {
                 $0[$1.shp - shp0] = rootView.sheetID(at: $1.shp)
             }
             let csv = CopiedSheetsValue(deltaPoint: Point(), sheetIDs: sids)
@@ -1473,7 +1473,7 @@ final class IOAction: Action {
             for (i, v) in csv.sheetIDs.enumerated() {
                 let (shp, osid) = v
                 guard let osrr = rootView.model.sheetRecorders[osid] else { continue }
-                let nsid = SheetID()
+                let nsid = UUID()
                 let nsrr = nDocument.makeSheetRecorder(at: nsid)
                 
                 if let oldSID = world.sheetIDs[shp] {
@@ -1524,8 +1524,8 @@ final class IOAction: Action {
             }
             nDocument.worldRecord.data = try? world.serializedData()
             nDocument.worldRecord.isWillwrite = true
-            nDocument.cameraRecord.data = try? rootView.camera.serializedData()
-            nDocument.cameraRecord.isWillwrite = true
+            nDocument.povRecord.data = try? rootView.pov.serializedData()
+            nDocument.povRecord.isWillwrite = true
             try nDocument.write()
             
             try ioResult.setAttributes()

@@ -1075,7 +1075,7 @@ final class SheetView: BindableView, @unchecked Sendable {
     weak var selectedTextView: SheetTextView?
     
     var history = SheetHistory()
-    var id = SheetID()
+    var id = UUID()
     
     let node: Node
     let opacityNode = Node()

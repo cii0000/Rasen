@@ -38,7 +38,7 @@ final class RootView: View, @unchecked Sendable {
         history = model.history()
         selections = model.selections()
         finding = model.finding()
-        camera = Self.clippedCamera(from: model.camera())
+        pov = Self.clippedPOV(from: model.pov())
         baseThumbnailBlocks = model.baseThumbnailBlocks()
         
         node.children = [sheetsNode, gridNode, mapNode, currentMapNode]
@@ -48,9 +48,9 @@ final class RootView: View, @unchecked Sendable {
                 self?.updateAutosavingTimer()
             }
         }
-        model.cameraRecord.willwriteClosure = { [weak self] (record) in
+        model.povRecord.willwriteClosure = { [weak self] (record) in
             guard let self else { return }
-            record.value = self.camera
+            record.value = self.pov
         }
         model.selectionsRecord.willwriteClosure = { [weak self] (record) in
             guard let self else { return }
@@ -67,11 +67,11 @@ final class RootView: View, @unchecked Sendable {
             self.model.worldHistoryRecord.isPreparedWrite = true
         }
         
-        if camera.rotation != 0 {
-            defaultCursor = Cursor.rotate(rotation: -camera.rotation + .pi / 2)
+        if pov.rotation != 0 {
+            defaultCursor = Cursor.rotate(rotation: -pov.rotation + .pi / 2)
             cursor = defaultCursor
         }
-        updateTransformsWithCamera()
+        updateTransformsWithPOV()
         updateWithWorld()
         updateWithSelections(oldValue: [])
         updateWithFinding()
@@ -302,14 +302,14 @@ final class RootView: View, @unchecked Sendable {
             }
         }
     }
-    func append(_ sids: [IntPoint: SheetID], enableNode: Bool = true) {
+    func append(_ sids: [IntPoint: UUID], enableNode: Bool = true) {
         let undoItem = WorldUndoItem.removeSheets(sids.map { $0.key })
         let redoItem = WorldUndoItem.insertSheets(sids)
         append(undo: undoItem, redo: redoItem)
         set(redoItem, enableNode: enableNode)
     }
     func removeSheets(at shps: [IntPoint]) {
-        var sids = [IntPoint: SheetID]()
+        var sids = [IntPoint: UUID]()
         shps.forEach {
             sids[$0] = world.sheetIDs[$0]
         }
@@ -376,7 +376,7 @@ final class RootView: View, @unchecked Sendable {
         var localizedDescription = "There are sheets added in the upper right corner because the positions data is not found.".localized
     }
     func restoreDatabase() throws {
-        var resetSIDs = Set<SheetID>()
+        var resetSIDs = Set<UUID>()
         for sid in model.sheetRecorders.keys {
             if world.sheetPositions[sid] == nil {
                 resetSIDs.insert(sid)
@@ -405,13 +405,13 @@ final class RootView: View, @unchecked Sendable {
             throw RestoreError()
         }
     }
-    func moveSheetsToUpperRightCorner(with sids: [SheetID],
+    func moveSheetsToUpperRightCorner(with sids: [UUID],
                                       isNewUndoGroup: Bool = true) {
         let xCount = Int(Double(sids.count).squareRoot())
         let fxi = (world.sheetPositions.values.max { $0.x < $1.x }?.x ?? 0) + 2
         var dxi = 0
         var yi = (world.sheetPositions.values.max { $0.y < $1.y }?.y ?? 0) + 2
-        var newSIDs = [IntPoint: SheetID]()
+        var newSIDs = [IntPoint: UUID]()
         for sid in sids {
             let shp = IntPoint(fxi + dxi, yi)
             newSIDs[shp] = sid
@@ -508,7 +508,7 @@ final class RootView: View, @unchecked Sendable {
     func clearHistory(progressHandler: (Double, inout Bool) -> ()) {
         syncSave()
         
-        var resetSRRs = [SheetID: Model.SheetRecorder]()
+        var resetSRRs = [UUID: Model.SheetRecorder]()
         for (sid, srr) in model.sheetRecorders {
             if world.sheetPositions[sid] == nil {
                 resetSRRs[sid] = srr
@@ -558,8 +558,8 @@ final class RootView: View, @unchecked Sendable {
     static let maxSheetCount = 10000
     static let maxSheetAABB = AABB(maxValueX: Double(maxSheetCount) * Sheet.width,
                                    maxValueY: Double(maxSheetCount) * Sheet.height)
-    static let minCameraLog2Scale = -12.0, maxCameraLog2Scale = 10.0
-    static func clippedCameraPosition(from p: Point) -> Point {
+    static let minPOVLog2Scale = -12.0, maxPOVLog2Scale = 10.0
+    static func clippedPOVPosition(from p: Point) -> Point {
         var p = p
         if p.x < maxSheetAABB.minX {
             p.x = maxSheetAABB.minX
@@ -573,32 +573,31 @@ final class RootView: View, @unchecked Sendable {
         }
         return p
     }
-    static func clippedCamera(from camera: Camera) -> Camera {
-        var camera = camera
-        camera.position = clippedCameraPosition(from: camera.position)
-        let s = camera.scale.width
-        if s != camera.scale.height {
-            camera.scale = Size(square: s)
+    static func clippedPOV(from pov: Attitude) -> Attitude {
+        var pov = pov
+        pov.position = clippedPOVPosition(from: pov.position)
+        let s = pov.scale.width
+        if s != pov.scale.height {
+            pov.scale = Size(square: s)
         }
         
-        let logScale = camera.logScale
+        let logScale = pov.logScale
         if logScale.isNaN {
-            camera.logScale = 0
-        } else if logScale < minCameraLog2Scale {
-            camera.logScale = minCameraLog2Scale
-        } else if logScale > maxCameraLog2Scale {
-            camera.logScale = maxCameraLog2Scale
+            pov.logScale = 0
+        } else if logScale < minPOVLog2Scale {
+            pov.logScale = minPOVLog2Scale
+        } else if logScale > maxPOVLog2Scale {
+            pov.logScale = maxPOVLog2Scale
         }
-        return camera
+        return pov
     }
-    static let defaultCamera = Camera(position: Sheet.defaultBounds.centerPoint,
-                                      scale: Size(width: 1.25, height: 1.25))
-    var cameraNotifications = [((RootView, Camera) -> ())]()
-    var camera = defaultCamera {
+    
+    var povNotifications = [((RootView, Attitude) -> ())]()
+    var pov = Root.defaultPOV {
         didSet {
-            model.cameraRecord.isWillwrite = true
-            updateTransformsWithCamera()
-            cameraNotifications.forEach { $0(self, camera) }
+            model.povRecord.isWillwrite = true
+            updateTransformsWithPOV()
+            povNotifications.forEach { $0(self, pov) }
         }
     }
     var drawableSize = Size() {
@@ -608,10 +607,10 @@ final class RootView: View, @unchecked Sendable {
     }
     var screenBounds = Rect() {
         didSet {
-            centeringCameraTransform = Transform(translation: -screenBounds.centerPoint)
+            centeringPOVTransform = Transform(translation: -screenBounds.centerPoint)
             viewportToScreenTransform = Transform(viewportSize: screenBounds.size)
             screenToViewportTransform = Transform(invertedViewportSize: screenBounds.size)
-            updateTransformsWithCamera()
+            updateTransformsWithPOV()
         }
     }
     var worldBounds: Rect { screenBounds * screenToWorldTransform }
@@ -619,12 +618,12 @@ final class RootView: View, @unchecked Sendable {
     var screenToWorldScale: Double { screenToWorldTransform.absXScale }
     private(set) var worldToScreenTransform = Transform.identity
     private(set) var worldToScreenScale = 1.0
-    private(set) var centeringCameraTransform = Transform.identity
+    private(set) var centeringPOVTransform = Transform.identity
     private(set) var viewportToScreenTransform = Transform.identity
     private(set) var screenToViewportTransform = Transform.identity
     private(set) var worldToViewportTransform = Transform.identity
-    private func updateTransformsWithCamera() {
-        screenToWorldTransform = centeringCameraTransform * camera.transform
+    private func updateTransformsWithPOV() {
+        screenToWorldTransform = centeringPOVTransform * pov.transform
         worldToScreenTransform = screenToWorldTransform.inverted()
         worldToScreenScale = worldToScreenTransform.absXScale
         worldToViewportTransform = worldToScreenTransform * screenToViewportTransform
@@ -637,12 +636,12 @@ final class RootView: View, @unchecked Sendable {
         readAndClose(with: screenBounds, screenToWorldTransform)
         updateMapWith(worldToScreenTransform: worldToScreenTransform,
                       screenToWorldTransform: screenToWorldTransform,
-                      camera: camera,
+                      pov: pov,
                       in: screenBounds)
         updateGrid(with: screenToWorldTransform, in: screenBounds)
         updateNodeNotifications.forEach { $0(self) }
         updateRunningNodesPosition()
-        updateSheetViewsWithCamera()
+        updateSheetViewsWithPOV()
 //        updateCursorNode()
     }
     let editableMapScale = 2.0 ** -4
@@ -667,7 +666,7 @@ final class RootView: View, @unchecked Sendable {
         return p.rounded(decimalPlaces: decimalPlaces)
     }
     
-    func updateSheetViewsWithCamera() {
+    func updateSheetViewsWithPOV() {
         sheetViewValues.forEach {
             if let view = $0.value.sheetView {
                 updateWithIsFullEdit(in: view)
@@ -684,7 +683,7 @@ final class RootView: View, @unchecked Sendable {
     }
     
     var sheetLineWidth: Double { Line.defaultLineWidth }
-    var sheetTextSize: Double { camera.logScale > 2 ? 100.0 : Font.defaultSize }
+    var sheetTextSize: Double { pov.logScale > 2 ? 100.0 : Font.defaultSize }
     
     var runningNodes = [(origin: Point, node: Node)]()
     var runningsNode: Node?
@@ -725,8 +724,8 @@ final class RootView: View, @unchecked Sendable {
                     runningNode.attitude.position = p
                 }
                 runningNode.attitude.scale = Size(square: 1 / worldToScreenScale)
-                if camera.rotation != 0 {
-                    runningNode.attitude.rotation = camera.rotation
+                if pov.rotation != 0 {
+                    runningNode.attitude.rotation = pov.rotation
                 }
             } else {
                 runningNode.isHidden = true
@@ -1750,18 +1749,18 @@ final class RootView: View, @unchecked Sendable {
     }
     var thumbnailType = Model.ThumbnailType.w4
     
-    private(set) var baseThumbnailBlocks: [SheetID: Texture.Block]
+    private(set) var baseThumbnailBlocks: [UUID: Texture.Block]
     
     struct ThumbnailNodeValue {
         var type: Model.ThumbnailType?
-        let sheetID: SheetID
+        let sheetID: UUID
         var node: Node?
         var task: Task<(), any Error>?
     }
     private(set) var thumbnailNodeValues = [IntPoint: ThumbnailNodeValue]()
     
     struct SheetViewValue: @unchecked Sendable {
-        let sheetID: SheetID
+        let sheetID: UUID
         var sheetView: SheetView?
         var task: Task<(), any Error>?
     }
@@ -1774,7 +1773,7 @@ final class RootView: View, @unchecked Sendable {
     }
     
     @discardableResult
-    func readThumbnailNode(at sid: SheetID) -> Node? {
+    func readThumbnailNode(at sid: UUID) -> Node? {
         guard let shp = sheetPosition(at: sid) else { return nil }
         if let tv = thumbnailNodeValues[shp]?.node { return tv }
         let ssFrame = sheetFrame(with: shp)
@@ -1782,7 +1781,7 @@ final class RootView: View, @unchecked Sendable {
                     path: Path(Rect(size: ssFrame.size)),
                     fillType: readFillType(at: sid) ?? .color(.disabled))
     }
-    func readThumbnail(at sid: SheetID) -> Texture? {
+    func readThumbnail(at sid: UUID) -> Texture? {
         if let shp = sheetPosition(at: sid) {
             if let fillType = thumbnailNode(at: shp)?.fillType,
                case .texture(let thumbnailTexture) = fillType {
@@ -1802,7 +1801,7 @@ final class RootView: View, @unchecked Sendable {
         }
         return thumbnailTexture
     }
-    func readFillType(at sid: SheetID) -> Node.FillType? {
+    func readFillType(at sid: UUID) -> Node.FillType? {
         if let shp = sheetPosition(at: sid) {
             if let fillType = thumbnailNode(at: shp)?.fillType {
                 return fillType
@@ -1818,17 +1817,17 @@ final class RootView: View, @unchecked Sendable {
         }
         return .texture(thumbnailTexture)
     }
-    func readThumbnailData(at sid: SheetID) -> Data? {
+    func readThumbnailData(at sid: UUID) -> Data? {
         model.thumbnailRecord(at: sid, with: thumbnailType)?.decodedData
     }
-    func readSheet(at sid: SheetID) -> Sheet? {
+    func readSheet(at sid: UUID) -> Sheet? {
         if let shp = sheetPosition(at: sid), let sheet = sheetView(at: shp)?.model {
             sheet
         } else {
             model.sheet(at: sid)
         }
     }
-    func readSheetHistory(at sid: SheetID) -> SheetHistory? {
+    func readSheetHistory(at sid: UUID) -> SheetHistory? {
         if let shp = sheetPosition(at: sid), let history = sheetView(at: shp)?.history {
             history
         } else {
@@ -1836,7 +1835,7 @@ final class RootView: View, @unchecked Sendable {
         }
     }
     
-    func updateStringRecord(at sid: SheetID, with sheetView: SheetView,
+    func updateStringRecord(at sid: UUID, with sheetView: SheetView,
                             isPreparedWrite: Bool = false) {
         guard let sheetRecorder = model.sheetRecorders[sid] else { return }
         sheetRecorder.stringRecord.value = sheetView.model.allTextsString
@@ -1849,11 +1848,11 @@ final class RootView: View, @unchecked Sendable {
     
     struct ThumbnailMipmap {
         var thumbnail4Data: Data
-        var thumbnail4: Thumbnail?
-        var thumbnail16: Thumbnail?
-        var thumbnail64: Thumbnail?
-        var thumbnail256: Thumbnail?
-        var thumbnail1024: Thumbnail?
+        var thumbnail4: Image?
+        var thumbnail16: Image?
+        var thumbnail64: Image?
+        var thumbnail256: Image?
+        var thumbnail1024: Image?
     }
     func hideSelectedRange(_ handler: () -> ()) {
         var isHiddenSelectedRange = false
@@ -1868,7 +1867,7 @@ final class RootView: View, @unchecked Sendable {
             textView.isHiddenSelectedRange = false
         }
     }
-    func makeThumbnailRecord(at sid: SheetID, with sheetView: SheetView,
+    func makeThumbnailRecord(at sid: UUID, with sheetView: SheetView,
                              isPreparedWrite: Bool = false) {
         hideSelectedRange {
             if let tm = thumbnailMipmap(from: sheetView),
@@ -1996,7 +1995,7 @@ final class RootView: View, @unchecked Sendable {
         readAndClose(with: aBounds, transform, model.sheetRecorders)
     }
     func readAndClose(with aBounds: Rect, _ transform: Transform,
-                      _ sheetRecorders: [SheetID: Model.SheetRecorder]) {
+                      _ sheetRecorders: [UUID: Model.SheetRecorder]) {
         let bounds = aBounds * transform
         let d = transform.log2Scale.clipped(min: 0, max: 4, newMin: 1440, newMax: 360)
         let thumbnailsBounds = bounds.inset(by: -d)
@@ -2022,7 +2021,7 @@ final class RootView: View, @unchecked Sendable {
         }
     }
     private func set(_ type: Model.ThumbnailType?, in tv: ThumbnailNodeValue,
-                     at sid: SheetID, _ shp: IntPoint) {
+                     at sid: UUID, _ shp: IntPoint) {
         if sheetViewValues[shp]?.sheetView != nil { return }
         if let type = type {
             if let oldType = tv.type {
@@ -2042,7 +2041,7 @@ final class RootView: View, @unchecked Sendable {
             }
         }
     }
-    func openThumbnail(at shp: IntPoint, _ sid: SheetID, _ thumbnailNode: Node?,
+    func openThumbnail(at shp: IntPoint, _ sid: UUID, _ thumbnailNode: Node?,
                        _ type: Model.ThumbnailType) {
         let thumbnailNode = thumbnailNode ?? emptyNode(at: shp)
         guard type != .w4, let thumbnailRecord = self.model.thumbnailRecord(at: sid, with: type) else {
@@ -2074,7 +2073,7 @@ final class RootView: View, @unchecked Sendable {
             }
         }
     }
-    func close(from sids: [SheetID]) {
+    func close(from sids: [UUID]) {
         sids.forEach {
             if let shp = sheetPosition(at: $0) {
                 readAndClose(.none, priority: .medium, at: $0, shp)
@@ -2082,7 +2081,7 @@ final class RootView: View, @unchecked Sendable {
         }
     }
     private func updateThumbnail(_ sheetViewValue: SheetViewValue,
-                                 at shp: IntPoint, _ sid: SheetID) {
+                                 at shp: IntPoint, _ sid: UUID) {
         if let sheetView = sheetViewValue.sheetView {
             if let texture = sheetView.node.cacheTexture {
                 if let tv = thumbnailNodeValues[shp], let tNode = tv.node {
@@ -2105,7 +2104,7 @@ final class RootView: View, @unchecked Sendable {
     }
     struct ReadingError: Error {}
     private func readAndClose(_ type: NodeType, priority: TaskPriority = .high,
-                              at sid: SheetID, _ shp: IntPoint) {
+                              at sid: UUID, _ shp: IntPoint) {
         switch type {
         case .none:
             if let sheetViewValue = sheetViewValues[shp] {
@@ -2230,14 +2229,14 @@ final class RootView: View, @unchecked Sendable {
         }
     }
     
-    func renderableSheetNode(at sid: SheetID) -> CPUNode? {
+    func renderableSheetNode(at sid: UUID) -> CPUNode? {
         guard let shp = sheetPosition(at: sid) else { return nil }
         guard let sheet = model.sheet(at: sid) else { return nil }
         let frame = sheetFrame(with: shp)
         return sheet.node(isBorder: false, attitude: .init(position: frame.origin), in: frame.bounds)
     }
     
-    func readSheetView(at sid: SheetID) -> SheetView? {
+    func readSheetView(at sid: UUID) -> SheetView? {
         guard let shp = sheetPosition(at: sid) else { return nil }
         return sheetView(at: shp) ?? readSheetView(at: sid, shp)
     }
@@ -2253,7 +2252,7 @@ final class RootView: View, @unchecked Sendable {
     func readSheetView(at p: Point) -> SheetView? {
         readSheetView(at: sheetPosition(at: p))
     }
-    func readSheetView(at sid: SheetID, _ shp: IntPoint,
+    func readSheetView(at sid: UUID, _ shp: IntPoint,
                        isUpdateNode: Bool = false) -> SheetView? {
         guard let sheetRecorder = model.sheetRecorders[sid] else { return nil }
         let sheetRecord = sheetRecorder.sheetRecord
@@ -2328,10 +2327,10 @@ final class RootView: View, @unchecked Sendable {
         return lastAudiotracks
     }
     
-    func sheetPosition(at sid: SheetID) -> IntPoint? {
+    func sheetPosition(at sid: UUID) -> IntPoint? {
         world.sheetPositions[sid]
     }
-    func sheetID(at shp: IntPoint) -> SheetID? {
+    func sheetID(at shp: IntPoint) -> UUID? {
         world.sheetIDs[shp]
     }
     func sheetPosition(at p: Point) -> IntPoint {
@@ -2382,7 +2381,7 @@ final class RootView: View, @unchecked Sendable {
                        isNewUndoGroup: Bool = true) -> SheetView? {
         if let sheetView = sheetView(at: shp) { return sheetView }
         if sheetID(at: shp) != nil { return nil }
-        let newSID = SheetID()
+        let newSID = UUID()
         guard !model.contains(at: newSID) else { return nil }
         return append(Sheet(), history: nil, at: newSID, at: shp,
                       isNewUndoGroup: isNewUndoGroup)
@@ -2393,7 +2392,7 @@ final class RootView: View, @unchecked Sendable {
                                                              isNew: Bool)? {
         if let sheetView = sheetView(at: shp) { return (sheetView, false) }
         if sheetID(at: shp) != nil { return nil }
-        let newSID = SheetID()
+        let newSID = UUID()
         guard !model.contains(at: newSID) else { return nil }
         return (append(Sheet(), history: nil, at: newSID, at: shp,
                        isNewUndoGroup: isNewUndoGroup), true)
@@ -2406,7 +2405,7 @@ final class RootView: View, @unchecked Sendable {
         if let sheetView = sheetView(at: shp) {
             sheetView.node.removeFromParent()
         }
-        let newSID = SheetID()
+        let newSID = UUID()
         guard !model.contains(at: newSID) else { return nil }
         return append(sheet, history: history,
                       at: newSID, at: shp,
@@ -2414,7 +2413,7 @@ final class RootView: View, @unchecked Sendable {
     }
     @discardableResult
     func append(_ sheet: Sheet, history: SheetHistory?,
-                at sid: SheetID, at shp: IntPoint,
+                at sid: UUID, at shp: IntPoint,
                 isNewUndoGroup: Bool = true) -> SheetView {
         if isNewUndoGroup {
             newUndoGroup()
@@ -2459,8 +2458,8 @@ final class RootView: View, @unchecked Sendable {
         return sheetView
     }
     @discardableResult
-    func duplicateSheet(from sid: SheetID) -> SheetID {
-        let nsid = SheetID()
+    func duplicateSheet(from sid: UUID) -> UUID {
+        let nsid = UUID()
         let nsrr = model.makeSheetRecorder(at: nsid)
         if let shp = sheetPosition(at: sid),
            let sheetView = sheetView(at: shp) {
@@ -2513,8 +2512,8 @@ final class RootView: View, @unchecked Sendable {
         
         return nsid
     }
-    func appendSheet(from osrr: Model.SheetRecorder) -> SheetID {
-        let nsid = SheetID()
+    func appendSheet(from osrr: Model.SheetRecorder) -> UUID {
+        let nsid = UUID()
         let nsrr = model.makeSheetRecorder(at: nsid)
         nsrr.sheetRecord.data = osrr.sheetRecord.valueDataOrDecodedData
         nsrr.thumbnail4Record.data = osrr.thumbnail4Record.valueDataOrDecodedData
@@ -2556,7 +2555,7 @@ final class RootView: View, @unchecked Sendable {
         
         return nsid
     }
-    func removeSheet(at sid: SheetID, for shp: IntPoint) {
+    func removeSheet(at sid: UUID, for shp: IntPoint) {
         try? model.removeSheetRecoder(at: sid)
         
         if let sheetViewValue = sheetViewValues[shp] {
@@ -2908,7 +2907,7 @@ final class RootView: View, @unchecked Sendable {
     }
     
     var isFullEditNote: Bool {
-        camera.logScale < -4
+        pov.logScale < -4
     }
     var currentBeatInterval: Rational {
         isFullEditNote ? Sheet.fullEditBeatInterval : Sheet.beatInterval
@@ -2983,7 +2982,7 @@ final class RootView: View, @unchecked Sendable {
     }
     func updateMapWith(worldToScreenTransform: Transform,
                        screenToWorldTransform: Transform,
-                       camera: Camera,
+                       pov: Attitude,
                        in screenBounds: Rect) {
         let worldBounds = screenBounds * screenToWorldTransform
         for road in roads {
@@ -3087,9 +3086,9 @@ final class RootView: View, @unchecked Sendable {
     }
     
     func cursor(from string: String) -> Cursor {
-        if camera.rotation != 0 {
+        if pov.rotation != 0 {
             .rotate(string: string,
-                    rotation: -camera.rotation + .pi / 2)
+                    rotation: -pov.rotation + .pi / 2)
         } else {
             .circle(string: string)
         }

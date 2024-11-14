@@ -24,12 +24,12 @@ struct ColorPathValue {
 
 struct CopiedSheetsValue: Equatable {
     var deltaPoint = Point()
-    var sheetIDs = [IntPoint: SheetID]()
+    var sheetIDs = [IntPoint: UUID]()
 }
 extension CopiedSheetsValue: Protobuf {
     init(_ pb: PBCopiedSheetsValue) throws {
         deltaPoint = try Point(pb.deltaPoint)
-        sheetIDs = try [IntPoint: SheetID](pb.sheetIds)
+        sheetIDs = try [IntPoint: UUID](pb.sheetIds)
     }
     var pb: PBCopiedSheetsValue {
         .with {
@@ -70,13 +70,13 @@ extension NotesValue: Protobuf {
 
 struct InteroptionsValue: Codable {
     var ids: [InterOption]
-    var sheetID: SheetID
+    var sheetID: UUID
     var rootKeyframeIndex: Int
 }
 extension InteroptionsValue: Protobuf {
     init(_ pb: PBInterOptionsValue) throws {
         ids = try pb.ids.map { try InterOption($0) }
-        sheetID = try SheetID(pb.sheetID)
+        sheetID = try UUID(pb.sheetID)
         rootKeyframeIndex = Int(pb.rootKeyframeIndex)
     }
     var pb: PBInterOptionsValue {
@@ -1608,13 +1608,13 @@ final class PastableAction: Action {
             if selectingLineNode.children.count == 3 {
                 selectingLineNode.children[0].attitude = Attitude(position: np,
                                                                   scale: Size(square: 1.0 * scale),
-                                                                  rotation: rootView.camera.rotation - firstRotation)
+                                                                  rotation: rootView.pov.rotation - firstRotation)
                 
                 let textChildren = selectingLineNode.children[1].children
                 if textChildren.count == value.texts.count {
                     let screenScale = rootView.worldToScreenScale
                     let t = Transform(scale: 1.0 * firstScale / screenScale)
-                            .rotated(by: rootView.camera.rotation - firstRotation)
+                        .rotated(by: rootView.pov.rotation - firstRotation)
                     let nt = t.translated(by: np - sb.minXMinYPoint)
                     for (i, text) in value.texts.enumerated() {
                         textChildren[i].attitude = Attitude(position: (text.origin) * nt + sb.minXMinYPoint,
@@ -2090,9 +2090,9 @@ final class PastableAction: Action {
         let screenScale = rootView.worldToScreenScale
         func firstTransform(at p: Point) -> Transform {
             if firstScale != screenScale
-                || firstRotation != rootView.camera.rotation {
+                || firstRotation != rootView.pov.rotation {
                 let t = Transform(scale: 1.0 * firstScale / screenScale)
-                    .rotated(by: rootView.camera.rotation - firstRotation)
+                    .rotated(by: rootView.pov.rotation - firstRotation)
                 return t.translated(by: p)
             } else {
                 return Transform(translation: p)
@@ -2100,9 +2100,9 @@ final class PastableAction: Action {
         }
         func transform(in frame: Rect, at p: Point) -> Transform {
             if firstScale != screenScale
-                || firstRotation != rootView.camera.rotation{
+                || firstRotation != rootView.pov.rotation{
                 let t = Transform(scale: 1.0 * firstScale / screenScale)
-                    .rotated(by: rootView.camera.rotation - firstRotation)
+                    .rotated(by: rootView.pov.rotation - firstRotation)
                 return t.translated(by: p - frame.minXMinYPoint)
             } else {
                 return Transform(translation: p - frame.minXMinYPoint)
@@ -3031,7 +3031,7 @@ final class PastableAction: Action {
             
             type = .paste
             firstScale = rootView.worldToScreenScale
-            firstRotation = rootView.camera.rotation
+            firstRotation = rootView.pov.rotation
             textScale = firstScale
             editingSP = sp
             editingP = rootView.convertScreenToWorld(sp)
@@ -3151,7 +3151,7 @@ final class PastableAction: Action {
         rootView.cursorPoint = sp
         let p = rootView.convertScreenToWorld(sp)
         if case .copiedSheetsValue(let csv) = pasteObject {
-            var nIndexes = [IntPoint: SheetID]()
+            var nIndexes = [IntPoint: UUID]()
             var removeIndexes = [IntPoint]()
             for (shp, sid) in csv.sheetIDs {
                 var sf = rootView.sheetFrame(with: shp)

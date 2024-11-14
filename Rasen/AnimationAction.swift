@@ -1063,7 +1063,7 @@ final class InterpolateAction: InputKeyEventAction {
             }
             guard let o = cos.first else { return }
             
-            let sheetID: SheetID, ios: [InterOption], oldRootKeyframeIndex: Int, oldLines: [Line]
+            let sheetID: UUID, ios: [InterOption], oldRootKeyframeIndex: Int, oldLines: [Line]
             switch o {
             case .sheetValue(let v):
                 sheetID = v.id

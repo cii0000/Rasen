@@ -175,7 +175,7 @@ extension KeyframeOption: Hashable, Codable {}
 struct SheetValue {
     var lines = [Line](), planes = [Plane](),
         texts = [Text](), origin = Point()
-    var id = SheetID(), rootKeyframeIndex = 0
+    var id = UUID(), rootKeyframeIndex = 0
     var keyframes = [Keyframe]()
     var keyframeBeganIndex = 0
 }
@@ -206,7 +206,7 @@ extension SheetValue: Protobuf {
         planes = try pb.planes.map { try Plane($0) }
         texts = try pb.texts.map { try Text($0) }
         origin = try Point(pb.origin)
-        id = try SheetID(pb.id)
+        id = try UUID(pb.id)
         rootKeyframeIndex = Int(pb.rootKeyframeIndex)
         keyframes = try pb.keyframes.map { try Keyframe($0) }
         keyframeBeganIndex = Int(pb.keyframeBeganIndex)
@@ -247,7 +247,7 @@ extension SheetValue {
                    planes: lhs.planes + rhs.planes,
                    texts: lhs.texts + rhs.texts,
                    origin: lhs.origin,
-                   id: lhs.id == rhs.id ? lhs.id : SheetID(),
+                   id: lhs.id == rhs.id ? lhs.id : UUID(),
                    rootKeyframeIndex: lhs.rootKeyframeIndex,
                    keyframes: lhs.keyframes + rhs.keyframes,
                    keyframeBeganIndex: lhs.keyframeBeganIndex)
@@ -258,7 +258,7 @@ extension SheetValue {
         lhs.texts += rhs.texts
         lhs.keyframeBeganIndex += rhs.keyframeBeganIndex
         if lhs.id != rhs.id {
-            lhs.id = SheetID()
+            lhs.id = UUID()
         }
     }
 }

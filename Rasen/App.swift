@@ -624,7 +624,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             self.addCursorRect(self.bounds, cursor: cursor.ns)
             Cursor.current = cursor
         }
-        rootView.cameraNotifications.append { [weak self] (_, _) in
+        rootView.povNotifications.append { [weak self] (_, _) in
             guard let self else { return }
             if !self.isHiddenActionList {
                 if self.actionIsEditingSheet != self.rootView.isEditingSheet {

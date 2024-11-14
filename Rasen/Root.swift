@@ -19,10 +19,6 @@ import struct Foundation.UUID
 import struct Foundation.Data
 import struct Foundation.URL
 
-typealias Camera = Attitude
-typealias Thumbnail = Image
-typealias SheetID = UUID
-
 struct CornerRectValue {
     var rect: Rect
     var rectCorner: RectCorner
@@ -200,7 +196,7 @@ extension Road {
 }
 
 enum WorldUndoItem {
-    case insertSheets(_ sids: [IntPoint: SheetID])
+    case insertSheets(_ sids: [IntPoint: UUID])
     case removeSheets(_ shps: [IntPoint])
 }
 extension WorldUndoItem: UndoItem {
@@ -226,7 +222,7 @@ extension WorldUndoItem: Protobuf {
         }
         switch value {
         case .insertSheets(let sids):
-            self = .insertSheets(try [IntPoint: SheetID](sids))
+            self = .insertSheets(try [IntPoint: UUID](sids))
         case .removeSheets(let shps):
             self = .removeSheets(try [IntPoint](shps))
         }
@@ -252,7 +248,7 @@ extension WorldUndoItem: Codable {
         let key = try container.decode(CodingTypeKey.self)
         switch key {
         case .insertSheets:
-            self = .insertSheets(try container.decode([IntPoint: SheetID].self))
+            self = .insertSheets(try container.decode([IntPoint: UUID].self))
         case .removeSheets:
             self = .removeSheets(try container.decode([IntPoint].self))
         }
@@ -270,11 +266,11 @@ extension WorldUndoItem: Codable {
     }
 }
 
-extension Dictionary where Key == SheetID, Value == IntPoint {
+extension Dictionary where Key == UUID, Value == IntPoint {
     init(_ pb: PBIntPointStringDic) throws {
-        var shps = [SheetID: IntPoint]()
+        var shps = [UUID: IntPoint]()
         for e in pb.value {
-            if let sid = SheetID(uuidString: e.key) {
+            if let sid = UUID(uuidString: e.key) {
                 shps[sid] = try IntPoint(e.value)
             }
         }
@@ -290,11 +286,11 @@ extension Dictionary where Key == SheetID, Value == IntPoint {
         }
     }
 }
-extension Dictionary where Key == IntPoint, Value == SheetID {
+extension Dictionary where Key == IntPoint, Value == UUID {
     init(_ pb: PBStringIntPointDic) throws {
-        var sids = [IntPoint: SheetID]()
+        var sids = [IntPoint: UUID]()
         for e in pb.value {
-            sids[try .init(e.key)] = SheetID(uuidString: e.value)
+            sids[try .init(e.key)] = UUID(uuidString: e.value)
         }
         self = sids
     }
@@ -313,12 +309,12 @@ extension Dictionary where Key == IntPoint, Value == SheetID {
 }
 
 struct World {
-    var sheetIDs = [IntPoint: SheetID]()
-    var sheetPositions = [SheetID: IntPoint]()
+    var sheetIDs = [IntPoint: UUID]()
+    var sheetPositions = [UUID: IntPoint]()
 }
 extension World: Protobuf {
     init(_ pb: PBWorld) throws {
-        let shps = try [SheetID: IntPoint](pb.sheetPositions)
+        let shps = try [UUID: IntPoint](pb.sheetPositions)
         self.sheetIDs = World.sheetIDs(with: shps)
         self.sheetPositions = shps
     }
@@ -330,31 +326,31 @@ extension World: Protobuf {
 }
 extension World: Codable {}
 extension World {
-    func sheetID(at p: IntPoint) -> SheetID? {
+    func sheetID(at p: IntPoint) -> UUID? {
         sheetIDs[IntPoint(p.x, p.y)]
     }
     
-    static func sheetIDs(with shps: [SheetID: IntPoint]) -> [IntPoint: SheetID] {
-        var sids = [IntPoint: SheetID]()
+    static func sheetIDs(with shps: [UUID: IntPoint]) -> [IntPoint: UUID] {
+        var sids = [IntPoint: UUID]()
         sids.reserveCapacity(shps.count)
         for (sid, shp) in shps {
             sids[shp] = sid
         }
         return sids
     }
-    static func sheetPositions(with sids: [IntPoint: SheetID]) -> [SheetID: IntPoint] {
-        var shps = [SheetID: IntPoint]()
+    static func sheetPositions(with sids: [IntPoint: UUID]) -> [UUID: IntPoint] {
+        var shps = [UUID: IntPoint]()
         shps.reserveCapacity(sids.count)
         for (shp, sid) in sids {
             shps[sid] = shp
         }
         return shps
     }
-    init(_ sids: [IntPoint: SheetID] = [:]) {
+    init(_ sids: [IntPoint: UUID] = [:]) {
         self.sheetIDs = sids
         self.sheetPositions = World.sheetPositions(with: sids)
     }
-    init(_ shps: [SheetID: IntPoint] = [:]) {
+    init(_ shps: [UUID: IntPoint] = [:]) {
         self.sheetIDs = World.sheetIDs(with: shps)
         self.sheetPositions = shps
     }
@@ -410,7 +406,7 @@ final class Root: @unchecked Sendable {
     }
     
     struct SheetRecorder: @unchecked Sendable {
-        let sheetID: SheetID
+        let sheetID: UUID
         let directory: Directory
         
         static let sheetKey = "sheet.pb"
@@ -423,15 +419,15 @@ final class Root: @unchecked Sendable {
         let contentsDirectory: Directory
         
         static let thumbnail4Key = "t4.jpg"
-        let thumbnail4Record: Record<Thumbnail>
+        let thumbnail4Record: Record<Image>
         static let thumbnail16Key = "t16.jpg"
-        let thumbnail16Record: Record<Thumbnail>
+        let thumbnail16Record: Record<Image>
         static let thumbnail64Key = "t64.jpg"
-        let thumbnail64Record: Record<Thumbnail>
+        let thumbnail64Record: Record<Image>
         static let thumbnail256Key = "t256.jpg"
-        let thumbnail256Record: Record<Thumbnail>
+        let thumbnail256Record: Record<Image>
         static let thumbnail1024Key = "t1024.jpg"
-        let thumbnail1024Record: Record<Thumbnail>
+        let thumbnail1024Record: Record<Image>
         
         static let stringKey = "string.txt"
         let stringRecord: Record<String>
@@ -462,7 +458,7 @@ final class Root: @unchecked Sendable {
             return size
         }
         
-        init(_ directory: Directory, _ sid: SheetID, isLoadOnly: Bool = false) {
+        init(_ directory: Directory, _ sid: UUID, isLoadOnly: Bool = false) {
             self.sheetID = sid
             self.directory = directory
             sheetRecord = directory.makeRecord(forKey: Self.sheetKey, isLoadOnly: isLoadOnly)
@@ -493,13 +489,13 @@ final class Root: @unchecked Sendable {
     static let findingRecordKey = "finding.pb"
     var findingRecord: Record<Finding>
     
-    static let cameraRecordKey = "camera.pb"
-    var cameraRecord: Record<Camera>
+    static let povRecordKey = "pov.pb"
+    var povRecord: Record<Attitude>
     
     static let sheetsDirectoryKey = "sheets"
     let sheetsDirectory: Directory
     
-    private(set) var sheetRecorders: [SheetID: SheetRecorder]
+    private(set) var sheetRecorders: [UUID: SheetRecorder]
     
     init(_ url: URL, isLoadOnly: Bool = false) {
         self.url = url
@@ -510,15 +506,15 @@ final class Root: @unchecked Sendable {
         worldHistoryRecord = rootDirectory.makeRecord(forKey: Self.worldHistoryRecordKey, isLoadOnly: isLoadOnly)
         selectionsRecord = rootDirectory.makeRecord(forKey: Self.selectionsRecordKey, isLoadOnly: isLoadOnly)
         findingRecord = rootDirectory.makeRecord(forKey: Self.findingRecordKey, isLoadOnly: isLoadOnly)
-        cameraRecord = rootDirectory.makeRecord(forKey: Self.cameraRecordKey, isLoadOnly: isLoadOnly)
+        povRecord = rootDirectory.makeRecord(forKey: Self.povRecordKey, isLoadOnly: isLoadOnly)
         sheetsDirectory = rootDirectory.makeDirectory(forKey: Self.sheetsDirectoryKey, isLoadOnly: isLoadOnly)
         sheetRecorders = Self.sheetRecorders(from: sheetsDirectory, isLoadOnly: isLoadOnly)
     }
-    static func sheetID(forKey key: String) -> SheetID? { SheetID(uuidString: key) }
-    static func sheetIDKey(at sid: SheetID) -> String { sid.uuidString }
+    static func sheetID(forKey key: String) -> UUID? { UUID(uuidString: key) }
+    static func sheetIDKey(at sid: UUID) -> String { sid.uuidString }
     private static func sheetRecorders(from sheetsDirectory: Directory,
-                                       isLoadOnly: Bool = false) -> [SheetID: SheetRecorder] {
-        var srrs = [SheetID: SheetRecorder]()
+                                       isLoadOnly: Bool = false) -> [UUID: SheetRecorder] {
+        var srrs = [UUID: SheetRecorder]()
         srrs.reserveCapacity(sheetsDirectory.childrenURLs.count)
         for (key, _) in sheetsDirectory.childrenURLs {
             guard let sid = sheetID(forKey: key) else { continue }
@@ -551,12 +547,12 @@ final class Root: @unchecked Sendable {
     func finding() -> Finding {
         findingRecord.decodedValue ?? .init()
     }
-    func camera() -> Camera {
-        cameraRecord.decodedValue ?? Self.defaultCamera
+    func pov() -> Attitude {
+        povRecord.decodedValue ?? Self.defaultPOV
     }
     
-    func baseThumbnailBlocks() -> [SheetID: Texture.Block] {
-        var baseThumbnailBlocks = [SheetID: Texture.Block]()
+    func baseThumbnailBlocks() -> [UUID: Texture.Block] {
+        var baseThumbnailBlocks = [UUID: Texture.Block]()
         sheetRecorders.forEach {
             guard let data = $0.value.thumbnail4Record.decodedData else { return }
             if let block = try? Texture.block(from: data) {
@@ -576,8 +572,8 @@ final class Root: @unchecked Sendable {
     enum ThumbnailType: Int {
         case w4 = 4, w16 = 16, w64 = 64, w256 = 256, w1024 = 1024
     }
-    func thumbnailRecord(at sid: SheetID,
-                         with type: ThumbnailType) -> Record<Thumbnail>? {
+    func thumbnailRecord(at sid: UUID,
+                         with type: ThumbnailType) -> Record<Image>? {
         switch type {
         case .w4: sheetRecorders[sid]?.thumbnail4Record
         case .w16: sheetRecorders[sid]?.thumbnail16Record
@@ -587,19 +583,19 @@ final class Root: @unchecked Sendable {
         }
     }
     
-    func sheet(at sid: SheetID) -> Sheet? {
+    func sheet(at sid: UUID) -> Sheet? {
         sheetRecorders[sid]?.sheetRecord.decodedValue
     }
-    func sheetHistory(at sid: SheetID) -> SheetHistory? {
+    func sheetHistory(at sid: UUID) -> SheetHistory? {
         sheetRecorders[sid]?.sheetHistoryRecord.decodedValue
     }
     
-    func makeSheetRecorder(at sid: SheetID) -> SheetRecorder {
+    func makeSheetRecorder(at sid: UUID) -> SheetRecorder {
         let sheetRecoder = SheetRecorder(sheetsDirectory.makeDirectory(forKey: Self.sheetIDKey(at: sid)), sid)
         sheetRecorders[sid] = sheetRecoder
         return sheetRecoder
     }
-    func removeSheetRecoder(at sid: SheetID) throws {
+    func removeSheetRecoder(at sid: UUID) throws {
         if let sheetRecoder = sheetRecorders[sid] {
             sheetRecorders[sid] = nil
             try sheetsDirectory.remove(sheetRecoder.directory)
@@ -609,16 +605,16 @@ final class Root: @unchecked Sendable {
         sheetRecorders[srr.sheetID] = nil
         try sheetsDirectory.remove(srr.directory)
     }
-    func removeSheetHistory(at sid: SheetID) throws {
+    func removeSheetHistory(at sid: UUID) throws {
         if let srr = sheetRecorders[sid] {
             try srr.directory.remove(srr.sheetHistoryRecord)
         }
     }
-    func contains(at sid: SheetID) -> Bool {
+    func contains(at sid: UUID) -> Bool {
         sheetsDirectory.childrenURLs[Self.sheetIDKey(at: sid)] != nil
     }
 }
-extension Document {
-    static let defaultCamera = Camera(position: Sheet.defaultBounds.centerPoint,
-                                      scale: Size(width: 1.25, height: 1.25))
+extension Root {
+    static let defaultPOV = Attitude(position: Sheet.defaultBounds.centerPoint,
+                                     scale: Size(width: 1.25, height: 1.25))
 }
