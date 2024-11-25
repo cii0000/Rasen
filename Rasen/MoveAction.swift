@@ -1338,7 +1338,7 @@ final class MoveContentAction: DragEventAction {
                     contentView.isShownSpectrogram = isShownSpectrogram
                 case .position:
                     let np = beganContent.origin + sheetP - beganInP
-                    let maxBounds = Sheet.defaultBounds.inset(by: Sheet.textPadding)
+                    let maxBounds = sheetView.bounds.inset(by: Sheet.textPadding)
                     let nnp = maxBounds.clipped(Rect(origin: np, size: content.size)).origin
                     contentView.origin = nnp
                     rootView.updateSelects()
@@ -1475,7 +1475,7 @@ final class MoveTextAction: DragEventAction {
                     }
                 case .position:
                     let np = beganText.origin + sheetP - beganInP
-                    let maxBounds = Sheet.defaultBounds.inset(by: Sheet.textPadding)
+                    let maxBounds = sheetView.bounds.inset(by: Sheet.textPadding)
                     let nnp = maxBounds.clipped(Rect(origin: np, size: text.typesetter.typoBounds?.size ?? .init())).origin
                     textView.origin = nnp
                     rootView.updateSelects()

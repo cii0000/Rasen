@@ -1554,7 +1554,7 @@ final class PastableAction: Action {
     
     func updateWithPaste(at p: Point, atScreen sp: Point, _ phase: Phase) {
         let shp = rootView.sheetPosition(at: p)
-        let sb = rootView.sheetFrame(with: shp)
+        let sheetFrame = rootView.sheetFrame(with: shp)
         let sheetView = rootView.sheetView(at: shp)
         
         func updateWithValue(_ value: SheetValue) {
@@ -1584,7 +1584,7 @@ final class PastableAction: Action {
             
             let nSnapP: Point?, np: Point
             if !(sheetView?.id == value.id && sheetView?.rootKeyframeIndex == value.rootKeyframeIndex) {
-                let snapP = value.origin + sb.origin
+                let snapP = value.origin + sheetFrame.origin
                 nSnapP = snapP
                 np = snapP.distance(p) < snapDistance * rootView.screenToWorldScale && firstScale == rootView.worldToScreenScale ?
                     snapP : rootView.roundedPoint(from: p)
@@ -1615,9 +1615,9 @@ final class PastableAction: Action {
                     let screenScale = rootView.worldToScreenScale
                     let t = Transform(scale: 1.0 * firstScale / screenScale)
                         .rotated(by: rootView.pov.rotation - firstRotation)
-                    let nt = t.translated(by: np - sb.minXMinYPoint)
+                    let nt = t.translated(by: np - sheetFrame.minXMinYPoint)
                     for (i, text) in value.texts.enumerated() {
-                        textChildren[i].attitude = Attitude(position: (text.origin) * nt + sb.minXMinYPoint,
+                        textChildren[i].attitude = Attitude(position: (text.origin) * nt + sheetFrame.minXMinYPoint,
                                                             scale: Size(square: 1.0 * scale))
                     }
                 }
@@ -1635,7 +1635,7 @@ final class PastableAction: Action {
             }
         }
         func updateWithText(_ text: Text) {
-            let inP = p - sb.origin
+            let inP = p - sheetFrame.origin
             var isAppend = false
             
             var textView: SheetTextView?, sri: String.Index?
@@ -1695,7 +1695,7 @@ final class PastableAction: Action {
                     let textFrame = stb
                         * Attitude(position: p,
                                    scale: Size(square: 1.0 * scale)).transform
-                    let sb = sb.inset(by: Sheet.textPadding)
+                    let sb = sheetFrame.inset(by: Sheet.textPadding)
                     if !sb.contains(textFrame) {
                         let nFrame = sb.clipped(textFrame)
                         np = p + nFrame.origin - textFrame.origin
@@ -1771,7 +1771,7 @@ final class PastableAction: Action {
                let x = textView.typesetter.warpCursorOffset(at: textView.convertFromWorld(p))?.offset,
                textView.textOrientation == oldBorder.orientation.reversed(),
                let frame = textView.model.frame {
-                let f = frame + sb.origin
+                let f = frame + sheetFrame.origin
                 let edge = switch textView.model.orientation {
                 case .horizontal:
                     Edge(Point(f.minX + x, f.minY), Point(f.minX + x, f.maxY))
@@ -1785,7 +1785,7 @@ final class PastableAction: Action {
             
             var paths = [Path]()
             let values = snappableBorderLocations(from: oldBorder.orientation,
-                                                  with: sb)
+                                                  with: sheetFrame)
             switch oldBorder.orientation {
             case .horizontal:
                 func append(_ p0: Point, _ p1: Point, lw: Double) {
@@ -1793,43 +1793,43 @@ final class PastableAction: Action {
                                            width: p1.x - p0.x, height: lw)))
                 }
                 for value in values {
-                    append(Point(sb.minX, sb.minY + value),
-                           Point(sb.maxX, sb.minY + value), lw: lw * 1.5)
+                    append(Point(sheetFrame.minX, sheetFrame.minY + value),
+                           Point(sheetFrame.maxX, sheetFrame.minY + value), lw: lw * 1.5)
                 }
-                append(Point(sb.minX, sb.minY + oldBorder.location),
-                       Point(sb.maxX, sb.minY + oldBorder.location), lw: lw * 0.5)
+                append(Point(sheetFrame.minX, sheetFrame.minY + oldBorder.location),
+                       Point(sheetFrame.maxX, sheetFrame.minY + oldBorder.location), lw: lw * 0.5)
             case .vertical:
                 func append(_ p0: Point, _ p1: Point, lw: Double) {
                     paths.append(Path(Rect(x: p0.x - lw / 2, y: p0.y,
                                            width: lw, height: p1.y - p0.y)))
                 }
                 for value in values {
-                    append(Point(sb.minX + value, sb.minY),
-                           Point(sb.minX + value, sb.maxY), lw: lw * 1.5)
+                    append(Point(sheetFrame.minX + value, sheetFrame.minY),
+                           Point(sheetFrame.minX + value, sheetFrame.maxY), lw: lw * 1.5)
                 }
-                append(Point(sb.minX + oldBorder.location, sb.minY),
-                       Point(sb.minX + oldBorder.location, sb.maxY), lw: lw * 0.5)
+                append(Point(sheetFrame.minX + oldBorder.location, sheetFrame.minY),
+                       Point(sheetFrame.minX + oldBorder.location, sheetFrame.maxY), lw: lw * 0.5)
             }
             snapLineNode.children = paths.map {
                 Node(path: $0, fillType: .color(.subSelected))
             }
             
-            let inP = p - sb.origin
-            let bnp = borderSnappedPoint(inP, with: sb,
+            let inP = p - sheetFrame.origin
+            let bnp = borderSnappedPoint(inP, with: sheetFrame,
                                          distance: 3 / rootView.worldToScreenScale,
                                          oldBorder: oldBorder)
             isSnapped = bnp.isSnapped
-            let np = bnp.point + sb.origin
+            let np = bnp.point + sheetFrame.origin
             var nBorder = oldBorder
             switch oldBorder.orientation {
             case .horizontal:
-                selectingLineNode.path = Path([Pathline([Point(sb.minX, np.y),
-                                                         Point(sb.maxX, np.y)])])
-                nBorder.location = np.y - sb.minY
+                selectingLineNode.path = Path([Pathline([Point(sheetFrame.minX, np.y),
+                                                         Point(sheetFrame.maxX, np.y)])])
+                nBorder.location = np.y - sheetFrame.minY
             case .vertical:
-                selectingLineNode.path = Path([Pathline([Point(np.x, sb.minY),
-                                                         Point(np.x, sb.maxY)])])
-                nBorder.location = np.x - sb.minX
+                selectingLineNode.path = Path([Pathline([Point(np.x, sheetFrame.minY),
+                                                         Point(np.x, sheetFrame.maxY)])])
+                nBorder.location = np.x - sheetFrame.minX
             }
             if let sheetView {
                 let borders = sheetView.model.borders + [nBorder]
@@ -1916,7 +1916,7 @@ final class PastableAction: Action {
                     if let imf = imageFrame {
                         rect = imf
                     } else {
-                        let maxSize = Sheet.defaultBounds.inset(by: Sheet.textPadding).size
+                        let maxSize = sheetFrame.bounds.inset(by: Sheet.textPadding).size
                         var size = image.size / 2
                         if size.width > maxSize.width || size.height > maxSize.height {
                             size *= min(maxSize.width / size.width, maxSize.height / size.height)

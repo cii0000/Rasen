@@ -365,7 +365,6 @@ final class IOAction: Action {
                                 Task { @MainActor in
                                     var content = content
                                     var size = size / 2
-                                    let maxBounds = Sheet.defaultBounds.inset(by: Sheet.textPadding)
                                     let maxSize = maxBounds.size
                                     if size.width > maxSize.width || size.height > maxSize.height {
                                         size *= min(maxSize.width / size.width, maxSize.height / size.height)

@@ -18,6 +18,15 @@
 enum Phase: Int8, Codable {
     case began, changed, ended
 }
+extension Phase: CustomDebugStringConvertible {
+    var debugDescription: String {
+        switch self {
+        case .began: "began"
+        case .changed: "changed"
+        case .ended: "ended"
+        }
+    }
+}
 
 struct InputKeyType {
     static let click = InputKeyType(name: "Click".localized)
@@ -240,7 +249,6 @@ struct EventType {
     static let pinch = EventType(name: "2FingersPinch".localized)
     static let rotate = EventType(name: "2FingersRotate".localized)
     static let keyInput = EventType(name: "KeyInput".localized)
-    static let vPinch = EventType(name: "V Pinch".localized)
     
     var name: String
 }
@@ -339,24 +347,30 @@ extension Quasimode {
     
     static let goPrevious = Self(modifier: [.control], .z)//
     static let goNext = Self(modifier: [.control], .x)//
-    static let controlCopy = Self(modifier: [.control], .c)//
-    static let controlInterpolate = Self(modifier: [.control], .s)//
     static let goPreviousFrame = Self(modifier: [.control, .option], .z)//
     static let goNextFrame = Self(modifier: [.control, .option], .x)//
+    static let controlCopy = Self(modifier: [.control], .c)//
+    static let controlInterpolate = Self(modifier: [.control], .s)//
     
     static let zoom = Self(.pinch)
-    static let rotate = Self(.rotate)
+    static let keyZoom = Self(modifier: [.control, .option, .command], .drag)
     static let scroll = Self(.scroll)
+    static let keyScroll = Self(modifier: [.shift, .control, .command], .drag)
+    static let rotate = Self(.rotate)
+    static let keyRotate = Self(modifier: [.shift, .control, .option, .command], .drag)
     
     static let lookUp = Self(.threeFingersTap)
+    static let keyLookUp = Self(modifier: [.control, .command], .d)
     static let selectByRange = Self(.subDrag)
-    static let run = Self(.click)
     static let openMenu = Self(.subClick)
+    
+    static let runOrClose = Self(.click)
     static let stop = Self(.escape)
     
     static let inputCharacter = Self(.keyInput)
-    static let newWrap = Self(modifier: [.shift], .enter)
-    static let deleteWrap = Self(modifier: [.shift], .delete)
+    
+    static let changeToSuperscript = Self(modifier: [.command], .up)
+    static let changeToSubscript = Self(modifier: [.command], .down)
     
     static let undo = Self(modifier: [.command], .z)
     static let redo = Self(modifier: [.shift, .command], .z)
@@ -365,7 +379,6 @@ extension Quasimode {
     static let copy = Self(modifier: [.command], .c)
     static let copyLineColor = Self(modifier: [.option, .command], .c)
     static let paste = Self(modifier: [.command], .v)
-    static let scalingPaste = Self(modifier: [.command], .vPinch)
     
     static let find = Self(modifier: [.command], .f)
     
@@ -374,9 +387,6 @@ extension Quasimode {
     
     static let makeFaces = Self(modifier: [.command], .b)
     static let cutFaces = Self(modifier: [.shift, .command], .b)
-    
-    static let changeToSuperscript = Self(modifier: [.command], .up)
-    static let changeToSubscript = Self(modifier: [.command], .down)
     
     static let changeToVerticalText = Self(modifier: [.command], .l)
     static let changeToHorizontalText = Self(modifier: [.shift, .command], .l)
@@ -430,6 +440,18 @@ struct RotateEvent: Event {
     var screenPoint: Point, time: Double, rotationQuantity: Double, phase: Phase
 }
 
+struct TouchEvent: Event {
+    struct Finger: Hashable {
+        var normalizedPosition: Point, phase: Phase, isTouch: Bool, id: Int
+        
+        func hash(into hasher: inout Hasher) {
+            hasher.combine(id)
+        }
+    }
+    var screenPoint: Point, time: Double, phase: Phase
+    var fingers: Set<Finger>, deviceSize: Size
+}
+
 struct ActionItem {
     var name: String, quasimode: Quasimode, isEnableRoot = true
 }
@@ -481,10 +503,10 @@ extension ActionList {
                                               quasimode: .play,
                                               isEnableRoot: false)],
                                       
-                                      [.init(name: "Scroll".localized,
+                                      [.init(name: "Zoom".localized,
+                                             quasimode: .zoom),
+                                       .init(name: "Scroll".localized,
                                               quasimode: .scroll),
-                                       .init(name: "Zoom".localized,
-                                              quasimode: .zoom),
                                        .init(name: "Rotate".localized,
                                               quasimode: .rotate)],
                                       
@@ -494,9 +516,6 @@ extension ActionList {
                                               quasimode: .selectByRange),
                                        .init(name: "Open Menu".localized,
                                               quasimode: .openMenu),
-//                                       .init(name: "Run / Close".localized,
-//                                              quasimode: .run,
-//                                              isEnableRoot: false),
                                        .init(name: "Input Character".localized,
                                               quasimode: .inputCharacter,
                                               isEnableRoot: false)],
@@ -532,13 +551,6 @@ extension ActionList {
                                        .init(name: "Cut Faces".localized,
                                               quasimode: .cutFaces,
                                               isEnableRoot: false)],
-                                      
-//                                      [.init(name: "Change to Superscript".localized,
-//                                              quasimode: .changeToSuperscript,
-//                                              isEnableRoot: false),
-//                                       .init(name: "Change to Subscript".localized,
-//                                              quasimode: .changeToSubscript,
-//                                              isEnableRoot: false)],
                                       
                                       [.init(name: "Change to Vertical Text".localized,
                                               quasimode: .changeToVerticalText,

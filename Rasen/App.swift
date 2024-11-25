@@ -35,13 +35,119 @@ import UniformTypeIdentifiers
 }
 
 final class SubNSApplication: NSApplication {
-    override func sendEvent(_ event: NSEvent) {
-        if event.type == .gesture {
-            event.window?.sendEvent(event)
-        } else if event.type == .keyUp && event.modifierFlags.contains(.command) {
-            event.window?.sendEvent(event)
+    // PrivateAPI
+    @objc protocol HIDEvent {}
+    static let cgHandle = dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", RTLD_NOW)
+    typealias CGEventCopyIOHIDEventType = @convention(c) (_ cgEvent: CGEvent) -> any HIDEvent
+    let CGEventCopyIOHIDEvent = unsafeBitCast(dlsym(cgHandle, "CGEventCopyIOHIDEvent"),
+                                              to: CGEventCopyIOHIDEventType.self)
+    
+    static let ioKitHandle = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_NOW)
+    typealias IOHIDEventGetChildrenType = @convention(c) (_ event: any HIDEvent) -> CFArray
+    let IOHIDEventGetChildren = unsafeBitCast(dlsym(ioKitHandle, "IOHIDEventGetChildren"),
+                                              to: IOHIDEventGetChildrenType.self)
+    typealias IOHIDEventGetTypeType = @convention(c) (_ event: any AnyObject) -> UInt32
+    let IOHIDEventGetType = unsafeBitCast(dlsym(ioKitHandle, "IOHIDEventGetType"),
+                                          to: IOHIDEventGetTypeType.self)
+    typealias IOHIDEventGetEventFlagsType = @convention(c) (_ event: any AnyObject) -> UInt64
+    let IOHIDEventGetEventFlags = unsafeBitCast(dlsym(ioKitHandle, "IOHIDEventGetEventFlags"),
+                                                to: IOHIDEventGetEventFlagsType.self)
+    typealias IOHIDEventGetSenderIDType = @convention(c) (_ event: any AnyObject) -> UInt64
+    let IOHIDEventGetSenderID = unsafeBitCast(dlsym(ioKitHandle, "IOHIDEventGetSenderID"),
+                                              to: IOHIDEventGetSenderIDType.self)
+    typealias IOHIDEventGetIntegerValueType = @convention(c) (_ event: any AnyObject, UInt32) -> Int32
+    let IOHIDEventGetIntegerValue = unsafeBitCast(dlsym(ioKitHandle, "IOHIDEventGetIntegerValue"),
+                                                  to: IOHIDEventGetIntegerValueType.self)
+    typealias IOHIDEventGetFloatValueType = @convention(c) (_ event: any AnyObject, UInt32) -> Double
+    let IOHIDEventGetFloatValue = unsafeBitCast(dlsym(ioKitHandle, "IOHIDEventGetFloatValue"),
+                                                to: IOHIDEventGetFloatValueType.self)
+    
+    private var trackpadSize: Size?, oldTouchEvent: TouchEvent?
+    override func sendEvent(_ nsEvent: NSEvent) {
+        if nsEvent.type == .gesture {// AppKit bug: nsEvent.allTouches() returns [] after aleep
+            if let cgEvent = nsEvent.cgEvent, let view = nsEvent.window?.contentView as? SubMTKView {
+                if let size = nsEvent.allTouches().first?.deviceSize {
+                    trackpadSize = size.my
+                }
+                if let deviceSize = trackpadSize {
+                    let ioEvent = CGEventCopyIOHIDEvent(cgEvent)
+                    
+//                    let ioManager = IOHIDManagerCreate(kCFAllocatorDefault, 0)
+//                    let dic = [kIOHIDDeviceUsagePageKey: 65280]
+//                    IOHIDManagerSetDeviceMatching(ioManager, dic as CFDictionary)
+//                    print("A")
+////                    print("A", IOHIDManagerCopyDevices(ioManager))
+//                    if let devices = IOHIDManagerCopyDevices(ioManager) as? Set<IOHIDDevice> {
+////                        print(devices)
+//                        for device in devices {
+//                            print(IOHIDDeviceGetProperty(device, kIOHIDPrimaryUsageKey as CFString))
+////                            print(IOHIDDeviceCopyMatchingElements(device, [kIOHIDElementTypeKey: 0] as CFDictionary, IOHIDOptionsType.zero))
+//                        }
+//                    }
+                    
+                    let array = IOHIDEventGetChildren(ioEvent) as Array
+                    var fingers = [TouchEvent.Finger]()
+                    for o in array {
+                        // Referenced definition:
+                        // https://github.com/apple-oss-distributions/IOHIDFamily/blob/IOHIDFamily-2102.0.6/IOHIDFamily/IOHIDEvent.h
+                        // https://github.com/apple-oss-distributions/IOHIDFamily/blob/IOHIDFamily-1446.140.2/IOHIDFamily/IOHIDEventFieldDefs.h
+                        if IOHIDEventGetType(o) == 11 {
+//                            print(String(IOHIDEventGetSenderID(o), radix: 16))
+                            let x = IOHIDEventGetFloatValue(o, (11 << 16) | 0)
+                            let y = IOHIDEventGetFloatValue(o, (11 << 16) | 1)
+                            let id = Int(IOHIDEventGetIntegerValue(o, (11 << 16) | 5))
+                            let flags = IOHIDEventGetEventFlags(o)
+                            let flags1 = flags == 0x1//, flags2 = flags == 0x10001, flags3 = 0x30001
+                            let isTouch = Int(IOHIDEventGetIntegerValue(o, (11 << 16) | 9)) == 1
+                            guard !(oldTouchEvent == nil && !isTouch) else { continue }
+                            let phase: Phase = if let oldTouchEvent {
+                                if let v = oldTouchEvent.fingers.first(where: { $0.id == id }) {
+                                    flags1 ? .ended : (v.phase == .ended ? (!isTouch ? .ended : .began) : .changed)
+                                } else {
+                                    .began
+                                }
+                            } else {
+                                .began
+                            }
+                            fingers.append(.init(normalizedPosition: .init(x, 1 - y), phase: phase,
+                                                 isTouch: isTouch || phase == .began || phase == .ended,
+                                                 id: id))
+                        }
+                    }
+                    let screenPoint = view.screenPoint(with: nsEvent).my
+                    let time = nsEvent.timestamp
+                    let phase: Phase = fingers.contains(where: { $0.phase == .began }) ?
+                        .began : (fingers.contains(where: { $0.phase == .ended }) ? .ended : .changed)
+                    let event = TouchEvent(screenPoint: screenPoint, time: time, phase: phase,
+                                           fingers: .init(fingers), deviceSize: deviceSize)
+                    
+//                    print(event.time, fingers.map { ($0.id, $0.phase) }, nsEvent.allTouches()
+//                        .map { if $0.phase == .began {
+//                            "\($0.identity.hash) began"
+//                        } else if $0.phase == .moved || $0.phase == .stationary {
+//                            "\($0.identity.hash) changed"
+//                        } else if $0.phase == .ended || $0.phase == .cancelled {
+//                            "\($0.identity.hash) ended"
+//                        } else {
+//                            "\($0.identity.hash) none"
+//                    }})
+                    
+                    switch event.phase {
+                    case .began: view.touchesBegan(with: event)
+                    case .changed: view.touchesMoved(with: event)
+                    case .ended: view.touchesEnded(with: event)
+                    }
+                    
+                    oldTouchEvent = fingers.allSatisfy({ $0.phase == .ended }) ? nil : event
+                    return
+                }
+            }
+            
+            nsEvent.window?.sendEvent(nsEvent)
+        } else if nsEvent.type == .keyUp && nsEvent.modifierFlags.contains(.command) {
+            nsEvent.window?.sendEvent(nsEvent)
         } else {
-            super.sendEvent(event)
+            super.sendEvent(nsEvent)
         }
     }
 }
@@ -116,7 +222,7 @@ final class SubNSApplication: NSApplication {
         }
     }
     private func mainMenu() -> NSMenu {
-        let appName = System.appName
+        let appName = System.appName.localized
         let appMenu = NSMenu(title: appName)
         appMenu.addItem(withTitle: String(format: "About %@".localized, appName),
                         action: #selector(SubNSApplication.shared.orderFrontStandardAboutPanel(_:)),
@@ -1565,6 +1671,15 @@ final class SubMTKView: MTKView, MTKViewDelegate,
            let action = rootAction.inputKeyAction {
             
             action.flow(with: inputKeyEventWith(nsEvent, oldEvent.inputKeyType, .changed))
+        } else if let beganDragEvent = beganSubDragEvent {
+            let nEvent = dragEventWith(nsEvent, .changed)
+            if isSubDrag || nEvent.screenPoint.distance(beganDragEvent.screenPoint) > 5 {
+                if !isSubDrag {
+                    isSubDrag = true
+                    rootAction.subDrag(with: beganDragEvent)
+                }
+                rootAction.subDrag(with: nEvent)
+            }
         }
     }
     
@@ -1926,8 +2041,8 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         }
     }
     
-    var oldTouchPoints = [TouchID: Point]()
-    var touchedIDs = [TouchID]()
+    var oldTouchPoints = [Int: Point]()
+    var touchedIDs = [Int]()
     
     var isEnabledCustomTrackpad = true
     
@@ -1945,37 +2060,31 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     var snapScrollType = SnapScrollType.none
     var lastMagnification = 0.0
     var lastRotationQuantity = 0.0
-    var isBeganSwipe = false, swipePosition: Point?
+    var isBeganSwipe = false, swipePosition: Point?, beganSwipePosition: Point?
     
     private var scrollTimeValue = 0.0
     private var scrollTimer: (any DispatchSourceTimer)?
     private var pinchTimeValue = 0.0
     private var pinchTimer: (any DispatchSourceTimer)?
     
-    struct TouchID: Hashable {
-        var id: any NSCopying & NSObjectProtocol
-        
-        static func ==(lhs: Self, rhs: Self) -> Bool {
-            lhs.id.isEqual(rhs.id)
-        }
-        func hash(into hasher: inout Hasher) {
-            hasher.combine(id.hash)
+    func touchPoints(with event: TouchEvent) -> [Int: Point] {
+        event.fingers.reduce(into: .init()) {
+            guard $1.isTouch else { return }
+            $0[$1.id] = .init($1.normalizedPosition.x * event.deviceSize.width,
+                              $1.normalizedPosition.y * event.deviceSize.height)
         }
     }
-    func touchPoints(with event: NSEvent) -> [TouchID: Point] {
-        let touches = event.touches(matching: .touching, in: self)
-        return touches.reduce(into: [TouchID: Point]()) {
-            $0[.init(id: $1.identity)] =
-            Point(Double($1.normalizedPosition.x * $1.deviceSize.width),
-                  Double($1.normalizedPosition.y * $1.deviceSize.height))
-        }
-    }
-    override func touchesBegan(with event: NSEvent) {
+    
+    func touchesBegan(with event: TouchEvent) {
         guard isEnabledCustomTrackpad else { return }
         
         let ps = touchPoints(with: event)
         oldTouchPoints = ps
         touchedIDs = Array(ps.keys)
+        
+        beganSwipePosition = nil
+        isPrepare3FingersTap = false
+        isPrepare4FingersTap = false
         if ps.count == 2 {
             swipePosition = nil
             let ps0 = ps[touchedIDs[0]]!, ps1 = ps[touchedIDs[1]]!
@@ -1996,6 +2105,9 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             oldRotateAngle = nil
             oldScrollPosition = nil
             
+            let ps0 = ps[touchedIDs[0]]!, ps1 = ps[touchedIDs[1]]!, ps2 = ps[touchedIDs[2]]!
+            beganSwipePosition = [ps0, ps1, ps2].sum()
+            
             isBeganSwipe = false
             swipePosition = Point()
             isPrepare3FingersTap = true
@@ -2008,7 +2120,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             isPrepare4FingersTap = true
         }
     }
-    override func touchesMoved(with event: NSEvent) {
+    func touchesMoved(with event: TouchEvent) {
         guard isEnabledCustomTrackpad else { return }
         
         let ps = touchPoints(with: event)
@@ -2036,20 +2148,20 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     scrollTimer = nil
                     pinchTimer?.cancel()
                     pinchTimer = nil
-                    rootAction.pinch(with: .init(screenPoint: screenPoint(with: event).my,
-                                                 time: event.timestamp,
+                    rootAction.pinch(with: .init(screenPoint: event.screenPoint,
+                                                 time: event.time,
                                                  magnification: 0,
                                                  phase: .began))
-                    pinchVs.append((0, event.timestamp))
+                    pinchVs.append((0, event.time))
                     self.oldPinchDistance = nPinchDistance
                     lastMagnification = 0
                 } else if isBeganPinch {
                     let magnification = (nPinchDistance - oldPinchDistance) * 0.0125
-                    rootAction.pinch(with: .init(screenPoint: screenPoint(with: event).my,
-                                                 time: event.timestamp,
+                    rootAction.pinch(with: .init(screenPoint: event.screenPoint,
+                                                 time: event.time,
                                                  magnification: magnification.mid(lastMagnification),
                                                  phase: .changed))
-                    pinchVs.append((magnification, event.timestamp))
+                    pinchVs.append((magnification, event.time))
                     self.oldPinchDistance = nPinchDistance
                     lastMagnification = magnification
                 } else if !(isSubDrag && isSubTouth)
@@ -2063,13 +2175,13 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     scrollTimer = nil
                     pinchTimer?.cancel()
                     pinchTimer = nil
-                    rootAction.scroll(with: .init(screenPoint: screenPoint(with: event).my,
-                                                  time: event.timestamp,
+                    rootAction.scroll(with: .init(screenPoint: event.screenPoint,
+                                                  time: event.time,
                                                   scrollDeltaPoint: .init(),
                                                   phase: .began,
                                                   touchPhase: .began,
                                                   momentumPhase: nil))
-                    scrollVs.append((.init(), event.timestamp))
+                    scrollVs.append((.init(), event.time))
                     self.oldScrollPosition = nScrollPosition
                     lastScrollDeltaPosition = .init()
                     let dp = nScrollPosition - oldScrollPosition
@@ -2103,13 +2215,13 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     let scrollDeltaPosition = Point()
                         .movedWith(distance: length, angle: angle)
                     
-                    rootAction.scroll(with: .init(screenPoint: screenPoint(with: event).my,
-                                                  time: event.timestamp,
+                    rootAction.scroll(with: .init(screenPoint: event.screenPoint,
+                                                  time: event.time,
                                                   scrollDeltaPoint: scrollDeltaPosition.mid(lastScrollDeltaPosition),
                                                   phase: .changed,
                                                   touchPhase: .changed,
                                                   momentumPhase: nil))
-                    scrollVs.append((scrollDeltaPosition, event.timestamp))
+                    scrollVs.append((scrollDeltaPosition, event.time))
                     self.oldScrollPosition = nScrollPosition
                     lastScrollDeltaPosition = scrollDeltaPosition
                 } else if !isBeganScroll && !isBeganPinch && !isBeganRotate
@@ -2124,16 +2236,16 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     scrollTimer = nil
                     pinchTimer?.cancel()
                     pinchTimer = nil
-                    rootAction.rotate(with: .init(screenPoint: screenPoint(with: event).my,
-                                                  time: event.timestamp,
+                    rootAction.rotate(with: .init(screenPoint: event.screenPoint,
+                                                  time: event.time,
                                                   rotationQuantity: 0,
                                                   phase: .began))
                     self.oldRotateAngle = nRotateAngle
                     lastRotationQuantity = 0
                 } else if isBeganRotate {
                     let rotationQuantity = nRotateAngle.differenceRotation(oldRotateAngle) * 80
-                    rootAction.rotate(with: .init(screenPoint: screenPoint(with: event).my,
-                                                  time: event.timestamp,
+                    rootAction.rotate(with: .init(screenPoint: event.screenPoint,
+                                                  time: event.time,
                                                   rotationQuantity: rotationQuantity.mid(lastRotationQuantity),
                                                   phase: .changed))
                     self.oldRotateAngle = nRotateAngle
@@ -2142,7 +2254,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             }
         } else if ps.count == 3 {
             if touchedIDs.count == 3,
-               let swipePosition,
+               let swipePosition, let beganSwipePosition,
                let ps0 = ps[touchedIDs[0]],
                let ops0 = oldTouchPoints[touchedIDs[0]],
                let ps1 = ps[touchedIDs[1]],
@@ -2152,12 +2264,15 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 
                 let deltaP = [ps0 - ops0, ps1 - ops1, ps2 - ops2].sum()
                 
-                if !isBeganSwipe && abs(deltaP.x) > abs(deltaP.y) {
+                if !isBeganSwipe && abs(deltaP.x) > abs(deltaP.y)
+                    && ([ps0, ps1, ps2].sum() - beganSwipePosition).length() > 5 {
+                    
                     isBeganSwipe = true
                     isPrepare3FingersTap = false
+                    isPrepare4FingersTap = false
                     
-                    rootAction.swipe(with: .init(screenPoint: screenPoint(with: event).my,
-                                                 time: event.timestamp,
+                    rootAction.swipe(with: .init(screenPoint: event.screenPoint,
+                                                 time: event.time,
                                                  scrollDeltaPoint: Point(),
                                                  phase: .began))
                     self.swipePosition = swipePosition + deltaP
@@ -2168,8 +2283,8 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                         .clipped(min: minD, max: maxD, newMin: minD, newMax: newMaxD)
                     let sdy = absY < minD ? deltaP.y : deltaP.x.signValue * absY
                         .clipped(min: minD, max: maxD, newMin: minD, newMax: newMaxD)
-                    rootAction.swipe(with: .init(screenPoint: screenPoint(with: event).my,
-                                                 time: event.timestamp,
+                    rootAction.swipe(with: .init(screenPoint: event.screenPoint,
+                                                 time: event.time,
                                                  scrollDeltaPoint: .init(sdx, sdy),
                                                  phase: .changed))
                     self.swipePosition = swipePosition + deltaP
@@ -2201,8 +2316,8 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             }
         } else {
             if swipePosition != nil, isBeganSwipe {
-                rootAction.swipe(with: .init(screenPoint: screenPoint(with: event).my,
-                                             time: event.timestamp,
+                rootAction.swipe(with: .init(screenPoint: event.screenPoint,
+                                             time: event.time,
                                              scrollDeltaPoint: Point(),
                                              phase: .ended))
                 swipePosition = nil
@@ -2216,36 +2331,38 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         
         oldTouchPoints = ps
     }
-    override func touchesEnded(with event: NSEvent) {
+    func touchesEnded(with event: TouchEvent) {
         guard isEnabledCustomTrackpad else { return }
         
-        if oldTouchPoints.count == 3 {
-            if isPrepare3FingersTap {
-                var event = inputKeyEventWith(event, .threeFingersTap, .began)
-                let action = LookUpAction(rootAction)
-                action.flow(with: event)
-                Sleep.start()
-                event.phase = .ended
-                action.flow(with: event)
-            }
-        } else if oldTouchPoints.count == 4 {
-            if isPrepare4FingersTap {
-                var event = inputKeyEventWith(event, .fourFingersTap, .began)
-                let action = PlayAction(rootAction)
-                action.flow(with: event)
-                Sleep.start()
-                event.phase = .ended
-                action.flow(with: event)
-            }
-        }
-        
         if swipePosition != nil {
-            rootAction.swipe(with: .init(screenPoint: screenPoint(with: event).my,
-                                         time: event.timestamp,
+            rootAction.swipe(with: .init(screenPoint: event.screenPoint,
+                                         time: event.time,
                                          scrollDeltaPoint: Point(),
                                          phase: .ended))
             swipePosition = nil
             isBeganSwipe = false
+        } else if !isBeganPinch && !isBeganScroll && !isBeganRotate && isPrepare3FingersTap {
+            var event = InputKeyEvent(screenPoint: event.screenPoint,
+                                      time: event.time,
+                                      pressure: 1, phase: .began, isRepeat: false,
+                                      inputKeyType: .threeFingersTap)
+            let action = LookUpAction(rootAction)
+            action.flow(with: event)
+            Sleep.start()
+            event.phase = .ended
+            action.flow(with: event)
+            isPrepare3FingersTap = false
+        } else if !isBeganPinch && !isBeganScroll && !isBeganRotate && isPrepare4FingersTap {
+            var event = InputKeyEvent(screenPoint: event.screenPoint,
+                                      time: event.time,
+                                      pressure: 1, phase: .began, isRepeat: false,
+                                      inputKeyType: .fourFingersTap)
+            let action = PlayAction(rootAction)
+            action.flow(with: event)
+            Sleep.start()
+            event.phase = .ended
+            action.flow(with: event)
+            isPrepare4FingersTap = false
         }
         
         endPinch(with: event)
@@ -2256,7 +2373,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         touchedIDs = []
     }
     
-    func endPinch(with event: NSEvent,
+    func endPinch(with event: TouchEvent,
                   timeInterval: Double = 1 / 60) {
         guard isBeganPinch else { return }
         self.oldPinchDistance = nil
@@ -2264,7 +2381,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         guard pinchVs.count >= 2 else { return }
         
         let fpi = pinchVs[..<(pinchVs.count - 1)]
-            .lastIndex(where: { event.timestamp - $0.time > 0.05 }) ?? 0
+            .lastIndex(where: { event.time - $0.time > 0.05 }) ?? 0
         let lpv = pinchVs.last!
         let t = timeInterval + lpv.time
         
@@ -2277,13 +2394,13 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         let minTV = 0.01
         let sv = tv / (tv - minTV)
         if tv.isNaN || v < 0.04 || a == 0 {
-            rootAction.pinch(with: .init(screenPoint: screenPoint(with: event).my,
-                                         time: event.timestamp,
+            rootAction.pinch(with: .init(screenPoint: event.screenPoint,
+                                         time: event.time,
                                          magnification: 0,
                                          phase: .ended))
         } else {
             pinchTimeValue = tv
-            let screenPoint = screenPoint(with: event).my, time = event.timestamp
+            let screenPoint = event.screenPoint, time = event.time
             pinchTimer = DispatchSource.scheduledTimer(withTimeInterval: timeInterval) { [weak self] in
                 DispatchQueue.main.async { [weak self] in
                     guard let self else { return }
@@ -2309,18 +2426,18 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             }
         }
     }
-    func endRotate(with event: NSEvent) {
+    func endRotate(with event: TouchEvent) {
         guard isBeganRotate else { return }
         self.oldRotateAngle = nil
         isBeganRotate = false
         guard rotateVs.count >= 2 else { return }
         
-        rootAction.rotate(with: .init(screenPoint: screenPoint(with: event).my,
-                                      time: event.timestamp,
+        rootAction.rotate(with: .init(screenPoint: event.screenPoint,
+                                      time: event.time,
                                       rotationQuantity: 0,
                                       phase: .ended))
     }
-    func endScroll(with event: NSEvent,
+    func endScroll(with event: TouchEvent,
                    timeInterval: Double = 1 / 60) {
         guard isBeganScroll else { return }
         self.oldScrollPosition = nil
@@ -2328,7 +2445,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         guard scrollVs.count >= 2 else { return }
         
         let fsi = scrollVs[..<(scrollVs.count - 1)]
-            .lastIndex(where: { event.timestamp - $0.time > 0.05 }) ?? 0
+            .lastIndex(where: { event.time - $0.time > 0.05 }) ?? 0
         let lsv = scrollVs.last!
         let t = timeInterval + lsv.time
         
@@ -2343,22 +2460,22 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         let minTV = 100.0
         let sv = tv / (tv - minTV)
         if tv.isNaN || v < 5 || a == 0 {
-            rootAction.scroll(with: .init(screenPoint: screenPoint(with: event).my,
-                                          time: event.timestamp,
+            rootAction.scroll(with: .init(screenPoint: event.screenPoint,
+                                          time: event.time,
                                           scrollDeltaPoint: .init(),
                                           phase: .ended,
                                           touchPhase: .ended,
                                           momentumPhase: nil))
         } else {
-            rootAction.scroll(with: .init(screenPoint: screenPoint(with: event).my,
-                                          time: event.timestamp,
+            rootAction.scroll(with: .init(screenPoint: event.screenPoint,
+                                          time: event.time,
                                           scrollDeltaPoint: .init(),
                                           phase: .changed,
                                           touchPhase: .ended,
                                           momentumPhase: .began))
             
             scrollTimeValue = tv
-            let screenPoint = screenPoint(with: event).my, time = event.timestamp
+            let screenPoint = event.screenPoint, time = event.time
             scrollTimer = DispatchSource.scheduledTimer(withTimeInterval: timeInterval) { [weak self] in
                 DispatchQueue.main.async { [weak self] in
                     guard let self else { return }
@@ -2386,61 +2503,6 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 }
             }
         }
-    }
-    
-    func cancelScroll(with event: NSEvent) {
-        scrollTimer?.cancel()
-        scrollTimer = nil
-        
-        guard isBeganScroll else { return }
-        isBeganScroll = false
-        rootAction.scroll(with: .init(screenPoint: screenPoint(with: event).my,
-                                      time: event.timestamp,
-                                      scrollDeltaPoint: .init(),
-                                      phase: .ended,
-                                      touchPhase: .ended,
-                                      momentumPhase: nil))
-        oldScrollPosition = nil
-    }
-    func cancelPinch(with event: NSEvent) {
-        pinchTimer?.cancel()
-        pinchTimer = nil
-        
-        guard isBeganPinch else { return }
-        isBeganPinch = false
-        rootAction.pinch(with: .init(screenPoint: screenPoint(with: event).my,
-                                     time: event.timestamp,
-                                     magnification: 0,
-                                     phase: .ended))
-        oldPinchDistance = nil
-    }
-    func cancelRotatte(with event: NSEvent) {
-        guard isBeganRotate else { return }
-        isBeganRotate = false
-        rootAction.rotate(with: .init(screenPoint: screenPoint(with: event).my,
-                                      time: event.timestamp,
-                                      rotationQuantity: 0,
-                                      phase: .ended))
-        oldRotateAngle = nil
-    }
-    override func touchesCancelled(with event: NSEvent) {
-        guard isEnabledCustomTrackpad else { return }
-        
-        if swipePosition != nil {
-            rootAction.swipe(with: .init(screenPoint: screenPoint(with: event).my,
-                                         time: event.timestamp,
-                                         scrollDeltaPoint: .init(),
-                                         phase: .ended))
-            swipePosition = nil
-            isBeganSwipe = false
-        }
-        
-        cancelScroll(with: event)
-        cancelRotatte(with: event)
-        cancelPinch(with: event)
-        
-        oldTouchPoints = [:]
-        touchedIDs = []
     }
     
     private enum TouchGesture {
@@ -2633,10 +2695,6 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         }
     }
     
-//    // control return
-//    override func insertLineBreak(_ sender: Any?) {}
-//    // option return
-//    override func insertNewlineIgnoringFieldAction(_ sender: Any?) {}
     override func insertNewline(_ sender: Any?) {
         rootAction.textAction.insertNewline()
     }
@@ -2929,15 +2987,6 @@ private extension NSImage {
                     .write(to: url.appendingPathComponent("\(String(Int(width))).png"))
             }
         }
-    }
-    
-    final var bitmapSize: CGSize {
-        if let tiffRepresentation = tiffRepresentation {
-            if let bitmap = NSBitmapImageRep(data: tiffRepresentation) {
-                return CGSize(width: bitmap.pixelsWide, height: bitmap.pixelsHigh)
-            }
-        }
-        return CGSize()
     }
     final var PNGRepresentation: Data? {
         if let tiffRepresentation = tiffRepresentation,
@@ -3266,26 +3315,6 @@ extension String {
     }
 }
 
-extension URLSession {
-    static func attributedString(fromURLString str: String,
-                                 completionHandler: @Sendable @escaping (NSAttributedString?) -> ()) {
-        guard let str = str.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
-              let url = URL(string: str) else { return }
-        
-        let request = URLRequest(url: url)
-        let task = URLSession.shared.dataTask(with: request) { (data, response, error) in
-            guard let data = data else { return }
-            
-            let attString = try? NSAttributedString(data: data,
-                                                    options: [.documentType: NSAttributedString.DocumentType.html,
-                                                              .characterEncoding: String.Encoding.utf8.rawValue],
-                                                    documentAttributes: nil)
-            completionHandler(attString)
-        }
-        task.resume()
-    }
-}
-
 struct System {
     static let appName = "Rasen".localized
     static let dataName = String(format: "%@ Data".localized, appName)
@@ -3414,15 +3443,10 @@ struct TextDictionary {
         case "!", "！": return "Exclamation mark".localized
         case "?", "？": return "Question mark".localized
         default:
-            let range = CFRange(location: 0,
-                                length: (nstr as NSString).length)
-            guard let nnstr = DCSCopyTextDefinition(nil,
-                                                    nstr as CFString,
-                                                    range)?
-                    .takeRetainedValue() as String? else { return nil }
+            let range = CFRange(location: 0, length: (nstr as NSString).length)
+            guard let nnstr = DCSCopyTextDefinition(nil, nstr as CFString, range)?.takeRetainedValue() as String? else { return nil }
             return nnstr.count < 1000 ? nnstr : nil
         }
-        
     }
 }
 
@@ -3438,52 +3462,6 @@ final class TextChecker {
                                    inSpellDocumentWithTag: tag)
         guard let firstStr = strs?.first else { return nil }
         return firstStr
-    }
-}
-
-final class CodeView: NSView {
-    var closure: (Bool) -> ()
-    
-    let titleView: NSTextField
-    let codeView: SubNSTextField
-    
-    init(codeName: String, closure: @escaping (Bool) -> ()) {
-        self.closure = closure
-        
-        titleView = NSTextField(wrappingLabelWithString: String(format: "To enable the Run button, enter \"%@\" in the text box below.".localized, codeName))
-        titleView.font = NSFont.systemFont(ofSize: NSFont.systemFontSize(for: .small))
-        titleView.frame = NSRect(x: 0, y: 0, width: 280, height: 30)
-        codeView = SubNSTextField(frame: NSRect(), closure: { _ in })
-        codeView.stringValue = codeName
-        codeView.sizeToFit()
-        codeView.frame.size.width = 100
-        codeView.stringValue = ""
-        titleView.frame.origin = NSPoint(x: 0, y: codeView.frame.height + 5)
-        super.init(frame: NSRect(x: 0, y: 0, width: max(codeView.frame.width, titleView.frame.width), height: titleView.frame.height + codeView.frame.height + 5))
-        addSubview(codeView)
-        addSubview(titleView)
-        codeView.closure = { [weak self] str in
-            self?.closure(str == codeName)
-        }
-    }
-    required init(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-}
-
-final class SubNSTextField: NSTextField {
-    var closure: (String) -> () = { (_) in }
-    
-    init(frame: NSRect, closure: @escaping (String) -> ()) {
-        self.closure = closure
-        super.init(frame: frame)
-    }
-    required init(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-    
-    override func textDidChange(_ notification: Notification) {
-        closure(stringValue)
     }
 }
 

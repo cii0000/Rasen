@@ -2238,10 +2238,6 @@ extension Sheet {
         }.max { $0.value < $1.value }?.key
     }
     
-    var bounds: Rect {
-        Sheet.defaultBounds
-    }
-    
     func boundsTuple(at p: Point,
                      in bounds: Rect) -> (bounds: Rect, isAll: Bool) {
         guard !borders.isEmpty else { return (bounds, true) }

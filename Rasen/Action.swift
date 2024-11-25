@@ -291,12 +291,12 @@ final class RootAction: Action {
         case .undo: UndoAction(self)
         case .redo: RedoAction(self)
         case .find: FindAction(self)
-        case .lookUp: LookUpAction(self)
+        case .lookUp, .keyLookUp: LookUpAction(self)
         case .changeToVerticalText: ChangeToVerticalTextAction(self)
         case .changeToHorizontalText: ChangeToHorizontalTextAction(self)
         case .changeToSuperscript: ChangeToSuperscriptAction(self)
         case .changeToSubscript: ChangeToSubscriptAction(self)
-        case .run: RunAction(self)
+        case .runOrClose: RunAction(self)
         case .changeToDraft: ChangeToDraftAction(self)
         case .cutDraft: CutDraftAction(self)
         case .makeFaces: MakeFacesAction(self)
@@ -332,7 +332,7 @@ final class RootAction: Action {
                 
                 stopInputTextEvent(isEndEdit: quasimode != .undo && quasimode != .redo)
             }
-            if quasimode == .run {
+            if quasimode == .runOrClose {
                 textAction.moveEndInputKey()
             }
             stopDragEvent()

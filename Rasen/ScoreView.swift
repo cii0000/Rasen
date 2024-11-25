@@ -1611,15 +1611,16 @@ extension ScoreView {
     }
     
     func contains(_ p : Point, scale: Double) -> Bool {
-        containsTimeline(p, scale: scale)
-        || containsIsShownSpectrogram(p, scale: scale)
-        || mainFrame.contains(p)
+        model.enabled
+        && (containsTimeline(p, scale: scale)
+            || containsIsShownSpectrogram(p, scale: scale)
+            || mainFrame.contains(p))
     }
     func containsMainFrame(_ p: Point) -> Bool {
-        model.enabled ? mainFrame.contains(p) : false
+        model.enabled && mainFrame.contains(p)
     }
     func containsTimeline(_ p : Point, scale: Double) -> Bool {
-        model.enabled ? timelineFrame.outsetBy(dx: 5 * scale, dy: 3 * scale).contains(p) : false
+        model.enabled && timelineFrame.outsetBy(dx: 5 * scale, dy: 3 * scale).contains(p)
     }
     var timelineFrame: Rect {
         let sx = self.x(atBeat: model.beatRange.start)

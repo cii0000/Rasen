@@ -1366,44 +1366,23 @@ extension Path {
                 func appendB(_ bezier: Bezier, _ preb: BezierInterpolation) {
                     let da = abs(Point.differenceAngle(bezier.cp - bezier.p0,
                                                        bezier.p1 - bezier.cp))
-                    func isMiniCross() -> Bool {
-                        if da > .pi * 0.6 {
-                            let d0 = bezier.p0.distanceSquared(bezier.cp)
-                            let d1 = bezier.cp.distanceSquared(bezier.p1)
-                            return (d0 / s * s < 4 * 4 || d1 / s * s < 4 * 4)
-                        } else {
-                            return false
-                        }
-                    }
-                    if da > .pi * 0.9 || isMiniCross() {
-                        let ns0 = s * preb.x0, ncs = s * preb.cx
-                        let p0 = bezier.p0, cp = bezier.position(withT: 0.5)
-                        let fa = bezier.firstAngle, la = bezier.lastAngle
-                        let dp0 = Point().movedWith(distance: ns0,
-                                                    angle: fa + .pi / 2)
-                        append(p0 - dp0)
-                        append(p0 + dp0)
-                        appendLastCap(cp, angle: fa, radius: ncs)
-                        appendFirstCap(cp, angle: la - .pi, radius: ncs)
-                    } else {
-                        let l = bezier.length(withFlatness: 4)
-                        let ct = da < .pi * 0.1 ?
-                            da.clipped(min: 0, max: .pi * 0.3,
-                                       newMin: 0, newMax: 1.5) :
-                            da.clipped(min: .pi * 0.3, max: .pi * 0.9,
-                                       newMin: 1.5, newMax: 16)
-                        let c = l * ct * rlw * quality
-                        let count = c.isNaN ? 2 : Int(c.clipped(min: 2, max: 32))
-                        let rCount = 1 / Double(count)
-                        for i in 0 ..< count {
-                            let t = Double(i) * rCount
-                            let ns = s * preb.position(withT: t)
-                            let p = bezier.position(withT: t)
-                            let dp = bezier.difference(withT: t)
-                                .perpendicularDeltaPoint(withDistance: ns)
-                            append(p - dp)
-                            append(p + dp)
-                        }
+                    let l = bezier.length(withFlatness: 4)
+                    let ct = da < .pi * 0.1 ?
+                        da.clipped(min: 0, max: .pi * 0.3,
+                                   newMin: 0, newMax: 1.5) :
+                        da.clipped(min: .pi * 0.3, max: .pi * 0.9,
+                                   newMin: 1.5, newMax: 16)
+                    let c = l * ct * rlw * quality
+                    let count = c.isNaN ? 2 : Int(c.clipped(min: 2, max: 32))
+                    let rCount = 1 / Double(count)
+                    for i in 0 ..< count {
+                        let t = Double(i) * rCount
+                        let ns = s * preb.position(withT: t)
+                        let p = bezier.position(withT: t)
+                        let dp = bezier.difference(withT: t)
+                            .perpendicularDeltaPoint(withDistance: ns)
+                        append(p - dp)
+                        append(p + dp)
                     }
                 }
                 let d0 = bezier.p0.distance(bezier.cp)
@@ -1781,41 +1760,20 @@ extension Path {
                              preT: Double, nextT: Double) {
                     let da = abs(Point.differenceAngle(bezier.cp - bezier.p0,
                                                        bezier.p1 - bezier.cp))
-                    func isMiniCross() -> Bool {
-                        if da > .pi * 0.6 {
-                            let d0 = bezier.p0.distanceSquared(bezier.cp)
-                            let d1 = bezier.cp.distanceSquared(bezier.p1)
-                            return (d0 / s * s < 4 * 4 || d1 / s * s < 4 * 4)
-                        } else {
-                            return false
-                        }
-                    }
-                    if da > .pi * 0.9 || isMiniCross() {
-                        let ncs = s * preb.cx
-                        let cp = bezier.position(withT: 0.5)
-                        let fa = bezier.firstAngle, la = bezier.lastAngle
-                        append(from: k - 1)
-                        append(from: k - 1)
-                        appendLastCap(cp, angle: fa, radius: ncs,
-                                      at: k - 1)
-                        appendFirstCap(cp, angle: la - .pi, radius: ncs,
-                                       at: k - 1)
-                    } else {
-                        let l = bezier.length(withFlatness: 4)
-                        let ct = da < .pi * 0.1 ?
-                            da.clipped(min: 0, max: .pi * 0.3,
-                                       newMin: 0, newMax: 1.5) :
-                            da.clipped(min: .pi * 0.3, max: .pi * 0.9,
-                                       newMin: 1.5, newMax: 16)
-                        let c = l * ct * rlw * quality
-                        let count = c.isNaN ? 2 : Int(c.clipped(min: 2, max: 32))
-                        let rCount = 1 / Double(count)
-                        for i in 0 ..< count {
-                            let t = Double.linear(preT, nextT,
-                                                  t: Double(i) * rCount)
-                            append(from: k, t: t)
-                            append(from: k, t: t)
-                        }
+                    let l = bezier.length(withFlatness: 4)
+                    let ct = da < .pi * 0.1 ?
+                        da.clipped(min: 0, max: .pi * 0.3,
+                                   newMin: 0, newMax: 1.5) :
+                        da.clipped(min: .pi * 0.3, max: .pi * 0.9,
+                                   newMin: 1.5, newMax: 16)
+                    let c = l * ct * rlw * quality
+                    let count = c.isNaN ? 2 : Int(c.clipped(min: 2, max: 32))
+                    let rCount = 1 / Double(count)
+                    for i in 0 ..< count {
+                        let t = Double.linear(preT, nextT,
+                                              t: Double(i) * rCount)
+                        append(from: k, t: t)
+                        append(from: k, t: t)
                     }
                 }
                 let d0 = bezier.p0.distance(bezier.cp)

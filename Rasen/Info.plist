@@ -16,9 +16,9 @@
 				<string>rasendoc</string>
 			</array>
 			<key>CFBundleTypeIconFile</key>
-			<string>DOCIcon</string>
+			<string></string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>0</integer>
+			<integer>1</integer>
 			<key>CFBundleTypeName</key>
 			<string>Rasen Document</string>
 			<key>CFBundleTypeRole</key>
@@ -38,9 +38,9 @@
 				<string>rasendoch</string>
 			</array>
 			<key>CFBundleTypeIconFile</key>
-			<string>DOCHIcon</string>
+			<string></string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>0</integer>
+			<integer>1</integer>
 			<key>CFBundleTypeName</key>
 			<string>Rasen Document with History</string>
 			<key>CFBundleTypeRole</key>
@@ -60,9 +60,9 @@
 				<string>rasendata</string>
 			</array>
 			<key>CFBundleTypeIconFile</key>
-			<string>DATAIcon</string>
+			<string></string>
 			<key>CFBundleTypeIconSystemGenerated</key>
-			<integer>0</integer>
+			<integer>1</integer>
 			<key>CFBundleTypeName</key>
 			<string>Rasen Data</string>
 			<key>CFBundleTypeRole</key>
@@ -91,6 +91,8 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSHasLocalizedDisplayName</key>
+	<true/>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.graphics-design</string>
 	<key>LSMinimumSystemVersion</key>
@@ -107,13 +109,13 @@
 			<key>UTTypeDescription</key>
 			<string>Rasen Document</string>
 			<key>UTTypeIconFile</key>
-			<string>DOCIcon</string>
+			<string></string>
 			<key>UTTypeIcons</key>
 			<dict>
 				<key>UTTypeIconBadgeName</key>
 				<string></string>
 				<key>UTTypeIconText</key>
-				<string></string>
+				<string>doc</string>
 			</dict>
 			<key>UTTypeIdentifier</key>
 			<string>net.cii0.Rasen.rasendoc</string>
@@ -135,9 +137,12 @@
 			<key>UTTypeDescription</key>
 			<string>Rasen Document with History</string>
 			<key>UTTypeIconFile</key>
-			<string>DOCHIcon</string>
+			<string></string>
 			<key>UTTypeIcons</key>
-			<dict/>
+			<dict>
+				<key>UTTypeIconText</key>
+				<string>doch</string>
+			</dict>
 			<key>UTTypeIdentifier</key>
 			<string>net.cii0.Rasen.rasendoch</string>
 			<key>UTTypeReferenceURL</key>
@@ -158,9 +163,12 @@
 			<key>UTTypeDescription</key>
 			<string>Rasen Data</string>
 			<key>UTTypeIconFile</key>
-			<string>DATAIcon</string>
+			<string></string>
 			<key>UTTypeIcons</key>
-			<dict/>
+			<dict>
+				<key>UTTypeIconText</key>
+				<string>data</string>
+			</dict>
 			<key>UTTypeIdentifier</key>
 			<string>net.cii0.Rasen.rasendata</string>
 			<key>UTTypeReferenceURL</key>

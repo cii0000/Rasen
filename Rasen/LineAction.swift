@@ -852,7 +852,7 @@ final class LineAction: Action {
                      event.phase)
         }
         
-        return (nLine, isSnapStraight)
+        return (isSnapStraight ? nLine.with(size: 1) : nLine, isSnapStraight)
     }
     
     nonisolated
