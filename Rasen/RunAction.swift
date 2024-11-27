@@ -100,7 +100,7 @@ final class RunAction: InputKeyEventAction {
             if let (textView, ti, _, _) = sheetView.textTuple(at: inP) {
                 let text = textView.model
                 
-                if URL(webString: text.string)?.openInBrowser() ?? false { return }
+                if text.string.hasPrefix("http"), URL(string: text.string)?.openInBrowser() ?? false { return }
                 
                 if text.string == "drawWaveform =" {
                     var view: SheetContentView?, minD = Double.infinity

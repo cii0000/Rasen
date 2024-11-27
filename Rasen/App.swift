@@ -52,9 +52,6 @@ final class SubNSApplication: NSApplication {
     typealias IOHIDEventGetEventFlagsType = @convention(c) (_ event: any AnyObject) -> UInt64
     let IOHIDEventGetEventFlags = unsafeBitCast(dlsym(ioKitHandle, "IOHIDEventGetEventFlags"),
                                                 to: IOHIDEventGetEventFlagsType.self)
-    typealias IOHIDEventGetSenderIDType = @convention(c) (_ event: any AnyObject) -> UInt64
-    let IOHIDEventGetSenderID = unsafeBitCast(dlsym(ioKitHandle, "IOHIDEventGetSenderID"),
-                                              to: IOHIDEventGetSenderIDType.self)
     typealias IOHIDEventGetIntegerValueType = @convention(c) (_ event: any AnyObject, UInt32) -> Int32
     let IOHIDEventGetIntegerValue = unsafeBitCast(dlsym(ioKitHandle, "IOHIDEventGetIntegerValue"),
                                                   to: IOHIDEventGetIntegerValueType.self)
@@ -71,20 +68,6 @@ final class SubNSApplication: NSApplication {
                 }
                 if let deviceSize = trackpadSize {
                     let ioEvent = CGEventCopyIOHIDEvent(cgEvent)
-                    
-//                    let ioManager = IOHIDManagerCreate(kCFAllocatorDefault, 0)
-//                    let dic = [kIOHIDDeviceUsagePageKey: 65280]
-//                    IOHIDManagerSetDeviceMatching(ioManager, dic as CFDictionary)
-//                    print("A")
-////                    print("A", IOHIDManagerCopyDevices(ioManager))
-//                    if let devices = IOHIDManagerCopyDevices(ioManager) as? Set<IOHIDDevice> {
-////                        print(devices)
-//                        for device in devices {
-//                            print(IOHIDDeviceGetProperty(device, kIOHIDPrimaryUsageKey as CFString))
-////                            print(IOHIDDeviceCopyMatchingElements(device, [kIOHIDElementTypeKey: 0] as CFDictionary, IOHIDOptionsType.zero))
-//                        }
-//                    }
-                    
                     let array = IOHIDEventGetChildren(ioEvent) as Array
                     var fingers = [TouchEvent.Finger]()
                     for o in array {
@@ -92,25 +75,28 @@ final class SubNSApplication: NSApplication {
                         // https://github.com/apple-oss-distributions/IOHIDFamily/blob/IOHIDFamily-2102.0.6/IOHIDFamily/IOHIDEvent.h
                         // https://github.com/apple-oss-distributions/IOHIDFamily/blob/IOHIDFamily-1446.140.2/IOHIDFamily/IOHIDEventFieldDefs.h
                         if IOHIDEventGetType(o) == 11 {
-//                            print(String(IOHIDEventGetSenderID(o), radix: 16))
                             let x = IOHIDEventGetFloatValue(o, (11 << 16) | 0)
                             let y = IOHIDEventGetFloatValue(o, (11 << 16) | 1)
                             let id = Int(IOHIDEventGetIntegerValue(o, (11 << 16) | 5))
                             let flags = IOHIDEventGetEventFlags(o)
-                            let flags1 = flags == 0x1//, flags2 = flags == 0x10001, flags3 = 0x30001
+                            let flags1 = flags == 0x1, flags2 = flags == 0x10001
                             let isTouch = Int(IOHIDEventGetIntegerValue(o, (11 << 16) | 9)) == 1
                             guard !(oldTouchEvent == nil && !isTouch) else { continue }
                             let phase: Phase = if let oldTouchEvent {
                                 if let v = oldTouchEvent.fingers.first(where: { $0.id == id }) {
-                                    flags1 ? .ended : (v.phase == .ended ? (!isTouch ? .ended : .began) : .changed)
+                                    flags1 ? .ended : (v.phase == .ended ?
+                                                       (!isTouch ? .ended : .began) :
+                                                        (flags2 && !isTouch ? .ended : .changed))
                                 } else {
                                     .began
                                 }
                             } else {
                                 .began
                             }
+                            guard !(phase == .began && (flags1 || flags2)) else { continue }
+                            if let oldTouchEvent, phase == .ended,
+                                oldTouchEvent.fingers.contains(where: { $0.id == id && $0.phase == .ended }) { continue }
                             fingers.append(.init(normalizedPosition: .init(x, 1 - y), phase: phase,
-                                                 isTouch: isTouch || phase == .began || phase == .ended,
                                                  id: id))
                         }
                     }
@@ -121,23 +107,20 @@ final class SubNSApplication: NSApplication {
                     let event = TouchEvent(screenPoint: screenPoint, time: time, phase: phase,
                                            fingers: .init(fingers), deviceSize: deviceSize)
                     
-//                    print(event.time, fingers.map { ($0.id, $0.phase) }, nsEvent.allTouches()
-//                        .map { if $0.phase == .began {
-//                            "\($0.identity.hash) began"
-//                        } else if $0.phase == .moved || $0.phase == .stationary {
-//                            "\($0.identity.hash) changed"
-//                        } else if $0.phase == .ended || $0.phase == .cancelled {
-//                            "\($0.identity.hash) ended"
-//                        } else {
-//                            "\($0.identity.hash) none"
-//                    }})
+                    let bb0 = fingers.map { $0.phase }.sorted(by: { $0.rawValue < $1.rawValue })
+                    let bb1 = nsEvent.allTouches().map { SubMTKView.finger(with: $0) }.map { $0.phase }.sorted(by: { $0.rawValue < $1.rawValue })
+                    if bb0 != bb1 {
+                        let b0 = fingers.map { ($0.id, $0.phase) }
+                        let b1 = nsEvent.allTouches().map { SubMTKView.finger(with: $0) }.map { ($0.id, $0.phase) }
+                        print(event.time, b0, b1)
+                    }
                     
                     switch event.phase {
                     case .began: view.touchesBegan(with: event)
                     case .changed: view.touchesMoved(with: event)
                     case .ended: view.touchesEnded(with: event)
                     }
-                    
+
                     oldTouchEvent = fingers.allSatisfy({ $0.phase == .ended }) ? nil : event
                     return
                 }
@@ -530,9 +513,7 @@ final class SubNSApplication: NSApplication {
         let nsTextView = NSTextView(frame: nsFrame)
         nsTextView.string = string
         nsTextView.isEditable = false
-        nsTextView.autoresizingMask = [.width, .height,
-                                     .minXMargin, .maxXMargin,
-                                     .minYMargin, .maxYMargin]
+        nsTextView.autoresizingMask = [.width, .height, .minXMargin, .maxXMargin, .minYMargin, .maxYMargin]
         let nsScrollView = NSScrollView(frame: nsFrame)
         nsScrollView.hasVerticalScroller = true
         nsScrollView.documentView = nsTextView
@@ -1905,6 +1886,9 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         }))
         
         rootAction.stopAllEvents()
+        if rootAction.isPlaying(with: event) {
+            rootAction.stopPlaying(with: event)
+        }
         NSMenu.popUpContextMenu(menu, with: nsEvent, for: self)
     }
     func menuDidClose(_ menu: NSMenu) {
@@ -2041,11 +2025,10 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         }
     }
     
-    var oldTouchPoints = [Int: Point]()
-    var touchedIDs = [Int]()
-    
     var isEnabledCustomTrackpad = true
     
+    var oldTouchPoints = [Int: Point]()
+    var touchedIDs = [Int]()
     var isBeganScroll = false, oldScrollPosition: Point?, allScrollPosition = Point()
     var isBeganPinch = false, oldPinchDistance: Double?
     var isBeganRotate = false, oldRotateAngle: Double?
@@ -2061,6 +2044,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     var lastMagnification = 0.0
     var lastRotationQuantity = 0.0
     var isBeganSwipe = false, swipePosition: Point?, beganSwipePosition: Point?
+    var began4FingersPosition: Point?
     
     private var scrollTimeValue = 0.0
     private var scrollTimer: (any DispatchSourceTimer)?
@@ -2069,12 +2053,45 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     func touchPoints(with event: TouchEvent) -> [Int: Point] {
         event.fingers.reduce(into: .init()) {
-            guard $1.isTouch else { return }
             $0[$1.id] = .init($1.normalizedPosition.x * event.deviceSize.width,
                               $1.normalizedPosition.y * event.deviceSize.height)
         }
     }
+    static func finger(with touch: NSTouch) -> TouchEvent.Finger {
+        let phase: Phase = if touch.phase.contains(.began) {
+            .began
+        } else if touch.phase.contains(.moved) || touch.phase.contains(.stationary) {
+            .changed
+        } else {
+            .ended
+        }
+        return .init(normalizedPosition: touch.normalizedPosition.my, phase: phase, id: touch.identity.hash)
+    }
     
+    override func touchesBegan(with nsEvent: NSEvent) {
+        guard let touch = nsEvent.allTouches().first else { return }
+        touchesBegan(with: .init(screenPoint: screenPoint(with: nsEvent).my,
+                                 time: nsEvent.timestamp, phase: .began,
+                                 fingers: Set(nsEvent.allTouches().map { Self.finger(with: $0) }),
+                     deviceSize: touch.deviceSize.my))
+    }
+    override func touchesMoved(with nsEvent: NSEvent) {
+        guard let touch = nsEvent.allTouches().first else { return }
+        touchesMoved(with: .init(screenPoint: screenPoint(with: nsEvent).my,
+                                 time: nsEvent.timestamp, phase: .changed,
+                                 fingers: Set(nsEvent.allTouches().map { Self.finger(with: $0) }),
+                     deviceSize: touch.deviceSize.my))
+    }
+    override func touchesEnded(with nsEvent: NSEvent) {
+        guard let touch = nsEvent.allTouches().first else { return }
+        touchesEnded(with: .init(screenPoint: screenPoint(with: nsEvent).my,
+                                 time: nsEvent.timestamp, phase: .ended,
+                                 fingers: Set(nsEvent.allTouches().map { Self.finger(with: $0) }),
+                     deviceSize: touch.deviceSize.my))
+    }
+    override func touchesCancelled(with event: NSEvent) {
+        touchesEnded(with: event)
+    }
     func touchesBegan(with event: TouchEvent) {
         guard isEnabledCustomTrackpad else { return }
         
@@ -2106,7 +2123,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             oldScrollPosition = nil
             
             let ps0 = ps[touchedIDs[0]]!, ps1 = ps[touchedIDs[1]]!, ps2 = ps[touchedIDs[2]]!
-            beganSwipePosition = [ps0, ps1, ps2].sum()
+            beganSwipePosition = [ps0, ps1, ps2].mean()
             
             isBeganSwipe = false
             swipePosition = Point()
@@ -2116,7 +2133,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             oldRotateAngle = nil
             oldScrollPosition = nil
             
-            oldScrollPosition = (0 ..< 4).map { ps[touchedIDs[$0]]! }.mean()!
+            began4FingersPosition = (0 ..< 4).map { ps[touchedIDs[$0]]! }.mean()!
             isPrepare4FingersTap = true
         }
     }
@@ -2262,10 +2279,9 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                let ps2 = ps[touchedIDs[2]],
                let ops2 = oldTouchPoints[touchedIDs[2]] {
                 
-                let deltaP = [ps0 - ops0, ps1 - ops1, ps2 - ops2].sum()
-                
+                let deltaP = [ps0 - ops0, ps1 - ops1, ps2 - ops2].mean()!
                 if !isBeganSwipe && abs(deltaP.x) > abs(deltaP.y)
-                    && ([ps0, ps1, ps2].sum() - beganSwipePosition).length() > 5 {
+                    && ([ps0, ps1, ps2].mean()! - beganSwipePosition).length() > 3 {
                     
                     isBeganSwipe = true
                     isPrepare3FingersTap = false
@@ -2290,27 +2306,27 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     self.swipePosition = swipePosition + deltaP
                 } else {
                     let vs = (0 ..< 3).compactMap { ps[touchedIDs[$0]] }
-                    if let oldScrollPosition, vs.count == 3 {
+                    if vs.count == 3 {
                         let np = vs.mean()!
-                        if np.distance(oldScrollPosition) > 5 {
+                        if np.distance(beganSwipePosition) > 3 {
                             isPrepare3FingersTap = false
                         }
                     }
                 }
             } else if touchedIDs.count == 3 {
                 let vs = (0 ..< 3).compactMap { ps[touchedIDs[$0]] }
-                if let oldScrollPosition, vs.count == 3 {
+                if let beganSwipePosition, vs.count == 3 {
                     let np = vs.mean()!
-                    if np.distance(oldScrollPosition) > 5 {
+                    if np.distance(beganSwipePosition) > 3 {
                         isPrepare3FingersTap = false
                     }
                 }
             }
         } else if ps.count == 4 && touchedIDs.count == 4 {
             let vs = (0 ..< 4).compactMap { ps[touchedIDs[$0]] }
-            if let oldScrollPosition, vs.count == 4 {
+            if let began4FingersPosition, vs.count == 4 {
                 let np = vs.mean()!
-                if np.distance(oldScrollPosition) > 5 {
+                if np.distance(began4FingersPosition) > 3 {
                     isPrepare4FingersTap = false
                 }
             }
@@ -2334,14 +2350,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     func touchesEnded(with event: TouchEvent) {
         guard isEnabledCustomTrackpad else { return }
         
-        if swipePosition != nil {
-            rootAction.swipe(with: .init(screenPoint: event.screenPoint,
-                                         time: event.time,
-                                         scrollDeltaPoint: Point(),
-                                         phase: .ended))
-            swipePosition = nil
-            isBeganSwipe = false
-        } else if !isBeganPinch && !isBeganScroll && !isBeganRotate && isPrepare3FingersTap {
+        if !isBeganPinch && !isBeganScroll && !isBeganRotate && isPrepare3FingersTap {
             var event = InputKeyEvent(screenPoint: event.screenPoint,
                                       time: event.time,
                                       pressure: 1, phase: .began, isRepeat: false,
@@ -2363,6 +2372,13 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             event.phase = .ended
             action.flow(with: event)
             isPrepare4FingersTap = false
+        } else if swipePosition != nil {
+            rootAction.swipe(with: .init(screenPoint: event.screenPoint,
+                                         time: event.time,
+                                         scrollDeltaPoint: Point(),
+                                         phase: .ended))
+            swipePosition = nil
+            isBeganSwipe = false
         }
         
         endPinch(with: event)
@@ -2877,128 +2893,6 @@ enum Appearance {
     nonisolated(unsafe) static var current: Appearance = .light
 }
 
-private extension NSImage {
-    static func iconNodes(centerP scp: Point, scale: Double, r: Double, lineWidth lw: Double,
-                          documentWidth: Double = 0,
-                          in nb: Rect) -> [Node] {
-        func spiralPathline(a: Double = 0.25, b: Double = -0.25,
-                        angle: Double,
-                        firstT: Double,
-                        lastT: Double = -50) -> Pathline {
-            var ps = [Point]()
-            for i in (0 ... 1000).reversed() {
-                let t = (Double(i) / 1000).clipped(min: 0, max: 1,
-                                                 newMin: firstT,
-                                                 newMax: lastT)
-                let x = a ** (b * t) * .cos(t + angle)
-                let y = a ** (b * t) * .sin(t + angle)
-                
-                let p = Point(x, y) * scale + scp
-                if nb.contains(p) {
-                    ps.append(p)
-                } else {
-                    ps.append(nb.clipped(p))
-                    break
-                }
-            }
-            return Pathline(ps, isClosed: false)
-        }
-        
-        let sp0 = spiralPathline(angle: 0, firstT: 5)
-        let sp1 = spiralPathline(angle: .pi2 / 3, firstT: 5)
-        let sp2 = spiralPathline(angle: .pi2 * 2 / 3, firstT: 5)
-        
-        var pls0 = [Pathline.Element]()
-        pls0 += Pathline.squircle(p0: nb.maxXMaxYPoint,
-                                p1: nb.minXMaxYPoint,
-                                p2: nb.minXMinYPoint, r: r)
-        let pls0p = pls0.first?.lastPoint ?? .init()
-        pls0 += sp0.elements.reversed()
-        pls0 += sp2.elements
-        
-        var pls1 = [Pathline.Element]()
-        if documentWidth > 0 {
-            pls1 += [.linear(nb.maxXMaxYPoint + Point(0, -documentWidth)),
-                     .linear(nb.maxXMaxYPoint + Point(-documentWidth, 0))]
-        } else {
-            pls1 += Pathline.squircle(p0: nb.maxXMinYPoint,
-                                    p1: nb.maxXMaxYPoint,
-                                    p2: nb.minXMaxYPoint, r: r)
-        }
-        let pls1p = pls1.first?.lastPoint ?? .init()
-        pls1 += sp2.elements.reversed()
-        pls1 += sp1.elements
-          
-        let color0 = Color(red: 0.0011757521, green: 0.7693206, blue: 0.91262335)
-        let color1 = Color(red: 0.99986285, green: 0.87789917, blue: 0.84061176)
-        return [Node(path: Path([Pathline(firstPoint: pls0p,
-                                          elements: pls0,
-                                          isClosed: true)],
-                                isPolygon: false),
-                     fillType: .color(color0)),
-                Node(path: Path([Pathline(firstPoint: pls1p,
-                                          elements: pls1,
-                                          isClosed: true)],
-                                isPolygon: false),
-                     fillType: .color(color1)),
-                Node(path: Path([sp0]),
-                     lineWidth: lw, lineType: .color(.content)),
-                Node(path: Path([sp1]),
-                     lineWidth: lw, lineType: .color(.content)),
-                Node(path: Path([sp2]),
-                     lineWidth: lw, lineType: .color(.content))]
-    }
-    @MainActor static func exportAppIcon() {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.begin { [weak panel] result in
-            guard let panel = panel else { return }
-            guard result == .OK else { return }
-            guard let url = panel.url else { return }
-            for width in [16, 32, 64, 128, 256, 512, 1024] as [Double] {
-                let size = CGSize(width: width, height: width)
-                let nsImage = NSImage(size: size, flipped: false) { rect -> Bool in
-                    let ctx = NSGraphicsContext.current!.cgContext
-                    let rect = rect.my
-                    
-                    let cp = rect.centerPoint
-                    let lw = width * 15 / 1024
-                    let r = (width * (1024 - 100 * 2) / 1024 - lw) / 2
-                    let nb = Rect(x: cp.x - r, y: cp.y - r,
-                                  width: r * 2, height: r * 2)
-                    
-                    let path = Path(nb, cornerRadius: r * 0.43)
-                    let scp = cp + Point(-r * 0.125, r * 0.0625), scale = r * 2 * 1.25
-                    let nNodes = [Node(path: path,
-                                       fillType: .color(.background))]
-                    + iconNodes(centerP: scp, scale: scale, r: r * 0.43, lineWidth: lw, in: nb)
-                    + [Node(path: path,
-                            lineWidth: lw, lineType: .color(.content))]
-                    let node = Node(children: nNodes,
-                                    path: Path(rect))
-                    
-                    let image = node.imageInBounds(size: rect.size,
-                                                   backgroundColor: Color(lightness: 0, opacity: 0), .p3)
-                    image?.render(in: ctx)
-                    
-                    return true
-                }
-                try? nsImage.PNGRepresentation?
-                    .write(to: url.appendingPathComponent("\(String(Int(width))).png"))
-            }
-        }
-    }
-    final var PNGRepresentation: Data? {
-        if let tiffRepresentation = tiffRepresentation,
-           let bitmap = NSBitmapImageRep(data: tiffRepresentation) {
-            
-            return bitmap.representation(using: .png, properties: [.interlaced: false])
-        } else {
-            return nil
-        }
-    }
-}
-
 struct UTType {
     var uti: UniformTypeIdentifiers.UTType
     init(importedAs: String) {
@@ -3234,9 +3128,7 @@ extension URL {
     }
     var allFileSize: Int {
         var fileSize = 0
-        let urls = FileManager.default
-            .enumerator(at: self,
-                        includingPropertiesForKeys: nil)?.allObjects as? [URL]
+        let urls = FileManager.default.enumerator(at: self, includingPropertiesForKeys: nil)?.allObjects as? [URL]
         urls?.lazy.forEach {
             fileSize += (try? $0.resourceValues(forKeys: [.totalFileAllocatedSizeKey]))?
                 .totalFileAllocatedSize ?? 0
@@ -3258,8 +3150,7 @@ extension URL {
     static let contents = library.appending(path: "contents")
     
     init(libraryName: String) {
-        let directoryURL = FileManager.default.urls(for: .libraryDirectory,
-                                                    in: .userDomainMask)[0]
+        let directoryURL = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask)[0]
         self = directoryURL.appendingPathComponent(libraryName)
     }
     init?(bundleName: String, extension ex: String) {
@@ -3287,13 +3178,7 @@ extension URL {
         return resourceValues?.typeIdentifier
     }
     
-    init?(webString: String) {
-        guard webString.hasPrefix("http") else { return nil }
-        self.init(string: webString)
-    }
-    
-    @discardableResult
-    func openInBrowser() -> Bool {
+    @discardableResult func openInBrowser() -> Bool {
         NSWorkspace.shared.open(self)
     }
 }
@@ -3966,8 +3851,7 @@ extension Color {
         }
     }
     var cg: CGColor {
-        CGColor.with(rgb: rgba, alpha: opacity,
-                     colorSpace: colorSpace.cg ?? .default)
+        CGColor.with(rgb: rgba, alpha: opacity, colorSpace: colorSpace.cg ?? .default)
     }
 }
 extension CGColor {

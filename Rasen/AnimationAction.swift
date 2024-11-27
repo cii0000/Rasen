@@ -364,6 +364,7 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
     }
     
     private let indexInterval = 5.0
+    private let correction = 3.5
     
     private var sheetView: SheetView?, contentIndex: Int?
     private var contentView: SheetContentView? {
@@ -385,7 +386,7 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
             preSP = event.screenPoint
         }
         flow(with: SwipeEvent(screenPoint: event.screenPoint, time: event.time,
-                        scrollDeltaPoint: event.screenPoint - preSP, phase: event.phase))
+                              scrollDeltaPoint: (event.screenPoint - preSP) / correction, phase: event.phase))
         preSP = event.screenPoint
     }
     func flow(with event: SwipeEvent) {
@@ -436,7 +437,7 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
         case .changed:
             if let sheetView {
                 if let contentView {
-                    allDX += event.scrollDeltaPoint.x
+                    allDX += event.scrollDeltaPoint.x * correction
                     let deltaI = Int((allDX / indexInterval).rounded())
                     if deltaI != oldDeltaI {
                         oldDeltaI = deltaI
@@ -461,7 +462,7 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
                             return
                         }
                     }
-                    allDX += event.scrollDeltaPoint.x
+                    allDX += event.scrollDeltaPoint.x * correction
                     if sheetView.model.enabledAnimation {
                         let animationView = sheetView.animationView
                         let animation = animationView.model
@@ -494,6 +495,12 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
                                 sheetView.stop()
                             }
                             sheetView.rootKeyframeIndex = nRootI
+                            if animationView.currentKeyframe.isKey
+                                || (!animationView.currentKeyframe.isKey && animationView.model.keyframes[oldKI].isKey)
+                                || animationView.model.index == 0 {
+                                
+                                Feedback.performAlignment()
+                            }
                             
                             preMoveEventTime = event.time
                             
@@ -642,6 +649,7 @@ final class PlayAction: InputKeyEventAction {
                     }
                     cSheetView.play(atSec: sec, inSec: secRange, otherTimelineIDs: ids)
                 }
+                rootView.cursor = rootView.cursor(from: cSheetView.currentTimeString() + "...", isArrow: true)
             }
         case .changed:
             break

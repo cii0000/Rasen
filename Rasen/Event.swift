@@ -341,8 +341,8 @@ extension Quasimode {
     static let moveLineZ = Self(modifier: [.shift, .control], .drag)
     
     static let selectFrame = Self(.swipe)
-    static let play = Self(.fourFingersTap)
     static let keySelectFrame = Self(modifier: [.control, .command], .drag)
+    static let play = Self(.fourFingersTap)
     static let keyPlay = Self(modifier: [.control, .command], .click)
     
     static let goPrevious = Self(modifier: [.control], .z)//
@@ -442,7 +442,7 @@ struct RotateEvent: Event {
 
 struct TouchEvent: Event {
     struct Finger: Hashable {
-        var normalizedPosition: Point, phase: Phase, isTouch: Bool, id: Int
+        var normalizedPosition: Point, phase: Phase, id: Int
         
         func hash(into hasher: inout Hasher) {
             hasher.combine(id)

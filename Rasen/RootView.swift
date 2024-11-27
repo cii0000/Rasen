@@ -3085,8 +3085,10 @@ final class RootView: View, @unchecked Sendable {
         oldMapType = mapType
     }
     
-    func cursor(from string: String) -> Cursor {
-        if pov.rotation != 0 {
+    func cursor(from string: String, isArrow: Bool = false) -> Cursor {
+        if isArrow {
+            .arrowWith(string: string)
+        } else if pov.rotation != 0 {
             .rotate(string: string,
                     rotation: -pov.rotation + .pi / 2)
         } else {

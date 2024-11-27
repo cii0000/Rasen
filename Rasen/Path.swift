@@ -1872,4 +1872,111 @@ extension Path {
         
         return rgbas
     }
+    
+    func pathDistancePoints(lineWidth lw: Double, quality: Double = 1) -> (ps: [DistancePoint], counts: [Int]) {
+        var points = [DistancePoint](), counts = [Int]()
+        let s = lw / 2
+        
+        func appendLinear(p0: Point, p1: Point,
+                          p00: Point? = nil,
+                          lastAngle: Double? = nil) {
+            guard p0 != p1 else { return }
+            points.append(.init(p0, s))
+            points.append(.init(p1, s))
+        }
+        
+        func appendBezier(_ bezier: Bezier, p00: Point?) {
+            guard !bezier.isLineaer else {
+                appendLinear(p0: bezier.p0, p1: bezier.p1, p00: p00)
+                return
+            }
+            let l = bezier.length(withFlatness: 4)
+            let ll = l * 0.2
+            let d = Edge(bezier.p0, bezier.p1).distance(from: bezier.cp)
+            let c = l * min(1, d / ll) * quality
+            let count = c.isNaN ? 2 : Int(c.clipped(min: 2, max: 20))
+            let rCount = 1 / Double(count)
+            for i in 0 ..< count {
+                let t = Double(i) * rCount
+                let p = bezier.position(withT: t)
+                points.append(.init(p, s))
+            }
+        }
+        
+        func appendLine(_ line: Line) {
+            points += line.pathDistancePoints(quality: quality)
+        }
+        
+        func appendArc(_ arc: Arc) {
+            let dAngle = abs(arc.endAngle - arc.startAngle)
+            let c = arc.radius * dAngle * quality
+            let count = c.isNaN ? 1 : max(1, Int(c))
+            let rCount = 1 / Double(count)
+            for i in 0 ..< count {
+                let theta = Double.linear(arc.startAngle, arc.endAngle,
+                                          t: Double(i) * rCount)
+                let unitP = PolarPoint(1, theta).rectangular
+                let p = arc.centerPosition + unitP * arc.radius
+                points.append(.init(p, arc.radius))
+            }
+        }
+        
+        var oldIndex = 0
+        for pathline in pathlines {
+            var p0 = pathline.firstPoint, p00: Point?
+            if !pathline.isClosed && isCap {
+                if case .line(let line)? = pathline.elements.first,
+                   p0 == line.firstPoint {
+                    points.append(.init(line.firstPoint, line.firstDistance))
+                } else {
+                    points.append(.init(p0, s))
+                }
+            }
+            for element in pathline.elements {
+                switch element {
+                case .linear(let p1):
+                    appendLinear(p0: p0, p1: p1, p00: p00)
+                    p00 = p0
+                    p0 = p1
+                case .bezier(let p1, let cp):
+                    appendBezier(Bezier(p0: p0, cp: cp, p1: p1), p00: p00)
+                    p00 = p0
+                    p0 = p1
+                case .line(let line):
+                    let fp = line.firstPoint
+                    if p0 != fp {
+                        appendLinear(p0: p0, p1: fp, p00: p00)
+                    }
+                    appendLine(line)
+                    p00 = p0
+                    p0 = line.lastPoint
+                case .arc(let arc):
+                    let sp = arc.startPosition
+                    if p0 != sp {
+                        appendLinear(p0: p0, p1: sp, p00: p00)
+                    }
+                    appendArc(arc)
+                    p00 = p0
+                    p0 = arc.endPosition
+                }
+            }
+            if pathline.isClosed {
+                appendLinear(p0: p0, p1: pathline.firstPoint, p00: p00,
+                             lastAngle: pathline.firstAngle)
+                if points.count - oldIndex >= 8 {
+                    points += points[oldIndex ..< (8 + oldIndex)]
+                }
+            } else if isCap {
+                if case .line(let line)? = pathline.elements.last {
+                    points.append(.init(line.lastPoint, line.lastDistance))
+                } else {
+                    points.append(.init(p0, s))
+                }
+            }
+            
+            counts.append((points.count - oldIndex) / 4)
+            oldIndex = points.count
+        }
+        return (points, counts)
+    }
 }

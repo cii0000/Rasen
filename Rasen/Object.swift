@@ -192,8 +192,7 @@ extension OSheet {
 }
 
 struct OArray: Hashable, BidirectionalCollection {
-    var dimension: Int, nextCount: Int
-    var value: [O]
+    var value: [O], dimension: Int, nextCount: Int
 }
 extension OArray {
     init(_ value: [O], dimension: Int = 1, nextCount: Int = 1) {
@@ -260,8 +259,50 @@ extension OArray {
         .init(value, dimension: dimension, nextCount: nextCount)
     }
     
+    static func ** (lhs: Self, rhs: O) -> Self {
+        .init(lhs.map { $0 ** rhs }, dimension: lhs.dimension, nextCount: lhs.nextCount)
+    }
+    static func ** (lhs: O, rhs: Self) -> Self {
+        .init(rhs.map { lhs ** $0 }, dimension: rhs.dimension, nextCount: rhs.nextCount)
+    }
+    static func apow(_ lhs: Self, _ rhs: O) -> Self {
+        .init(lhs.map { O.apow($0, rhs) }, dimension: lhs.dimension, nextCount: lhs.nextCount)
+    }
+    static func apow(_ lhs: O, _ rhs: Self) -> Self {
+        .init(rhs.map { O.apow(lhs, $0) }, dimension: rhs.dimension, nextCount: rhs.nextCount)
+    }
+    static func * (lhs: Self, rhs: O) -> Self {
+        .init(lhs.map { $0 * rhs }, dimension: lhs.dimension, nextCount: lhs.nextCount)
+    }
+    static func * (lhs: O, rhs: Self) -> Self {
+        .init(rhs.map { lhs * $0 }, dimension: rhs.dimension, nextCount: rhs.nextCount)
+    }
+    static func / (lhs: Self, rhs: O) -> Self {
+        .init(lhs.map { $0 / rhs }, dimension: lhs.dimension, nextCount: lhs.nextCount)
+    }
+    static func / (lhs: O, rhs: Self) -> Self {
+        .init(rhs.map { lhs / $0 }, dimension: rhs.dimension, nextCount: rhs.nextCount)
+    }
+    static func % (lhs: Self, rhs: O) -> Self {
+        .init(lhs.map { $0 % rhs }, dimension: lhs.dimension, nextCount: lhs.nextCount)
+    }
+    static func % (lhs: O, rhs: Self) -> Self {
+        .init(rhs.map { lhs % $0 }, dimension: rhs.dimension, nextCount: rhs.nextCount)
+    }
+    static func + (lhs: Self, rhs: O) -> Self {
+        .init(lhs.map { $0 + rhs }, dimension: lhs.dimension, nextCount: lhs.nextCount)
+    }
+    static func + (lhs: O, rhs: Self) -> Self {
+        .init(rhs.map { lhs + $0 }, dimension: rhs.dimension, nextCount: rhs.nextCount)
+    }
+    static func - (lhs: Self, rhs: O) -> Self {
+        .init(lhs.map { $0 - rhs }, dimension: lhs.dimension, nextCount: lhs.nextCount)
+    }
+    static func - (lhs: O, rhs: Self) -> Self {
+        .init(rhs.map { lhs - $0 }, dimension: rhs.dimension, nextCount: rhs.nextCount)
+    }
     func rounded(_ rule: FloatingPointRoundingRule = .toNearestOrAwayFromZero) -> Self {
-        .init(dimension: dimension, nextCount: nextCount, value: value.rounded(rule))
+        .init(value: value.rounded(rule), dimension: dimension, nextCount: nextCount)
     }
 }
 
@@ -285,6 +326,74 @@ struct ORange: Hashable {
     }
 }
 extension ORange {
+    static func ** (lhs: Self, rhs: O) -> Self {
+        Self.cal(lhs: lhs, rhs: rhs, fn: **)
+    }
+    static func ** (lhs: O, rhs: Self) -> Self {
+        Self.cal(lhs: lhs, rhs: rhs, fn: **)
+    }
+    static func apow(_ lhs: Self, _ rhs: O) -> Self {
+        Self.cal(lhs: lhs, rhs: rhs, fn: O.apow)
+    }
+    static func apow(_ lhs: O, _ rhs: Self) -> Self {
+        Self.cal(lhs: lhs, rhs: rhs, fn: O.apow)
+    }
+    static func * (lhs: Self, rhs: O) -> Self {
+        Self.cal(lhs: lhs, rhs: rhs, fn: *)
+    }
+    static func * (lhs: O, rhs: Self) -> Self {
+        Self.cal(lhs: lhs, rhs: rhs, fn: *)
+    }
+    static func / (lhs: Self, rhs: O) -> Self {
+        Self.cal(lhs: lhs, rhs: rhs, fn: /)
+    }
+    static func / (lhs: O, rhs: Self) -> Self {
+        Self.cal(lhs: lhs, rhs: rhs, fn: /)
+    }
+    static func % (lhs: Self, rhs: O) -> Self {
+        Self.cal(lhs: lhs, rhs: rhs, fn: %)
+    }
+    static func % (lhs: O, rhs: Self) -> Self {
+        Self.cal(lhs: lhs, rhs: rhs, fn: %)
+    }
+    static func + (lhs: Self, rhs: O) -> Self {
+        Self.cal(lhs: lhs, rhs: rhs, fn: +)
+    }
+    static func + (lhs: O, rhs: Self) -> Self {
+        Self.cal(lhs: lhs, rhs: rhs, fn: +)
+    }
+    static func - (lhs: Self, rhs: O) -> Self {
+        Self.cal(lhs: lhs, rhs: rhs, fn: -)
+    }
+    static func - (lhs: O, rhs: Self) -> Self {
+        Self.cal(lhs: lhs, rhs: rhs, fn: -)
+    }
+    static func cal(lhs: O, rhs: Self, fn: (O, O) -> (O)) -> Self {
+        switch rhs.type {
+        case .fili(let f, let l): .init(.fili(fn(lhs, f), fn(lhs, l)), delta: fn(lhs, rhs.delta))
+        case .filo(let f, let l): .init(.filo(fn(lhs, f), fn(lhs, l)), delta: fn(lhs, rhs.delta))
+        case .foli(let f, let l): .init(.foli(fn(lhs, f), fn(lhs, l)), delta: fn(lhs, rhs.delta))
+        case .folo(let f, let l): .init(.folo(fn(lhs, f), fn(lhs, l)), delta: fn(lhs, rhs.delta))
+        case .fi(let f): .init(.fi(fn(lhs, f)), delta: fn(lhs, rhs.delta))
+        case .fo(let f): .init(.fo(fn(lhs, f)), delta: fn(lhs, rhs.delta))
+        case .li(let l): .init(.li(fn(lhs, l)), delta: fn(lhs, rhs.delta))
+        case .lo(let l): .init(.lo(fn(lhs, l)), delta: fn(lhs, rhs.delta))
+        case .all: rhs
+        }
+    }
+    static func cal(lhs: Self, rhs: O, fn: (O, O) -> (O)) -> Self {
+        switch lhs.type {
+        case .fili(let f, let l): .init(.fili(fn(f, rhs), fn(l, rhs)), delta: fn(lhs.delta, rhs))
+        case .filo(let f, let l): .init(.filo(fn(f, rhs), fn(l, rhs)), delta: fn(lhs.delta, rhs))
+        case .foli(let f, let l): .init(.foli(fn(f, rhs), fn(l, rhs)), delta: fn(lhs.delta, rhs))
+        case .folo(let f, let l): .init(.folo(fn(f, rhs), fn(l, rhs)), delta: fn(lhs.delta, rhs))
+        case .fi(let f): .init(.fi(fn(f, rhs)), delta: fn(lhs.delta, rhs))
+        case .fo(let f): .init(.fo(fn(f, rhs)), delta: fn(lhs.delta, rhs))
+        case .li(let l): .init(.li(fn(l, rhs)), delta: fn(lhs.delta, rhs))
+        case .lo(let l): .init(.lo(fn(l, rhs)), delta: fn(lhs.delta, rhs))
+        case .all: lhs
+        }
+    }
     func rounded(_ rule: FloatingPointRoundingRule = .toNearestOrAwayFromZero) -> ORange {
         switch type {
         case .fili(let f, let l):
@@ -493,7 +602,7 @@ struct F: Hashable, Sendable {
         case pow, apow, multiply, division, modulo, addition, subtraction,
              equal, notEqual, less, greater, lessEqual, greaterEqual,
              not, floor, round, ceil, abs, sqrt, sin, cos, tan, asin, acos, atan, atan2, plus, minus,
-             filiZ, filoZ,
+             filiZ, filoZ, foliZ, foloZ, fiZ, foZ, liZ, loZ, filiR, filoR, foliR, foloR, fiR, foR, liR, loR, delta,
              counta, at, select, set, insert, remove, makeMatrix, releaseMatrix, `is`,
              random, asLabel, asString, asError, isError,
              send, showAboutRun, showAllDefinitions,
@@ -685,6 +794,21 @@ extension F {
         case .minus: -args[0]
         case .filiZ: .rangeO(.fili(args[0], args[1]), isSmooth: false)
         case .filoZ: .rangeO(.filo(args[0], args[1]), isSmooth: false)
+        case .foliZ: .rangeO(.foli(args[0], args[1]), isSmooth: false)
+        case .foloZ: .rangeO(.folo(args[0], args[1]), isSmooth: false)
+        case .fiZ: .rangeO(.fi(args[0]), isSmooth: false)
+        case .foZ: .rangeO(.fo(args[0]), isSmooth: false)
+        case .liZ: .rangeO(.li(args[0]), isSmooth: false)
+        case .loZ: .rangeO(.lo(args[0]), isSmooth: false)
+        case .filiR: .rangeO(.fili(args[0], args[1]), isSmooth: true)
+        case .filoR: .rangeO(.filo(args[0], args[1]), isSmooth: true)
+        case .foliR: .rangeO(.foli(args[0], args[1]), isSmooth: true)
+        case .foloR: .rangeO(.folo(args[0], args[1]), isSmooth: true)
+        case .fiR: .rangeO(.fi(args[0]), isSmooth: true)
+        case .foR: .rangeO(.fo(args[0]), isSmooth: true)
+        case .liR: .rangeO(.li(args[0]), isSmooth: true)
+        case .loR: .rangeO(.lo(args[0]), isSmooth: true)
+        case .delta: .deltaO(args[0], args[1])
         case .counta: args[0].counta
         case .at: .at(args[0], args[1])
         case .select: .select(args[0], args[1])
@@ -1159,6 +1283,37 @@ extension O {
                F(140, left: 1, right: 1, .filiZ))
         append(filoZName, OKeyInfo(rangeGroup, "{x | $0 ≤ x < $1, x ∈ Z}"),
                F(140, left: 1, right: 1, .filoZ))
+        append(foliZName, OKeyInfo(rangeGroup, "{x | $0 < x ≤ $1, x ∈ Z}"),
+               F(140, left: 1, right: 1, .foliZ))
+        append(foloZName, OKeyInfo(rangeGroup, "{x | $0 < x < $1, x ∈ Z}"),
+               F(140, left: 1, right: 1, .foloZ))
+        append(fiZName, OKeyInfo(rangeGroup, "{x | $0 ≤ x, x ∈ Z}"),
+               F(140, left: 1, .fiZ))
+        append(foZName, OKeyInfo(rangeGroup, "{x | $0 < x, x ∈ Z}"),
+               F(140, left: 1, .foZ))
+        append(liZName, OKeyInfo(rangeGroup, "{x | x ≤ $0, x ∈ Z}"),
+               F(140, right: 1, .liZ))
+        append(loZName, OKeyInfo(rangeGroup, "{x | x < $0, x ∈ Z}"),
+               F(140, right: 1, .loZ))
+        append(filiRName, OKeyInfo(rangeGroup, "{x | $0 ≤ x ≤ $1, x ∈ R}"),
+               F(140, left: 1, right: 1, .filiR))
+        append(filoRName, OKeyInfo(rangeGroup, "{x | $0 ≤ x < $1, x ∈ R}"),
+               F(140, left: 1, right: 1, .filoR))
+        append(foliRName, OKeyInfo(rangeGroup, "{x | $0 < x ≤ $1, x ∈ R}"),
+               F(140, left: 1, right: 1, .foliR))
+        append(foloRName, OKeyInfo(rangeGroup, "{x | $0 < x < $1, x ∈ R}"),
+               F(140, left: 1, right: 1, .foloR))
+        append(fiRName, OKeyInfo(rangeGroup, "{x | $0 ≤ x, x ∈ R}"),
+               F(140, left: 1, .fiR))
+        append(foRName, OKeyInfo(rangeGroup, "{x | $0 < x, x ∈ R}"),
+               F(140, left: 1, .foR))
+        append(liRName, OKeyInfo(rangeGroup, "{x | x ≤ $0, x ∈ R}"),
+               F(140, right: 1, .liR))
+        append(loRName, OKeyInfo(rangeGroup, "{x | x < $0, x ∈ R}"),
+               F(140, right: 1, .loR))
+        
+        append(deltaName, OKeyInfo(rangeGroup, "Change spacing between elements, e.g. 0 ..< 10 __ 2 = (0 2 4 6 8)".localized),
+               F(140, left: 1, right: 1, .delta))
         
         let arrayGroup = OKeyInfo.Group(name: "Array or set".localized)
         append(countaName, OKeyInfo(arrayGroup, "Get count.".localized),
@@ -1210,13 +1365,13 @@ extension O {
         append(showAllDefinitionsName, OKeyInfo(sheetGroup, "Show all definitions.".localized),
                F(left: 1, .showAllDefinitions))
         append(drawName, OKeyInfo(sheetGroup, "Draw points $0 on sheet, e.g. draw ((100 100) (200 200))".localized),
-               F(right: 1, .draw))
+               F(left: 1, .draw))
         append(drawAxesName, OKeyInfo(sheetGroup, "Draw axes on the sheet with $0 as the base scale, $1 as the x axis name, $2 as the y axis name, and the center of the sheet as the origin,\ne.g. drawAxes base: 1 \"X\" \"Y\"".localized),
                F(left: [], right: ["base", "", ""], .drawAxes))
         append(plotName, OKeyInfo(sheetGroup, "Plot points $1 on the sheet with $0 as the base scale, center of the sheet as the origin,\ne.g. plot base: 1 ((0 0) (1 1))".localized),
                F(left: [], right: ["base", ""], .plot))
-        append(flipName, OKeyInfo(sheetGroup, "Flip sheet based on $0, e.g. flip horizontal".localized),
-               F(right: 1, .flip))
+        append(flipName, OKeyInfo(sheetGroup, "Flip sheet based on $0, e.g. horizontal flip".localized),
+               F(left: 1, .flip))
         
         let otherGroup = OKeyInfo.Group(name: "Other".localized)
         append(asLabelName, OKeyInfo(otherGroup, "Make label.".localized),
@@ -1480,6 +1635,8 @@ extension O {
             case .int(let b): return O(Int.overPow(Int(a), b))
             case .rational(let b): return O(Double(a) ** Double(b))
             case .double(let b): return O(Double(a) ** b)
+            case .array(let b): return .init(ao ** b)
+            case .range(let b): return .init(ao ** b)
             case .error: return bo
             default: break
             }
@@ -1492,6 +1649,8 @@ extension O {
             case .int(let b): return O(Int.overPow(a, b))
             case .rational(let b): return O(Double(a) ** Double(b))
             case .double(let b): return O(Double(a) ** b)
+            case .array(let b): return .init(ao ** b)
+            case .range(let b): return .init(ao ** b)
             case .error: return bo
             default: break
             }
@@ -1504,6 +1663,8 @@ extension O {
             case .int(let b): return O(Rational.overPow(a, b))
             case .rational(let b): return O(Double(a) ** Double(b))
             case .double(let b): return O(Double(a) ** b)
+            case .array(let b): return .init(ao ** b)
+            case .range(let b): return .init(ao ** b)
             case .error: return bo
             default: break
             }
@@ -1516,6 +1677,8 @@ extension O {
             case .int(let b): return O(a ** Double(b))
             case .rational(let b): return O(a ** Double(b))
             case .double(let b): return O(a ** b)
+            case .array(let b): return .init(ao ** b)
+            case .range(let b): return .init(ao ** b)
             case .error: return bo
             default: break
             }
@@ -1541,6 +1704,8 @@ extension O {
             case .int(let b): return O(.apow(Double(a), Double(b)))
             case .rational(let b): return O(.apow(Double(a), Double(b)))
             case .double(let b): return O(.apow(Double(a), b))
+            case .array(let b): return .init(.apow(ao, b))
+            case .range(let b): return .init(.apow(ao, b))
             case .error: return bo
             default: break
             }
@@ -1550,6 +1715,8 @@ extension O {
             case .int(let b): return O(.apow(Double(a), Double(b)))
             case .rational(let b): return O(.apow(Double(a), Double(b)))
             case .double(let b): return O(.apow(Double(a), b))
+            case .array(let b): return .init(.apow(ao, b))
+            case .range(let b): return .init(.apow(ao, b))
             case .error: return bo
             default: break
             }
@@ -1559,6 +1726,8 @@ extension O {
             case .int(let b): return O(.apow(Double(a), Double(b)))
             case .rational(let b): return O(.apow(Double(a), Double(b)))
             case .double(let b): return O(.apow(Double(a), b))
+            case .array(let b): return .init(.apow(ao, b))
+            case .range(let b): return .init(.apow(ao, b))
             case .error: return bo
             default: break
             }
@@ -1568,6 +1737,8 @@ extension O {
             case .int(let b): return O(.apow(a, Double(b)))
             case .rational(let b): return O(.apow(a, Double(b)))
             case .double(let b): return O(.apow(a, b))
+            case .array(let b): return .init(.apow(ao, b))
+            case .range(let b): return .init(.apow(ao, b))
             case .error: return bo
             default: break
             }
@@ -1594,6 +1765,8 @@ extension O {
                     return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
                 }
                 return O(Double(a) * b)
+            case .array(let b): return .init(ao * b)
+            case .range(let b): return .init(ao * b)
             case .error: return bo
             default: break
             }
@@ -1607,6 +1780,8 @@ extension O {
                     return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
                 }
                 return O(Double(a) * b)
+            case .array(let b): return .init(ao * b)
+            case .range(let b): return .init(ao * b)
             case .error: return bo
             default: break
             }
@@ -1620,6 +1795,8 @@ extension O {
                     return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
                 }
                 return O(Double(a) * b)
+            case .array(let b): return .init(ao * b)
+            case .range(let b): return .init(ao * b)
             case .error: return bo
             default: break
             }
@@ -1641,19 +1818,18 @@ extension O {
                 }
                 return O(a * Double(b))
             case .double(let b):
-                if a.isInfinite || b.isInfinite {
-                    if (a.isInfinite && b == 0) || (a == 0 && b.isInfinite) {
-                        return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
-                    }
+                if (a.isInfinite || b.isInfinite) && ((a.isInfinite && b == 0) || (a == 0 && b.isInfinite)) {
+                    return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
                 }
                 return O(a * b)
+            case .array(let b): return .init(ao * b)
+            case .range(let b): return .init(ao * b)
             case .error: return bo
             default: break
             }
         case .array(let a):
             switch bo {
-            case .bool, .int, .rational, .double:
-                return O(OArray(a.map { $0 * bo }))
+            case .bool, .int, .rational, .double: return .init(a * bo)
             case .array(let b):
                 guard a.dimension == b.dimension else {
                     return O(OError.undefined(with: "\(ao.name) \(multiplyName) \(bo.name)"))
@@ -1736,6 +1912,8 @@ extension O {
                     O(Double(a) / Double(b)) :
                     O(Rational.overDiv(Rational(a), b))
             case .double(let b): return O(Double(a) / b)
+            case .array(let b): return .init(ao / b)
+            case .range(let b): return .init(ao / b)
             case .error: return bo
             default: break
             }
@@ -1754,6 +1932,8 @@ extension O {
                     O(Double(a) / Double(b)) :
                     O(Rational.overDiv(Rational(a), b))
             case .double(let b): return O(Double(a) / b)
+            case .array(let b): return .init(ao / b)
+            case .range(let b): return .init(ao / b)
             case .error: return bo
             default: break
             }
@@ -1772,6 +1952,8 @@ extension O {
                     O(Double(a) / Double(b)) :
                     O(Rational.overDiv(a, b))
             case .double(let b): return O(Double(a) / b)
+            case .array(let b): return .init(ao / b)
+            case .range(let b): return .init(ao / b)
             case .error: return bo
             default: break
             }
@@ -1785,6 +1967,8 @@ extension O {
                     return O(OError.undefined(with: "\(ao.name) \(divisionName) \(bo.name)"))
                 }
                 return O(a / b)
+            case .array(let b): return .init(ao / b)
+            case .range(let b): return .init(ao / b)
             case .error: return bo
             default: break
             }
@@ -1826,6 +2010,8 @@ extension O {
             case .int(let b): return O(Int.overMod(Int(a), b))
             case .rational(let b): return O(Rational.overMod(Rational(a), b))
             case .double(let b): return O(Double(a).truncatingRemainder(dividingBy: b))
+            case .array(let b): return .init(ao % b)
+            case .range(let b): return .init(ao % b)
             case .error: return bo
             default: break
             }
@@ -1834,8 +2020,9 @@ extension O {
             case .bool(let b): return O(Int.overMod(a, Int(b)))
             case .int(let b): return O(Int.overMod(a, b))
             case .rational(let b): return O(Rational.overMod(Rational(a), b))
-            case .double(let b):
-                return O(Double(a).truncatingRemainder(dividingBy: b))
+            case .double(let b): return O(Double(a).truncatingRemainder(dividingBy: b))
+            case .array(let b): return .init(ao % b)
+            case .range(let b): return .init(ao % b)
             case .error: return bo
             default: break
             }
@@ -1844,24 +2031,45 @@ extension O {
             case .bool(let b): return O(Rational.overMod(a, Rational(b)))
             case .int(let b): return O(Rational.overMod(a, Rational(b)))
             case .rational(let b): return O(Rational.overMod(a, b))
-            case .double(let b):
-                return O(Double(a).truncatingRemainder(dividingBy: b))
+            case .double(let b): return O(Double(a).truncatingRemainder(dividingBy: b))
+            case .array(let b): return .init(ao % b)
+            case .range(let b): return .init(ao % b)
             case .error: return bo
             default: break
             }
         case .double(let a):
             switch bo {
-            case .bool(let b):
-                return O(a.truncatingRemainder(dividingBy: Double(b)))
-            case .int(let b):
-                return O(a.truncatingRemainder(dividingBy: Double(b)))
-            case .rational(let b):
-                return O(a.truncatingRemainder(dividingBy: Double(b)))
+            case .bool(let b): return O(a.truncatingRemainder(dividingBy: Double(b)))
+            case .int(let b): return O(a.truncatingRemainder(dividingBy: Double(b)))
+            case .rational(let b): return O(a.truncatingRemainder(dividingBy: Double(b)))
             case .double(let b):
                 if a.isInfinite && b.isInfinite {
                     return O(OError.undefined(with: "\(ao.name) \(moduloName) \(bo.name)"))
                 }
                 return O(a.truncatingRemainder(dividingBy: b))
+            case .array(let b): return .init(ao % b)
+            case .range(let b): return .init(ao % b)
+            case .error: return bo
+            default: break
+            }
+        case .array(let a):
+            switch bo {
+            case .bool, .int, .rational, .double: return .init(a % bo)
+            case .array(let b):
+                if a.isEqualDimension(b) {
+                    var n = [O]()
+                    n.reserveCapacity(a.count)
+                    for (i, ae) in a.enumerated() {
+                        let ne = ae % b[i]
+                        switch ne {
+                        case .error: return ne
+                        default: n.append(ne)
+                        }
+                    }
+                    return O(a.with(n))
+                } else {
+                    return O(OError.undefined(with: "\(ao.name) \(additionName) \(bo.name)"))
+                }
             case .error: return bo
             default: break
             }
@@ -1884,6 +2092,8 @@ extension O {
             case .int(let b): return O(Int.overAdd(Int(a), b))
             case .rational(let b): return O(Rational.overAdd(Rational(a), b))
             case .double(let b): return O(Double(a) + b)
+            case .array(let b): return .init(ao + b)
+            case .range(let b): return .init(ao + b)
             case .error: return bo
             default: break
             }
@@ -1893,6 +2103,8 @@ extension O {
             case .int(let b): return O(Int.overAdd(a, b))
             case .rational(let b): return O(Rational.overAdd(Rational(a), b))
             case .double(let b): return O(Double(a) + b)
+            case .array(let b): return .init(ao + b)
+            case .range(let b): return .init(ao + b)
             case .error: return bo
             default: break
             }
@@ -1902,6 +2114,8 @@ extension O {
             case .int(let b): return O(Rational.overAdd(a, Rational(b)))
             case .rational(let b): return O(Rational.overAdd(a, b))
             case .double(let b): return O(Double(a) + b)
+            case .array(let b): return .init(ao + b)
+            case .range(let b): return .init(ao + b)
             case .error: return bo
             default: break
             }
@@ -1917,11 +2131,14 @@ extension O {
                     }
                 }
                 return O(a + b)
+            case .array(let b): return .init(ao + b)
+            case .range(let b): return .init(ao + b)
             case .error: return bo
             default: break
             }
         case .array(let a):
             switch bo {
+            case .bool, .int, .rational, .double: return .init(a + bo)
             case .array(let b):
                 if a.isEqualDimension(b) {
                     var n = [O]()
@@ -1998,6 +2215,8 @@ extension O {
             case .int(let b): return O(Int.overDiff(Int(a), b))
             case .rational(let b): return O(Rational.overDiff(Rational(a), b))
             case .double(let b): return O(Double(a) - b)
+            case .array(let b): return .init(ao - b)
+            case .range(let b): return .init(ao - b)
             case .error: return bo
             default: break
             }
@@ -2007,6 +2226,8 @@ extension O {
             case .int(let b): return O(Int.overDiff(a, b))
             case .rational(let b): return O(Rational.overDiff(Rational(a), b))
             case .double(let b): return O(Double(a) - b)
+            case .array(let b): return .init(ao - b)
+            case .range(let b): return .init(ao - b)
             case .error: return bo
             default: break
             }
@@ -2016,6 +2237,8 @@ extension O {
             case .int(let b): return O(Rational.overDiff(a, Rational(b)))
             case .rational(let b): return O(Rational.overDiff(a, b))
             case .double(let b): return O(Double(a) - b)
+            case .array(let b): return .init(ao - b)
+            case .range(let b): return .init(ao - b)
             case .error: return bo
             default: break
             }
@@ -2031,11 +2254,14 @@ extension O {
                     }
                 }
                 return O(a - b)
+            case .array(let b): return .init(ao - b)
+            case .range(let b): return .init(ao - b)
             case .error: return bo
             default: break
             }
         case .array(let a):
             switch bo {
+            case .bool, .int, .rational, .double: return .init(a - bo)
             case .array(let b):
                 if a.isEqualDimension(b) {
                     var n = [O]()
@@ -2704,6 +2930,10 @@ extension O {
         return O(OError(String(format: "'%1$@' %2$@ '%3$@' is false".localized,
                                ao.name, str, bo.name)))
     }
+    static let fiZName = "..."
+    static let foZName = "..."
+    static let liZName = "..."
+    static let loZName = "..."
     static let filiZName = "..."
     static let filoZName = "..<"
     static let foliZName = "<.."
@@ -2712,6 +2942,10 @@ extension O {
     static let filoRName = "~~<"
     static let foliRName = "<~~"
     static let foloRName = "<~<"
+    static let fiRName = "~~~"
+    static let foRName = "~~~"
+    static let liRName = "~~~"
+    static let loRName = "~~~"
     static func rangeO(_ type: ORange.RangeType, isSmooth: Bool) -> O {
         switch type {
         case .fili(let ao, let bo):
@@ -2732,6 +2966,16 @@ extension O {
                 rangeError(ao, isSmooth ? foloRName : foloZName, bo)
         default:
             O(ORange(type, delta: O(isSmooth ? 0 : 1)))
+        }
+    }
+    
+    static let deltaName = "__"
+    static func deltaO(_ ao: O, _ bo: O) -> O {
+        switch ao {
+        case .range(let a):
+            return .range(ORange(a.type, delta: bo))
+        default:
+            return O(OError.undefined(with: "\(ao.name) \(O.deltaName) \(bo.name)"))
         }
     }
 }
@@ -4859,10 +5103,37 @@ extension O {
     static let drawName = "draw"
     static func draw(_ ao: O, _ oDic: inout [OKey: O]) -> O {
         switch ao {
+        case .dic(let a):
+            if let rectO = a[O("rect")], case .dic(let rectDic) = rectO, let r = a[O("r")]?.asDouble,
+               let originO = rectDic[O("origin")], let sizeO = rectDic[O("size")],
+                 case .array(let originOs) = originO, case .dic(let sizeDic) = sizeO,
+                  originOs.count == 2, let x = originOs[0].asDouble, let y = originOs[1].asDouble,
+               let width = sizeDic[O("width")]?.asDouble, let height = sizeDic[O("height")]?.asDouble {
+                
+                let rect = Rect(x: x, y: y, width: width, height: height)
+                let path = Path([Pathline(rect, cornerRadius: r)])
+                let (dps, _) = path.pathDistancePoints(lineWidth: 1)
+                let line = Line(controls: dps.map { .init(point: $0.point, pressure: $0.distance * 2 / 1) })
+                return drawLine(line, &oDic)
+            } else if let originO = a[O("origin")], let sizeO = a[O("size")],
+               case .array(let originOs) = originO, case .dic(let sizeDic) = sizeO,
+                originOs.count == 2, let x = originOs[0].asDouble, let y = originOs[1].asDouble,
+               let width = sizeDic[O("width")]?.asDouble, let height = sizeDic[O("height")]?.asDouble {
+                
+                let rect = Rect(x: x, y: y, width: width, height: height)
+                let ps = [rect.minXMaxYPoint, rect.minXMinYPoint, rect.minXMinYPoint,
+                          rect.maxXMinYPoint, rect.maxXMinYPoint, rect.maxXMaxYPoint, rect.maxXMaxYPoint,
+                          rect.minXMaxYPoint]
+                let line = Line(controls: ps.map { Line.Control(point: $0) })
+                return drawLine(line, &oDic)
+            }
+            return O(OError.undefined(with: "\(self) \(O.drawName)"))
         case .error: return ao
         default:
             let ps = ao.asPoints
-            if ps.count == 1 {
+            if ps.isEmpty {
+                return O(OError.undefined(with: "\(self) \(O.drawName)"))
+            } else if ps.count == 1 {
                 return drawPoint(ps[0], &oDic)
             } else {
                 let line = Line(controls: ps.map { Line.Control(point: $0) })
