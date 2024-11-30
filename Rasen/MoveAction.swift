@@ -409,6 +409,7 @@ final class MoveScoreAction: DragEventAction {
                     
                     beganScoreOption = sheetView.model.score.option
                     beganBeatX = scoreView.x(atBeat: score.beatRange.start)
+                    beganNotes = score.notes.count.range.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
                 } else if let (noteI, result) = scoreView.hitTestPoint(scoreP, scale: rootView.screenToWorldScale) {
                     self.noteI = noteI
                     
@@ -875,6 +876,21 @@ final class MoveScoreAction: DragEventAction {
                     if py != scoreView.timelineY
                         || beat != scoreView.model.beatRange.start {
                         
+                        if beat != scoreView.model.beatRange.start {
+                            let dBeat = beat - (beganScoreOption?.beatRange.start ?? 0)
+                            
+                            var nivs = [IndexValue<Note>](capacity: beganNotes.count)
+                            for (noteI, beganNote) in beganNotes {
+                                guard noteI < score.notes.count else { continue }
+                                
+                                let nBeat = dBeat + beganNote.beatRange.start
+                                var note = beganNote
+                                note.beatRange.start = nBeat
+                                nivs.append(.init(value: note, index: noteI))
+                            }
+                            scoreView.replace(nivs)
+                            scoreView.option.keyBeats = beganScoreOption?.keyBeats.map { $0 + dBeat } ?? []
+                        }
                         var option = scoreView.option
                         option.beatRange.start = beat
                         option.timelineY = py

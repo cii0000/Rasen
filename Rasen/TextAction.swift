@@ -646,7 +646,8 @@ final class TextAction: InputTextEventAction {
         let p = rootView.convertScreenToWorld(event.screenPoint)
         if !event.isRepeat, let sheetView = rootView.sheetView(at: p),
            sheetView.model.score.enabled,
-           sheetView.scoreView.containsMainFrame(sheetView.scoreView.convertFromWorld(p)) {
+           sheetView.scoreView.containsMainFrame(sheetView.scoreView.convertFromWorld(p),
+                                                 scale: rootView.screenToWorldScale) {
             let scoreView = sheetView.scoreView
             let scoreP = scoreView.convertFromWorld(p)
             

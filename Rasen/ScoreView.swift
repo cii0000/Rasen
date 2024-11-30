@@ -1614,10 +1614,10 @@ extension ScoreView {
         model.enabled
         && (containsTimeline(p, scale: scale)
             || containsIsShownSpectrogram(p, scale: scale)
-            || mainFrame.contains(p))
+            || containsMainFrame(p, scale: scale))
     }
-    func containsMainFrame(_ p: Point) -> Bool {
-        model.enabled && mainFrame.contains(p)
+    func containsMainFrame(_ p: Point, scale: Double) -> Bool {
+        model.enabled && mainFrame.outset(by: 10 * scale).contains(p)
     }
     func containsTimeline(_ p : Point, scale: Double) -> Bool {
         model.enabled && timelineFrame.outsetBy(dx: 5 * scale, dy: 3 * scale).contains(p)

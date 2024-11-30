@@ -1521,7 +1521,7 @@ final class SheetView: BindableView, @unchecked Sendable {
     }
     
     func containsOtherTimeline(_ p: Point, scale: Double) -> Bool {
-        if scoreView.containsMainFrame(scoreView.convert(p, from: node))
+        if scoreView.containsMainFrame(scoreView.convert(p, from: node), scale: scale)
             || scoreView.containsTimeline(scoreView.convert(p, from: node), scale: scale) {
             return true
         }

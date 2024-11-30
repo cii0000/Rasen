@@ -1064,7 +1064,9 @@ final class LineAction: Action {
             return
         } else if event.phase == .began {
             let p = rootView.convertScreenToWorld(event.screenPoint)
-            if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled {
+            if let sheetView = rootView.sheetView(at: p),
+               sheetView.scoreView.containsMainFrame(sheetView.scoreView.convertFromWorld(p),
+                                                     scale: rootView.screenToWorldScale) {
                 isDrawNote = true
                 noteSheetView = sheetView
                 drawNote(with: event)
