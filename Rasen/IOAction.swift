@@ -846,7 +846,9 @@ final class IOAction: Action {
                 if renderings.count == 1, let node = renderings[0].renderableMainSheetNode(),
                    let pdf = try? PDF(mediaBox: Rect(size: size)) {
                    
-                    node.render(in: renderings[0].bounds, to: size, backgroundColor: .background, in: pdf)
+                    pdf.newPage { pdf in
+                        node.render(in: renderings[0].bounds, to: size, in: pdf)
+                    }
                     pdf.finish()
                     return pdf.dataSize
                 } else {
@@ -898,7 +900,7 @@ final class IOAction: Action {
                     exportPDF(from: renderings, unionFrame: unionFrame, size: size, at: ioResult)
                 case .gif:
                     let nSize = size.snapped(Size(width: 800, height: 1200)).rounded()
-                    exportGIF(from: renderings, colorSpace, size: nSize, at: ioResult)
+                    exportGIF(from: renderings, unionFrame: unionFrame, colorSpace, size: nSize, at: ioResult)
                 case .movie:
                     let nSize = size.width > size.height ?
                     size.snapped(Size(width: 1920, height: 1080).rounded()) :
@@ -1026,18 +1028,16 @@ final class IOAction: Action {
                     for rendering in renderings {
                         if let node = rendering.renderableMainSheetNode() {
                             let origin = rendering.mainItem.frame.origin - unionFrame.origin
-                            node.render(in: rendering.bounds, to: rendering.bounds + origin,
-                                        backgroundColor: .background,
-                                        in: pdf)
+                            node.render(in: rendering.bounds, to: rendering.bounds + origin, in: pdf)
                         }
                     }
                 }
             } else {
                 for (i, rendering) in renderings.enumerated() {
                     if let node = rendering.renderableMainSheetNode() {
-                        node.render(in: rendering.bounds, to: size,
-                                    backgroundColor: .background,
-                                    in: pdf)
+                        pdf.newPage { pdf in
+                            node.render(in: rendering.bounds, to: size, in: pdf)
+                        }
                     }
                     
                     progressHandler(Double(i + 1) / Double(renderings.count), &isStop)
@@ -1096,45 +1096,61 @@ final class IOAction: Action {
         }
     }
     
-    func exportGIF(from renderings: [Rendering], _ colorSpace: ColorSpace,
+    func exportGIF(from renderings: [Rendering], unionFrame: Rect?, _ colorSpace: ColorSpace,
                    size: Size, at ioResult: IOResult) {
         @Sendable func export(progressHandler: (Double, inout Bool) -> ()) throws {
             var images = [(image: Image, time: Rational)]()
             var isStop = false, t = 0.0
             let allC = renderings.count + 1
-            for rendering in renderings {
-                if let sheet = rendering.mainItem.decodedSheet() {
-                    let ot = t
-                    var beat = Rational(0)
-                    for (i, _) in sheet.animation.keyframes.enumerated() {
-                        let node = sheet.node(isBorder: false, atRootBeat: beat,
-                                              attitude: .init(position: rendering.mainItem.frame.bounds.origin),
-                                              in: rendering.mainItem.frame.bounds)
-                        let durBeat = sheet.animation.rendableKeyframeDurBeat(at: i)
-                        if let image = node.image(in: rendering.mainItem.frame.bounds, size: size,
-                                                  backgroundColor: .background, colorSpace) {
-                            images.append((image, sheet.animation.sec(fromBeat: durBeat)))
-                        }
-                        beat += durBeat
-                        let d = Double(i) / Double(sheet.animation.keyframes.count - 1)
-                        t = ot + d / Double(allC)
-                        progressHandler(t, &isStop)
-                    }
-                } else {
-                    let ot = t
-                    let node = CPUNode(path: Path(rendering.bounds), fillType: .color(.background))
-                    if let image = node.image(in: rendering.bounds, size: size,
-                                              backgroundColor: .background, colorSpace) {
-                        images.append((image, Keyframe.defaultDurBeat))
-                        t = ot + 1 / Double(allC)
-                        progressHandler(t, &isStop)
+            
+            if let unionFrame {
+                let scaleX = size.width / unionFrame.width
+                let scaleY = size.height / unionFrame.height
+                var nImage = Image(size: size, color: .background.with(colorSpace))
+                for rendering in renderings {
+                    let origin = rendering.mainItem.frame.origin - unionFrame.origin
+                    if let node = rendering.renderableMainSheetNode(),
+                       let image = node.renderedAntialiasFillImage(in: rendering.bounds, to: size, colorSpace) {
+                        nImage = nImage?.drawn(image,
+                                               in: (rendering.bounds + origin)
+                                               * Transform(scaleX: scaleX, y: scaleY))
                     }
                 }
+                try nImage?.write(.gif, to: ioResult.url)
+            } else {
+                for rendering in renderings {
+                    if let sheet = rendering.mainItem.decodedSheet() {
+                        let ot = t
+                        var beat = Rational(0)
+                        for (i, _) in sheet.animation.keyframes.enumerated() {
+                            let node = sheet.node(isBorder: false, atRootBeat: beat,
+                                                  attitude: .init(position: rendering.mainItem.frame.origin),
+                                                  in: rendering.bounds)
+                            let durBeat = sheet.animation.rendableKeyframeDurBeat(at: i)
+                            if let image = node.renderedAntialiasFillImage(in: rendering.bounds, to: size, colorSpace) {
+                                images.append((image, sheet.animation.sec(fromBeat: durBeat)))
+                            }
+                            beat += durBeat
+                            let d = Double(i) / Double(sheet.animation.keyframes.count - 1)
+                            t = ot + d / Double(allC)
+                            progressHandler(t, &isStop)
+                        }
+                    } else {
+                        let ot = t
+                        if let node = renderings[0].renderableMainSheetNode(),
+                           let image = node.renderedAntialiasFillImage(in: renderings[0].bounds, to: size,
+                                                                       colorSpace) {
+                            images.append((image, Keyframe.defaultDurBeat))
+                            t = ot + 1 / Double(allC)
+                            progressHandler(t, &isStop)
+                        }
+                    }
+                    
+                    if isStop { break }
+                }
                 
-                if isStop { break }
+                try Image.writeGIF(images, to: ioResult.url)
             }
-            
-            try Image.writeGIF(images, to: ioResult.url)
             progressHandler(1, &isStop)
             try ioResult.setAttributes()
         }

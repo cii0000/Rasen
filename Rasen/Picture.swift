@@ -316,12 +316,12 @@ extension Picture {
                 guard lp0.p != lp1.p else { return }
                 let dSq = lp0.p.distanceSquared(lp1.p)
                 let maxD0 = maxD + cd * lp1.d
-                guard dSq >= maxD0 * maxD0 else { return }
+                guard dSq >= maxD0 * maxD0 || lp0.i == lp1.i else { return }
                 let maxD1 = scd * (lp0.d + lp1.d)
                 let v0 = lp0.vector, v1 = lp1.vector, v2 = lp1.p - lp0.p
                 let angle = abs(Point.differenceAngle(v0, v2)) + abs(Point.differenceAngle(v2, -v1))
-                guard angle < .pi / 8 else { return }
-                let maxND = angle.clipped(min: .pi / 8, max: 0, newMin: maxD0, newMax: maxD1)
+                guard angle < .pi / 2 else { return }
+                let maxND = angle.clipped(min: .pi / 2, max: 0, newMin: maxD0, newMax: maxD1)
                 if dSq < maxND * maxND {
                     bitmap.stroke(Edge(lp0.p, lp1.p))
                 }
@@ -454,7 +454,6 @@ extension Picture {
                             fillValue = fillValue < .max - 1 ? fillValue + 1 : 1
                             v = fillValue
                             bitmap.floodFill(v, atX: x, y: y)
-                            
                             aroundValues[v] = Set(nPoints)
                             iis[v] = iPolys.count
                             iPolys.append(.init(points: nPoints, holePoints: []))
@@ -636,64 +635,54 @@ extension Picture {
 }
 
 private struct BitmapScan {
-    var minX, maxX, y: Int
-    var isTop: Bool
+    var x0, x1, y: Int, dy: Int
+    
+    init(_ x0: Int, _ x1: Int, _ y: Int, _ dy: Int) {
+        self.x0 = x0
+        self.x1 = x1
+        self.y = y
+        self.dy = dy
+    }
 }
 extension Bitmap {
     func floodFill(_ value: Value, atX fx: Int, y fy: Int) {
         let inValue = self[fx, fy]
+        func isInside(_ x: Int, _ y: Int) -> Bool {
+            x >= 0 && x < width && y >= 0 && y < height && self[x, y] == inValue
+        }
+        func set(_ x: Int, _ y: Int) {
+            self[x, y] = value
+        }
         
         var stack = Stack<BitmapScan>()
-        stack.push(.init(minX: fx, maxX: fx, y: fy, isTop: false))
-        
-        func isFill(_ x: Int, _ y: Int) -> Bool {
-            self[x, y] == inValue
-        }
-        func pushScans(minX: Int, maxX: Int, y: Int, isTop: Bool) {
-            var mx = minX
-            while mx < maxX {
-                while mx < maxX && !isFill(mx, y) {
-                    mx += 1
-                }
-                let nMinX = mx
-                while mx < maxX && isFill(mx, y) {
-                    self[mx, y] = value
-                    mx += 1
-                }
-                stack.push(.init(minX: nMinX, maxX: mx, y: y, isTop: isTop))
-            }
-        }
-        
+        stack.push(.init(fx, fx, fy, 1))
+        stack.push(.init(fx, fx, fy - 1, -1))
         while let scan = stack.pop() {
-            let y = scan.y
-            var minX = scan.minX - 1
-            while minX >= 0 && isFill(minX, y) {
-                self[minX, y] = value
-                minX -= 1
+            var x0 = scan.x0, x1 = scan.x1, y = scan.y, dy = scan.dy
+            var x = x0
+            if isInside(x, y) {
+                while isInside(x - 1, y) {
+                    set(x - 1, y)
+                    x -= 1
+                }
+                if x < x0 {
+                    stack.push(.init(x, x0 - 1, y - dy, -dy))
+                }
             }
-            minX += 1
-            var maxX = scan.maxX
-            while maxX < width && isFill(maxX, y) {
-                self[maxX, y] = value
-                maxX += 1
-            }
-            let by = y - 1, ty = y + 1
-            if scan.isTop {
-                if by >= 0 {
-                    pushScans(minX: minX, maxX: scan.minX, y: by, isTop: false)
-                    pushScans(minX: scan.maxX, maxX: maxX, y: by, isTop: false)
+            while x0 <= x1 {
+                while isInside(x0, y) {
+                    set(x0, y)
+                    x0 += 1
                 }
-                if ty < height {
-                    pushScans(minX: minX, maxX: maxX, y: ty, isTop: true)
+                if x0 > x {
+                    stack.push(.init(x, x0 - 1, y + dy, dy))
                 }
-            } else {
-                if ty < height {
-                    pushScans(minX: minX, maxX: scan.minX, y: ty, isTop: true)
-                    pushScans(minX: scan.maxX, maxX: maxX, y: ty, isTop: true)
+                if x0 - 1 > x1 {
+                    stack.push(.init(x1 + 1, x0 - 1, y - dy, -dy))
                 }
-                if by >= 0 {
-                    pushScans(minX: minX, maxX: maxX, y: by, isTop: false)
-                }
+                x0 = x0 + 1
+                while x0 < x1 && !isInside(x0, y) { x0 += 1 }
+                x = x0
             }
         }
     }

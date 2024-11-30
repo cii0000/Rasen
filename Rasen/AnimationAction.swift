@@ -376,7 +376,7 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
     private var oldDeltaI: Int?
     private var beganSP = Point(), preSP = Point(),
                 beganRootI = 0, beganBeat = Rational(0),
-                beganSelectedFrameIndexes = [Int](), beganEventTime = 0.0
+                beganSelectedFrameIndexes = [Int](), beganEventTime = 0.0, preEventTime: Double?
     private var preMoveEventTime: Double?
     private var allDX = 0.0
     private var snapEventTime: Double?
@@ -405,6 +405,7 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
         case .began:
             beganSP = event.screenPoint
             beganEventTime = event.time
+            preEventTime = nil
             sheetView = rootView.sheetView(at: p)
             if let sheetView {
                 if let contentIndex = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
@@ -495,11 +496,13 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
                                 sheetView.stop()
                             }
                             sheetView.rootKeyframeIndex = nRootI
-                            if animationView.currentKeyframe.isKey
+                            if preEventTime == nil || event.time - preEventTime! > 0.1,
+                               animationView.currentKeyframe.isKey
                                 || (!animationView.currentKeyframe.isKey && animationView.model.keyframes[oldKI].isKey)
                                 || animationView.model.index == 0 {
                                 
                                 Feedback.performAlignment()
+                                preEventTime = event.time
                             }
                             
                             preMoveEventTime = event.time
@@ -618,6 +621,8 @@ final class PlayAction: InputKeyEventAction {
                     
                     if cSheetView.model.enabledTimeline {
                         cSheetView.play()
+                        rootView.cursor = rootView.cursor(from: cSheetView.currentTimeString() + "...",
+                                                          isArrow: true)
                     }
                 } else {
                     let sheetP = cSheetView.convertFromWorld(p)
@@ -649,7 +654,6 @@ final class PlayAction: InputKeyEventAction {
                     }
                     cSheetView.play(atSec: sec, inSec: secRange, otherTimelineIDs: ids)
                 }
-                rootView.cursor = rootView.cursor(from: cSheetView.currentTimeString() + "...", isArrow: true)
             }
         case .changed:
             break

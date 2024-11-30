@@ -1119,9 +1119,9 @@ final class SheetView: BindableView, @unchecked Sendable {
                                 keyPath: keyPath.appending(path: \Model.borders))
         
         node = Node(children: [opacityNode,
-                               animationView.previousNextNode,
                                scoreView.node,
                                contentsView.node,
+                               animationView.previousNextNode,
                                animationView.node,
                                textsView.node,
                                bordersView.node,
@@ -6819,20 +6819,9 @@ final class SheetView: BindableView, @unchecked Sendable {
     func makeFacesFromKeyframeIndex(with path: Path?, topolygons: [Topolygon],
                                     isSelection: Bool,
                                     isNewUndoGroup: Bool = true) {
-        func isInterpolated(at otherKI: Int) -> Bool {
-            let lines0 = model.animation.keyframes[otherKI].picture.lines
-            let lines1 = model.animation.keyframes[model.animation.index].picture.lines
-            guard !lines1.isEmpty else {
-                return false
-            }
-            let idSet = Set(lines0.map { $0.id })
-            var i = 0
-            for line in lines1 {
-                if idSet.contains(line.id) {
-                    i += 1
-                }
-            }
-            return Double(i) / Double(lines1.count - 1) > 0.25
+        func enabledPlanes(at otherKI: Int) -> [Plane]? {
+            let planes = model.animation.keyframes[otherKI].picture.planes
+            return planes.isEmpty ? nil : planes
         }
         let b = bounds
         let result: Picture.AutoFillResult
@@ -6841,23 +6830,7 @@ final class SheetView: BindableView, @unchecked Sendable {
                 let ki = model.animation.index
                 let preKI = ki - 1 >= 0 ?ki - 1 : model.animation.keyframes.count - 1
                 let nextKI = ki + 1 < model.animation.keyframes.count ?ki + 1 : 0
-                if isInterpolated(at: preKI) {
-                    let aPlanes = model.animation.keyframes[preKI].picture.planes
-                    if !aPlanes.isEmpty {
-                        return aPlanes
-                    } else if isInterpolated(at: nextKI) {
-                        let aPlanes = model.animation.keyframes[nextKI].picture.planes
-                        if !aPlanes.isEmpty {
-                            return aPlanes
-                        }
-                    }
-                } else if isInterpolated(at: nextKI) {
-                    let aPlanes = model.animation.keyframes[nextKI].picture.planes
-                    if !aPlanes.isEmpty {
-                        return aPlanes
-                    }
-                }
-                return nil
+                return enabledPlanes(at: preKI) ?? enabledPlanes(at: nextKI)
             }
             result = Picture.autoFill(fromOther: otherPlanes(),
                                       from: topolygons,

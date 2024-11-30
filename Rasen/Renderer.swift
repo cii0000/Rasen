@@ -1273,89 +1273,37 @@ extension CPUNode {
     }
 }
 extension CPUNode {
-    func render(with size: Size, in pdf: PDF) {
-        guard let bounds = bounds else { return }
-        render(in: bounds, to: size, in: pdf)
-    }
-    func render(with size: Size, backgroundColor: Color, in pdf: PDF) {
-        guard let bounds = bounds else { return }
-        render(in: bounds, to: size,
-               backgroundColor: backgroundColor, in: pdf)
-    }
     func render(in bounds: Rect, to size: Size, in pdf: PDF) {
         let transform = Transform(translation: -bounds.origin)
-            * Transform(scaleX: size.width / bounds.width,
-                        y: size.height / bounds.height)
+        * Transform(scaleX: size.width / bounds.width, y: size.height / bounds.height)
         render(to: size, transform: transform, in: pdf)
     }
-    func render(in bounds: Rect, to size: Size,
-                backgroundColor: Color, in pdf: PDF) {
-        let transform = Transform(translation: -bounds.origin)
-            * Transform(scaleX: size.width / bounds.width,
-                        y: size.height / bounds.height)
-        render(to: size, transform: transform,
-               backgroundColor: backgroundColor, in: pdf)
-    }
     func render(to size: Size, transform: Transform, in pdf: PDF) {
-        let ctx = pdf.ctx
-        let nt = localTransform.inverted() * transform
-        ctx.saveGState()
-        ctx.beginPDFPage(nil)
-        
-        if case .color(let backgroundColor) = fillType {
-            ctx.setFillColor(backgroundColor.cg)
-            ctx.fill(Rect(origin: Point(), size: size).cg)
-        }
-        ctx.concatenate(nt.cg)
-        render(in: ctx)
-        
-        ctx.endPDFPage()
-        ctx.restoreGState()
-    }
-    func render(to size: Size, transform: Transform,
-                backgroundColor: Color, in pdf: PDF) {
-        let ctx = pdf.ctx
-        let nt = localTransform.inverted() * transform
-        ctx.saveGState()
-        ctx.beginPDFPage(nil)
-        
-        ctx.setFillColor(backgroundColor.cg)
-        ctx.fill(Rect(origin: Point(), size: size).cg)
-        ctx.concatenate(nt.cg)
-        render(in: ctx)
-        
-        ctx.endPDFPage()
-        ctx.restoreGState()
+        render(to: Rect(origin: Point(), size: size), transform, in: pdf)
     }
     func render(in bounds: Rect, to toBounds: Rect, in pdf: PDF) {
         let transform = Transform(translation: -bounds.origin)
-            * Transform(scaleX: toBounds.width / bounds.width,
-                        y: toBounds.height / bounds.height)
-            * Transform(translation: toBounds.origin)
-        let ctx = pdf.ctx
-        let nt = localTransform.inverted() * transform
-        ctx.saveGState()
-        if case .color(let backgroundColor) = fillType {
-            ctx.setFillColor(backgroundColor.cg)
-            ctx.fill(toBounds.cg)
-        }
-        ctx.concatenate(nt.cg)
-        render(in: ctx)
-        ctx.restoreGState()
+        * Transform(scaleX: toBounds.width / bounds.width, y: toBounds.height / bounds.height)
+        * Transform(translation: toBounds.origin)
+        render(to: toBounds, transform, in: pdf)
     }
-    func render(in bounds: Rect, to toBounds: Rect,
-                backgroundColor: Color, in pdf: PDF) {
-        let transform = Transform(translation: -bounds.origin)
-            * Transform(scaleX: toBounds.width / bounds.width,
-                        y: toBounds.height / bounds.height)
-            * Transform(translation: toBounds.origin)
-        let ctx = pdf.ctx
+    func render(to toBounds: Rect, _ transform: Transform, in pdf: PDF) {
+        let backgroundColor = if case .color(let color) = fillType {
+            color
+        } else {
+            Color.background
+        }
         let nt = localTransform.inverted() * transform
+        
+        let ctx = pdf.ctx
         ctx.saveGState()
+       
         ctx.setFillColor(backgroundColor.cg)
         ctx.fill(toBounds.cg)
+        
         ctx.concatenate(nt.cg)
-        render(in: ctx)
+        render(in: ctx, isDrawFillAntialias: nil)
+        
         ctx.restoreGState()
     }
     
@@ -1390,7 +1338,7 @@ extension CPUNode {
                size: Size,
                backgroundColor: Color? = nil, _ colorSpace: ColorSpace,
                isAntialias: Bool = true,
-               isGray: Bool = false, isDrawFillAntialias: Bool = false) -> Image? {
+               isGray: Bool = false, isDrawFillAntialias: Bool? = false) -> Image? {
         let transform = Transform(translation: -bounds.origin)
             * Transform(scaleX: size.width / bounds.width,
                         y: size.height / bounds.height)
@@ -1401,7 +1349,7 @@ extension CPUNode {
     func image(size: Size, transform: Transform,
                backgroundColor: Color? = nil, _ colorSpace: ColorSpace,
                isAntialias: Bool = true,
-               isGray: Bool = false, isDrawFillAntialias: Bool = false) -> Image? {
+               isGray: Bool = false, isDrawFillAntialias: Bool? = false) -> Image? {
         let ctx = context(size: size, transform: transform, backgroundColor: backgroundColor,
                           colorSpace, isAntialias: isAntialias, isGray: isGray,
                           isDrawFillAntialias: isDrawFillAntialias)
@@ -1425,7 +1373,7 @@ extension CPUNode {
     private func context(size: Size, transform: Transform,
                          backgroundColor: Color? = nil, _ colorSpace: ColorSpace,
                          isAntialias: Bool = true,
-                         isGray: Bool = false, isDrawFillAntialias: Bool = false) -> CGContext? {
+                         isGray: Bool = false, isDrawFillAntialias: Bool? = false) -> CGContext? {
         guard let space = isGray ? CGColorSpaceCreateDeviceGray() : colorSpace.cg else { return nil }
         let ctx: CGContext
         if colorSpace.isHDR {
@@ -1450,7 +1398,7 @@ extension CPUNode {
         if let backgroundColor = backgroundColor {
             ctx.setFillColor(backgroundColor.cg)
             ctx.fill(Rect(origin: Point(), size: size).cg)
-        } else if isDrawFillAntialias, case .color(let backgroundColor)? = fillType {
+        } else if isDrawFillAntialias ?? true, case .color(let backgroundColor)? = fillType {
             ctx.setFillColor(backgroundColor.cg)
             ctx.fill(Rect(origin: Point(), size: size).cg)
         }
@@ -1470,21 +1418,21 @@ extension CPUNode {
                         y: size.height / bounds.height)
         render(transform: transform, in: ctx)
     }
-    func render(transform: Transform, in ctx: CGContext, isDrawFillAntialias: Bool = false) {
+    func render(transform: Transform, in ctx: CGContext, isDrawFillAntialias: Bool? = false) {
         let nt = localTransform.inverted() * transform
         ctx.saveGState()
         ctx.concatenate(nt.cg)
         render(in: ctx, isDrawFillAntialias: isDrawFillAntialias)
         ctx.restoreGState()
     }
-    func render(in ctx: CGContext, isDrawFillAntialias: Bool = false) {
+    func render(in ctx: CGContext, isDrawFillAntialias: Bool? = false) {
         guard !isHidden else { return }
         if !isIdentityFromLocal {
             ctx.saveGState()
             ctx.concatenate(localTransform.cg)
         }
         if let typesetter = path.typesetter, let b = bounds {
-            if !isDrawFillAntialias {
+            if !(isDrawFillAntialias ?? false) {
                 switch lineType {
                 case .color(let color):
                     ctx.saveGState()
@@ -1504,7 +1452,7 @@ extension CPUNode {
                 }
             }
         } else if !path.isEmpty {
-            if isDrawFillAntialias, let fillType {
+            if isDrawFillAntialias ?? true, let fillType {
                 switch fillType {
                 case .color(let color):
                     let cgPath = CGMutablePath()
@@ -1574,7 +1522,7 @@ extension CPUNode {
                     }
                 }
             }
-            if !isDrawFillAntialias, let lineType {
+            if !(isDrawFillAntialias ?? false), let lineType {
                 switch lineType {
                 case .color(let color):
                     ctx.setFillColor(color.cg)

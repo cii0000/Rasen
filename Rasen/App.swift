@@ -106,15 +106,6 @@ final class SubNSApplication: NSApplication {
                         .began : (fingers.contains(where: { $0.phase == .ended }) ? .ended : .changed)
                     let event = TouchEvent(screenPoint: screenPoint, time: time, phase: phase,
                                            fingers: .init(fingers), deviceSize: deviceSize)
-                    
-                    let bb0 = fingers.map { $0.phase }.sorted(by: { $0.rawValue < $1.rawValue })
-                    let bb1 = nsEvent.allTouches().map { SubMTKView.finger(with: $0) }.map { $0.phase }.sorted(by: { $0.rawValue < $1.rawValue })
-                    if bb0 != bb1 {
-                        let b0 = fingers.map { ($0.id, $0.phase) }
-                        let b1 = nsEvent.allTouches().map { SubMTKView.finger(with: $0) }.map { ($0.id, $0.phase) }
-                        print(event.time, b0, b1)
-                    }
-                    
                     switch event.phase {
                     case .began: view.touchesBegan(with: event)
                     case .changed: view.touchesMoved(with: event)
@@ -2043,8 +2034,8 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     var snapScrollType = SnapScrollType.none
     var lastMagnification = 0.0
     var lastRotationQuantity = 0.0
-    var isBeganSwipe = false, swipePosition: Point?, beganSwipePosition: Point?
-    var began4FingersPosition: Point?
+    var isBeganSwipe = false, swipePosition: Point?, beganSwipePosition: Point?, beganSwipeTime: Double?
+    var began4FingersPosition: Point?, began4FingersTime: Double?
     
     private var scrollTimeValue = 0.0
     private var scrollTimer: (any DispatchSourceTimer)?
@@ -2127,6 +2118,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             
             isBeganSwipe = false
             swipePosition = Point()
+            beganSwipeTime = event.time
             isPrepare3FingersTap = true
         } else if ps.count == 4 {
             oldPinchDistance = nil
@@ -2134,6 +2126,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             oldScrollPosition = nil
             
             began4FingersPosition = (0 ..< 4).map { ps[touchedIDs[$0]]! }.mean()!
+            began4FingersTime = event.time
             isPrepare4FingersTap = true
         }
     }
@@ -2150,14 +2143,15 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 let ops0 = oldTouchPoints[touchedIDs[0]],
                 let ops1 = oldTouchPoints[touchedIDs[1]] {
                
+                let pinchDistance = 4.0, scrollDistance = 5.0
                 let nps0 = ps0.mid(ops0), nps1 = ps1.mid(ops1)
                 let nPinchDistance = nps0.distance(nps1)
                 let nRotateAngle = nps0.angle(nps1)
                 let nScrollPosition = nps0.mid(nps1)
                 if !isBeganScroll && !isBeganPinch && !isBeganRotate
                     && abs(Edge(ops0, ps0).angle(Edge(ops1, ps1))) > .pi / 2
-                    && abs(nPinchDistance - oldPinchDistance) > 6
-                    && nScrollPosition.distance(oldScrollPosition) <= 5 {
+                    && abs(nPinchDistance - oldPinchDistance) > pinchDistance
+                    && nScrollPosition.distance(oldScrollPosition) <= scrollDistance {
                     
                     isBeganPinch = true
                     
@@ -2184,8 +2178,8 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 } else if !(isSubDrag && isSubTouth)
                             && !isBeganScroll && !isBeganPinch
                             && !isBeganRotate
-                            && abs(nPinchDistance - oldPinchDistance) <= 6
-                            && nScrollPosition.distance(oldScrollPosition) > 5 {
+                            && abs(nPinchDistance - oldPinchDistance) <= pinchDistance
+                            && nScrollPosition.distance(oldScrollPosition) > scrollDistance {
                     isBeganScroll = true
                     
                     scrollTimer?.cancel()
@@ -2211,13 +2205,13 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     allScrollPosition += dp
                     switch snapScrollType {
                     case .x:
-                        if abs(allScrollPosition.y) < 5 {
+                        if abs(allScrollPosition.y) < scrollDistance {
                             dp.y = 0
                         } else {
                             snapScrollType = .none
                         }
                     case .y:
-                        if abs(allScrollPosition.x) < 5 {
+                        if abs(allScrollPosition.x) < scrollDistance {
                             dp.x = 0
                         } else {
                             snapScrollType = .none
@@ -2243,8 +2237,8 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     lastScrollDeltaPosition = scrollDeltaPosition
                 } else if !isBeganScroll && !isBeganPinch && !isBeganRotate
                             && nPinchDistance > 120
-                            && abs(nPinchDistance - oldPinchDistance) <= 6
-                            && nScrollPosition.distance(oldScrollPosition) <= 5
+                            && abs(nPinchDistance - oldPinchDistance) <= pinchDistance
+                            && nScrollPosition.distance(oldScrollPosition) <= scrollDistance
                             && abs(nRotateAngle.differenceRotation(oldRotateAngle)) > .pi * 0.02 {
                     
                     isBeganRotate = true
@@ -2351,27 +2345,31 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         guard isEnabledCustomTrackpad else { return }
         
         if !isBeganPinch && !isBeganScroll && !isBeganRotate && isPrepare3FingersTap {
-            var event = InputKeyEvent(screenPoint: event.screenPoint,
-                                      time: event.time,
-                                      pressure: 1, phase: .began, isRepeat: false,
-                                      inputKeyType: .threeFingersTap)
-            let action = LookUpAction(rootAction)
-            action.flow(with: event)
-            Sleep.start()
-            event.phase = .ended
-            action.flow(with: event)
-            isPrepare3FingersTap = false
+            if let beganSwipeTime, event.time - beganSwipeTime < 0.35 {
+                var event = InputKeyEvent(screenPoint: event.screenPoint,
+                                          time: event.time,
+                                          pressure: 1, phase: .began, isRepeat: false,
+                                          inputKeyType: .threeFingersTap)
+                let action = LookUpAction(rootAction)
+                action.flow(with: event)
+                Sleep.start()
+                event.phase = .ended
+                action.flow(with: event)
+                isPrepare3FingersTap = false
+            }
         } else if !isBeganPinch && !isBeganScroll && !isBeganRotate && isPrepare4FingersTap {
-            var event = InputKeyEvent(screenPoint: event.screenPoint,
-                                      time: event.time,
-                                      pressure: 1, phase: .began, isRepeat: false,
-                                      inputKeyType: .fourFingersTap)
-            let action = PlayAction(rootAction)
-            action.flow(with: event)
-            Sleep.start()
-            event.phase = .ended
-            action.flow(with: event)
-            isPrepare4FingersTap = false
+            if let began4FingersTime, event.time - began4FingersTime < 0.35 {
+                var event = InputKeyEvent(screenPoint: event.screenPoint,
+                                          time: event.time,
+                                          pressure: 1, phase: .began, isRepeat: false,
+                                          inputKeyType: .fourFingersTap)
+                let action = PlayAction(rootAction)
+                action.flow(with: event)
+                Sleep.start()
+                event.phase = .ended
+                action.flow(with: event)
+                isPrepare4FingersTap = false
+            }
         } else if swipePosition != nil {
             rootAction.swipe(with: .init(screenPoint: event.screenPoint,
                                          time: event.time,
