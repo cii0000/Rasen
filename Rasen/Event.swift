@@ -451,6 +451,14 @@ struct TouchEvent: Event {
     var screenPoint: Point, time: Double, phase: Phase
     var fingers: Set<Finger>, deviceSize: Size
 }
+extension TouchEvent {
+    var isAllBegan: Bool {
+        fingers.allSatisfy({ $0.phase == .began })
+    }
+    var isAllEnded: Bool {
+        fingers.allSatisfy({ $0.phase == .ended })
+    }
+}
 
 struct ActionItem {
     var name: String, quasimode: Quasimode, isEnableRoot = true

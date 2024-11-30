@@ -645,6 +645,7 @@ private struct BitmapScan {
     }
 }
 extension Bitmap {
+    /// Scan fill algorithm
     func floodFill(_ value: Value, atX fx: Int, y fy: Int) {
         let inValue = self[fx, fy]
         func isInside(_ x: Int, _ y: Int) -> Bool {
@@ -658,7 +659,8 @@ extension Bitmap {
         stack.push(.init(fx, fx, fy, 1))
         stack.push(.init(fx, fx, fy - 1, -1))
         while let scan = stack.pop() {
-            var x0 = scan.x0, x1 = scan.x1, y = scan.y, dy = scan.dy
+            let x1 = scan.x1, y = scan.y, dy = scan.dy
+            var x0 = scan.x0
             var x = x0
             if isInside(x, y) {
                 while isInside(x - 1, y) {

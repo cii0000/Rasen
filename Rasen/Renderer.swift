@@ -1223,11 +1223,12 @@ struct CPUNode {
     var lineType: Node.LineType?
     var fillType: Node.FillType?
     var isCPUFillAntialias = true
+    var isDrawLineAntialias = false
     
     init(children: [Self] = [Self](), isHidden: Bool = false, attitude: Attitude = Attitude(),
          path: Path = Path(),
          lineWidth: Double = 0.0, lineType: Node.LineType? = nil, fillType: Node.FillType? = nil,
-         isCPUFillAntialias: Bool = true) {
+         isCPUFillAntialias: Bool = true, isDrawLineAntialias: Bool = false) {
         
         self.children = children
         self.isHidden = isHidden
@@ -1240,12 +1241,13 @@ struct CPUNode {
         self.lineType = lineType
         self.fillType = fillType
         self.isCPUFillAntialias = isCPUFillAntialias
+        self.isDrawLineAntialias = isDrawLineAntialias
     }
     init(children: [Self] = [Self](), isHidden: Bool = false, attitude: Attitude = Attitude(),
          localTransform: Transform = .identity, isIdentityFromLocal: Bool = true,
          path: Path = Path(),
          lineWidth: Double = 0.0, lineType: Node.LineType? = nil, fillType: Node.FillType? = nil,
-         isCPUFillAntialias: Bool = true) {
+         isCPUFillAntialias: Bool = true, isDrawLineAntialias: Bool = false) {
         
         self.children = children
         self.isHidden = isHidden
@@ -1257,6 +1259,7 @@ struct CPUNode {
         self.lineType = lineType
         self.fillType = fillType
         self.isCPUFillAntialias = isCPUFillAntialias
+        self.isDrawLineAntialias = isDrawLineAntialias
     }
 }
 extension Node {
@@ -1522,7 +1525,8 @@ extension CPUNode {
                     }
                 }
             }
-            if !(isDrawFillAntialias ?? false), let lineType {
+            if isDrawLineAntialias ?
+                (isDrawFillAntialias ?? false) : !(isDrawFillAntialias ?? false), let lineType {
                 switch lineType {
                 case .color(let color):
                     ctx.setFillColor(color.cg)

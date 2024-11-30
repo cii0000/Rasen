@@ -91,10 +91,10 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
-	<key>LSHasLocalizedDisplayName</key>
-	<true/>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.graphics-design</string>
+	<key>LSHasLocalizedDisplayName</key>
+	<true/>
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSHumanReadableCopyright</key>
@@ -140,6 +140,8 @@
 			<string></string>
 			<key>UTTypeIcons</key>
 			<dict>
+				<key>UTTypeIconBadgeName</key>
+				<string></string>
 				<key>UTTypeIconText</key>
 				<string>doch</string>
 			</dict>
@@ -166,6 +168,8 @@
 			<string></string>
 			<key>UTTypeIcons</key>
 			<dict>
+				<key>UTTypeIconBadgeName</key>
+				<string></string>
 				<key>UTTypeIconText</key>
 				<string>data</string>
 			</dict>

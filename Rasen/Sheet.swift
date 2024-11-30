@@ -1424,10 +1424,10 @@ extension Line {
               lineWidth: size,
               lineType: .color(uuColor.value))
     }
-    func cpuNode(from color: Color) -> CPUNode {
+    func cpuNode(from color: Color, isDrawLineAntialias: Bool = false) -> CPUNode {
         .init(path: .init(self),
               lineWidth: size,
-              lineType: .color(color))
+              lineType: .color(color), isDrawLineAntialias: isDrawLineAntialias)
     }
 }
 extension Plane {
@@ -2420,7 +2420,8 @@ extension Sheet {
         let draftLineNodes: [CPUNode]
         if !draftPicture.lines.isEmpty {
             let lineColor = draftLinesColor()
-            draftLineNodes = draftPicture.lines.map { $0.cpuNode(from: lineColor) }
+            draftLineNodes = draftPicture.lines.map { $0.cpuNode(from: lineColor,
+                                                                 isDrawLineAntialias: true) }
         } else {
             draftLineNodes = []
         }
@@ -2437,7 +2438,6 @@ extension Sheet {
         
         let children0 = draftPlaneNodes + draftLineNodes
         let children1 = planeNodes + lineNodes
-        
         let children2 = textNodes + borderNodes + captionNodes
         if isBackground {
             return .init(children: children0 + children1 + children2,

@@ -5102,8 +5102,7 @@ extension O {
     
     static let drawName = "draw"
     static func draw(_ ao: O, _ oDic: inout [OKey: O]) -> O {
-        switch ao {
-        case .dic(let a):
+        func no(from a: [O: O], lineWidth: Double? = nil) -> O {
             if let rectO = a[O("rect")], case .dic(let rectDic) = rectO, let r = a[O("r")]?.asDouble,
                let originO = rectDic[O("origin")], let sizeO = rectDic[O("size")],
                  case .array(let originOs) = originO, case .dic(let sizeDic) = sizeO,
@@ -5113,7 +5112,8 @@ extension O {
                 let rect = Rect(x: x, y: y, width: width, height: height)
                 let path = Path([Pathline(rect, cornerRadius: r)])
                 let (dps, _) = path.pathDistancePoints(lineWidth: 1)
-                let line = Line(controls: dps.map { .init(point: $0.point, pressure: $0.distance * 2 / 1) })
+                let line = Line(controls: dps.map { .init(point: $0.point, pressure: 1) },
+                                size: lineWidth ?? Line.defaultLineWidth)
                 return drawLine(line, &oDic)
             } else if let originO = a[O("origin")], let sizeO = a[O("size")],
                case .array(let originOs) = originO, case .dic(let sizeDic) = sizeO,
@@ -5124,10 +5124,25 @@ extension O {
                 let ps = [rect.minXMaxYPoint, rect.minXMinYPoint, rect.minXMinYPoint,
                           rect.maxXMinYPoint, rect.maxXMinYPoint, rect.maxXMaxYPoint, rect.maxXMaxYPoint,
                           rect.minXMaxYPoint]
-                let line = Line(controls: ps.map { Line.Control(point: $0) })
+                let line = Line(controls: ps.map { Line.Control(point: $0) },
+                                size: lineWidth ?? Line.defaultLineWidth)
                 return drawLine(line, &oDic)
             }
             return O(OError.undefined(with: "\(self) \(O.drawName)"))
+        }
+        switch ao {
+        case .array(let a):
+            if a.count == 2,
+               case .dic(let rectDic) = a[0],
+               case .dic(let lineWidthDic) = a[1],
+               let lineWidth = lineWidthDic[O("lineWidth")]?.asDouble {
+                
+                return no(from: rectDic, lineWidth: lineWidth)
+            } else {
+                return O(OError.undefined(with: "\(self) \(O.drawName)"))
+            }
+        case .dic(let a):
+            return no(from: a)
         case .error: return ao
         default:
             let ps = ao.asPoints

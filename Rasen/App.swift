@@ -2086,6 +2086,11 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     func touchesBegan(with event: TouchEvent) {
         guard isEnabledCustomTrackpad else { return }
         
+        if oldTouchPoints.isEmpty {
+            beganSwipeTime = event.time
+            began4FingersTime = event.time
+        }
+        
         let ps = touchPoints(with: event)
         oldTouchPoints = ps
         touchedIDs = Array(ps.keys)
@@ -2118,7 +2123,6 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             
             isBeganSwipe = false
             swipePosition = Point()
-            beganSwipeTime = event.time
             isPrepare3FingersTap = true
         } else if ps.count == 4 {
             oldPinchDistance = nil
@@ -2126,7 +2130,6 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             oldScrollPosition = nil
             
             began4FingersPosition = (0 ..< 4).map { ps[touchedIDs[$0]]! }.mean()!
-            began4FingersTime = event.time
             isPrepare4FingersTap = true
         }
     }
@@ -2343,9 +2346,8 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     func touchesEnded(with event: TouchEvent) {
         guard isEnabledCustomTrackpad else { return }
-        
         if !isBeganPinch && !isBeganScroll && !isBeganRotate && isPrepare3FingersTap {
-            if let beganSwipeTime, event.time - beganSwipeTime < 0.35 {
+            if event.isAllEnded, let beganSwipeTime, event.time - beganSwipeTime < 0.3 {
                 var event = InputKeyEvent(screenPoint: event.screenPoint,
                                           time: event.time,
                                           pressure: 1, phase: .began, isRepeat: false,
@@ -2358,7 +2360,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 isPrepare3FingersTap = false
             }
         } else if !isBeganPinch && !isBeganScroll && !isBeganRotate && isPrepare4FingersTap {
-            if let began4FingersTime, event.time - began4FingersTime < 0.35 {
+            if event.isAllEnded, let began4FingersTime, event.time - began4FingersTime < 0.3 {
                 var event = InputKeyEvent(screenPoint: event.screenPoint,
                                           time: event.time,
                                           pressure: 1, phase: .began, isRepeat: false,
