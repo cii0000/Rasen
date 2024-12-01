@@ -680,6 +680,7 @@ final class RootView: View, @unchecked Sendable {
         sheetView.contentsView.elementViews.forEach { $0.isFullEdit = isFullEdit }
         sheetView.scoreView.isFullEdit = isFullEdit
         sheetView.animationView.isFullEdit = isFullEdit
+        sheetView.scoreView.isEditTone = isEditTone
     }
     
     var sheetLineWidth: Double { Line.defaultLineWidth }
@@ -2906,6 +2907,9 @@ final class RootView: View, @unchecked Sendable {
         Sheet.knobEditDistance * screenToWorldScale
     }
     
+    var isEditTone: Bool {
+        pov.logScale < -2
+    }
     var isFullEditNote: Bool {
         pov.logScale < -4
     }
