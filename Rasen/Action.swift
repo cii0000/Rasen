@@ -16,6 +16,7 @@
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
 import struct Foundation.UUID
+import Dispatch
 
 @MainActor protocol Action {
     func updateNode()
@@ -491,44 +492,75 @@ final class RotateAction: RotateEventAction {
         rootView = rootAction.rootView
     }
     
-    let correction = .pi / 40.0, clipD = .pi / 8.0
-    var isClipped = false
+    private var cursorTimer: (any DispatchSourceTimer)?
+    private var oldRotation = 0.0
+    
+    let correction = .pi / 30.0, clipD = .pi / 8.0
+    var isClipped = false, worldCenterP = Point()
     func flow(with event: RotateEvent) {
         switch event.phase {
-        case .began: isClipped = false
+        case .began:
+            isClipped = false
+            worldCenterP = event.screenPoint * rootView.screenToWorldTransform
+            oldRotation = rootView.pov.rotation
         default: break
         }
-        guard !isClipped && event.rotationQuantity != 0 else { return }
-        var transform = rootView.pov.transform
-        let p = event.screenPoint * rootView.screenToWorldTransform
-        let r = transform.angle
-        let rotation = r - event.rotationQuantity * correction
-        let nr: Double
-        if (rotation < clipD && rotation >= 0 && r < 0)
-            || (rotation > -clipD && rotation <= 0 && r > 0) {
+        
+        if !isClipped && event.rotationQuantity != 0 {
+            var transform = rootView.pov.transform
+            let p = worldCenterP
+            let r = transform.angle
+            let rotation = r - event.rotationQuantity * correction
+            let nr: Double
+            if (rotation < clipD && rotation >= 0 && r < 0)
+                || (rotation > -clipD && rotation <= 0 && r > 0) {
+                
+                nr = 0
+                Feedback.performAlignment()
+                isClipped = true
+            } else {
+                nr = rotation.loopedRotation
+            }
+            transform.translate(by: -p)
+            transform.rotate(by: nr - r)
+            transform.translate(by: p)
+            var pov = RootView.clippedPOV(from: .init(transform))
+            if isClipped {
+                pov.rotation = 0
+                rootView.pov = pov
+            } else {
+                rootView.pov = pov
+            }
+        }
+        
+        switch event.phase {
+        case .began:
+            cursorTimer = DispatchSource.scheduledTimer(withTimeInterval: 1 / 60) { [weak self] in
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, !(self.cursorTimer?.isCancelled ?? true) else { return }
+                    let rootView = self.rootView
+                    guard rootView.pov.rotation != self.oldRotation else { return }
+                    self.oldRotation = rootView.pov.rotation
+                    if rootView.pov.rotation != 0 {
+                        rootView.defaultCursor = Cursor.rotate(rotation: -rootView.pov.rotation + .pi / 2)
+                        rootView.cursor = rootView.defaultCursor
+                    } else {
+                        rootView.defaultCursor = .drawLine
+                        rootView.cursor = rootView.defaultCursor
+                    }
+                }
+            }
+        case .changed: break
+        case .ended:
+            cursorTimer?.cancel()
             
-            nr = 0
-            Feedback.performAlignment()
-            isClipped = true
-        } else {
-            nr = rotation.loopedRotation
-        }
-        transform.translate(by: -p)
-        transform.rotate(by: nr - r)
-        transform.translate(by: p)
-        var pov = RootView.clippedPOV(from: .init(transform))
-        if isClipped {
-            pov.rotation = 0
-            rootView.pov = pov
-        } else {
-            rootView.pov = pov
-        }
-        if rootView.pov.rotation != 0 {
-            rootView.defaultCursor = Cursor.rotate(rotation: -rootView.pov.rotation + .pi / 2)
-            rootView.cursor = rootView.defaultCursor
-        } else {
-            rootView.defaultCursor = .drawLine
-            rootView.cursor = rootView.defaultCursor
+            if rootView.pov.rotation != 0 {
+                rootView.defaultCursor = Cursor.rotate(rotation: -rootView.pov.rotation + .pi / 2)
+                rootView.cursor = rootView.defaultCursor
+            } else {
+                rootView.defaultCursor = .drawLine
+                rootView.cursor = rootView.defaultCursor
+            }
         }
     }
 }

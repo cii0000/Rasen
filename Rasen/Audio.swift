@@ -1503,7 +1503,6 @@ extension AVAudioPCMBuffer {
             let enabledAttack = abs(self[ci, 0]) > Waveclip.minAmp
             let enabledRelease = abs(self[ci, frameCount - 1]) > Waveclip.minAmp
             if enabledAttack || enabledRelease {
-                print("attack", enabledAttack, "release", enabledRelease)
                 enumerated(channelIndex: ci) { i, v in
                     let aSec = Double(i) * rSampleRate
                     if enabledAttack && aSec < Waveclip.attackSec {
