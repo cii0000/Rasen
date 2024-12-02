@@ -449,14 +449,14 @@ struct TouchEvent: Event {
         }
     }
     var screenPoint: Point, time: Double, phase: Phase
-    var fingers: Set<Finger>, deviceSize: Size
+    var fingers: [Int: Finger], deviceSize: Size
 }
 extension TouchEvent {
     var isAllBegan: Bool {
-        fingers.allSatisfy({ $0.phase == .began })
+        fingers.allSatisfy({ $0.value.phase == .began })
     }
     var isAllEnded: Bool {
-        fingers.allSatisfy({ $0.phase == .ended })
+        fingers.allSatisfy({ $0.value.phase == .ended })
     }
 }
 

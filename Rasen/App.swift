@@ -69,7 +69,8 @@ final class SubNSApplication: NSApplication {
                 if let deviceSize = trackpadSize {
                     let ioEvent = CGEventCopyIOHIDEvent(cgEvent)
                     let array = IOHIDEventGetChildren(ioEvent) as Array
-                    var fingers = [TouchEvent.Finger]()
+                    var fingers = [Int: TouchEvent.Finger]()
+                    var isOldPositons = false
                     for o in array {
                         // Referenced definition:
                         // https://github.com/apple-oss-distributions/IOHIDFamily/blob/IOHIDFamily-2102.0.6/IOHIDFamily/IOHIDEvent.h
@@ -82,10 +83,9 @@ final class SubNSApplication: NSApplication {
                             let flags1 = flags == 0x1, flags2 = flags == 0x10001
                             let isTouch = Int(IOHIDEventGetIntegerValue(o, (11 << 16) | 9)) == 1
                             let eventMask = Int(IOHIDEventGetIntegerValue(o, (11 << 16) | 7))
-                            guard eventMask != 64
-                                    && !(oldTouchEvent == nil && !isTouch) else { continue }
+                            guard !(oldTouchEvent == nil && !isTouch) else { continue }
                             let phase: Phase = if let oldTouchEvent {
-                                if let v = oldTouchEvent.fingers.first(where: { $0.id == id }) {
+                                if let v = oldTouchEvent.fingers[id] {
                                     flags1 ? .ended : (v.phase == .ended ?
                                                        (!isTouch ? .ended : .began) :
                                                         (flags2 && !isTouch ? .ended : .changed))
@@ -97,24 +97,35 @@ final class SubNSApplication: NSApplication {
                             }
                             guard !(phase == .began && (flags1 || flags2)) else { continue }
                             if let oldTouchEvent, phase == .ended,
-                                oldTouchEvent.fingers.contains(where: { $0.id == id && $0.phase == .ended }) { continue }
-                            fingers.append(.init(normalizedPosition: .init(x, 1 - y), phase: phase,
-                                                 id: id))
+                               let oldFinger = oldTouchEvent.fingers[id], oldFinger.phase == .ended { continue }
+                            if phase == .changed
+                                && !(eventMask == 4 || eventMask == 68 || eventMask == 100) {
+                                isOldPositons = true
+                            }
+                            fingers[id] = .init(normalizedPosition: .init(x, 1 - y), phase: phase, id: id)
                         }
                     }
+                    if isOldPositons {
+                        for id in fingers.keys {
+                            if let p = oldTouchEvent?.fingers[id]?.normalizedPosition {
+                                fingers[id]?.normalizedPosition = p
+                            }
+                        }
+                    }
+                    
                     let screenPoint = view.screenPoint(with: nsEvent).my
                     let time = nsEvent.timestamp
-                    let phase: Phase = fingers.contains(where: { $0.phase == .began }) ?
-                        .began : (fingers.contains(where: { $0.phase == .ended }) ? .ended : .changed)
+                    let phase: Phase = fingers.contains(where: { $0.value.phase == .began }) ?
+                        .began : (fingers.contains(where: { $0.value.phase == .ended }) ? .ended : .changed)
                     let event = TouchEvent(screenPoint: screenPoint, time: time, phase: phase,
-                                           fingers: .init(fingers), deviceSize: deviceSize)
+                                           fingers: fingers, deviceSize: deviceSize)
                     switch event.phase {
                     case .began: view.touchesBegan(with: event)
                     case .changed: view.touchesMoved(with: event)
                     case .ended: view.touchesEnded(with: event)
                     }
 
-                    oldTouchEvent = fingers.allSatisfy({ $0.phase == .ended }) ? nil : event
+                    oldTouchEvent = fingers.allSatisfy({ $0.value.phase == .ended }) ? nil : event
                     return
                 }
             }
@@ -2046,8 +2057,8 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     func touchPoints(with event: TouchEvent) -> [Int: Point] {
         event.fingers.reduce(into: .init()) {
-            $0[$1.id] = .init($1.normalizedPosition.x * event.deviceSize.width,
-                              $1.normalizedPosition.y * event.deviceSize.height)
+            $0[$1.key] = .init($1.value.normalizedPosition.x * event.deviceSize.width,
+                               $1.value.normalizedPosition.y * event.deviceSize.height)
         }
     }
     static func finger(with touch: NSTouch) -> TouchEvent.Finger {
@@ -2058,28 +2069,35 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         } else {
             .ended
         }
-        return .init(normalizedPosition: touch.normalizedPosition.my, phase: phase, id: touch.identity.hash)
+        return .init(normalizedPosition: touch.normalizedPosition.my, phase: phase,
+                     id: touch.identity.hash)
+    }
+    static func fingers(with allTouches: Set<NSTouch>) -> [Int: TouchEvent.Finger] {
+        allTouches.reduce(into: .init()) {
+            let finger = Self.finger(with: $1)
+            $0[finger.id] = finger
+        }
     }
     
     override func touchesBegan(with nsEvent: NSEvent) {
         guard let touch = nsEvent.allTouches().first else { return }
         touchesBegan(with: .init(screenPoint: screenPoint(with: nsEvent).my,
                                  time: nsEvent.timestamp, phase: .began,
-                                 fingers: Set(nsEvent.allTouches().map { Self.finger(with: $0) }),
+                                 fingers: Self.fingers(with: nsEvent.allTouches()),
                      deviceSize: touch.deviceSize.my))
     }
     override func touchesMoved(with nsEvent: NSEvent) {
         guard let touch = nsEvent.allTouches().first else { return }
         touchesMoved(with: .init(screenPoint: screenPoint(with: nsEvent).my,
                                  time: nsEvent.timestamp, phase: .changed,
-                                 fingers: Set(nsEvent.allTouches().map { Self.finger(with: $0) }),
+                                 fingers: Self.fingers(with: nsEvent.allTouches()),
                      deviceSize: touch.deviceSize.my))
     }
     override func touchesEnded(with nsEvent: NSEvent) {
         guard let touch = nsEvent.allTouches().first else { return }
         touchesEnded(with: .init(screenPoint: screenPoint(with: nsEvent).my,
                                  time: nsEvent.timestamp, phase: .ended,
-                                 fingers: Set(nsEvent.allTouches().map { Self.finger(with: $0) }),
+                                 fingers: Self.fingers(with: nsEvent.allTouches()),
                      deviceSize: touch.deviceSize.my))
     }
     override func touchesCancelled(with event: NSEvent) {

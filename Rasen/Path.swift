@@ -1366,6 +1366,16 @@ extension Path {
                 func appendB(_ bezier: Bezier, _ preb: BezierInterpolation) {
                     let da = abs(Point.differenceAngle(bezier.cp - bezier.p0,
                                                        bezier.p1 - bezier.cp))
+                    func isMiniCross() -> Bool {
+                        if da > .pi * 0.4 {
+                            let d0 = bezier.p0.distanceSquared(bezier.cp)
+                            let d1 = bezier.cp.distanceSquared(bezier.p1)
+                            return (d0 / s * s < 4 * 4 || d1 / s * s < 4 * 4)
+                        } else {
+                            return false
+                        }
+                    }
+                    let isCap = da > .pi * 0.9 || isMiniCross()
                     let l = bezier.length(withFlatness: 4)
                     let ct = da < .pi * 0.1 ?
                         da.clipped(min: 0, max: .pi * 0.3,
@@ -1374,6 +1384,7 @@ extension Path {
                                    newMin: 1.5, newMax: 16)
                     let c = l * ct * rlw * quality
                     let count = c.isNaN ? 2 : Int(c.clipped(min: 2, max: 32))
+                    let halfCount = count / 2
                     let rCount = 1 / Double(count)
                     for i in 0 ..< count {
                         let t = Double(i) * rCount
@@ -1383,20 +1394,20 @@ extension Path {
                             .perpendicularDeltaPoint(withDistance: ns)
                         append(p - dp)
                         append(p + dp)
+                        if isCap && i == halfCount {
+                            let fa = bezier.firstAngle, la = bezier.lastAngle
+                            appendLastCap(p, angle: fa, radius: ns)
+                            appendFirstCap(p, angle: la - .pi, radius: ns)
+                        }
                     }
                 }
                 let d0 = bezier.p0.distance(bezier.cp)
                 let d1 = bezier.cp.distance(bezier.p1)
-                let t0 = d0 < d1 ? d0 / d1 : d1 / d0
-                if t0 < 0.35 {
-                    let t = (d0 < d1 ? d0 / d1 : (d0 - d1) / d0).mid(0.5)
-                    let (b0, b1) = bezier.split(withT: t)
-                    let (preb0, preb1) = preb.split(withT: t)
-                    appendB(b0, preb0)
-                    appendB(b1, preb1)
-                } else {
-                    appendB(bezier, preb)
-                }
+                let t = (d0 < d1 ? d0 / d1 : (d0 - d1) / d0).mid(0.5)
+                let (b0, b1) = bezier.split(withT: t)
+                let (preb0, preb1) = preb.split(withT: t)
+                appendB(b0, preb0)
+                appendB(b1, preb1)
             }
             let lp = line.lastPoint, lastAngle = line.lastAngle
             let lpr = line.controls[.last].pressure
