@@ -91,6 +91,9 @@ extension Picture {
                          borders: [Border] = [],
                          isSelection: Bool) -> AutoFillResult {
         if nPolys.isEmpty {
+            if !planes.isEmpty {
+                return .planeValue(.init(planes: [], moveIndexValues: []))
+            }
             return .none
         }
         var nPlanes: [(plane: Plane, area: Double)] = nPolys.map {
@@ -140,7 +143,7 @@ extension Picture {
                 return $0.element
             }
         }
-        if indexValues.count == nPlanes.count {
+        if indexValues.count == nPlanes.count && planes.count == nPlanes.count {
             return .none
         }
         let removePlaneIndexes = isIndexesArray.enumerated().compactMap {
@@ -224,7 +227,7 @@ extension Picture {
     
     private static func topolygons(with bounds: Rect,
                                    from lines: [Line],
-                                   connectableScale cd: Double = 3.0,
+                                   connectableScale cd: Double = 4.0,
                                    straightConnectableScale scd: Double = 6.0,
                                    renderingScale: Double,
                                    borders: [Border]) -> [Topolygon] {
@@ -291,7 +294,8 @@ extension Picture {
         }
         
         struct LinePoint: Rectable {
-            var p: Point, d: Double, vector: Point, i: Int, fol: FirstOrLast, bounds: Rect
+            var p: Point, d: Double, lenfth: Double,
+                vector: Point, i: Int, fol: FirstOrLast, bounds: Rect
         }
         
         let edgeLineSearchTree = RectSearchTree(edgeLines)
@@ -299,9 +303,10 @@ extension Picture {
         var lps = [LinePoint](capacity: lines.count * 2)
         for (li, line) in lines.enumerated() {
             let fp = line.firstPoint, lp = line.lastPoint, d = line.size / 2
-            lps.append(.init(p: fp, d: d, vector: -line.firstVector,
+            let length = line.length()
+            lps.append(.init(p: fp, d: d, lenfth: length, vector: -line.firstVector,
                              i: li, fol: .first, bounds: .init(fp, distance: scd * d)))
-            lps.append(.init(p: lp, d: d, vector: line.lastVector,
+            lps.append(.init(p: lp, d: d, lenfth: length, vector: line.lastVector,
                              i: li, fol: .last, bounds: .init(lp, distance: scd * d)))
         }
         let lpSearchTree = RectSearchTree(lps)!
@@ -310,18 +315,18 @@ extension Picture {
             let minDSq = (lp0.d / 2).squared
             let maxD = cd * lp0.d
             let maxDSq = maxD * maxD
+            let lengthScale = lps[lp0.i].lenfth.clipped(min: lp0.d * 4, max: lp0.d * 8,
+                                                        newMin: 0.5, newMax: 1)
             
             lpSearchTree.intersects(from: lp0.bounds) { lp1i in
                 let lp1 = lps[lp1i]
                 guard lp0.p != lp1.p else { return }
                 let dSq = lp0.p.distanceSquared(lp1.p)
-                let maxD0 = maxD + cd * lp1.d
-                guard dSq >= maxD0 * maxD0 || lp0.i == lp1.i else { return }
-                let maxD1 = scd * (lp0.d + lp1.d)
+                let maxD1 = scd * (lp0.d + lp1.d) * lengthScale
                 let v0 = lp0.vector, v1 = lp1.vector, v2 = lp1.p - lp0.p
-                let angle = abs(Point.differenceAngle(v0, v2)) + abs(Point.differenceAngle(v2, -v1))
-                guard angle < .pi / 2 else { return }
-                let maxND = angle.clipped(min: .pi / 2, max: 0, newMin: maxD0, newMax: maxD1)
+                let dAngle = abs(Point.differenceAngle(v0, v2))
+                + abs(Point.differenceAngle(v2, -v1))
+                let maxND = dAngle.clipped(min: .pi, max: 0, newMin: 0, newMax: maxD1)
                 if dSq < maxND * maxND {
                     bitmap.stroke(Edge(lp0.p, lp1.p))
                 }
@@ -338,7 +343,7 @@ extension Picture {
                         let dSq = np.distanceSquared(lp0.p)
                         let vector0 = lp0.vector, vector1 = np - lp0.p
                         let s = abs(Point.differenceAngle(vector0, vector1))
-                            .clipped(min: 0, max: .pi, newMin: 1, newMax: 0.5)
+                            .clipped(min: 0, max: .pi, newMin: 1, newMax: 0.5) * lengthScale
                         if dSq < vMinDSq && dSq > minDSq && dSq < maxDSq * s * s {
                             vMinDSq = dSq
                             vMinNP = np

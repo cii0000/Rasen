@@ -59,7 +59,7 @@ final class SubNSApplication: NSApplication {
     let IOHIDEventGetFloatValue = unsafeBitCast(dlsym(ioKitHandle, "IOHIDEventGetFloatValue"),
                                                 to: IOHIDEventGetFloatValueType.self)
     
-    private var trackpadSize: Size?, oldTouchEvent: TouchEvent?
+    private var trackpadSize: Size?, oldTouchEvent: TouchEvent?, isPreOldPositons = false
     override func sendEvent(_ nsEvent: NSEvent) {
         if nsEvent.type == .gesture {// AppKit bug: nsEvent.allTouches() returns [] after aleep
             if let cgEvent = nsEvent.cgEvent, let view = nsEvent.window?.contentView as? SubMTKView {
@@ -98,7 +98,7 @@ final class SubNSApplication: NSApplication {
                             guard !(phase == .began && (flags1 || flags2)) else { continue }
                             if let oldTouchEvent, phase == .ended,
                                let oldFinger = oldTouchEvent.fingers[id], oldFinger.phase == .ended { continue }
-                            if phase == .changed
+                            if let oldFinger = oldTouchEvent?.fingers[id], oldFinger.phase == .began || isPreOldPositons, phase == .changed
                                 && !(eventMask == 4 || eventMask == 68 || eventMask == 100) {
                                 isOldPositons = true
                             }
@@ -112,6 +112,7 @@ final class SubNSApplication: NSApplication {
                             }
                         }
                     }
+                    isPreOldPositons = isOldPositons
                     
                     let screenPoint = view.screenPoint(with: nsEvent).my
                     let time = nsEvent.timestamp
