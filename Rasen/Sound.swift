@@ -1042,6 +1042,7 @@ struct Note {
     var pitch = Rational(0)
     var pits = [Pit()]
     var envelope = Envelope()
+    var spectlopeHeight = Sheet.spectlopeHeight
     var id = UUID()
 }
 extension Note: Protobuf {
@@ -1053,6 +1054,8 @@ extension Note: Protobuf {
             pits = [Pit()]
         }
         envelope = (try? Envelope(pb.envelope)) ?? .init()
+        spectlopeHeight = ((try? pb.spectlopeHeight.notNaN()) ?? 0)
+            .clipped(min: Sheet.spectlopeHeight, max: Sheet.spectlopeHeight)
         id = (try? UUID(pb.id)) ?? UUID()
     }
     var pb: PBNote {
@@ -1061,6 +1064,7 @@ extension Note: Protobuf {
             $0.pitch = pitch.pb
             $0.pits = pits.map { $0.pb }
             $0.envelope = envelope.pb
+            $0.spectlopeHeight = spectlopeHeight
             $0.id = id.pb
         }
     }

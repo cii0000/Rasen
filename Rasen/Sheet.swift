@@ -2184,8 +2184,8 @@ extension Sheet {
     static let pitchHeight = 2.5
     static let noteHeight = 2.0
     static let tonePadding = 2.0
-    static let evenY = 1.0, overtoneHeight = 2.0
-    static let spectlopeHeight = 16.0
+    static let evenY = 1.0
+    static let spectlopeHeight = 2.0, maxSpectlopeHeight = 12.0
     static let reverbHeight = 0.5
     static let spectrogramX = 10.0, isShownSpectrogramHeight = 6.0
 }

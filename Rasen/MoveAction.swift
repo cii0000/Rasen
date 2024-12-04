@@ -322,7 +322,8 @@ final class MoveScoreAction: DragEventAction {
     enum SlideType {
         case keyBeats, allBeat, endBeat, isShownSpectrogram,
              startNoteBeat, endNoteBeat, note,
-             pit, reverbEarlyRSec, reverbEarlyAndLateRSec, reverbDurSec, even, sprol
+             pit, reverbEarlyRSec, reverbEarlyAndLateRSec, reverbDurSec,
+             even, sprol, spectlopeHeight
     }
     
     private let editableInterval = 5.0
@@ -613,6 +614,16 @@ final class MoveScoreAction: DragEventAction {
                         updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
                         
                         rootView.cursor = .circle(string: Pitch(value: .init(beganTone.spectlope.sprols[sprolI].pitch, intervalScale: Sheet.fullEditPitchInterval)).octaveString(hidableDecimal: false))
+                    case .spectlopeHeight:
+                        type = .spectlopeHeight
+                        
+                        self.noteI = noteI
+                        
+                        if rootView.isSelect(at: p) {
+                            let noteIs = sheetView.noteIndexes(from: rootView.selections)
+                            beganNotes = noteIs.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
+                        }
+                        beganNotes[noteI] = score.notes[noteI]
                     }
                 } else if let noteI = scoreView.noteIndex(at: scoreP, scale: rootView.screenToWorldScale) {
                     let note = score.notes[noteI]
@@ -1112,6 +1123,20 @@ final class MoveScoreAction: DragEventAction {
                         
                         rootView.cursor = .circle(string: Pitch(value: .init(nPitch, intervalScale: Sheet.fullEditPitchInterval)).octaveString(hidableDecimal: false))
                     }
+                case .spectlopeHeight:
+                    var nivs = [IndexValue<Note>](capacity: beganNotes.count)
+                    for (noteI, beganNote) in beganNotes {
+                        guard noteI < score.notes.count else { continue }
+                        
+                        var note = beganNote
+                        note.spectlopeHeight = (sheetP.y - beganSheetP.y + note.spectlopeHeight)
+                            .clipped(min: Sheet.spectlopeHeight, max: Sheet.maxSpectlopeHeight)
+                        
+                        nivs.append(.init(value: note, index: noteI))
+                    }
+                    scoreView.replace(nivs)
+                    
+                    rootView.updateSelects()
                 }
             }
         case .ended:

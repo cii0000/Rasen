@@ -235,6 +235,7 @@ message PBNote {
     repeated PBPit pits = 2;
     PBRationalRange beatRange = 3;
     PBEnvelope envelope = 7;
+    double spectlopeHeight = 10;
     PBUUID id = 9;
 }
 

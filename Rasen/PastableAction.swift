@@ -937,9 +937,8 @@ final class PastableAction: Action {
             let scoreView = sheetView.scoreView
             let score = scoreView.model
             
+            let nlw = max(0.5, 10 * rootView.screenToWorldScale)
             func show(_ ps: [Point]) {
-                let nlw = max(0.5, 10 * rootView.screenToWorldScale)
-                
                 let node = Node(attitude: .init(position: scoreView.node.convertToWorld(Point())),
                                 path: Path(ps.map { Pathline(circleRadius: nlw, position: $0) }),
                                 fillType: .color(.selected))
@@ -1012,6 +1011,17 @@ final class PastableAction: Action {
                     }
                 }
                 show(ps)
+            case .spectlopeHeight:
+                let note = score.notes[noteI]
+                let toneFrames = scoreView.toneFrames(at: noteI)
+                
+                let node = Node(attitude: .init(position: scoreView.node.convertToWorld(Point())),
+                                path: .init(toneFrames.map { Edge($0.frame.minXMaxYPoint,
+                                                                  $0.frame.maxXMaxYPoint) }),
+                                lineWidth: rootView.worldLineWidth,
+                                lineType: .color(.selected))
+                selectingLineNode.children = [node]
+                Pasteboard.shared.copiedObjects = [.normalizationValue(note.spectlopeHeight)]
             }
             return true
         } else if let sheetView = rootView.sheetView(at: p),
@@ -1440,6 +1450,14 @@ final class PastableAction: Action {
                 sheetView.newUndoGroup()
                 sheetView.replace(nivs)
                 return true
+            case .spectlopeHeight:
+                var note = score.notes[noteI]
+                if note.spectlopeHeight != Sheet.spectlopeHeight {
+                    note.spectlopeHeight = Sheet.spectlopeHeight
+                    sheetView.replace([IndexValue<Note>(value: note, index: noteI)])
+                    Pasteboard.shared.copiedObjects = [.normalizationValue(note.spectlopeHeight)]
+                    return true
+                }
             }
         } else if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled,
                   let noteI = sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),

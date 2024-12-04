@@ -1182,6 +1182,11 @@ struct PBNote: @unchecked Sendable {
   /// Clears the value of `envelope`. Subsequent reads from it will return its default value.
   mutating func clearEnvelope() {_uniqueStorage()._envelope = nil}
 
+  var spectlopeHeight: Double {
+    get {return _storage._spectlopeHeight}
+    set {_uniqueStorage()._spectlopeHeight = newValue}
+  }
+
   var id: PBUUID {
     get {return _storage._id ?? PBUUID()}
     set {_uniqueStorage()._id = newValue}
@@ -5135,6 +5140,7 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
     2: .same(proto: "pits"),
     3: .same(proto: "beatRange"),
     7: .same(proto: "envelope"),
+    10: .same(proto: "spectlopeHeight"),
     9: .same(proto: "id"),
   ]
 
@@ -5143,6 +5149,7 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
     var _pits: [PBPit] = []
     var _beatRange: PBRationalRange? = nil
     var _envelope: PBEnvelope? = nil
+    var _spectlopeHeight: Double = 0
     var _id: PBUUID? = nil
 
     #if swift(>=5.10)
@@ -5162,6 +5169,7 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
       _pits = source._pits
       _beatRange = source._beatRange
       _envelope = source._envelope
+      _spectlopeHeight = source._spectlopeHeight
       _id = source._id
     }
   }
@@ -5186,6 +5194,7 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
         case 3: try { try decoder.decodeSingularMessageField(value: &_storage._beatRange) }()
         case 7: try { try decoder.decodeSingularMessageField(value: &_storage._envelope) }()
         case 9: try { try decoder.decodeSingularMessageField(value: &_storage._id) }()
+        case 10: try { try decoder.decodeSingularDoubleField(value: &_storage._spectlopeHeight) }()
         default: break
         }
       }
@@ -5213,6 +5222,9 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
       try { if let v = _storage._id {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
       } }()
+      if _storage._spectlopeHeight.bitPattern != 0 {
+        try visitor.visitSingularDoubleField(value: _storage._spectlopeHeight, fieldNumber: 10)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -5226,6 +5238,7 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
         if _storage._pits != rhs_storage._pits {return false}
         if _storage._beatRange != rhs_storage._beatRange {return false}
         if _storage._envelope != rhs_storage._envelope {return false}
+        if _storage._spectlopeHeight != rhs_storage._spectlopeHeight {return false}
         if _storage._id != rhs_storage._id {return false}
         return true
       }
