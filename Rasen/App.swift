@@ -59,7 +59,7 @@ final class SubNSApplication: NSApplication {
     let IOHIDEventGetFloatValue = unsafeBitCast(dlsym(ioKitHandle, "IOHIDEventGetFloatValue"),
                                                 to: IOHIDEventGetFloatValueType.self)
     
-    private var trackpadSize: Size?, oldTouchEvent: TouchEvent?, isPreOldPositons = false
+    private var trackpadSize: Size?, oldTouchEvent: TouchEvent?
     override func sendEvent(_ nsEvent: NSEvent) {
         if nsEvent.type == .gesture {// AppKit bug: nsEvent.allTouches() returns [] after aleep
             if let cgEvent = nsEvent.cgEvent, let view = nsEvent.window?.contentView as? SubMTKView {
@@ -70,7 +70,6 @@ final class SubNSApplication: NSApplication {
                     let ioEvent = CGEventCopyIOHIDEvent(cgEvent)
                     let array = IOHIDEventGetChildren(ioEvent) as Array
                     var fingers = [Int: TouchEvent.Finger]()
-                    var isOldPositons = false
                     for o in array {
                         // Referenced definition:
                         // https://github.com/apple-oss-distributions/IOHIDFamily/blob/IOHIDFamily-2102.0.6/IOHIDFamily/IOHIDEvent.h
@@ -82,37 +81,21 @@ final class SubNSApplication: NSApplication {
                             let flags = IOHIDEventGetEventFlags(o)
                             let flags1 = flags == 0x1, flags2 = flags == 0x10001
                             let isTouch = Int(IOHIDEventGetIntegerValue(o, (11 << 16) | 9)) == 1
-                            let eventMask = Int(IOHIDEventGetIntegerValue(o, (11 << 16) | 7))
                             guard !(oldTouchEvent == nil && !isTouch) else { continue }
-                            let phase: Phase = if let oldTouchEvent {
-                                if let v = oldTouchEvent.fingers[id] {
-                                    flags1 ? .ended : (v.phase == .ended ?
-                                                       (!isTouch ? .ended : .began) :
-                                                        (flags2 && !isTouch ? .ended : .changed))
-                                } else {
-                                    .began
-                                }
+                            let phase: Phase = if let oldTouchEvent,
+                                                    let v = oldTouchEvent.fingers[id] {
+                                flags1 ? .ended : (v.phase == .ended ?
+                                                   (!isTouch ? .ended : .began) :
+                                                    (flags2 && !isTouch ? .ended : .changed))
                             } else {
                                 .began
                             }
                             guard !(phase == .began && (flags1 || flags2)) else { continue }
                             if let oldTouchEvent, phase == .ended,
                                let oldFinger = oldTouchEvent.fingers[id], oldFinger.phase == .ended { continue }
-                            if let oldFinger = oldTouchEvent?.fingers[id], oldFinger.phase == .began || isPreOldPositons, phase == .changed
-                                && !(eventMask == 4 || eventMask == 68 || eventMask == 100) {
-                                isOldPositons = true
-                            }
                             fingers[id] = .init(normalizedPosition: .init(x, 1 - y), phase: phase, id: id)
                         }
                     }
-                    if isOldPositons {
-                        for id in fingers.keys {
-                            if let p = oldTouchEvent?.fingers[id]?.normalizedPosition {
-                                fingers[id]?.normalizedPosition = p
-                            }
-                        }
-                    }
-                    isPreOldPositons = isOldPositons
                     
                     let screenPoint = view.screenPoint(with: nsEvent).my
                     let time = nsEvent.timestamp
@@ -125,7 +108,7 @@ final class SubNSApplication: NSApplication {
                     case .changed: view.touchesMoved(with: event)
                     case .ended: view.touchesEnded(with: event)
                     }
-
+                    
                     oldTouchEvent = fingers.allSatisfy({ $0.value.phase == .ended }) ? nil : event
                     return
                 }
@@ -2035,18 +2018,18 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     var oldTouchPoints = [Int: Point]()
     var touchedIDs = [Int]()
-    var isBeganScroll = false, oldScrollPosition: Point?, allScrollPosition = Point()
-    var isBeganPinch = false, oldPinchDistance: Double?
-    var isBeganRotate = false, oldRotateAngle: Double?
+    var isBeganScroll = false, isFirstChangedScroll = false, beganScrollPosition: Point?, oldScrollPosition: Point?, allScrollPosition = Point()
+    var isBeganPinch = false, isFirstChangedPinch = false,beganPinchDistance: Double?, oldPinchDistance: Double?
+    var isBeganRotate = false, isFirstChangedRotate = false, beganRotateAngle: Double?, oldRotateAngle: Double?
     var isPrepare3FingersTap = false, isPrepare4FingersTap = false
     var scrollVs = [(dp: Point, time: Double)]()
     var pinchVs = [(d: Double, time: Double)]()
-    var lastScrollDeltaPosition = Point()
+    var lastScrollDeltaPoint = Point()
     enum  SnapScrollType {
         case none, x, y
     }
     var snapScrollType = SnapScrollType.none
-    var lastMagnification = 0.0
+    var lastMagnification = 0.0, preMagnification = 0.0
     var lastRotationQuantity = 0.0
     var isBeganSwipe = false, swipePosition: Point?, beganSwipePosition: Point?, beganSwipeTime: Double?
     var began4FingersPosition: Point?, began4FingersTime: Double?
@@ -2123,20 +2106,30 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             swipePosition = nil
             let ps0 = ps[touchedIDs[0]]!, ps1 = ps[touchedIDs[1]]!
             oldPinchDistance = ps0.distance(ps1)
-            oldRotateAngle = ps0.angle(ps1)
             oldScrollPosition = ps0.mid(ps1)
+            oldRotateAngle = ps0.angle(ps1)
+            beganPinchDistance = oldPinchDistance
+            beganScrollPosition = oldScrollPosition
+            beganRotateAngle = oldRotateAngle
             isBeganPinch = false
             isBeganScroll = false
             isBeganRotate = false
+            isFirstChangedPinch = false
+            isFirstChangedScroll = false
+            isFirstChangedRotate = false
             snapScrollType = .none
-            lastScrollDeltaPosition = .init()
+            lastScrollDeltaPoint = .init()
             lastMagnification = 0
+            preMagnification = 0
             pinchVs = []
             scrollVs = []
         } else if ps.count == 3 {
             oldPinchDistance = nil
-            oldRotateAngle = nil
             oldScrollPosition = nil
+            oldRotateAngle = nil
+            beganPinchDistance = nil
+            beganScrollPosition = nil
+            beganRotateAngle = nil
             
             let ps0 = ps[touchedIDs[0]]!, ps1 = ps[touchedIDs[1]]!, ps2 = ps[touchedIDs[2]]!
             beganSwipePosition = [ps0, ps1, ps2].mean()
@@ -2146,8 +2139,11 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             isPrepare3FingersTap = true
         } else if ps.count == 4 {
             oldPinchDistance = nil
-            oldRotateAngle = nil
             oldScrollPosition = nil
+            oldRotateAngle = nil
+            beganPinchDistance = nil
+            beganScrollPosition = nil
+            beganRotateAngle = nil
             
             began4FingersPosition = (0 ..< 4).map { ps[touchedIDs[$0]]! }.mean()!
             isPrepare4FingersTap = true
@@ -2159,69 +2155,15 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         let ps = touchPoints(with: event)
         if ps.count == 2 {
             if touchedIDs.count == 2,
-               let oldPinchDistance, let oldScrollPosition, let oldRotateAngle,
+               let beganPinchDistance, let beganScrollPosition, let beganRotateAngle,
                 let ps0 = ps[touchedIDs[0]],
                 let ps1 = ps[touchedIDs[1]],
                 let ops0 = oldTouchPoints[touchedIDs[0]],
                 let ops1 = oldTouchPoints[touchedIDs[1]] {
                
                 let pinchDistance = 5.0, scrollDistance = 5.0
-                let nPinchDistance = ps0.distance(ps1)
-                let nRotateAngle = ps0.angle(ps1)
-                let nScrollPosition = ps0.mid(ps1)
-                let isPinchWithDistance = abs(nPinchDistance - oldPinchDistance) > pinchDistance
-                && abs(Edge(ops0, ps0).angle(Edge(ops1, ps1))) > .pi / 2
-                let isScrollWithDistance = nScrollPosition.distance(oldScrollPosition) > scrollDistance
-                if !isBeganScroll && !isBeganPinch && !isBeganRotate
-                    && isPinchWithDistance {
-                    
-                    isBeganPinch = true
-                    
-                    scrollTimer?.cancel()
-                    scrollTimer = nil
-                    pinchTimer?.cancel()
-                    pinchTimer = nil
-                    rootAction.pinch(with: .init(screenPoint: event.screenPoint,
-                                                 time: event.time,
-                                                 magnification: 0,
-                                                 phase: .began))
-                    pinchVs.append((0, event.time))
-                    self.oldPinchDistance = nPinchDistance
-                    lastMagnification = 0
-                } else if isBeganPinch {
-                    let magnification = (nPinchDistance - oldPinchDistance) * 0.0125
-                    rootAction.pinch(with: .init(screenPoint: event.screenPoint,
-                                                 time: event.time,
-                                                 magnification: magnification.mid(lastMagnification),
-                                                 phase: .changed))
-                    pinchVs.append((magnification, event.time))
-                    self.oldPinchDistance = nPinchDistance
-                    lastMagnification = magnification
-                } else if !(isSubDrag && isSubTouth)
-                            && !isBeganScroll && !isBeganPinch && !isBeganRotate
-                            && !isPinchWithDistance && isScrollWithDistance {
-                    isBeganScroll = true
-                    
-                    scrollTimer?.cancel()
-                    scrollTimer = nil
-                    pinchTimer?.cancel()
-                    pinchTimer = nil
-                    rootAction.scroll(with: .init(screenPoint: event.screenPoint,
-                                                  time: event.time,
-                                                  scrollDeltaPoint: .init(),
-                                                  phase: .began,
-                                                  touchPhase: .began,
-                                                  momentumPhase: nil))
-                    scrollVs.append((.init(), event.time))
-                    self.oldScrollPosition = nScrollPosition
-                    lastScrollDeltaPosition = .init()
-                    let dp = nScrollPosition - oldScrollPosition
-                    snapScrollType = min(abs(dp.x), abs(dp.y)) < 3
-                        ? (abs(dp.x) > abs(dp.y) ? .x : .y) : .none
-                    
-                    allScrollPosition = .init()
-                } else if isBeganScroll {
-                    var dp = nScrollPosition - oldScrollPosition
+                func scrollDeltaPoint(fromDelta dp: Point) -> Point {
+                    var dp = dp
                     allScrollPosition += dp
                     switch snapScrollType {
                     case .x:
@@ -2240,46 +2182,121 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     }
                     let angle = dp.angle()
                     let dpl = dp.length() * 3.5
-                    let length = dpl < 15 ? dpl : dpl
-                        .clipped(min: 15, max: 200,
-                                 newMin: 15, newMax: 500)
-                    let scrollDeltaPosition = Point()
-                        .movedWith(distance: length, angle: angle)
+                    let length = dpl < 15 ? dpl : dpl.clipped(min: 15, max: 200,
+                                                              newMin: 15, newMax: 500)
+                    return Point().movedWith(distance: length, angle: angle)
+                }
+                
+                let nPinchDistance = ps0.distance(ps1)
+                let oldPinchDistance = oldPinchDistance ?? beganPinchDistance
+                let oMagnification = (nPinchDistance - oldPinchDistance) * 0.0125
+                let magnification: Double = if lastMagnification == 0 {
+                    oMagnification.signValue * min(abs(oMagnification), 0.001)
+                } else {
+                    oMagnification
+                }
+                
+                let nScrollPosition = ps0.mid(ps1)
+                let nRotateAngle = ps0.angle(ps1)
+                let isPinchWithDistance = abs(nPinchDistance - beganPinchDistance) > pinchDistance
+                && abs(Edge(ops0, ps0).angle(Edge(ops1, ps1))) > .pi / 2
+                let isScrollWithDistance = nScrollPosition.distance(beganScrollPosition) > scrollDistance
+                if !isBeganScroll && !isBeganPinch && !isBeganRotate
+                    && isPinchWithDistance {
+                    
+                    isBeganPinch = true
+                    
+                    scrollTimer?.cancel()
+                    scrollTimer = nil
+                    pinchTimer?.cancel()
+                    pinchTimer = nil
+                    
+                    rootAction.pinch(with: .init(screenPoint: event.screenPoint,
+                                                 time: event.time,
+                                                 magnification: 0,
+                                                 phase: .began))
+                    pinchVs = [(0, event.time)]
+                    preMagnification = 0
+                } else if isBeganPinch {
+                    if isFirstChangedPinch || lastMagnification.sign == magnification.sign {
+                        rootAction.pinch(with: .init(screenPoint: event.screenPoint,
+                                                     time: event.time,
+                                                     magnification: magnification.mid(preMagnification),
+                                                     phase: .changed))
+                        pinchVs.append((magnification, event.time))
+                        preMagnification = magnification
+                    } else {
+                        isFirstChangedPinch = true
+                    }
+                } else if !(isSubDrag && isSubTouth)
+                            && !isBeganScroll && !isBeganPinch && !isBeganRotate
+                            && !isPinchWithDistance && isScrollWithDistance {
+                    isBeganScroll = true
+                    
+                    scrollTimer?.cancel()
+                    scrollTimer = nil
+                    pinchTimer?.cancel()
+                    pinchTimer = nil
                     
                     rootAction.scroll(with: .init(screenPoint: event.screenPoint,
                                                   time: event.time,
-                                                  scrollDeltaPoint: scrollDeltaPosition.mid(lastScrollDeltaPosition),
-                                                  phase: .changed,
-                                                  touchPhase: .changed,
+                                                  scrollDeltaPoint: .init(),
+                                                  phase: .began,
+                                                  touchPhase: .began,
                                                   momentumPhase: nil))
-                    scrollVs.append((scrollDeltaPosition, event.time))
-                    self.oldScrollPosition = nScrollPosition
-                    lastScrollDeltaPosition = scrollDeltaPosition
+                    scrollVs = [(.init(), event.time)]
+                    lastScrollDeltaPoint = .init()
+                    
+                    let dp = nScrollPosition - (oldScrollPosition ?? beganScrollPosition)
+                    snapScrollType = min(abs(dp.x), abs(dp.y)) < 3
+                        ? (abs(dp.x) > abs(dp.y) ? .x : .y) : .none
+                    allScrollPosition = dp
+                } else if isBeganScroll, let oldScrollPosition {
+                    let scrollDeltaPoint = scrollDeltaPoint(fromDelta: nScrollPosition - oldScrollPosition)
+                    if isFirstChangedScroll || abs(Point.differenceAngle(nScrollPosition, oldScrollPosition)) > .pi / 2 {
+                        rootAction.scroll(with: .init(screenPoint: event.screenPoint,
+                                                      time: event.time,
+                                                      scrollDeltaPoint: scrollDeltaPoint.mid(lastScrollDeltaPoint),
+                                                      phase: .changed,
+                                                      touchPhase: .changed,
+                                                      momentumPhase: nil))
+                        scrollVs.append((scrollDeltaPoint, event.time))
+                        lastScrollDeltaPoint = scrollDeltaPoint
+                    } else {
+                        isFirstChangedScroll = true
+                    }
                 } else if !isBeganScroll && !isBeganPinch && !isBeganRotate
                             && !isPinchWithDistance && !isScrollWithDistance
                             && nPinchDistance > 120
-                            && abs(nRotateAngle.differenceRotation(oldRotateAngle)) > .pi * 0.02 {
+                            && abs(nRotateAngle.differenceRotation(beganRotateAngle)) > .pi * 0.02 {
                     isBeganRotate = true
                     
                     scrollTimer?.cancel()
                     scrollTimer = nil
                     pinchTimer?.cancel()
                     pinchTimer = nil
+                    
                     rootAction.rotate(with: .init(screenPoint: event.screenPoint,
                                                   time: event.time,
                                                   rotationQuantity: 0,
                                                   phase: .began))
-                    self.oldRotateAngle = nRotateAngle
                     lastRotationQuantity = 0
-                } else if isBeganRotate {
+                } else if isBeganRotate, let oldRotateAngle {
                     let rotationQuantity = nRotateAngle.differenceRotation(oldRotateAngle) * 80
-                    rootAction.rotate(with: .init(screenPoint: event.screenPoint,
-                                                  time: event.time,
-                                                  rotationQuantity: rotationQuantity.mid(lastRotationQuantity),
-                                                  phase: .changed))
-                    self.oldRotateAngle = nRotateAngle
-                    lastRotationQuantity = rotationQuantity
+                    if isFirstChangedRotate || lastRotationQuantity.sign == rotationQuantity.sign {
+                        rootAction.rotate(with: .init(screenPoint: event.screenPoint,
+                                                      time: event.time,
+                                                      rotationQuantity: rotationQuantity.mid(lastRotationQuantity),
+                                                      phase: .changed))
+                        lastRotationQuantity = rotationQuantity
+                    } else {
+                        isFirstChangedRotate = true
+                    }
                 }
+                self.oldPinchDistance = nPinchDistance
+                self.oldScrollPosition = nScrollPosition
+                self.oldRotateAngle = nRotateAngle
+                lastMagnification = magnification
             }
         } else if ps.count == 3 {
             if touchedIDs.count == 3,
@@ -2410,7 +2427,13 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         guard isBeganPinch else { return }
         self.oldPinchDistance = nil
         isBeganPinch = false
-        guard pinchVs.count >= 2 else { return }
+        guard pinchVs.count >= 2 else {
+            rootAction.pinch(with: .init(screenPoint: event.screenPoint,
+                                         time: event.time,
+                                         magnification: 0,
+                                         phase: .ended))
+            return
+        }
         
         let fpi = pinchVs[..<(pinchVs.count - 1)]
             .lastIndex(where: { event.time - $0.time > 0.05 }) ?? 0
@@ -2472,7 +2495,15 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         guard isBeganScroll else { return }
         self.oldScrollPosition = nil
         isBeganScroll = false
-        guard scrollVs.count >= 2 else { return }
+        guard scrollVs.count >= 2 else {
+            rootAction.scroll(with: .init(screenPoint: event.screenPoint,
+                                          time: event.time,
+                                          scrollDeltaPoint: .init(),
+                                          phase: .ended,
+                                          touchPhase: .ended,
+                                          momentumPhase: nil))
+            return
+        }
         
         let fsi = scrollVs[..<(scrollVs.count - 1)]
             .lastIndex(where: { event.time - $0.time > 0.05 }) ?? 0
@@ -2485,7 +2516,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                             ys: scrollVs[fsi...].map { $0.dp.length() })
         let v = min(a * t + b, 700)
         let scale = v.clipped(min: 100, max: 700,
-                              newMin: 0.9, newMax: 0.95)
+                              newMin: 0.91, newMax: 0.95)
         let tv = v / timeInterval
         let minTV = 100.0
         let sv = tv / (tv - minTV)

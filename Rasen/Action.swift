@@ -91,6 +91,9 @@ final class RootAction: Action {
     var modifierKeys = ModifierKeys()
     
     func indicate(with event: DragEvent) {
+        if !rootView.isUpdateWithCursorPosition {
+            rootView.isUpdateWithCursorPosition = true
+        }
         rootView.cursorPoint = event.screenPoint
         textAction.isMovedCursor = true
         textAction.moveEndInputKey(isStopFromMarkedText: true)
