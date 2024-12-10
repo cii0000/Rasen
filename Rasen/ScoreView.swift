@@ -1170,6 +1170,7 @@ extension ScoreView {
                     var y: Double
                 }
                 var vItems = [VItem](), vItem = VItem(vs: [], fqPs: [], y: oy),
+                    pitIs = [Int](),
                     lastV: [PAndColor]?, isLastAppned = false
                 for (bi, nBeat) in beats.enumerated() {
                     let nx = self.x(atBeat: nBeat)
@@ -1178,9 +1179,10 @@ extension ScoreView {
                     let noteY = y(fromPitch: psPitch)
                     
                     let topY = noteY
-                    if currentY - topY < Sheet.tonePadding / 2 {
-                        currentY = Double.linear(topY + Sheet.tonePadding, toneMaxY, t: t)
-                    } else if currentY - topY > Sheet.tonePadding * 3 / 2 {
+                    if currentY - topY < Sheet.tonePadding / 2
+                        || currentY - topY > Sheet.tonePadding * 3 / 2
+                        || (pitIsDic[nBeat]?.count ?? 0) >= 2 {
+                        
                         currentY = Double.linear(topY + Sheet.tonePadding, toneMaxY, t: t)
                     }
                     let ny = currentY
@@ -1189,7 +1191,8 @@ extension ScoreView {
                         vItem.y = ny
                     }
                     
-                    func appendKobs(at pi: Int, y: Double) {
+                    func appendKnobs(at pi: Int, y: Double) {
+                        let nx = x(atBeat: note.pits[pi].beat + note.beatRange.start)
                         let p = Point(nx, y)
                         let sprols = pitbend.pits[pi].tone.spectlope.sprols
                         let sprolYs = sprols.map { tonePanelPitchY(fromPitch: $0.pitch, atY: p.y) }
@@ -1208,12 +1211,16 @@ extension ScoreView {
                                                                  .init(knobPRC.p.x, y + spectlopeH))))
                     }
                     
+                    if let nPitI = pitIsDic[nBeat]?.first {
+                        pitIs.append(nPitI)
+                    }
                     if oy != ny || bi == beats.count - 1 {
-                        if let nPitIs = pitIsDic[nBeat], nPitIs.count >= 2 {
-                            appendKobs(at: nPitIs[.first], y: oy)
+                        for pitI in pitIs {
+                            appendKnobs(at: pitI, y: oy)
                         }
                         toneFrames.append(Rect(x: ox, y: oy, width: nx - ox, height: spectlopeH))
-                        let v = pAndColors(x: nx, pitch: psPitch, minY: 0, sprols: sprols, isBack: false)
+                        let v = pAndColors(x: nx, pitch: psPitch, minY: 0, sprols: sprols,
+                                           isBack: false)
                         vItem.vs.append(v)
                         if !isFullNoise {
                             let fqLineP = Point(nx, tonePanelPitchY(fromPitch: psPitch, atY: 0))
@@ -1224,9 +1231,11 @@ extension ScoreView {
                         
                         ox = nx
                         oy = ny
+                        
+                        pitIs = []
                     }
-                    if let nPitI = pitIsDic[nBeat]?.last {
-                        appendKobs(at: nPitI, y: ny)
+                    if let nPitIs = pitIsDic[nBeat], nPitIs.count >= 2 {
+                        appendKnobs(at: nPitIs[.last], y: ny)
                     }
                     
                     let v = pAndColors(x: nx, pitch: psPitch, minY: 0, sprols: sprols, isBack: false)
@@ -1965,7 +1974,7 @@ extension ScoreView {
             if ods < maxPitDS {
                 let ds = pointline(from: note).minDistanceSquared(at: p)
                 if ds < noteD * noteD {
-                    return (noteI, .note)
+                    return minResult ?? (noteI, .note)
                 }
             }
         }
@@ -2249,9 +2258,10 @@ extension ScoreView {
                 let noteY = y(fromPitch: psPitch)
                 
                 let topY = noteY
-                if currentY - topY < Sheet.tonePadding / 2 {
-                    currentY = Double.linear(topY + Sheet.tonePadding, toneMaxY, t: t)
-                } else if currentY - topY > Sheet.tonePadding * 3 / 2 {
+                if currentY - topY < Sheet.tonePadding / 2
+                    || currentY - topY > Sheet.tonePadding * 3 / 2
+                    || (pitIsDic[nBeat]?.count ?? 0) >= 2 {
+                    
                     currentY = Double.linear(topY + Sheet.tonePadding, toneMaxY, t: t)
                 }
                 let ny = currentY
@@ -2259,10 +2269,10 @@ extension ScoreView {
                     oy = ny
                 }
                 
+                if let nPitI = pitIsDic[nBeat]?.first {
+                    pitIs.append(nPitI)
+                }
                 if oy != ny || bi == beats.count - 1 {
-                    if let nPitIs = pitIsDic[nBeat], nPitIs.count >= 2 {
-                        pitIs.append(nPitIs[.first])
-                    }
                     toneFrames.append((pitIs.sorted(),
                                        Rect(x: ox, y: oy, width: nx - ox, height: note.spectlopeHeight)))
                     ox = nx
@@ -2270,8 +2280,8 @@ extension ScoreView {
                     
                     pitIs = []
                 }
-                if let nPitI = pitIsDic[nBeat]?.last {
-                    pitIs.append(nPitI)
+                if let nPitIs = pitIsDic[nBeat], nPitIs.count >= 2 {
+                    pitIs.append(nPitIs[.last])
                 }
             }
             return toneFrames

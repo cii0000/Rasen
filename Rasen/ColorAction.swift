@@ -371,13 +371,19 @@ final class ColorAction: Action {
                         if rootView.isSelect(at: p) {
                             noteAndPitIs = sheetView.noteAndPitAndSprolIs(from: rootView.selections)
                         } else {
-                            let id = pitI != nil ? score.notes[noteI].pits[pitI!][type] : nil
-                            noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) {
-                                $0[$1.offset] = $1.element.pits.enumerated().reduce(into: [Int: Set<Int>]()) { (v, ip) in
-                                    if id == nil || ip.element[type] == id {
-                                        v[ip.offset] = sprolI < ip.element.tone.spectlope.count ? [sprolI] : []
+                            if let pitI {
+                                let id = score.notes[noteI].pits[pitI][type]
+                                noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) {
+                                    $0[$1.offset] = $1.element.pits.enumerated().reduce(into: [Int: Set<Int>]()) { (v, ip) in
+                                        if ip.element[type] == id {
+                                            v[ip.offset] = sprolI < ip.element.tone.spectlope.count ? [sprolI] : []
+                                        }
                                     }
                                 }
+                            } else {
+                                noteAndPitIs = [noteI: score.notes[noteI].pits.enumerated().reduce(into: [Int: Set<Int>]()) { (v, ip) in
+                                    v[ip.offset] = sprolI < ip.element.tone.spectlope.count ? [sprolI] : []
+                                }]
                             }
                         }
                     } else if rootView.isSelect(at: p) {

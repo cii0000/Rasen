@@ -2198,9 +2198,12 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 
                 let nScrollPosition = ps0.mid(ps1)
                 let nRotateAngle = ps0.angle(ps1)
+                let isPinchWithAngle = abs(Edge(ops0, ps0).angle(Edge(ops1, ps1))) > .pi / 2
                 let isPinchWithDistance = abs(nPinchDistance - beganPinchDistance) > pinchDistance
-                && abs(Edge(ops0, ps0).angle(Edge(ops1, ps1))) > .pi / 2
-                let isScrollWithDistance = nScrollPosition.distance(beganScrollPosition) > scrollDistance
+                && isPinchWithAngle
+                let isScrollWithDistance = nScrollPosition.distance(beganScrollPosition) > scrollDistance && !isPinchWithAngle
+                let isRotateWithDistance = nPinchDistance > 120
+                && abs(nRotateAngle.differenceRotation(beganRotateAngle)) > .pi * 0.02
                 if !isBeganScroll && !isBeganPinch && !isBeganRotate
                     && isPinchWithDistance {
                     
@@ -2253,7 +2256,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     allScrollPosition = dp
                 } else if isBeganScroll, let oldScrollPosition {
                     let scrollDeltaPoint = scrollDeltaPoint(fromDelta: nScrollPosition - oldScrollPosition)
-                    if isFirstChangedScroll || abs(Point.differenceAngle(nScrollPosition, oldScrollPosition)) > .pi / 2 {
+                    if isFirstChangedScroll || abs(Point.differenceAngle(nScrollPosition, oldScrollPosition)) < .pi / 2 {
                         rootAction.scroll(with: .init(screenPoint: event.screenPoint,
                                                       time: event.time,
                                                       scrollDeltaPoint: scrollDeltaPoint.mid(lastScrollDeltaPoint),
@@ -2267,8 +2270,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     }
                 } else if !isBeganScroll && !isBeganPinch && !isBeganRotate
                             && !isPinchWithDistance && !isScrollWithDistance
-                            && nPinchDistance > 120
-                            && abs(nRotateAngle.differenceRotation(beganRotateAngle)) > .pi * 0.02 {
+                            && isRotateWithDistance {
                     isBeganRotate = true
                     
                     scrollTimer?.cancel()
