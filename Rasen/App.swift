@@ -2193,7 +2193,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 let magnification: Double = if lastMagnification == 0 {
                     oMagnification.signValue * min(abs(oMagnification), 0.001)
                 } else {
-                    oMagnification
+                    oMagnification.mid(lastMagnification)
                 }
                 
                 let nScrollPosition = ps0.mid(ps1)

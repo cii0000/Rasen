@@ -614,19 +614,21 @@ extension Rendnote {
                 let sinCount = Int((min(spectlope.maxFq, cutFq) / fq).clipped(min: 1, max: Double(Int.max)))
                 let fq = fq.clipped(min: Score.minFq, max: cutFq)
                 
-                var sign = true, mainSpectrum = [Double](capacity: sinCount)
+                var sign = true, prePitch = 0.0, mainSpectrum = [Double](capacity: sinCount)
                 let spectrum = (1 ... sinCount).map { n in
                     let nFq = fq * Double(n)
                     let pitch = Pitch.pitch(fromFq: nFq)
                     let loudnessVolm = Loudness.volm40Phon(fromPitch: pitch)
+                    let mainScale = (pitch - prePitch).clipped(min: 0, max: 2, newMin: 3, newMax: 1)
                     let spectlopeVolm = spectlope.overtonesVolm(atPitch: pitch)
                     let cutScale = nFq.clipped(min: cutStartFq, max: cutFq, newMin: 1, newMax: 0)
                     let overtoneScale = isAll || n == 1 ? (sign ? 1 : -1) : (sign ? oddScale : evenScale)
                     let sqfa = Double(n) ** sqfa
-                    let a = overtoneScale / sqfa * cutScale
-                    let amp = Volm.amp(fromVolm: loudnessVolm * spectlopeVolm) * a
-                    mainSpectrum.append(Volm.amp(fromVolm: spectlopeVolm) * a)
+                    let a = Volm.amp(fromVolm: spectlopeVolm) * overtoneScale / sqfa * cutScale
+                    let amp = Volm.amp(fromVolm: loudnessVolm) * a
+                    mainSpectrum.append(a * mainScale)
                     sign = !sign
+                    prePitch = pitch
                     return amp
                 }
                 
@@ -859,24 +861,27 @@ extension Rendnote {
                     let frame = frames[i]
                     let sec = frame.sec
                     let spectlope = pitbend.spectlope(atSec: sec)
-                    var sign = true, mainSpectrum = [Double](capacity: maxSinCount), rmsV = 0.0
+                    var sign = true, prePitch = 0.0, mainSpectrum = [Double](capacity: maxSinCount), rmsV = 0.0
                     var spectrum = (1 ... maxSinCount).map { n in
                         let fq = frame.fq * Double(n)
                         let pitch = Pitch.pitch(fromFq: fq)
                         let loudnessVolm = Loudness.volm40Phon(fromPitch: pitch)
+                        let mainScale = (pitch - prePitch).clipped(min: 0, max: 2, newMin: 3, newMax: 1)
                         
                         let spectlopeVolm = spectlope.overtonesVolm(atPitch: pitch)
                         let overtoneScale = isEqualAllOvertone ?
                         (isAll || n == 1 ? (sign ? 1 : -1) : (sign ? oddScale : evenScale)) :
                         (n == 1 ? 1 : (sign ? oddScales[i] : evenScales[i]))
                         sign = !sign
+                        prePitch = pitch
                         
-                        let a = overtoneScale * rsqfas[n]
-                        let amp = Volm.amp(fromVolm: loudnessVolm * spectlopeVolm) * a
-                        mainSpectrum.append(Volm.amp(fromVolm: spectlopeVolm) * a * (fq > cutStartFq ? (fq < cutFq ? cutScales[Int(fq) - intCutStartFq] : 0) : 1))
+                        let oa = overtoneScale * rsqfas[n]
+                        let a = Volm.amp(fromVolm: spectlopeVolm) * oa
+                        let amp = Volm.amp(fromVolm: loudnessVolm) * a
+                        mainSpectrum.append(a * (fq > cutStartFq ? (fq < cutFq ? cutScales[Int(fq) - intCutStartFq] : 0) : 1) * mainScale)
                         
                         let maxSpectlopeVolm = maxSpectlope.volm(atPitch: pitch)
-                        rmsV += (Volm.amp(fromVolm: maxSpectlopeVolm) * a * (fq > cutStartFq ? (fq < cutFq ? cutScales[Int(fq) - intCutStartFq] : 0) : 1)).squared
+                        rmsV += (Volm.amp(fromVolm: maxSpectlopeVolm) * oa * (fq > cutStartFq ? (fq < cutFq ? cutScales[Int(fq) - intCutStartFq] : 0) : 1) * mainScale).squared
                         return amp
                     }
                     let rms = (rmsV / 2).squareRoot()

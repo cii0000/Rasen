@@ -406,8 +406,12 @@ extension Sprol {
 }
 
 struct Spectlope: Hashable, Codable {
-    var sprols = [Sprol(pitch: 12 * 0, volm: 1, noise: 0),
-                  Sprol(pitch: 12 * 10, volm: 0, noise: 0)]
+    var sprols = [Sprol(pitch: 12 * 0, volm: 0.5, noise: 0),
+                  Sprol(pitch: 12 * 2, volm: 1, noise: 0),
+                  Sprol(pitch: 12 * 3, volm: 0.5, noise: 0),
+                  Sprol(pitch: 12 * 5, volm: 0.65, noise: 0),
+                  Sprol(pitch: 12 * 6, volm: 0.35, noise: 0),
+                  Sprol(pitch: 12 * 8, volm: 0.1, noise: 0)]
 }
 extension Spectlope: Protobuf {
     init(_ pb: PBSpectlope) throws {
@@ -1055,7 +1059,7 @@ extension Note: Protobuf {
         }
         envelope = (try? Envelope(pb.envelope)) ?? .init()
         spectlopeHeight = ((try? pb.spectlopeHeight.notNaN()) ?? 0)
-            .clipped(min: Sheet.spectlopeHeight, max: Sheet.spectlopeHeight)
+            .clipped(min: Sheet.spectlopeHeight, max: Sheet.maxSpectlopeHeight)
         id = (try? UUID(pb.id)) ?? UUID()
     }
     var pb: PBNote {

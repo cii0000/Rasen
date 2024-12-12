@@ -3284,7 +3284,7 @@ final class SheetView: BindableView, @unchecked Sendable {
             insertNode(nivs)
             if isMakeRect {
                 let rect = nivs.reduce(into: Rect?.none) {
-                    $0 += scoreView.noteFrame(at: $1.index)
+                    $0 += scoreView.transformedNoteFrame(at: $1.index)
                 }
                 return (rect, [])
             }
@@ -3293,11 +3293,11 @@ final class SheetView: BindableView, @unchecked Sendable {
             if isMakeRect {
                 var rect: Rect?
                 for niv in nivs {
-                    rect += scoreView.noteFrame(at: niv.index)
+                    rect += scoreView.transformedNoteFrame(at: niv.index)
                 }
                 replaceNode(nivs)
                 for niv in nivs {
-                    rect += scoreView.noteFrame(at: niv.index)
+                    rect += scoreView.transformedNoteFrame(at: niv.index)
                 }
                 return (rect, [])
             } else {
@@ -3307,7 +3307,7 @@ final class SheetView: BindableView, @unchecked Sendable {
             stop()
             if isMakeRect {
                 let rect = noteIndexes.reduce(into: Rect?.none) {
-                    $0 += scoreView.noteFrame(at: $1)
+                    $0 += scoreView.transformedNoteFrame(at: $1)
                 }
                 removeNotesNode(at: noteIndexes)
                 return (rect, [])
@@ -3320,7 +3320,7 @@ final class SheetView: BindableView, @unchecked Sendable {
             scoreView.updateDraftNotes()
             if isMakeRect {
                 let rect = nivs.reduce(into: Rect?.none) {
-                    $0 += scoreView.draftNoteFrame(at: $1.index)
+                    $0 += scoreView.transformedDraftNoteFrame(at: $1.index)
                 }
                 return (rect, [])
             }
@@ -3328,7 +3328,7 @@ final class SheetView: BindableView, @unchecked Sendable {
             stop()
             if isMakeRect {
                 let rect = noteIndexes.reduce(into: Rect?.none) {
-                    $0 += scoreView.draftNoteFrame(at: $1)
+                    $0 += scoreView.transformedDraftNoteFrame(at: $1)
                 }
                 removeDraftNotesNode(at: noteIndexes)
                 scoreView.updateDraftNotes()
@@ -3387,7 +3387,7 @@ final class SheetView: BindableView, @unchecked Sendable {
             stop()
             scoreView.option = option
             if isMakeRect {
-                return (scoreView.mainFrame, [])
+                return (scoreView.transformedMainFrame, [])
             }
         }
         return (nil, [])

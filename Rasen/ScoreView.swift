@@ -137,19 +137,19 @@ final class ScoreView: TimelineView, @unchecked Sendable {
                     }
                 }
             }
+            reverbsNode.children.forEach {
+                $0.children.forEach {
+                    if $0.name == "isFullEdit" {
+                        $0.isHidden = !isFullEdit
+                    }
+                }
+            }
         }
     }
     var isEditTone = false {
         didSet {
             guard isEditTone != oldValue else { return }
             notesNode.children.forEach {
-                $0.children.forEach {
-                    if $0.name == "point" {
-                        $0.isHidden = !isEditTone
-                    }
-                }
-            }
-            reverbsNode.children.forEach {
                 $0.children.forEach {
                     if $0.name == "point" {
                         $0.isHidden = !isEditTone
@@ -195,6 +195,9 @@ final class ScoreView: TimelineView, @unchecked Sendable {
         let sy = y(fromPitch: Score.pitchRange.start)
         let ey = y(fromPitch: Score.pitchRange.end)
         return .init(x: sx, y: sy, width: ex - sx, height: ey - sy)
+    }
+    var transformedMainFrame: Rect {
+        mainFrame * node.localTransform
     }
     
     let octaveNode = Node(isHidden: true), draftNotesNode = Node(), notesNode = Node()
@@ -1431,6 +1434,9 @@ extension ScoreView {
             lastP = .init(nex, ny)
         }
         
+        let isMinSpectlopeHeight = note.spectlopeHeight == Sheet.spectlopeHeight
+        let isHiddenFullEdit = isMinSpectlopeHeight ? !isFullEdit : !isEditTone
+        
         let earlyReverbColor = Self.color(from: .init(volm: note.envelope.reverb.earlyVolm, pan: lastStereo.pan))
         let lateReverbColor = Self.color(from: .init(volm: note.envelope.reverb.lateVolm, pan: lastStereo.pan))
         let zeroReverbColor = Self.color(from: .init(volm: 0, pan: lastStereo.pan))
@@ -1458,8 +1464,12 @@ extension ScoreView {
                                .init(durReverbP.x, lastP.y - reverbHalfH),
                                .init(durReverbP.x, lastP.y + reverbHalfH)]),
                   fillType: .gradient([lateReverbColor, lateReverbColor, zeroReverbColor, zeroReverbColor])),
-            .init(name: "point", path: .init(reverbBackKnobPathlines), fillType: .color(.content)),
-            .init(name: "point", path: .init(reverbKnobPathlines), fillType: .color(.background))
+            .init(name: "isFullEdit",
+                  isHidden: !isFullEdit,
+                  path: .init(reverbBackKnobPathlines), fillType: .color(.content)),
+            .init(name: "isFullEdit",
+                  isHidden: !isFullEdit,
+                  path: .init(reverbKnobPathlines), fillType: .color(.background))
         ]
         
         var nodes = [Node]()
@@ -1506,12 +1516,21 @@ extension ScoreView {
                                         lineWidth: borderWidth,
                                         lineType: .color(.content)))
         }
+        tonePanelNodes.append(.init(name: isMinSpectlopeHeight ? "isFullEdit" : "point",
+                                    isHidden: isHiddenFullEdit,
+                                    path: Path(toneFrames.map {
+            Pathline(Rect(origin: $0.minXMaxYPoint + .init(0, 0.03125), size: .init(width: $0.width, height: 0.0625)))
+        }), fillType: .color(.content)))
         
         if !tonePanelKnobPRCs.isEmpty {
             let toneBackKnobPathlines = tonePanelKnobPRCs.map {
                 Pathline(circleRadius: $0.r * 1.5, position: $0.p)
             }
-            tonePanelNodes.append(.init(name: "point", path: .init(toneBackKnobPathlines), fillType: .color(.content)))
+            
+            tonePanelNodes.append(.init(name: isMinSpectlopeHeight ? "isFullEdit" : "point",
+                                        isHidden: isHiddenFullEdit,
+                                        path: .init(toneBackKnobPathlines),
+                                        fillType: .color(.content)))
             let prsDic = tonePanelKnobPRCs.reduce(into: [Color: [(p: Point, r: Double)]]()) {
                 if $0[$1.color] == nil {
                     $0[$1.color] = [($1.p, $1.r)]
@@ -1523,7 +1542,11 @@ extension ScoreView {
                 let toneKnobPathlines = prs.map {
                     Pathline(circleRadius: $0.r, position: $0.p)
                 }
-                tonePanelNodes.append(.init(name: "point", path: .init(toneKnobPathlines), fillType: .color(color)))
+                
+                tonePanelNodes.append(.init(name: isMinSpectlopeHeight ? "isFullEdit" : "point",
+                                            isHidden: isHiddenFullEdit,
+                                            path: .init(toneKnobPathlines),
+                                            fillType: .color(color)))
             }
         }
         
@@ -1764,7 +1787,7 @@ extension ScoreView {
         var minDSq = Double.infinity, minResult: (noteI: Int, result: PointHitResult)?
         
         for (noteI, note) in model.notes.enumerated().reversed() {
-            if isEditTone {
+            if note.spectlopeHeight == Sheet.spectlopeHeight ? isFullEdit : isEditTone {
                 for (pitIs, toneFrame) in toneFrames(from: note) {
                     let dSq = toneFrame.distanceSquared(p)
                     if dSq < minDSq && dSq < toneMaxDSq {
@@ -1819,7 +1842,7 @@ extension ScoreView {
             }
         }
         
-        if isEditTone {
+        if isFullEdit {
             for (noteI, note) in model.notes.enumerated().reversed() {
                 let reverbFrame = reverbFrame(from: note)
                 let dSq = reverbFrame.distanceSquared(p)
@@ -1896,7 +1919,7 @@ extension ScoreView {
         var minDSq = Double.infinity, minResult: (noteI: Int, result: ColorHitResult)?
         
         for (noteI, note) in model.notes.enumerated().reversed() {
-            if isEditTone {
+            if note.spectlopeHeight == Sheet.spectlopeHeight ? isFullEdit : isEditTone {
                 for (pitIs, toneFrame) in toneFrames(from: note) {
                     let dSq = toneFrame.distanceSquared(p)
                     if dSq < minDSq && dSq < toneMaxDSq {
@@ -1979,7 +2002,7 @@ extension ScoreView {
             }
         }
         
-        if isEditTone {
+        if isFullEdit {
             let hnh = pitchHeight / 2
             for (noteI, note) in model.notes.enumerated().reversed() {
                 let noteD = noteH(from: note) / 2
@@ -2093,8 +2116,14 @@ extension ScoreView {
     func noteFrame(at noteI: Int) -> Rect {
         notesNode.children[noteI].path.bounds ?? .init()
     }
+    func transformedNoteFrame(at noteI: Int) -> Rect {
+        noteFrame(at: noteI) * node.localTransform
+    }
     func draftNoteFrame(at noteI: Int) -> Rect {
         draftNotesNode.children[noteI].path.bounds ?? .init()
+    }
+    func transformedDraftNoteFrame(at noteI: Int) -> Rect {
+        draftNoteFrame(at: noteI) * node.localTransform
     }
     func noteY(atX x: Double, at noteI: Int) -> Double {
         noteY(atX: x, from: model.notes[noteI])
