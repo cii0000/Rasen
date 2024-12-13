@@ -1682,7 +1682,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 oldPressureStage = 0, isDrag = false, isStrongDrag = false,
                 firstTime = 0.0, firstP = Point(), isMovedDrag = false
     override func mouseDown(with nsEvent: NSEvent) {
-        if beganSwipePosition != nil { return }
+        if beganSwipePosition != nil && nsEvent.subtype != .tabletPoint { return }
         isOneFlag = false
         isDrag = false
         isStrongDrag = false
@@ -2450,7 +2450,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         let tv = v / timeInterval
         let minTV = 0.01
         let sv = tv / (tv - minTV)
-        if tv.isNaN || v < 0.04 || a == 0 {
+        if tv.isNaN || v < 0.03 || a == 0 {
             rootAction.pinch(with: .init(screenPoint: event.screenPoint,
                                          time: event.time,
                                          magnification: 0,
@@ -2522,7 +2522,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         let tv = v / timeInterval
         let minTV = 100.0
         let sv = tv / (tv - minTV)
-        if tv.isNaN || v < 5 || a == 0 {
+        if tv.isNaN || v < 4 || a == 0 {
             rootAction.scroll(with: .init(screenPoint: event.screenPoint,
                                           time: event.time,
                                           scrollDeltaPoint: .init(),

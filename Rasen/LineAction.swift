@@ -16,6 +16,7 @@
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
 import Dispatch
+import struct Foundation.UUID
 
 final class DrawLineAction: DragEventAction {
     let action: LineAction
@@ -1120,6 +1121,7 @@ final class LineAction: Action {
     private var  oldDrawLineEventsCount = 0
     private var drawLineEvents = [DrawLineEvent](), drawLineEventsCount = 0, snapLines = [Line]()
     var textView: SheetTextView?
+    private(set) var beganLineColor: Color?, beganSheetID: UUID?, beganAnimationRootIndex = 0
     
     func drawLine(with event: DragEvent, isStraight: Bool) {
         let p = rootView.convertScreenToWorld(event.screenPoint)
@@ -1136,8 +1138,14 @@ final class LineAction: Action {
             rootView.node.insert(child: tempLineNode,
                                      at: rootView.accessoryNodeIndex)
             
-            snapLines = rootView.sheetView(at: centerSHP)?
-                .model.picture.lines ?? []
+            let sheetView = rootView.sheetView(at: centerSHP)
+            snapLines = sheetView?.model.picture.lines ?? []
+            
+            if let sheetView, sheetView.model.enabledAnimation {
+                beganSheetID = sheetView.id
+                beganAnimationRootIndex = sheetView.model.animation.rootIndex
+                beganLineColor = Line.defaultUUColor.value
+            }
             
             drawLineEvents.append(.init(p: p - centerOrigin,
                                         sp: event.screenPoint, pressure: event.pressure,
@@ -1220,8 +1228,18 @@ final class LineAction: Action {
             if centerBounds.contains(lb),
                let sheetView = rootView.madeSheetView(at: centerSHP) {
                 
-                sheetView.newUndoGroup()
-                sheetView.append(tempLine)
+                if sheetView.model.enabledAnimation, sheetView.id == beganSheetID,
+                   beganAnimationRootIndex != sheetView.model.animation.rootIndex {
+                    
+                    let oldRootI = sheetView.model.animation.rootIndex
+                    sheetView.rootKeyframeIndex = beganAnimationRootIndex
+                    sheetView.newUndoGroup()
+                    sheetView.append(tempLine)
+                    sheetView.rootKeyframeIndex = oldRootI
+                } else {
+                    sheetView.newUndoGroup()
+                    sheetView.append(tempLine)
+                }
 //                if sheetView.isSound {
 //                    rootView.updateAudio()
 //                }

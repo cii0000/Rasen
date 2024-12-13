@@ -514,6 +514,15 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
                                 animationView.shownInterTypeKeyframeIndex = animationView.model.index
                             }
                             
+                            if let lineAction = (rootAction.dragAction as? DrawLineAction)?.action,
+                               sheetView.id == lineAction.beganSheetID,
+                               let lineColor = lineAction.beganLineColor {
+                                
+                                let isSelect = animationView.model.index !=
+                                animationView.model.index(atRoot: lineAction.beganAnimationRootIndex)
+                                lineAction.tempLineNode?.lineType = .color(isSelect ? lineColor.with(opacity: 0.1) : lineColor)
+                            }
+                            
                             rootView.cursor = rootView.cursor(from: sheetView.currentTimeString())
                             sheetView.showOtherTimeNodeFromMainBeat()
                         }
