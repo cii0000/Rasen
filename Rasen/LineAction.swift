@@ -884,6 +884,7 @@ final class LineAction: Action {
     
     private var isDrawNote = false
     private var noteSheetView: SheetView?, oldPitch = Rational(0), firstTone = Tone(),
+                firstSpectlopeHeight = Sheet.spectlopeHeight,
                 beganScore: Score?, beganPitch = Rational(), octaveNode: Node?, oldBeat = Rational(0),
                 noteI: Int?, noteStartBeat: Rational?, notePlayer: NotePlayer?
     func drawNote(with event: DragEvent, isStraight: Bool = false) {
@@ -910,10 +911,12 @@ final class LineAction: Action {
                 let beatInterval = rootView.currentBeatInterval
                 let beat = scoreView.beat(atX: inP.x, interval: beatInterval)
                 let beatRange = beat ..< beat
-                firstTone = isStraight ? Tone.empty() : Tone()
+                firstTone = pitch == Score.maxPitch ? Tone.noise() : (isStraight ? Tone.empty() : Tone())
+                firstSpectlopeHeight = pitch == Score.maxPitch ? Sheet.maxSpectlopeHeight : Sheet.spectlopeHeight
                 let note = Note(beatRange: beatRange, pitch: pitch,
                                 pits: .init([.init(beat: 0, pitch: 0, tone: firstTone)]),
-                                envelope: !isStraight && firstTone.spectlope.isFullNoise ? .init(releaseSec: 0.5) : .init())
+                                envelope: !isStraight && firstTone.spectlope.isFullNoise ? .init(releaseSec: 0.5) : .init(),
+                                spectlopeHeight: firstSpectlopeHeight)
                 
                 noteI = count
                 oldPitch = pitch
@@ -966,7 +969,8 @@ final class LineAction: Action {
                 let beatRange = beat > nsBeat ? nsBeat ..< beat : beat ..< nsBeat
                 let note = Note(beatRange: beatRange, pitch: pitch,
                                 pits: [.init(beat: 0, pitch: 0, tone: firstTone)],
-                                envelope: !isStraight && firstTone.spectlope.isFullNoise ? .init(releaseSec: 0.5) : .init())
+                                envelope: !isStraight && firstTone.spectlope.isFullNoise ? .init(releaseSec: 0.5) : .init(),
+                                spectlopeHeight: firstSpectlopeHeight)
                 let isNote = oldPitch != pitch
                 
                 if isNote {
@@ -1093,7 +1097,9 @@ final class LineAction: Action {
             return
         } else if event.phase == .began {
             let p = rootView.convertScreenToWorld(event.screenPoint)
-            if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled {
+            if let sheetView = rootView.sheetView(at: p),
+               sheetView.scoreView.containsMainFrame(sheetView.scoreView.convertFromWorld(p),
+                                                     scale: rootView.screenToWorldScale) {
                 isDrawNote = true
                 noteSheetView = sheetView
                 drawNote(with: event, isStraight: true)
@@ -1408,7 +1414,9 @@ final class LineAction: Action {
             switch type {
             case .cut:
                 if isEditingSheet {
-                    if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled {
+                    if let sheetView = rootView.sheetView(at: p),
+                       sheetView.scoreView.containsMainFrame(sheetView.scoreView.convertFromWorld(p),
+                                                             scale: rootView.screenToWorldScale) {
                         removeNote(with: event)
                     } else {
                         lassoCopy(isRemove: true, distance: lassoDistance,

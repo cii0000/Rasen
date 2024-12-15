@@ -631,15 +631,17 @@ final class MoveScoreAction: DragEventAction {
                     
                     let nsx = scoreView.x(atBeat: note.beatRange.start)
                     let nex = scoreView.x(atBeat: note.beatRange.end)
+                    let nw = nex - nsx
                     let nsy = scoreView.noteY(atBeat: note.beatRange.start, from: note)
                     let ney = scoreView.noteY(atBeat: note.beatRange.end, from: note)
                     let nfsw = (nex - nsx) * rootView.worldToScreenScale
                     let dx = nfsw.clipped(min: 3, max: 30, newMin: 1, newMax: 8)
                     * rootView.screenToWorldScale
+                    let ndx = note.pits.count == 1 && nw / 4 < dx ? nw / 4 : dx
                     
-                    type = if scoreP.x - nsx < dx && abs(scoreP.y - nsy) < dx {
+                    type = if scoreP.x - nsx < ndx && abs(scoreP.y - nsy) < ndx {
                         .startNoteBeat
-                    } else if scoreP.x - nex > -dx && abs(scoreP.y - ney) < dx {
+                    } else if scoreP.x - nex > -ndx && abs(scoreP.y - ney) < ndx {
                         .endNoteBeat
                     } else {
                         .note

@@ -1619,32 +1619,31 @@ extension AVAudioPCMBuffer {
                 maxDAmp = max(maxDAmp, maxAmp - targetAmp)
             } else {
                 if let nMinI = minI {
-                    ps.append(P(minI: nMinI, maxI: i - 1, scale: targetAmp / (maxDAmp + targetAmp)))
+                    ps.append(P(minI: nMinI, maxI: i, scale: targetAmp / (maxDAmp + targetAmp)))
                     minI = nil
                     maxDAmp = 0
                 }
             }
         }
+        print(targetAmp, ps.count)
         let attackCount = Int(attackSec * sampleRate)
         let releaseCount = Int(releaseSec * sampleRate)
         var scales = [Float](repeating: 1, count: frameCount)
         for p in ps {
             let minI = max(0, p.minI - attackCount)
-            for i in minI ..< p.minI {
-                let t = Float(i - minI) / Float(attackCount)
-                let scale = Float.linear(1, p.scale, t: t)
+            for i in (minI ..< p.minI).reversed() {
+                let t = Float(p.minI - i) / Float(attackCount)
+                let scale = Float.linear(p.scale, 1, t: t)
                 scales[i] = min(scale, scales[i])
             }
-            for i in p.minI ... p.maxI {
-                scales[i] = p.scale
+            for i in p.minI ..< p.maxI {
+                scales[i] = min(p.scale, scales[i])
             }
             let maxI = min(frameCount - 1, p.maxI + releaseCount)
-            if p.maxI + 1 <= maxI {
-                for i in (p.maxI + 1) ... maxI {
-                    let t = Float(i - p.maxI) / Float(releaseCount)
-                    let scale = Float.linear(p.scale, 1, t: t)
-                    scales[i] = min(scale, scales[i])
-                }
+            for i in p.maxI ... maxI {
+                let t = Float(i - p.maxI) / Float(releaseCount)
+                let scale = Float.linear(p.scale, 1, t: t)
+                scales[i] = min(scale, scales[i])
             }
         }
         

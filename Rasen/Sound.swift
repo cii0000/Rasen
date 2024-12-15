@@ -816,6 +816,11 @@ extension Tone {
         Self.init(overtone: .init(evenAmp: 0, oddVolm: 0),
                   spectlope: .init(sprols: [.init(pitch: 0, volm: 1, noise: 0)]))
     }
+    static func noise() -> Self {
+        Self.init(overtone: .init(evenAmp: 1, oddVolm: 1),
+                  spectlope: .init(sprols: [.init(pitch: 0, volm: 1, noise: 1),
+                                            .init(pitch: Score.doubleMaxPitch, volm: 1, noise: 1)]))
+    }
     
     func with(id: UUID) -> Self {
         var v = self

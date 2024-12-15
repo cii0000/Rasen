@@ -2018,6 +2018,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     
     var oldTouchPoints = [Int: Point]()
     var touchedIDs = [Int]()
+    var began2FingersTime: Double?
     var isBeganScroll = false, isFirstChangedScroll = false, beganScrollPosition: Point?, oldScrollPosition: Point?, allScrollPosition = Point()
     var isBeganPinch = false, isFirstChangedPinch = false,beganPinchDistance: Double?, oldPinchDistance: Double?
     var isBeganRotate = false, isFirstChangedRotate = false, beganRotateAngle: Double?, oldRotateAngle: Double?
@@ -2104,6 +2105,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         isPrepare4FingersTap = false
         if ps.count == 2 {
             swipePosition = nil
+            began2FingersTime = event.time
             let ps0 = ps[touchedIDs[0]]!, ps1 = ps[touchedIDs[1]]!
             oldPinchDistance = ps0.distance(ps1)
             oldScrollPosition = ps0.mid(ps1)
@@ -2161,7 +2163,10 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 let ops0 = oldTouchPoints[touchedIDs[0]],
                 let ops1 = oldTouchPoints[touchedIDs[1]] {
                
-                let pinchDistance = 5.0, scrollDistance = 5.0
+                let t = (event.time - (began2FingersTime ?? event.time))
+                    .clipped(min: 0.1, max: 0.25, newMin: 8, newMax: 2)
+                let pinchDistance = t
+                let scrollDistance = t
                 func scrollDeltaPoint(fromDelta dp: Point) -> Point {
                     var dp = dp
                     allScrollPosition += dp

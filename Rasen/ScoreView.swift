@@ -1550,7 +1550,7 @@ extension ScoreView {
             }
         }
         
-        if isOneOvertone {//
+        if isOneOvertone || note.isDefaultTone {//
             tonePanelKnobPRCs = []
             tonePanelNodes = []
         }
@@ -1673,7 +1673,8 @@ extension ScoreView {
         model.enabled
         && (containsTimeline(p, scale: scale)
             || containsIsShownSpectrogram(p, scale: scale)
-            || containsMainFrame(p, scale: scale))
+            || containsMainFrame(p, scale: scale)
+            || containsNote(p, scale: scale, enabledTone: true, enabledRelease: true))
     }
     func containsMainFrame(_ p: Point, scale: Double) -> Bool {
         model.enabled && mainFrame.outset(by: 10 * scale).contains(p)
@@ -1706,8 +1707,9 @@ extension ScoreView {
         return minI
     }
     
-    func containsNote(_ p: Point, scale: Double) -> Bool {
-        noteIndex(at: p, scale: scale) != nil
+    func containsNote(_ p: Point, scale: Double, enabledTone: Bool = false, enabledRelease: Bool = false) -> Bool {
+        noteIndex(at: p, scale: scale,
+                  enabledTone: enabledTone, enabledRelease: enabledRelease) != nil
     }
     func noteIndex(at p: Point, scale: Double, enabledTone: Bool = false, enabledRelease: Bool = false) -> Int? {
         let hnh = pitchHeight / 2
@@ -1819,10 +1821,12 @@ extension ScoreView {
                 }
             }
             
+            let nw = width(atDurBeat: note.beatRange.length)
+            let nMaxDSq = note.pits.count == 1 && nw / 4 < maxD ? (nw / 4).squared : maxDSq
             for pitI in note.pits.count.range {
                 let pitP = pitPosition(atPit: pitI, from: note)
                 let dSq = pitP.distanceSquared(p)
-                if dSq < minDSq && dSq < maxDSq {
+                if dSq < minDSq && dSq < nMaxDSq {
                     minDSq = dSq
                     minResult = (noteI, .pit(pitI: pitI))
                 }
@@ -2243,7 +2247,7 @@ extension ScoreView {
         toneFrames(at: noteI).contains(where: { $0.frame.contains(p) })
     }
     func toneFrames(from note: Note) -> [(pitIs: [Int], frame: Rect)] {
-        guard note.beatRange.length > 0 && !note.isOneOvertone else {
+        guard note.beatRange.length > 0 && !note.isOneOvertone && !note.isDefaultTone else {
             return []
         }
         let nsx = x(atBeat: note.beatRange.start)
