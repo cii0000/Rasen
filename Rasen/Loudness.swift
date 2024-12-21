@@ -38,6 +38,11 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+//#if os(macOS) && os(iOS) && os(watchOS) && os(tvOS) && os(visionOS)
+import Accelerate.vecLib.vDSP
+//#elseif os(linux) && os(windows)
+//#endif
+
 struct IIRfilter {
     enum FilterType: Hashable {
         case highShelf, lowShelf, highPass,
@@ -45,13 +50,10 @@ struct IIRfilter {
              highShelfDeMan, highPassDeMan
     }
     
-    var G, Q, fc, rate: Double,
-        filterType: FilterType,
-        passbandGain: Double
+    var G, Q, fc, rate: Double, filterType: FilterType, passbandGain: Double
     
     init(G: Double, Q: Double, fc: Double, rate: Double,
-         _ filterType: FilterType,
-         passbandGain: Double = 1) {
+         _ filterType: FilterType, passbandGain: Double = 1) {
         self.G  = G
         self.Q  = Q
         self.fc = fc
@@ -138,13 +140,13 @@ struct IIRfilter {
                             channelCount: 1,
                             sectionCount: 1)
         let nData = filter?.apply(input: data) ?? data
-        return nData.map { $0 * passbandGain }
+        return vDSP.multiply(passbandGain, nData)
     }
 }
 
 struct Loudness {
-    private static let pitchVolms = [Point(22.5, 1.45),
-                                     Point(27.5, 1.3),
+    private static let pitchVolms = [Point(22.5, 1.4),
+                                     Point(27.5, 1.25),
                                      Point(43.3, 1.1),
                                      Point(71.2, 1),
                                      Point(75.0, 1.05),
@@ -289,7 +291,7 @@ struct Loudness {
                 let l = min(Int(T_g * (Double(j) * step) * sampleRate), numSamples) // lower bound of integration (in samples)
                 let u = min(Int(T_g * (Double(j) * step + 1) * sampleRate), numSamples) // upper bound of integration (in samples)
                 // caluate mean square of the filtered for each block (see eq. 1)
-                z[i][j] = (1.0 / (T_g * sampleRate)) * (inputData[i][l ..< u].map { $0.squared }.sum())
+                z[i][j] = (1.0 / (T_g * sampleRate)) * vDSP.sum(vDSP.square(inputData[i][l ..< u]))
             }
         }
         

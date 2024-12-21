@@ -407,11 +407,11 @@ extension Sprol {
 
 struct Spectlope: Hashable, Codable {
     var sprols = [Sprol(pitch: 12 * 0, volm: 0.5, noise: 0),
-                  Sprol(pitch: 12 * 2, volm: 1, noise: 0),
+                  Sprol(pitch: 12 * 1, volm: 1, noise: 0),
                   Sprol(pitch: 12 * 3, volm: 0.5, noise: 0),
-                  Sprol(pitch: 12 * 5, volm: 0.65, noise: 0),
-                  Sprol(pitch: 12 * 6, volm: 0.35, noise: 0),
-                  Sprol(pitch: 12 * 8, volm: 0.1, noise: 0)]
+                  Sprol(pitch: 12 * 4, volm: 0.75, noise: 0),
+                  Sprol(pitch: 12 * 6, volm: 0.5, noise: 0),
+                  Sprol(pitch: 12 * 10, volm: 0, noise: 0)]
 }
 extension Spectlope: Protobuf {
     init(_ pb: PBSpectlope) throws {
@@ -959,7 +959,7 @@ extension Reverb {
         earlySec + lateSec + releaseSec
     }
     func count(sampleRate: Double) -> Int {
-        Int((durSec * sampleRate).rounded(.up))
+        Int((min(durSec, 1000) * sampleRate).rounded(.up))
     }
     
     func fir(sampleRate: Double, channel: Int) -> [Double] {
@@ -1390,14 +1390,14 @@ extension Note {
 
 struct Chord: Hashable, Codable {
     enum ChordType: Int, Hashable, Codable, CaseIterable, CustomStringConvertible {
-        case power, major, suspended, minor, augmented, flatfive, diminish, tritone
+        case power, major2, major, suspended, minor, minor2, augmented, flatfive, diminish, tritone
         
         var description: String {
             switch self {
             case .power: "Pow"
-            case .major: "Maj"
+            case .major, .major2: "Maj"
             case .suspended: "Sus"
-            case .minor: "Min"
+            case .minor, .minor2: "Min"
             case .augmented: "Aug"
             case .flatfive: "Fla"
             case .diminish: "Dim"
@@ -1407,9 +1407,11 @@ struct Chord: Hashable, Codable {
         var unisons: [Int] {
             switch self {
             case .power: [0, 7]
+            case .major2: [0, 4]
             case .major: [0, 4, 7]
             case .suspended: [0, 5, 7]
             case .minor: [0, 3, 7]
+            case .minor2: [0, 3]
             case .augmented: [0, 4, 8]
             case .flatfive: [0, 4, 6]
             case .diminish: [0, 3, 6]
@@ -1421,7 +1423,7 @@ struct Chord: Hashable, Codable {
             [.major, .suspended, .minor, .augmented, .flatfive, .diminish]
         }
         static var cases2Count: [Self] {
-            [.power]
+            [.power, .major2, .minor2]
         }
         static var cases1Count: [Self] {
             [.tritone]
@@ -1441,7 +1443,7 @@ struct Chord: Hashable, Codable {
         var inversionCount: Int {
             switch self {
             case .augmented, .tritone: 1
-            case .power: 2
+            case .power, .major2, .minor2: 2
             default: 3
             }
         }
@@ -1480,6 +1482,7 @@ extension Chord {
                 let nUnisons = type.unisons.map { ($0 + unison).mod(12) }
                 if pitchsSet.isSuperset(of: nUnisons) {
                     typers.append(.init(type, unison: unison))
+                    if type == .augmented { break }
                 }
             }
         }

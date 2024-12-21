@@ -1022,32 +1022,29 @@ final class PastableAction: Action {
                                 lineType: .color(.selected))
                 selectingLineNode.children = [node]
                 Pasteboard.shared.copiedObjects = [.normalizationValue(note.spectlopeHeight)]
-            }
-            return true
-        } else if let sheetView = rootView.sheetView(at: p),
-                    let noteI = sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
-                                                              scale: rootView.screenToWorldScale) {
-            let scoreView = sheetView.scoreView
-            let score = scoreView.model
-            let scoreP = scoreView.convertFromWorld(p)
-            
-            let pitchInterval = rootView.currentPitchInterval
-            let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
-            let beatInterval = rootView.currentBeatInterval
-            let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
-            var note = score.notes[noteI]
-            note.pitch -= pitch
-            note.beatRange.start -= beat
-            
-            if isSendPasteboard {
-                Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [note]))]
-            }
-            let lines = [scoreView.pointline(from: score.notes[noteI])]
-                .map { scoreView.convertToWorld($0) }
-            selectingLineNode.children = lines.map {
-                Node(path: Path($0.controls.map { $0.point }),
-                     lineWidth: rootView.worldLineWidth * 1.5,
-                     lineType: .color(.selected))
+            case .note, .startBeat, .endBeat:
+                let scoreView = sheetView.scoreView
+                let score = scoreView.model
+                let scoreP = scoreView.convertFromWorld(p)
+                
+                let pitchInterval = rootView.currentPitchInterval
+                let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
+                let beatInterval = rootView.currentBeatInterval
+                let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
+                var note = score.notes[noteI]
+                note.pitch -= pitch
+                note.beatRange.start -= beat
+                
+                if isSendPasteboard {
+                    Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [note]))]
+                }
+                let lines = [scoreView.pointline(from: score.notes[noteI])]
+                    .map { scoreView.convertToWorld($0) }
+                selectingLineNode.children = lines.map {
+                    Node(path: Path($0.controls.map { $0.point }),
+                         lineWidth: rootView.worldLineWidth * 1.5,
+                         lineType: .color(.selected))
+                }
             }
             return true
         } else if let (sBorder, edge) = rootView.worldBorder(at: p, distance: d) {
@@ -1478,29 +1475,25 @@ final class PastableAction: Action {
                     Pasteboard.shared.copiedObjects = [.normalizationValue(note.spectlopeHeight)]
                     return true
                 }
+            case .note, .startBeat, .endBeat:
+                let scoreP = scoreView.convertFromWorld(p)
+                
+                let pitchInterval = rootView.currentPitchInterval
+                let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
+                let beatInterval = rootView.currentBeatInterval
+                let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
+                var note = score.notes[noteI]
+                note.pitch -= pitch
+                note.beatRange.start -= beat
+                
+                Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [note]))]
+                
+                sheetView.newUndoGroup()
+                sheetView.removeNote(at: noteI)
+                
+                sheetView.updatePlaying()
+                return true
             }
-        } else if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled,
-                  let noteI = sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
-                                                            scale: rootView.screenToWorldScale) {
-            let scoreView = sheetView.scoreView
-            let score = scoreView.model
-            let scoreP = scoreView.convertFromWorld(p)
-            
-            let pitchInterval = rootView.currentPitchInterval
-            let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
-            let beatInterval = rootView.currentBeatInterval
-            let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
-            var note = score.notes[noteI]
-            note.pitch -= pitch
-            note.beatRange.start -= beat
-            
-            Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [note]))]
-            
-            sheetView.newUndoGroup()
-            sheetView.removeNote(at: noteI)
-            
-            sheetView.updatePlaying()
-            return true
         } else if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled,
                     let keyBeatI = sheetView.scoreView.keyBeatIndex(at: sheetView.scoreView.convertFromWorld(p),
                                                                     scale: rootView.screenToWorldScale) {

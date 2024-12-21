@@ -74,7 +74,8 @@ final class NotePlayer {
         self.aNotes = notes
         self.sequencer = sequencer
         scoreNoder = sequencer.append(ScoreTrackItem(rendnotes: [], sampleRate: Audio.defaultSampleRate,
-                                                     startSec: 0, durSec: 0))
+                                                     startSec: 0, durSec: 0,
+                                                     isEnabledSamples: false))
     }
     
     var isPlaying = false
@@ -422,11 +423,20 @@ private final class NotewaveBox {
 extension UnsafeMutableBufferPointer: @retroactive @unchecked Sendable where Element: NotewaveBox {}
 
 struct ScoreTrackItem {
-    var rendnotes = [Rendnote]()
-    var sampleRate = Audio.defaultSampleRate
-    var startSec = 0.0
-    var durSec = Rational(0)
+    var rendnotes = [Rendnote]() {
+        didSet { isChanged = true }
+    }
+    var sampleRate = Audio.defaultSampleRate {
+        didSet { isChanged = true }
+    }
+    var startSec = 0.0 {
+        didSet { isChanged = true }
+    }
+    var durSec = Rational(0) {
+        didSet { isChanged = true }
+    }
     let id = UUID()
+    var isEnabledSamples = true
     
     struct NotewaveID: Hashable {
         var fq: Double, noiseSeed0: UInt64, noiseSeed1: UInt64,
@@ -443,14 +453,22 @@ struct ScoreTrackItem {
         }
     }
     fileprivate(set) var notewaveDic = [NotewaveID: Notewave]()
+    fileprivate(set) var isChanged = false
+    fileprivate(set) var sampless = [[Double]]()
+    var sampleCount: Int {
+        sampless.isEmpty ? 0 : sampless[0].count
+    }
 }
 extension ScoreTrackItem {
-    init(score: Score, startSec: Double = 0, sampleRate: Double, isUpdateNotewaveDic: Bool) {
+    init(score: Score, startSec: Double = 0, sampleRate: Double, isUpdateNotewaveDic: Bool,
+         isEnabledSamples: Bool = true) {
         rendnotes = score.notes.map { .init(note: $0, score: score) }
         self.sampleRate = sampleRate
         self.startSec = startSec
         durSec = score.secRange.end
+        self.isEnabledSamples = isEnabledSamples
         if isUpdateNotewaveDic {
+            isChanged = true
             updateNotewaveDic()
         }
     }
@@ -492,13 +510,19 @@ extension ScoreTrackItem {
     }
     
     mutating func replace(_ sivs: [IndexValue<Stereo>]) {
+        var isUpdate = false
         sivs.forEach {
             let rendnote = rendnotes[$0.index]
             let notewaveID = ScoreTrackItem.NotewaveID(rendnote)
             if var notewave = notewaveDic[notewaveID] {
-                notewave.stereos = .init(repeating: $0.value, count: notewave.stereos.count)
+                notewave = rendnote.notewave(from: notewave.noStereoSamples, stereo: $0.value,
+                                             sampleRate: sampleRate)
                 notewaveDic[notewaveID] = notewave
+                isUpdate = true
             }
+        }
+        if isUpdate {
+            updateSamples()
         }
     }
     
@@ -557,6 +581,37 @@ extension ScoreTrackItem {
                 }
             }
         }
+        if isChanged {
+            updateSamples()
+            isChanged = false
+        }
+    }
+    mutating func updateSamples(targetLoudnessDb: Double = -14) {
+        guard isEnabledSamples else { return }
+        let ranges = rendnotes.map { $0.releasedRange(sampleRate: sampleRate, startSec: startSec) }
+        let count = ranges.maxValue { $0.end } ?? 0
+        var sampless = [[Double](repeating: 0, count: count),
+                        [Double](repeating: 0, count: count)]
+        for (rendnote, range) in zip(rendnotes, ranges) {
+            guard let notewave = notewave(from: rendnote),
+                  range.length <= notewave.sampleCount else { continue }
+            for i in range {
+                guard i >= 0 else { continue }
+                sampless[0][i] += notewave.sampless[0][i - range.start]
+                sampless[1][i] += notewave.sampless[1][i - range.start]
+            }
+        }
+        
+        let lufs = (try? Loudness(sampleRate: sampleRate).integratedLoudnessDb(data: sampless)) ?? 0
+        if lufs > targetLoudnessDb {
+            let gain = Loudness.normalizeLoudnessScale(inputLoudness: lufs, targetLoudness: targetLoudnessDb)
+            vDSP.multiply(gain, sampless[0], result: &sampless[0])
+            vDSP.multiply(gain, sampless[1], result: &sampless[1])
+        }
+        
+        sampless = PCMBuffer.compress(sampless: sampless, sampleRate: sampleRate)
+        
+        self.sampless = sampless
     }
 }
 
@@ -653,14 +708,17 @@ final class ScoreNoder: ObjectHashable {
                 outputBLP[$0].mData!.assumingMemoryBound(to: Float.self)
             }
             
-            func updateF(i: Int, ui: Int, mi: Int, ni: Int, samples: [[Double]], stereos: [Stereo],
+            func updateF(i: Int, ui: Int, mi: Int, ni: Int, sampless: [[Double]],
                          isPremultipliedEnvelope: Bool,
                          allAttackStartSec: Double?, allReleaseStartSec: Double?,
                          playingAttackStartSec: Double?, playingReleaseStartSec: Double?,
                          envelopeMemo: EnvelopeMemo, startSec: Double, releaseSec: Double?) {
                 let sec = Double(i) * rSampleRate
+                
                 let waveclipAmp = isPremultipliedEnvelope ?
                 1 : Waveclip.amp(atSec: sec, attackStartSec: startSec, releaseStartSec: releaseSec)
+                * Volm.amp(fromVolm: envelopeMemo.volm(atSec: sec - startSec,
+                                                       releaseStartSec: releaseSec != nil ? releaseSec! - startSec : nil))
                 
                 let allWaveclipAmp = Waveclip
                     .amp(atSec: sec, attackStartSec: allAttackStartSec, releaseStartSec: allReleaseStartSec)
@@ -669,48 +727,18 @@ final class ScoreNoder: ObjectHashable {
                     .amp(atSec: Double(ui) * rSampleRate,
                          attackStartSec: playingAttackStartSec, releaseStartSec: playingReleaseStartSec)
                 
-                let envelopeVolm = isPremultipliedEnvelope ?
-                1 :
-                envelopeMemo.volm(atSec: sec - startSec,
-                                  releaseStartSec: releaseSec != nil ? releaseSec! - startSec : nil)
-                
-                let stereo = stereos.count == 1 ? stereos[0] : stereos[mi]
-                let amp = Volm.amp(fromVolm: stereo.volm * envelopeVolm)
-                * waveclipAmp * allWaveclipAmp * playingWaveclipAmp
-                let pan = stereo.pan
-                
-                if pan == 0 || nFramess.count < 2 {
-                    if nFramess.count >= 2 && samples.count >= 2 {
-                        nFramess[0][ni] += Float(samples[0][mi] * amp)
-                        nFramess[1][ni] += Float(samples[1][mi] * amp)
+                let amp = waveclipAmp * allWaveclipAmp * playingWaveclipAmp
+                if nFramess.count >= 2 {
+                    if sampless.count >= 2 {
+                        nFramess[0][ni] += Float(sampless[0][mi] * amp)
+                        nFramess[1][ni] += Float(sampless[1][mi] * amp)
                     } else {
-                        let sample = Float(samples[0][mi] * amp)
-                        for frames in nFramess {
-                            frames[ni] += sample
-                        }
+                        let nAmp = Float(sampless[0][mi] * amp)
+                        nFramess[0][ni] += nAmp
+                        nFramess[1][ni] += nAmp
                     }
                 } else {
-                    let nPan = pan.clipped(min: -1, max: 1) * 0.75
-                    if samples.count >= 2 {
-                        let sample0 = samples[0][mi] * amp
-                        let sample1 = samples[1][mi] * amp
-                        if nPan < 0 {
-                            nFramess[0][ni] += Float(sample0)
-                            nFramess[1][ni] += Float(sample1 * Volm.amp(fromVolm: 1 + nPan))
-                        } else {
-                            nFramess[0][ni] += Float(sample0 * Volm.amp(fromVolm: 1 - nPan))
-                            nFramess[1][ni] += Float(sample1)
-                        }
-                    } else {
-                        let sample = samples[0][mi] * amp
-                        if nPan < 0 {
-                            nFramess[0][ni] += Float(sample)
-                            nFramess[1][ni] += Float(sample * Volm.amp(fromVolm: 1 + nPan))
-                        } else {
-                            nFramess[0][ni] += Float(sample * Volm.amp(fromVolm: 1 - nPan))
-                            nFramess[1][ni] += Float(sample)
-                        }
-                    }
+                    nFramess[0][ni] += Float(sampless[0][mi] * amp)
                 }
             }
             
@@ -754,8 +782,8 @@ final class ScoreNoder: ObjectHashable {
                     var mi = (frameStartI - si) % notewave.sampleCount
                     for ni in 0 ..< Int(frameCount) {
                         updateF(i: ni + frameStartI, ui: ni + frameStartI, mi: mi, ni: ni,
-                                samples: notewave.samples, stereos: notewave.stereos,
-                                isPremultipliedEnvelope: notewave.isPremultipliedEnvelope,
+                                sampless: notewave.sampless,
+                                isPremultipliedEnvelope: !notewave.isLoop,
                                 allAttackStartSec: nil, allReleaseStartSec: nil,
                                 playingAttackStartSec: nil, playingReleaseStartSec: nil,
                                 envelopeMemo: rendnote.envelopeMemo,
@@ -778,9 +806,11 @@ final class ScoreNoder: ObjectHashable {
                 
                 let beganPauseI = endSampleTime != nil ? Int(endSampleTime! - startSampleTime) + seqStartI : nil
                 
-                for rendnote in scoreTrackItem.rendnotes {
-                    let loopedNoteRange = rendnote.releasedRange(sampleRate: sampleRate, startSec: startSec)
-                    if let beganPauseI, beganPauseI < loopedNoteRange.lowerBound + loopStartI { continue }
+                _ = {
+                    let scoreDurSec = Double(scoreTrackItem.durSec)
+                    let loopedNoteRange = Range(start: Int((startSec * sampleRate).rounded(.down)),
+                                                length: scoreTrackItem.sampleCount)
+                    if let beganPauseI, beganPauseI < loopedNoteRange.lowerBound + loopStartI { return }
                     
                     let preLoopedNoteRange = loopedNoteRange - maxCount
                     let cLoopedNoteRange = loopedNoteRange.clamped(to: 0 ..< maxCount)
@@ -789,7 +819,7 @@ final class ScoreNoder: ObjectHashable {
                     guard loopedFrameRange.intersects(cLoopedNoteRange)
                             || (type == .loop && preLoopedFrameRange.intersects(cLoopedNoteRange))
                             || (isLooped && loopedFrameRange.intersects(cPreLoopedNoteRange))
-                            || (isLooped && preLoopedFrameRange.intersects(cPreLoopedNoteRange)) else { continue }
+                            || (isLooped && preLoopedFrameRange.intersects(cPreLoopedNoteRange)) else { return }
                     
                     let isFirstCross = loopedNoteRange.lowerBound < 0
                     let isLastCross = loopedNoteRange.upperBound > maxCount
@@ -812,14 +842,12 @@ final class ScoreNoder: ObjectHashable {
                     && (preNoteRange.lowerBound != beganPauseI && preNoteRange.contains(beganPauseI!)) ?
                     Double(beganPauseI!) * rSampleRate : nil
                     guard !(beganPauseI != nil && noteRange.lowerBound >= beganPauseI!)
-                            || !(beganPauseI != nil && preNoteRange.lowerBound >= beganPauseI!) else { continue }
+                            || !(beganPauseI != nil && preNoteRange.lowerBound >= beganPauseI!) else { return }
                     
-                    guard let notewave = scoreTrackItem.notewave(from: rendnote) else { continue }
                     contains = true
                     
-                    let sampleCount = notewave.sampleCount
-                    func update(notewave: Notewave,
-                                envelopeMemo: EnvelopeMemo, startSec: Double, releaseSec: Double?,
+                    let sampleCount = scoreTrackItem.sampleCount
+                    func update(envelopeMemo: EnvelopeMemo, startSec: Double, releaseSec: Double?,
                                 playingReleaseStartSec: Double?,
                                 range: Range<Int>, startI: Int) {
                         var i = loopedFrameStartI
@@ -828,8 +856,8 @@ final class ScoreNoder: ObjectHashable {
                                 let mi = i - startI
                                 if mi < sampleCount {
                                     updateF(i: i, ui: ni + frameStartI, mi: mi, ni: ni,
-                                            samples: notewave.samples, stereos: notewave.stereos,
-                                            isPremultipliedEnvelope: notewave.isPremultipliedEnvelope,
+                                            sampless: scoreTrackItem.sampless,
+                                            isPremultipliedEnvelope: true,
                                             allAttackStartSec: allAttackStartSec,
                                             allReleaseStartSec: allReleaseStartSec,
                                             playingAttackStartSec: playingAttackStartSec,
@@ -847,24 +875,22 @@ final class ScoreNoder: ObjectHashable {
                     
                     if cLoopedNoteRange.intersects(loopedFrameRange)
                         || cLoopedNoteRange.intersects(preLoopedFrameRange) {
-                        update(notewave: notewave,
-                               envelopeMemo: rendnote.envelopeMemo,
-                               startSec: startSec + rendnote.secRange.start,
-                               releaseSec: startSec + rendnote.secRange.end,
+                        update(envelopeMemo: .init(.init()),
+                               startSec: startSec,
+                               releaseSec: startSec + scoreDurSec,
                                playingReleaseStartSec: playingReleaseStartSec,
                                range: cLoopedNoteRange, startI: loopedNoteRange.start)
                     }
                     if type == .loop && isLooped,
                        cPreLoopedNoteRange.intersects(loopedFrameRange)
                         || cPreLoopedNoteRange.intersects(preLoopedFrameRange) {
-                        update(notewave: notewave,
-                               envelopeMemo: rendnote.envelopeMemo,
-                               startSec: startSec + rendnote.secRange.start - seqDurSec,
-                               releaseSec: startSec + rendnote.secRange.end - seqDurSec,
+                        update(envelopeMemo: .init(.init()),
+                               startSec: startSec - seqDurSec,
+                               releaseSec: startSec + scoreDurSec - seqDurSec,
                                playingReleaseStartSec: prePlayingReleaseStartSec,
                                range: cPreLoopedNoteRange, startI: preLoopedNoteRange.start)
                     }
-                }
+                } ()
             }
             
             if !contains {
@@ -1213,6 +1239,7 @@ extension Sequencer {
     func buffer(sampleRate: Double,
                 headroomAmp: Double = Audio.headroomAmp,
                 enabledUseWaveclip: Bool = true,
+                targetLoudnessDb: Double? = -14,
                 isCompress: Bool = true,
                 progressHandler: (Double, inout Bool) -> ()) throws -> AVAudioPCMBuffer? {
         let oldHeadroomAmp = clippingAudioUnit.headroomAmp
@@ -1278,6 +1305,14 @@ extension Sequencer {
         
         if enabledUseWaveclip {
             allBuffer.useWaveclip()
+        }
+        if let targetLoudnessDb {
+            let lufs = allBuffer.integratedLoudness
+            if lufs > targetLoudnessDb {
+                let gain = Loudness.normalizeLoudnessScale(inputLoudness: lufs,
+                                                           targetLoudness: targetLoudnessDb)
+                allBuffer *= Float(gain)
+            }
         }
         if isCompress {
             allBuffer.compress(targetAmp: Float(headroomAmp))
@@ -1597,9 +1632,65 @@ extension AVAudioPCMBuffer {
         }
     }
     
-    func compress(targetDb: Double, attackSec: Double = 0.02, releaseSec: Double = 0.02) {
-        compress(targetAmp: .init(Volm.amp(fromDb: targetDb)), attackSec: attackSec, releaseSec: releaseSec)
+    static func compress(sampless: [[Double]], headroomAmp: Double = Audio.headroomAmp,
+                         sampleRate: Double,
+                         attackSec: Double = 0.02, releaseSec: Double = 0.02) -> [[Double]] {
+        struct P {
+            var minI, maxI: Int, scale: Double
+        }
+        let frameCount = sampless.isEmpty ? 0 : sampless[0].count
+        
+        var minI: Int?, maxDAmp = 0.0, ps = [P]()
+        for i in 0 ..< frameCount {
+            var maxAmp = 0.0
+            for ci in 0 ..< sampless.count {
+                let amp = sampless[ci][i]
+                maxAmp = max(maxAmp, abs(amp))
+            }
+            if maxAmp > headroomAmp {
+                if minI == nil {
+                    minI = i
+                }
+                maxDAmp = max(maxDAmp, maxAmp - headroomAmp)
+            } else {
+                if let nMinI = minI {
+                    ps.append(P(minI: nMinI, maxI: i, scale: headroomAmp / (maxDAmp + headroomAmp)))
+                    minI = nil
+                    maxDAmp = 0
+                }
+            }
+        }
+        
+        if ps.isEmpty {
+            return sampless
+        }
+        
+        let attackCount = Int(attackSec * sampleRate)
+        let rAttackCount = 1 / Double(attackCount)
+        let releaseCount = Int(releaseSec * sampleRate)
+        let rReleaseCount = 1 / Double(releaseCount)
+        var scales = [Double](repeating: 1, count: frameCount)
+        for p in ps {
+            let minI = max(0, p.minI - attackCount)
+            for i in (minI ..< p.minI).reversed() {
+                let t = Double(p.minI - i) * rAttackCount
+                let scale = Double.linear(p.scale, 1, t: t)
+                scales[i] = min(scale, scales[i])
+            }
+            for i in p.minI ..< p.maxI {
+                scales[i] = min(p.scale, scales[i])
+            }
+            let maxI = min(frameCount - 1, p.maxI + releaseCount)
+            for i in p.maxI ... maxI {
+                let t = Double(i - p.maxI) * rReleaseCount
+                let scale = Double.linear(p.scale, 1, t: t)
+                scales[i] = min(scale, scales[i])
+            }
+        }
+        
+        return sampless.count.range.map { vDSP.multiply(scales, sampless[$0]) }
     }
+    
     func compress(targetAmp: Float, attackSec: Double = 0.02, releaseSec: Double = 0.02) {
         struct P {
             var minI, maxI: Int, scale: Float
@@ -1625,7 +1716,9 @@ extension AVAudioPCMBuffer {
                 }
             }
         }
-        print(targetAmp, ps.count)
+        
+        if ps.isEmpty { return }
+        
         let attackCount = Int(attackSec * sampleRate)
         let releaseCount = Int(releaseSec * sampleRate)
         var scales = [Float](repeating: 1, count: frameCount)

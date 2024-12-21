@@ -998,15 +998,11 @@ final class LineAction: Action {
             octaveNode?.removeFromParent()
             octaveNode = nil
             
-            let p = rootView.convertScreenToWorld(event.screenPoint)
-            if let sheetView = noteSheetView, let nsBeat = noteStartBeat, let noteI,
-               !sheetView.model.score.notes.isEmpty {
+            if let sheetView = noteSheetView, let noteI,
+               noteI < sheetView.scoreView.model.notes.count {
                 
                 let scoreView = sheetView.scoreView
-                let sheetP = sheetView.convertFromWorld(p)
-                let interval = rootView.currentBeatInterval
-                let beat = scoreView.beat(atX: sheetP.x, interval: interval)
-                let beatRange = beat > nsBeat ? nsBeat ..< beat : beat ..< nsBeat
+                let beatRange = scoreView.model.notes[noteI].beatRange
                 if beatRange.length == 0 {
                     scoreView.remove(at: noteI)
                 } else {

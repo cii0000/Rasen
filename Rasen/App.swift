@@ -2032,6 +2032,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     var snapScrollType = SnapScrollType.none
     var lastMagnification = 0.0, preMagnification = 0.0
     var lastRotationQuantity = 0.0
+    var isTouchedSubDrag = false
     var isBeganSwipe = false, swipePosition: Point?, beganSwipePosition: Point?, beganSwipeTime: Double?
     var began4FingersPosition: Point?, began4FingersTime: Double?
     
@@ -2094,6 +2095,11 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         if oldTouchPoints.isEmpty {
             beganSwipeTime = event.time
             began4FingersTime = event.time
+            isTouchedSubDrag = false
+        }
+        
+        if isSubDrag {
+            isTouchedSubDrag = true
         }
         
         let ps = touchPoints(with: event)
@@ -2155,7 +2161,12 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         guard isEnabledCustomTrackpad else { return }
         
         let ps = touchPoints(with: event)
-        if ps.count == 2 {
+        if isTouchedSubDrag || isSubDrag {
+            isTouchedSubDrag = true
+            endPinch(with: event, enabledMomentum: false)
+            endScroll(with: event, enabledMomentum: false)
+            endRotate(with: event)
+        } else if ps.count == 2 {
             if touchedIDs.count == 2,
                let beganPinchDistance, let beganScrollPosition, let beganRotateAngle,
                 let ps0 = ps[touchedIDs[0]],
@@ -2385,6 +2396,19 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     func touchesEnded(with event: TouchEvent) {
         guard isEnabledCustomTrackpad else { return }
+        
+        if isTouchedSubDrag || isSubDrag {
+            endPinch(with: event, enabledMomentum: false)
+            endScroll(with: event, enabledMomentum: false)
+            endRotate(with: event)
+            
+            oldTouchPoints = [:]
+            touchedIDs = []
+            beganSwipePosition = nil
+            isTouchedSubDrag = false
+            return
+        }
+        
         if !isBeganPinch && !isBeganScroll && !isBeganRotate && isPrepare3FingersTap {
             if event.isAllEnded, let beganSwipeTime, event.time - beganSwipeTime < 0.3 {
                 var event = InputKeyEvent(screenPoint: event.screenPoint,
@@ -2429,12 +2453,12 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         beganSwipePosition = nil
     }
     
-    func endPinch(with event: TouchEvent,
+    func endPinch(with event: TouchEvent, enabledMomentum: Bool = true,
                   timeInterval: Double = 1 / 60) {
         guard isBeganPinch else { return }
         self.oldPinchDistance = nil
         isBeganPinch = false
-        guard pinchVs.count >= 2 else {
+        guard pinchVs.count >= 2 && enabledMomentum else {
             rootAction.pinch(with: .init(screenPoint: event.screenPoint,
                                          time: event.time,
                                          magnification: 0,
@@ -2497,12 +2521,12 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                                       rotationQuantity: 0,
                                       phase: .ended))
     }
-    func endScroll(with event: TouchEvent,
+    func endScroll(with event: TouchEvent, enabledMomentum: Bool = true,
                    timeInterval: Double = 1 / 60) {
         guard isBeganScroll else { return }
         self.oldScrollPosition = nil
         isBeganScroll = false
-        guard scrollVs.count >= 2 else {
+        guard scrollVs.count >= 2 && enabledMomentum else {
             rootAction.scroll(with: .init(screenPoint: event.screenPoint,
                                           time: event.time,
                                           scrollDeltaPoint: .init(),
@@ -4091,6 +4115,7 @@ extension LineCap {
 struct Cursor {
     nonisolated(unsafe) static let arrow = arrowWith()
     nonisolated(unsafe) static let drawLine = circle()
+    nonisolated(unsafe) static let cross = crossWith()
     nonisolated(unsafe) static let block = ban()
     nonisolated(unsafe) static let stop = rect()
     
@@ -4111,7 +4136,7 @@ struct Cursor {
         }
     }
     
-    static let circleDefaultSize = 7.0, circleDefaultLineWidth = 2.0
+    static let circleDefaultSize = 7.0, circleDefaultLineWidth = 1.5
     static func circle(size s: Double = circleDefaultSize,
                        scale: Double = 1,
                        string: String = "",
@@ -4120,7 +4145,7 @@ struct Cursor {
                        darkColor: Color = .background,
                        darkOutlineColor: Color = .darkBackground) -> Cursor {
         let lineWidth = circleDefaultLineWidth * scale,
-            subLineWidth = 1.25 * scale
+            subLineWidth = 1.125 * scale
         let d = (subLineWidth + lineWidth / 2).rounded(.up)
         let r = s / 2
         let b = Rect(x: d, y: d, width: s, height: s)
@@ -4309,6 +4334,75 @@ struct Cursor {
                                      outlineColor: darkOutlineColor),
                       hotSpot: hotSpot)
     }
+    
+    static func crossWith(size s: Double = circleDefaultSize,
+                          scale: Double = 1,
+                          string: String = "",
+                          lightColor: Color = .content,
+                          lightOutlineColor: Color = .background,
+                          darkColor: Color = .background,
+                          darkOutlineColor: Color = .darkBackground) -> Cursor {
+        let lineWidth = circleDefaultLineWidth * scale,
+            subLineWidth = 1.5 * scale
+        let d = (subLineWidth + lineWidth / 2).rounded(.up)
+        let r = s / 2
+        let b = Rect(x: d, y: d, width: s, height: s)
+        
+        let tPath: Path?, tSize: Size
+        if !string.isEmpty {
+            let text = Text(string: string, size: Font.defaultSize)
+            let tb = text.frame ?? Rect()
+            tSize = tb.size + Size(width: 0, height: 3)
+            tPath = text.typesetter.path()
+        } else {
+            tSize = .init()
+            tPath = nil
+        }
+        
+        let hotSpot = Point(d + s / 2, -d - s / 2)
+        
+        func node(color: Color, outlineColor: Color) -> Node {
+            func crossPath(width w: Double, lineWidth: Double) -> Path {
+                let cp = b.centerPoint + Point(0, tSize.height)
+                let hlw = lineWidth / 2
+                return .init([Point(cp.x - hlw, cp.y + hlw + w), Point(cp.x - hlw, cp.y + hlw),
+                              Point(cp.x - hlw - w, cp.y + hlw), Point(cp.x - hlw - w, cp.y - hlw),
+                              Point(cp.x - hlw, cp.y - hlw), Point(cp.x - hlw, cp.y - hlw - w),
+                              Point(cp.x + hlw, cp.y - hlw - w), Point(cp.x + hlw, cp.y - hlw),
+                              Point(cp.x + hlw + w, cp.y - hlw), Point(cp.x + hlw + w,  cp.y + hlw),
+                              Point(cp.x + hlw, cp.y + hlw), Point(cp.x + hlw, cp.y + hlw + w)], isClosed: true)
+            }
+            let outlineNode = Node(path: crossPath(width: r, lineWidth: lineWidth + subLineWidth),
+                                   fillType: .color(outlineColor))
+            let inlineNode = Node(path: crossPath(width: r, lineWidth: lineWidth),
+                                  fillType: .color(color))
+            let nodes: [Node]
+            if let tPath {
+                nodes = [outlineNode, inlineNode,
+                         Node(attitude: Attitude(position: Point(d, b.centerPoint.y)),
+                               path: tPath,
+                               lineWidth: lineWidth + subLineWidth,
+                               lineType: .color(outlineColor)),
+                         Node(attitude: Attitude(position: Point(d, b.centerPoint.y)),
+                               path: tPath,
+                               fillType: .color(color))]
+            } else {
+                nodes = [outlineNode, inlineNode]
+            }
+            
+            let size = Size(width: max(s, tSize.width) + d * 2,
+                            height: s + d * 2 + tSize.height)
+            return Node(children: nodes,
+                        path: Path(Rect(origin: Point(), size: size)))
+        }
+        
+        return Cursor(lightNode: node(color: lightColor,
+                                      outlineColor: lightOutlineColor),
+                      darkNode: node(color: darkColor,
+                                     outlineColor: darkOutlineColor),
+                      hotSpot: hotSpot)
+    }
+    
     static func ban(size s: Double = 12,
                     lightColor: Color = .content,
                     lightOutlineColor: Color = .background,

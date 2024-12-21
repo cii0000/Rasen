@@ -402,25 +402,30 @@ extension Rendnote {
         min(isLoop ?
             fq.rounded(.up) / fq :
             secRange.length + max(Waveclip.releaseSec, envelopeMemo.releaseSec),
-            100000)
+            1000)
     }
     
     func sampleCount(sampleRate: Double) -> Int {
         guard !pitbend.isEmpty else { return 1 }
-        let rendableDurSec = min(secRange.length + max(Waveclip.releaseSec, envelopeMemo.releaseSec), 100000)
+        if isLoop {
+            let rendableDurSec = min(fq.rounded(.up) / fq, 1000)
+            return max(1, Int((rendableDurSec * sampleRate).rounded(.down)))
+        }
+        let rendableDurSec = min(secRange.length + max(Waveclip.releaseSec, envelopeMemo.releaseSec), 1000)
         let sampleCount = max(1, Int((rendableDurSec * sampleRate).rounded(.up)))
         return envelopeMemo.reverb.isEmpty ?
         sampleCount :
         sampleCount + envelopeMemo.reverb.count(sampleRate: sampleRate) - 1
     }
     func releaseCount(sampleRate: Double) -> Int {
-        let rendableDurSec = min(max(Waveclip.releaseSec, envelopeMemo.releaseSec), 100000)
+        let rendableDurSec = min(max(Waveclip.releaseSec, envelopeMemo.releaseSec), 1000)
         let sampleCount = max(1, Int((rendableDurSec * sampleRate).rounded(.up)))
         return envelopeMemo.reverb.isEmpty ?
         sampleCount :
         sampleCount + envelopeMemo.reverb.count(sampleRate: sampleRate) - 1
     }
     func releasedRange(sampleRate: Double, startSec: Double) -> Range<Int> {
+        isLoop ? (0 ..< sampleCount(sampleRate: sampleRate)) :
         .init(start: Int(((secRange.lowerBound + startSec) * sampleRate).rounded(.down)),
               length: sampleCount(sampleRate: sampleRate))
     }
@@ -428,17 +433,17 @@ extension Rendnote {
 extension Rendnote {
     func notewave(stftCount: Int = 1024, fAlpha: Double = 1, rmsSize: Int = 2048,
                   cutFq: Double = 16384, cutStartFq: Double = 15800, sampleRate: Double) -> Notewave {
-        var notewave = aNotewave(stftCount: stftCount, fAlpha: fAlpha, rmsSize: rmsSize,
-                                 cutFq: cutFq, cutStartFq: cutStartFq, sampleRate: sampleRate)
+        let rSampleRate = 1 / sampleRate
+        var samples = samples(stftCount: stftCount, fAlpha: fAlpha, rmsSize: rmsSize,
+                              cutFq: cutFq, cutStartFq: cutStartFq, sampleRate: sampleRate)
         if !isLoop {
-            let sampleCount = notewave.sampleCount
-            let rSampleRate = 1 / sampleRate
+            let sampleCount = samples.count
             let attackStartSec = !pitbend.firstStereo.isEmpty && !pitbend.firstSpectlope.isEmptyVolm ? 0.0 : nil
             let releaseStartSec = Double(sampleCount - 1) * rSampleRate - Waveclip.releaseSec
             for i in 0 ..< sampleCount {
-                notewave.samples[0][i] *= Waveclip.amp(atSec: Double(i) * rSampleRate,
-                                                       attackStartSec: attackStartSec,
-                                                       releaseStartSec: releaseStartSec)
+                samples[i] *= Waveclip.amp(atSec: Double(i) * rSampleRate,
+                                           attackStartSec: attackStartSec,
+                                           releaseStartSec: releaseStartSec)
             }
             
             if envelopeMemo.decaySec == 0 || envelopeMemo.sustainVolm == 1 {
@@ -446,44 +451,84 @@ extension Rendnote {
                     .clipped(min: 0, max: sampleCount)
                 for i in 0 ..< si {
                     let sec = Double(i) * rSampleRate
-                    notewave.samples[0][i]
+                    samples[i]
                     *= Volm.amp(fromVolm: envelopeMemo.volm(atSec: sec, releaseStartSec: releaseStartSec))
                 }
                 let ei = max(si, Int((releaseStartSec * sampleRate).rounded(.down)))
                     .clipped(min: 0, max: sampleCount)
                 for i in ei ..< sampleCount {
                     let sec = Double(i) * rSampleRate
-                    notewave.samples[0][i]
+                    samples[i]
                     *= Volm.amp(fromVolm: envelopeMemo.volm(atSec: sec, releaseStartSec: releaseStartSec))
                 }
             } else {
                 for i in 0 ..< sampleCount {
                     let sec = Double(i) * rSampleRate
-                    notewave.samples[0][i]
+                    samples[i]
                     *= Volm.amp(fromVolm: envelopeMemo.volm(atSec: sec, releaseStartSec: releaseStartSec))
                 }
             }
-            
-            notewave.isPremultipliedEnvelope = true
         }
-        
-        if !envelopeMemo.reverb.isEmpty {
-            let sampleCount = notewave.sampleCount
-            notewave.samples = [vDSP.apply(fir: envelopeMemo.reverb.fir(sampleRate: sampleRate, channel: 0),
-                                           in: notewave.samples[0]),
-                                vDSP.apply(fir: envelopeMemo.reverb.fir(sampleRate: sampleRate, channel: 1),
-                                           in: notewave.samples[0])]
-            notewave.stereos += .init(repeating: notewave.stereos.last!,
-                                      count: notewave.sampleCount - notewave.stereos.count)
-            if isLoop && notewave.sampleCount > sampleCount {
-                let count = notewave.sampleCount - sampleCount
-                notewave.samples[0].removeLast(count)
-                notewave.samples[1].removeLast(count)
-                notewave.stereos.removeLast(count)
+        return notewave(from: samples, sampleRate: sampleRate)
+    }
+    func notewave(from samples: [Double], stereo: Stereo? = nil, sampleRate: Double) -> Notewave {
+        let rSampleRate = 1 / sampleRate
+        var sampless: [[Double]]
+        let stereoScale = Volm.volm(fromAmp: 1 / 2.0.squareRoot())
+        if pitbend.isEqualAllStereo || stereo != nil {
+            let stereo = (stereo ?? pitbend.firstStereo).multiply(volm: stereoScale)
+            let stereoAmp = Volm.amp(fromVolm: stereo.volm)
+            let nSamples = vDSP.multiply(stereoAmp, samples)
+            let pan = stereo.pan
+            if pan == 0 {
+                sampless = [nSamples, nSamples]
+            } else {
+                let nPan = pan.clipped(min: -1, max: 1) * 0.75
+                if nPan < 0 {
+                    sampless = [nSamples, vDSP.multiply(Volm.amp(fromVolm: 1 + nPan), nSamples)]
+                } else {
+                    sampless = [vDSP.multiply(Volm.amp(fromVolm: 1 - nPan), nSamples), nSamples]
+                }
+            }
+        } else {
+            let stereos = samples.count.range.map { pitbend.stereo(atSec: Double($0) * rSampleRate).multiply(volm: stereoScale) }
+            let stereoAmps = stereos.map { Volm.amp(fromVolm: $0.volm) }
+            let nSamples = vDSP.multiply(samples, stereoAmps)
+            
+            sampless = [[Double](capacity: nSamples.count), [Double](capacity: nSamples.count)]
+            for (sample, stereo) in zip(nSamples, stereos) {
+                let pan = stereo.pan
+                if pan == 0 {
+                    sampless[0].append(sample)
+                    sampless[1].append(sample)
+                } else {
+                    let nPan = pan.clipped(min: -1, max: 1) * 0.75
+                    if nPan < 0 {
+                        sampless[0].append(sample)
+                        sampless[1].append(sample * Volm.amp(fromVolm: 1 + nPan))
+                    } else {
+                        sampless[0].append(sample * Volm.amp(fromVolm: 1 - nPan))
+                        sampless[1].append(sample)
+                    }
+                }
             }
         }
         
-        notewave.samples.forEach { samples in
+        var notewave = Notewave(noStereoSamples: samples, sampless: sampless, isLoop: isLoop)
+        if !envelopeMemo.reverb.isEmpty {
+            let sampleCount = notewave.sampleCount
+            notewave.sampless = [vDSP.apply(fir: envelopeMemo.reverb.fir(sampleRate: sampleRate, channel: 0),
+                                            in: notewave.sampless[0]),
+                                 vDSP.apply(fir: envelopeMemo.reverb.fir(sampleRate: sampleRate, channel: 1),
+                                            in: notewave.sampless[1])]
+            if isLoop && notewave.sampleCount > sampleCount {
+                let count = notewave.sampleCount - sampleCount
+                notewave.sampless[0].removeLast(count)
+                notewave.sampless[1].removeLast(count)
+            }
+        }
+        
+        notewave.sampless.forEach { samples in
             if samples.contains(where: { $0.isNaN || $0.isInfinite }) {
                 print(samples.contains(where: { $0.isInfinite }) ? "inf" : "nan")
             }
@@ -491,33 +536,18 @@ extension Rendnote {
         
         return notewave
     }
-    private func aNotewave(stftCount: Int, fAlpha: Double, rmsSize: Int,
-                           cutFq: Double, cutStartFq: Double, sampleRate: Double) -> Notewave {
-        guard !pitbend.isEmpty else {
-            return .init(samples: [[0]], stereos: [.init()], isLoop: isLoop)
+    private func samples(stftCount: Int, fAlpha: Double, rmsSize: Int,
+                         cutFq: Double, cutStartFq: Double, sampleRate: Double) -> [Double] {
+        let sampleCount = Int((rendableDurSec * sampleRate).rounded(isLoop ? .down : .up))
+        guard !pitbend.isEmpty && sampleCount >= 1 else {
+            return [0]
         }
-        let isLoop = isLoop
         let isStft = isStft
         let isFullNoise = pitbend.isFullNoise
         let containsNoise = pitbend.containsNoise
-        let rendableDurSec = rendableDurSec
-        
-        let sampleCount = Int((rendableDurSec * sampleRate).rounded(isLoop ? .down : .up))
-        guard sampleCount >= 1 else {
-            return .init(samples: [[0]], stereos: [.init()], isLoop: isLoop)
-        }
-        
-        let stereoScale = Volm.volm(fromAmp: 1 / 2.0.squareRoot())
-        func stereos(sampleCount: Int) -> [Stereo] {
-            pitbend.isEqualAllStereo ?
-            [pitbend.firstStereo.multiply(volm: stereoScale)] :
-            sampleCount.range.map { pitbend.stereo(atSec: Double($0) * rSampleRate).multiply(volm: stereoScale) }
-        }
-        
+        let rSampleRate = 1 / sampleRate
         let fq = fq.clipped(min: Score.minFq, max: cutFq)
         let notePitch = Pitch.pitch(fromFq: fq)
-        
-        let rSampleRate = 1 / sampleRate
         
         let isOneSin = pitbend.isOneOvertone
         if isOneSin {
@@ -528,12 +558,10 @@ extension Rendnote {
                 let pitch = Pitch.pitch(fromFq: fq)
                 let amp = Volm.amp(fromVolm: Loudness.volm40Phon(fromPitch: pitch))
                 vDSP.multiply(amp * rScale, samples, result: &samples)
-                
-                let stereos = stereos(sampleCount: samples.count)
-                return .init(samples: [samples], stereos: stereos, isLoop: isLoop)
+                return samples
             } else {
                 var phase = 0.0
-                let samples = sampleCount.range.map {
+                return sampleCount.range.map {
                     let sec = Double($0) * rSampleRate
                     let fq = (fq * pitbend.fqScale(atSec: sec)).clipped(min: Score.minFq, max: cutFq)
                     let pitch = Pitch.pitch(fromFq: fq)
@@ -542,9 +570,6 @@ extension Rendnote {
                     phase += fq * pi2rs
                     return v
                 }
-                
-                let stereos = stereos(sampleCount: samples.count)
-                return .init(samples: [samples], stereos: stereos, isLoop: isLoop)
             }
         }
         
@@ -602,13 +627,9 @@ extension Rendnote {
                                                                         evenScale: -evenScale)
                 let noiseSamples = vDSP.gaussianNoise(count: sampleCount + stftCount,
                                                       seed0: noiseSeed0, seed1: noiseSeed1)
-                var samples = clippedStft(vDSP.apply(noiseSamples, spectrum: noiseSpectrum))
+                let samples = clippedStft(vDSP.apply(noiseSamples, spectrum: noiseSpectrum))
                 let mainSamples = clippedStft(vDSP.apply(noiseSamples, spectrum: mainNoiseSpectrum))
-                
-                samples = normarizedWithRMS(from: mainSamples, to: samples)
-                
-                let stereos = stereos(sampleCount: samples.count)
-                return .init(samples: [samples], stereos: stereos, isLoop: isLoop)
+                return normarizedWithRMS(from: mainSamples, to: samples)
             } else {
                 let spectlope = pitbend.firstSpectlope
                 let sinCount = Int((min(spectlope.maxFq, cutFq) / fq).clipped(min: 1, max: Double(Int.max)))
@@ -700,8 +721,7 @@ extension Rendnote {
                     vDSP.multiply(scale, samples, result: &samples)
                 }
                 
-                let stereos = stereos(sampleCount: samples.count)
-                return .init(samples: [samples], stereos: stereos, isLoop: isLoop)
+                return samples
             }
         } else {
             func normarizedWithRMS(from sSamples: [Double], to lSamples: [Double]) -> [Double] {
@@ -775,11 +795,8 @@ extension Rendnote {
                 }
                 
                 let mainSamples = clippedStft(vDSP.apply(noiseSamples, spectrogram: mainNoiseSpectrogram))
-                var samples = clippedStft(vDSP.apply(noiseSamples, spectrogram: noiseSpectrogram))
-                samples = normarizedWithRMS(from: mainSamples, to: samples)
-                
-                let stereos = stereos(sampleCount: samples.count)
-                return .init(samples: [samples], stereos: stereos, isLoop: isLoop)
+                let samples = clippedStft(vDSP.apply(noiseSamples, spectrogram: noiseSpectrogram))
+                return normarizedWithRMS(from: mainSamples, to: samples)
             } else {
                 let maxSpectlopeFq = pitbend.spectlopeInterpolation.keys
                     .maxValue { $0.value.maxFq } ?? Score.maxFq
@@ -943,10 +960,7 @@ extension Rendnote {
                     vDSP.add(samples, nNoiseSamples, result: &samples)
                     vDSP.add(mainSamples, nMainNoiseSamples, result: &mainSamples)
                 }
-                samples = normarizedWithRMS(from: mainSamples, to: samples)
-                
-                let stereos = stereos(sampleCount: samples.count)
-                return .init(samples: [samples], stereos: stereos, isLoop: isLoop)
+                return normarizedWithRMS(from: mainSamples, to: samples)
             }
         }
     }
@@ -1013,13 +1027,12 @@ extension vDSP {
 }
 
 struct Notewave {
-    var samples = [[Double]]()
-    var stereos = [Stereo]()
+    var noStereoSamples = [Double]()
+    var sampless = [[Double]]()
     var isLoop = false
-    var isPremultipliedEnvelope = false
 }
 extension Notewave {
     var sampleCount: Int {
-        samples.isEmpty ? 0 : samples[0].count
+        sampless.isEmpty ? 0 : sampless[0].count
     }
 }

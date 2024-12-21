@@ -1271,6 +1271,8 @@ struct PBScore: Sendable {
 
   var timelineY: Double = 0
 
+  var keyPitchs: [PBRational] = []
+
   var keyBeats: [PBRational] = []
 
   var enabled: Bool = false
@@ -5323,6 +5325,7 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
     9: .same(proto: "beatRange"),
     3: .same(proto: "tempo"),
     10: .same(proto: "timelineY"),
+    11: .same(proto: "keyPitchs"),
     7: .same(proto: "keyBeats"),
     4: .same(proto: "enabled"),
     8: .same(proto: "isShownSpectrogram"),
@@ -5344,6 +5347,7 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
       case 8: try { try decoder.decodeSingularBoolField(value: &self.isShownSpectrogram) }()
       case 9: try { try decoder.decodeSingularMessageField(value: &self._beatRange) }()
       case 10: try { try decoder.decodeSingularDoubleField(value: &self.timelineY) }()
+      case 11: try { try decoder.decodeRepeatedMessageField(value: &self.keyPitchs) }()
       default: break
       }
     }
@@ -5381,6 +5385,9 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
     if self.timelineY.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.timelineY, fieldNumber: 10)
     }
+    if !self.keyPitchs.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.keyPitchs, fieldNumber: 11)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5390,6 +5397,7 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
     if lhs._beatRange != rhs._beatRange {return false}
     if lhs._tempo != rhs._tempo {return false}
     if lhs.timelineY != rhs.timelineY {return false}
+    if lhs.keyPitchs != rhs.keyPitchs {return false}
     if lhs.keyBeats != rhs.keyBeats {return false}
     if lhs.enabled != rhs.enabled {return false}
     if lhs.isShownSpectrogram != rhs.isShownSpectrogram {return false}
