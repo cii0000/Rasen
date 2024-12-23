@@ -224,6 +224,9 @@ extension Stereo {
     var isEmpty: Bool {
         volm == 0
     }
+    var amp: Double {
+        Volm.amp(fromVolm: volm)
+    }
     
     func with(volm: Double) -> Self {
         var v = self
@@ -1127,6 +1130,7 @@ extension Note {
     }
     
     func chordBeatRangeAndRoundedPitchs(minBeatLength: Rational = .init(1, 8)) -> [(beatRange: Range<Rational>, roundedPitch: Int)] {
+        guard !isOneOvertone && !isFullNoise else { return [] }
         if pits.count >= 2 {
             var ns = [(beatRange: Range<Rational>, roundedPitch: Int)]()
             var preBeat = beatRange.start, prePitch = Int((pitch + pits[0].pitch).rounded())
@@ -1648,7 +1652,7 @@ extension Chord: CustomStringConvertible {
 
 struct ScoreOption {
     var beatRange = Music.defaultBeatRange
-    var keyBeats: [Rational] = [4, 8, 12]
+    var keyBeats: [Rational] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     var tempo = Music.defaultTempo
     var timelineY = Sheet.timelineY
     var enabled = false
@@ -1692,7 +1696,7 @@ struct Score: BeatRangeType {
     var beatRange = Music.defaultBeatRange
     var tempo = Music.defaultTempo
     var timelineY = Sheet.timelineY
-    var keyBeats: [Rational] = [4, 8, 12]
+    var keyBeats: [Rational] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
     var enabled = false
     var isShownSpectrogram = false
     var id = UUID()
@@ -1749,7 +1753,6 @@ extension Score {
     func chordPitches(atBeat range: Range<Rational>) -> [Int] {
         var pitchLengths = [Int: [Range<Rational>]]()
         for note in notes + draftNotes {
-            guard !note.isOneOvertone && !note.isFullNoise else { continue }
             for (beatRange, roundedPitch) in note.chordBeatRangeAndRoundedPitchs() {
                 if let iRange = beatRange.intersection(range) {
                     if pitchLengths[roundedPitch] != nil {
@@ -1760,7 +1763,7 @@ extension Score {
                 }
             }
         }
-        let length = range.length / 4
+        let length = range.length / 3
         return pitchLengths.filter { $0.value.sum { $0.length } >= length }.keys.sorted()
     }
     

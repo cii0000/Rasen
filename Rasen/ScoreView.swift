@@ -204,6 +204,7 @@ final class ScoreView: TimelineView, @unchecked Sendable {
     let timelineContentNode = Node(fillType: .color(.content))
     let timelineSubBorderNode = Node(fillType: .color(.subBorder))
     let timelineBorderNode = Node(fillType: .color(.border))
+    let timelineBackgroundNode = Node(fillType: .color(.background))
     let timelineFullEditBorderNode = Node(isHidden: true, fillType: .color(.border))
     let chordNode = Node()
     let pitsNode = Node(fillType: .color(.background))
@@ -224,6 +225,7 @@ final class ScoreView: TimelineView, @unchecked Sendable {
         node = Node(children: [spectlopesNode, timelineBorderNode, timelineFullEditBorderNode,
                                octaveNode,
                                timelineSubBorderNode, chordNode,
+                               timelineBackgroundNode,
                                timelineContentNode,
                                draftNotesNode, reverbsNode, notesNode, pitsNode, tonesNode,
                                timeNode, clippingNode])
@@ -272,13 +274,16 @@ extension ScoreView {
     func updateTimeline() {
         if model.enabled {
             let (contentPathlines, subBorderPathlines,
-                 borderPathlines, fullEditBorderPathlines) = self.timelinePathlinesTuple()
+                 borderPathlines, fullEditBorderPathlines,
+                 backgroundPathlines) = self.timelinePathlinesTuple()
+            timelineBackgroundNode.path = .init(backgroundPathlines)
             timelineContentNode.path = .init(contentPathlines)
             timelineSubBorderNode.path = .init(subBorderPathlines)
             timelineBorderNode.path = .init(borderPathlines)
             timelineFullEditBorderNode.path = .init(fullEditBorderPathlines)
             node.attitude.position.y = model.timelineY
         } else {
+            timelineBackgroundNode.path = .init()
             timelineContentNode.path = .init()
             timelineSubBorderNode.path = .init()
             timelineBorderNode.path = .init()
@@ -523,7 +528,8 @@ extension ScoreView {
     func timelinePathlinesTuple() -> (contentPathlines: [Pathline],
                                       subBorderPathlines: [Pathline],
                                       borderPathlines: [Pathline],
-                                      fullEditBorderPathlines: [Pathline]) {
+                                      fullEditBorderPathlines: [Pathline],
+                                      backgroundPathlines: [Pathline]) {
         let score = model
         let sBeat = max(score.beatRange.start, -10000),
             eBeat = min(score.beatRange.end, 10000)
@@ -542,6 +548,7 @@ extension ScoreView {
         var subBorderPathlines = [Pathline]()
         var borderPathlines = [Pathline]()
         var fullEditBorderPathlines = [Pathline]()
+        var backgroundPathlines = [Pathline]()
         
         makeBeatPathlines(in: score.beatRange, sy: sy, ey: ey,
                           subBorderPathlines: &subBorderPathlines,
@@ -585,6 +592,11 @@ extension ScoreView {
                                                  width: lw, height: ey - sy)))
             contentPathlines.append(.init(Rect(x: nx - knobW / 2, y: y - knobH / 2,
                                                width: knobW, height: knobH)))
+            
+            let blw = 0.25
+            if !keyBeat.isInteger {
+                backgroundPathlines.append(.init(Rect(x: x(atBeat: keyBeat) - blw / 2, y: sy, width: blw, height: ey - sy)))
+            }
         }
         contentPathlines.append(.init(Rect(x: ex - knobW / 2, y: y - knobH / 2,
                                            width: knobW, height: knobH)))
@@ -619,7 +631,8 @@ extension ScoreView {
                                                   height: sprKbobH)))
         }
         
-        return (contentPathlines, subBorderPathlines, borderPathlines, fullEditBorderPathlines)
+        return (contentPathlines, subBorderPathlines, borderPathlines, fullEditBorderPathlines,
+                backgroundPathlines)
     }
     
     func chordTypers(at p: Point, scale: Double) -> [Chord.ChordTyper] {
@@ -676,7 +689,6 @@ extension ScoreView {
     func chordPathlines() -> (subBorderPathlines: [Pathline], backgroundPathlines: [Pathline]) {
         let score = model
         let pitchRange = Score.pitchRange
-        let sBeat = max(score.beatRange.start, -10000), eBeat = min(score.beatRange.end, 10000)
         
         var subBorderPathlines = [Pathline](), backgroundPathlines = [Pathline]()
         
@@ -697,72 +709,85 @@ extension ScoreView {
         subBorderPathlines += chordBeats.map {
             Pathline(Rect(x: x(atBeat: $0) - plw / 2, y: sy, width: plw, height: ey - sy))
         }
+        let blw = 0.25
+        backgroundPathlines += chordBeats.compactMap {
+            !$0.isInteger ?
+            Pathline(Rect(x: x(atBeat: $0) - blw / 2, y: sy, width: blw, height: ey - sy)) :
+            nil
+        }
         
         let trs = chordRanges.map { ($0, score.chordPitches(atBeat: $0)) }
-        for (tr, pitchs) in trs {
+        for (chordBeatRange, pitchs) in trs {
             let pitchs = pitchs.sorted()
             guard let chord = Chord(pitchs: pitchs) else { continue }
+            let typers = chord.typers.sorted(by: { $0.type.rawValue > $1.type.rawValue })
             
-            let nsx = x(atBeat: tr.start + score.beatRange.start),
-                nex = x(atBeat: tr.end + score.beatRange.start)
-            let maxTyperCount = min(chord.typers.count, Int((nex - nsx) / 5))
-            let d = 1.5, maxW = 6.0, nw = maxW * Double(maxTyperCount - 1)
-            let centerX = nsx.mid(nex)
+            let midBeat = chordBeatRange.start.mid(chordBeatRange.end) + score.beatRange.start
+            let chordSX = x(atBeat: chordBeatRange.start + score.beatRange.start),
+                chordEX = x(atBeat: chordBeatRange.end + score.beatRange.start)
+            let chordW = chordEX - chordSX
+            let chordCenterX = chordSX.mid(chordEX)
+            let oMaxW = 6.0, padding = 2.0
+            let oNw = oMaxW * Double(chord.typers.count - 1) + padding * 2
+            let cw = max(0, chordW)
+            let lwScale = chord.typers.count == 1 ? 1 : (oNw < cw ? 1 : cw / (Double(chord.typers.count - 1) * oMaxW + padding * 2))
+            let centerD = chord.typers.count == 1 && midBeat.isInteger ? 0.125 : 0.0
+            let tlw0 = 0.5 * lwScale + centerD
+            let tlw1 = 1 * lwScale + centerD
+            let maxW = oMaxW * lwScale
+            let nw = maxW * Double(chord.typers.count - 1)
             
-            let typers = chord.typers.sorted(by: { $0.type.rawValue > $1.type.rawValue })[..<maxTyperCount]
-            
-            if let range = Range<Int>(pitchRange) {
-                let ilw = 1.0
-                let unisonsSet = typers.reduce(into: Set<Int>()) { $0.formUnion($1.unisons) }
-                for pitch in range {
-                    let pitchUnison = pitch.mod(12)
-                    guard unisonsSet.contains(pitchUnison) else { continue }
-                    let py = self.y(fromPitch: Rational(pitch))
-                    subBorderPathlines.append(Pathline(Rect(x: nsx, y: py - ilw / 2,
-                                                            width: nex - nsx, height: ilw)))
+            guard let pitchRange = Range<Int>(pitchRange) else { continue }
+            let plh = 1.0
+            let unisonsSet = typers.reduce(into: Set<Int>()) { $0.formUnion($1.unisons) }
+            for pitch in pitchRange {
+                let pitchUnison = pitch.mod(12)
+                guard unisonsSet.contains(pitchUnison) else { continue }
+                let py = self.y(fromPitch: Rational(pitch))
+                subBorderPathlines.append(.init(Rect(x: chordSX, y: py - plh / 2,
+                                                     width: chordEX - chordSX, height: plh)))
+                
+                for (ti, typer) in typers.enumerated() {
+                    guard typer.unisons.contains(pitchUnison) else { continue }
+                    let isInversion = typer.type == .augmented ?
+                    false : typer.mainUnison == pitchUnison
                     
-                    for (ti, typer) in typers.enumerated() {
-                        if typer.unisons.contains(pitchUnison) {
-                            let isInversion = typer.type == .augmented ?
-                            false : typer.mainUnison == pitchUnison
-                            
-                            let tlw = 0.5
-                            let fx = centerX - nw / 2 + maxW * Double(ti)
-                            func append(count: Int, lineWidth lw: Double) {
-                                let allLw = lw * Double(count * 2 - 1)
-                                for i in 0 ..< count * 2 {
-                                    let nd = Double(i) * lw
-                                    let pathline = Pathline(Rect(x: fx - allLw / 2 + nd, y: py - d,
-                                                                 width: lw, height: d * 2))
-                                    if i % 2 == 0 {
-                                        subBorderPathlines.append(pathline)
-                                    } else if i < count * 2 - 1 {
-                                        backgroundPathlines.append(pathline)
-                                    }
-                                }
-                                subBorderPathlines.append(.init(Rect(x: fx - allLw / 2, y: py - d - tlw,
-                                                                     width: allLw, height: tlw)))
-                                subBorderPathlines.append(.init(Rect(x: fx - allLw / 2, y: py + d,
-                                                                     width: allLw, height: tlw)))
-                                if isInversion {
-                                    let ilw = 0.75
-                                    subBorderPathlines.append(.init(Rect(x: fx - allLw / 2 - ilw, y: py - d - ilw,
-                                                                         width: allLw + 2 * ilw, height: ilw)))
-                                    subBorderPathlines.append(.init(Rect(x: fx - allLw / 2 - ilw, y: py + d,
-                                                                         width: allLw + 2 * ilw, height: ilw)))
-                                }
-                            }
-                            
-                            switch typer.type {
-                            case .power: append(count: 2, lineWidth: tlw * 2)
-                            case .major, .major2: append(count: 1, lineWidth: tlw * 2)
-                            case .suspended: append(count: 3, lineWidth: tlw * 2)
-                            case .minor, .minor2: append(count: 1, lineWidth: tlw)
-                            case .augmented: append(count: 2, lineWidth: tlw)
-                            case .flatfive: append(count: 3, lineWidth: tlw)
-                            case .diminish, .tritone: append(count: 4, lineWidth: tlw)
+                    let hd = typer.type.inversionCount == 2 ? 2.5 : 1.5
+                    let fx = chordCenterX - nw / 2 + maxW * Double(ti)
+                    func append(count: Int, lineWidth lw: Double) {
+                        let allLw = lw * Double(count * 2 - 1)
+                        for i in 0 ..< count * 2 {
+                            let nd = Double(i) * lw
+                            let pathline = Pathline(Rect(x: fx - allLw / 2 + nd, y: py - hd,
+                                                         width: lw, height: hd * 2))
+                            if i % 2 == 0 {
+                                subBorderPathlines.append(pathline)
+                            } else if i < count * 2 - 1 {
+                                backgroundPathlines.append(pathline)
                             }
                         }
+                        subBorderPathlines.append(.init(Rect(x: fx - allLw / 2, y: py - hd - tlw0,
+                                                             width: allLw, height: tlw0)))
+                        subBorderPathlines.append(.init(Rect(x: fx - allLw / 2, y: py + hd,
+                                                             width: allLw, height: tlw0)))
+                        
+                        if isInversion {
+                            let ilw = 0.75 * lwScale
+                            subBorderPathlines.append(.init(Rect(x: fx - allLw / 2 - ilw, y: py - hd - ilw,
+                                                                 width: allLw + 2 * ilw, height: ilw)))
+                            subBorderPathlines.append(.init(Rect(x: fx - allLw / 2 - ilw, y: py + hd,
+                                                                 width: allLw + 2 * ilw, height: ilw)))
+                        }
+                    }
+                    
+                    switch typer.type {
+                    case .power: append(count: 2, lineWidth: tlw1)
+                    case .major, .major2: append(count: 1, lineWidth: tlw1)
+                    case .suspended: append(count: 3, lineWidth: tlw1)
+                    case .minor, .minor2: append(count: 1, lineWidth: tlw0)
+                    case .augmented: append(count: 2, lineWidth: tlw0)
+                    case .flatfive: append(count: 3, lineWidth: tlw0)
+                    case .diminish, .tritone: append(count: 4, lineWidth: tlw0)
                     }
                 }
             }

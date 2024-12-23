@@ -370,7 +370,7 @@ extension Pitbend {
 }
 
 struct Rendnote {
-    var fq: Double
+    var rootFq: Double, firstFq: Double
     var noiseSeed0: UInt64
     var noiseSeed1: UInt64
     var pitbend: Pitbend
@@ -385,9 +385,12 @@ extension Rendnote {
         let eSec = Double(score.sec(fromBeat: note.beatRange.end))
         
         let (seed0, seed1) = note.containsNoise ? note.id.uInt64Values : (0, 0)
-        self.init(fq: Pitch.fq(fromPitch: .init(note.pitch)),
+        let rootFq = Pitch.fq(fromPitch: .init(note.pitch))
+        let pitbend = note.pitbend(fromTempo: score.tempo)
+        self.init(rootFq: rootFq,
+                  firstFq: rootFq * pitbend.firstFqScale,
                   noiseSeed0: seed0, noiseSeed1: seed1,
-                  pitbend: note.pitbend(fromTempo: score.tempo),
+                  pitbend: pitbend,
                   secRange: sSec ..< eSec,
                   envelopeMemo: .init(note.envelope))
     }
@@ -400,7 +403,7 @@ extension Rendnote {
     }
     var rendableDurSec: Double {
         min(isLoop ?
-            fq.rounded(.up) / fq :
+            firstFq.rounded(.up) / firstFq :
             secRange.length + max(Waveclip.releaseSec, envelopeMemo.releaseSec),
             1000)
     }
@@ -408,7 +411,7 @@ extension Rendnote {
     func sampleCount(sampleRate: Double) -> Int {
         guard !pitbend.isEmpty else { return 1 }
         if isLoop {
-            let rendableDurSec = min(fq.rounded(.up) / fq, 1000)
+            let rendableDurSec = min(firstFq.rounded(.up) / firstFq, 1000)
             return max(1, Int((rendableDurSec * sampleRate).rounded(.down)))
         }
         let rendableDurSec = min(secRange.length + max(Waveclip.releaseSec, envelopeMemo.releaseSec), 1000)
@@ -546,16 +549,18 @@ extension Rendnote {
         let isFullNoise = pitbend.isFullNoise
         let containsNoise = pitbend.containsNoise
         let rSampleRate = 1 / sampleRate
-        let fq = fq.clipped(min: Score.minFq, max: cutFq)
-        let notePitch = Pitch.pitch(fromFq: fq)
+        let rootFq = rootFq.clipped(min: Score.minFq, max: cutFq)
+        let firstFq = firstFq.clipped(min: Score.minFq, max: cutFq)
+        let cutPitch = Pitch.pitch(fromFq: cutFq)
+        let rootPitch = Pitch.pitch(fromFq: rootFq)
         
         let isOneSin = pitbend.isOneOvertone
         if isOneSin {
             let pi2rs = .pi2 * rSampleRate, rScale = Double.sqrt(2)
             if pitbend.isEqualAllPitch {
-                let a = fq * pi2rs
+                let a = firstFq * pi2rs
                 var samples = sampleCount.range.map { Double.sin(Double($0) * a) }
-                let pitch = Pitch.pitch(fromFq: fq)
+                let pitch = Pitch.pitch(fromFq: firstFq)
                 let amp = Volm.amp(fromVolm: Loudness.volm40Phon(fromPitch: pitch))
                 vDSP.multiply(amp * rScale, samples, result: &samples)
                 return samples
@@ -563,7 +568,7 @@ extension Rendnote {
                 var phase = 0.0
                 return sampleCount.range.map {
                     let sec = Double($0) * rSampleRate
-                    let fq = (fq * pitbend.fqScale(atSec: sec)).clipped(min: Score.minFq, max: cutFq)
+                    let fq = (rootFq * pitbend.fqScale(atSec: sec)).clipped(min: Score.minFq, max: cutFq)
                     let pitch = Pitch.pitch(fromFq: fq)
                     let amp = Volm.amp(fromVolm: Loudness.volm40Phon(fromPitch: pitch))
                     let v = amp * rScale * Double.sin(phase)
@@ -576,12 +581,9 @@ extension Rendnote {
         let halfStftCount = stftCount / 2
         let maxFq = sampleRate / 2
         let sqfa = fAlpha * 0.5
-        let sqfas: [Double] = halfStftCount.range.map {
-            let nfq = Double($0) / Double(halfStftCount) * maxFq
-            return $0 == 0 || nfq == 0 ? 1 : 1 / (nfq / fq) ** sqfa
-        }
+        let sqfas = halfStftCount.range.map { $0 == 0 ? 1 : 1 / Double($0) ** sqfa }
         
-        func aNoiseSpectrum(fromNoise spectlope: Spectlope, fq: Double,
+        func aNoiseSpectrum(fromNoise spectlope: Spectlope,
                             oddScale: Double, evenScale: Double) -> (spectrum: [Double], mainSpectrum: [Double]) {
             var sign = true, mainSpectrum = [Double](capacity: halfStftCount)
             return ((1 ... halfStftCount).map { fqi in
@@ -622,7 +624,6 @@ extension Rendnote {
                 evenScale = -overtone.evenAmp
             if isFullNoise {
                 let (noiseSpectrum, mainNoiseSpectrum) = aNoiseSpectrum(fromNoise: pitbend.firstSpectlope,
-                                                                        fq: fq,
                                                                         oddScale: oddScale,
                                                                         evenScale: -evenScale)
                 let noiseSamples = vDSP.gaussianNoise(count: sampleCount + stftCount,
@@ -632,12 +633,12 @@ extension Rendnote {
                 return normarizedWithRMS(from: mainSamples, to: samples)
             } else {
                 let spectlope = pitbend.firstSpectlope
-                let sinCount = Int((min(spectlope.maxFq, cutFq) / fq).clipped(min: 1, max: Double(Int.max)))
-                let fq = fq.clipped(min: Score.minFq, max: cutFq)
+                let sinCount = Int((min(spectlope.maxFq, cutFq) / firstFq).clipped(min: 1, max: Double(Int.max)))
+                let pitch = rootPitch + pitbend.firstPitch
                 
                 var sign = true, prePitch = 0.0, mainSpectrum = [Double](capacity: sinCount)
                 let spectrum = (1 ... sinCount).map { n in
-                    let nFq = fq * Double(n)
+                    let nFq = firstFq * Double(n)
                     let pitch = Pitch.pitch(fromFq: nFq)
                     let loudnessVolm = Loudness.volm40Phon(fromPitch: pitch)
                     let mainScale = (pitch - prePitch).clipped(min: 0, max: 2, newMin: 3, newMax: 1)
@@ -653,7 +654,7 @@ extension Rendnote {
                     return amp
                 }
                 
-                let dPhase = fq * .pi2 * rSampleRate
+                let dPhase = firstFq * .pi2 * rSampleRate
                 var x = 0.0
                 var sin1Xs = [Double](capacity: sampleCount)
                 var cos1Xs = [Double](capacity: sampleCount)
@@ -703,7 +704,6 @@ extension Rendnote {
                 
                 if containsNoise {
                     let (noiseSpectrum, mainNoiseSpectrum) = aNoiseSpectrum(fromNoise: spectlope,
-                                                                            fq: fq,
                                                                             oddScale: oddScale,
                                                                             evenScale: -evenScale)
                     let noiseSamples = vDSP.gaussianNoise(count: sampleCount + stftCount,
@@ -733,9 +733,8 @@ extension Rendnote {
                     return nSamples
                 }
                 var volms = [(sec: Double, sumVolm: Double)](capacity: pitbend.pits.count)
-                let notePitch = Pitch.pitch(fromFq: self.fq)
                 for (pit, sec) in zip(pitbend.pits, pitbend.secs) {
-                    let pitch = self.pitbend.pitch(atSec: sec) + notePitch
+                    let pitch = (rootPitch + pitbend.pitch(atSec: sec)).clipped(min: Score.doubleMinPitch, max: cutPitch)
                     let sumVolm = pit.tone.spectlope.sumOvertonesVolm(fromPitch: pitch) + pit.tone.spectlope.sumNoiseVolm
                     volms.append((sec, sumVolm))
                 }
@@ -783,11 +782,10 @@ extension Rendnote {
                 let noiseSpectrogram = stride(from: 0, to: sampleCount, by: overlapSamplesCount).map { i in
                     let sec = Double(i) * rSampleRate
                     let spectlope = pitbend.spectlope(atSec: sec)
-                    let fq = fq * pitbend.fqScale(atSec: sec)
                     let overtone = pitbend.overtone(atSec: sec)
                     let oddScale = overtone.isAll ? 1 : Volm.amp(fromVolm: overtone.oddVolm)
                     let evenScale = overtone.isAll ? -1 : -overtone.evenAmp
-                    let (noiseSpectrum, mainNoiseSpectrum) = aNoiseSpectrum(fromNoise: spectlope, fq: fq,
+                    let (noiseSpectrum, mainNoiseSpectrum) = aNoiseSpectrum(fromNoise: spectlope,
                                                                       oddScale: oddScale,
                                                                       evenScale: -evenScale)
                     mainNoiseSpectrogram.append(mainNoiseSpectrum)
@@ -808,7 +806,7 @@ extension Rendnote {
                 var x = 0.0
                 let frames: [Frame] = sampleCount.range.map { i in
                     let sec = Double(i) * rSampleRate
-                    let fq = (fq * pitbend.fqScale(atSec: sec)).clipped(min: Score.minFq, max: cutFq)
+                    let fq = (rootFq * pitbend.fqScale(atSec: sec)).clipped(min: Score.minFq, max: cutFq)
                     let sinCount = Int((min(maxSpectlopeFq, cutFq) / fq).clipped(min: 1, max: Double(Int.max)))
                     let sin1X = Double.sin(x), cos1X = Double.cos(x)
                     x += fq * pi2rs
@@ -866,7 +864,7 @@ extension Rendnote {
                 
                 var maxSpectlope = pitbend.firstSpectlope, maxSumVolm = 0.0
                 for (pit, sec) in zip(pitbend.pits, pitbend.secs) {
-                    let pitch = self.pitbend.pitch(atSec: sec) + notePitch
+                    let pitch = (rootPitch + pitbend.pitch(atSec: sec)).clipped(min: Score.doubleMinPitch, max: cutPitch)
                     let sumVolm = pit.tone.spectlope.sumOvertonesVolm(fromPitch: pitch)
                     if sumVolm > maxSumVolm {
                         maxSpectlope = pit.tone.spectlope
@@ -932,7 +930,6 @@ extension Rendnote {
                     if containsNoise {
                         let noiseSpectlope = pitbend.spectlope(atSec: sec)
                         var (noiseSpectrum, mainNoiseSpectrum) = aNoiseSpectrum(fromNoise: noiseSpectlope,
-                                                                               fq: frame.fq,
                                                                                oddScale: oddScale,
                                                                                evenScale: -evenScale)
                         vDSP.multiply(scale, noiseSpectrum, result: &noiseSpectrum)

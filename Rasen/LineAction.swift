@@ -915,7 +915,6 @@ final class LineAction: Action {
                 firstSpectlopeHeight = pitch == Score.maxPitch ? Sheet.maxSpectlopeHeight : Sheet.spectlopeHeight
                 let note = Note(beatRange: beatRange, pitch: pitch,
                                 pits: .init([.init(beat: 0, pitch: 0, tone: firstTone)]),
-                                envelope: !isStraight && firstTone.spectlope.isFullNoise ? .init(releaseSec: 0.5) : .init(),
                                 spectlopeHeight: firstSpectlopeHeight)
                 
                 noteI = count
@@ -969,7 +968,6 @@ final class LineAction: Action {
                 let beatRange = beat > nsBeat ? nsBeat ..< beat : beat ..< nsBeat
                 let note = Note(beatRange: beatRange, pitch: pitch,
                                 pits: [.init(beat: 0, pitch: 0, tone: firstTone)],
-                                envelope: !isStraight && firstTone.spectlope.isFullNoise ? .init(releaseSec: 0.5) : .init(),
                                 spectlopeHeight: firstSpectlopeHeight)
                 let isNote = oldPitch != pitch
                 

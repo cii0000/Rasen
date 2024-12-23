@@ -97,7 +97,9 @@ final class NotePlayer {
             let noteID = UUID()
             noteIDs.insert(noteID)
             let (seed0, seed1) = note.id.uInt64Values
-            return .init(fq: Pitch.fq(fromPitch: .init(note.notePitch) + note.pitch.doubleValue),
+            let rootFq = Pitch.fq(fromPitch: .init(note.notePitch) + note.pitch.doubleValue)
+            return .init(rootFq: rootFq,
+                         firstFq: rootFq,
                          noiseSeed0: seed0, noiseSeed1: seed1,
                          pitbend: .init(pitch: 0,
                                         stereo: note.stereo,
@@ -439,12 +441,12 @@ struct ScoreTrackItem {
     var isEnabledSamples = true
     
     struct NotewaveID: Hashable {
-        var fq: Double, noiseSeed0: UInt64, noiseSeed1: UInt64,
+        var lootFq: Double, noiseSeed0: UInt64, noiseSeed1: UInt64,
             envelopeMemo: EnvelopeMemo, pitbend: Pitbend,
             rendableDurSec: Double
         
         init(_ rendnote: Rendnote) {
-            fq = rendnote.fq
+            lootFq = rendnote.rootFq
             noiseSeed0 = rendnote.noiseSeed0
             noiseSeed1 = rendnote.noiseSeed1
             envelopeMemo = rendnote.envelopeMemo
