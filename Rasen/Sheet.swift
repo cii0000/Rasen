@@ -2182,7 +2182,7 @@ extension Sheet {
     static let fullEditPitchInterval = Rational(1, 12), pitchInterval = Rational(1)
     static let fullEditBeatInterval = Rational(1, 144), beatInterval = Rational(1, 12)
     static let pitchHeight = 2.5
-    static let noteHeight = 2.0
+    static let noteHeight = 1.75
     static let tonePadding = 2.0
     static let evenY = 1.0
     static let spectlopeHeight = 2.0, maxSpectlopeHeight = 12.0

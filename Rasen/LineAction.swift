@@ -912,7 +912,9 @@ final class LineAction: Action {
                 let beat = scoreView.beat(atX: inP.x, interval: beatInterval)
                 let beatRange = beat ..< beat
                 firstTone = pitch == Score.maxPitch ? Tone.noise() : (isStraight ? Tone.empty() : Tone())
-                firstSpectlopeHeight = pitch == Score.maxPitch ? Sheet.maxSpectlopeHeight : Sheet.spectlopeHeight
+                firstSpectlopeHeight = pitch == Score.maxPitch ?
+                Sheet.spectlopeHeight.mid(Sheet.maxSpectlopeHeight) :
+                Sheet.spectlopeHeight
                 let note = Note(beatRange: beatRange, pitch: pitch,
                                 pits: .init([.init(beat: 0, pitch: 0, tone: firstTone)]),
                                 spectlopeHeight: firstSpectlopeHeight)

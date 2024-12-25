@@ -409,11 +409,11 @@ extension Sprol {
 }
 
 struct Spectlope: Hashable, Codable {
-    var sprols = [Sprol(pitch: 12 * 0, volm: 0.5, noise: 0),
-                  Sprol(pitch: 12 * 1, volm: 1, noise: 0),
+    var sprols = [Sprol(pitch: 12 * 0, volm: 0.25, noise: 0),
+                  Sprol(pitch: 12 * 2, volm: 1, noise: 0),
                   Sprol(pitch: 12 * 3, volm: 0.5, noise: 0),
                   Sprol(pitch: 12 * 4, volm: 0.75, noise: 0),
-                  Sprol(pitch: 12 * 6, volm: 0.5, noise: 0),
+                  Sprol(pitch: 12 * 7, volm: 0.5, noise: 0),
                   Sprol(pitch: 12 * 10, volm: 0, noise: 0)]
 }
 extension Spectlope: Protobuf {
@@ -821,8 +821,10 @@ extension Tone {
     }
     static func noise() -> Self {
         Self.init(overtone: .init(evenAmp: 1, oddVolm: 1),
-                  spectlope: .init(sprols: [.init(pitch: 0, volm: 1, noise: 1),
-                                            .init(pitch: Score.doubleMaxPitch, volm: 1, noise: 1)]))
+                  spectlope: .init(sprols: [Sprol(pitch: 12 * 5, volm: 0, noise: 1),
+                                            Sprol(pitch: 12 * 6, volm: 0.5, noise: 1),
+                                            Sprol(pitch: 12 * 9, volm: 1, noise: 1),
+                                            Sprol(pitch: 12 * 10, volm: 0, noise: 1)]))
     }
     
     func with(id: UUID) -> Self {
@@ -1394,30 +1396,40 @@ extension Note {
 
 struct Chord: Hashable, Codable {
     enum ChordType: Int, Hashable, Codable, CaseIterable, CustomStringConvertible {
-        case power, major2, major, suspended, minor, minor2, augmented, flatfive, diminish, tritone
+        case octave, power, major3, major, suspended, minor, minor3, augmented, flatfive,
+             wholeTone, semitone,
+             diminish, tritone
         
         var description: String {
             switch self {
+            case .octave: "Oct"
             case .power: "Pow"
-            case .major, .major2: "Maj"
+            case .major: "Maj"
+            case .major3: "Maj3"
             case .suspended: "Sus"
-            case .minor, .minor2: "Min"
+            case .minor: "Min"
+            case .minor3: "Min3"
             case .augmented: "Aug"
             case .flatfive: "Fla"
+            case .wholeTone: "Who"
+            case .semitone: "Sem"
             case .diminish: "Dim"
             case .tritone: "Tri"
             }
         }
         var unisons: [Int] {
             switch self {
+            case .octave: [0]
             case .power: [0, 7]
-            case .major2: [0, 4]
+            case .major3: [0, 4]
             case .major: [0, 4, 7]
             case .suspended: [0, 5, 7]
             case .minor: [0, 3, 7]
-            case .minor2: [0, 3]
+            case .minor3: [0, 3]
             case .augmented: [0, 4, 8]
             case .flatfive: [0, 4, 6]
+            case .wholeTone: [0, 2]
+            case .semitone: [0, 1]
             case .diminish: [0, 3, 6]
             case .tritone: [0, 6]
             }
@@ -1427,7 +1439,7 @@ struct Chord: Hashable, Codable {
             [.major, .suspended, .minor, .augmented, .flatfive, .diminish]
         }
         static var cases2Count: [Self] {
-            [.power, .major2, .minor2]
+            [.power, .major3, .minor3, .wholeTone, .semitone]
         }
         static var cases1Count: [Self] {
             [.tritone]
@@ -1446,8 +1458,8 @@ struct Chord: Hashable, Codable {
         }
         var inversionCount: Int {
             switch self {
-            case .augmented, .tritone: 1
-            case .power, .major2, .minor2: 2
+            case .augmented, .tritone, .octave: 1
+            case .power, .major3, .minor3, .wholeTone, .semitone: 2
             default: 3
             }
         }
@@ -1473,29 +1485,36 @@ struct Chord: Hashable, Codable {
 }
 extension Chord {
     init?(pitchs: [Int]) {
-        let pitchs = Set(pitchs.map { $0.mod(12) }).sorted()
-        guard pitchs.count >= 2 else { return nil }
+        let unisons = Set(pitchs.map { $0.mod(12) }).sorted()
+        guard unisons.count >= 2 else {
+            if unisons.count == 1 && pitchs.count >= 2 {
+                self.init(typers: [.init(.octave, unison: unisons[0])])
+                return
+            }
+            return nil
+        }
         
-        let pitchsSet = Set(pitchs)
+        let unisonsSet = Set(unisons)
         
-        var typers = [ChordTyper]()
+        var typers = [ChordTyper](), filledUnisonSet = Set<Int>()
         
         for type in ChordType.cases3Count {
-            for j in 0 ..< pitchs.count {
-                let unison = pitchs[j]
+            for j in 0 ..< unisons.count {
+                let unison = unisons[j]
                 let nUnisons = type.unisons.map { ($0 + unison).mod(12) }
-                if pitchsSet.isSuperset(of: nUnisons) {
+                if unisonsSet.isSuperset(of: nUnisons) {
                     typers.append(.init(type, unison: unison))
+                    filledUnisonSet.formUnion(nUnisons)
                     if type == .augmented { break }
                 }
             }
         }
         
         for type in ChordType.cases2Count {
-            for j in 0 ..< pitchs.count {
-                let unison = pitchs[j]
+            for j in 0 ..< unisons.count {
+                let unison = unisons[j]
                 let nUnisons = type.unisons.map { ($0 + unison).mod(12) }
-                if pitchsSet.isSuperset(of: nUnisons) {
+                if unisonsSet.isSuperset(of: nUnisons) && !filledUnisonSet.isSuperset(of: nUnisons) {
                     let nTyper = ChordTyper(type, unison: unison)
                     if !typers.contains(where: { $0.unisons.isSuperset(of: nTyper.unisons) }) {
                         typers.append(nTyper)
@@ -1505,10 +1524,10 @@ extension Chord {
         }
         
         for type in ChordType.cases1Count {
-            for j in 0 ..< pitchs.count {
-                let unison = pitchs[j]
+            for j in 0 ..< unisons.count {
+                let unison = unisons[j]
                 let nUnisons = type.unisons.map { ($0 + unison).mod(12) }
-                if pitchsSet.isSuperset(of: nUnisons) {
+                if unisonsSet.isSuperset(of: nUnisons) {
                     let nTyper = ChordTyper(type, unison: unison)
                     if !typers.contains(where: { $0.unisons.isSuperset(of: nTyper.unisons) }) {
                         typers.append(nTyper)
@@ -1652,7 +1671,15 @@ extension Chord: CustomStringConvertible {
 
 struct ScoreOption {
     var beatRange = Music.defaultBeatRange
-    var keyBeats: [Rational] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    var keyBeats: [Rational] = [0 + Rational(1, 2),
+                                1, 1 + Rational(1, 2), 2, 2 + Rational(1, 2),
+                                3, 3 + Rational(1, 2), 4, 4 + Rational(1, 2),
+                                5, 5 + Rational(1, 2), 6, 6 + Rational(1, 2),
+                                7, 7 + Rational(1, 2), 8, 8 + Rational(1, 2),
+                                9, 9 + Rational(1, 2), 10, 10 + Rational(1, 2),
+                                11, 11 + Rational(1, 2), 12, 12 + Rational(1, 2),
+                                13, 13 + Rational(1, 2), 14, 14 + Rational(1, 2),
+                                15, 15 + Rational(1, 2)]
     var tempo = Music.defaultTempo
     var timelineY = Sheet.timelineY
     var enabled = false
@@ -1696,7 +1723,15 @@ struct Score: BeatRangeType {
     var beatRange = Music.defaultBeatRange
     var tempo = Music.defaultTempo
     var timelineY = Sheet.timelineY
-    var keyBeats: [Rational] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+    var keyBeats: [Rational] = [0 + Rational(1, 2),
+                                1, 1 + Rational(1, 2), 2, 2 + Rational(1, 2),
+                                3, 3 + Rational(1, 2), 4, 4 + Rational(1, 2),
+                                5, 5 + Rational(1, 2), 6, 6 + Rational(1, 2),
+                                7, 7 + Rational(1, 2), 8, 8 + Rational(1, 2),
+                                9, 9 + Rational(1, 2), 10, 10 + Rational(1, 2),
+                                11, 11 + Rational(1, 2), 12, 12 + Rational(1, 2),
+                                13, 13 + Rational(1, 2), 14, 14 + Rational(1, 2),
+                                15, 15 + Rational(1, 2)]
     var enabled = false
     var isShownSpectrogram = false
     var id = UUID()

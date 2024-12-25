@@ -634,7 +634,6 @@ extension Rendnote {
             } else {
                 let spectlope = pitbend.firstSpectlope
                 let sinCount = Int((min(spectlope.maxFq, cutFq) / firstFq).clipped(min: 1, max: Double(Int.max)))
-                let pitch = rootPitch + pitbend.firstPitch
                 
                 var sign = true, prePitch = 0.0, mainSpectrum = [Double](capacity: sinCount)
                 let spectrum = (1 ... sinCount).map { n in
