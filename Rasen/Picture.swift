@@ -294,7 +294,7 @@ extension Picture {
         }
         
         struct LinePoint: Rectable {
-            var p: Point, d: Double, lenfth: Double,
+            var p: Point, d: Double, length: Double,
                 vector: Point, i: Int, fol: FirstOrLast, bounds: Rect
         }
         
@@ -304,9 +304,9 @@ extension Picture {
         for (li, line) in lines.enumerated() {
             let fp = line.firstPoint, lp = line.lastPoint, d = line.size / 2
             let length = line.length()
-            lps.append(.init(p: fp, d: d, lenfth: length, vector: -line.firstVector,
+            lps.append(.init(p: fp, d: d, length: length, vector: -line.firstVector,
                              i: li, fol: .first, bounds: .init(fp, distance: scd * d)))
-            lps.append(.init(p: lp, d: d, lenfth: length, vector: line.lastVector,
+            lps.append(.init(p: lp, d: d, length: length, vector: line.lastVector,
                              i: li, fol: .last, bounds: .init(lp, distance: scd * d)))
         }
         let lpSearchTree = RectSearchTree(lps)!
@@ -315,8 +315,8 @@ extension Picture {
             let minDSq = (lp0.d / 2).squared
             let maxD = cd * lp0.d
             let maxDSq = maxD * maxD
-            let lengthScale = lps[lp0.i].lenfth.clipped(min: lp0.d * 4, max: lp0.d * 8,
-                                                        newMin: 0.5, newMax: 1)
+            let lengthScale = lp0.length.clipped(min: lp0.d * 4, max: lp0.d * 8,
+                                                 newMin: 0.5, newMax: 1)
             
             lpSearchTree.intersects(from: lp0.bounds) { lp1i in
                 let lp1 = lps[lp1i]
