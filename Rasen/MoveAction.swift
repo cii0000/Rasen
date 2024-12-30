@@ -423,6 +423,12 @@ final class MoveScoreAction: DragEventAction {
                     beganSP = sp
                     beganNote = note
                     
+                    let selectedNoteIs = if rootView.isSelect(at: p) {
+                        sheetView.noteAndPitAndSprolIs(from: rootView.selections).map { $0.key }
+                    } else {
+                        [noteI]
+                    }
+                    
                     switch result {
                     case .pit(let pitI):
                         type = .pit
@@ -441,7 +447,7 @@ final class MoveScoreAction: DragEventAction {
                         var noteAndPitIs: [Int: [Int]]
                         if rootView.isSelect(at: p) {
                             noteAndPitIs = sheetView.noteAndPitIndexes(from: rootView.selections,
-                                                                       enabledAll: false)
+                                                                       enabledAllPits: false)
                             if noteAndPitIs[noteI] != nil {
                                 if !noteAndPitIs[noteI]!.contains(pitI) {
                                     noteAndPitIs[noteI]?.append(pitI)
@@ -460,8 +466,8 @@ final class MoveScoreAction: DragEventAction {
                             nv[nap.key] = (score.notes[nap.key], pit, pitDic)
                         }
                         
-                        let vs = score.noteIAndNormarizedPits(atBeat: pit.beat + note.beatRange.start,
-                                                              in: Set(beganNotePits.keys).sorted())
+                        let noteIs = Set(beganNotePits.keys).intersection(selectedNoteIs).sorted()
+                        let vs = score.noteIAndNormarizedPits(atBeat: beganBeat, in: noteIs)
                         playerBeatNoteIndexes = vs.map { $0.noteI }
                         
                         updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
@@ -542,7 +548,7 @@ final class MoveScoreAction: DragEventAction {
                         var noteAndPitIs: [Int: [Int]]
                         if rootView.isSelect(at: p) {
                             noteAndPitIs = sheetView.noteAndPitIndexes(from: rootView.selections,
-                                                                       enabledAll: false)
+                                                                       enabledAllPits: false)
                             if noteAndPitIs[noteI] != nil {
                                 if !noteAndPitIs[noteI]!.contains(pitI) {
                                     noteAndPitIs[noteI]?.append(pitI)
@@ -566,6 +572,7 @@ final class MoveScoreAction: DragEventAction {
                         beganTone = score.notes[noteI].pits[pitI].tone
                         self.sprolI = sprolI
                         self.beganSpectlopeY = spectlopeY
+                        beganBeat = note.pits[pitI].beat + note.beatRange.start
                         self.beganSprol = beganTone.spectlope.sprols[sprolI]
 //                        self.beganSprol = scoreView.nearestSprol(at: scoreP, at: noteI)
                         self.beganSprolPitch = scoreView.spectlopePitch(at: scoreP, at: noteI, y: spectlopeY)
@@ -606,9 +613,8 @@ final class MoveScoreAction: DragEventAction {
                         
                         updatePitsWithSelection()
                         
-                        let noteIsSet = Set(beganNoteSprols.values.flatMap { $0.dic.keys }).sorted()
-                        let vs = score.noteIAndNormarizedPits(atBeat: note.pits[pitI].beat + note.beatRange.start,
-                                                              in: noteIsSet)
+                        let noteIs = Set(beganNoteSprols.values.flatMap { $0.dic.keys }).intersection(selectedNoteIs).sorted()
+                        let vs = score.noteIAndNormarizedPits(atBeat: beganBeat, in: noteIs)
                         playerBeatNoteIndexes = vs.map { $0.noteI }
                         
                         updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
@@ -659,8 +665,8 @@ final class MoveScoreAction: DragEventAction {
                         case .endNoteBeat: note.beatRange.end
                         default: scoreView.beat(atX: scoreP.x)
                         }
-                        let vs = score.noteIAndNormarizedPits(atBeat: playerBeat,
-                                                              in: Set(beganNotes.keys).sorted())
+                        let noteIs = Set(beganNotes.keys).intersection(selectedNoteIs).sorted()
+                        let vs = score.noteIAndNormarizedPits(atBeat: playerBeat, in: noteIs)
                         playerBeatNoteIndexes = vs.map { $0.noteI }
                         
                         updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)

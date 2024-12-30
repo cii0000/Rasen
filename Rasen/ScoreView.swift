@@ -224,8 +224,9 @@ final class ScoreView: TimelineView, @unchecked Sendable {
         
         node = Node(children: [spectlopesNode, timelineBorderNode, timelineFullEditBorderNode,
                                octaveNode,
-                               timelineSubBorderNode, chordNode,
+                               timelineSubBorderNode,
                                timelineBackgroundNode,
+                               chordNode,
                                timelineContentNode,
                                draftNotesNode, reverbsNode, notesNode, pitsNode, tonesNode,
                                timeNode, clippingNode])
@@ -292,9 +293,7 @@ extension ScoreView {
     }
     func updateChord() {
         if model.enabled {
-            let (pl0, pl1) = chordPathlines()
-            chordNode.children = [.init(path: .init(pl0), fillType: .color(.subBorder)),
-                                  .init(path: .init(pl1), fillType: .color(.background))]
+            chordNode.children = chordNodes()
         } else {
             chordNode.children = []
         }
@@ -585,6 +584,8 @@ extension ScoreView {
             cPitch += deltaPitch
         }
         
+        let psy = self.y(fromPitch: pitchRange.start), pey = self.y(fromPitch: pitchRange.end)
+        
         for keyBeat in score.keyBeats {
             guard score.beatRange.contains(keyBeat) else { continue }
             let nx = x(atBeat: keyBeat)
@@ -594,9 +595,13 @@ extension ScoreView {
             contentPathlines.append(.init(Rect(x: nx - knobW / 2, y: y - knobH / 2,
                                                width: knobW, height: knobH)))
             
+            let plw = 1.0
+            subBorderPathlines.append(.init(Rect(x: nx - plw / 2, y: psy, width: plw, height: pey - psy)))
+            
             let blw = 0.25
             if !keyBeat.isInteger {
-                backgroundPathlines.append(.init(Rect(x: x(atBeat: keyBeat) - blw / 2, y: sy, width: blw, height: ey - sy)))
+                backgroundPathlines.append(.init(Rect(x: nx - blw / 2, y: sy, width: blw, height: ey - sy)))
+                backgroundPathlines.append(.init(Rect(x: nx - blw / 2, y: psy, width: blw, height: pey - psy)))
             }
         }
         contentPathlines.append(.init(Rect(x: ex - knobW / 2, y: y - knobH / 2,
@@ -653,14 +658,25 @@ extension ScoreView {
     func chordEdges() -> [(edge: Edge, typers: [Chord.ChordTyper])] {
         let score = model
         let pitchRange = Score.pitchRange
-        let chordBeats = score.keyBeats
-        guard !chordBeats.isEmpty, let range = Range<Int>(pitchRange) else { return [] }
+        guard let intPitchRange = Range<Int>(pitchRange) else { return [] }
         
-        let nChordBeats = chordBeats.filter { $0 < score.beatRange.end }.sorted()
-        var preBeat: Rational = 0
-        var chordRanges = nChordBeats.count.array.map {
-            let v = preBeat ..< nChordBeats[$0]
-            preBeat = nChordBeats[$0]
+        let chordBeats = score.notes.reduce(into: Set<Rational>()) {
+            let vs = $1.chordBeatRangeAndRoundedPitchs()
+            for v in vs {
+                if score.beatRange.contains(v.beatRange.start) {
+                    $0.insert(v.beatRange.start)
+                }
+                if score.beatRange.contains(v.beatRange.end) {
+                    $0.insert(v.beatRange.end)
+                }
+            }
+        }.sorted()
+        guard !chordBeats.isEmpty else { return [] }
+        
+        var preBeat = score.beatRange.start
+        var chordRanges = chordBeats.count.array.map {
+            let v = preBeat ..< chordBeats[$0]
+            preBeat = chordBeats[$0]
             return v
         }
         chordRanges.append(preBeat ..< score.beatRange.end)
@@ -670,13 +686,12 @@ extension ScoreView {
         for (tr, pitchs) in trs {
             let pitchs = pitchs.sorted()
             guard let chord = Chord(pitchs: pitchs) else { continue }
+            let typers = chord.typers.sorted(by: { $0.type.rawValue > $1.type.rawValue })
             
             let nsx = x(atBeat: tr.start + score.beatRange.start),
                 nex = x(atBeat: tr.end + score.beatRange.start)
-            let maxTyperCount = min(chord.typers.count, Int((nex - nsx) / 5))
-            let typers = chord.typers.sorted(by: { $0.type.rawValue > $1.type.rawValue })[..<maxTyperCount]
             let unisonsSet = typers.reduce(into: Set<Int>()) { $0.formUnion($1.unisons) }
-            for pitch in range {
+            for pitch in intPitchRange {
                 let pitchUnison = pitch.mod(12)
                 guard unisonsSet.contains(pitchUnison) else { continue }
                 let py = self.y(fromPitch: Rational(pitch))
@@ -687,14 +702,40 @@ extension ScoreView {
         return chordEdges
     }
     
-    func chordPathlines() -> (subBorderPathlines: [Pathline], backgroundPathlines: [Pathline]) {
+    func chordNodes() -> [Node] {
         let score = model
         let pitchRange = Score.pitchRange
+        guard let intPitchRange = Range<Int>(pitchRange) else { return [] }
         
-        var subBorderPathlines = [Pathline](), backgroundPathlines = [Pathline]()
+        var colorPathlineDic0 = [Color: [Pathline]](),
+            colorPathlineDic1 = [Color: [Pathline]]()
+        func append0(_ pathline: Pathline, color: Color) {
+            if colorPathlineDic0[color] != nil {
+                colorPathlineDic0[color]?.append(pathline)
+            } else {
+                colorPathlineDic0[color] = [pathline]
+            }
+        }
+        func append1(_ pathline: Pathline, color: Color) {
+            if colorPathlineDic1[color] != nil {
+                colorPathlineDic1[color]?.append(pathline)
+            } else {
+                colorPathlineDic1[color] = [pathline]
+            }
+        }
         
-        let chordBeats = score.keyBeats.filter { score.beatRange.contains($0) }.sorted()
-        guard !chordBeats.isEmpty else { return (subBorderPathlines, backgroundPathlines) }
+        let chordBeats = score.notes.reduce(into: Set<Rational>()) {
+            let vs = $1.chordBeatRangeAndRoundedPitchs()
+            for v in vs {
+                if score.beatRange.contains(v.beatRange.start) {
+                    $0.insert(v.beatRange.start)
+                }
+                if score.beatRange.contains(v.beatRange.end) {
+                    $0.insert(v.beatRange.end)
+                }
+            }
+        }.sorted()
+        guard !chordBeats.isEmpty else { return [] }
         
         var preBeat = score.beatRange.start
         var chordRanges = chordBeats.count.array.map {
@@ -704,105 +745,79 @@ extension ScoreView {
         }
         chordRanges.append(preBeat ..< score.beatRange.end)
         
-        let sy = self.y(fromPitch: pitchRange.start), ey = self.y(fromPitch: pitchRange.end)
-        let plw = 1.0
-        subBorderPathlines += chordBeats.map {
-            Pathline(Rect(x: x(atBeat: $0) - plw / 2, y: sy, width: plw, height: ey - sy))
-        }
-        let blw = 0.25
-        backgroundPathlines += chordBeats.compactMap {
-            !$0.isInteger ?
-            Pathline(Rect(x: x(atBeat: $0) - blw / 2, y: sy, width: blw, height: ey - sy)) :
-            nil
-        }
-        
         let trs = chordRanges.map { ($0, score.chordPitches(atBeat: $0)) }
         for (chordBeatRange, pitchs) in trs {
             let pitchs = pitchs.sorted()
             guard let chord = Chord(pitchs: pitchs) else { continue }
             let typers = chord.typers.sorted(by: { $0.type.rawValue > $1.type.rawValue })
-            
-            let midBeat = chordBeatRange.start.mid(chordBeatRange.end)
-            let chordSX = x(atBeat: chordBeatRange.start),
-                chordEX = x(atBeat: chordBeatRange.end)
+            let unisonsSet = typers.reduce(into: Set<Int>()) { $0.formUnion($1.unisons) }
+            let pitchAndTypers: [(Int, [Chord.ChordTyper])] = intPitchRange.compactMap { pitch in
+                let pitchUnison = pitch.mod(12)
+                guard unisonsSet.contains(pitchUnison) else { return nil }
+                let nTypers = typers.filter { $0.unisons.contains(pitchUnison) }
+                return (pitch, nTypers)
+            }
+            let maxTypersCount = pitchAndTypers.maxValue { $0.1.count } ?? 0
+            guard maxTypersCount > 0 else { continue }
+            let chordSX = x(atBeat: chordBeatRange.start)
+            let chordEX = x(atBeat: chordBeatRange.end)
             let chordW = chordEX - chordSX
             let chordCenterX = chordSX.mid(chordEX)
-            let oMaxW = 5.0, padding = 2.0
-            let oNw = oMaxW * Double(chord.typers.count - 1) + padding * 2
+            let oMaxW = 1.0, padding = 1.0
+            let oNw = oMaxW * Double(maxTypersCount - 1) + padding * 2
             let cw = max(0, chordW)
-            let lwScale = chord.typers.count == 1 ? 1 : (oNw < cw ? 1 : cw / (Double(chord.typers.count - 1) * oMaxW + padding * 2))
-            let centerD = chord.typers.count == 1 && midBeat.isInteger ? 0.125 : 0.0
-            let tlw0 = 0.5 * lwScale + centerD
-            let tlw1 = 1 * lwScale + centerD
+            let lwScale = maxTypersCount == 1 ?
+            1 : (oNw < cw ? 1 : cw / (Double(maxTypersCount - 1) * oMaxW + padding * 2))
             let maxW = oMaxW * lwScale
-            let nw = maxW * Double(chord.typers.count - 1)
+            let nw = maxW * Double(maxTypersCount - 1)
+            let hd = Sheet.pitchHeight
             
-            guard let pitchRange = Range<Int>(pitchRange) else { continue }
-            let plh = 1.0
-            let unisonsSet = typers.reduce(into: Set<Int>()) { $0.formUnion($1.unisons) }
-            for pitch in pitchRange {
-                let pitchUnison = pitch.mod(12)
-                guard unisonsSet.contains(pitchUnison) else { continue }
+            let plh = 0.5
+            for (pitch, nTypers) in pitchAndTypers {
                 let py = self.y(fromPitch: Rational(pitch))
-                subBorderPathlines.append(.init(Rect(x: chordSX, y: py - plh / 2,
-                                                     width: chordEX - chordSX, height: plh)))
-                
-                for (ti, typer) in typers.enumerated() {
-                    guard typer.unisons.contains(pitchUnison) else { continue }
-                    let isInversion = typer.type == .augmented ?
-                    false : typer.mainUnison == pitchUnison
-                    
-                    let hd = typer.type == .wholeTone || typer.type == .semitone ?
-                    1.0 :
-                    (typer.type.inversionCount == 2 ? 2.5 : 1.5)
-                    let fx = chordCenterX - nw / 2 + maxW * Double(ti)
-                    func append(count: Int, lineWidth lw: Double, paddingWidth pw: Double) {
-                        let allLw = lw * Double(count) + pw * Double(count - 1)
-                        var ndx = 0.0
-                        for i in 0 ..< count * 2 {
-                            let nlw = i % 2 == 0 ? lw : pw
-                            let pathline = Pathline(Rect(x: fx - allLw / 2 + ndx, y: py - hd,
-                                                         width: nlw, height: hd * 2))
-                            if i % 2 == 0 {
-                                subBorderPathlines.append(pathline)
-                            } else if i < count * 2 - 1 {
-                                backgroundPathlines.append(pathline)
-                            }
-                            ndx += nlw
-                        }
-                        if count >= 2 {
-                            subBorderPathlines.append(.init(Rect(x: fx - allLw / 2, y: py - hd - tlw0,
-                                                                 width: allLw, height: tlw0)))
-                            subBorderPathlines.append(.init(Rect(x: fx - allLw / 2, y: py + hd,
-                                                                 width: allLw, height: tlw0)))
-                        }
+                let colors: [Color] = nTypers.map {
+                    switch $0.type {
+                    case .octave: .init(red: 0.85, green: 0.85, blue: 0.85)
+                    case .power: .init(red: 0.88, green: 0.88, blue: 0.75)
                         
-                        if isInversion {
-                            let ilw = 0.5 * lwScale
-                            subBorderPathlines.append(.init(Rect(x: fx - allLw / 2 - ilw, y: py - hd - ilw,
-                                                                 width: allLw + 2 * ilw, height: ilw)))
-                            subBorderPathlines.append(.init(Rect(x: fx - allLw / 2 - ilw, y: py + hd,
-                                                                 width: allLw + 2 * ilw, height: ilw)))
-                        }
+                    case .major: .init(red: 0.9, green: 0.8, blue: 0)
+                    case .major3: .init(red: 0.9, green: 0.8, blue: 0).with(lightness: 93)
+                        
+                    case .suspended: .init(red: 0.25, green: 0.9, blue: 0)
+                        
+                    case .minor: .init(red: 0.0, green: 0.8, blue: 0.95)
+                    case .minor3: .init(red: 0.0, green: 0.8, blue: 0.95).with(lightness: 90)
+                        
+                    case .augmented: .init(red: 0.75, green: 0.5, blue: 1.0)
+                        
+                    case .flatfive: .init(red: 1.0, green: 0.5, blue: 1.0)
+                        
+                    case .wholeTone: .init(red: 0.25, green: 0.9, blue: 0).with(lightness: 93)
+                    case .semitone: .init(red: 1.0, green: 0.75, blue: 0.5)
+                        
+                    case .diminish: .init(red: 1.0, green: 0.5, blue: 0.5)
+                    case .tritone: .init(red: 1.0, green: 0.5, blue: 0.5).with(lightness: 90)
                     }
-                    
-                    switch typer.type {
-                    case .octave: append(count: 1, lineWidth: tlw1 * 2, paddingWidth: 0)
-                    case .power: append(count: 2, lineWidth: tlw1, paddingWidth: tlw1)
-                    case .major, .major3: append(count: 1, lineWidth: tlw1, paddingWidth: tlw1)
-                    case .suspended: append(count: 3, lineWidth: tlw1, paddingWidth: tlw1)
-                    case .minor, .minor3: append(count: 1, lineWidth: tlw0, paddingWidth: tlw0)
-                    case .augmented: append(count: 2, lineWidth: tlw0, paddingWidth: tlw0)
-                    case .flatfive: append(count: 3, lineWidth: tlw0, paddingWidth: tlw0)
-                    case .wholeTone: append(count: 2, lineWidth: tlw1, paddingWidth: tlw0 / 2)
-                    case .semitone: append(count: 2, lineWidth: tlw0, paddingWidth: tlw0 / 2)
-                    case .diminish, .tritone: append(count: 4, lineWidth: tlw0, paddingWidth: tlw0)
-                    }
+                }
+                
+                for (ti, color) in colors.enumerated() {
+                    let fx = chordCenterX - nw / 2 + maxW * Double(ti)
+                    append0(.init(Rect(x: fx - plh * lwScale / 2, y: py - hd / 2,
+                                      width: plh * lwScale, height: hd)), color: color)
+                }
+                for (ti, color) in colors.enumerated() {
+                    let h = plh / Double(nTypers.count)
+                    append1(.init(Rect(x: chordSX, y: py - plh / 2 + h * Double(ti),
+                                      width: chordW, height: h)), color: color)
                 }
             }
         }
         
-        return (subBorderPathlines, backgroundPathlines)
+        return colorPathlineDic0.map { (color, pathlines) in
+            .init(path: .init(pathlines), fillType: .color(color))
+        } + colorPathlineDic1.map { (color, pathlines) in
+            .init(path: .init(pathlines), fillType: .color(color))
+        }
     }
     
     func octaveNode(fromPitch pitch: Rational, noteIs: [Int], _ color: Color = .border) -> Node {
@@ -1328,59 +1343,6 @@ extension ScoreView {
             spectlopeTonePanelNodes += curveSpectlopeNodes()
             tonePanelKnobPRCs = sprolKnobPAndRs
             
-            func spectlopeNodes(isBack: Bool) -> [Node] {
-                var nBeat = note.beatRange.start, vs = [[PAndColor]]()
-                var lastV: [PAndColor]?, isLastAppned = false
-                while nBeat <= note.beatRange.end {
-                    let x = self.x(atBeat: nBeat)
-                    let sprols = pitbend.spectlope(atSec: Double(model.sec(fromBeat: nBeat - note.beatRange.start))).sprols
-                    let psPitch = pitch(atBeat: nBeat, from: note)
-                    let noteY = y(fromPitch: psPitch)
-                    let v = pAndColors(x: x, pitch: psPitch, minY: noteY + Sheet.tonePadding,
-                                       sprols: sprols, isBack: isBack)
-                    isLastAppned = vs.last != v
-                    if isLastAppned {
-                        if let v = lastV {
-                            vs.append(v)
-                        }
-                        vs.append(v)
-                    }
-                    
-                    lastV = v
-                    nBeat += .init(1, 72)
-                }
-                if nBeat != note.beatRange.end {
-                    let x = self.x(atBeat: note.beatRange.end)
-                    let sprols = pitbend.spectlope(atSec: Double(model.sec(fromBeat: note.beatRange.end - note.beatRange.start))).sprols
-                    let psPitch = pitch(atBeat: note.beatRange.end, from: note)
-                    let noteY = y(fromPitch: psPitch)
-                    let v = pAndColors(x: x, pitch: psPitch, minY: noteY + Sheet.tonePadding,
-                                       sprols: sprols, isBack: isBack)
-                    vs.append(v)
-                }
-                
-                var nodes = [Node]()
-                if !vs.isEmpty && vs[0].count >= 2 {
-                    for yi in 1 ..< vs[0].count {
-                        var ps = [Point](capacity: 2 * vs.count)
-                        var colors = [Color](capacity: 2 * vs.count)
-                        for xi in vs.count.range {
-                            ps.append(vs[xi][yi - 1].p)
-                            ps.append(vs[xi][yi].p)
-                            colors.append(vs[xi][yi - 1].color)
-                            colors.append(vs[xi][yi].color)
-                        }
-                        let tst = TriangleStrip(points: ps)
-                        
-                        nodes.append(.init(path: Path(tst), fillType: .maxGradient(colors)))
-                    }
-                }
-                return nodes
-            }
-            if isFullNoise {
-                backSpectlopeNodes += spectlopeNodes(isBack: true)
-            }
-            
             lastP = .init(ps.last!.point)
         } else {
             let sustainHalfH = halfNH * note.envelope.sustainVolm
@@ -1457,9 +1419,6 @@ extension ScoreView {
                 return nNodes
             }
             spectlopeTonePanelNodes += spectlopeNodes(isBack: false)
-            if isFullNoise {
-                backSpectlopeNodes += spectlopeNodes(isBack: true)
-            }
             
             if !isFullNoise {
                 let fqY = tonePanelPitchY(fromPitch: .init(note.firstPitch), atY: spectlopeY)
@@ -1488,7 +1447,7 @@ extension ScoreView {
         let rps = [earlyReverbP, lateReverbP, durReverbP]
         let reverbBackKnobPathlines = rps.map { Pathline(circleRadius: sprolR * 1.5, position: $0) }
         let reverbKnobPathlines = rps.map { Pathline(circleRadius: sprolR, position: $0) }
-        let reverbNodes: [Node] = [
+        let reverbNodes: [Node] = note.isDefaultTone ? [] : [
             .init(path: .init(Rect(x: lastP.x, y: lastP.y - reverbLineHalfH,
                                    width: durReverbP.x - lastP.x, height: reverbLineHalfH * 2)),
                   fillType: .color(.content)),
@@ -1882,27 +1841,27 @@ extension ScoreView {
                 }
             }
             
+            let noteD = noteH(from: note) / 2
+            let maxPitD = Sheet.knobEditDistance * scale + noteD
             let nfsw = (nex - nsx) / scale
             let dx = nfsw.clipped(min: 3, max: 30, newMin: 1, newMax: 8) * scale
             let nsy = noteY(atBeat: note.beatRange.start, from: note)
             let ney = noteY(atBeat: note.beatRange.end, from: note)
             let ndx = note.pits.count == 1 && nw / 4 < dx ? nw / 4 : dx
             let pdSq = pointline(from: note).minDistanceSquared(at: p)
-            if p.x - nsx < ndx && abs(p.y - nsy) < ndx {
+            if p.x < nsx + ndx && abs(p.y - nsy) < maxD {
                 let dSq = min(pdSq, p.distanceSquared(.init(nsx, nsy)))
-                if dSq < minDSq {
+                if dSq < minDSq && pdSq < maxPitD * maxPitD {
                     minDSq = dSq
                     minResult = (noteI, .startBeat)
                 }
-            } else if p.x - nex > -ndx && abs(p.y - ney) < ndx {
+            } else if p.x > nex - ndx && abs(p.y - ney) < maxD {
                 let dSq = min(pdSq, p.distanceSquared(.init(nex, ney)))
-                if dSq < minDSq {
+                if dSq < minDSq && pdSq < maxPitD * maxPitD {
                     minDSq = dSq
                     minResult = (noteI, .endBeat)
                 }
             } else if !isPit {
-                let noteD = noteH(from: note) / 2
-                let maxPitD = Sheet.knobEditDistance * scale + noteD
                 if pdSq < minDSq && pdSq < maxPitD * maxPitD {
                     minDSq = pdSq
                     minResult = (noteI, .note)
@@ -1910,8 +1869,6 @@ extension ScoreView {
             }
             
             let hnh = pitchHeight / 2
-            let noteD = noteH(from: note) / 2
-            let maxPitD = Sheet.knobEditDistance * scale + noteD
             let maxPitDS = maxPitD * maxPitD
             let nf = noteFrame(at: noteI).outset(by: hnh)
             let ods = nf.distanceSquared(p)
@@ -1929,6 +1886,7 @@ extension ScoreView {
         
         if isFullEdit {
             for (noteI, note) in model.notes.enumerated().reversed() {
+                guard !note.isDefaultTone else { continue }
                 let reverbFrame = reverbFrame(from: note)
                 let dSq = reverbFrame.distanceSquared(p)
                 if dSq < minDSq && dSq < toneMaxDSq {
@@ -2090,6 +2048,7 @@ extension ScoreView {
         if isFullEdit {
             let hnh = pitchHeight / 2
             for (noteI, note) in model.notes.enumerated().reversed() {
+                guard !note.isDefaultTone else { continue }
                 let noteD = noteH(from: note) / 2
                 let maxPitD = Sheet.knobEditDistance * scale + noteD
                 let maxPitDS = maxPitD * maxPitD

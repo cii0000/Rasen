@@ -1131,7 +1131,7 @@ extension Note {
         return minPitch ..< maxPitch
     }
     
-    func chordBeatRangeAndRoundedPitchs(minBeatLength: Rational = .init(1, 8)) -> [(beatRange: Range<Rational>, roundedPitch: Int)] {
+    func chordBeatRangeAndRoundedPitchs(minBeatLength: Rational = 0) -> [(beatRange: Range<Rational>, roundedPitch: Int)] {
         guard !isOneOvertone && !isFullNoise else { return [] }
         if pits.count >= 2 {
             var ns = [(beatRange: Range<Rational>, roundedPitch: Int)]()
@@ -1671,15 +1671,7 @@ extension Chord: CustomStringConvertible {
 
 struct ScoreOption {
     var beatRange = Music.defaultBeatRange
-    var keyBeats: [Rational] = [0 + Rational(1, 2),
-                                1, 1 + Rational(1, 2), 2, 2 + Rational(1, 2),
-                                3, 3 + Rational(1, 2), 4, 4 + Rational(1, 2),
-                                5, 5 + Rational(1, 2), 6, 6 + Rational(1, 2),
-                                7, 7 + Rational(1, 2), 8, 8 + Rational(1, 2),
-                                9, 9 + Rational(1, 2), 10, 10 + Rational(1, 2),
-                                11, 11 + Rational(1, 2), 12, 12 + Rational(1, 2),
-                                13, 13 + Rational(1, 2), 14, 14 + Rational(1, 2),
-                                15, 15 + Rational(1, 2)]
+    var keyBeats = [Rational]()
     var tempo = Music.defaultTempo
     var timelineY = Sheet.timelineY
     var enabled = false
@@ -1723,15 +1715,7 @@ struct Score: BeatRangeType {
     var beatRange = Music.defaultBeatRange
     var tempo = Music.defaultTempo
     var timelineY = Sheet.timelineY
-    var keyBeats: [Rational] = [0 + Rational(1, 2),
-                                1, 1 + Rational(1, 2), 2, 2 + Rational(1, 2),
-                                3, 3 + Rational(1, 2), 4, 4 + Rational(1, 2),
-                                5, 5 + Rational(1, 2), 6, 6 + Rational(1, 2),
-                                7, 7 + Rational(1, 2), 8, 8 + Rational(1, 2),
-                                9, 9 + Rational(1, 2), 10, 10 + Rational(1, 2),
-                                11, 11 + Rational(1, 2), 12, 12 + Rational(1, 2),
-                                13, 13 + Rational(1, 2), 14, 14 + Rational(1, 2),
-                                15, 15 + Rational(1, 2)]
+    var keyBeats = [Rational]()
     var enabled = false
     var isShownSpectrogram = false
     var id = UUID()

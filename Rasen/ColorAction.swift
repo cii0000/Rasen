@@ -455,6 +455,12 @@ final class ColorAction: Action {
                 if let (noteI, result) = scoreView
                     .hitTestColor(scoreP, scale: rootView.screenToWorldScale) {
                     
+                    let selectedNoteIs = if rootView.isSelect(at: p) {
+                        sheetView.noteAndPitAndSprolIs(from: rootView.selections).map { $0.key }
+                    } else {
+                        [noteI]
+                    }
+                    
                     let note = score.notes[noteI]
                     
                     self.scoreResult = result
@@ -523,8 +529,8 @@ final class ColorAction: Action {
                         beganBeat = scoreView.beat(atX: scoreP.x)
                     }
                     
-                    let noteIsSet = Set(beganNotePits.values.flatMap { $0.dic.keys }).sorted()
-                    let vs = score.noteIAndNormarizedPits(atBeat: beganBeat, in: noteIsSet)
+                    let noteIs = Set(beganNotePits.values.flatMap { $0.dic.keys }).intersection(selectedNoteIs).sorted()
+                    let vs = score.noteIAndNormarizedPits(atBeat: beganBeat, in: noteIs)
                     playerBeatNoteIndexes = vs.map { $0.noteI }
                     
                     updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
@@ -908,6 +914,12 @@ final class ColorAction: Action {
                 if let (noteI, result) = scoreView
                     .hitTestColor(scoreP, scale: rootView.screenToWorldScale) {
                     
+                    let selectedNoteIs = if rootView.isSelect(at: p) {
+                        sheetView.noteAndPitAndSprolIs(from: rootView.selections).map { $0.key }
+                    } else {
+                        [noteI]
+                    }
+                    
                     let note = score.notes[noteI]
                     
                     self.scoreResult = result
@@ -968,8 +980,9 @@ final class ColorAction: Action {
                         rootView.node.append(child: panNode)
                     }
                     
-                    let noteIsSet = Set(beganNotePits.values.flatMap { $0.dic.keys }).sorted()
-                    let vs = score.noteIAndNormarizedPits(atBeat: beganBeat, in: noteIsSet)
+                    let noteIs = Set(beganNotePits.values.flatMap { $0.dic.keys }).intersection(selectedNoteIs).sorted()
+                    let vs = score.noteIAndNormarizedPits(atBeat: beganBeat, in: noteIs)
+                    
                     playerBeatNoteIndexes = vs.map { $0.noteI }
                     updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
                 } else if let ci = sheetView.contentIndex(at: sheetP, scale: rootView.screenToWorldScale),

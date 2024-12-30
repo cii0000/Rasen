@@ -145,19 +145,17 @@ struct IIRfilter {
 }
 
 struct Loudness {
-    private static let pitchVolms = [Point(22.5, 1.4),
-                                     Point(27.5, 1.25),
+    private static let pitchVolms = [Point(22.5, 1.45),
+                                     Point(27.5, 1.3),
                                      Point(43.3, 1.1),
                                      Point(71.2, 1),
                                      Point(75.0, 1.05),
-                                     Point(77.0, 1),
-                                     Point(84.0, 0.85),
-                                     Point(91.0, 0.75),
-                                     Point(95.0, 0.65),
-                                     Point(102.0, 0.5),
-                                     Point(109.0, 0.65),
-                                     Point(115.0, 0.85),
-                                     Point(118.0, 0.7)]
+                                     Point(77.0, 0.975),
+                                     Point(91.0, 0.85),
+                                     Point(95.0, 0.75),
+                                     Point(109.0, 0.85),
+                                     Point(115.0, 0.9),
+                                     Point(118.0, 0.85)]
     static func volm40Phon(fromPitch pitch: Double) -> Double {
         var prePitchVolm = pitchVolms.first!
         if pitch < prePitchVolm.x {

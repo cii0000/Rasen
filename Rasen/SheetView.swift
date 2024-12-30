@@ -6061,7 +6061,7 @@ final class SheetView: BindableView, @unchecked Sendable {
             fs.contains(where: { scoreView.intersectsNote($0, at: i) }) ? i : nil
         }
     }
-    func noteAndPitIndexes(from selections: [Selection], enabledAll: Bool = true) -> [Int: [Int]] {
+    func noteAndPitIndexes(from selections: [Selection], enabledAllPits: Bool = true) -> [Int: [Int]] {
         let fs = selections
             .map { $0.rect }
             .map { scoreView.convertFromWorld($0) }
@@ -6073,7 +6073,7 @@ final class SheetView: BindableView, @unchecked Sendable {
             }
             
             if pitIs.isEmpty {
-                if enabledAll && fs.contains(where: { scoreView.intersectsNote($0, at: noteI) }) {
+                if enabledAllPits && fs.contains(where: { scoreView.intersectsNote($0, at: noteI) }) {
                     n[noteI] = note.pits.count.array
                 }
             } else {

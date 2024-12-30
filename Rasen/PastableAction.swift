@@ -672,8 +672,8 @@ final class PastableAction: Action {
             selectingLineNode.path = Path(rects.map { Pathline(sheetView.convertToWorld($0)) })
         } else if rootView.isSelectSelectedNoneCursor(at: p), !rootView.selections.isEmpty {
             if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled,
-               sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
-                                             scale: rootView.screenToWorldScale) != nil {//lassoCopy
+               sheetView.scoreView.contains(sheetView.scoreView.convertFromWorld(p),
+                                            scale: rootView.screenToWorldScale) {//lassoCopy
                 
                 let scoreView = sheetView.scoreView
                 let nis = sheetView.noteIndexes(from: rootView.selections)
@@ -1209,7 +1209,7 @@ final class PastableAction: Action {
             } else {
                 if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled,
                    sheetView.scoreView
-                    .containsNote(sheetView.scoreView.convertFromWorld(p),
+                    .contains(sheetView.scoreView.convertFromWorld(p),
                                scale: rootView.screenToWorldScale) {
                     
                     let scoreView = sheetView.scoreView

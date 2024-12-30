@@ -1164,7 +1164,7 @@ final class FaceAction: Action {
                                     spectlope.sprols[.first].volm = 0
                                     spectlope.sprols[.last].volm = 0
                                 }
-                                let tone = Tone(overtone: .init(evenAmp: .random(in: 0 ..< 1)),
+                                let tone = Tone(overtone: .init(evenAmp: .random(in: 0.5 ..< 1)),
                                                 spectlope: spectlope)
                                 tones[pit.tone.id] = tone
                                 note.pits[pi].tone = tone
