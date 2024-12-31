@@ -1977,6 +1977,14 @@ extension Line {
                                isClosed: isClosed)]),
                     isPolygon: isPolygon)
     }
+    
+    init(_ pointline: Pointline,
+         size: Double = Line.defaultLineWidth,
+         uuColor: UUColor = Line.defaultUUColor) {
+        self.init(controls: pointline.controls.map { .init(point: $0.point,
+                                                           pressure: $0.pressure) },
+                  size: size, uuColor: uuColor)
+    }
 }
 extension Array where Element == Line {
     var bounds: Rect? {

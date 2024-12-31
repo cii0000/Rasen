@@ -745,22 +745,34 @@ extension ScoreView {
         }
         chordRanges.append(preBeat ..< score.beatRange.end)
         
+        struct PitchAndTyper: Hashable {
+            var pitch: Int, typers: [Chord.ChordTyper]
+        }
         let trs = chordRanges.map { ($0, score.chordPitches(atBeat: $0)) }
+        var cbpts = [(beatRange: Range<Rational>, pitchAndTypers: [PitchAndTyper])]()
         for (chordBeatRange, pitchs) in trs {
             let pitchs = pitchs.sorted()
             guard let chord = Chord(pitchs: pitchs) else { continue }
             let typers = chord.typers.sorted(by: { $0.type.rawValue > $1.type.rawValue })
             let unisonsSet = typers.reduce(into: Set<Int>()) { $0.formUnion($1.unisons) }
-            let pitchAndTypers: [(Int, [Chord.ChordTyper])] = intPitchRange.compactMap { pitch in
+            let pitchAndTypers: [PitchAndTyper] = intPitchRange.compactMap { pitch in
                 let pitchUnison = pitch.mod(12)
                 guard unisonsSet.contains(pitchUnison) else { return nil }
                 let nTypers = typers.filter { $0.unisons.contains(pitchUnison) }
-                return (pitch, nTypers)
+                return .init(pitch: pitch, typers: nTypers)
             }
-            let maxTypersCount = pitchAndTypers.maxValue { $0.1.count } ?? 0
+            if cbpts.last?.pitchAndTypers == pitchAndTypers {
+                cbpts[.last].beatRange.end = chordBeatRange.end
+            } else {
+                cbpts.append((chordBeatRange, pitchAndTypers))
+            }
+        }
+        
+        for cbpt in cbpts {
+            let maxTypersCount = cbpt.pitchAndTypers.maxValue { $0.typers.count } ?? 0
             guard maxTypersCount > 0 else { continue }
-            let chordSX = x(atBeat: chordBeatRange.start)
-            let chordEX = x(atBeat: chordBeatRange.end)
+            let chordSX = x(atBeat: cbpt.beatRange.start)
+            let chordEX = x(atBeat: cbpt.beatRange.end)
             let chordW = chordEX - chordSX
             let chordCenterX = chordSX.mid(chordEX)
             let oMaxW = 1.0, padding = 1.0
@@ -773,9 +785,9 @@ extension ScoreView {
             let hd = Sheet.pitchHeight
             
             let plh = 0.5
-            for (pitch, nTypers) in pitchAndTypers {
-                let py = self.y(fromPitch: Rational(pitch))
-                let colors: [Color] = nTypers.map {
+            for pitchAndTyper in cbpt.pitchAndTypers {
+                let py = self.y(fromPitch: Rational(pitchAndTyper.pitch))
+                let colors: [Color] = pitchAndTyper.typers.map {
                     switch $0.type {
                     case .octave: .init(red: 0.85, green: 0.85, blue: 0.85)
                     case .power: .init(red: 0.88, green: 0.88, blue: 0.75)
@@ -806,7 +818,7 @@ extension ScoreView {
                                       width: plh * lwScale, height: hd)), color: color)
                 }
                 for (ti, color) in colors.enumerated() {
-                    let h = plh / Double(nTypers.count)
+                    let h = plh / Double(pitchAndTyper.typers.count)
                     append1(.init(Rect(x: chordSX, y: py - plh / 2 + h * Double(ti),
                                       width: chordW, height: h)), color: color)
                 }
@@ -1099,6 +1111,7 @@ extension ScoreView {
                 return (beat, result, isOneOvertone ? 0 : result.sumTone)
             }
             let maxSumTone = ns.maxValue { $0.sumTone } ?? 0
+            var preBeatY: Double?
             for n in ns {
                 let noteX = x(atBeat: n.beat), noteY = noteY(atBeat: n.beat, from: note)
                 var stereo = n.result.stereo
@@ -1106,12 +1119,20 @@ extension ScoreView {
                     stereo.volm *= maxSumTone == 0 ? 0 : n.sumTone / maxSumTone
                 }
                 lastStereo = stereo
+                if (pitIsDic[n.beat]?.count ?? 0) >= 2, let preBeatY {
+                    ps.append(.init(noteX, preBeatY, halfNH, Self.color(from: stereo)))
+                    mps.append(.init(noteX, preBeatY, mainLineHalfH, .content))
+                    if isEven {
+                        meps.append(.init(noteX, preBeatY, mainEvenLineHalfH, Self.color(fromScale: n.result.tone.overtone.evenAmp)))
+                    }
+                }
                 ps.append(.init(noteX, noteY, halfNH, Self.color(from: stereo)))
                 mps.append(.init(noteX, noteY, mainLineHalfH, .content))
                 if isEven {
                     meps.append(.init(noteX, noteY, mainEvenLineHalfH, Self.color(fromScale: n.result.tone.overtone.evenAmp)))
                 }
                 eps.append(.init(noteX, evenY, overtoneHalfH, Self.color(fromScale: n.result.tone.overtone.evenAmp)))
+                preBeatY = noteY
             }
             
             ps.append(.init(nsx + nw + releaseW, noteY(atBeat: note.beatRange.end, from: note), 0,

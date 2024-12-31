@@ -2019,7 +2019,14 @@ final class PastableAction: Action {
                     notePlayer?.play()
                 }
                 
-                let vs = scoreView.model.noteIAndNormarizedPits(atBeat: beat,
+                let minBV = beganNotes.min(by: { $0.value.beatRange.start < $1.value.beatRange.start })
+                let maxBV = beganNotes.max(by: { $0.value.beatRange.end < $1.value.beatRange.end })
+                let minBeat = (minBV?.value.beatRange.start ?? 0) + beat
+                let maxBeat = (maxBV?.value.beatRange.end ?? 0) + beat
+                let noteI = !beganNotes.contains(where: { 0 >= $0.value.beatRange.start }) ?
+                minBV?.key :
+                (!beganNotes.contains(where: { 0 < $0.value.beatRange.end }) ? maxBV?.key : nil)
+                let vs = scoreView.model.noteIAndNormarizedPits(atBeat: beat.clipped(min: minBeat, max: maxBeat), selectedNoteI: noteI,
                                                                 in: Set(beganNotes.keys).sorted())
                 playerBeatNoteIndexes = vs.map { $0.noteI }
                 

@@ -1152,20 +1152,8 @@ final class FaceAction: Action {
                                 note.pits[pi].tone = tone
                             } else if pit.tone.isDefault {
                                 let pitch = Double(pit.pitch + note.pitch)
-                                var spectlope = Spectlope(sprols: [
-                                    .init(pitch: pitch - 12, volm: .random(in: 0 ..< 1), noise: 0),
-                                    .init(pitch: pitch, volm: .random(in: 0 ..< 1), noise: 0),
-                                    .init(pitch: pitch + 12, volm: .random(in: 0 ..< 1), noise: 0),
-                                    .init(pitch: pitch + 24, volm: .random(in: 0 ..< 1), noise: 0),
-                                    .init(pitch: pitch + 36, volm: .random(in: 0 ..< 0.5), noise: 0),
-                                    .init(pitch: pitch + 48, volm: .random(in: 0 ..< 0.25), noise: 0)
-                                ].filter { Score.doublePitchRange.contains($0.pitch) }).normarized()
-                                if spectlope.sprols.count > 2 {
-                                    spectlope.sprols[.first].volm = 0
-                                    spectlope.sprols[.last].volm = 0
-                                }
                                 let tone = Tone(overtone: .init(evenAmp: .random(in: 0.5 ..< 1)),
-                                                spectlope: spectlope)
+                                                spectlope: .random(pitch: pitch))
                                 tones[pit.tone.id] = tone
                                 note.pits[pi].tone = tone
                             }

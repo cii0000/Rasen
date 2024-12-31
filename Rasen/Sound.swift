@@ -409,12 +409,13 @@ extension Sprol {
 }
 
 struct Spectlope: Hashable, Codable {
-    var sprols = [Sprol(pitch: 12 * 0, volm: 0.25, noise: 0),
+    var sprols = [Sprol(pitch: 12 * 0, volm: 0.1, noise: 0),
+                  Sprol(pitch: 12 * 1, volm: 0.25, noise: 0),
                   Sprol(pitch: 12 * 2, volm: 1, noise: 0),
-                  Sprol(pitch: 12 * 3, volm: 0.5, noise: 0),
-                  Sprol(pitch: 12 * 4, volm: 0.75, noise: 0),
-                  Sprol(pitch: 12 * 7, volm: 0.5, noise: 0),
-                  Sprol(pitch: 12 * 10, volm: 0, noise: 0)]
+                  Sprol(pitch: 12 * 3, volm: 0.25, noise: 0),
+                  Sprol(pitch: 12 * 4, volm: 0.375, noise: 0),
+                  Sprol(pitch: 12 * 7, volm: 0.25, noise: 0),
+                  Sprol(pitch: 12 * 10, volm: 0.125, noise: 0)]
 }
 extension Spectlope: Protobuf {
     init(_ pb: PBSpectlope) throws {
@@ -432,6 +433,27 @@ extension Spectlope {
     }
     init(noisePitchVolms: [Point]) {
         sprols = noisePitchVolms.map { .init(pitch: $0.x, volm: $0.y, noise: 1) }
+    }
+    static func random(pitch: Double) -> Self {
+        var spectlope = Spectlope(sprols: [Sprol(pitch: 12 * 0, volm: .random(in: 0 ..< 0.2), noise: 0),
+                                           Sprol(pitch: 12 * 1, volm: .random(in: 0.15 ..< 0.35), noise: 0),
+                                           Sprol(pitch: 12 * .random(in: 1.5 ..< 2.5), volm: 1, noise: 0),
+                                           Sprol(pitch: 12 * .random(in: 3 ..< 3.5), volm: .random(in: 0.15 ..< 0.35), noise: 0),
+                                           Sprol(pitch: 12 * .random(in: 4 ..< 5), volm: .random(in: 0.35 ..< 0.5), noise: 0),
+                                           Sprol(pitch: 12 * .random(in: 6 ..< 8), volm: .random(in: 0.2 ..< 0.35), noise: 0),
+                                           Sprol(pitch: 12 * 10, volm: .random(in: 0.1 ..< 0.2), noise: 0)])
+        for (i, sprol) in spectlope.sprols.enumerated() {
+            if pitch < sprol.pitch {
+                if i >= 1 {
+                    spectlope.sprols.removeFirst(i - 1)
+                }
+                break
+            }
+        }
+        if spectlope.sprols.count >= 2 {
+            spectlope.sprols[.first].volm = 0
+        }
+        return spectlope.normarized()
     }
 }
 extension Spectlope {
@@ -1786,6 +1808,26 @@ extension Score {
         return pitchLengths.filter { $0.value.sum { $0.length } >= length }.keys.sorted()
     }
     
+    func scaleBeatLengths(from noteIs: [Int]) -> [Int: Rational] {
+        var ranges = [Int: [Range<Rational>]]()
+        noteIs.forEach {
+            for rangeAndPitchs in notes[$0].chordBeatRangeAndRoundedPitchs() {
+                let pitch = rangeAndPitchs.roundedPitch.mod(12)
+                if ranges[pitch] != nil {
+                    ranges[pitch]?.append(rangeAndPitchs.beatRange)
+                } else {
+                    ranges[pitch] = [rangeAndPitchs.beatRange]
+                }
+            }
+        }
+        
+        return ranges.reduce(into: .init()) {
+            var pitchLengths = [Range<Rational>]()
+            $1.value.forEach { Range.union($0, in: &pitchLengths) }
+            $0[$1.key] = pitchLengths.sum { $0.length }
+        }
+    }
+    
     func noteIAndPits(atBeat beat: Rational,
                       in noteIs: [Int]) -> [(noteI: Int, pitResult: Note.PitResult)] {
         noteIs.compactMap { noteI in
@@ -1797,15 +1839,39 @@ extension Score {
             }
         }
     }
-    func noteIAndNormarizedPits(atBeat beat: Rational,
-                      in noteIs: [Int]) -> [(noteI: Int, pitResult: Note.PitResult)] {
-        noteIs.compactMap { noteI in
-            let note = notes[noteI]
-            return if note.beatRange.contains(beat) || note.beatRange.end == beat {
-                (noteI, note.normarizedPitResult(atBeat: Double(beat - note.beatRange.start)))
+    func noteIAndNormarizedPits(atBeat beat: Rational, selectedNoteI: Int?,
+                                in noteIs: [Int]) -> [(noteI: Int, pitResult: Note.PitResult)] {
+        let firstOrlast: FirstOrLast?
+        if let selectedNoteI {
+            let note = notes[selectedNoteI]
+            if note.beatRange.start == beat {
+                firstOrlast = .first
+            } else if note.beatRange.end == beat {
+                firstOrlast = .last
             } else {
-                nil
+                firstOrlast = nil
             }
+        } else {
+            firstOrlast = nil
+        }
+        
+        return noteIs.compactMap { noteI in
+            let note = notes[noteI]
+            if noteI == selectedNoteI {
+                if note.beatRange.contains(beat) || note.beatRange.end == beat {
+                    return (noteI, note.normarizedPitResult(atBeat: Double(beat - note.beatRange.start)))
+                }
+            } else if firstOrlast == nil {
+                if note.beatRange.contains(beat) {
+                    return (noteI, note.normarizedPitResult(atBeat: Double(beat - note.beatRange.start)))
+                }
+            } else {
+                if (beat > note.beatRange.start && beat < note.beatRange.end)
+                    || (firstOrlast == .first ? note.beatRange.start == beat : note.beatRange.end == beat) {
+                    return (noteI, note.normarizedPitResult(atBeat: Double(beat - note.beatRange.start)))
+                }
+            }
+            return nil
         }
     }
 }

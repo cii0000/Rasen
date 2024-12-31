@@ -316,7 +316,7 @@ final class ColorAction: Action {
     private var beganEnvelope = Envelope(), beganNotes = [Int: Note]()
     private var beganNotePits = [UUID: (nid: UUID, dic: [Int: (note: Note, pits: [Int: (pit: Pit, sprolIs: Set<Int>)])])]()
     private var beganContents = [Int: Content]()
-    private var beganSP = Point(), beganVolm = 0.0
+    private var beganSP = Point(), beganVolm = 0.0, preEventTime = 0.0
     private var notePlayer: NotePlayer?, playerBeatNoteIndexes = [Int](), beganBeat = Rational(0)
     
     func changeVolm(with event: DragEvent) {
@@ -335,6 +335,7 @@ final class ColorAction: Action {
             }
             
             beganSP = sp
+            preEventTime = event.time
             let p = rootView.convertScreenToWorld(sp)
             if let sheetView = rootView.sheetView(at: p) {
                 self.sheetView = sheetView
@@ -530,7 +531,8 @@ final class ColorAction: Action {
                     }
                     
                     let noteIs = Set(beganNotePits.values.flatMap { $0.dic.keys }).intersection(selectedNoteIs).sorted()
-                    let vs = score.noteIAndNormarizedPits(atBeat: beganBeat, in: noteIs)
+                    let vs = score.noteIAndNormarizedPits(atBeat: beganBeat,
+                                                          selectedNoteI: noteI, in: noteIs)
                     playerBeatNoteIndexes = vs.map { $0.noteI }
                     
                     updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
@@ -556,7 +558,8 @@ final class ColorAction: Action {
                 isEditingLightness = true
             }
         case .changed:
-            guard let sheetView else { return }
+            guard let sheetView, event.time - preEventTime >= 1 / 60 else { return }
+            preEventTime = event.time
             
             let wp = rootView.convertScreenToWorld(event.screenPoint)
             let p = lightnessNode.convertFromWorld(wp)
@@ -800,6 +803,7 @@ final class ColorAction: Action {
             beganSP = sp
             let p = rootView.convertScreenToWorld(sp)
             beganWorldP = p
+            preEventTime = event.time
             if let sheetView = rootView.sheetView(at: p) {
                 self.sheetView = sheetView
                 
@@ -981,7 +985,7 @@ final class ColorAction: Action {
                     }
                     
                     let noteIs = Set(beganNotePits.values.flatMap { $0.dic.keys }).intersection(selectedNoteIs).sorted()
-                    let vs = score.noteIAndNormarizedPits(atBeat: beganBeat, in: noteIs)
+                    let vs = score.noteIAndNormarizedPits(atBeat: beganBeat, selectedNoteI: noteI, in: noteIs)
                     
                     playerBeatNoteIndexes = vs.map { $0.noteI }
                     updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
@@ -1019,7 +1023,8 @@ final class ColorAction: Action {
                 }
             }
         case .changed:
-            guard let sheetView else { return }
+            guard let sheetView, event.time - preEventTime >= 1 / 60 else { return }
+            preEventTime = event.time
             
             if scoreResult?.isSprol ?? false {
                 let noise = (beganNoise + (sp.x - rootView.convertWorldToScreen(beganWorldP).x) / panWidth).clipped(min: 0, max: 1)
@@ -1185,6 +1190,7 @@ final class ColorAction: Action {
             }
             
             beganSP = sp
+            preEventTime = event.time
             let p = rootView.convertScreenToWorld(sp)
             if let sheetView = rootView.sheetView(at: p) {
                 self.sheetView = sheetView
@@ -1314,7 +1320,7 @@ final class ColorAction: Action {
                     }
                     
                     let noteIsSet = Set(beganNotePits.values.flatMap { $0.dic.keys }).sorted()
-                    let vs = score.noteIAndNormarizedPits(atBeat: beganBeat, in: noteIsSet)
+                    let vs = score.noteIAndNormarizedPits(atBeat: beganBeat, selectedNoteI: noteI, in: noteIsSet)
                     playerBeatNoteIndexes = vs.map { $0.noteI }
                     
                     updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
@@ -1333,7 +1339,8 @@ final class ColorAction: Action {
                 isEditingLightness = true
             }
         case .changed:
-            guard let sheetView else { return }
+            guard let sheetView, event.time - preEventTime >= 1 / 60 else { return }
+            preEventTime = event.time
             
             let wp = rootView.convertScreenToWorld(event.screenPoint)
             let p = lightnessNode.convertFromWorld(wp)
