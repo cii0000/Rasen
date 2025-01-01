@@ -749,7 +749,8 @@ extension ScoreView {
             var pitch: Int, typers: [Chord.ChordTyper]
         }
         let trs = chordRanges.map { ($0, score.chordPitches(atBeat: $0)) }
-        var cbpts = [(beatRange: Range<Rational>, pitchAndTypers: [PitchAndTyper])]()
+        var cbpts = [(beatRange: Range<Rational>, typers: [Chord.ChordTyper],
+                      pitchAndTypers: [PitchAndTyper])]()
         for (chordBeatRange, pitchs) in trs {
             let pitchs = pitchs.sorted()
             guard let chord = Chord(pitchs: pitchs) else { continue }
@@ -764,12 +765,12 @@ extension ScoreView {
             if cbpts.last?.pitchAndTypers == pitchAndTypers {
                 cbpts[.last].beatRange.end = chordBeatRange.end
             } else {
-                cbpts.append((chordBeatRange, pitchAndTypers))
+                cbpts.append((chordBeatRange, typers, pitchAndTypers))
             }
         }
         
         for cbpt in cbpts {
-            let maxTypersCount = cbpt.pitchAndTypers.maxValue { $0.typers.count } ?? 0
+            let maxTypersCount = cbpt.typers.count
             guard maxTypersCount > 0 else { continue }
             let chordSX = x(atBeat: cbpt.beatRange.start)
             let chordEX = x(atBeat: cbpt.beatRange.end)
@@ -813,7 +814,8 @@ extension ScoreView {
                 }
                 
                 for (ti, color) in colors.enumerated() {
-                    let fx = chordCenterX - nw / 2 + maxW * Double(ti)
+                    let nti = cbpt.typers.firstIndex(of: pitchAndTyper.typers[ti])!
+                    let fx = chordCenterX - nw / 2 + maxW * Double(nti)
                     append0(.init(Rect(x: fx - plh * lwScale / 2, y: py - hd / 2,
                                       width: plh * lwScale, height: hd)), color: color)
                 }

@@ -63,7 +63,19 @@ extension LyricsUnison.Step {
         }
     }
 }
+extension LyricsUnison.Accidental {
+    var name: String {
+        switch self {
+        case .none: ""
+        case .flat: "♭"
+        case .sharp: "#"
+        }
+    }
+}
 extension LyricsUnison {
+    var name: String {
+        step.name + accidental.name
+    }
     var unison: Int {
         (Int(step.rawValue) + Int(accidental.rawValue)).mod(12)
     }
@@ -156,17 +168,9 @@ extension MusicScaleType {
         }
         return n
     } ()
-    init?(pitchs: [Int]) {
-        guard pitchs.count >= 3 else { return nil }
-        
-        for i in 0 ..< pitchs.count {
-            let pitchIs = Set(pitchs.map { ($0 - pitchs[i]).mod(12) })
-            if let n = Self.selfDic[pitchIs] {
-                self = n
-                return
-            }
-        }
-        return nil
+    init?(unisons: Set<Int>) {
+        guard unisons.count >= 3, let n = Self.selfDic[unisons] else { return nil }
+        self = n
     }
     
     var unisons: [Int] {
@@ -202,6 +206,28 @@ extension MusicScaleType {
         case .minor, .hexaMinor, .pentaMinor: true
         default: false
         }
+    }
+}
+struct MusicScale {
+    var type: MusicScaleType
+    var unison: Int
+}
+extension MusicScale {
+    init?(pitchs: [Int]) {
+        guard pitchs.count >= 3 else { return nil }
+        let pitchs = Set(pitchs).sorted()
+        for i in 0 ..< pitchs.count {
+            let unisons = Set(pitchs.map { ($0 - pitchs[i]).mod(12) })
+            if let type = MusicScaleType(unisons: unisons) {
+                self.type = type
+                self.unison = pitchs[i]
+                return
+            }
+        }
+        return nil
+    }
+    var name: String {
+        "\(LyricsUnison(unison: unison, isSharp: false).name) \(type) (\(unison))"
     }
 }
 
@@ -1518,7 +1544,7 @@ extension Chord {
         
         let unisonsSet = Set(unisons)
         
-        var typers = [ChordTyper](), filledUnisonSet = Set<Int>()
+        var typers = [ChordTyper]()
         
         for type in ChordType.cases3Count {
             for j in 0 ..< unisons.count {
@@ -1526,7 +1552,6 @@ extension Chord {
                 let nUnisons = type.unisons.map { ($0 + unison).mod(12) }
                 if unisonsSet.isSuperset(of: nUnisons) {
                     typers.append(.init(type, unison: unison))
-                    filledUnisonSet.formUnion(nUnisons)
                     if type == .augmented { break }
                 }
             }
@@ -1536,7 +1561,7 @@ extension Chord {
             for j in 0 ..< unisons.count {
                 let unison = unisons[j]
                 let nUnisons = type.unisons.map { ($0 + unison).mod(12) }
-                if unisonsSet.isSuperset(of: nUnisons) && !filledUnisonSet.isSuperset(of: nUnisons) {
+                if unisonsSet.isSuperset(of: nUnisons) {
                     let nTyper = ChordTyper(type, unison: unison)
                     if !typers.contains(where: { $0.unisons.isSuperset(of: nTyper.unisons) }) {
                         typers.append(nTyper)
