@@ -1047,6 +1047,34 @@ final class PastableAction: Action {
                 }
             }
             return true
+        } else if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled,
+                  sheetView.scoreView.contains(sheetView.scoreView.convertFromWorld(p),
+                                               scale: rootView.screenToWorldScale) {
+            let scoreView = sheetView.scoreView
+            if let result = scoreView.hitTestOption(scoreView.convertFromWorld(p),
+                                                    scale: rootView.screenToWorldScale) {
+                switch result {
+                case .keyBeat(let keyBeatI):
+                    Pasteboard.shared.copiedObjects = [.border(.init(.vertical))]
+                    
+                    let keyBeat = scoreView.model.keyBeats[keyBeatI]
+                    selectingLineNode.fillType = .color(.subSelected)
+                    selectingLineNode.lineType = .color(.selected)
+                    selectingLineNode.lineWidth = rootView.worldLineWidth
+                    let edge = scoreView.convertToWorld(scoreView.keyBeatEdge(fromBeat: keyBeat))
+                    selectingLineNode.path = Path([Pathline([edge.p0, edge.p1])])
+                    return true
+                case .scale(_, let pitch):
+                    Pasteboard.shared.copiedObjects = [.border(.init(.horizontal))]
+                    
+                    selectingLineNode.fillType = .color(.subSelected)
+                    selectingLineNode.lineType = .color(.selected)
+                    selectingLineNode.lineWidth = rootView.worldLineWidth
+                    let edge = scoreView.convertToWorld(scoreView.scaleEdge(fromPitch: pitch))
+                    selectingLineNode.path = Path([Pathline([edge.p0, edge.p1])])
+                    return true
+                }
+            }
         } else if let (sBorder, edge) = rootView.worldBorder(at: p, distance: d) {
             if isSendPasteboard {
                 Pasteboard.shared.copiedObjects = [.border(sBorder)]
@@ -1495,26 +1523,40 @@ final class PastableAction: Action {
                 return true
             }
         } else if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled,
-                    let keyBeatI = sheetView.scoreView.keyBeatIndex(at: sheetView.scoreView.convertFromWorld(p),
-                                                                    scale: rootView.screenToWorldScale) {
-            let keyBeat = sheetView.model.score.keyBeats[keyBeatI]
-            
+                  sheetView.scoreView.contains(sheetView.scoreView.convertFromWorld(p),
+                                               scale: rootView.screenToWorldScale) {
             var option = sheetView.model.score.option
-            option.keyBeats.remove(at: keyBeatI)
-            
-            Pasteboard.shared.copiedObjects = [.normalizationRationalValue(keyBeat)]
-            
-            sheetView.newUndoGroup()
-            sheetView.set(option)
-            return true
-        } else if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled,
-                  sheetView.scoreView.model.notes.isEmpty {
-            var option = sheetView.model.score.option
-            option.enabled = false
-            
-            sheetView.newUndoGroup()
-            sheetView.set(option)
-            return true
+            if sheetView.scoreView.model.notes.isEmpty {
+                option.enabled = false
+                sheetView.newUndoGroup()
+                sheetView.set(option)
+                return true
+            } else {
+                if let result = sheetView.scoreView
+                    .hitTestOption(sheetView.scoreView.convertFromWorld(p),
+                                   scale: rootView.screenToWorldScale) {
+                    switch result {
+                    case .keyBeat(let keyBeatI):
+                        var option = sheetView.model.score.option
+                        option.keyBeats.remove(at: keyBeatI)
+                        
+                        Pasteboard.shared.copiedObjects = [.border(.init(.vertical))]
+                        
+                        sheetView.newUndoGroup()
+                        sheetView.set(option)
+                        return true
+                    case .scale(let scaleI, _):
+                        var option = sheetView.model.score.option
+                        option.scales.remove(at: scaleI)
+                        
+                        Pasteboard.shared.copiedObjects = [.border(.init(.horizontal))]
+                        
+                        sheetView.newUndoGroup()
+                        sheetView.set(option)
+                        return true
+                    }
+                }
+            }
         } else if let (border, i, edge) = rootView.border(at: p, distance: d),
                   let sheetView = rootView.sheetView(at: p) {
             
@@ -1791,7 +1833,7 @@ final class PastableAction: Action {
         }
         func updateBorder(with oldBorder: Border) {
             if phase == .began {
-                selectingLineNode.lineType = .color(.border)
+                selectingLineNode.lineType = .color(.subBorder)
             }
             
             let lw = rootView.screenToWorldScale < 0.5 ? rootView.screenToWorldScale * 2 : 1
@@ -1809,8 +1851,39 @@ final class PastableAction: Action {
                 case .vertical:
                     Edge(Point(f.minX, f.maxY - x), Point(f.maxX, f.maxY - x))
                 }
+                if !snapLineNode.children.isEmpty {
+                    rootView.cursor = .arrow
+                }
                 snapLineNode.children = []
                 selectingLineNode.path = Path([Pathline(edge)])
+                selectingLineNode.lineWidth = 0.5
+                return
+            } else if let sheetView,
+                        sheetView.scoreView.contains(sheetView.scoreView.convertFromWorld(p),
+                                                     scale: rootView.screenToWorldScale) {
+                let scoreP = sheetView.scoreView.convertFromWorld(p)
+                let edges: [Edge]
+                switch oldBorder.orientation {
+                case .horizontal:
+                    let pitch = sheetView.scoreView.pitch(atY: scoreP.y,
+                                                          interval: rootView.currentPitchInterval)
+                    edges = sheetView.scoreView.scaleEdges(fromUnison: pitch.mod(12))
+                    rootView.cursor = .arrowWith(string: Pitch(value: pitch).octaveString())
+                case .vertical:
+                    let beat = sheetView.scoreView.beat(atX: scoreP.x,
+                                                        interval: rootView.currentBeatInterval)
+                    let sy = sheetView.scoreView.y(fromPitch: Score.minPitch)
+                    let ey = sheetView.scoreView.y(fromPitch: Score.maxPitch)
+                    let x = sheetView.scoreView.x(atBeat: beat)
+                    edges = [Edge(.init(x, sy), .init(x, ey))]
+                    isSnapped = beat.isInteger
+                    if !snapLineNode.children.isEmpty {
+                        rootView.cursor = .arrow
+                    }
+                }
+                snapLineNode.children = []
+                selectingLineNode.lineWidth = 0.5
+                selectingLineNode.path = Path(edges.map { Pathline(sheetView.scoreView.convertToWorld($0)) })
                 return
             }
             
@@ -2541,42 +2614,67 @@ final class PastableAction: Action {
         case .text(let text):
             pasteText(text)
         case .border(let border):
-            if let sheetView = rootView.madeSheetView(at: shp) {
+            if let sheetView = rootView.sheetView(at: shp),
+               let (textView, ti, _, _) = sheetView.textTuple(at: sheetView.convertFromWorld(p)),
+               let x = textView.typesetter.warpCursorOffset(at: textView.convertFromWorld(p))?.offset {
+                let widthCount = textView.model.size == 0 ?
+                    Typobute.maxWidthCount :
+                    (x / textView.model.size)
+                    .clipped(min: Typobute.minWidthCount,
+                             max: Typobute.maxWidthCount)
                 
-                if let (textView, ti, _, _) = sheetView.textTuple(at: sheetView.convertFromWorld(p)),
-                   let x = textView.typesetter.warpCursorOffset(at: textView.convertFromWorld(p))?.offset {
-                    let widthCount = textView.model.size == 0 ?
-                        Typobute.maxWidthCount :
-                        (x / textView.model.size)
-                        .clipped(min: Typobute.minWidthCount,
-                                 max: Typobute.maxWidthCount)
+                var text = textView.model
+                if text.widthCount != widthCount {
+                    text.widthCount = widthCount
                     
-                    var text = textView.model
-                    if text.widthCount != widthCount {
-                        text.widthCount = widthCount
+                    let sb = sheetView.bounds.inset(by: Sheet.textPadding)
+                    if let textFrame = text.frame, !sb.contains(textFrame) {
+                        let nFrame = sb.clipped(textFrame)
+                        text.origin += nFrame.origin - textFrame.origin
                         
-                        let sb = sheetView.bounds.inset(by: Sheet.textPadding)
-                        if let textFrame = text.frame, !sb.contains(textFrame) {
-                            let nFrame = sb.clipped(textFrame)
-                            text.origin += nFrame.origin - textFrame.origin
+                        if let textFrame = text.frame, !sb.outset(by: 1).contains(textFrame) {
                             
-                            if let textFrame = text.frame, !sb.outset(by: 1).contains(textFrame) {
-                                
-                                let scale = min(sb.width / textFrame.width,
-                                                sb.height / textFrame.height)
-                                let dp = sb.clipped(textFrame).origin - textFrame.origin
-                                text.size *= scale
-                                text.origin += dp
-                            }
+                            let scale = min(sb.width / textFrame.width,
+                                            sb.height / textFrame.height)
+                            let dp = sb.clipped(textFrame).origin - textFrame.origin
+                            text.size *= scale
+                            text.origin += dp
                         }
-                        
-                        sheetView.newUndoGroup()
-                        sheetView.replace([IndexValue(value: text, index: ti)])
                     }
-                    return
+                    
+                    sheetView.newUndoGroup()
+                    sheetView.replace([IndexValue(value: text, index: ti)])
                 }
-                
-                
+                return
+            } else if let sheetView = rootView.sheetView(at: shp),
+                      sheetView.scoreView.contains(sheetView.scoreView.convertFromWorld(p),
+                                                   scale: rootView.screenToWorldScale) {
+                let scoreP = sheetView.scoreView.convertFromWorld(p)
+                switch border.orientation {
+                case .horizontal:
+                    let pitch = sheetView.scoreView.pitch(atY: scoreP.y,
+                                                          interval: rootView.currentPitchInterval)
+                    let unison = pitch.mod(12)
+                    var option = sheetView.scoreView.option
+                    if !option.scales.contains(unison) {
+                        option.scales.append(unison)
+                        option.scales.sort()
+                        sheetView.newUndoGroup()
+                        sheetView.set(option)
+                    }
+                case .vertical:
+                    let beat = sheetView.scoreView.beat(atX: scoreP.x,
+                                                        interval: rootView.currentBeatInterval)
+                    var option = sheetView.scoreView.option
+                    if !option.keyBeats.contains(beat) {
+                        option.keyBeats.append(beat)
+                        option.keyBeats.sort()
+                        sheetView.newUndoGroup()
+                        sheetView.set(option)
+                    }
+                }
+                return
+            } else if let sheetView = rootView.madeSheetView(at: shp) {
                 let sb = rootView.sheetFrame(with: shp)
                 let inP = sheetView.convertFromWorld(p)
                 let np = borderSnappedPoint(inP, with: sb,

@@ -226,7 +226,7 @@ final class KeyframeView: BindableView, @unchecked Sendable {
 
 extension TimelineView {
     func makeBeatPathlines(in beatRange: Range<Rational>,
-                           sy: Double, ey: Double,
+                           sy: Double, ey: Double, subBorderBeats: Set<Rational> = [],
                            subBorderPathlines: inout [Pathline],
                            fullEditBorderPathlines: inout [Pathline],
                            borderPathlines: inout [Pathline]) {
@@ -249,15 +249,25 @@ extension TimelineView {
                 
                 let rect = Rect(x: beatX - lw / 2, y: sy,
                                 width: lw, height: ey - sy)
-                if lw == 0.0625 {
-                    fullEditBorderPathlines.append(.init(rect))
-                } else if lw == 0.5 {
+                if subBorderBeats.contains(cBeat) {
                     subBorderPathlines.append(.init(rect))
+                } else if lw == 0.0625 {
+                    fullEditBorderPathlines.append(.init(rect))
                 } else {
                     borderPathlines.append(.init(rect))
                 }
             }
             cBeat += deltaBeat
+        }
+        
+        subBorderBeats.sorted().forEach {
+            if $0 % deltaBeat != 0 {
+                let beatX = x(atBeat: $0)
+                let lw = 0.0625
+                let rect = Rect(x: beatX - lw / 2, y: sy,
+                                width: lw, height: ey - sy)
+                subBorderPathlines.append(.init(rect))
+            }
         }
     }
 }

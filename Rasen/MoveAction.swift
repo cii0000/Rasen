@@ -320,7 +320,7 @@ final class MoveScoreAction: DragEventAction {
     }
     
     enum SlideType {
-        case keyBeats, allBeat, endBeat, isShownSpectrogram,
+        case keyBeats, allBeat, endBeat, isShownSpectrogram, scale,
              startNoteBeat, endNoteBeat, note,
              pit, reverbEarlyRSec, reverbEarlyAndLateRSec, reverbDurSec,
              even, sprol, spectlopeHeight
@@ -389,29 +389,7 @@ final class MoveScoreAction: DragEventAction {
                 }
                 
                 let scoreP = scoreView.convert(sheetP, from: sheetView.node)
-                if scoreView.containsIsShownSpectrogram(scoreP, scale: rootView.screenToWorldScale) {
-                    type = .isShownSpectrogram
-                    
-                    beganScoreOption = scoreView.model.option
-                } else if let keyBeatI = scoreView.keyBeatIndex(at: scoreP, scale: rootView.screenToWorldScale) {
-                    type = .keyBeats
-                    
-                    self.keyBeatI = keyBeatI
-                    beganScoreOption = score.option
-                    beganBeatX = scoreView.x(atBeat: score.keyBeats[keyBeatI])
-                } else if abs(scoreP.x - scoreView.x(atBeat: score.beatRange.end)) < rootView.worldKnobEditDistance
-                            && abs(scoreP.y - scoreView.timelineCenterY) < Sheet.timelineHalfHeight {
-                    type = .endBeat
-                    
-                    beganScoreOption = sheetView.model.score.option
-                    beganBeatX = scoreView.x(atBeat: score.beatRange.end)
-                } else if scoreView.containsTimeline(scoreP, scale: rootView.screenToWorldScale) {
-                    type = .allBeat
-                    
-                    beganScoreOption = sheetView.model.score.option
-                    beganBeatX = scoreView.x(atBeat: score.beatRange.start)
-                    beganNotes = score.notes.count.range.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
-                } else if let (noteI, result) = scoreView.hitTestPoint(scoreP, scale: rootView.screenToWorldScale) {
+                if let (noteI, result) = scoreView.hitTestPoint(scoreP, scale: rootView.screenToWorldScale) {
                     self.noteI = noteI
                     
                     let score = scoreView.model
@@ -733,6 +711,48 @@ final class MoveScoreAction: DragEventAction {
                         let cPitch = result.notePitch + result.pitch.rationalValue(intervalScale: Sheet.fullEditBeatInterval)
                         rootView.cursor = .circle(string: Pitch(value: cPitch).octaveString())
                     }
+                } else if let result = scoreView.hitTestOption(scoreP, scale: rootView.screenToWorldScale) {
+                    switch result {
+                    case .keyBeat(let keyBeatI):
+                        type = .keyBeats
+                        
+                        self.keyBeatI = keyBeatI
+                        beganScoreOption = score.option
+                        let beat = score.keyBeats[keyBeatI]
+                        beganBeatX = scoreView.x(atBeat: beat)
+                        oldBeat = beat
+                    case .scale:
+                        type = .scale
+                        
+                        beganScoreOption = score.option
+                        beganPitch = scoreView.pitch(atY: scoreP.y,
+                                                     interval: rootView.currentPitchInterval)
+                        beganPitchY = scoreView.y(fromPitch: beganPitch)
+                        
+                        let octaveNode = scoreView.scaleNode(mainPitch: beganPitch)
+                        octaveNode.attitude.position
+                        = sheetView.convertToWorld(scoreView.node.attitude.position)
+                        self.octaveNode = octaveNode
+                        rootView.node.append(child: octaveNode)
+                        
+                        rootView.cursor = .arrowWith(string: Pitch(value: beganPitch).octaveString())
+                    }
+                } else if scoreView.containsIsShownSpectrogram(scoreP, scale: rootView.screenToWorldScale) {
+                    type = .isShownSpectrogram
+                    
+                    beganScoreOption = scoreView.model.option
+                } else if abs(scoreP.x - scoreView.x(atBeat: score.beatRange.end)) < rootView.worldKnobEditDistance
+                            && abs(scoreP.y - scoreView.timelineCenterY) < Sheet.timelineHalfHeight {
+                    type = .endBeat
+                    
+                    beganScoreOption = sheetView.model.score.option
+                    beganBeatX = scoreView.x(atBeat: score.beatRange.end)
+                } else if scoreView.containsTimeline(scoreP, scale: rootView.screenToWorldScale) {
+                    type = .allBeat
+                    
+                    beganScoreOption = sheetView.model.score.option
+                    beganBeatX = scoreView.x(atBeat: score.beatRange.start)
+                    beganNotes = score.notes.count.range.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
                 }
             }
         case .changed:
@@ -917,6 +937,29 @@ final class MoveScoreAction: DragEventAction {
                             option.keyBeats.sort()
                             scoreView.option = option
                             rootView.updateSelects()
+                            
+                            if nBeat.isInteger {
+                                Feedback.performAlignment()
+                            }
+                        }
+                    }
+                case .scale:
+                    if let beganScoreOption {
+                        let pitch = scoreView.pitch(atY: beganPitchY + sheetP.y - beganSheetP.y,
+                                                    interval: rootView.currentPitchInterval)
+                        if pitch != oldPitch {
+                            let dPitch = pitch - beganPitch
+                            
+                            var option = beganScoreOption
+                            option.scales = option.scales.map { ($0 + dPitch).mod(12) }
+                            scoreView.option = option
+                            rootView.updateSelects()
+                            
+                            octaveNode?.children = scoreView.scaleNode(mainPitch: pitch).children
+                            
+                            rootView.cursor = .arrowWith(string: Pitch(value: pitch).octaveString())
+                            
+                            oldPitch = pitch
                         }
                     }
                 case .allBeat:
@@ -1190,7 +1233,9 @@ final class MoveScoreAction: DragEventAction {
             octaveNode = nil
             
             if let sheetView {
-                if type == .keyBeats || type == .endBeat || type == .isShownSpectrogram {
+                if type == .keyBeats || type == .scale
+                    || type == .endBeat || type == .isShownSpectrogram {
+                    
                     sheetView.updatePlaying()
                     if let beganScoreOption, sheetView.model.score.option != beganScoreOption {
                         sheetView.newUndoGroup()

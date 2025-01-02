@@ -1230,6 +1230,8 @@ struct PBScoreOption: Sendable {
 
   var keyBeats: [PBRational] = []
 
+  var scales: [PBRational] = []
+
   var enabled: Bool = false
 
   var isShownSpectrogram: Bool = false
@@ -1271,9 +1273,9 @@ struct PBScore: Sendable {
 
   var timelineY: Double = 0
 
-  var keyPitchs: [PBRational] = []
-
   var keyBeats: [PBRational] = []
+
+  var scales: [PBRational] = []
 
   var enabled: Bool = false
 
@@ -5258,6 +5260,7 @@ extension PBScoreOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
     2: .same(proto: "tempo"),
     7: .same(proto: "timelineY"),
     4: .same(proto: "keyBeats"),
+    8: .same(proto: "scales"),
     3: .same(proto: "enabled"),
     5: .same(proto: "isShownSpectrogram"),
   ]
@@ -5274,6 +5277,7 @@ extension PBScoreOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
       case 5: try { try decoder.decodeSingularBoolField(value: &self.isShownSpectrogram) }()
       case 6: try { try decoder.decodeSingularMessageField(value: &self._beatRange) }()
       case 7: try { try decoder.decodeSingularDoubleField(value: &self.timelineY) }()
+      case 8: try { try decoder.decodeRepeatedMessageField(value: &self.scales) }()
       default: break
       }
     }
@@ -5302,6 +5306,9 @@ extension PBScoreOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
     if self.timelineY.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.timelineY, fieldNumber: 7)
     }
+    if !self.scales.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.scales, fieldNumber: 8)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5310,6 +5317,7 @@ extension PBScoreOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
     if lhs._tempo != rhs._tempo {return false}
     if lhs.timelineY != rhs.timelineY {return false}
     if lhs.keyBeats != rhs.keyBeats {return false}
+    if lhs.scales != rhs.scales {return false}
     if lhs.enabled != rhs.enabled {return false}
     if lhs.isShownSpectrogram != rhs.isShownSpectrogram {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -5325,8 +5333,8 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
     9: .same(proto: "beatRange"),
     3: .same(proto: "tempo"),
     10: .same(proto: "timelineY"),
-    11: .same(proto: "keyPitchs"),
     7: .same(proto: "keyBeats"),
+    11: .same(proto: "scales"),
     4: .same(proto: "enabled"),
     8: .same(proto: "isShownSpectrogram"),
     5: .same(proto: "id"),
@@ -5347,7 +5355,7 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
       case 8: try { try decoder.decodeSingularBoolField(value: &self.isShownSpectrogram) }()
       case 9: try { try decoder.decodeSingularMessageField(value: &self._beatRange) }()
       case 10: try { try decoder.decodeSingularDoubleField(value: &self.timelineY) }()
-      case 11: try { try decoder.decodeRepeatedMessageField(value: &self.keyPitchs) }()
+      case 11: try { try decoder.decodeRepeatedMessageField(value: &self.scales) }()
       default: break
       }
     }
@@ -5385,8 +5393,8 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
     if self.timelineY.bitPattern != 0 {
       try visitor.visitSingularDoubleField(value: self.timelineY, fieldNumber: 10)
     }
-    if !self.keyPitchs.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.keyPitchs, fieldNumber: 11)
+    if !self.scales.isEmpty {
+      try visitor.visitRepeatedMessageField(value: self.scales, fieldNumber: 11)
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -5397,8 +5405,8 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
     if lhs._beatRange != rhs._beatRange {return false}
     if lhs._tempo != rhs._tempo {return false}
     if lhs.timelineY != rhs.timelineY {return false}
-    if lhs.keyPitchs != rhs.keyPitchs {return false}
     if lhs.keyBeats != rhs.keyBeats {return false}
+    if lhs.scales != rhs.scales {return false}
     if lhs.enabled != rhs.enabled {return false}
     if lhs.isShownSpectrogram != rhs.isShownSpectrogram {return false}
     if lhs._id != rhs._id {return false}

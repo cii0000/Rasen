@@ -1634,7 +1634,7 @@ final class RootView: View, @unchecked Sendable {
         }
     }
     var textMaxTypelineWidthNode = Node(lineWidth: 0.5, lineType: .color(.border))
-    var textCursorWidthNode = Node(lineWidth: 3, lineType: .color(.border))
+    var textCursorWidthNode = Node(lineWidth: 3, lineType: .color(.subBorder))
     var textCursorNode = Node(lineWidth: 0.5, lineType: .color(.background),
                               fillType: .color(.content))
     func updateTextCursor(isMove: Bool = false) {

@@ -1719,6 +1719,7 @@ extension Chord: CustomStringConvertible {
 struct ScoreOption {
     var beatRange = Music.defaultBeatRange
     var keyBeats = [Rational]()
+    var scales: [Rational] = [0, 2, 4, 5, 7, 9, 11]
     var tempo = Music.defaultTempo
     var timelineY = Sheet.timelineY
     var enabled = false
@@ -1728,6 +1729,7 @@ extension ScoreOption: Protobuf {
     init(_ pb: PBScoreOption) throws {
         beatRange = (try? RationalRange(pb.beatRange).value) ?? Music.defaultBeatRange
         keyBeats = pb.keyBeats.compactMap { try? Rational($0) }
+        scales = pb.scales.compactMap { try? Rational($0) }
         tempo = (try? Rational(pb.tempo))?.clipped(Music.tempoRange) ?? Music.defaultTempo
         timelineY = pb.timelineY.clipped(min: Sheet.timelineY,
                                          max: Sheet.height - Sheet.timelineY)
@@ -1738,6 +1740,7 @@ extension ScoreOption: Protobuf {
         .with {
             $0.beatRange = RationalRange(value: beatRange).pb
             $0.keyBeats = keyBeats.map { $0.pb }
+            $0.scales = scales.map { $0.pb }
             if tempo != Music.defaultTempo {
                 $0.tempo = tempo.pb
             }
@@ -1763,6 +1766,7 @@ struct Score: BeatRangeType {
     var tempo = Music.defaultTempo
     var timelineY = Sheet.timelineY
     var keyBeats = [Rational]()
+    var scales: [Rational] = [0, 2, 4, 5, 7, 9, 11]
     var enabled = false
     var isShownSpectrogram = false
     var id = UUID()
@@ -1773,6 +1777,7 @@ extension Score: Protobuf {
         draftNotes = pb.draftNotes.compactMap { try? Note($0) }
         beatRange = (try? RationalRange(pb.beatRange).value) ?? Music.defaultBeatRange
         keyBeats = pb.keyBeats.compactMap { try? Rational($0) }
+        scales = pb.scales.compactMap { try? Rational($0) }
         tempo = (try? Rational(pb.tempo))?.clipped(Music.tempoRange) ?? Music.defaultTempo
         timelineY = pb.timelineY.clipped(min: Sheet.timelineY,
                                          max: Sheet.height - Sheet.timelineY)
@@ -1786,6 +1791,7 @@ extension Score: Protobuf {
             $0.draftNotes = draftNotes.map { $0.pb }
             $0.beatRange = RationalRange(value: beatRange).pb
             $0.keyBeats = keyBeats.map { $0.pb }
+            $0.scales = scales.map { $0.pb }
             $0.tempo = tempo.pb
             $0.timelineY = timelineY
             $0.enabled = enabled
@@ -1903,13 +1909,15 @@ extension Score {
 extension Score {
     var option: ScoreOption {
         get {
-            .init(beatRange: beatRange, keyBeats: keyBeats, tempo: tempo, timelineY: timelineY,
+            .init(beatRange: beatRange, keyBeats: keyBeats, scales: scales,
+                  tempo: tempo, timelineY: timelineY,
                   enabled: enabled,
                   isShownSpectrogram: isShownSpectrogram)
         }
         set {
             beatRange = newValue.beatRange
             keyBeats = newValue.keyBeats
+            scales = newValue.scales
             tempo = newValue.tempo
             timelineY = newValue.timelineY
             enabled = newValue.enabled

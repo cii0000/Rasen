@@ -244,6 +244,7 @@ message PBScoreOption {
     PBRational tempo = 2;
     double timelineY = 7;
     repeated PBRational keyBeats = 4;
+    repeated PBRational scales = 8;
     bool enabled = 3;
     bool isShownSpectrogram = 5;
 }
@@ -253,8 +254,8 @@ message PBScore {
     PBRationalRange beatRange = 9;
     PBRational tempo = 3;
     double timelineY = 10;
-    repeated PBRational keyPitchs = 11;
     repeated PBRational keyBeats = 7;
+    repeated PBRational scales = 11;
     bool enabled = 4;
     bool isShownSpectrogram = 8;
     PBUUID id = 5;

@@ -199,7 +199,9 @@ final class LookUpAction: InputKeyEventAction {
             let fileSize = content.url.fileSize ?? 0
             let string = IOResult.fileSizeNameFrom(fileSize: fileSize)
             rootView.show(content.type.displayName + "\n\t\("File Size".localized): \(string)", at: p)
-        } else if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled {
+        } else if let sheetView = rootView.sheetView(at: p),
+                  sheetView.scoreView.contains(sheetView.scoreView.convertFromWorld(p),
+                                               scale: rootView.screenToWorldScale) {
             let scoreView = sheetView.scoreView
             let pitchInterval = rootView.currentPitchInterval
             let pitch = Pitch(value: scoreView.pitch(atY: scoreView.convertFromWorld(p).y, interval: pitchInterval))

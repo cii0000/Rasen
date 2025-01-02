@@ -204,7 +204,6 @@ final class ScoreView: TimelineView, @unchecked Sendable {
     let timelineContentNode = Node(fillType: .color(.content))
     let timelineSubBorderNode = Node(fillType: .color(.subBorder))
     let timelineBorderNode = Node(fillType: .color(.border))
-    let timelineBackgroundNode = Node(fillType: .color(.background))
     let timelineFullEditBorderNode = Node(isHidden: true, fillType: .color(.border))
     let chordNode = Node()
     let pitsNode = Node(fillType: .color(.background))
@@ -225,7 +224,6 @@ final class ScoreView: TimelineView, @unchecked Sendable {
         node = Node(children: [spectlopesNode, timelineBorderNode, timelineFullEditBorderNode,
                                octaveNode,
                                timelineSubBorderNode,
-                               timelineBackgroundNode,
                                chordNode,
                                timelineContentNode,
                                draftNotesNode, reverbsNode, notesNode, pitsNode, tonesNode,
@@ -275,16 +273,13 @@ extension ScoreView {
     func updateTimeline() {
         if model.enabled {
             let (contentPathlines, subBorderPathlines,
-                 borderPathlines, fullEditBorderPathlines,
-                 backgroundPathlines) = self.timelinePathlinesTuple()
-            timelineBackgroundNode.path = .init(backgroundPathlines)
+                 borderPathlines, fullEditBorderPathlines) = self.timelinePathlinesTuple()
             timelineContentNode.path = .init(contentPathlines)
             timelineSubBorderNode.path = .init(subBorderPathlines)
             timelineBorderNode.path = .init(borderPathlines)
             timelineFullEditBorderNode.path = .init(fullEditBorderPathlines)
             node.attitude.position.y = model.timelineY
         } else {
-            timelineBackgroundNode.path = .init()
             timelineContentNode.path = .init()
             timelineSubBorderNode.path = .init()
             timelineBorderNode.path = .init()
@@ -527,8 +522,7 @@ extension ScoreView {
     func timelinePathlinesTuple() -> (contentPathlines: [Pathline],
                                       subBorderPathlines: [Pathline],
                                       borderPathlines: [Pathline],
-                                      fullEditBorderPathlines: [Pathline],
-                                      backgroundPathlines: [Pathline]) {
+                                      fullEditBorderPathlines: [Pathline]) {
         let score = model
         let sBeat = max(score.beatRange.start, -10000),
             eBeat = min(score.beatRange.end, 10000)
@@ -547,20 +541,22 @@ extension ScoreView {
         var subBorderPathlines = [Pathline]()
         var borderPathlines = [Pathline]()
         var fullEditBorderPathlines = [Pathline]()
-        var backgroundPathlines = [Pathline]()
         
         makeBeatPathlines(in: score.beatRange, sy: sy, ey: ey,
+                          subBorderBeats: Set(score.keyBeats),
                           subBorderPathlines: &subBorderPathlines,
                           fullEditBorderPathlines: &fullEditBorderPathlines,
                           borderPathlines: &borderPathlines)
-        
         
         makeBeatPathlines(in: score.beatRange, 
                           sy: self.y(fromPitch: pitchRange.start),
                           ey: self.y(fromPitch: pitchRange.end),
+                          subBorderBeats: Set(score.keyBeats),
                           subBorderPathlines: &subBorderPathlines,
                           fullEditBorderPathlines: &fullEditBorderPathlines,
                           borderPathlines: &borderPathlines)
+        
+        let scaleSet = Set(score.scales.map { $0.mod(12) })
         
         let roundedSPitch = pitchRange.start.rounded(.down)
         let deltaPitch = Rational(1, 6)
@@ -569,7 +565,7 @@ extension ScoreView {
         while cPitch <= pitchRange.end {
             if cPitch >= pitchRange.start {
                 let plw: Double = if cPitch % pitchR1 == 0 {
-                    0.25
+                    scaleSet.contains(cPitch.mod(12)) ? 0.5 : 0.25
                 } else {
                     0.0625
                 }
@@ -577,6 +573,8 @@ extension ScoreView {
                 let rect = Rect(x: sx, y: py - plw / 2, width: ex - sx, height: plw)
                 if plw == 0.0625 {
                     fullEditBorderPathlines.append(Pathline(rect))
+                } else if plw == 0.5 {
+                    subBorderPathlines.append(.init(rect))
                 } else {
                     borderPathlines.append(Pathline(rect))
                 }
@@ -584,25 +582,10 @@ extension ScoreView {
             cPitch += deltaPitch
         }
         
-        let psy = self.y(fromPitch: pitchRange.start), pey = self.y(fromPitch: pitchRange.end)
-        
         for keyBeat in score.keyBeats {
-            guard score.beatRange.contains(keyBeat) else { continue }
             let nx = x(atBeat: keyBeat)
-            let lw = 1.0
-            subBorderPathlines.append(.init(Rect(x: nx - lw / 2, y: sy,
-                                                 width: lw, height: ey - sy)))
             contentPathlines.append(.init(Rect(x: nx - knobW / 2, y: y - knobH / 2,
                                                width: knobW, height: knobH)))
-            
-            let plw = 1.0
-            subBorderPathlines.append(.init(Rect(x: nx - plw / 2, y: psy, width: plw, height: pey - psy)))
-            
-            let blw = 0.25
-            if !keyBeat.isInteger {
-                backgroundPathlines.append(.init(Rect(x: nx - blw / 2, y: sy, width: blw, height: ey - sy)))
-                backgroundPathlines.append(.init(Rect(x: nx - blw / 2, y: psy, width: blw, height: pey - psy)))
-            }
         }
         contentPathlines.append(.init(Rect(x: ex - knobW / 2, y: y - knobH / 2,
                                            width: knobW, height: knobH)))
@@ -637,8 +620,7 @@ extension ScoreView {
                                                   height: sprKbobH)))
         }
         
-        return (contentPathlines, subBorderPathlines, borderPathlines, fullEditBorderPathlines,
-                backgroundPathlines)
+        return (contentPathlines, subBorderPathlines, borderPathlines, fullEditBorderPathlines)
     }
     
     func chordTypers(at p: Point, scale: Double) -> [Chord.ChordTyper] {
@@ -749,8 +731,7 @@ extension ScoreView {
             var pitch: Int, typers: [Chord.ChordTyper]
         }
         let trs = chordRanges.map { ($0, score.chordPitches(atBeat: $0)) }
-        var cbpts = [(beatRange: Range<Rational>, typers: [Chord.ChordTyper],
-                      pitchAndTypers: [PitchAndTyper])]()
+        var cbpts = [(beatRange: Range<Rational>, pitchAndTypers: [PitchAndTyper])]()
         for (chordBeatRange, pitchs) in trs {
             let pitchs = pitchs.sorted()
             guard let chord = Chord(pitchs: pitchs) else { continue }
@@ -765,12 +746,12 @@ extension ScoreView {
             if cbpts.last?.pitchAndTypers == pitchAndTypers {
                 cbpts[.last].beatRange.end = chordBeatRange.end
             } else {
-                cbpts.append((chordBeatRange, typers, pitchAndTypers))
+                cbpts.append((chordBeatRange, pitchAndTypers))
             }
         }
         
         for cbpt in cbpts {
-            let maxTypersCount = cbpt.typers.count
+            let maxTypersCount = cbpt.pitchAndTypers.maxValue { $0.typers.count } ?? 0
             guard maxTypersCount > 0 else { continue }
             let chordSX = x(atBeat: cbpt.beatRange.start)
             let chordEX = x(atBeat: cbpt.beatRange.end)
@@ -782,7 +763,6 @@ extension ScoreView {
             let lwScale = maxTypersCount == 1 ?
             1 : (oNw < cw ? 1 : cw / (Double(maxTypersCount - 1) * oMaxW + padding * 2))
             let maxW = oMaxW * lwScale
-            let nw = maxW * Double(maxTypersCount - 1)
             let hd = Sheet.pitchHeight
             
             let plh = 0.5
@@ -790,7 +770,7 @@ extension ScoreView {
                 let py = self.y(fromPitch: Rational(pitchAndTyper.pitch))
                 let colors: [Color] = pitchAndTyper.typers.map {
                     switch $0.type {
-                    case .octave: .init(red: 0.85, green: 0.85, blue: 0.85)
+                    case .octave: .init(red: 0.65, green: 0.65, blue: 0.65)
                     case .power: .init(red: 0.88, green: 0.88, blue: 0.75)
                         
                     case .major: .init(red: 0.9, green: 0.8, blue: 0)
@@ -803,19 +783,19 @@ extension ScoreView {
                         
                     case .augmented: .init(red: 0.75, green: 0.5, blue: 1.0)
                         
-                    case .flatfive: .init(red: 1.0, green: 0.5, blue: 1.0)
+                    case .flatfive: .init(red: 1.0, green: 0.6, blue: 1.0)
                         
                     case .wholeTone: .init(red: 0.25, green: 0.9, blue: 0).with(lightness: 93)
-                    case .semitone: .init(red: 1.0, green: 0.75, blue: 0.5)
+                    case .semitone: .init(red: 1.0, green: 0.65, blue: 0.2)
                         
                     case .diminish: .init(red: 1.0, green: 0.5, blue: 0.5)
-                    case .tritone: .init(red: 1.0, green: 0.5, blue: 0.5).with(lightness: 90)
+                    case .tritone: .init(red: 1.0, green: 0.5, blue: 0.5).with(lightness: 80)
                     }
                 }
                 
+                let nw = maxW * Double(pitchAndTyper.typers.count - 1)
                 for (ti, color) in colors.enumerated() {
-                    let nti = cbpt.typers.firstIndex(of: pitchAndTyper.typers[ti])!
-                    let fx = chordCenterX - nw / 2 + maxW * Double(nti)
+                    let fx = chordCenterX - nw / 2 + maxW * Double(ti)
                     append0(.init(Rect(x: fx - plh * lwScale / 2, y: py - hd / 2,
                                       width: plh * lwScale, height: hd)), color: color)
                 }
@@ -882,6 +862,62 @@ extension ScoreView {
         return Node(children: nodes)
     }
     
+    func keyBeatEdge(fromBeat beat: Rational) -> Edge {
+        let x = x(atBeat: beat)
+        let pitchRange = Score.pitchRange
+        let sy = y(fromPitch: pitchRange.start)
+        let ey = y(fromPitch: pitchRange.end)
+        return .init(.init(x, sy), .init(x, ey))
+    }
+    func scaleEdge(fromPitch pitch: Rational) -> Edge {
+        let sx = x(atBeat: model.beatRange.start)
+        let ex = x(atBeat: model.beatRange.end)
+        let y = y(fromPitch: pitch)
+        return .init(.init(sx, y), .init(ex, y))
+    }
+    func scaleEdges(fromUnison unison: Rational) -> [Edge] {
+        let pitchRange = Score.pitchRange
+        let sx = x(atBeat: model.beatRange.start)
+        let ex = x(atBeat: model.beatRange.end)
+        
+        var edges = [Edge](), pitch = unison
+        while pitch < pitchRange.start { pitch += 12 }
+        while pitchRange.contains(pitch) {
+            let y = y(fromPitch: pitch)
+            edges.append(.init(.init(sx, y), .init(ex, y)))
+            pitch += 12
+        }
+        return edges
+    }
+    func scaleNode(mainPitch: Rational,
+                   mainColor: Color = .subInterpolated, _ color: Color = .subBorder) -> Node {
+        let score = model, pitchRange = Score.pitchRange
+        let scaleSet = Set(score.scales.map { $0.mod(12) })
+        let sx = x(atBeat: score.beatRange.start)
+        let ex = x(atBeat: score.beatRange.end)
+        
+        let roundedSPitch = pitchRange.start.rounded(.down)
+        let deltaPitch = Rational(1, 6)
+        var cPitch = roundedSPitch
+        var pathlines = [Pathline]()
+        let plw = 0.5
+        while cPitch <= pitchRange.end {
+            if cPitch >= pitchRange.start {
+                if scaleSet.contains(cPitch.mod(12)) {
+                    let py = self.y(fromPitch: cPitch)
+                    let rect = Rect(x: sx, y: py - plw / 2, width: ex - sx, height: plw)
+                    pathlines.append(.init(rect))
+                }
+            }
+            cPitch += deltaPitch
+        }
+        
+        let py = self.y(fromPitch: mainPitch)
+        
+        return .init(children: [.init(path: .init(pathlines), fillType: .color(color)),
+                                .init(path: .init(Rect(x: sx, y: py - plw / 2, width: ex - sx, height: plw)), fillType: .color(mainColor))])
+    }
+    
     func draftNoteNode(from note: Note) -> Node {
         let noteNode = noteNode(from: note).node.children[0]
         var color = Color.draft
@@ -896,10 +932,12 @@ extension ScoreView {
                                                 reverbNode: Node,
                                                 spectlopeNode: Node) {
         guard note.beatRange.length > 0 else {
-            return (.init(children: [.init(path: Path(Rect(.init(x(atBeat: note.beatRange.start),
-                                                                 y(fromPitch: note.firstPitch)),
-                                                           distance: 0).outsetBy(dx: 0.25, dy: 1)),
-                                           fillType: .color(color != nil ? color! : .content))]),
+            let path = Path(Rect(.init(x(atBeat: note.beatRange.start),
+                                       y(fromPitch: note.firstPitch)),
+                                 distance: 0).outsetBy(dx: 0.25, dy: 1))
+            return (.init(children: [.init(path: path,
+                                           fillType: .color(color != nil ? color! : .content))],
+                          path: path),
                     .init(), .init(), .init())
         }
         let nh = noteH(from: note)
@@ -1944,6 +1982,50 @@ extension ScoreView {
         }
         
         return minResult
+    }
+    
+    enum OptionHitResult {
+        case keyBeat(beatI: Int)
+        case scale(scaleI: Int, pitch: Rational)
+    }
+    func hitTestOption(_ p: Point, scale: Double) -> OptionHitResult? {
+        if let keyBeatI = keyBeatIndex(at: p, scale: scale) {
+            return .keyBeat(beatI: keyBeatI)
+        }
+        
+        guard containsMainFrame(p, scale: scale) else { return nil }
+        let maxD = Sheet.knobEditDistance * scale
+        let maxDSq = maxD * maxD
+        let score = model
+        
+        var result: OptionHitResult?, minDSq = Double.infinity
+        for (ki, keyBeat) in score.keyBeats.enumerated() {
+            let x = x(atBeat: keyBeat)
+            let dSq = p.x.distanceSquared(x)
+            if dSq < minDSq && dSq < maxDSq {
+                minDSq = dSq
+                result = .keyBeat(beatI: ki)
+            }
+        }
+        if result != nil {
+            return result
+        }
+        
+        let pitchRange = Score.pitchRange
+        for (si, scale) in score.scales.enumerated() {
+            var pitch = scale.mod(12)
+            while pitch < pitchRange.start { pitch += 12 }
+            while pitchRange.contains(pitch) {
+                let y = y(fromPitch: pitch)
+                let dSq = p.y.distanceSquared(y)
+                if dSq < minDSq && dSq < maxDSq {
+                    minDSq = dSq
+                    result = .scale(scaleI: si, pitch: pitch)
+                }
+                pitch += 12
+            }
+        }
+        return result
     }
     
     enum ColorHitResult {
