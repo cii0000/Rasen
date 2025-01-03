@@ -1869,6 +1869,7 @@ final class PastableAction: Action {
                                                           interval: rootView.currentPitchInterval)
                     edges = sheetView.scoreView.scaleEdges(fromUnison: pitch.mod(12))
                     rootView.cursor = .arrowWith(string: Pitch(value: pitch).octaveString())
+                    selectingLineNode.lineWidth = pitch.isInteger ? 0.5 : 0.25
                 case .vertical:
                     let beat = sheetView.scoreView.beat(atX: scoreP.x,
                                                         interval: rootView.currentBeatInterval)
@@ -1880,9 +1881,9 @@ final class PastableAction: Action {
                     if !snapLineNode.children.isEmpty {
                         rootView.cursor = .arrow
                     }
+                    selectingLineNode.lineWidth = 0.5
                 }
                 snapLineNode.children = []
-                selectingLineNode.lineWidth = 0.5
                 selectingLineNode.path = Path(edges.map { Pathline(sheetView.scoreView.convertToWorld($0)) })
                 return
             }

@@ -721,12 +721,11 @@ final class MoveScoreAction: DragEventAction {
                         let beat = score.keyBeats[keyBeatI]
                         beganBeatX = scoreView.x(atBeat: beat)
                         oldBeat = beat
-                    case .scale:
+                    case .scale(_, let pitch):
                         type = .scale
                         
                         beganScoreOption = score.option
-                        beganPitch = scoreView.pitch(atY: scoreP.y,
-                                                     interval: rootView.currentPitchInterval)
+                        beganPitch = pitch
                         beganPitchY = scoreView.y(fromPitch: beganPitch)
                         
                         let octaveNode = scoreView.scaleNode(mainPitch: beganPitch)

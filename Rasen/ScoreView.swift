@@ -582,6 +582,21 @@ extension ScoreView {
             cPitch += deltaPitch
         }
         
+        for scale in score.scales {
+            let unison = scale.mod(12)
+            if !unison.isInteger {
+                var pitch = unison
+                while pitch < pitchRange.start { pitch += 12 }
+                while pitchRange.contains(pitch) {
+                    let plw = 0.25
+                    let py = self.y(fromPitch: pitch)
+                    let rect = Rect(x: sx, y: py - plw / 2, width: ex - sx, height: plw)
+                    subBorderPathlines.append(.init(rect))
+                    pitch += 12
+                }
+            }
+        }
+        
         for keyBeat in score.keyBeats {
             let nx = x(atBeat: keyBeat)
             contentPathlines.append(.init(Rect(x: nx - knobW / 2, y: y - knobH / 2,
@@ -897,23 +912,37 @@ extension ScoreView {
         let ex = x(atBeat: score.beatRange.end)
         
         let roundedSPitch = pitchRange.start.rounded(.down)
-        let deltaPitch = Rational(1, 6)
         var cPitch = roundedSPitch
         var pathlines = [Pathline]()
-        let plw = 0.5
         while cPitch <= pitchRange.end {
             if cPitch >= pitchRange.start {
                 if scaleSet.contains(cPitch.mod(12)) {
+                    let plw = cPitch.isInteger ? 0.5 : 0.25
                     let py = self.y(fromPitch: cPitch)
                     let rect = Rect(x: sx, y: py - plw / 2, width: ex - sx, height: plw)
                     pathlines.append(.init(rect))
                 }
             }
-            cPitch += deltaPitch
+            cPitch += 1
+        }
+        
+        for scale in score.scales {
+            let unison = scale.mod(12)
+            if !unison.isInteger {
+                var pitch = unison
+                while pitch < pitchRange.start { pitch += 12 }
+                while pitchRange.contains(pitch) {
+                    let plw = 0.25
+                    let py = self.y(fromPitch: pitch)
+                    let rect = Rect(x: sx, y: py - plw / 2, width: ex - sx, height: plw)
+                    pathlines.append(.init(rect))
+                    pitch += 12
+                }
+            }
         }
         
         let py = self.y(fromPitch: mainPitch)
-        
+        let plw = mainPitch.isInteger ? 0.5 : 0.25
         return .init(children: [.init(path: .init(pathlines), fillType: .color(color)),
                                 .init(path: .init(Rect(x: sx, y: py - plw / 2, width: ex - sx, height: plw)), fillType: .color(mainColor))])
     }
