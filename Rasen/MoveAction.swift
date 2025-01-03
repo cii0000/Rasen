@@ -203,10 +203,6 @@ final class MoveAnimationAction: DragEventAction {
                         sheetView.binder[keyPath: sheetView.keyPath].animation.beatRange.start = beat
                         sheetView.binder[keyPath: sheetView.keyPath].animation.timelineY = py
                         sheetView.animationView.updateTimeline()
-                        
-                        if isChangeBeat && beat.isInteger {
-                            Feedback.performAlignment()
-                        }
                     }
                 case .startBeat:
                     let interval = rootView.currentKeyframeBeatInterval
@@ -217,10 +213,6 @@ final class MoveAnimationAction: DragEventAction {
                             .animation.beatRange.start = beat
                         
                         sheetView.animationView.updateTimeline()
-                        
-                        if beat.isInteger {
-                            Feedback.performAlignment()
-                        }
                     }
                 case .endBeat:
                     if let beganAnimationOption {
@@ -233,10 +225,6 @@ final class MoveAnimationAction: DragEventAction {
                             let nkBeat = max(beganAnimationOption.beatRange.end + dBeat, startBeat)
                             
                             animationView.beatRange?.end = nkBeat
-                            
-                            if nkBeat.isInteger {
-                                Feedback.performAlignment()
-                            }
                         }
                     }
                 case .key:
@@ -277,10 +265,6 @@ final class MoveAnimationAction: DragEventAction {
                         
                         sheetView.rootBeatIndex = rootBeatIndex
                         sheetView.animationView.updateTimeline()
-                        
-                        if oldBeat != beat && beat.isInteger {
-                            Feedback.performAlignment()
-                        }
                     }
                 case .none: break
                 }
@@ -954,10 +938,6 @@ final class MoveScoreAction: DragEventAction {
                             option.keyBeats.sort()
                             scoreView.option = option
                             rootView.updateSelects()
-                            
-                            if nBeat.isInteger {
-                                Feedback.performAlignment()
-                            }
                         }
                     }
                 case .scale:
@@ -1005,10 +985,6 @@ final class MoveScoreAction: DragEventAction {
                             }
                             scoreView.replace(nivs)
                             scoreView.option.keyBeats = beganScoreOption?.keyBeats.map { $0 + dBeat } ?? []
-                            
-                            if beat.isInteger {
-                                Feedback.performAlignment()
-                            }
                         }
                         var option = scoreView.option
                         option.beatRange.start = beat
@@ -1029,10 +1005,6 @@ final class MoveScoreAction: DragEventAction {
                             oldBeat = nkBeat
                             scoreView.option.beatRange.end = nkBeat
                             rootView.updateSelects()
-                            
-                            if nkBeat.isInteger {
-                                Feedback.performAlignment()
-                            }
                         }
                     }
                 case .isShownSpectrogram:
@@ -1457,10 +1429,6 @@ final class MoveContentAction: DragEventAction {
                         
                         contentView.set(timeOption, origin: Point(sheetView.animationView.x(atBeat: beat), timelineY))
                         rootView.updateSelects()
-                        
-                        if isChangeBeat && beat.isInteger {
-                            Feedback.performAlignment()
-                        }
                     }
                     
                 case .startBeat:
@@ -1480,10 +1448,6 @@ final class MoveContentAction: DragEventAction {
                             contentView.set(timeOption, origin: .init(sheetView.animationView
                                 .x(atBeat: timeOption.beatRange.start), content.origin.y))
                             rootView.updateSelects()
-                            
-                            if timeOption.beatRange.start.isInteger {
-                                Feedback.performAlignment()
-                            }
                         }
                     }
                 case .endBeat:
@@ -1498,10 +1462,6 @@ final class MoveContentAction: DragEventAction {
                             contentView.set(timeOption, origin: .init(sheetView.animationView
                                 .x(atBeat: timeOption.beatRange.start), content.origin.y))
                             rootView.updateSelects()
-                            
-                            if beat.isInteger || content.localBeatRange?.end == beat - timeOption.beatRange.start {
-                                Feedback.performAlignment()
-                            }
                         }
                     }
                 case .isShownSpectrogram:
