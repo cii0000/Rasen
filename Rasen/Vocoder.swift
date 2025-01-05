@@ -553,7 +553,7 @@ extension Rendnote {
         let firstFq = firstFq.clipped(min: Score.minFq, max: cutFq)
         let cutPitch = Pitch.pitch(fromFq: cutFq)
         let rootPitch = Pitch.pitch(fromFq: rootFq)
-        let startPhase = secRange.start * firstFq * .pi2
+        let startPhase = secRange.start.isInfinite ? 0.0 : (secRange.start * firstFq * .pi2)
         
         let isOneSin = pitbend.isOneOvertone
         if isOneSin {

@@ -94,8 +94,6 @@ final class NotePlayer {
     private func playNote() {
         noteIDs = []
         let rendnotes: [Rendnote] = notes.map { note in
-            let noteID = UUID()
-            noteIDs.insert(noteID)
             let (seed0, seed1) = note.id.uInt64Values
             let rootFq = Pitch.fq(fromPitch: .init(note.notePitch) + note.pitch.doubleValue)
             return .init(rootFq: rootFq,
@@ -108,6 +106,7 @@ final class NotePlayer {
                          secRange: -.infinity ..< .infinity,
                          envelopeMemo: .init(note.envelope))
         }
+        rendnotes.forEach { noteIDs.insert($0.id) }
         
         scoreNoder.scoreTrackItem.rendnotes += rendnotes
         scoreNoder.scoreTrackItem.updateNotewaveDic()
@@ -409,6 +408,7 @@ final class PCMNoder: ObjectHashable {
             
             return noErr
         }
+        try? node.auAudioUnit.outputBusses[0].setFormat(format)
         
         self.stereo = pcmTrackItem.stereo
     }
@@ -886,6 +886,7 @@ final class ScoreNoder: ObjectHashable {
             
             return noErr
         }
+        try? node.auAudioUnit.outputBusses[0].setFormat(format)
     }
 }
 
@@ -1029,7 +1030,7 @@ final class Sequencer {
         self.limiterNode = limiterNode
         
         engine.connect(mixerNode, to: limiterNode,
-                       format: mixerNode.outputFormat(forBus: 0))
+                       format: limiterNode.inputFormat(forBus: 0))
         engine.connect(limiterNode, to: engine.mainMixerNode,
                        format: limiterNode.outputFormat(forBus: 0))
         
@@ -1789,8 +1790,7 @@ final class ClippingAudioUnit: AUAudioUnit {
     public override var outputBusses: AUAudioUnitBusArray {
         outputBusArray
     }
-
-    private var maxFramesToRender: UInt32 = 512
+    
     private var pcmBuffer: AVAudioPCMBuffer?
 
     var headroomAmp: Float? = Float(Audio.floatHeadroomAmp)
@@ -1806,22 +1806,22 @@ final class ClippingAudioUnit: AUAudioUnit {
         inputBus.maximumChannelCount = 8
         try outputBus = AUAudioUnitBus(format: format)
 
+        let maxFramesToRender: UInt32 = 512
         guard let pcmBuffer
                 = AVAudioPCMBuffer(pcmFormat: format,
                                    frameCapacity: maxFramesToRender) else { throw SError() }
         self.pcmBuffer = pcmBuffer
 
-        try super.init(componentDescription: componentDescription,
-                       options: options)
+        try super.init(componentDescription: componentDescription, options: options)
 
         self.maximumFramesToRender = maxFramesToRender
     }
     override func allocateRenderResources() throws {
         try super.allocateRenderResources()
-
+        
         guard let pcmBuffer
-                = AVAudioPCMBuffer(pcmFormat: inputBus.format,
-                                   frameCapacity: maxFramesToRender) else { throw SError() }
+                = AVAudioPCMBuffer(pcmFormat: outputBus.format,
+                                   frameCapacity: maximumFramesToRender) else { throw SError() }
         self.pcmBuffer = pcmBuffer
     }
     override func deallocateRenderResources() {
@@ -1844,7 +1844,7 @@ final class ClippingAudioUnit: AUAudioUnit {
             
             guard let inputData = self.pcmBuffer?.mutableAudioBufferList else { return kAudioUnitErr_NoConnection }
             let inputBLP = UnsafeMutableAudioBufferListPointer(inputData)
-            let byteSize = Int(min(frameCount, self.maxFramesToRender)) * MemoryLayout<Float>.size
+            let byteSize = Int(frameCount) * MemoryLayout<Float>.size
             for i in 0 ..< inputBLP.count {
                 inputBLP[i].mDataByteSize = UInt32(byteSize)
             }
