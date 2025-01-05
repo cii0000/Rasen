@@ -106,8 +106,7 @@ final class NotePlayer {
                                         overtone: note.tone.overtone,
                                         spectlope: note.tone.spectlope),
                          secRange: -.infinity ..< .infinity,
-                         envelopeMemo: .init(note.envelope),
-                         id: noteID)
+                         envelopeMemo: .init(note.envelope))
         }
         
         scoreNoder.scoreTrackItem.rendnotes += rendnotes
@@ -440,21 +439,7 @@ struct ScoreTrackItem {
     let id = UUID()
     var isEnabledSamples = true
     
-    struct NotewaveID: Hashable {
-        var lootFq: Double, noiseSeed0: UInt64, noiseSeed1: UInt64,
-            envelopeMemo: EnvelopeMemo, pitbend: Pitbend,
-            rendableDurSec: Double
-        
-        init(_ rendnote: Rendnote) {
-            lootFq = rendnote.rootFq
-            noiseSeed0 = rendnote.noiseSeed0
-            noiseSeed1 = rendnote.noiseSeed1
-            envelopeMemo = rendnote.envelopeMemo
-            pitbend = rendnote.pitbend
-            rendableDurSec = rendnote.rendableDurSec
-        }
-    }
-    fileprivate(set) var notewaveDic = [NotewaveID: Notewave]()
+    fileprivate(set) var notewaveDic = [UUID: Notewave]()
     fileprivate(set) var isChanged = false
     fileprivate(set) var sampless = [[Double]]()
     var sampleCount: Int {
@@ -480,7 +465,7 @@ extension ScoreTrackItem {
     }
     
     func notewave(from rendnote: Rendnote) -> Notewave? {
-        notewaveDic[.init(rendnote)]
+        notewaveDic[rendnote.id]
     }
     
     mutating func changeTempo(with score: Score) {
@@ -515,7 +500,7 @@ extension ScoreTrackItem {
         var isUpdate = false
         sivs.forEach {
             let rendnote = rendnotes[$0.index]
-            let notewaveID = ScoreTrackItem.NotewaveID(rendnote)
+            let notewaveID = rendnote.id
             if var notewave = notewaveDic[notewaveID] {
                 notewave = rendnote.notewave(from: notewave.noStereoSamples, stereo: $0.value,
                                              sampleRate: sampleRate)
@@ -533,7 +518,7 @@ extension ScoreTrackItem {
     }
     
     mutating func updateNotewaveDic() {
-        let newNIDs = Set(rendnotes.map { NotewaveID($0) })
+        let newNIDs = Set(rendnotes.map { $0.id })
         let oldNIDs = Set(notewaveDic.keys)
         
         for nid in oldNIDs {
@@ -541,8 +526,8 @@ extension ScoreTrackItem {
             notewaveDic[nid] = nil
         }
         
-        let ors = rendnotes.reduce(into: [NotewaveID: Rendnote]()) { $0[NotewaveID($1)] = $1 }
-        var newWillRenderRendnoteDic = [NotewaveID: Rendnote]()
+        let ors = rendnotes.reduce(into: [UUID: Rendnote]()) { $0[$1.id] = $1 }
+        var newWillRenderRendnoteDic = [UUID: Rendnote]()
         for nid in newNIDs {
             guard notewaveDic[nid] == nil else { continue }
             newWillRenderRendnoteDic[nid] = ors[nid]
@@ -1815,7 +1800,7 @@ final class ClippingAudioUnit: AUAudioUnit {
 
     override init(componentDescription: AudioComponentDescription,
                   options: AudioComponentInstantiationOptions = []) throws {
-        guard let format = AVAudioFormat(standardFormatWithSampleRate: 44100,
+        guard let format = AVAudioFormat(standardFormatWithSampleRate: Audio.defaultSampleRate,
                                          channels: 2) else { throw SError() }
         try inputBus = AUAudioUnitBus(format: format)
         inputBus.maximumChannelCount = 8

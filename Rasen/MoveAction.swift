@@ -711,6 +711,24 @@ final class MoveScoreAction: DragEventAction {
                         let cPitch = result.notePitch + result.pitch.rationalValue(intervalScale: Sheet.fullEditBeatInterval)
                         rootView.cursor = .circle(string: Pitch(value: cPitch).octaveString())
                     }
+                } else if scoreView.containsIsShownSpectrogram(scoreP, scale: rootView.screenToWorldScale) {
+                    type = .isShownSpectrogram
+                    
+                    beganScoreOption = scoreView.model.option
+                } else if abs(scoreP.x - scoreView.x(atBeat: score.beatRange.end)) < rootView.worldKnobEditDistance
+                            && abs(scoreP.y - scoreView.timelineCenterY) < Sheet.timelineHalfHeight {
+                    type = .endBeat
+                    
+                    beganScoreOption = sheetView.model.score.option
+                    beganBeatX = scoreView.x(atBeat: score.beatRange.end)
+                    oldBeat = sheetView.model.score.beatRange.end
+                } else if scoreView.containsTimeline(scoreP, scale: rootView.screenToWorldScale) {
+                    type = .allBeat
+                    
+                    beganScoreOption = sheetView.model.score.option
+                    beganBeatX = scoreView.x(atBeat: score.beatRange.start)
+                    beganNotes = score.notes.count.range.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
+                    oldBeat = sheetView.model.score.beatRange.start
                 } else if let result = scoreView.hitTestOption(scoreP, scale: rootView.screenToWorldScale) {
                     switch result {
                     case .keyBeat(let keyBeatI):
@@ -736,24 +754,6 @@ final class MoveScoreAction: DragEventAction {
                         
                         rootView.cursor = .arrowWith(string: Pitch(value: beganPitch).octaveString())
                     }
-                } else if scoreView.containsIsShownSpectrogram(scoreP, scale: rootView.screenToWorldScale) {
-                    type = .isShownSpectrogram
-                    
-                    beganScoreOption = scoreView.model.option
-                } else if abs(scoreP.x - scoreView.x(atBeat: score.beatRange.end)) < rootView.worldKnobEditDistance
-                            && abs(scoreP.y - scoreView.timelineCenterY) < Sheet.timelineHalfHeight {
-                    type = .endBeat
-                    
-                    beganScoreOption = sheetView.model.score.option
-                    beganBeatX = scoreView.x(atBeat: score.beatRange.end)
-                    oldBeat = sheetView.model.score.beatRange.end
-                } else if scoreView.containsTimeline(scoreP, scale: rootView.screenToWorldScale) {
-                    type = .allBeat
-                    
-                    beganScoreOption = sheetView.model.score.option
-                    beganBeatX = scoreView.x(atBeat: score.beatRange.start)
-                    beganNotes = score.notes.count.range.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
-                    oldBeat = sheetView.model.score.beatRange.start
                 }
             }
         case .changed:

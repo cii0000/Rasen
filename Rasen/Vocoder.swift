@@ -377,7 +377,7 @@ struct Rendnote {
     var secRange: Range<Double>
     var envelopeMemo: EnvelopeMemo
     var isRelease = false
-    var id = UUID()
+    let id = UUID()
 }
 extension Rendnote {
     init(note: Note, score: Score, snapBeatScale: Rational = .init(1, 4)) {
@@ -553,19 +553,20 @@ extension Rendnote {
         let firstFq = firstFq.clipped(min: Score.minFq, max: cutFq)
         let cutPitch = Pitch.pitch(fromFq: cutFq)
         let rootPitch = Pitch.pitch(fromFq: rootFq)
+        let startPhase = secRange.start * firstFq * .pi2
         
         let isOneSin = pitbend.isOneOvertone
         if isOneSin {
             let pi2rs = .pi2 * rSampleRate, rScale = Double.sqrt(2)
             if pitbend.isEqualAllPitch {
                 let a = firstFq * pi2rs
-                var samples = sampleCount.range.map { Double.sin(Double($0) * a) }
+                var samples = sampleCount.range.map { Double.sin(Double($0) * a + startPhase) }
                 let pitch = Pitch.pitch(fromFq: firstFq)
                 let amp = Volm.amp(fromVolm: Loudness.volm40Phon(fromPitch: pitch))
                 vDSP.multiply(amp * rScale, samples, result: &samples)
                 return samples
             } else {
-                var phase = 0.0
+                var phase = startPhase
                 return sampleCount.range.map {
                     let sec = Double($0) * rSampleRate
                     let fq = (rootFq * pitbend.fqScale(atSec: sec)).clipped(min: Score.minFq, max: cutFq)
@@ -654,7 +655,7 @@ extension Rendnote {
                 }
                 
                 let dPhase = firstFq * .pi2 * rSampleRate
-                var x = 0.0
+                var x = startPhase
                 var sin1Xs = [Double](capacity: sampleCount)
                 var cos1Xs = [Double](capacity: sampleCount)
                 var sinMXs = [Double](capacity: sampleCount)
@@ -802,7 +803,7 @@ extension Rendnote {
                     var sec: Double, fq: Double, sinCount: Int, sin1X: Double, cos1X: Double
                 }
                 let pi2rs = .pi2 * rSampleRate
-                var x = 0.0
+                var x = startPhase
                 let frames: [Frame] = sampleCount.range.map { i in
                     let sec = Double(i) * rSampleRate
                     let fq = (rootFq * pitbend.fqScale(atSec: sec)).clipped(min: Score.minFq, max: cutFq)

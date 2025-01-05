@@ -435,12 +435,11 @@ extension Sprol {
 }
 
 struct Spectlope: Hashable, Codable {
-    var sprols = [Sprol(pitch: 12 * 0, volm: 0.1, noise: 0),
-                  Sprol(pitch: 12 * 1, volm: 0.25, noise: 0),
+    var sprols = [Sprol(pitch: 12 * 0, volm: 0.25, noise: 0),
                   Sprol(pitch: 12 * 2, volm: 1, noise: 0),
-                  Sprol(pitch: 12 * 3, volm: 0.25, noise: 0),
-                  Sprol(pitch: 12 * 4, volm: 0.375, noise: 0),
-                  Sprol(pitch: 12 * 7, volm: 0.25, noise: 0),
+                  Sprol(pitch: 12 * 2.5, volm: 0.75, noise: 0),
+                  Sprol(pitch: 12 * 4, volm: 0.45, noise: 0),
+                  Sprol(pitch: 12 * 6, volm: 0.3, noise: 0),
                   Sprol(pitch: 12 * 10, volm: 0.125, noise: 0)]
 }
 extension Spectlope: Protobuf {
@@ -461,25 +460,19 @@ extension Spectlope {
         sprols = noisePitchVolms.map { .init(pitch: $0.x, volm: $0.y, noise: 1) }
     }
     static func random(pitch: Double) -> Self {
-        var spectlope = Spectlope(sprols: [Sprol(pitch: 12 * 0, volm: .random(in: 0 ..< 0.2), noise: 0),
-                                           Sprol(pitch: 12 * 1, volm: .random(in: 0.15 ..< 0.35), noise: 0),
-                                           Sprol(pitch: 12 * .random(in: 1.5 ..< 2.5), volm: 1, noise: 0),
-                                           Sprol(pitch: 12 * .random(in: 3 ..< 3.5), volm: .random(in: 0.15 ..< 0.35), noise: 0),
-                                           Sprol(pitch: 12 * .random(in: 4 ..< 5), volm: .random(in: 0.35 ..< 0.5), noise: 0),
-                                           Sprol(pitch: 12 * .random(in: 6 ..< 8), volm: .random(in: 0.2 ..< 0.35), noise: 0),
-                                           Sprol(pitch: 12 * 10, volm: .random(in: 0.1 ..< 0.2), noise: 0)])
-        for (i, sprol) in spectlope.sprols.enumerated() {
-            if pitch < sprol.pitch {
-                if i >= 1 {
-                    spectlope.sprols.removeFirst(i - 1)
-                }
-                break
-            }
-        }
-        if spectlope.sprols.count >= 2 {
-            spectlope.sprols[.first].volm = 0
-        }
-        return spectlope.normarized()
+        Spectlope(sprols: [Sprol(pitch: 12 * 0, volm: 0.25, noise: 0),
+                           Sprol(pitch: 12 * 2, volm: 1, noise: 0),
+                           Sprol(pitch: 12 * 2.5, volm: 0.75, noise: 0),
+                           Sprol(pitch: 12 * 4, volm: 0.45, noise: 0),
+                           Sprol(pitch: 12 * 4.5, volm: .random(in: 0.25 ..< 0.425), noise: 0),
+                           Sprol(pitch: 12 * 5, volm: .random(in: 0.35 ..< 0.7), noise: 0),
+                           Sprol(pitch: 12 * 5.5, volm: .random(in: 0 ..< 0.35), noise: 0),
+                           Sprol(pitch: 12 * 6, volm: .random(in: 0.275 ..< 0.5), noise: 0),
+                           Sprol(pitch: 12 * 6.5, volm: .random(in: 0 ..< 0.275), noise: 0),
+                           Sprol(pitch: 12 * 7, volm: .random(in: 0.2 ..< 0.5), noise: 0),
+                           Sprol(pitch: 12 * 7.5, volm: .random(in: 0 ..< 0.2), noise: 0),
+                           Sprol(pitch: 12 * 8, volm: .random(in: 0.125 ..< 0.2), noise: 0),
+                           Sprol(pitch: 12 * 10, volm: 0.125, noise: 0)])
     }
 }
 extension Spectlope {
@@ -1533,7 +1526,8 @@ struct Chord: Hashable, Codable {
 }
 extension Chord {
     init?(pitchs: [Int]) {
-        let unisons = Set(pitchs.map { $0.mod(12) }).sorted()
+        let mods = pitchs.map { $0.mod(12) }
+        let unisons = Set(mods).sorted()
         guard unisons.count >= 2 else {
             if unisons.count == 1 && pitchs.count >= 2 {
                 self.init(typers: [.init(.octave, unison: unisons[0])])
@@ -1581,6 +1575,18 @@ extension Chord {
                     }
                 }
             }
+        }
+        
+        var filledUnisons = Set<Int>(), octaveUnisons = Set<Int>()
+        for unison in mods {
+            if filledUnisons.contains(unison) {
+                octaveUnisons.insert(unison)
+            } else {
+                filledUnisons.insert(unison)
+            }
+        }
+        for unison in octaveUnisons.sorted() {
+            typers.append(.init(.octave, unison: unison))
         }
         
         guard !typers.isEmpty else { return nil }

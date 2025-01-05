@@ -786,7 +786,7 @@ extension ScoreView {
                 let colors: [Color] = pitchAndTyper.typers.map {
                     switch $0.type {
                     case .octave: .init(red: 0.65, green: 0.65, blue: 0.65)
-                    case .power: .init(red: 0.88, green: 0.88, blue: 0.75)
+                    case .power: .init(red: 0.8, green: 0.8, blue: 0.68)
                         
                     case .major: .init(red: 0.9, green: 0.8, blue: 0)
                     case .major3: .init(red: 0.9, green: 0.8, blue: 0).with(lightness: 93)
@@ -1883,7 +1883,7 @@ extension ScoreView {
         let toneMaxDSq = toneMaxD * toneMaxD
         var minDSq = Double.infinity, minResult: (noteI: Int, result: PointHitResult)?
         var containsNote = false
-        var isPit = false
+        var isPit = false, pds = [Point: Double]()
         for (noteI, note) in model.notes.enumerated().reversed() {
             if note.spectlopeHeight == Sheet.spectlopeHeight ? isFullEdit : isEditTone {
                 for (pitIs, toneFrame) in toneFrames(from: note) {
@@ -1917,44 +1917,78 @@ extension ScoreView {
                 }
             }
             
+            let pointline = pointline(from: note)
             let nsx = x(atBeat: note.beatRange.start)
             let nex = x(atBeat: note.beatRange.end)
+            let nsy = noteY(atBeat: note.beatRange.start, from: note)
+            let ney = noteY(atBeat: note.beatRange.end, from: note)
             let nw = nex - nsx
             let nMaxDSq = note.pits.count == 1 && nw / 4 < maxD ? (nw / 4).squared : maxDSq
             for pitI in note.pits.count.range {
                 let pitP = pitPosition(atPit: pitI, from: note)
                 let dSq = pitP.distanceSquared(p)
-                if dSq < minDSq && dSq < nMaxDSq {
-                    minDSq = dSq
-                    minResult = (noteI, .pit(pitI: pitI))
-                    isPit = true
+                if dSq <= minDSq && dSq < nMaxDSq {
+                    let pdSq = pointline.minDistanceSquared(at: p)
+                    if let minPDSq = pds[pitP] {
+                        if pdSq < minPDSq {
+                            pds[pitP] = pdSq
+                            minDSq = dSq
+                            minResult = (noteI, .pit(pitI: pitI))
+                            isPit = true
+                        }
+                    } else {
+                        pds[pitP] = pdSq
+                        minDSq = dSq
+                        minResult = (noteI, .pit(pitI: pitI))
+                        isPit = true
+                    }
+                }
+            }
+            if note.pits.last?.beat != note.beatRange.length {
+                let pitP = Point(nex, ney)
+                let dSq = pitP.distanceSquared(p)
+                if dSq <= minDSq && dSq < nMaxDSq {
+                    let pdSq = pointline.minDistanceSquared(at: p)
+                    if let minPDSq = pds[pitP] {
+                        if pdSq < minPDSq {
+                            pds[pitP] = pdSq
+                            minDSq = dSq
+                            minResult = (noteI, .endBeat)
+                            isPit = true
+                        }
+                    } else {
+                        pds[pitP] = pdSq
+                        minDSq = dSq
+                        minResult = (noteI, .endBeat)
+                        isPit = true
+                    }
                 }
             }
             
             let noteD = noteH(from: note) / 2
             let maxPitD = Sheet.knobEditDistance * scale + noteD
-            let nfsw = (nex - nsx) / scale
-            let dx = nfsw.clipped(min: 3, max: 30, newMin: 1, newMax: 8) * scale
-            let nsy = noteY(atBeat: note.beatRange.start, from: note)
-            let ney = noteY(atBeat: note.beatRange.end, from: note)
-            let ndx = note.pits.count == 1 && nw / 4 < dx ? nw / 4 : dx
-            let pdSq = pointline(from: note).minDistanceSquared(at: p)
-            if p.x < nsx + ndx && abs(p.y - nsy) < maxD {
-                let dSq = min(pdSq, p.distanceSquared(.init(nsx, nsy)))
-                if dSq < minDSq && pdSq < maxPitD * maxPitD {
-                    minDSq = dSq
-                    minResult = (noteI, .startBeat)
-                }
-            } else if p.x > nex - ndx && abs(p.y - ney) < maxD {
-                let dSq = min(pdSq, p.distanceSquared(.init(nex, ney)))
-                if dSq < minDSq && pdSq < maxPitD * maxPitD {
-                    minDSq = dSq
-                    minResult = (noteI, .endBeat)
-                }
-            } else if !isPit {
-                if pdSq < minDSq && pdSq < maxPitD * maxPitD {
-                    minDSq = pdSq
-                    minResult = (noteI, .note)
+            if !isPit {
+                let nfsw = (nex - nsx) / scale
+                let dx = nfsw.clipped(min: 3, max: 30, newMin: 1, newMax: 8) * scale
+                let ndx = note.pits.count == 1 && nw / 4 < dx ? nw / 4 : dx
+                let pdSq = pointline.minDistanceSquared(at: p)
+                if p.x < nsx + ndx && abs(p.y - nsy) < maxD {
+                    let dSq = min(pdSq, p.distanceSquared(.init(nsx, nsy)))
+                    if dSq < minDSq && pdSq < maxPitD * maxPitD {
+                        minDSq = dSq
+                        minResult = (noteI, .startBeat)
+                    }
+                } else if p.x > nex - ndx && abs(p.y - ney) < maxD {
+                    let dSq = min(pdSq, p.distanceSquared(.init(nex, ney)))
+                    if dSq < minDSq && pdSq < maxPitD * maxPitD {
+                        minDSq = dSq
+                        minResult = (noteI, .endBeat)
+                    }
+                } else {
+                    if pdSq < minDSq && pdSq < maxPitD * maxPitD {
+                        minDSq = pdSq
+                        minResult = (noteI, .note)
+                    }
                 }
             }
             
@@ -1963,7 +1997,7 @@ extension ScoreView {
             let nf = noteFrame(at: noteI).outset(by: hnh)
             let ods = nf.distanceSquared(p)
             if ods < maxPitDS {
-                let ds = pointline(from: note).minDistanceSquared(at: p)
+                let ds = pointline.minDistanceSquared(at: p)
                 if ds < noteD * noteD {
                     containsNote = true
                 }
