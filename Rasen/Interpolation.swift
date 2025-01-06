@@ -17,7 +17,7 @@
 
 struct Interpolation<Value: MonoInterpolatable & Equatable> {
     enum KeyType: Int8, Hashable, Codable {
-        case step, spline
+        case step, linear, spline
     }
     struct Key {
         var value: Value
@@ -77,12 +77,16 @@ extension Interpolation {
         guard !keys.isEmpty else { return nil }
         let i1 = timeResult.index
         let k1 = keys[i1]
-        guard k1.type == .spline && keys.count > 1,
+        guard k1.type != .step && keys.count > 1,
            timeResult.sectionTime > 0 else { return k1.value }
         if !isLoop && i1 + 1 >= keys.count {
             return k1.value
         }
         let k2 = keys[i1 + 1 >= keys.count ? 0 : i1 + 1]
+        if k1.type == .linear {
+            let t = timeResult.internalTime / timeResult.sectionTime
+            return Value.linear(k1.value, k2.value, t: t)
+        }
         if !isLoop && i1 - 1 < 0 {
             let t = timeResult.internalTime / timeResult.sectionTime
             if i1 + 2 >= keys.count {
@@ -139,13 +143,17 @@ extension Interpolation {
         guard !keys.isEmpty else { return nil }
         let i1 = timeResult.index
         let k1 = keys[i1]
-        guard k1.type == .spline && keys.count > 1,
+        guard k1.type != .step && keys.count > 1,
            timeResult.sectionTime > 0 else { return k1.value }
         if !isLoop && i1 + 1 >= keys.count {
             return k1.value
         }
         let k2 = keys[i1 + 1 >= keys.count ? 0 : i1 + 1]
         guard k1.value != k2.value else { return k1.value }
+        if k1.type == .linear {
+            let t = timeResult.internalTime / timeResult.sectionTime
+            return Value.linear(k1.value, k2.value, t: t)
+        }
         if !isLoop && i1 - 1 < 0 {
             let t = timeResult.internalTime / timeResult.sectionTime
             if i1 + 2 >= keys.count {

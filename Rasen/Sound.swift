@@ -1261,31 +1261,13 @@ extension Note {
             }
         }
         
-        var pitKeys: [Interpolation<InterPit>.Key] = pits.map {
-            .init(value: .init(pitch: .init($0.pitch),
-                               stereo: $0.stereo,
-                               tone: $0.tone,
-                               lyric: $0.lyric),
-                  time: .init($0.beat),
-                  type: .spline)
-        }
-        if pits.first?.beat != 0 {
-            pitKeys.insert(.init(value: pitKeys.first!.value, time: 0, type: .spline), at: 0)
-        }
-        let durSec = Double(beatRange.length)
-        if pits.last?.beat != beatRange.length {
-            pitKeys.append(.init(value: pitKeys.last!.value, time: durSec, type: .spline))
-        }
-        let it = Interpolation<InterPit>(keys: pitKeys, duration: durSec)
-        guard let value = it.monoValueEnabledFirstLast(withT: .init(beat), isLoop: false) else {
-            let pit = firstPit
-            return .init(notePitch: pitch, pitch: .rational(pit.pitch), stereo: pit.stereo,
-                         tone: pit.tone, lyric: pit.lyric,
-                         envelope: envelope, id: id)
-        }
-        return .init(notePitch: pitch, pitch: .real(value.pitch),
-                     stereo: value.stereo,
-                     tone: value.tone, lyric: value.lyric,
+        let sec = beat * 60 / 120
+        let pitbend = pitbend(fromTempo: 120)
+        return .init(notePitch: pitch, pitch: .real(pitbend.pitch(atSec: sec) * 12),
+                     stereo: pitbend.stereo(atSec: sec),
+                     tone: .init(overtone: pitbend.overtone(atSec: sec),
+                                 spectlope: pitbend.spectlope(atSec: sec),
+                                 id: .init()), lyric: "",
                      envelope: envelope, id: id)
     }
     func normarizedPitResult(atBeat beat: Double) -> PitResult {

@@ -258,16 +258,17 @@ struct Pitbend: Codable, Hashable {
         let spectlopes = pits.map { $0.tone.spectlope.with(count: spectlopeCount) }
         let secs = pits.map { Double(Score.sec(fromBeat: $0.beat, tempo: tempo)) }
         let durSec = Double(Score.sec(fromBeat: beatRange.length, tempo: tempo))
-        func interpolation<T: MonoInterpolatable & Equatable>(isAll: Bool, _ vs: [T]) -> Interpolation<T> {
+        func interpolation<T: MonoInterpolatable & Equatable>(isAll: Bool, _ vs: [T],
+                                                              _ type: Interpolation<T>.KeyType = .spline) -> Interpolation<T> {
             guard !isAll else { return .init() }
             var pitKeys = zip(vs, secs).map {
-                Interpolation.Key(value: $0.0, time: $0.1, type: .spline)
+                Interpolation.Key(value: $0.0, time: $0.1, type: type)
             }
             if pits.first!.beat > 0 {
-                pitKeys.insert(.init(value: pitKeys.first!.value, time: 0, type: .spline), at: 0)
+                pitKeys.insert(.init(value: pitKeys.first!.value, time: 0, type: type), at: 0)
             }
             if pits.last!.beat < beatRange.length {
-                pitKeys.append(.init(value: pitKeys.last!.value, time: durSec, type: .spline))
+                pitKeys.append(.init(value: pitKeys.last!.value, time: durSec, type: type))
             }
             return .init(keys: pitKeys, duration: durSec)
         }
@@ -281,7 +282,7 @@ struct Pitbend: Codable, Hashable {
         let firstStereo = stereos.first!
         self.firstStereo = firstStereo
         isEqualAllStereo = stereos.allSatisfy { $0 == firstStereo }
-        stereoInterpolation = interpolation(isAll: isEqualAllStereo, stereos)
+        stereoInterpolation = interpolation(isAll: isEqualAllStereo, stereos, .linear)
         
         let firstOvertone = overtones.first!
         self.firstOvertone = firstOvertone
