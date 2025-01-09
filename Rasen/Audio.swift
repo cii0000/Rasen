@@ -441,6 +441,7 @@ struct ScoreTrackItem {
     
     fileprivate(set) var notewaveDic = [UUID: Notewave]()
     fileprivate(set) var isChanged = false
+    fileprivate(set) var lufs = 0.0
     fileprivate(set) var sampless = [[Double]]()
     var sampleCount: Int {
         sampless.isEmpty ? 0 : sampless[0].count
@@ -487,13 +488,6 @@ extension ScoreTrackItem {
         rendnotes.replace(noteIVs.map {
             IndexValue(value: Rendnote(note: $0.value, score: score), index: $0.index)
         })
-    }
-    
-    mutating func replace(_ eivs: [IndexValue<Envelope>]) {
-        eivs.forEach { replace($0.value, at: $0.index) }
-    }
-    mutating func replace(_ envelope: Envelope, at noteI: Int) {
-        rendnotes[noteI].envelopeMemo = .init(envelope)
     }
     
     mutating func replace(_ sivs: [IndexValue<Stereo>]) {
@@ -590,6 +584,7 @@ extension ScoreTrackItem {
         }
         
         let lufs = (try? Loudness(sampleRate: sampleRate).integratedLoudnessDb(data: sampless)) ?? 0
+        self.lufs = lufs
         if lufs > targetLoudnessDb {
             let gain = Loudness.normalizeLoudnessScale(inputLoudness: lufs, targetLoudness: targetLoudnessDb)
             vDSP.multiply(gain, sampless[0], result: &sampless[0])

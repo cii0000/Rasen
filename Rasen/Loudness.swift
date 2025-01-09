@@ -145,8 +145,8 @@ struct IIRfilter {
 }
 
 struct Loudness {
-    private static let pitchVolms = [Point(22.5, 1.45),
-                                     Point(27.5, 1.3),
+    private static let pitchVolms = [Point(22.5, 1.25),
+                                     Point(27.5, 1.2),
                                      Point(43.3, 1.1),
                                      Point(71.2, 1),
                                      Point(75.0, 1.05),
@@ -173,6 +173,29 @@ struct Loudness {
     }
     static func reverseVolm40Phon(fromPitch pitch: Double) -> Double {
         1 / volm40Phon(fromPitch: pitch)
+    }
+    
+    private static let pitchClearVolms = [Point(0, 1),
+                                          Point(48, 1),
+                                          Point(92, 0.65),
+                                          Point(120, 0.25)]
+    static func clearVolm40Phon(fromPitch pitch: Double) -> Double {
+        var prePitchVolm = pitchClearVolms.first!
+        if pitch < prePitchVolm.x {
+            return prePitchVolm.y
+        }
+        for i in 1 ..< pitchClearVolms.count {
+            let pitchVolum = pitchClearVolms[i]
+            if pitch < pitchVolum.x {
+                let t = (pitch - prePitchVolm.x) / (pitchVolum.x - prePitchVolm.x)
+                return Double.linear(prePitchVolm.y, pitchVolum.y, t: t)
+            }
+            prePitchVolm = pitchVolum
+        }
+        return prePitchVolm.y
+    }
+    static func reverseClearVolm40Phon(fromPitch pitch: Double) -> Double {
+        1 / clearVolm40Phon(fromPitch: pitch)
     }
     
     enum FilterClass: String {

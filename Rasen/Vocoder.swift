@@ -487,7 +487,7 @@ extension Rendnote {
             if pan == 0 {
                 sampless = [nSamples, nSamples]
             } else {
-                let nPan = pan.clipped(min: -1, max: 1) * 0.75
+                let nPan = pan.clipped(min: -1, max: 1)
                 if nPan < 0 {
                     sampless = [nSamples, vDSP.multiply(Volm.amp(fromVolm: 1 + nPan), nSamples)]
                 } else {
@@ -506,7 +506,7 @@ extension Rendnote {
                     sampless[0].append(sample)
                     sampless[1].append(sample)
                 } else {
-                    let nPan = pan.clipped(min: -1, max: 1) * 0.75
+                    let nPan = pan.clipped(min: -1, max: 1)
                     if nPan < 0 {
                         sampless[0].append(sample)
                         sampless[1].append(sample * Volm.amp(fromVolm: 1 + nPan))
@@ -555,6 +555,7 @@ extension Rendnote {
         let cutPitch = Pitch.pitch(fromFq: cutFq)
         let rootPitch = Pitch.pitch(fromFq: rootFq)
         let startPhase = secRange.start.isInfinite ? 0.0 : (secRange.start * firstFq * .pi2)
+        let firstClearVolm = Loudness.clearVolm40Phon(fromPitch: Pitch.pitch(fromFq: firstFq))
         
         let isOneSin = pitbend.isOneOvertone
         if isOneSin {
@@ -564,7 +565,7 @@ extension Rendnote {
                 var samples = sampleCount.range.map { Double.sin(Double($0) * a + startPhase) }
                 let pitch = Pitch.pitch(fromFq: firstFq)
                 let amp = Volm.amp(fromVolm: Loudness.volm40Phon(fromPitch: pitch))
-                vDSP.multiply(amp * rScale, samples, result: &samples)
+                vDSP.multiply(amp * rScale * firstClearVolm, samples, result: &samples)
                 return samples
             } else {
                 var phase = startPhase
@@ -573,7 +574,7 @@ extension Rendnote {
                     let fq = (rootFq * pitbend.fqScale(atSec: sec)).clipped(min: Score.minFq, max: cutFq)
                     let pitch = Pitch.pitch(fromFq: fq)
                     let amp = Volm.amp(fromVolm: Loudness.volm40Phon(fromPitch: pitch))
-                    let v = amp * rScale * Double.sin(phase)
+                    let v = amp * rScale * Double.sin(phase) * Loudness.clearVolm40Phon(fromPitch: pitch)
                     phase += fq * pi2rs
                     return v
                 }
@@ -652,7 +653,7 @@ extension Rendnote {
                     mainSpectrum.append(a * mainScale)
                     sign = !sign
                     prePitch = pitch
-                    return amp
+                    return amp * firstClearVolm
                 }
                 
                 let dPhase = firstFq * .pi2 * rSampleRate
@@ -902,7 +903,8 @@ extension Rendnote {
                     }
                     let rms = (rmsV / 2).squareRoot()
                     let scale = rms == 0 ? 0 : 1 / rms
-                    vDSP.multiply(scale, spectrum, result: &spectrum)
+                    let clearVolm = Loudness.clearVolm40Phon(fromPitch: Pitch.pitch(fromFq: frame.fq))
+                    vDSP.multiply(scale * clearVolm, spectrum, result: &spectrum)
                     vDSP.multiply(scale, mainSpectrum, result: &mainSpectrum)
                     
                     if i > 0 {

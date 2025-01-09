@@ -1024,8 +1024,56 @@ final class LineAction: Action {
         if let sheetView = rootView.sheetView(at: p) {
             let scoreView = sheetView.scoreView
             let scoreP = scoreView.convertFromWorld(p)
-            let nLine = tempLine * Transform(translation: -centerBounds.origin)
+            let nLine = tempLine * Transform(translation: -centerBounds.origin - Point(0, scoreView.timelineY))
+            let scale = rootView.screenToWorldScale
             let lasso = Lasso(line: nLine)
+            let edge = Edge(nLine.firstPoint, nLine.lastPoint)
+            let length = edge.length
+            let d = nLine.controls.maxValue { edge.distanceSquared(from: $0.point) }?.squareRoot() ?? 0
+            if let lb = nLine.bounds, d < 5 * scale && length > 10 * scale {
+                let x = lb.midX
+                let beatInterval = rootView.currentBeatInterval
+                let pitchInterval = rootView.currentPitchInterval
+                let beat = scoreView.beat(atX: x, interval: beatInterval)
+                let nis = (0 ..< scoreView.model.notes.count).compactMap { i in
+                    lasso.intersects(scoreView.pointline(from: scoreView.model.notes[i])) ? i : nil
+                }
+                var notes = [Note](), replaceIVs = [IndexValue<Note>]()
+                for noteI in nis {
+                    let note = scoreView.model.notes[noteI]
+                    let pit = scoreView.splittedPit(at: .init(x, 0), at: noteI,
+                                                    beatInterval: beatInterval,
+                                                    pitchInterval: pitchInterval)
+                    if pit.beat >= 0 && pit.beat < note.beatRange.length,
+                       let pitI = note.pits.enumerated().reversed().first(where: { $0.element.beat + note.beatRange.start <= beat })?.offset {
+                        let isLastAppend = pitI == 0 || note.pits[pitI].pitch != pit.pitch
+                        let nPits = ([pit] + (pitI + 1 < note.pits.count ? Array(note.pits[(pitI + 1)...]) : [])).map {
+                            var nPit = $0
+                            nPit.beat -= pit.beat
+                            return nPit
+                        }
+                        let nNote0 = Note(beatRange: note.beatRange.start ..< (pit.beat + note.beatRange.start),
+                                          pitch: note.pitch,
+                                          pits: Array(note.pits[...pitI]) + (isLastAppend ? [pit] : []),
+                                          envelope: note.envelope,
+                                          spectlopeHeight: note.spectlopeHeight, id: note.id)
+                        let nNote1 = Note(beatRange: (pit.beat + note.beatRange.start) ..< note.beatRange.end,
+                                          pitch: note.pitch,
+                                          pits: nPits,
+                                          envelope: note.envelope,
+                                          spectlopeHeight: note.spectlopeHeight, id: .init())
+                        replaceIVs.append(.init(value: nNote0, index: noteI))
+                        notes.append(nNote1)
+                    }
+                }
+                if !replaceIVs.isEmpty {
+                    sheetView.newUndoGroup()
+                    sheetView.replace(replaceIVs)
+                    sheetView.append(notes)
+                }
+                return
+            }
+            
             let nis = (0 ..< scoreView.model.notes.count).compactMap { i in
                 lasso.intersects(scoreView.pointline(from: scoreView.model.notes[i])) ? i : nil
             }

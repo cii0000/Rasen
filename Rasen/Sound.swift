@@ -435,12 +435,12 @@ extension Sprol {
 }
 
 struct Spectlope: Hashable, Codable {
-    var sprols = [Sprol(pitch: 12 * 0, volm: 0.25, noise: 0),
-                  Sprol(pitch: 12 * 2, volm: 1, noise: 0),
-                  Sprol(pitch: 12 * 2.5, volm: 0.75, noise: 0),
-                  Sprol(pitch: 12 * 4, volm: 0.45, noise: 0),
-                  Sprol(pitch: 12 * 6, volm: 0.3, noise: 0),
-                  Sprol(pitch: 12 * 10, volm: 0.125, noise: 0)]
+    var sprols = [Sprol(pitch: 12 * 0, volm: 0.5, noise: 0),
+                  Sprol(pitch: 12 * 1.5, volm: 1, noise: 0),
+                  Sprol(pitch: 12 * 2.5, volm: 0.85, noise: 0),
+                  Sprol(pitch: 12 * 4, volm: 0.6, noise: 0),
+                  Sprol(pitch: 12 * 6, volm: 0.4, noise: 0),
+                  Sprol(pitch: 12 * 10, volm: 0.15, noise: 0)]
 }
 extension Spectlope: Protobuf {
     init(_ pb: PBSpectlope) throws {
@@ -460,7 +460,7 @@ extension Spectlope {
         sprols = noisePitchVolms.map { .init(pitch: $0.x, volm: $0.y, noise: 1) }
     }
     static func random(pitch: Double) -> Self {
-        Spectlope(sprols: [Sprol(pitch: 12 * 0, volm: 0.25, noise: 0),
+        Spectlope(sprols: [Sprol(pitch: 12 * 0, volm: 0.5, noise: 0),
                            Sprol(pitch: 12 * 2, volm: 1, noise: 0),
                            Sprol(pitch: 12 * 2.5, volm: 0.75, noise: 0),
                            Sprol(pitch: 12 * 4, volm: 0.45, noise: 0),
@@ -922,7 +922,7 @@ extension Tone: MonoInterpolatable {
 }
 
 struct Pit: Codable, Hashable {
-    var beat = Rational(0), pitch = Rational(0), stereo = Stereo(volm: 0.375), tone = Tone(), lyric = ""
+    var beat = Rational(0), pitch = Rational(0), stereo = Stereo(volm: 0.4375), tone = Tone(), lyric = ""
 }
 extension Pit: Protobuf {
     init(_ pb: PBPit) throws {
@@ -1666,7 +1666,11 @@ extension Chord {
     }
     
     static func approximationJustIntonation5Limit(pitch: Rational) -> Rational {
-        switch pitch {
+        let intPitch = (pitch / 12).rounded(.down)
+        return approximationJustIntonation5Limit(unison: pitch.mod(12)) + intPitch * 12
+    }
+    static func approximationJustIntonation5Limit(unison: Rational) -> Rational {
+        switch unison {
         case 1: 1 + .init(1173, 10000)
         case 2: 2 + .init(391, 10000)
         case 3: 3 + .init(1564, 10000)
@@ -1678,7 +1682,7 @@ extension Chord {
         case 9: 9 + .init(-1564, 10000)
         case 10: 10 + .init(-391, 10000)
         case 11: 11 + .init(-1173, 10000)
-        default: pitch
+        default: 0
         }
     }
     static func justIntonationRatio5Limit(unison: Int) -> Rational {

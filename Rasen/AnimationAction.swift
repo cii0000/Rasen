@@ -837,7 +837,7 @@ final class InsertKeyframeAction: InputKeyEventAction {
                                                                  enabledTone: true) {
                         let score = scoreView.model
                         let scoreP = scoreView.convertFromWorld(p)
-                        if let (pitI, _) = scoreView.pitIAndSprolI(at: scoreP, at: noteI) {
+                        if let (pitI, _) = scoreView.pitIAndSprolI(at: scoreP, at: noteI, scale: rootView.screenToWorldScale) {
                             let (_, sprol) = scoreView.nearestSprol(at: scoreP, at: noteI)
                             let oldTone = score.notes[noteI].pits[pitI].tone
                             var tone = oldTone

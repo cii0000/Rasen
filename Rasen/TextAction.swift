@@ -203,15 +203,22 @@ final class LookUpAction: InputKeyEventAction {
                   sheetView.scoreView.contains(sheetView.scoreView.convertFromWorld(p),
                                                scale: rootView.screenToWorldScale) {
             let scoreView = sheetView.scoreView
-            let pitchInterval = rootView.currentPitchInterval
-            let pitch = Pitch(value: scoreView.pitch(atY: scoreView.convertFromWorld(p).y, interval: pitchInterval))
-            let fqStr = "\(pitch.octaveString()) (\(pitch.fq.string(digitsCount: 2)) Hz)".localized
-            let typers = scoreView.chordTypers(at: scoreView.convertFromWorld(p), scale: rootView.screenToWorldScale)
-            if !typers.isEmpty {
-                let str = typers.reduce(into: "") { $0 += (!$0.isEmpty ? " " : "") + $1.type.description }
-                rootView.show(fqStr + " " + str, at: p)
+            let scoreP = scoreView.convertFromWorld(p)
+            if scoreView.containsTimeline(scoreP, scale: rootView.screenToWorldScale) {
+                scoreView.scoreTrackItem?.updateNotewaveDic()
+                let lufs = scoreView.scoreTrackItem?.lufs ?? 0
+                rootView.show("Score".localized + "\n\t\("Loudness".localized): \(lufs) LUFS", at: p)
             } else {
-                rootView.show(fqStr, at: p)
+                let pitchInterval = rootView.currentPitchInterval
+                let pitch = Pitch(value: scoreView.pitch(atY: scoreP.y, interval: pitchInterval))
+                let fqStr = "\(pitch.octaveString()) (\(pitch.fq.string(digitsCount: 2)) Hz)".localized
+                let typers = scoreView.chordTypers(at: scoreView.convertFromWorld(p), scale: rootView.screenToWorldScale)
+                if !typers.isEmpty {
+                    let str = typers.reduce(into: "") { $0 += (!$0.isEmpty ? " " : "") + $1.type.description }
+                    rootView.show(fqStr + " " + str, at: p)
+                } else {
+                    rootView.show(fqStr, at: p)
+                }
             }
         } else if let sheetView = rootView.sheetView(at: p),
                   let (node, contentView) = sheetView.spectrogramNode(at: sheetView.convertFromWorld(p)) {

@@ -469,7 +469,7 @@ extension ScoreView {
         spectlopesNode.children.replace(seivs)
         octaveNode.children.replace(noivs.enumerated().map { .init(value: octaveNode(fromPitch: nivs[$0.offset].value.firstPitch, $0.element.value.children[0].clone), index: $0.element.index) })
         
-        scoreTrackItem?.replace(eivs)
+        scoreTrackItem?.replace(nivs, with: model)
     }
     func remove(at noteI: Int) {
         unupdateModel.notes.remove(at: noteI)
@@ -1805,19 +1805,19 @@ extension ScoreView {
     }
     func noteIndex(at p: Point, scale: Double, enabledTone: Bool = false, enabledRelease: Bool = false) -> Int? {
         let hnh = pitchHeight / 2
-        var minDS = Double.infinity, minI: Int?
+        var minDSq = Double.infinity, minI: Int?
         for (noteI, note) in model.notes.enumerated().reversed() {
             let noteD = noteH(from: note) / 2
             let maxPitD = Sheet.knobEditDistance * scale + noteD
-            let maxPitDS = maxPitD * maxPitD
+            let maxPitDSq = maxPitD * maxPitD
             let nf = noteFrame(at: noteI).outset(by: hnh)
-            let ods = nf.distanceSquared(p)
-            if ods < maxPitDS {
-                let ds = pointline(from: note).minDistanceSquared(at: p)
-                if ds < noteD * noteD {
+            let oDSq = nf.distanceSquared(p)
+            if oDSq < maxPitDSq {
+                let dSq = pointline(from: note).minDistanceSquared(at: p)
+                if dSq < noteD * noteD {
                     return noteI
-                } else if ds < minDS && ds < maxPitDS {
-                    minDS = ds
+                } else if dSq < minDSq && dSq < maxPitDSq {
+                    minDSq = dSq
                     minI = noteI
                 }
             }
@@ -1825,10 +1825,10 @@ extension ScoreView {
             if enabledTone {
                 for (_, toneFrame) in toneFrames(from: note) {
                     let maxD = Sheet.knobEditDistance * scale
-                    let maxDS = maxD * maxD
+                    let maxDSq = maxD * maxD
                     
-                    let ds = toneFrame.distanceSquared(p)
-                    if ds < minDS && ds < maxDS {
+                    let dSq = toneFrame.distanceSquared(p)
+                    if dSq < minDSq && dSq < maxDSq {
                         return noteI
                     }
                 }
@@ -1836,26 +1836,26 @@ extension ScoreView {
             
             if enabledRelease {
                 let maxD = Sheet.knobEditDistance * scale
-                let maxDS = maxD * maxD
+                let maxDSq = maxD * maxD
                 
                 let erp = earlyReverbPosition(from: note)
                 let elrp = lateReverbPosition(from: note)
-                var ds = erp.distanceSquared(p)
-                if ds < minDS && ds < maxDS && (erp.x == elrp.x ? p.x < erp.x : true) {
-                    minDS = ds
+                var dSq = erp.distanceSquared(p)
+                if dSq < minDSq && dSq < maxDSq && (erp.x == elrp.x ? p.x < erp.x : true) {
+                    minDSq = dSq
                     minI = noteI
                 }
                 
-                ds = elrp.distanceSquared(p)
-                if ds < minDS && ds < maxDS && (erp.x == elrp.x ? p.x > erp.x : true) {
-                    minDS = ds
+                dSq = elrp.distanceSquared(p)
+                if dSq < minDSq && dSq < maxDSq && (erp.x == elrp.x ? p.x > erp.x : true) {
+                    minDSq = dSq
                     minI = noteI
                 }
                 
                 let drp = durReverbPosition(from: note)
-                ds = drp.distanceSquared(p)
-                if ds < minDS && ds < maxDS && (elrp.x == drp.x ? p.x > elrp.x : true) {
-                    minDS = ds
+                dSq = drp.distanceSquared(p)
+                if dSq < minDSq && dSq < maxDSq && (elrp.x == drp.x ? p.x > elrp.x : true) {
+                    minDSq = dSq
                     minI = noteI
                 }
             }
@@ -1993,13 +1993,13 @@ extension ScoreView {
             }
             
             let hnh = pitchHeight / 2
-            let maxPitDS = maxPitD * maxPitD
+            let maxPitDSq = maxPitD * maxPitD
             let nf = noteFrame(at: noteI).outset(by: hnh)
-            let ods = nf.distanceSquared(p)
-            if ods < maxPitDS {
-                let ds = pointline.minDistanceSquared(at: p)
-                if ds < noteD * noteD {
-                    containsNote = true
+            let oDSq = nf.distanceSquared(p)
+            if oDSq < maxPitDSq {
+                let dSq = pointline.minDistanceSquared(at: p)
+                if dSq < noteD * noteD && p.x >= nsx && p.x < nex {
+                    return minResult ?? (noteI, .note)
                 }
             }
         }
@@ -2128,7 +2128,7 @@ extension ScoreView {
                            Sheet.knobEditDistance * scale)
         let toneMaxDSq = toneMaxD * toneMaxD
         var minDSq = Double.infinity, minResult: (noteI: Int, result: ColorHitResult)?
-        
+        var pds = [Point: Double]()
         for (noteI, note) in model.notes.enumerated().reversed() {
             if note.spectlopeHeight == Sheet.spectlopeHeight ? isFullEdit : isEditTone {
                 for (pitIs, toneFrame) in toneFrames(from: note) {
@@ -2190,24 +2190,39 @@ extension ScoreView {
                 }
             }
             
+            let pointline = pointline(from: note)
+            let nsx = x(atBeat: note.beatRange.start)
+            let nex = x(atBeat: note.beatRange.end)
+            let nw = nex - nsx
+            let nMaxDSq = note.pits.count == 1 && nw / 4 < maxD ? (nw / 4).squared : maxDSq
             for pitI in note.pits.count.range {
                 let pitP = pitPosition(atPit: pitI, from: note)
                 let dSq = pitP.distanceSquared(p)
-                if dSq < minDSq && dSq < maxDSq {
-                    minDSq = dSq
-                    minResult = (noteI, .pit(pitI: pitI))
+                if dSq <= minDSq && dSq < nMaxDSq {
+                    let pdSq = pointline.minDistanceSquared(at: p)
+                    if let minPDSq = pds[pitP] {
+                        if pdSq < minPDSq {
+                            pds[pitP] = pdSq
+                            minDSq = dSq
+                            minResult = (noteI, .pit(pitI: pitI))
+                        }
+                    } else {
+                        pds[pitP] = pdSq
+                        minDSq = dSq
+                        minResult = (noteI, .pit(pitI: pitI))
+                    }
                 }
             }
             
             let hnh = pitchHeight / 2
             let noteD = noteH(from: note) / 2
             let maxPitD = Sheet.knobEditDistance * scale + noteD
-            let maxPitDS = maxPitD * maxPitD
+            let maxPitDSq = maxPitD * maxPitD
             let nf = noteFrame(at: noteI).outset(by: hnh)
-            let ods = nf.distanceSquared(p)
-            if ods < maxPitDS {
-                let ds = pointline(from: note).minDistanceSquared(at: p)
-                if ds < noteD * noteD {
+            let odSq = nf.distanceSquared(p)
+            if odSq < maxPitDSq {
+                let dSq = pointline.minDistanceSquared(at: p)
+                if dSq < noteD * noteD && p.x >= nsx && p.x < nex {
                     return minResult ?? (noteI, .note)
                 }
             }
@@ -2219,12 +2234,12 @@ extension ScoreView {
                 guard !note.isDefaultTone else { continue }
                 let noteD = noteH(from: note) / 2
                 let maxPitD = Sheet.knobEditDistance * scale + noteD
-                let maxPitDS = maxPitD * maxPitD
+                let maxPitDSq = maxPitD * maxPitD
                 let nf = noteFrame(at: noteI).outset(by: hnh)
-                let ods = nf.distanceSquared(p)
-                if ods < maxPitDS {
-                    let ds = pointline(from: note).minDistanceSquared(at: p)
-                    if ds < noteD * noteD { break }
+                let oDSq = nf.distanceSquared(p)
+                if oDSq < maxPitDSq {
+                    let dSq = pointline(from: note).minDistanceSquared(at: p)
+                    if dSq < noteD * noteD { break }
                 }
                 
                 let reverbFrame = reverbFrame(from: note)
@@ -2543,21 +2558,27 @@ extension ScoreView {
     func spectlopeFrames(at noteI: Int) -> [(pitIs: [Int], frame: Rect)] {
         spectlopeFrames(from: model.notes[noteI])
     }
-    func pitIAndSprolI(at p: Point, at noteI: Int) -> (pitI: Int, sprolI: Int)? {
+    func pitIAndSprolI(at p: Point, at noteI: Int, scale: Double) -> (pitI: Int, sprolI: Int)? {
+        let toneMaxD = min(Sheet.tonePadding - Sheet.noteHeight / 2,
+                           Sheet.knobEditDistance * scale)
+        let toneMaxDSq = toneMaxD * toneMaxD
+        
         let score = model
         let note = score.notes[noteI]
-        var minDS = Double.infinity, minPitI: Int?, minSprolI: Int?
+        var minDSq = Double.infinity, minPitI: Int?, minSprolI: Int?
         for (pitIs, toneFrame) in toneFrames(at: noteI) {
-            guard toneFrame.contains(p) else { continue }
-            for pitI in pitIs {
-                let pit = note.pits[pitI]
-                for (sprolI, _) in pit.tone.spectlope.sprols.enumerated() {
-                    let psp = sprolPosition(atSprol: sprolI, atPit: pitI, at: noteI, atY: toneFrame.minY)
-                    let ds = p.distanceSquared(psp)
-                    if ds < minDS {
-                        minDS = ds
-                        minPitI = pitI
-                        minSprolI = sprolI
+            let dSq = toneFrame.distanceSquared(p)
+            if dSq < minDSq && dSq < toneMaxDSq {
+                for pitI in pitIs {
+                    let pit = note.pits[pitI]
+                    for (sprolI, _) in pit.tone.spectlope.sprols.enumerated() {
+                        let psp = sprolPosition(atSprol: sprolI, atPit: pitI, at: noteI, atY: toneFrame.minY)
+                        let ds = p.distanceSquared(psp)
+                        if ds < minDSq {
+                            minDSq = ds
+                            minPitI = pitI
+                            minSprolI = sprolI
+                        }
                     }
                 }
             }

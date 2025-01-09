@@ -722,13 +722,6 @@ final class MoveScoreAction: DragEventAction {
                     beganScoreOption = sheetView.model.score.option
                     beganBeatX = scoreView.x(atBeat: score.beatRange.end)
                     oldBeat = sheetView.model.score.beatRange.end
-                } else if scoreView.containsTimeline(scoreP, scale: rootView.screenToWorldScale) {
-                    type = .allBeat
-                    
-                    beganScoreOption = sheetView.model.score.option
-                    beganBeatX = scoreView.x(atBeat: score.beatRange.start)
-                    beganNotes = score.notes.count.range.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
-                    oldBeat = sheetView.model.score.beatRange.start
                 } else if let result = scoreView.hitTestOption(scoreP, scale: rootView.screenToWorldScale) {
                     switch result {
                     case .keyBeat(let keyBeatI):
@@ -754,6 +747,13 @@ final class MoveScoreAction: DragEventAction {
                         
                         rootView.cursor = .arrowWith(string: Pitch(value: beganPitch).octaveString())
                     }
+                } else if scoreView.containsTimeline(scoreP, scale: rootView.screenToWorldScale) {
+                    type = .allBeat
+                    
+                    beganScoreOption = sheetView.model.score.option
+                    beganBeatX = scoreView.x(atBeat: score.beatRange.start)
+                    beganNotes = score.notes.count.range.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
+                    oldBeat = sheetView.model.score.beatRange.start
                 }
             }
         case .changed:

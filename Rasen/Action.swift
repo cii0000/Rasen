@@ -1152,8 +1152,7 @@ final class FaceAction: Action {
                                 note.pits[pi].tone = tone
                             } else if pit.tone.isDefault {
                                 let pitch = Double(pit.pitch + note.pitch)
-                                let tone = Tone(overtone: .init(evenAmp: .random(in: 0.5 ..< 1)),
-                                                spectlope: .random(pitch: pitch))
+                                let tone = Tone(spectlope: .random(pitch: pitch))
                                 tones[pit.tone.id] = tone
                                 note.pits[pi].tone = tone
                             }
