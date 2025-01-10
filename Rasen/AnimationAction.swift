@@ -637,7 +637,8 @@ final class PlayAction: InputKeyEventAction {
                     let sheetP = cSheetView.convertFromWorld(p)
                     var ids = Set<UUID>()
                     var secRange: Range<Rational>?
-                    var sec: Rational = cSheetView.animationView.sec(atX: sheetP.x)
+                    var sec: Rational = cSheetView.sec(at: sheetP, scale: rootView.screenToWorldScale,
+                                                       interval: rootView.currentBeatInterval)
                     let scoreView = cSheetView.scoreView
                     if scoreView.model.enabled, let scoreTrackItem = scoreView.scoreTrackItem {
                         let scoreP = scoreView.convertFromWorld(p)

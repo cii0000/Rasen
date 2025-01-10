@@ -193,13 +193,6 @@ final class LookUpAction: InputKeyEventAction {
             let fqStr = "\("Note".localized) \(pitch.octaveString()) (\(fq.string(digitsCount: 2)) Hz)".localized
             rootView.show(fqStr, at: p)
         } else if let sheetView = rootView.sheetView(at: p),
-                    let ci = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
-                                                    scale: rootView.screenToWorldScale) {
-            let content = sheetView.contentsView.elementViews[ci].model
-            let fileSize = content.url.fileSize ?? 0
-            let string = IOResult.fileSizeNameFrom(fileSize: fileSize)
-            rootView.show(content.type.displayName + "\n\t\("File Size".localized): \(string)", at: p)
-        } else if let sheetView = rootView.sheetView(at: p),
                   sheetView.scoreView.contains(sheetView.scoreView.convertFromWorld(p),
                                                scale: rootView.screenToWorldScale) {
             let scoreView = sheetView.scoreView
@@ -228,6 +221,13 @@ final class LookUpAction: InputKeyEventAction {
             let nfq = Pitch(value: pitchRat).fq
             let fqStr = "\(Pitch(value: pitchRat).octaveString()) (\(nfq.string(digitsCount: 2)) Hz)".localized
             rootView.show(fqStr, at: p)
+        } else if let sheetView = rootView.sheetView(at: p),
+                    let ci = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
+                                                    scale: rootView.screenToWorldScale) {
+            let content = sheetView.contentsView.elementViews[ci].model
+            let fileSize = content.url.fileSize ?? 0
+            let string = IOResult.fileSizeNameFrom(fileSize: fileSize)
+            rootView.show(content.type.displayName + "\n\t\("File Size".localized): \(string)", at: p)
         } else if !rootView.isDefaultUUColor(at: p),
                   let sheetView = rootView.sheetView(at: p),
                   let plane = sheetView.plane(at: sheetView.convertFromWorld(p)) {

@@ -1282,6 +1282,16 @@ final class SheetView: BindableView, @unchecked Sendable {
                     width: knobW, height: knobH)
     }
     
+    func sec(at p: Point, scale: Double, interval: Rational) -> Rational {
+        if let (_, view) = contentIndexAndView(at: p, scale: scale) {
+            view.sec(atX: p.x, interval: interval)
+        } else if scoreView.contains(p, scale: scale) {
+            scoreView.sec(atX: p.x, interval: interval)
+        } else {
+            animationView.sec(atX: p.x, interval: interval)
+        }
+    }
+    
     func interporatedTimelineNodes(from ids: [UUID]) -> [Node] {
         animationView.interporatedTimelineNodes(from: ids)
     }
@@ -2135,15 +2145,7 @@ final class SheetView: BindableView, @unchecked Sendable {
     
     func spectrogramNode(at p: Point) -> (node: Node, contentView: SheetContentView)? {
         for contentView in contentsView.elementViews {
-            var nNode: Node?
-            contentView.node.allChildren { node, stop in
-                if node.name.hasPrefix("spectrogram"),
-                   node.contains(node.convert(p, from: self.node)) {
-                    stop = true
-                    nNode = node
-                }
-            }
-            if let nNode {
+            if let nNode = contentView.spectrogramNode(at: contentView.convert(p, from: node)) {
                 return (nNode, contentView)
             }
         }

@@ -1882,7 +1882,6 @@ extension ScoreView {
                            Sheet.knobEditDistance * scale)
         let toneMaxDSq = toneMaxD * toneMaxD
         var minDSq = Double.infinity, minResult: (noteI: Int, result: PointHitResult)?
-        var containsNote = false
         var isPit = false, pds = [Point: Double]()
         for (noteI, note) in model.notes.enumerated().reversed() {
             if note.spectlopeHeight == Sheet.spectlopeHeight ? isFullEdit : isEditTone {
@@ -2002,10 +2001,6 @@ extension ScoreView {
                     return minResult ?? (noteI, .note)
                 }
             }
-        }
-        
-        if containsNote {
-            return minResult
         }
         
         if isFullEdit {

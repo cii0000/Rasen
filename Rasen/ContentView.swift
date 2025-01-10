@@ -696,8 +696,24 @@ extension ContentView {
         containsContent(p)
         || containsTimeline(p, scale: scale)
         || containsIsShownSpectrogram(p, scale: scale)
+        || containsSpectrogram(p)
     }
     
+    func spectrogramNode(at p: Point) -> Node? {
+        guard model.isShownSpectrogram else { return nil }
+        var nNode: Node?
+        node.allChildren { node, stop in
+            if node.name.hasPrefix("spectrogram"),
+               node.contains(node.convert(p, from: self.node)) {
+                stop = true
+                nNode = node
+            }
+        }
+        return nNode
+    }
+    func containsSpectrogram(_ p: Point) -> Bool {
+        spectrogramNode(at: p) != nil
+    }
     func isShownSpectrogram(at p :Point) -> Bool {
         if model.type.isAudio {
             p.y > Sheet.timelineHalfHeight + Sheet.isShownSpectrogramHeight / 2
