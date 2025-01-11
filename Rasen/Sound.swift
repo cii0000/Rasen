@@ -975,7 +975,7 @@ struct Reverb: Hashable, Codable {
 }
 extension Reverb: Protobuf {
     init(_ pb: PBReverb) throws {
-        earlySec = max(0.02, ((try? pb.earlySec.notNaN()) ?? 0))
+        earlySec = max(0, ((try? pb.earlySec.notNaN()) ?? 0))
         earlyVolm = ((try? pb.earlyVolm.notNaN()) ?? 0).clipped(min: 0, max: 1)
         lateSec = max(0, ((try? pb.lateSec.notNaN()) ?? 0))
         lateVolm = ((try? pb.lateVolm.notNaN()) ?? 0).clipped(min: 0, max: 1)
@@ -996,6 +996,9 @@ extension Reverb: Protobuf {
 extension Reverb {
     var isEmpty: Bool {
         (earlySec == 0 && lateSec == 0 && releaseSec == 0) || (earlyVolm == 0 && lateVolm == 0)
+    }
+    var isFull: Bool {
+        earlySec == 0 && lateSec == 0 && releaseSec == 0 && earlyVolm == 1 && lateVolm == 1
     }
     
     var earlyLateSec: Double {
@@ -1033,7 +1036,7 @@ extension Reverb {
             sec.clipped(min: earlyLateSec, max: durSec, newMin: lateVolm, newMax: 0)
             
             let t1 = random.nextT()
-            let nPan = (t1 * 2 - 1) * (1 - sec.clipped(min: 0, max: earlyLateSec, newMin: 1, newMax: 0).squared) * 0.75
+            let nPan = t1 * 2 - 1
             let nVolm = if nPan < 0 {
                 channel == 0 ? volm : volm * (1 + nPan)
             } else {

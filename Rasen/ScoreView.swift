@@ -974,7 +974,7 @@ extension ScoreView {
         let nsx = x(atBeat: note.beatRange.start)
         let ny = y(fromPitch: note.firstPitch)
         let nw = width(atDurBeat: max(note.beatRange.length, Sheet.fullEditBeatInterval))
-        let attackW = 0.0
+        let attackW = width(atDurSec: Waveclip.attackSec)
         let decayW = 0.0
         let releaseW = 0.0
         let attackX = nsx + attackW, decayX = nsx + attackW + decayW, releaseX = nsx + nw + releaseW
@@ -2676,19 +2676,19 @@ extension ScoreView {
     }
     
     func earlyReverbPosition(from note: Note) -> Point {
-        noteLastPosition(from: note) + .init(width(atDurSec: note.envelope.reverb.earlySec), 0)
+        noteLastPosition(from: note) + .init(width(atDurSec: note.envelope.reverb.earlySec + 0.02), 0)
     }
     func reverbEarlyRSecPosition(at noteI: Int) -> Point {
         earlyReverbPosition(from: model.notes[noteI])
     }
     func lateReverbPosition(from note: Note) -> Point {
-        noteLastPosition(from: note) + .init(width(atDurSec: note.envelope.reverb.earlyLateSec), 0)
+        noteLastPosition(from: note) + .init(width(atDurSec: note.envelope.reverb.earlyLateSec + 0.02), 0)
     }
     func reverbEarlyAndLateRSecPosition(at noteI: Int) -> Point {
         lateReverbPosition(from: model.notes[noteI])
     }
     func durReverbPosition(from note: Note) -> Point {
-        noteLastPosition(from: note) + .init(width(atDurSec: note.envelope.reverb.durSec), 0)
+        noteLastPosition(from: note) + .init(width(atDurSec: note.envelope.reverb.durSec + 0.02), 0)
     }
     func reverbDurSecPosition(at noteI: Int) -> Point {
         durReverbPosition(from: model.notes[noteI])

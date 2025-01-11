@@ -151,89 +151,7 @@ struct EnvelopeMemo: Hashable, Codable {
         maxSec = releaseSec + (envelope.reverb.isEmpty ? 0 : envelope.reverb.durSec)
     }
 }
-extension EnvelopeMemo {
-    func volm(atSec sec: Double, releaseStartSec: Double?) -> Double {
-        1
-//        if sec < 0 {
-//            return 0
-//        }
-//        let adVolm: Double
-//        if attackSec > 0 && sec < attackSec {
-//            adVolm = sec * rAttackSec
-//        } else {
-//            let nSec = sec - attackSec
-//            adVolm = if decaySec > 0 && nSec < decaySec {
-//                .linear(1, sustainVolm, t: nSec * rDecaySec)
-//            } else {
-//                sustainVolm
-//            }
-//        }
-//        if let releaseStartSec, sec >= releaseStartSec {
-//            let nSec = sec - releaseStartSec
-//            return if releaseSec > 0 && nSec < releaseSec {
-//                .linear(adVolm, 0, t: nSec * rReleaseSec)
-//            } else {
-//                0
-//            }
-//        } else {
-//            return adVolm
-//        }
-    }
-}
 
-struct InterPit: Hashable, Codable {
-    var pitch = 0.0, stereo = Stereo(), tone = Tone(), lyric = ""
-}
-extension InterPit: MonoInterpolatable {
-    static func linear(_ f0: Self, _ f1: Self, t: Double) -> Self {
-        .init(pitch: .linear(f0.pitch, f1.pitch, t: t),
-              stereo: .linear(f0.stereo, f1.stereo, t: t),
-              tone: .linear(f0.tone, f1.tone, t: t),
-              lyric: f0.lyric)
-    }
-    static func firstSpline(_ f1: Self,
-                            _ f2: Self, _ f3: Self, t: Double) -> Self {
-        .init(pitch: .firstSpline(f1.pitch, f2.pitch, f3.pitch, t: t),
-              stereo: .firstSpline(f1.stereo, f2.stereo, f3.stereo, t: t),
-              tone: .firstSpline(f1.tone, f2.tone, f3.tone, t: t),
-              lyric: f1.lyric)
-    }
-    static func spline(_ f0: Self, _ f1: Self,
-                       _ f2: Self, _ f3: Self, t: Double) -> Self {
-        .init(pitch: .spline(f0.pitch, f1.pitch, f2.pitch, f3.pitch, t: t),
-              stereo: .spline(f0.stereo, f1.stereo, f2.stereo, f3.stereo, t: t),
-              tone: .spline(f0.tone, f1.tone, f2.tone, f3.tone, t: t),
-              lyric: f1.lyric)
-    }
-    static func lastSpline(_ f0: Self, _ f1: Self,
-                           _ f2: Self, t: Double) -> Self {
-        .init(pitch: .lastSpline(f0.pitch, f1.pitch, f2.pitch, t: t),
-              stereo: .lastSpline(f0.stereo, f1.stereo, f2.stereo, t: t),
-              tone: .lastSpline(f0.tone, f1.tone, f2.tone, t: t),
-              lyric: f1.lyric)
-    }
-    static func firstMonospline(_ f1: Self,
-                                _ f2: Self, _ f3: Self, with ms: Monospline) -> Self {
-        .init(pitch: .firstMonospline(f1.pitch, f2.pitch, f3.pitch, with: ms),
-              stereo: .firstMonospline(f1.stereo, f2.stereo, f3.stereo, with: ms),
-              tone: .firstMonospline(f1.tone, f2.tone, f3.tone, with: ms),
-              lyric: f1.lyric)
-    }
-    static func monospline(_ f0: Self, _ f1: Self,
-                           _ f2: Self, _ f3: Self, with ms: Monospline) -> Self {
-        .init(pitch: .monospline(f0.pitch, f1.pitch, f2.pitch, f3.pitch, with: ms),
-              stereo: .monospline(f0.stereo, f1.stereo, f2.stereo, f3.stereo, with: ms),
-              tone: .monospline(f0.tone, f1.tone, f2.tone, f3.tone, with: ms),
-              lyric: f1.lyric)
-    }
-    static func lastMonospline(_ f0: Self, _ f1: Self,
-                               _ f2: Self, with ms: Monospline) -> Self {
-        .init(pitch: .lastMonospline(f0.pitch, f1.pitch, f2.pitch, with: ms),
-              stereo: .lastMonospline(f0.stereo, f1.stereo, f2.stereo, with: ms),
-              tone: .lastMonospline(f0.tone, f1.tone, f2.tone, with: ms),
-              lyric: f1.lyric)
-    }
-}
 struct Pitbend: Codable, Hashable {
     let pitchInterpolation: Interpolation<Double>
     let firstPitch: Double, firstFqScale: Double, isEqualAllPitch: Bool
@@ -372,11 +290,10 @@ extension Pitbend {
 
 struct Rendnote {
     var rootFq: Double, firstFq: Double
-    var noiseSeed0: UInt64
-    var noiseSeed1: UInt64
+    var noiseSeed0, noiseSeed1: UInt64
     var pitbend: Pitbend
     var secRange: Range<Double>
-    var envelopeMemo: EnvelopeMemo
+    var reverb: Reverb
     var isRelease = false
     let id = UUID()
 }
@@ -393,7 +310,7 @@ extension Rendnote {
                   noiseSeed0: seed0, noiseSeed1: seed1,
                   pitbend: pitbend,
                   secRange: sSec ..< eSec,
-                  envelopeMemo: .init(note.envelope))
+                  reverb: note.envelope.reverb)
     }
     
     var isStft: Bool {
@@ -403,9 +320,7 @@ extension Rendnote {
         secRange.length.isInfinite
     }
     var rendableDurSec: Double {
-        min(isLoop ?
-            firstFq.rounded(.up) / firstFq :
-            secRange.length + max(Waveclip.releaseSec, envelopeMemo.releaseSec),
+        min(isLoop ? firstFq.rounded(.up) / firstFq : secRange.length + Waveclip.releaseSec,
             1000)
     }
     
@@ -415,18 +330,17 @@ extension Rendnote {
             let rendableDurSec = min(firstFq.rounded(.up) / firstFq, 1000)
             return max(1, Int((rendableDurSec * sampleRate).rounded(.down)))
         }
-        let rendableDurSec = min(secRange.length + max(Waveclip.releaseSec, envelopeMemo.releaseSec), 1000)
+        let rendableDurSec = min(secRange.length + Waveclip.releaseSec, 1000)
         let sampleCount = max(1, Int((rendableDurSec * sampleRate).rounded(.up)))
-        return envelopeMemo.reverb.isEmpty ?
+        return reverb.isEmpty ?
         sampleCount :
-        sampleCount + envelopeMemo.reverb.count(sampleRate: sampleRate) - 1
+        sampleCount + reverb.count(sampleRate: sampleRate) - 1
     }
     func releaseCount(sampleRate: Double) -> Int {
-        let rendableDurSec = min(max(Waveclip.releaseSec, envelopeMemo.releaseSec), 1000)
+        let rendableDurSec = min(Waveclip.releaseSec, 1000)
         let sampleCount = max(1, Int((rendableDurSec * sampleRate).rounded(.up)))
-        return envelopeMemo.reverb.isEmpty ?
-        sampleCount :
-        sampleCount + envelopeMemo.reverb.count(sampleRate: sampleRate) - 1
+        return reverb.isEmpty ?
+        sampleCount : sampleCount + reverb.count(sampleRate: sampleRate) - 1
     }
     func releasedRange(sampleRate: Double, startSec: Double) -> Range<Int> {
         isLoop ? (0 ..< sampleCount(sampleRate: sampleRate)) :
@@ -448,29 +362,6 @@ extension Rendnote {
                 samples[i] *= Waveclip.amp(atSec: Double(i) * rSampleRate,
                                            attackStartSec: attackStartSec,
                                            releaseStartSec: releaseStartSec)
-            }
-            
-            if envelopeMemo.decaySec == 0 || envelopeMemo.sustainVolm == 1 {
-                let si = Int((envelopeMemo.attackSec * sampleRate).rounded(.up))
-                    .clipped(min: 0, max: sampleCount)
-                for i in 0 ..< si {
-                    let sec = Double(i) * rSampleRate
-                    samples[i]
-                    *= Volm.amp(fromVolm: envelopeMemo.volm(atSec: sec, releaseStartSec: releaseStartSec))
-                }
-                let ei = max(si, Int((releaseStartSec * sampleRate).rounded(.down)))
-                    .clipped(min: 0, max: sampleCount)
-                for i in ei ..< sampleCount {
-                    let sec = Double(i) * rSampleRate
-                    samples[i]
-                    *= Volm.amp(fromVolm: envelopeMemo.volm(atSec: sec, releaseStartSec: releaseStartSec))
-                }
-            } else {
-                for i in 0 ..< sampleCount {
-                    let sec = Double(i) * rSampleRate
-                    samples[i]
-                    *= Volm.amp(fromVolm: envelopeMemo.volm(atSec: sec, releaseStartSec: releaseStartSec))
-                }
             }
         }
         return notewave(from: samples, sampleRate: sampleRate)
@@ -519,11 +410,11 @@ extension Rendnote {
         }
         
         var notewave = Notewave(noStereoSamples: samples, sampless: sampless, isLoop: isLoop)
-        if !envelopeMemo.reverb.isEmpty {
+        if !reverb.isEmpty {
             let sampleCount = notewave.sampleCount
-            notewave.sampless = [vDSP.apply(fir: envelopeMemo.reverb.fir(sampleRate: sampleRate, channel: 0),
+            notewave.sampless = [vDSP.apply(fir: reverb.fir(sampleRate: sampleRate, channel: 0),
                                             in: notewave.sampless[0]),
-                                 vDSP.apply(fir: envelopeMemo.reverb.fir(sampleRate: sampleRate, channel: 1),
+                                 vDSP.apply(fir: reverb.fir(sampleRate: sampleRate, channel: 1),
                                             in: notewave.sampless[1])]
             if isLoop && notewave.sampleCount > sampleCount {
                 let count = notewave.sampleCount - sampleCount

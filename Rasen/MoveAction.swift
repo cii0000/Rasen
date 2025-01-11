@@ -1085,7 +1085,7 @@ final class MoveScoreAction: DragEventAction {
                 case .reverbEarlyRSec:
                     let dBeat = scoreView.durBeat(atWidth: sheetP.x - beganSheetP.x)
                     let sec = (beganEnvelope.reverb.earlySec + score.sec(fromBeat: dBeat))
-                        .clipped(min: 0.02, max: 10)
+                        .clipped(min: 0, max: 10)
                     
                     let nid = UUID()
                     var eivs = [IndexValue<Envelope>](capacity: beganNotes.count)

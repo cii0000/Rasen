@@ -104,7 +104,7 @@ final class NotePlayer {
                                         overtone: note.tone.overtone,
                                         spectlope: note.tone.spectlope),
                          secRange: -.infinity ..< .infinity,
-                         envelopeMemo: .init(note.envelope))
+                         reverb: note.envelope.reverb)
         }
         rendnotes.forEach { noteIDs.insert($0.id) }
         
@@ -694,13 +694,11 @@ final class ScoreNoder: ObjectHashable {
                          isPremultipliedEnvelope: Bool,
                          allAttackStartSec: Double?, allReleaseStartSec: Double?,
                          playingAttackStartSec: Double?, playingReleaseStartSec: Double?,
-                         envelopeMemo: EnvelopeMemo, startSec: Double, releaseSec: Double?) {
+                         startSec: Double, releaseSec: Double?) {
                 let sec = Double(i) * rSampleRate
                 
                 let waveclipAmp = isPremultipliedEnvelope ?
                 1 : Waveclip.amp(atSec: sec, attackStartSec: startSec, releaseStartSec: releaseSec)
-                * Volm.amp(fromVolm: envelopeMemo.volm(atSec: sec - startSec,
-                                                       releaseStartSec: releaseSec != nil ? releaseSec! - startSec : nil))
                 
                 let allWaveclipAmp = Waveclip
                     .amp(atSec: sec, attackStartSec: allAttackStartSec, releaseStartSec: allReleaseStartSec)
@@ -768,7 +766,6 @@ final class ScoreNoder: ObjectHashable {
                                 isPremultipliedEnvelope: !notewave.isLoop,
                                 allAttackStartSec: nil, allReleaseStartSec: nil,
                                 playingAttackStartSec: nil, playingReleaseStartSec: nil,
-                                envelopeMemo: rendnote.envelopeMemo,
                                 startSec: nStartSec, releaseSec: releaseSec)
                         mi += 1
                         if mi >= notewave.sampleCount {
@@ -844,7 +841,6 @@ final class ScoreNoder: ObjectHashable {
                                             allReleaseStartSec: allReleaseStartSec,
                                             playingAttackStartSec: playingAttackStartSec,
                                             playingReleaseStartSec: playingReleaseStartSec,
-                                            envelopeMemo: envelopeMemo,
                                             startSec: startSec, releaseSec: releaseSec)
                                 }
                             }
