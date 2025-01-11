@@ -2175,7 +2175,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 let ops1 = oldTouchPoints[touchedIDs[1]] {
                
                 let t = (event.time - (began2FingersTime ?? event.time))
-                    .clipped(min: 0.1, max: 0.25, newMin: 8, newMax: 2)
+                    .clipped(min: 0.1, max: 0.25, newMin: 9, newMax: 3)
                 let pinchDistance = t
                 let scrollDistance = t
                 func scrollDeltaPoint(fromDelta dp: Point) -> Point {
@@ -2238,11 +2238,12 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                     preMagnification = 0
                 } else if isBeganPinch {
                     if isFirstChangedPinch || lastMagnification.sign == magnification.sign {
+                        let m = magnification.mid(preMagnification)
                         rootAction.pinch(with: .init(screenPoint: event.screenPoint,
                                                      time: event.time,
-                                                     magnification: magnification.mid(preMagnification),
+                                                     magnification: m,
                                                      phase: .changed))
-                        pinchVs.append((magnification, event.time))
+                        pinchVs.append((m, event.time))
                         preMagnification = magnification
                     } else {
                         isFirstChangedPinch = true
@@ -2273,13 +2274,14 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 } else if isBeganScroll, let oldScrollPosition {
                     let scrollDeltaPoint = scrollDeltaPoint(fromDelta: nScrollPosition - oldScrollPosition)
                     if isFirstChangedScroll || abs(Point.differenceAngle(nScrollPosition, oldScrollPosition)) < .pi / 2 {
+                        let sdp = scrollDeltaPoint.mid(lastScrollDeltaPoint)
                         rootAction.scroll(with: .init(screenPoint: event.screenPoint,
                                                       time: event.time,
-                                                      scrollDeltaPoint: scrollDeltaPoint.mid(lastScrollDeltaPoint),
+                                                      scrollDeltaPoint: sdp,
                                                       phase: .changed,
                                                       touchPhase: .changed,
                                                       momentumPhase: nil))
-                        scrollVs.append((scrollDeltaPoint, event.time))
+                        scrollVs.append((sdp, event.time))
                         lastScrollDeltaPoint = scrollDeltaPoint
                     } else {
                         isFirstChangedScroll = true
