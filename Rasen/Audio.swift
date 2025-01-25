@@ -496,7 +496,7 @@ extension ScoreTrackItem {
             let rendnote = rendnotes[$0.index]
             let notewaveID = rendnote.id
             if var notewave = notewaveDic[notewaveID] {
-                notewave = rendnote.notewave(from: notewave.noStereoSamples, stereo: $0.value,
+                notewave = rendnote.notewave(from: notewave.noStereoSampless, stereo: $0.value,
                                              sampleRate: sampleRate)
                 notewaveDic[notewaveID] = notewave
                 isUpdate = true

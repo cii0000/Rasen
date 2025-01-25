@@ -1681,7 +1681,7 @@ final class SheetView: BindableView, @unchecked Sendable {
                 firstSec: Rational?
     private var willPlaySec: Rational?, playingOtherTimelineIDs = Set<UUID>()
     private var playingFrameRate: Rational = 24, firstDeltaSec: Rational = 0
-    private var waringClock: SuspendingClock.Instant?
+    private var waringClock: SuspendingClock.Instant?, beganPlaySec: SuspendingClock.Instant?
     private var audioPauseTask: Task<(), any Error>?
     let frameRate = Keyframe.defaultFrameRate
     var isPlaying = false {
@@ -1859,6 +1859,7 @@ final class SheetView: BindableView, @unchecked Sendable {
 //                draftPlanesView.node.isHidden = true
             
             playingFrameRate = Rational(60)
+            beganPlaySec = .now
             let timeInterval = Double(1 / playingFrameRate)
             playingTimer = DispatchSource.scheduledTimer(withTimeInterval: timeInterval) { [weak self] in
                 DispatchQueue.main.async { [weak self] in
@@ -2024,6 +2025,49 @@ final class SheetView: BindableView, @unchecked Sendable {
 //    }
     private func loopPlay() {
         guard let willPlaySec else { return }
+        if sequencer != nil, let beganPlaySec {
+            let ddSec = beganPlaySec.duration(to: .now).sec
+            let dSec = Rational(ddSec, intervalScale: .init(1, 60))
+            let preDurSec = previousSheetView?.model.allDurSec ?? 0
+            let mainDurSec = model.allDurSec
+            guard mainDurSec > 0 else { return }
+            let nexrDurSec = nextSheetView?.model.allDurSec ?? 0
+            if preDurSec == 0 && nexrDurSec == 0 {
+                playingSheetIndex = 0
+                playingSec = (dSec + willPlaySec) % mainDurSec
+            } else {
+                let nSec = dSec + willPlaySec
+                var i = 0, sec: Rational = 0
+                while true {
+                    let oldSec = sec
+                    if i == 0 {
+                        sec += mainDurSec
+                        if nSec < sec {
+                            playingSec = (nSec - oldSec) % mainDurSec
+                            break
+                        }
+                        i = nexrDurSec == 0 ? -1 : 1
+                    } else if i == -1 {
+                        sec += preDurSec
+                        if nSec < sec {
+                            playingSec = (nSec - oldSec) % preDurSec
+                            break
+                        }
+                        i = 0
+                    } else {
+                        sec += nexrDurSec
+                        if nSec < sec {
+                            playingSec = (nSec - oldSec) % nexrDurSec
+                            break
+                        }
+                        i = preDurSec == 0 ? 0 : -1
+                    }
+                }
+                playingSheetIndex = i
+            }
+            return
+        }
+        
         let nSec = willPlaySec + 1 / playingFrameRate
         
         let sheetView = playingSheetView

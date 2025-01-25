@@ -27,19 +27,19 @@ import Accelerate.vecLib.vDSP
 struct Random: Hashable, Codable {
     private var s0, s1, s2, s3: UInt64
     
+    static func next(seed: inout UInt64) -> UInt64 {
+        seed &+= 0x9e3779b97f4a7c15
+        var z = seed
+        z = (z ^ (z >> 30)) &* 0xbf58476d1ce4e5b9
+        z = (z ^ (z >> 27)) &* 0x94d049bb133111eb
+        return z ^ (z >> 31)
+    }
     init(seed: UInt64) {
-        func next(x: inout UInt64) -> UInt64 {
-            x &+= 0x9e3779b97f4a7c15
-            var z = x
-            z = (z ^ (z >> 30)) &* 0xbf58476d1ce4e5b9
-            z = (z ^ (z >> 27)) &* 0x94d049bb133111eb
-            return z ^ (z >> 31)
-        }
         var seed = seed
-        s0 = next(x: &seed)
-        s1 = next(x: &seed)
-        s2 = next(x: &seed)
-        s3 = next(x: &seed)
+        s0 = Self.next(seed: &seed)
+        s1 = Self.next(seed: &seed)
+        s2 = Self.next(seed: &seed)
+        s3 = Self.next(seed: &seed)
     }
     
     private func rol(_ x: UInt64, _ k: Int) -> UInt64 {
@@ -351,65 +351,123 @@ extension Rendnote {
 extension Rendnote {
     func notewave(stftCount: Int = 1024, fAlpha: Double = 1, rmsSize: Int = 2048,
                   cutFq: Double = 16384, cutStartFq: Double = 15800, sampleRate: Double) -> Notewave {
-        let rSampleRate = 1 / sampleRate
-        var samples = samples(stftCount: stftCount, fAlpha: fAlpha, rmsSize: rmsSize,
-                              cutFq: cutFq, cutStartFq: cutStartFq, sampleRate: sampleRate)
-        if !isLoop {
-            let sampleCount = samples.count
-            let attackStartSec = !pitbend.firstStereo.isEmpty && !pitbend.firstSpectlope.isEmptyVolm ? 0.0 : nil
-            let releaseStartSec = Double(sampleCount - 1) * rSampleRate - Waveclip.releaseSec
-            for i in 0 ..< sampleCount {
-                samples[i] *= Waveclip.amp(atSec: Double(i) * rSampleRate,
-                                           attackStartSec: attackStartSec,
-                                           releaseStartSec: releaseStartSec)
+        func nSamples(noiseSeed0: UInt64, noiseSeed1: UInt64) -> [Double] {
+            var samples = samples(stftCount: stftCount, fAlpha: fAlpha, rmsSize: rmsSize,
+                                  noiseSeed0: noiseSeed0, noiseSeed1: noiseSeed1,
+                                  cutFq: cutFq, cutStartFq: cutStartFq, sampleRate: sampleRate)
+            if !isLoop {
+                let rSampleRate = 1 / sampleRate
+                let sampleCount = samples.count
+                let attackStartSec = !pitbend.firstStereo.isEmpty && !pitbend.firstSpectlope.isEmptyVolm ? 0.0 : nil
+                let releaseStartSec = Double(sampleCount - 1) * rSampleRate - Waveclip.releaseSec
+                for i in 0 ..< sampleCount {
+                    samples[i] *= Waveclip.amp(atSec: Double(i) * rSampleRate,
+                                               attackStartSec: attackStartSec,
+                                               releaseStartSec: releaseStartSec)
+                }
             }
+            return samples
         }
-        return notewave(from: samples, sampleRate: sampleRate)
+        if reverb.isFull {
+            var noiseSeed2 = noiseSeed0
+            _ = Random.next(seed: &noiseSeed2)
+            _ = Random.next(seed: &noiseSeed2)
+            _ = Random.next(seed: &noiseSeed2)
+            _ = Random.next(seed: &noiseSeed2)
+            var noiseSeed3 = noiseSeed1
+            _ = Random.next(seed: &noiseSeed3)
+            _ = Random.next(seed: &noiseSeed3)
+            _ = Random.next(seed: &noiseSeed3)
+            _ = Random.next(seed: &noiseSeed3)
+            let samples0 = nSamples(noiseSeed0: noiseSeed0, noiseSeed1: noiseSeed1)
+            let samples1 = nSamples(noiseSeed0: noiseSeed2, noiseSeed1: noiseSeed3)
+            return notewave(from: [samples0, samples1], sampleRate: sampleRate)
+        } else {
+            let samples = nSamples(noiseSeed0: noiseSeed0, noiseSeed1: noiseSeed1)
+            return notewave(from: [samples], sampleRate: sampleRate)
+        }
     }
-    func notewave(from samples: [Double], stereo: Stereo? = nil, sampleRate: Double) -> Notewave {
+    func notewave(from sampless: [[Double]], stereo: Stereo? = nil, sampleRate: Double) -> Notewave {
         let rSampleRate = 1 / sampleRate
-        var sampless: [[Double]]
+        var nSampless: [[Double]]
         let stereoScale = Volm.volm(fromAmp: 1 / 2.0.squareRoot())
+        
         if pitbend.isEqualAllStereo || stereo != nil {
             let stereo = (stereo ?? pitbend.firstStereo).multiply(volm: stereoScale)
             let stereoAmp = Volm.amp(fromVolm: stereo.volm)
-            let nSamples = vDSP.multiply(stereoAmp, samples)
+            let oSampless = sampless.map { vDSP.multiply(stereoAmp, $0) }
             let pan = stereo.pan
-            if pan == 0 {
-                sampless = [nSamples, nSamples]
-            } else {
-                let nPan = pan.clipped(min: -1, max: 1)
-                if nPan < 0 {
-                    sampless = [nSamples, vDSP.multiply(Volm.amp(fromVolm: 1 + nPan), nSamples)]
-                } else {
-                    sampless = [vDSP.multiply(Volm.amp(fromVolm: 1 - nPan), nSamples), nSamples]
-                }
-            }
-        } else {
-            let stereos = samples.count.range.map { pitbend.stereo(atSec: Double($0) * rSampleRate).multiply(volm: stereoScale) }
-            let stereoAmps = stereos.map { Volm.amp(fromVolm: $0.volm) }
-            let nSamples = vDSP.multiply(samples, stereoAmps)
-            
-            sampless = [[Double](capacity: nSamples.count), [Double](capacity: nSamples.count)]
-            for (sample, stereo) in zip(nSamples, stereos) {
-                let pan = stereo.pan
+            if oSampless.count == 1 {
+                let nSamples = oSampless[0]
                 if pan == 0 {
-                    sampless[0].append(sample)
-                    sampless[1].append(sample)
+                    nSampless = [nSamples, nSamples]
                 } else {
                     let nPan = pan.clipped(min: -1, max: 1)
                     if nPan < 0 {
-                        sampless[0].append(sample)
-                        sampless[1].append(sample * Volm.amp(fromVolm: 1 + nPan))
+                        nSampless = [nSamples,
+                                     vDSP.multiply(Volm.amp(fromVolm: 1 + nPan), nSamples)]
                     } else {
-                        sampless[0].append(sample * Volm.amp(fromVolm: 1 - nPan))
-                        sampless[1].append(sample)
+                        nSampless = [vDSP.multiply(Volm.amp(fromVolm: 1 - nPan), nSamples),
+                                     nSamples]
+                    }
+                }
+            } else {
+                if pan == 0 {
+                    nSampless = [oSampless[0], oSampless[1]]
+                } else {
+                    let nPan = pan.clipped(min: -1, max: 1)
+                    if nPan < 0 {
+                        nSampless = [oSampless[0],
+                                     vDSP.multiply(Volm.amp(fromVolm: 1 + nPan), oSampless[1])]
+                    } else {
+                        nSampless = [vDSP.multiply(Volm.amp(fromVolm: 1 - nPan), oSampless[0]),
+                                     oSampless[1]]
+                    }
+                }
+            }
+        } else {
+            let stereos = sampless[0].count.range.map { pitbend.stereo(atSec: Double($0) * rSampleRate).multiply(volm: stereoScale) }
+            let stereoAmps = stereos.map { Volm.amp(fromVolm: $0.volm) }
+            let oSampless = sampless.map { vDSP.multiply($0, stereoAmps) }
+            nSampless = [[Double](capacity: stereos.count), [Double](capacity: stereos.count)]
+            if oSampless.count == 1 {
+                for (sample, stereo) in zip(oSampless[0], stereos) {
+                    let pan = stereo.pan
+                    if pan == 0 {
+                        nSampless[0].append(sample)
+                        nSampless[1].append(sample)
+                    } else {
+                        let nPan = pan.clipped(min: -1, max: 1)
+                        if nPan < 0 {
+                            nSampless[0].append(sample)
+                            nSampless[1].append(sample * Volm.amp(fromVolm: 1 + nPan))
+                        } else {
+                            nSampless[0].append(sample * Volm.amp(fromVolm: 1 - nPan))
+                            nSampless[1].append(sample)
+                        }
+                    }
+                }
+            } else {
+                for (si, stereo) in stereos.enumerated() {
+                    let pan = stereo.pan
+                    if pan == 0 {
+                        nSampless[0].append(oSampless[0][si])
+                        nSampless[1].append(oSampless[1][si])
+                    } else {
+                        let nPan = pan.clipped(min: -1, max: 1)
+                        if nPan < 0 {
+                            nSampless[0].append(oSampless[0][si])
+                            nSampless[1].append(oSampless[1][si] * Volm.amp(fromVolm: 1 + nPan))
+                        } else {
+                            nSampless[0].append(oSampless[0][si] * Volm.amp(fromVolm: 1 - nPan))
+                            nSampless[1].append(oSampless[1][si])
+                        }
                     }
                 }
             }
         }
         
-        var notewave = Notewave(noStereoSamples: samples, sampless: sampless, isLoop: isLoop)
+        var notewave = Notewave(noStereoSampless: sampless, sampless: nSampless, isLoop: isLoop)
         if !reverb.isEmpty {
             let sampleCount = notewave.sampleCount
             notewave.sampless = [vDSP.apply(fir: reverb.fir(sampleRate: sampleRate, channel: 0),
@@ -432,6 +490,7 @@ extension Rendnote {
         return notewave
     }
     private func samples(stftCount: Int, fAlpha: Double, rmsSize: Int,
+                         noiseSeed0: UInt64, noiseSeed1: UInt64,
                          cutFq: Double, cutStartFq: Double, sampleRate: Double) -> [Double] {
         let sampleCount = Int((rendableDurSec * sampleRate).rounded(isLoop ? .down : .up))
         guard !pitbend.isEmpty && sampleCount >= 1 else {
@@ -918,7 +977,7 @@ extension vDSP {
 }
 
 struct Notewave {
-    var noStereoSamples = [Double]()
+    var noStereoSampless = [[Double]]()
     var sampless = [[Double]]()
     var isLoop = false
 }

@@ -884,6 +884,7 @@ final class LineAction: Action {
     
     private var isDrawNote = false
     private var noteSheetView: SheetView?, oldPitch = Rational(0), firstTone = Tone(),
+                firstReverb = Reverb(),
                 firstSpectlopeHeight = Sheet.spectlopeHeight,
                 beganScore: Score?, beganPitch = Rational(), octaveNode: Node?, oldBeat = Rational(0),
                 noteI: Int?, noteStartBeat: Rational?, notePlayer: NotePlayer?
@@ -911,12 +912,16 @@ final class LineAction: Action {
                 let beatInterval = rootView.currentBeatInterval
                 let beat = scoreView.beat(atX: inP.x, interval: beatInterval)
                 let beatRange = beat ..< beat
+                let isNoise = pitch == Score.maxPitch
                 firstTone = pitch == Score.maxPitch ? Tone.noise() : (isStraight ? Tone.empty() : Tone())
+                firstReverb = isNoise ? Reverb(earlySec: 0, earlyVolm: 1,
+                                               lateSec: 0, lateVolm: 1, releaseSec: 0) : Reverb()
                 firstSpectlopeHeight = pitch == Score.maxPitch ?
                 Sheet.spectlopeHeight.mid(Sheet.maxSpectlopeHeight) :
                 Sheet.spectlopeHeight
                 let note = Note(beatRange: beatRange, pitch: pitch,
                                 pits: .init([.init(beat: 0, pitch: 0, tone: firstTone)]),
+                                envelope: .init(reverb: firstReverb),
                                 spectlopeHeight: firstSpectlopeHeight)
                 
                 noteI = count
@@ -970,6 +975,7 @@ final class LineAction: Action {
                 let beatRange = beat > nsBeat ? nsBeat ..< beat : beat ..< nsBeat
                 let note = Note(beatRange: beatRange, pitch: pitch,
                                 pits: [.init(beat: 0, pitch: 0, tone: firstTone)],
+                                envelope: .init(reverb: firstReverb),
                                 spectlopeHeight: firstSpectlopeHeight)
                 let isNote = oldPitch != pitch
                 

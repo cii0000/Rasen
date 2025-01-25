@@ -704,6 +704,7 @@ extension FormantFilter {
             n[0].sdPitch *= 1.5
             n[0].pitch += -13
             n[0].edPitch *= 1.7
+            n[0].eVolm *= 0.75
             n.formMultiplyEsVolm(0.125, at: 0)
             n[1].pitch += 7
             n[1].dPitch *= 1.25
@@ -935,16 +936,16 @@ extension FormantFilter {
             }
             n[1].fillVolm(0.0625)
             n.fillEsVolm(0, at: 1)
-            n[2].fillVolm(0.1)
-            n.formFillEsVolm(0.05, at: 2)
-            n[3].fillVolm(0.15)
-            n.formFillEsVolm(0.45, at: 3)
-            n[4].sVolm = 0.5
-            n[4].eVolm = 0.55
-            n.formFillEsVolm(0.65, at: 4)
-            n[5].sVolm = 0.55
-            n[5].eVolm = 0.3
-            n[5].edVolm = 0.2
+            n[2].fillVolm(0.25)
+            n.formFillEsVolm(0.3, at: 2)
+            n[3].fillVolm(0.4)
+            n.formFillEsVolm(0.65, at: 3)
+            n[4].sVolm = 0.7
+            n[4].eVolm = 0.8
+            n.formFillEsVolm(0.85, at: 4)
+            n[5].sVolm = 0.8
+            n[5].eVolm = 0.65
+            n[5].edVolm = 0.4
             return .linear(self, n, t: opacity)
         case .ɕ, .dʒ, .tɕ:
             var n = toNoise(from: 2)
@@ -959,13 +960,13 @@ extension FormantFilter {
             n.fillEsVolm(0, at: 1)
             n[2].sdVolm = 0
             n[2].fillVolm(0.2)
-            n.formFillEsVolm(0.3, at: 2)
-            n[3].fillVolm(0.4)
-            n.formFillEsVolm(0.55, at: 3)
-            n[4].fillVolm(0.55)
-            n.formFillEsVolm(0.45, at: 4)
-            n[5].fillVolm(0.4)
-            n[5].edVolm = 0.3
+            n.formFillEsVolm(0.4, at: 2)
+            n[3].fillVolm(0.5)
+            n.formFillEsVolm(0.85, at: 3)
+            n[4].fillVolm(0.85)
+            n.formFillEsVolm(0.6, at: 4)
+            n[5].fillVolm(0.45)
+            n[5].edVolm = 0.4
             return .linear(self, n, t: opacity)
         case .ha, .he, .ho:
             var n = toNoise()
@@ -1282,7 +1283,7 @@ struct Mora: Hashable, Codable {
                 paddingSec = 0.03
             case .ɾ, .ɾj:
                 onsetDurSec = 0.0075
-                pitch = -1
+                pitch = -2
                 paddingSec = 0.035
             case .p, .pj:
                 onsetDurSec = 0.03
@@ -1424,7 +1425,7 @@ struct Mora: Hashable, Codable {
                 ff0[1].pitch = .linear(nFf[1].pitch, nextFf[1].pitch, t: 0.25)
                 let fScale = switch oph {
                 case .ka: 0.6
-                case .kj, .ke: 1.0
+                case .kj, .ke: 0.7
                 default: 1.25
                 }
                 ff0[1].fillVolm(fScale * .linear(nFf[1].volm, nextFf[1].volm, t: 0.75))
@@ -1455,7 +1456,7 @@ struct Mora: Hashable, Codable {
                 var ff0 = nFf.applyNoise(oph)
                 let fScale = switch oph {
                 case .ga: 0.6
-                case .gj, .ge: 1.0
+                case .gj, .ge: 0.7
                 default: 1.25
                 }
                 ff0[1].fillVolm(fScale * .linear(ff0[1].volm, nextFf[1].volm, t: 0.75))
@@ -1495,7 +1496,7 @@ struct Mora: Hashable, Codable {
                 onsetFf0.formMultiplyEsVolm(0.7, at: 4)
                 
                 kffs.append(.init(onsetFf0, durSec: onsetDurSec, pitch: pitch))
-                kffs.append(.init(onsetFf, durSec: 0.03, pitch: pitch))
+                kffs.append(.init(onsetFf, durSec: 0.02, pitch: pitch))
                 
                 var ff0 = nextFf
                 ff0[0] = .linear(onsetFf[0], nextFf[0], t: 0.5)
@@ -1535,7 +1536,7 @@ struct Mora: Hashable, Codable {
                 case .tɕ, .ts: 0.02
                 default: 0.035
                 }
-                let onsetLastDurSec = 0.015
+                let onsetLastDurSec = 0.02
                 let onsetFf = nFf.applyNoise(oph)
                 if let preFf = previousFormantFilter, let id = previousID {
                     let nnFf = FormantFilter.linear(preFf, nFf, t: 0.75)
