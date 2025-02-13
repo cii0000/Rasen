@@ -748,9 +748,10 @@ final class AnimationView: TimelineView, @unchecked Sendable {
             let i = model.index(atRootInter: model.rootInterIndex - 1)
             let nodes = model.keyframes[i].picture.lines.map {
                 Node(path: Path($0),
-                     lineWidth: $0.size, lineType: .color(.previous))
+                     lineWidth: $0.size, lineType: .color(.background))
             }
-            return Node(children: nodes)
+            return Node(children: nodes, isClippingChildren: true,
+                        path: .init(bounds), fillType: .color(.previous))
 //            let view = keyframesView.elementViews[i].linesView
 //            let lineColor = Color.previous
 //            view.elementViews.forEach {
@@ -762,9 +763,10 @@ final class AnimationView: TimelineView, @unchecked Sendable {
             let i = model.index(atRootInter: model.rootInterIndex + 1)
             let nodes = model.keyframes[i].picture.lines.map {
                 Node(path: Path($0),
-                     lineWidth: $0.size, lineType: .color(.next))
+                     lineWidth: $0.size, lineType: .color(.background))
             }
-            return Node(children: nodes)
+            return Node(children: nodes, isClippingChildren: true,
+                        path: .init(bounds), fillType: .color(.next))
 //            let i = model.index(atRoot: rootIndex + 1)
 //            let view = keyframesView.elementViews[i].linesView
 //            let lineColor = Color.next

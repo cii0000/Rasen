@@ -407,6 +407,8 @@ final class Node: @unchecked Sendable {
         }
     }
     
+    var isClippingChildren = false
+    
     var isCPUFillAntialias = true
     
     var enableCache = false {
@@ -479,7 +481,7 @@ final class Node: @unchecked Sendable {
     
     init(name: String = "",
          children: [Node] = [],
-         isHidden: Bool = false,
+         isHidden: Bool = false, isClippingChildren: Bool = false,
          attitude: Attitude = Attitude(),
          path: Path = Path(),
          lineWidth: Double = 0, lineType: LineType? = nil,
@@ -488,6 +490,7 @@ final class Node: @unchecked Sendable {
         self.name = name
         backingChildren = children
         self.isHidden = isHidden
+        self.isClippingChildren = isClippingChildren
         self.aPath = path
         self.attitude = attitude
         self.localTransform = attitude.transform
@@ -519,7 +522,7 @@ final class Node: @unchecked Sendable {
     }
     
     private init(name: String, backingChildren: [Node],
-                 isHidden: Bool, attitude: Attitude,
+                 isHidden: Bool, isClippingChildren: Bool, attitude: Attitude,
                  localTransform: Transform, isIdentityFromLocal: Bool, localScale: Double,
                  worldTransform: Transform, path: Path,
                  lineWidth : Double,
@@ -539,6 +542,7 @@ final class Node: @unchecked Sendable {
         self.name = name
         self.backingChildren = backingChildren
         self.isHidden = isHidden
+        self.isClippingChildren = isClippingChildren
         self.attitude = attitude
         self.localTransform = localTransform
         self.isIdentityFromLocal = isIdentityFromLocal
@@ -582,6 +586,7 @@ final class Node: @unchecked Sendable {
         Node(name: name,
              backingChildren: backingChildren.map { $0.clone },
              isHidden: isHidden,
+             isClippingChildren: isClippingChildren,
              attitude: attitude,
              localTransform: localTransform,
              isIdentityFromLocal: isIdentityFromLocal,
@@ -741,7 +746,7 @@ extension Node {
             return
         }
         
-        if let fillPathBuffer = fillPathBuffer {
+        if !isClippingChildren, let fillPathBuffer = fillPathBuffer {
             if path.isPolygon {
                 if let fillColorBuffer = fillColorBuffer {
                     if isFillOpaque {
@@ -859,11 +864,69 @@ extension Node {
             }
         }
         
-        children.forEach { $0.draw(currentTransform: transform,
-                                   currentTransformBytes: transformBytes,
-                                   currentScale: tScale,
-                                   rootTransform: rootTransform,
-                                   in: ctx) }
+        if isClippingChildren {
+            ctx.setStencilPipeline()
+            ctx.setReplaceDepthStencil()
+            ctx.setStencilReferenceValue(0)
+            if let fillPathBuffer = fillPathBuffer {
+                if path.isPolygon {
+                    ctx.setVertex(fillPathBuffer, at: 0)
+                    ctx.setVertex(bytes: transformBytes,
+                                  length: transformLength, at: 1)
+                    ctx.drawTriangleStrip(with: fillPathBufferVertexCounts)
+                }
+            }
+            ctx.setReplaceDepthStencil()
+            ctx.setStencilReferenceValue(1)
+            children.forEach {
+                $0.updateDatas()
+                if let lineType = $0.lineType, let linePathBuffer = $0.linePathBuffer {
+                    switch lineType {
+                    case .color:
+                       ctx.setVertex(linePathBuffer, at: 0)
+                       ctx.setVertex(bytes: transformBytes,
+                                      length: transformLength, at: 1)
+                       ctx.drawTriangleStrip(with: $0.linePathBufferVertexCounts)
+                    case .gradient: break
+                    }
+                }
+            }
+            if let fillPathBuffer = fillPathBuffer {
+                if path.isPolygon {
+                    if let fillColorBuffer = fillColorBuffer {
+                        if isFillOpaque {
+                            ctx.setOpaqueColorPipeline()
+                        } else {
+                            ctx.setAlphaColorPipeline()
+                        }
+                        ctx.setReversedClippingDepthStencil()
+                        ctx.setVertex(fillPathBuffer, at: 0)
+                        ctx.setVertex(fillColorBuffer, at: 1)
+                        ctx.setVertex(bytes: transformBytes,
+                                      length: transformLength, at: 2)
+                        ctx.drawTriangleStrip(with: fillPathBufferVertexCounts)
+                    }
+                }
+            }
+            ctx.setStencilPipeline()
+            ctx.setReplaceDepthStencil()
+            ctx.setStencilReferenceValue(0)
+            if let fillPathBuffer = fillPathBuffer {
+                if path.isPolygon {
+                    ctx.setVertex(fillPathBuffer, at: 0)
+                    ctx.setVertex(bytes: transformBytes,
+                                  length: transformLength, at: 1)
+                    ctx.drawTriangleStrip(with: fillPathBufferVertexCounts)
+                }
+            }
+            ctx.setNormalDepthStencil()
+        } else {
+            children.forEach { $0.draw(currentTransform: transform,
+                                       currentTransformBytes: transformBytes,
+                                       currentScale: tScale,
+                                       rootTransform: rootTransform,
+                                       in: ctx) }
+        }
         
         if isRenderCache && enableCache, let owner = owner {
             ctx.clip(owner.viewportBounds)

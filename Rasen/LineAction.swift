@@ -218,10 +218,10 @@ final class LineAction: Action {
                                           minSpeed: Double = 300.0,
                                           maxSpeed: Double = 1000.0,
                                           exp: Double = 2.0,
-                                          minTime: Double = 0.06,
+                                          minTime: Double = 0.1,
                                           maxTime: Double = 0.03,
-                                          minDistance: Double = 0.5,
-                                          maxDistance: Double = 0.5,
+                                          minDistance: Double = 1,
+                                          maxDistance: Double = 1,
                                           maxPressureDistance maxPrD: Double = 0.05) -> Bool {
         guard deltaTime > 0 else {
             return false

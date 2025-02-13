@@ -1267,7 +1267,7 @@ final class InterpolateAction: InputKeyEventAction {
                     
                     let oldKeyframe = animationView.model.keyframe(atRoot: oldRootKeyframeIndex)
                     for idiv in idivs {
-                        let li = oldKeyframe.picture.lines.firstIndex(where: { $0.id == idiv.value.id })!
+                        guard let li = oldKeyframe.picture.lines.firstIndex(where: { $0.id == idiv.value.id }) else { continue }
                         let upperLineIDs = Set(oldKeyframe.picture.lines[(li + 1)...].map { $0.id })
                         let nli = animationView.currentKeyframe.picture.lines.firstIndex { upperLineIDs.contains($0.id) }
                         if let nli, nli != idiv.index {

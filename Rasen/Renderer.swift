@@ -102,8 +102,11 @@ final class Renderstate {
     let stencilRenderPipelineState: any MTLRenderPipelineState
     let stencilBezierRenderPipelineState: any MTLRenderPipelineState
     let invertDepthStencilState: any MTLDepthStencilState
+    let zeroDepthStencilState: any MTLDepthStencilState
+    let replaceDepthStencilState: any MTLDepthStencilState
     let normalDepthStencilState: any MTLDepthStencilState
     let clippingDepthStencilState: any MTLDepthStencilState
+    let reversedClippingDepthStencilState: any MTLDepthStencilState
     let cacheSamplerState: any MTLSamplerState
     
     nonisolated(unsafe) static let sampleCount1 = try? Renderstate(sampleCount: 1)
@@ -247,6 +250,28 @@ final class Renderstate {
         }
         invertDepthStencilState = ss
         
+        let zeroStencilD = MTLStencilDescriptor()
+        zeroStencilD.stencilFailureOperation = .zero
+        zeroStencilD.depthStencilPassOperation = .zero
+        let zeroDepthStencilD = MTLDepthStencilDescriptor()
+        zeroDepthStencilD.backFaceStencil = zeroStencilD
+        zeroDepthStencilD.frontFaceStencil = zeroStencilD
+        guard let zs = device.makeDepthStencilState(descriptor: zeroDepthStencilD) else {
+            throw Renderer.metalError
+        }
+        zeroDepthStencilState = zs
+        
+        let replaceStencilD = MTLStencilDescriptor()
+        replaceStencilD.stencilFailureOperation = .replace
+        replaceStencilD.depthStencilPassOperation = .replace
+        let replaceDepthStencilD = MTLDepthStencilDescriptor()
+        replaceDepthStencilD.backFaceStencil = replaceStencilD
+        replaceDepthStencilD.frontFaceStencil = replaceStencilD
+        guard let rs = device.makeDepthStencilState(descriptor: replaceDepthStencilD) else {
+            throw Renderer.metalError
+        }
+        replaceDepthStencilState = rs
+        
         let clippingStencilD = MTLStencilDescriptor()
         clippingStencilD.stencilCompareFunction = .notEqual
         clippingStencilD.stencilFailureOperation = .keep
@@ -258,6 +283,18 @@ final class Renderstate {
             throw Renderer.metalError
         }
         clippingDepthStencilState = cs
+        
+        let reversedClippingStencilD = MTLStencilDescriptor()
+        reversedClippingStencilD.stencilCompareFunction = .equal
+        reversedClippingStencilD.stencilFailureOperation = .keep
+        reversedClippingStencilD.depthStencilPassOperation = .zero
+        let reversedClippingDepthStecilD = MTLDepthStencilDescriptor()
+        reversedClippingDepthStecilD.backFaceStencil = reversedClippingStencilD
+        reversedClippingDepthStecilD.frontFaceStencil = reversedClippingStencilD
+        guard let rcs = device.makeDepthStencilState(descriptor: reversedClippingDepthStecilD) else {
+            throw Renderer.metalError
+        }
+        reversedClippingDepthStencilState = rcs
         
         let normalDepthStencilD = MTLDepthStencilDescriptor()
         guard let ncs = device.makeDepthStencilState(descriptor: normalDepthStencilD) else {
@@ -370,11 +407,23 @@ final class Context {
     func setInvertDepthStencil() {
         encoder.setDepthStencilState(rs.invertDepthStencilState)
     }
+    func setZeroDepthStencil() {
+        encoder.setDepthStencilState(rs.zeroDepthStencilState)
+    }
+    func setReplaceDepthStencil() {
+        encoder.setDepthStencilState(rs.replaceDepthStencilState)
+    }
+    func setStencilReferenceValue(_ v: UInt32) {
+        encoder.setStencilReferenceValue(v)
+    }
     func setNormalDepthStencil() {
         encoder.setDepthStencilState(rs.normalDepthStencilState)
     }
     func setClippingDepthStencil() {
         encoder.setDepthStencilState(rs.clippingDepthStencilState)
+    }
+    func setReversedClippingDepthStencil() {
+        encoder.setDepthStencilState(rs.reversedClippingDepthStencilState)
     }
 }
 
@@ -745,7 +794,7 @@ extension Node {
             default:
                 typesetter.draw(in: b, fillColor: .content, in: ctx)
             }
-        } else if !path.isEmpty {
+        } else if !isClippingChildren && !path.isEmpty {
             if let fillType = fillType {
                 switch fillType {
                 case .color(let color):
@@ -866,7 +915,52 @@ extension Node {
                 }
             }
         }
-        children.forEach { $0.render(in: ctx) }
+        if isClippingChildren {
+            if !path.isEmpty {
+                if let fillType = fillType {
+                    switch fillType {
+                    case .color(let color):
+                        ctx.saveGState()
+                        
+                        ctx.setAlpha(.init(color.opacity))
+                        ctx.beginTransparencyLayer(auxiliaryInfo: nil)
+                        let cgColor = color.with(opacity: 1).cg
+                        ctx.setFillColor(cgColor)
+                        
+                        children.forEach {
+                            if let lineType = $0.lineType {
+                                switch lineType {
+                                case .color:
+                                    let (pd, counts) = $0.path.outlinePointsDataWith(lineWidth: $0.lineWidth)
+                                    var i = 0
+                                    let cgPath = CGMutablePath()
+                                    for count in counts {
+                                        let points = (i ..< (i + count)).map {
+                                            Point(Double(pd[$0 * 4]),
+                                                  Double(pd[$0 * 4 + 1])).cg
+                                        }
+                                        if !points.isEmpty {
+                                            cgPath.addLines(between: points)
+                                            cgPath.closeSubpath()
+                                        }
+                                        i += count
+                                    }
+                                    ctx.addPath(cgPath)
+                                    ctx.fillPath()
+                                default: break
+                                }
+                            }
+                        }
+                        
+                        ctx.endTransparencyLayer()
+                        ctx.restoreGState()
+                    default: break
+                    }
+                }
+            }
+        } else {
+            children.forEach { $0.render(in: ctx) }
+        }
         if !isIdentityFromLocal {
             ctx.restoreGState()
         }

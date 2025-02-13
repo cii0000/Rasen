@@ -1760,7 +1760,7 @@ final class RootView: View, @unchecked Sendable {
     }
     private(set) var thumbnailNodeValues = [IntPoint: ThumbnailNodeValue]()
     
-    struct SheetViewValue: @unchecked Sendable {
+    struct SheetViewValue {
         let sheetID: UUID
         var sheetView: SheetView?
         var task: Task<(), any Error>?
