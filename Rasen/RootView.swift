@@ -382,8 +382,8 @@ final class RootView: View, @unchecked Sendable {
                 resetSIDs.insert(sid)
             }
         }
-        history.rootBranch.all { (_, branch) in
-            for group in branch.groups {
+        history.allGroups { (_, groups) in
+            for group in groups {
                 for udv in group.values {
                     if let item = udv.loadedRedoItem() {
                         if case .insertSheets(let sids) = item.undoItem {

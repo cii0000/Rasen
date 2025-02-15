@@ -29,9 +29,8 @@ extension Date: Protobuf {
     }
 }
 
-typealias VersionPath = [Int]
 struct Version: Hashable, Codable {
-    var indexPath = VersionPath(), groupIndex = 0
+    var indexPath = [Int](), groupIndex = 0
 }
 
 enum UndoItemType {
@@ -327,15 +326,45 @@ extension UndoGroup: Codable {
     }
 }
 
-struct Branch<T: UndoItem> {
+private final class _Branch<T: UndoItem>: @unchecked Sendable {
     var groups = [UndoGroup<T>]()
-    var children = [Branch<T>]()
+    var children = [_Branch<T>]()
     var selectedChildIndex = Int?.none
     fileprivate var childrenCount = 0
+    
+    init(groups: [UndoGroup<T>] = .init(), children: [_Branch<T>] = .init(),
+         selectedChildIndex: Int? = nil) {
+        self.groups = groups
+        self.children = children
+        self.selectedChildIndex = selectedChildIndex
+        self.childrenCount = children.count
+    }
+    
+    deinit {
+        var count = 0
+        self.allBranchs { _, _ in count += 1 }
+        
+        var allBranchs = [_Branch<T>](capacity: count)
+        var branchStack = Stack<_Branch<T>>(minimumCapacity: count)
+        branchStack.push(self)
+        while let branch = branchStack.pop() {
+            allBranchs.append(branch)
+            for child in branch.children.reversed() {
+                branchStack.push(child)
+            }
+        }
+        allBranchs.forEach {
+            $0.groups = []
+            $0.children = []
+            $0.selectedChildIndex = nil
+        }
+        allBranchs = []
+    }
 }
-extension Branch: Protobuf {
+extension _Branch: Protobuf {
     typealias PB = PBBranch
-    init(_ pb: PBBranch) throws {
+    convenience init(_ pb: PBBranch) throws {
+        self.init()
         groups = try pb.groups.map { try UndoGroup($0) }
         childrenCount = Int(pb.childrenCount)
         if case .selectedChildIndex(let selectedChildIndex)?
@@ -359,14 +388,14 @@ extension Branch: Protobuf {
         }
     }
 }
-extension Branch {
-    mutating func appendInLastGroup(undo undoItem: T,
+extension _Branch {
+    func appendInLastGroup(undo undoItem: T,
                                     redo redoItem: T) {
         let uiv = UndoItemValue(undoItem: undoItem, redoItem: redoItem)
         let udv = UndoDataValue(save: uiv)
         groups[.last].values.append(udv)
     }
-    mutating func setFirstInLastGroup(item: T) {
+    func setFirstInLastGroup(item: T) {
         let uiv = UndoItemValue(undoItem: item, redoItem: item)
         let udv = UndoDataValue(save: uiv)
         groups[.last].values = [udv]
@@ -376,69 +405,64 @@ extension Branch {
         get { self[version.indexPath].groups[version.groupIndex] }
         set { self[version.indexPath].groups[version.groupIndex] = newValue }
     }
-    subscript(indexPath: VersionPath) -> Branch<T> {
-        get {
-            var branch = self
-            indexPath.forEach {
-                branch = branch.children[$0]
-            }
-            return branch
+    subscript(indexPath: [Int]) -> _Branch<T> {
+        var branch = self
+        indexPath.forEach {
+            branch = branch.children[$0]
         }
-        set {
-            if indexPath.isEmpty {
-                self = newValue
-            } else if indexPath.count <= 1 {
-                children[indexPath[0]] = newValue
-            } else {
-                var branch = self, branches = [Branch<T>]()
-                indexPath.forEach {
-                    branches.append(branch)
-                    branch = branch.children[$0]
-                }
-                var n = newValue
-                for (i, j) in indexPath.enumerated().reversed() {
-                    var nBranch = branches[i]
-                    nBranch.children[j] = n
-                    n = nBranch
-                }
-                self = n
-            }
-        }
+        return branch
     }
     func version(atAll i: Int) -> Version? {
         guard i > 0 else { return nil }
         let i = i - 1
-        var branch = self, j = 0, versionPath = VersionPath()
+        var branch = self, j = 0, indexPath = [Int]()
         while true {
             let nj = j + branch.groups.count
             if nj > i {
-                return Version(indexPath: versionPath, groupIndex: i - j)
+                return Version(indexPath: indexPath, groupIndex: i - j)
             }
             guard let sci = branch.selectedChildIndex else { break }
-            versionPath.append(sci)
+            indexPath.append(sci)
             j = nj
             branch = branch.children[sci]
         }
-        return Version(indexPath: versionPath,
-                       groupIndex: branch.groups.count - 1)
+        return .init(indexPath: indexPath, groupIndex: branch.groups.count - 1)
     }
     
-    func all(_ handler: (VersionPath, Branch<T>) -> ()) {
-        var vpbs = [(VersionPath(), self)]
-        while let (versionPath, branch) = vpbs.last {
-            vpbs.removeLast()
-            handler(versionPath, branch)
+    func allBranchs(_ handler: ([Int], _Branch<T>) -> ()) {
+        var indexPathAndBranchs = [([Int](), self)]
+        while let (indexPath, branch) = indexPathAndBranchs.last {
+            indexPathAndBranchs.removeLast()
+            handler(indexPath, branch)
             for (i, child) in branch.children.enumerated().reversed() {
-                var versionPath = versionPath
-                versionPath.append(i)
-                vpbs.append((versionPath, child))
+                var indexPath = indexPath
+                indexPath.append(i)
+                indexPathAndBranchs.append((indexPath, child))
             }
         }
     }
+    func allGroups(_ handler: ([Int], [UndoGroup<T>]) -> ()) {
+        var indexPathAndBranchs = [([Int](), self)]
+        while let (indexPath, branch) = indexPathAndBranchs.last {
+            indexPathAndBranchs.removeLast()
+            handler(indexPath, branch.groups)
+            for (i, child) in branch.children.enumerated().reversed() {
+                var indexPath = indexPath
+                indexPath.append(i)
+                indexPathAndBranchs.append((indexPath, child))
+            }
+        }
+    }
+    
+    func copy() -> Self {
+        .init(groups: groups, children: children.map { $0.copy() },
+              selectedChildIndex: selectedChildIndex)
+    }
 }
-extension Branch: Codable {
-    public init(from decoder: any Decoder) throws {
+extension _Branch: Codable {
+    public convenience init(from decoder: any Decoder) throws {
         var container = try decoder.unkeyedContainer()
+        self.init()
         groups = try container.decode([UndoGroup<T>].self)
         childrenCount = try container.decode(Int.self)
         selectedChildIndex = try container.decodeIfPresent(Int.self)
@@ -451,13 +475,19 @@ extension Branch: Codable {
     }
 }
 
-struct BranchCoder<T: UndoItem> {
-    var rootBranch: Branch<T>
+struct Branch<T: UndoItem> {
+    var groups = [UndoGroup<T>]()
+    var childrenCount = 0
+    var selectedChildIndex = Int?.none
+}
+
+private struct BranchCoder<T: UndoItem> {
+    var rootBranch: _Branch<T>
 }
 extension BranchCoder: Protobuf {
     typealias PB = PBBranchCoder
     init(_ pb: PBBranchCoder) throws {
-        let allBranches = try pb.allBranches.map { try Branch<T>($0) }
+        let allBranches = try pb.allBranches.map { try _Branch<T>($0) }
         rootBranch = BranchCoder.rootBranch(from: allBranches)
     }
     var pb: PBBranchCoder {
@@ -467,59 +497,59 @@ extension BranchCoder: Protobuf {
     }
 }
 private enum BranchLoop<T: UndoItem> {
-    case first(_ branch: Branch<T>)
-    case next(_ children: [Branch<T>], _ branch: Branch<T>, _ j: Int)
+    case first(_ branch: _Branch<T>)
+    case next(_ children: [_Branch<T>], _ branch: _Branch<T>, _ j: Int)
 }
 extension BranchCoder {
-    static func rootBranch(from allBranches: [Branch<T>]) -> Branch<T> {
+    static func rootBranch(from allBranches: [_Branch<T>]) -> _Branch<T> {
         guard let root = allBranches.first else {
-            return Branch<T>()
+            return _Branch<T>()
         }
         
         var i = 0, loopStack = Stack<BranchLoop<T>>()
-        var returnStack = Stack<Branch<T>>()
+        var returnStack = Stack<_Branch<T>>()
         loopStack.push(.first(root))
         loop: while true {
-            let un: Branch<T>, nj: Int
-            var children: [Branch<T>]
+            let branch: _Branch<T>, nj: Int
+            var children: [_Branch<T>]
             switch loopStack.pop()! {
-            case .first(let oun):
-                children = [Branch<T>]()
-                children.reserveCapacity(oun.childrenCount)
-                un = oun
+            case .first(let oBranch):
+                children = [_Branch<T>]()
+                children.reserveCapacity(oBranch.childrenCount)
+                branch = oBranch
                 nj = 0
-            case .next(var nchildren, let oun, let oj):
-                nchildren.append(returnStack.pop()!)
-                children = nchildren
-                un = oun
+            case .next(var nChildren, let oBranch, let oj):
+                nChildren.append(returnStack.pop()!)
+                children = nChildren
+                branch = oBranch
                 nj = oj
             }
-            for j in nj ..< un.childrenCount {
+            for j in nj ..< branch.childrenCount {
                 i += 1
                 
-                loopStack.push(.next(children, un, j + 1))
+                loopStack.push(.next(children, branch, j + 1))
                 loopStack.push(.first(allBranches[i]))
                 continue loop
             }
             
-            var nun = un
-            nun.children = children
-            nun.children.enumerated().reversed().forEach {
+            let nBranch = branch
+            nBranch.children = children
+            nBranch.children.enumerated().reversed().forEach {
                 if $0.element.groups.isEmpty {
-                    nun.children.remove(at: $0.offset)
+                    nBranch.children.remove(at: $0.offset)
                 }
             }
             
             if loopStack.isEmpty {
-                return nun
+                return nBranch
             } else {
-                returnStack.push(nun)
+                returnStack.push(nBranch)
                 continue loop
             }
         }
     }
-    var allBranches: [Branch<T>] {
-        var allBranches = [Branch<T>]()
+    var allBranches: [_Branch<T>] {
+        var allBranches = [_Branch<T>]()
         var uns = [rootBranch]
         while let un = uns.last {
             uns.removeLast()
@@ -534,7 +564,7 @@ extension BranchCoder {
 extension BranchCoder: Codable {
     public init(from decoder: any Decoder) throws {
         var container = try decoder.unkeyedContainer()
-        let allBranches = try container.decode([Branch<T>].self)
+        let allBranches = try container.decode([_Branch<T>].self)
         rootBranch = BranchCoder.rootBranch(from: allBranches)
     }
     public func encode(to encoder: any Encoder) throws {
@@ -548,7 +578,7 @@ enum UndoType {
 }
 
 struct History<T: UndoItem> {
-    var rootBranch = Branch<T>()
+    private var rootBranch = _Branch<T>()
     var currentVersionIndex = 0, currentVersion = Version?.none
 }
 extension History: Protobuf {
@@ -578,25 +608,27 @@ extension History: Codable {
         check()
     }
     mutating func check() {
+        copyIfShared()
+        
         guard currentVersionIndex > 0 else {
             currentVersion = nil
             return
         }
         let i = currentVersionIndex - 1
-        var ug = rootBranch, j = 0, ip = VersionPath()
+        var branch = rootBranch, j = 0, indexPath = [Int]()
         while true {
-            let nj = j + ug.groups.count
+            let nj = j + branch.groups.count
             if nj > i {
-                currentVersion = Version(indexPath: ip, groupIndex: i - j)
+                currentVersion = Version(indexPath: indexPath, groupIndex: i - j)
                 return
             }
-            guard let sci = ug.selectedChildIndex else { break }
-            ip.append(sci)
+            guard let sci = branch.selectedChildIndex else { break }
+            indexPath.append(sci)
             j = nj
-            ug = ug.children[sci]
+            branch = branch.children[sci]
         }
-        currentVersionIndex = j + ug.groups.count - 1
-        currentVersion = Version(indexPath: ip, groupIndex: ug.groups.count - 1)
+        currentVersionIndex = j + branch.groups.count - 1
+        currentVersion = .init(indexPath: indexPath, groupIndex: branch.groups.count - 1)
     }
     func encode(to encoder: any Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
@@ -606,69 +638,68 @@ extension History: Codable {
     }
 }
 extension History {
+    private mutating func copyIfShared() {
+        if isKnownUniquelyReferenced(&rootBranch) { return }
+        rootBranch = rootBranch.copy()
+    }
+    
     mutating func newBranch() {
-        if let ui = currentVersion {
-            var cuip = ui.indexPath
-            var branch0 = rootBranch[cuip]
-            if ui.groupIndex == branch0.groups.count - 1 {
-                guard let sci = branch0.selectedChildIndex else { return }
-                var un0 = Branch<T>()
-                un0.groups = [UndoGroup()]
-                let ni = sci + 1
-                branch0.children.insert(un0, at: ni)
-                branch0.selectedChildIndex = ni
-                rootBranch[cuip] = branch0
-                cuip.append(ni)
+        copyIfShared()
+        
+        if let currentVersion {
+            var indexPath = currentVersion.indexPath
+            var branch = rootBranch[indexPath]
+            if currentVersion.groupIndex == branch.groups.count - 1 {
+                guard let i = branch.selectedChildIndex else { return }
+                let branch0 = _Branch<T>(groups: [.init()])
+                let ni = i + 1
+                branch.children.insert(branch0, at: ni)
+                branch.selectedChildIndex = ni
+                indexPath.append(ni)
             } else {
-                var un0 = Branch<T>(), un1 = Branch<T>()
-                un0.groups = Array(branch0.groups[(ui.groupIndex + 1)...])
-                un0.children = branch0.children
-                un0.selectedChildIndex = branch0.selectedChildIndex
-                un1.groups = [UndoGroup()]
-                branch0.groups.removeLast(branch0.groups.count - ui.groupIndex - 1)
-                branch0.children = [un0, un1]
-                branch0.selectedChildIndex = 1
-                rootBranch[cuip] = branch0
-                cuip.append(1)
+                let branch0 = _Branch<T>(groups: Array(branch.groups[(currentVersion.groupIndex + 1)...]),
+                                         children: branch.children,
+                                         selectedChildIndex: branch.selectedChildIndex)
+                let branch1 = _Branch<T>(groups: [.init()])
+                branch.groups.removeLast(branch.groups.count - currentVersion.groupIndex - 1)
+                branch.children = [branch0, branch1]
+                branch.selectedChildIndex = 1
+                indexPath.append(1)
             }
-            currentVersion = Version(indexPath: cuip, groupIndex: 0)
+            self.currentVersion = .init(indexPath: indexPath, groupIndex: 0)
             currentVersionIndex += 1
         } else {
-            let un0 = rootBranch
-            if un0.groups.count == 0 {
-                guard let sci = un0.selectedChildIndex else { return }
-                var un1 = Branch<T>()
-                un1.groups = [UndoGroup()]
-                let ni = sci + 1
-                rootBranch.groups = []
-                rootBranch.children.insert(un1, at: ni)
+            let branch0 = rootBranch
+            if branch0.groups.count == 0 {
+                guard let i = branch0.selectedChildIndex else { return }
+                let branch1 = _Branch<T>(groups: [.init()])
+                let ni = i + 1
+                rootBranch.children.insert(branch1, at: ni)
                 rootBranch.selectedChildIndex = ni
-                currentVersion = Version(indexPath: [ni], groupIndex: 0)
+                currentVersion = .init(indexPath: [ni], groupIndex: 0)
                 currentVersionIndex = 1
             } else {
-                var un1 = Branch<T>()
-                un1.groups = [UndoGroup()]
-                rootBranch.groups = []
-                rootBranch.children = [un0, un1]
-                rootBranch.selectedChildIndex = 1
-                currentVersion = Version(indexPath: [1], groupIndex: 0)
+                let branch1 = _Branch<T>(groups: [.init()])
+                rootBranch = .init(groups: [], children: [branch0, branch1], selectedChildIndex: 1)
+                currentVersion = .init(indexPath: [1], groupIndex: 0)
                 currentVersionIndex = 1
             }
         }
     }
     mutating func newUndoGroup(firstItem: T? = nil) {
+        copyIfShared()
+        
         if !isLeafUndo {
             newBranch()
         } else {
-            if let cui = currentVersion {
-                rootBranch[cui.indexPath].groups.append(UndoGroup())
+            if let version = currentVersion {
+                rootBranch[version.indexPath].groups.append(UndoGroup())
                 currentVersionIndex += 1
                 currentVersion!.groupIndex += 1
             } else {
                 rootBranch.groups = [UndoGroup()]
                 currentVersionIndex = 1
-                currentVersion = Version(indexPath: VersionPath(),
-                                         groupIndex: 0)
+                currentVersion = Version(indexPath: .init(), groupIndex: 0)
             }
         }
         if let item = firstItem {
@@ -677,6 +708,8 @@ extension History {
         }
     }
     mutating func append(undo undoItem: T, redo redoItem: T) {
+        copyIfShared()
+        
         rootBranch[currentVersion!.indexPath]
             .appendInLastGroup(undo: undoItem, redo: redoItem)
     }
@@ -686,55 +719,57 @@ extension History {
         var version: Version, valueIndex: Int
     }
     mutating func undoAndResults(to toTopIndex: Int) -> [UndoResult] {
+        copyIfShared()
+        
         let fromTopIndex = currentVersionIndex
         guard fromTopIndex != toTopIndex else { return [] }
         func enumerated(minI: Int, maxI: Int, _ handler: (Version) -> ()) {
             var minI = minI
             if minI == 0 {
                 minI = 1
-                handler(Version(indexPath: VersionPath(), groupIndex: -1))
+                handler(Version(indexPath: .init(), groupIndex: -1))
             }
             guard minI <= maxI else { return }
             for i in minI ... maxI {
-                let ui = rootBranch.version(atAll: i)!
-                handler(ui)
+                let version = rootBranch.version(atAll: i)!
+                handler(version)
             }
         }
         var results = [UndoResult]()
         if fromTopIndex < toTopIndex {
-            enumerated(minI: fromTopIndex + 1, maxI: toTopIndex) { (ui) in
-                rootBranch[ui].values.enumerated().forEach {
+            enumerated(minI: fromTopIndex + 1, maxI: toTopIndex) { (version) in
+                rootBranch[version].values.enumerated().forEach {
                     results.append(UndoResult(item: $0.element,
                                               type: .redo,
-                                              version: ui,
+                                              version: version,
                                               valueIndex: $0.offset))
                 }
             }
         } else {
-            var values = [(Version)]()
-            values.reserveCapacity(fromTopIndex - toTopIndex)
-            enumerated(minI: toTopIndex, maxI: fromTopIndex - 1) { (ui) in
-                values.append((ui))
+            var versions = [(Version)]()
+            versions.reserveCapacity(fromTopIndex - toTopIndex)
+            enumerated(minI: toTopIndex, maxI: fromTopIndex - 1) { (version) in
+                versions.append((version))
             }
-            values.reversed().forEach { (ui) in
-                let un = rootBranch[ui.indexPath]
-                if ui.groupIndex + 1 >= un.groups.count {
-                    var nui = ui
-                    nui.groupIndex = 0
-                    nui.indexPath.append(un.selectedChildIndex!)
-                    un.children[un.selectedChildIndex!].groups[0].reverse {
+            versions.reversed().forEach { (version) in
+                let branch = rootBranch[version.indexPath]
+                if version.groupIndex + 1 >= branch.groups.count {
+                    var nVersion = version
+                    nVersion.groupIndex = 0
+                    nVersion.indexPath.append(branch.selectedChildIndex!)
+                    branch.children[branch.selectedChildIndex!].groups[0].reverse {
                         results.append(UndoResult(item: $0.element,
                                                   type: .undo,
-                                                  version: nui,
+                                                  version: nVersion,
                                                   valueIndex: $0.offset))
                     }
                 } else {
-                    var nui = ui
-                    nui.groupIndex = ui.groupIndex + 1
-                    rootBranch[nui].reverse {
+                    var nVersion = version
+                    nVersion.groupIndex = version.groupIndex + 1
+                    rootBranch[nVersion].reverse {
                         results.append(UndoResult(item: $0.element,
                                                   type: .undo,
-                                                  version: nui,
+                                                  version: nVersion,
                                                   valueIndex: $0.offset))
                     }
                 }
@@ -745,18 +780,31 @@ extension History {
         return results
     }
     
+    subscript(version: Version) -> UndoGroup<T> {
+        get { rootBranch[version.indexPath].groups[version.groupIndex] }
+        set {
+            copyIfShared()
+            
+            rootBranch[version.indexPath].groups[version.groupIndex] = newValue
+        }
+    }
+    
+    mutating func set(selectedChildIndex: Int, at indexPath: [Int]) {
+        copyIfShared()
+        
+        rootBranch[indexPath].selectedChildIndex = selectedChildIndex
+    }
+    
     mutating func reset() {
-        rootBranch = Branch()
+        copyIfShared()
+        
+        rootBranch = _Branch()
         currentVersionIndex = 0
         currentVersion = nil
     }
+    
     var isEmpty: Bool {
         rootBranch.groups.isEmpty && rootBranch.children.isEmpty
-    }
-    
-    subscript(ui: Version) -> UndoGroup<T> {
-        get { rootBranch[ui.indexPath].groups[ui.groupIndex] }
-        set { rootBranch[ui.indexPath].groups[ui.groupIndex] = newValue }
     }
     
     var currentMaxVersionIndex: Int {
@@ -775,5 +823,31 @@ extension History {
     }
     var isCanRedo: Bool {
         currentVersionIndex < currentMaxVersionIndex
+    }
+    
+    func branch(from indexPath: [Int]) -> Branch<T> {
+        let branch = rootBranch[indexPath]
+        return .init(groups: branch.groups, childrenCount: branch.children.count,
+                     selectedChildIndex: branch.selectedChildIndex)
+    }
+    var currentDate: Date? {
+        if let version = currentVersion {
+            rootBranch[version].date
+        } else {
+            nil
+        }
+    }
+    
+    func allGroups(_ handler: ([Int], [UndoGroup<T>]) -> ()) {
+        rootBranch.allGroups(handler)
+    }
+    func allBranchsFromSelected(_ handler: (Branch<T>, Int) -> ()) {
+        var branch = rootBranch
+        while let i = branch.selectedChildIndex {
+            handler(.init(groups: branch.groups, childrenCount: branch.children.count,
+                          selectedChildIndex: branch.selectedChildIndex),
+                    i)
+            branch = branch.children[i]
+        }
     }
 }

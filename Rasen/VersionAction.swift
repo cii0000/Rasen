@@ -134,11 +134,10 @@ final class VersionAction: Action {
         rootNode.append(child: currentKnobNode)
         rootView.node.append(child: rootNode)
     }
-    func updatePath<T: UndoItem>(maxTopIndex: Int, rootBranch: Branch<T>) {
+    func updatePath<T: UndoItem>(maxVersionIndex: Int, history: History<T>) {
         var pathlines = [Pathline]()
-        pathlines.append(Pathline([Point(),
-                                   Point(undoXWidth * Double(maxTopIndex), 0)]))
-        (0 ... maxTopIndex).forEach { i in
+        pathlines.append(Pathline([Point(), Point(undoXWidth * Double(maxVersionIndex), 0)]))
+        (0 ... maxVersionIndex).forEach { i in
             let sx = undoXWidth * Double(i)
             pathlines.append(Pathline([Point(sx, -yd), Point(sx, yd)]))
         }
@@ -149,21 +148,18 @@ final class VersionAction: Action {
         rootNode.children = []
         outlineYNodes = []
         yNodes = []
-        var un = rootBranch, count = 0
-        while let sci = un.selectedChildIndex {
-            count += un.groups.count
+        
+        var count = 0
+        history.allBranchsFromSelected { branch, i in
+            count += branch.groups.count
             let x = undoXWidth * Double(count)
-            let (path, p) = yPath(selectedIndex: sci,
-                                  count: un.children.count, x: x)
-            let outlineYNode = Node(path: path, lineWidth: 2,
-                                    lineType: .color(.background))
-            let yNode = Node(path: path, lineWidth: 1,
-                             lineType: .color(.content))
+            let (path, p) = yPath(selectedIndex: i, count: branch.childrenCount, x: x)
+            let outlineYNode = Node(path: path, lineWidth: 2, lineType: .color(.background))
+            let yNode = Node(path: path, lineWidth: 1, lineType: .color(.content))
             outlineYNode.attitude.position = p
             yNode.attitude.position = p
             outlineYNodes.append(outlineYNode)
             yNodes.append(yNode)
-            un = un.children[sci]
         }
         
         rootNode.append(child: outlineNode)
@@ -355,10 +351,10 @@ final class VersionAction: Action {
             oldSP = event.screenPoint
             oldTime = event.time
             
-            func update<T: UndoItem>(currentVersion: Version?,
-                                     currentVersionIndex: Int,
-                                     currentMaxVersionIndex:Int,
-                                     rootBranch: Branch<T>) {
+            func update<T: UndoItem>(from history: History<T>) {
+                let currentVersion = history.currentVersion
+                let currentVersionIndex = history.currentVersionIndex
+                let currentMaxVersionIndex = history.currentMaxVersionIndex
                 beganVersion = currentVersion
                 
                 beganXIndex = currentVersionIndex
@@ -367,20 +363,19 @@ final class VersionAction: Action {
                 maxXCount = currentMaxVersionIndex + 1
                 
                 dyIndex = 0
-                let beganVIP = beganVersion?.indexPath ?? []
-                let un = rootBranch[beganVIP]
-                if let yi = un.selectedChildIndex,
+                let beganIndexPath = beganVersion?.indexPath ?? []
+                let branch = history.branch(from: beganIndexPath)
+                if let yi = branch.selectedChildIndex,
                    currentVersion?.groupIndex == nil
-                    || currentVersion?.groupIndex == un.groups.count - 1 {
+                    || currentVersion?.groupIndex == branch.groups.count - 1 {
                     
                     beganYIndex = yi
                     currentYIndex = yi
                     ydp = Point(0, -undoYWidth * Double(yi))
-                    maxYCount = un.children.count
+                    maxYCount = branch.childrenCount
                 }
                 
-                updatePath(maxTopIndex: currentMaxVersionIndex,
-                           rootBranch: rootBranch)
+                updatePath(maxVersionIndex: currentMaxVersionIndex, history: history)
                 var attitude = Attitude(rootView.screenToWorldTransform)
                 let up = rootView.convertScreenToWorld(rootView.convertWorldToScreen(p) - beganDP)
                 attitude.position = up
@@ -401,18 +396,12 @@ final class VersionAction: Action {
                 self.sheetView = nil
                 isEditRoot = true
                 
-                update(currentVersion: rootView.history.currentVersion,
-                       currentVersionIndex: rootView.history.currentVersionIndex,
-                       currentMaxVersionIndex: rootView.history.currentMaxVersionIndex,
-                       rootBranch: rootView.history.rootBranch)
+                update(from: rootView.history)
             } else if let sheetView = rootView.sheetView(at: p) {
                 self.sheetView = sheetView
                 isEditRoot = false
                 
-                update(currentVersion: sheetView.history.currentVersion,
-                       currentVersionIndex: sheetView.history.currentVersionIndex,
-                       currentMaxVersionIndex: sheetView.history.currentMaxVersionIndex,
-                       rootBranch: sheetView.history.rootBranch)
+                update(from: sheetView.history)
             } else {
                 self.sheetView = nil
                 isEditRoot = false
@@ -420,15 +409,15 @@ final class VersionAction: Action {
                 updateEmptyPath(at: p)
             }
             
-            if let sheetView = sheetView {
-                if let version = sheetView.history.currentVersion {
-                    updateDate(sheetView.history.rootBranch[version].date)
+            if let sheetView {
+                if let date = sheetView.history.currentDate {
+                    updateDate(date)
                 } else {
                     rootView.cursor = .arrow
                 }
             } else {
-                if let version = rootView.history.currentVersion {
-                    updateDate(rootView.history.rootBranch[version].date)
+                if let date = rootView.history.currentDate {
+                    updateDate(date)
                 } else {
                     rootView.cursor = .arrow
                 }
@@ -436,31 +425,27 @@ final class VersionAction: Action {
         case .changed:
             guard (sheetView != nil || isEditRoot) && maxXCount > 0 else { return }
             
-            func uip<T: UndoItem>(currentVersion: Version?,
-                                  rootBranch: Branch<T>) -> VersionPath? {
-                let buip = currentVersion?.indexPath ?? []
-                let un = rootBranch[buip]
-                if un.selectedChildIndex != nil {
+            func yIndexPath<T: UndoItem>(from history: History<T>) -> [Int]? {
+                let currentVersion = history.currentVersion
+                let indexPath = currentVersion?.indexPath ?? []
+                let branch = history.branch(from: indexPath)
+                if branch.selectedChildIndex != nil {
                     if currentVersion?.groupIndex == nil
-                        || currentVersion?.groupIndex == un.groups.count - 1 {
+                        || currentVersion?.groupIndex == branch.groups.count - 1 {
                         
-                        return buip
+                        return indexPath
                     }
                 }
                 return nil
             }
-            let buip: VersionPath?
-            if let sheetView = sheetView {
-                buip = uip(currentVersion: sheetView.history.currentVersion,
-                           rootBranch: sheetView.history.rootBranch)
+            let yIndexPath = if let sheetView {
+                yIndexPath(from: sheetView.history)
             } else {
-                buip = uip(currentVersion: rootView.history.currentVersion,
-                           rootBranch: rootView.history.rootBranch)
+                yIndexPath(from: rootView.history)
             }
             
-            let speed = (event.screenPoint - oldSP).length()
-                / (event.time - oldTime)
-            if buip != nil && speed < 200 {
+            let speed = (event.screenPoint - oldSP).length() / (event.time - oldTime)
+            if yIndexPath != nil && speed < 200 {
                 let dp = event.screenPoint - oldSP
                 type = abs(dp.x) > abs(dp.y) ? .x : .y
             }
@@ -479,29 +464,26 @@ final class VersionAction: Action {
                     currentXIndex = newIndex
                     
                     undo(at: p, undoIndex: newIndex)
-                    currentKnobNode.attitude.position.x
-                        = undoXWidth * Double(newIndex)
+                    currentKnobNode.attitude.position.x = undoXWidth * Double(newIndex)
                     
-                    func updateY<T: UndoItem>(currentVersion: Version?,
-                                              rootBranch: Branch<T>) {
-                        let buip = currentVersion?.indexPath ?? []
-                        let un = rootBranch[buip]
-                        if let yi = un.selectedChildIndex,
+                    func updateY<T: UndoItem>(from history: History<T>) {
+                        let currentVersion = history.currentVersion
+                        let indexPath = currentVersion?.indexPath ?? []
+                        let branch = history.branch(from: indexPath)
+                        if let yi = branch.selectedChildIndex,
                            currentVersion?.groupIndex == nil
-                            || currentVersion?.groupIndex == un.groups.count - 1 {
+                            || currentVersion?.groupIndex == branch.groups.count - 1 {
                             
                             beganYIndex = yi
                             currentYIndex = yi
                             ydp = Point(0, -undoYWidth * Double(yi - dyIndex))
-                            maxYCount = un.children.count
+                            maxYCount = branch.childrenCount
                         }
                     }
                     if let sheetView = sheetView {
-                        updateY(currentVersion: sheetView.history.currentVersion,
-                                rootBranch: sheetView.history.rootBranch)
+                        updateY(from: sheetView.history)
                     } else {
-                        updateY(currentVersion: rootView.history.currentVersion,
-                                rootBranch: rootView.history.rootBranch)
+                        updateY(from: rootView.history)
                     }
                     
                     let np = rootView.convertScreenToWorld(beganSP)
@@ -511,30 +493,25 @@ final class VersionAction: Action {
                     rootNode.attitude.position = up
                 }
             case .y:
-                if let buip = buip {
+                if let yIndexPath {
                     var dp = ydp + deltaP
-                    dp.y = dp.y.clipped(min: -undoYWidth * Double(maxYCount - 1),
-                                        max: 0)
+                    dp.y = dp.y.clipped(min: -undoYWidth * Double(maxYCount - 1), max: 0)
                     let newIndex = Int((-dp.y / undoYWidth).rounded())
                         .clipped(min: 0, max: maxYCount - 1)
                     if newIndex != currentYIndex {
                         dyIndex += newIndex - currentYIndex
                         currentYIndex = newIndex
                         
-                        if let sheetView = sheetView {
-                            sheetView.history.rootBranch[buip]
-                                .selectedChildIndex = newIndex
-                            let maxIndex = sheetView.history.currentMaxVersionIndex
-                            updatePath(maxTopIndex: maxIndex,
-                                       rootBranch: sheetView.history.rootBranch)
-                            maxXCount = maxIndex + 1
+                        if let sheetView {
+                            sheetView.history.set(selectedChildIndex: newIndex, at: yIndexPath)
+                            let maxVersionIndex = sheetView.history.currentMaxVersionIndex
+                            updatePath(maxVersionIndex: maxVersionIndex, history: sheetView.history)
+                            maxXCount = maxVersionIndex + 1
                         } else {
-                            rootView.history.rootBranch[buip]
-                                .selectedChildIndex = newIndex
-                            let maxIndex = rootView.history.currentMaxVersionIndex
-                            updatePath(maxTopIndex: maxIndex,
-                                       rootBranch: rootView.history.rootBranch)
-                            maxXCount = maxIndex + 1
+                            rootView.history.set(selectedChildIndex: newIndex, at: yIndexPath)
+                            let maxVersionIndex = rootView.history.currentMaxVersionIndex
+                            updatePath(maxVersionIndex: maxVersionIndex, history: rootView.history)
+                            maxXCount = maxVersionIndex + 1
                         }
                         
                         let np = rootView.convertScreenToWorld(beganSP)
@@ -547,12 +524,12 @@ final class VersionAction: Action {
             }
             
             if let sheetView = sheetView {
-                if let version = sheetView.history.currentVersion {
-                    updateDate(sheetView.history.rootBranch[version].date)
+                if let date = sheetView.history.currentDate {
+                    updateDate(date)
                 }
             } else {
-                if let version = rootView.history.currentVersion {
-                    updateDate(rootView.history.rootBranch[version].date)
+                if let date = rootView.history.currentDate {
+                    updateDate(date)
                 }
             }
         case .ended:
