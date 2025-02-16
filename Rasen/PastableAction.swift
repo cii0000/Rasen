@@ -1115,6 +1115,14 @@ final class PastableAction: Action {
                             [.uuColor(rootView.uuColor(at: p))]
                     }
                 }
+                
+                let inP = fco.sheetView.convertFromWorld(p)
+                let ids: [UUID] = if let pi = fco.sheetView.planesView.firstIndex(at: inP) {
+                    [fco.sheetView.planesView.elementViews[pi].model.uuColor.id]
+                } else {
+                    []
+                }
+                
                 let scale = 1 / rootView.worldToScreenScale
                 selectingLineNode.children = colorOwners.reduce(into: [Node]()) {
                     let value = $1.colorPathValue(toColor: nil, color: .selected,
@@ -1127,6 +1135,9 @@ final class PastableAction: Action {
                     Node(path: mainPlanePath!, lineWidth: Line.defaultLineWidth * 4 * scale,
                          lineType: .color(.selected))
                 ] :  [])
+                + (fco.sheetView.model.enabledAnimation ?
+                   fco.sheetView.interporatedTimelineNodes(fromColor: ids) : [])
+                
                 return true
             }
         }
@@ -2685,14 +2696,42 @@ final class PastableAction: Action {
                 sheetView.append(Border(position: np, border: border))
             }
         case .uuColor(let uuColor):
+            func moveLine(oldUUColor: UUColor, from owner: SheetColorOwner) {
+                if oldUUColor == Line.defaultUUColor && uuColor != Line.defaultUUColor {
+                    if owner.colorValue.lineAnimationIndexes.count == 1 {
+                        let v = owner.colorValue.lineAnimationIndexes[0]
+                        if v.index == owner.sheetView.model.animation.index {
+                            let lis = owner.colorValue.lineIndexes.filter { $0 != 0 }
+                            if !lis.isEmpty {
+                                let livs = owner.sheetView.model.picture.lines[lis].enumerated()
+                                    .map { IndexValue(value: $0.element, index: $0.offset) }
+                                owner.sheetView.removeLines(at: lis)
+                                owner.sheetView.insert(livs)
+                            }
+                        }
+                    } else {
+                        let lis = owner.colorValue.lineIndexes.filter { $0 != 0 }
+                        if !lis.isEmpty {
+                            let livs = owner.sheetView.model.picture.lines[lis].enumerated()
+                                .map { IndexValue(value: $0.element, index: $0.offset) }
+                            owner.sheetView.removeLines(at: lis)
+                            owner.sheetView.insert(livs)
+                        }
+                    }
+                }
+            }
+            
             guard rootView.isSelect(at: p) else {
                 guard let _ = rootView.madeSheetView(at: shp) else { return }
-                let colorOwners = rootView.madeColorOwner(at: p,
-                                                          removingUUColor: uuColor)
+                let colorOwners = rootView.madeColorOwner(at: p, removingUUColor: uuColor)
                 colorOwners.forEach {
                     if $0.uuColor != uuColor {
+                        let oldUUColor = $0.uuColor
+                        
                         $0.uuColor = uuColor
                         $0.captureUUColor(isNewUndoGroup: true)
+                        
+                        moveLine(oldUUColor: oldUUColor, from: $0)
                     }
                 }
                 rootView.updateSelects()
@@ -2712,9 +2751,13 @@ final class PastableAction: Action {
                 var isNewUndoGroup = true
                 owners.forEach {
                     if $0.uuColor != uuColor {
+                        let oldUUColor = $0.uuColor
+                        
                         $0.uuColor = uuColor
                         $0.captureUUColor(isNewUndoGroup: isNewUndoGroup)
                         isNewUndoGroup = false
+                        
+                        moveLine(oldUUColor: oldUUColor, from: $0)
                     }
                 }
             }

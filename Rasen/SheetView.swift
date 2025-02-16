@@ -1041,6 +1041,42 @@ final class AnimationView: TimelineView, @unchecked Sendable {
         return [Node(path: convertToWorld(Path(selectedPathlines)),
                      fillType: .color(.selected))]
     }
+    func interporatedTimelineNodes(fromColor ids: [UUID]) -> [Node] {
+        guard !ids.isEmpty else { return [] }
+        let idSet = Set(ids)
+        
+        let knobW = Sheet.knobWidth, knobH = Sheet.knobHeight
+        let iKnobW = width(atDurBeat: Rational(1, frameRate)),
+            iKnobH = interpolatedKnobHeight
+        let nb = bounds.insetBy(dx: Sheet.textPadding.width, dy: 0)
+        let kfY = nb.minY + timelineY
+        
+        var selectedPathlines = [Pathline]()
+        
+        let beatRange = model.beatRange
+        for keyframe in model.keyframes {
+            let nPlanes = keyframe.picture.planes.filter { idSet.contains($0.uuColor.id) }
+            guard !nPlanes.isEmpty else { continue }
+            let kx = x(atBeat: keyframe.beat + beatRange.start)
+            
+            let pathline = Pathline(Rect(x: kx - iKnobW / 2,
+                                         y: kfY - iKnobH / 2,
+                                         width: iKnobW, height: iKnobH))
+            selectedPathlines.append(pathline)
+            
+            if keyframe.previousNext != .none
+                || !keyframe.draftPicture.isEmpty {
+                
+                let pathline = Pathline(Rect(x: kx - knobW / 2,
+                                             y: kfY + knobH / 2 + knobW,
+                                             width: knobW, height: knobW))
+                 selectedPathlines.append(pathline)
+            }
+        }
+        
+        return [Node(path: convertToWorld(Path(selectedPathlines)),
+                     fillType: .color(.selected))]
+    }
     
     var origin: Point { .init(0, timelineY) }
     var timelineCenterY: Double { 0 }
@@ -1296,6 +1332,9 @@ final class SheetView: BindableView, @unchecked Sendable {
     
     func interporatedTimelineNodes(from ids: [UUID]) -> [Node] {
         animationView.interporatedTimelineNodes(from: ids)
+    }
+    func interporatedTimelineNodes(fromColor ids: [UUID]) -> [Node] {
+        animationView.interporatedTimelineNodes(fromColor: ids)
     }
     
     func currentSelectiongTimeNode(indexInterval: Double) -> Node {
@@ -6885,6 +6924,7 @@ final class SheetView: BindableView, @unchecked Sendable {
         let result: Picture.AutoFillResult
         if model.enabledAnimation {
             func otherPlanes() -> [Plane]? {
+                guard model.picture.planes.isEmpty else { return nil }
                 let ki = model.animation.index
                 let preKI = ki - 1 >= 0 ?ki - 1 : model.animation.keyframes.count - 1
                 let nextKI = ki + 1 < model.animation.keyframes.count ?ki + 1 : 0

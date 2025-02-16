@@ -403,6 +403,8 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
         let p = rootView.convertScreenToWorld(sp)
         switch event.phase {
         case .began:
+            rootAction.rootView.closeLookingUp()
+            
             beganSP = event.screenPoint
             beganEventTime = event.time
             preEventTime = nil

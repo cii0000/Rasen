@@ -51,7 +51,7 @@ extension Picture {
     }
 }
 extension Picture {
-    static let defaultRenderingScale = 16.0
+    static let defaultRenderingScale = 8.0
     
     enum AutoFillResult {
         case planes(_ planes: [Plane])
@@ -189,19 +189,17 @@ extension Picture {
                     let nps = newPlaneValue.plane.topolygon.allPoints
 
                     oldVs.enumerated().forEach { (oi, oldV) in
-                        let ds = oldV.centroid.distanceSquared(newCentroid)
-                        if ds < 2500 {
-                            let x1 = (oldV.area.absRatio(newArea) - 1) * 100
-                            if x1 < 10000 {
+                        let ds = oldV.centroid.distanceSquared(newCentroid) / oldV.area.mid(newArea)
+                        let x0 = ds.squareRoot()
+                        if x0 < 2 {
+                            let x1 = (oldV.area.absRatio(newArea) - 1).squareRoot()
+                            if x1 < 5 {
                                 let oxs = oldV.oxs, oys = oldV.oys
                                 let dxs = nxs - oxs
                                 let dys = nys - oys
-
-                                let d = (dxs * dxs + dys * dys).squareRoot().sum()
-                                let x0 = ds
-                                let x2 = d
-                                let x3 = nps.contains(where: { oldV.pSet.contains($0) }) ? 0.0 : 100.0
-                                let s = x0 + x1 + x2 + x3
+                                let x2 = (dxs * dxs + dys * dys).squareRoot().sum()
+                                let x3 = nps.contains(where: { oldV.pSet.contains($0) }) ? 0.0 : 10000.0
+                                let s = x0 * 100 + x1 * 100 + x2 + x3
                                 vs.append((oi, ni, s))
                             }
                         }

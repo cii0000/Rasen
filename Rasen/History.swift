@@ -648,7 +648,7 @@ extension History {
         
         if let currentVersion {
             var indexPath = currentVersion.indexPath
-            var branch = rootBranch[indexPath]
+            let branch = rootBranch[indexPath]
             if currentVersion.groupIndex == branch.groups.count - 1 {
                 guard let i = branch.selectedChildIndex else { return }
                 let branch0 = _Branch<T>(groups: [.init()])

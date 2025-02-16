@@ -2017,7 +2017,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     var isEnabledCustomTrackpad = true
     
     var oldTouchPoints = [Int: Point]()
-    var touchedIDs = [Int]()
+    var touchedIDs = [Int](), beganTouchTime: Double?
     var began2FingersTime: Double?
     var isBeganScroll = false, isFirstChangedScroll = false, beganScrollPosition: Point?, oldScrollPosition: Point?, allScrollPosition = Point()
     var isBeganPinch = false, isFirstChangedPinch = false,beganPinchDistance: Double?, oldPinchDistance: Double?
@@ -2033,8 +2033,8 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     var lastMagnification = 0.0, preMagnification = 0.0
     var lastRotationQuantity = 0.0
     var isTouchedSubDrag = false
-    var isBeganSwipe = false, swipePosition: Point?, beganSwipePosition: Point?, beganSwipeTime: Double?
-    var began4FingersPosition: Point?, began4FingersTime: Double?
+    var isBeganSwipe = false, swipePosition: Point?, beganSwipePosition: Point?
+    var began4FingersPosition: Point?
     
     private var scrollTimeValue = 0.0
     private var scrollTimer: (any DispatchSourceTimer)?
@@ -2093,8 +2093,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         guard isEnabledCustomTrackpad else { return }
         
         if oldTouchPoints.isEmpty {
-            beganSwipeTime = event.time
-            began4FingersTime = event.time
+            beganTouchTime = event.time
             isTouchedSubDrag = false
         }
         
@@ -2412,7 +2411,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         }
         
         if !isBeganPinch && !isBeganScroll && !isBeganRotate && isPrepare3FingersTap {
-            if event.isAllEnded, let beganSwipeTime, event.time - beganSwipeTime < 0.3 {
+            if event.isAllEnded, let beganTouchTime, event.time - beganTouchTime < 0.2 {
                 var event = InputKeyEvent(screenPoint: event.screenPoint,
                                           time: event.time,
                                           pressure: 1, phase: .began, isRepeat: false,
@@ -2425,7 +2424,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 isPrepare3FingersTap = false
             }
         } else if !isBeganPinch && !isBeganScroll && !isBeganRotate && isPrepare4FingersTap {
-            if event.isAllEnded, let began4FingersTime, event.time - began4FingersTime < 0.3 {
+            if event.isAllEnded, let beganTouchTime, event.time - beganTouchTime < 0.3 {
                 var event = InputKeyEvent(screenPoint: event.screenPoint,
                                           time: event.time,
                                           pressure: 1, phase: .began, isRepeat: false,
