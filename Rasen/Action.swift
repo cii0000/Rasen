@@ -139,6 +139,9 @@ final class RootAction: Action {
         textAction.moveEndInputKey()
         switch event.phase {
         case .began:
+            stopDragEvent()
+            stopInputTextEvent()
+            updateLastEditedIntPoint(from: event)
             swipeAction = SelectFrameAction(self)
             swipeAction?.flow(with: event)
             oldSwipeEvent = event
