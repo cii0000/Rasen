@@ -1407,6 +1407,7 @@ final class LineAction: Action {
                     let snapLines = self.snapLines, clipBounds = self.clipBounds
                     DispatchQueue.global().async { [weak self] in
                         let (tempLine, _) = Self.line(from: events,
+                                                      isClip: false,
                                                       firstSnapLines: snapLines,
                                                       lastSnapLines: snapLines,
                                                       clipBounds: clipBounds,
@@ -1456,6 +1457,7 @@ final class LineAction: Action {
                                         phase: .ended))
             
             tempLine = Self.line(from: drawLineEvents,
+                                 isClip: false,
                                  firstSnapLines: snapLines,
                                  lastSnapLines: snapLines,
                                  clipBounds: clipBounds,

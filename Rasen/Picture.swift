@@ -226,7 +226,7 @@ extension Picture {
     private static func topolygons(with bounds: Rect,
                                    from lines: [Line],
                                    connectableScale cd: Double = 4.0,
-                                   straightConnectableScale scd: Double = 6.0,
+                                   straightConnectableScale scd: Double = 4.0,
                                    renderingScale: Double,
                                    borders: [Border]) -> [Topolygon] {
         guard !lines.isEmpty else { return [] }
@@ -306,6 +306,16 @@ extension Picture {
                              i: li, fol: .first, bounds: .init(fp, distance: scd * d)))
             lps.append(.init(p: lp, d: d, length: length, vector: line.lastVector,
                              i: li, fol: .last, bounds: .init(lp, distance: scd * d)))
+            
+            for bezier in line.bezierSequence {
+                let da = Point.differenceAngle(bezier.p0, bezier.cp, bezier.p1)
+                if abs(da) > .pi / 4 {
+                    let p = bezier.position(withT: 0.5)
+                    let vector = bezier.cp - p
+                    lps.append(.init(p: p, d: d, length: length, vector: vector,
+                                     i: li, fol: .first, bounds: .init(p, distance: scd * d)))
+                }
+            }
         }
         let lpSearchTree = RectSearchTree(lps)!
         
