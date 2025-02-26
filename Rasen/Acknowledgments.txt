@@ -11,7 +11,7 @@ Gensen (Bandle)
 Original font: Source Han Sans
 https://github.com/adobe-fonts/source-han-sans
 
-© 2024 Cii.
+© 2025 Cii.
 © 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'.
 
 Licensed under SIL Open Font License 1.1

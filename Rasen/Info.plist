@@ -98,7 +98,7 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>NSHumanReadableCopyright</key>
-	<string>©2024 Cii</string>
+	<string>©2025 Cii</string>
 	<key>UTExportedTypeDeclarations</key>
 	<array>
 		<dict>
