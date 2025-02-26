@@ -301,3 +301,11 @@ extension Content {
         && lhs.id == rhs.id
     }
 }
+extension Content: AppliableTransform {
+    static func * (lhs: Self, rhs: Transform) -> Self {
+        var lhs = lhs
+        lhs.size *= rhs.absXScale
+        lhs.origin *= rhs
+        return lhs
+    }
+}

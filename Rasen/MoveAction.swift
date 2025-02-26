@@ -27,6 +27,7 @@ final class MoveAction: DragEventAction {
     
     enum MoveType {
         case animation(MoveAnimationAction)
+        case sheet(MoveSheetAction)
         case line(MoveLineAction)
         case score(MoveScoreAction)
         case content(MoveContentAction)
@@ -39,6 +40,7 @@ final class MoveAction: DragEventAction {
     func updateNode() {
         switch type {
         case .animation(let action): action.updateNode()
+        case .sheet(let action): action.updateNode()
         case .line(let action): action.updateNode()
         case .score(let action): action.updateNode()
         case .content(let action): action.updateNode()
@@ -57,25 +59,29 @@ final class MoveAction: DragEventAction {
                 let sheetP = sheetView.convertFromWorld(p)
                 if sheetView.containsTempo(sheetP, maxDistance: rootView.worldKnobEditDistance * 0.5) {
                     type = .tempo(MoveTempoAction(rootAction))
+                } else if sheetView.animationView.containsTimeline(sheetP, scale: rootView.screenToWorldScale) {
+                    type = .animation(MoveAnimationAction(rootAction))
+                } else if sheetView.scoreView.contains(sheetView.scoreView.convertFromWorld(p),
+                                                       scale: rootView.screenToWorldScale) {
+                    type = .score(MoveScoreAction(rootAction))
+                } else if rootView.isSelect(at: p) {
+                    type = .sheet(MoveSheetAction(rootAction))
                 } else if sheetView.contentIndex(at: sheetP, scale: rootView.screenToWorldScale) != nil {
                     type = .content(MoveContentAction(rootAction))
                 } else if sheetView.textIndex(at: sheetP, scale: rootView.screenToWorldScale) != nil {
                     type = .text(MoveTextAction(rootAction))
-                } else if sheetView.scoreView.contains(sheetView.scoreView.convertFromWorld(p),
-                                                       scale: rootView.screenToWorldScale) {
-                    type = .score(MoveScoreAction(rootAction))
                 } else if sheetView.lineTuple(at: sheetP,
                                               isSmall: false,
                                               scale: rootView.screenToWorldScale) != nil {
                     type = .line(MoveLineAction(rootAction))
-                } else if sheetView.animationView.containsTimeline(sheetP, scale: rootView.screenToWorldScale) {
-                    type = .animation(MoveAnimationAction(rootAction))
                 }
             }
         }
         
         switch type {
         case .animation(let action):
+            action.flow(with: event)
+        case .sheet(let action):
             action.flow(with: event)
         case .line(let action):
             action.flow(with: event)
@@ -1759,6 +1765,171 @@ final class MoveTempoAction: DragEventAction {
                         if text != beganText {
                             updateUndoGroup()
                             sheetView.capture(text, old: beganText, at: ti)
+                        }
+                    }
+                }
+            }
+            
+            rootView.cursor = rootView.defaultCursor
+        }
+    }
+}
+
+final class MoveSheetAction: DragEventAction {
+    let rootAction: RootAction, rootView: RootView
+    let isEditingSheet: Bool
+
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
+        isEditingSheet = rootView.isEditingSheet
+    }
+
+    enum MoveType {
+        case move, scale, rotate
+    }
+    
+    private var sheetView: SheetView?, type = MoveType.move, oldP = Point(), typeRect = Rect()
+    private var lineIs = [Int](), planeIs = [Int](), textIs = [Int](), contentIs = [Int]()
+    private var oldLines = [Line](), oldPlanes = [Plane](), oldTexts = [Text](), oldContents = [Content]()
+    private var sheetOrigin = Point()
+
+    func flow(with event: DragEvent) {
+        guard isEditingSheet else {
+            rootAction.keepOut(with: event)
+            return
+        }
+        if rootAction.isPlaying(with: event) {
+            rootAction.stopPlaying(with: event)
+        }
+        
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
+        ?? event.screenPoint
+        let p = rootView.convertScreenToWorld(sp)
+        
+        switch event.phase {
+        case .began:
+            rootView.cursor = .arrow
+            
+            let shp = rootView.sheetPosition(at: p)
+            if let sheetView = rootView.sheetView(at: shp) {
+                if rootView.isSelect(at: p) {
+                    let lis = sheetView.lineIndexes(from: rootView.selections)
+                    let pis = sheetView.planeIndexes(from: rootView.selections)
+                    let tis = sheetView.textIndexes(from: rootView.selections)
+                    let cis = sheetView.contentIndexes(from: rootView.selections)
+                    lineIs = lis
+                    planeIs = pis
+                    textIs = tis
+                    contentIs = cis
+                    oldLines = sheetView.model.picture.lines[lineIs]
+                    oldPlanes = sheetView.model.picture.planes[planeIs]
+                    oldTexts = sheetView.model.texts[textIs]
+                    oldContents = sheetView.model.contents[contentIs]
+                    oldP = p
+                    sheetOrigin = rootView.sheetFrame(with: shp).origin
+                    self.sheetView = sheetView
+                    
+                    var minDSq = Double.infinity, maxD = 2 * rootView.screenToWorldScale
+                    for selection in rootView.selections {
+                        guard selection.rect.width != 0 && selection.rect.height != 0 else { continue }
+                        let rect = selection.rect
+                        if (rect.edges.minValue({ $0.distanceSquared(from: p) }) ?? .infinity) < maxD {
+                            func update(_ rp: Point, isRotate: Bool) {
+                                let dSq = rp.distanceSquared(p)
+                                if dSq < minDSq {
+                                    type = isRotate ? .rotate : .scale
+                                    typeRect = rect
+                                    minDSq = dSq
+                                }
+                            }
+                            update(rect.minXMinYPoint, isRotate: false)
+                            update(rect.minXMaxYPoint, isRotate: false)
+                            update(rect.maxXMinYPoint, isRotate: false)
+                            update(rect.maxXMaxYPoint, isRotate: false)
+                            update(rect.minXMidYPoint, isRotate: true)
+                            update(rect.midXMinYPoint, isRotate: true)
+                            update(rect.maxXMidYPoint, isRotate: true)
+                            update(rect.midXMaxYPoint, isRotate: true)
+                        }
+                    }
+                    rootView.selections = []
+                }
+            }
+        case .changed:
+            if let sheetView {
+                let dp = p - oldP
+                let transform: Transform = switch type {
+                case .move:
+                    .init(translation: dp)
+                case .scale:
+                    .init(translation: -typeRect.centerPoint + sheetOrigin)
+                    .scaled(by: typeRect.centerPoint.distance(p) / typeRect.centerPoint.distance(oldP))
+                    .translated(by: typeRect.centerPoint - sheetOrigin)
+                case .rotate:
+                    .init(translation: -typeRect.centerPoint + sheetOrigin)
+                    .rotated(by: Point.differenceAngle(oldP, typeRect.centerPoint, p) - .pi)
+                    .translated(by: typeRect.centerPoint - sheetOrigin)
+                }
+                for (li, oldLine) in zip(lineIs, oldLines) {
+                    var nLine = oldLine * transform
+                    nLine.size *= transform.absXScale
+                    sheetView.linesView.elementViews[li].model = nLine
+                }
+                for (pi, oldPlane) in zip(planeIs, oldPlanes) {
+                    sheetView.planesView.elementViews[pi].model = oldPlane * transform
+                }
+                for (ti, oldText) in zip(textIs, oldTexts) {
+                    sheetView.textsView.elementViews[ti].model = oldText * transform
+                }
+                for (ci, oldContent) in zip(contentIs, oldContents) {
+                    sheetView.contentsView.elementViews[ci].model = oldContent * transform
+                }
+            }
+        case .ended:
+            if let sheetView {
+                let lines = sheetView.model.picture.lines[lineIs]
+                let planes = sheetView.model.picture.planes[planeIs]
+                let texts = sheetView.model.texts[textIs]
+                let contents = sheetView.model.contents[contentIs]
+                let isLines = lines != oldLines, isPlanes = planes != oldPlanes,
+                    isTexts = texts != oldTexts, isContents = contents != oldContents
+                if isLines || isPlanes || isTexts || isContents {
+                    sheetView.newUndoGroup()
+                    if isLines {
+                        sheetView.captureLines(lines, old: oldLines, at: lineIs)
+                    }
+                    if isPlanes {
+                        sheetView.capturePlanes(planes, old: oldPlanes, at: planeIs)
+                    }
+                    if isTexts {
+                        sheetView.captureTexts(texts, old: oldTexts, at: textIs)
+                    }
+                    if isContents {
+                        sheetView.captureContents(contents, old: oldContents, at: contentIs)
+                    }
+                    if isLines {
+                        let lis = lineIs.filter { !sheetView.model.picture.lines[$0].intersects(sheetView.bounds) }
+                        if !lis.isEmpty {
+                            sheetView.removeLines(at: lis)
+                        }
+                    }
+                    if isPlanes {
+                        let pis = planeIs.filter { !sheetView.model.picture.planes[$0].path.intersects(sheetView.bounds) }
+                        if !pis.isEmpty {
+                            sheetView.removePlanes(at: pis)
+                        }
+                    }
+                    if isTexts {
+                        let tis = textIs.filter { !(sheetView.model.texts[$0].frame?.intersects(sheetView.bounds) ?? true) }
+                        if !tis.isEmpty {
+                            sheetView.removeTexts(at: tis)
+                        }
+                    }
+                    if isContents {
+                        let cis = contentIs.filter { !(sheetView.model.contents[$0].imageFrame?.intersects(sheetView.bounds) ?? true) }
+                        if !cis.isEmpty {
+                            sheetView.removeContents(at: cis)
                         }
                     }
                 }

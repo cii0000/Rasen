@@ -1647,7 +1647,7 @@ final class ColorAction: Action {
         tintLineNode.path = path
         tintOutlineNode.path = path
     }
-    var lastTintSnapTime: Double?
+    var lastTintSnapTime: Double?, dr = 0.0
     func changeTint(with event: DragEvent) {
         guard isEditingSheet else {
             rootAction.keepOut(with: event)
@@ -1689,6 +1689,7 @@ final class ColorAction: Action {
                 if let lastTintSnapTime = lastTintSnapTime {
                     if event.time - lastTintSnapTime > 1 {
                         isSnappedTint = false
+                        dr = r
                     }
                 } else {
                     if !isSnappedTint {
@@ -1700,7 +1701,7 @@ final class ColorAction: Action {
                 lastTintSnapTime = nil
                 isSnappedTint = false
             }
-            uuColor.value.chroma = isSnappedTint ? 0 : r
+            uuColor.value.chroma = isSnappedTint ? 0 : r - dr
             uuColor.value.hue = theta
             let polarPoint = Point(uuColor.value.a, uuColor.value.b).polar
             uuColor.value.hue = polarPoint.theta

@@ -197,6 +197,74 @@ final class RunAction: InputKeyEventAction {
                             return
                         }
                     }
+                } else if text.string == "exportIconImages =" {
+                    Task { @MainActor in
+                        let result = await URL.export(message: "message",
+                                                      name: "icons",
+                                                      fileType: Image.FileType.pngs,
+                                                      fileSizeHandler: { nil })
+                        switch result {
+                        case .complete(let ioResult):
+                            rootView.syncSave()
+                            
+                            var oSheet = sheetView.model
+                            oSheet.texts = oSheet.texts.filter { $0.string != "exportIconImages =" }
+                            let sheet = oSheet
+                            
+                            let bounds = sheetView.model.boundsTuple(at: sheetView.convertFromWorld(p),
+                                                                     in: rootView.sheetFrame(with: shp).bounds).bounds.integral
+                            
+                            let sizes = [16, 32, 64, 128, 256, 512, 1024]
+                            
+                            let progressPanel = ProgressPanel(message: "Exporting Images".localized)
+                            rootView.node.show(progressPanel)
+                            do {
+                                try ioResult.remove()
+                                try ioResult.makeDirectory()
+                                
+                                @Sendable func export(progressHandler: (Double, inout Bool) -> ()) throws {
+                                    var isStop = false
+                                    for (j, size) in sizes.enumerated() {
+                                        let node = sheet.node(isBorder: false, in: bounds)
+                                        let image = node.renderedAntialiasFillImage(in: bounds, to: Size(square: size), .sRGB)
+                                        let subIOResult = ioResult.sub(name: "\(size).png")
+                                        try image?.write(.png, to: subIOResult.url)
+                                        try subIOResult.setAttributes()
+                                        progressHandler(Double(j + 1) / Double(sizes.count), &isStop)
+                                        if isStop { break }
+                                    }
+                                }
+                                
+                                let task = Task.detached(priority: .high) {
+                                    do {
+                                        try export { (progress, isStop) in
+                                            if Task.isCancelled {
+                                                isStop = true
+                                                return
+                                            }
+                                            Task { @MainActor in
+                                                progressPanel.progress = progress
+                                            }
+                                        }
+                                        Task { @MainActor in
+                                            progressPanel.closePanel()
+                                        }
+                                    } catch {
+                                        Task { @MainActor in
+                                            self.rootView.node.show(error)
+                                            progressPanel.closePanel()
+                                        }
+                                    }
+                                }
+                                progressPanel.cancelHandler = { task.cancel() }
+                            } catch {
+                                self.rootView.node.show(error)
+                                progressPanel.closePanel()
+                            }
+                        case .cancel: break
+                        }
+                    }
+                    return
                 }
                 
                 if text.string.last == "=" {

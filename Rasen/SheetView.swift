@@ -3854,6 +3854,15 @@ final class SheetView: BindableView, @unchecked Sendable {
         append(undo: undoItem, redo: redoItem)
         set(redoItem)
     }
+    func removeTexts(at textIndexes: [Int]) {
+        let tivs = textIndexes.map {
+            IndexValue(value: model.texts[$0], index: $0)
+        }
+        let undoItem = SheetUndoItem.insertTexts(tivs)
+        let redoItem = SheetUndoItem.removeTexts(textIndexes: textIndexes)
+        append(undo: undoItem, redo: redoItem)
+        set(redoItem)
+    }
     func capture(_ ituv: IndexValue<TextValue>,
                  old oituv: IndexValue<TextValue>) {
         let undoItem = SheetUndoItem.replaceString(oituv)
@@ -4010,6 +4019,15 @@ final class SheetView: BindableView, @unchecked Sendable {
         let undoItem = SheetUndoItem.insertContents([IndexValue(value: model.contents[i],
                                                                 index: i)])
         let redoItem = SheetUndoItem.removeContents(contentIndexes: [i])
+        append(undo: undoItem, redo: redoItem)
+        set(redoItem)
+    }
+    func removeContents(at contentIndexes: [Int]) {
+        let civs = contentIndexes.map {
+            IndexValue(value: model.contents[$0], index: $0)
+        }
+        let undoItem = SheetUndoItem.insertContents(civs)
+        let redoItem = SheetUndoItem.removeContents(contentIndexes: contentIndexes)
         append(undo: undoItem, redo: redoItem)
         set(redoItem)
     }
@@ -4331,6 +4349,42 @@ final class SheetView: BindableView, @unchecked Sendable {
         
         let undoItem0 = SheetUndoItem.removeLines(lineIndexes: [i])
         let redoItem0 = SheetUndoItem.insertLines([IndexValue(value: line, index: i)])
+        append(undo: undoItem0, redo: redoItem0)
+    }
+    func captureLines(_ lines: [Line], old oldLines: [Line], at idxs: [Int]) {
+        let undoItem1 = SheetUndoItem.insertLines(zip(oldLines, idxs).map { .init(value: $0.0, index: $0.1) })
+        let redoItem1 = SheetUndoItem.removeLines(lineIndexes: idxs)
+        append(undo: undoItem1, redo: redoItem1)
+        
+        let undoItem0 = SheetUndoItem.removeLines(lineIndexes: idxs)
+        let redoItem0 = SheetUndoItem.insertLines(zip(lines, idxs).map { .init(value: $0.0, index: $0.1) })
+        append(undo: undoItem0, redo: redoItem0)
+    }
+    func capturePlanes(_ planes: [Plane], old oldPlanes: [Plane], at idxs: [Int]) {
+        let undoItem1 = SheetUndoItem.insertPlanes(zip(oldPlanes, idxs).map { .init(value: $0.0, index: $0.1) })
+        let redoItem1 = SheetUndoItem.removePlanes(planeIndexes: idxs)
+        append(undo: undoItem1, redo: redoItem1)
+        
+        let undoItem0 = SheetUndoItem.removePlanes(planeIndexes: idxs)
+        let redoItem0 = SheetUndoItem.insertPlanes(zip(planes, idxs).map { .init(value: $0.0, index: $0.1) })
+        append(undo: undoItem0, redo: redoItem0)
+    }
+    func captureTexts(_ texts: [Text], old oldTexts: [Text], at idxs: [Int]) {
+        let undoItem1 = SheetUndoItem.insertTexts(zip(oldTexts, idxs).map { .init(value: $0.0, index: $0.1) })
+        let redoItem1 = SheetUndoItem.removeTexts(textIndexes: idxs)
+        append(undo: undoItem1, redo: redoItem1)
+        
+        let undoItem0 = SheetUndoItem.removeTexts(textIndexes: idxs)
+        let redoItem0 = SheetUndoItem.insertTexts(zip(texts, idxs).map { .init(value: $0.0, index: $0.1) })
+        append(undo: undoItem0, redo: redoItem0)
+    }
+    func captureContents(_ contents: [Content], old oldContents: [Content], at idxs: [Int]) {
+        let undoItem1 = SheetUndoItem.insertContents(zip(oldContents, idxs).map { .init(value: $0.0, index: $0.1) })
+        let redoItem1 = SheetUndoItem.removeContents(contentIndexes: idxs)
+        append(undo: undoItem1, redo: redoItem1)
+        
+        let undoItem0 = SheetUndoItem.removeContents(contentIndexes: idxs)
+        let redoItem0 = SheetUndoItem.insertContents(zip(contents, idxs).map { .init(value: $0.0, index: $0.1) })
         append(undo: undoItem0, redo: redoItem0)
     }
     func setRootKeyframeIndex(rootKeyframeIndex: Int) {
@@ -6148,6 +6202,22 @@ final class SheetView: BindableView, @unchecked Sendable {
                 Path(convertFromWorld($0.rect))
                     .contains(planeView.node.path)
             }) { pi } else { nil }
+        }
+    }
+    func textIndexes(from selections: [Selection]) -> [Int] {
+        textsView.elementViews.enumerated().compactMap { (ti, textView) in
+            if let b = textView.transformedBounds, selections.contains(where: {
+                Path(convertFromWorld($0.rect))
+                    .intersects(b)
+            }) { ti } else { nil }
+        }
+    }
+    func contentIndexes(from selections: [Selection]) -> [Int] {
+        contentsView.elementViews.enumerated().compactMap { (ci, contentView) in
+            if let b = contentView.transformedBounds, selections.contains(where: {
+                Path(convertFromWorld($0.rect))
+                    .intersects(b)
+            }) { ci } else { nil }
         }
     }
     func noteIndexes(from selections: [Selection]) -> [Int] {

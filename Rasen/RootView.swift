@@ -1062,8 +1062,8 @@ final class RootView: View, @unchecked Sendable {
         }
     }
     func isSelect(at p: Point) -> Bool {
-        let d = 1.0 * screenToWorldScale
-        if isSelectedText {
+        let d = 2.0 * screenToWorldScale
+        if isSelectedText && !selectedFrames.isEmpty {
             return selectedFrames.contains(where: { $0.outset(by: d).contains(p) })
         } else {
             for s in selections {
@@ -1077,7 +1077,7 @@ final class RootView: View, @unchecked Sendable {
     }
     func isSelect(at rect: Rect) -> Bool {
         let d = 1.0 * screenToWorldScale
-        if isSelectedText {
+        if isSelectedText && !selectedFrames.isEmpty {
             return selectedFrames.contains(where: { $0.outset(by: d).intersects(rect) })
         } else {
             for s in selections {
