@@ -1613,9 +1613,15 @@ final class MoveTextAction: DragEventAction {
                     }
                 case .position:
                     let np = beganText.origin + sheetP - beganInP
-                    let maxBounds = sheetView.bounds.inset(by: Sheet.textPadding)
-                    let nnp = maxBounds.clipped(Rect(origin: np, size: text.typesetter.typoBounds?.size ?? .init())).origin
-                    textView.origin = nnp
+                    var text = text
+                    text.origin = rootView.roundedPoint(from: np)
+                    let sb = sheetView.bounds.inset(by: Sheet.textPadding)
+                    if let textFrame = text.frame, !sb.intersects(textFrame) {
+                        let nFrame = sb.moveOutline(textFrame)
+                        text.origin += nFrame.origin - textFrame.origin
+                    }
+                    textView.origin = text.origin
+                    
                     rootView.updateSelects()
                 }
             }

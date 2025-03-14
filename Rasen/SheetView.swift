@@ -1615,6 +1615,9 @@ final class SheetView: BindableView, @unchecked Sendable {
         }
     }
     func textIndex(at p: Point, scale: Double) -> Int? {
+        if let i = textTuple(at: p)?.textIndex {
+            return i
+        }
         for (i, view) in textsView.elementViews.enumerated().reversed() {
             if view.contains(view.convert(p, from: node), scale: scale) {
                 return i

@@ -230,7 +230,6 @@ final class ScoreView: TimelineView, @unchecked Sendable {
                                timeNode, clippingNode])
         updateClippingNode()
         updateTimeline()
-        updateSpectrogram()
         updateScore()
         updateDraftNotes()
         

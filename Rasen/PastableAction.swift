@@ -1780,8 +1780,8 @@ final class PastableAction: Action {
                         * Attitude(position: p,
                                    scale: Size(square: 1.0 * scale)).transform
                     let sb = sheetFrame.inset(by: Sheet.textPadding)
-                    if !sb.contains(textFrame) {
-                        let nFrame = sb.clipped(textFrame)
+                    if !sb.intersects(textFrame) {
+                        let nFrame = sb.moveOutline(textFrame)
                         np = p + nFrame.origin - textFrame.origin
                     } else {
                         np = p
@@ -2489,8 +2489,8 @@ final class PastableAction: Action {
                 text.origin = rootView.roundedPoint(from: nnp)
                 text.size = text.size * scale
                 let sb = sheetView.bounds.inset(by: Sheet.textPadding)
-                if let textFrame = text.frame, !sb.contains(textFrame) {
-                    let nFrame = sb.clipped(textFrame)
+                if let textFrame = text.frame, !sb.intersects(textFrame) {
+                    let nFrame = sb.moveOutline(textFrame)
                     text.origin += nFrame.origin - textFrame.origin
                     
                     if let textFrame = text.frame, !sb.outset(by: 1).contains(textFrame) {

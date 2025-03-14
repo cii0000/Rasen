@@ -95,7 +95,6 @@ final class ContentView<T: BinderProtocol>: SpectrgramView, @unchecked Sendable 
         
         updateClippingNode()
         updateTimeline()
-        updateSpectrogram()
         
         if model.type == .movie, let sec = model.rootSec {
             updateMovie(atSec: sec)

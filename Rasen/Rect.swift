@@ -235,6 +235,22 @@ extension Rect {
         }
         return n
     }
+    func moveOutline(_ other: Rect) -> Rect {
+        var n = other
+        if maxX < n.minX {
+            n.origin.x = maxX
+        }
+        if minX > n.maxX {
+            n.origin.x = minX - n.width
+        }
+        if maxY < n.minY {
+            n.origin.y = maxY
+        }
+        if minY > n.maxY {
+            n.origin.y = minY - n.height
+        }
+        return n
+    }
     func moveOut(_ other: Rect) -> Rect {
         if let r = intersection(other) {
             if r == other || r == self {

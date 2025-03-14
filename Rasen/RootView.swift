@@ -1763,6 +1763,7 @@ final class RootView: View, @unchecked Sendable {
     struct SheetViewValue {
         let sheetID: UUID
         var sheetView: SheetView?
+        var loadingNode: Node?, isLoading = false
         var task: Task<(), any Error>?
     }
     private(set) var sheetViewValues = [IntPoint: SheetViewValue]()
@@ -2145,10 +2146,14 @@ final class RootView: View, @unchecked Sendable {
                 
                 updateThumbnail(sheetViewValue, at: shp, sid)
                 sheetViewValues[shp]?.sheetView?.node.removeFromParent()
+                sheetViewValues[shp]?.loadingNode?.removeFromParent()
                 sheetViewValues[shp]?.sheetView?.cancelTasks()
                 sheetViewValues[shp] = nil
                 sheetViewValue.sheetView?.node.removeFromParent()
+                sheetViewValue.loadingNode?.removeFromParent()
                 updateFindingNodes(at: shp)
+                
+                self.sheetViewValues[shp]?.loadingNode?.removeFromParent()
             }
             updateSelects()
         case .sheet:
@@ -2156,77 +2161,108 @@ final class RootView: View, @unchecked Sendable {
             guard let sheetRecorder = self.model.sheetRecorders[sid] else { return }
             let frame = self.sheetFrame(with: shp)
             let screenToWorldScale = self.screenToWorldScale
-            let task = Task.detached(priority: priority) {
-                try Task.checkCancellation()
-                let sheetRecord = sheetRecorder.sheetRecord
-                let sheet = sheetRecord.decodedValue ?? .init(message: "Failed to load".localized)
-                try Task.checkCancellation()
-                let historyRecord = sheetRecorder.sheetHistoryRecord
-                let history = historyRecord.decodedValue
-                try Task.checkCancellation()
-                
-                let sheetBinder = RecordBinder(value: sheet, record: sheetRecord)
-                let sheetView = SheetView(binder: sheetBinder, keyPath: \SheetBinder.value)
-                try Task.checkCancellation()
-                sheetView.screenToWorldScale = screenToWorldScale
-                sheetView.id = sid
-                if let history {
-                    sheetView.history = history
-                }
-                sheetView.bounds = Rect(size: frame.size)
-                sheetView.node.attitude.position = frame.origin
-                try Task.checkCancellation()
-                try sheetView.node.allChildrenAndSelf {
-                    $0.updateDatas()
-                    try Task.checkCancellation()
-                }
-                try Task.checkCancellation()
-                do {
-                    guard let thumbnail = sheetRecorder.thumbnail1024Record.decodedValue else { throw ReadingError() }
-                    try Task.checkCancellation()
-                    let block = try Texture.block(from: thumbnail, isMipmapped: true)
-                    try Task.checkCancellation()
-                    Task { @MainActor in
-                        sheetView.node.cacheTexture = try .init(block: block)
-                    }
-                } catch {
-//                    sheetView.enableCache = true
-                }
-                try Task.checkCancellation()
-                
+            
+            Task.detached(priority: .high) {
+                try await Task.sleep(sec: 1.5)
                 Task { @MainActor in
-                    guard self.sheetID(at: shp) == sid,
-                          self.sheetViewValues[shp] != nil else { return }
-                    self.updateWithIsFullEdit(in: sheetView)
-                    sheetRecord.willwriteClosure = { [weak sheetView, weak self,
-                                                      weak historyRecord] (record) in
-                        if let sheetView {
-                            record.value = sheetView.model
-                            historyRecord?.value = sheetView.history
-                            historyRecord?.isPreparedWrite = true
-                            self?.makeThumbnailRecord(at: sid, with: sheetView,
-                                                      isPreparedWrite: true)// -> write
+                    if self.sheetViewValues[shp]?.isLoading ?? false {
+                        let node = Node(path: .init(frame), fillType: .color(.loading))
+                        self.sheetViewValues[shp]?.loadingNode?.removeFromParent()
+                        self.sheetViewValues[shp]?.loadingNode = node
+                        self.node.append(child: node)
+                    }
+                }
+            }
+            let task = Task.detached(priority: priority) {
+                try await withTaskCancellationHandler {
+                    try Task.checkCancellation()
+                    let sheetRecord = sheetRecorder.sheetRecord
+                    let sheet = sheetRecord.decodedValue ?? .init(message: "Failed to load".localized)
+                    try Task.checkCancellation()
+                    let historyRecord = sheetRecorder.sheetHistoryRecord
+                    let history = historyRecord.decodedValue
+                    try Task.checkCancellation()
+                    
+                    let sheetBinder = RecordBinder(value: sheet, record: sheetRecord)
+                    let sheetView = SheetView(binder: sheetBinder, keyPath: \SheetBinder.value)
+                    try Task.checkCancellation()
+                    sheetView.screenToWorldScale = screenToWorldScale
+                    sheetView.id = sid
+                    if let history {
+                        sheetView.history = history
+                    }
+                    sheetView.bounds = Rect(size: frame.size)
+                    sheetView.node.attitude.position = frame.origin
+                    try Task.checkCancellation()
+                    try sheetView.node.allChildrenAndSelf {
+                        $0.updateDatas()
+                        try Task.checkCancellation()
+                    }
+                    try Task.checkCancellation()
+                    do {
+                        guard let thumbnail = sheetRecorder.thumbnail1024Record.decodedValue else { throw ReadingError() }
+                        try Task.checkCancellation()
+                        let block = try Texture.block(from: thumbnail, isMipmapped: true)
+                        try Task.checkCancellation()
+                        Task { @MainActor in
+                            sheetView.node.cacheTexture = try .init(block: block)
+                        }
+                    } catch {
+    //                    sheetView.enableCache = true
+                    }
+                    try Task.checkCancellation()
+                    
+                    sheetView.contentsView.elementViews.forEach { $0.updateSpectrogram() }
+                    sheetView.scoreView.updateSpectrogram()
+                    
+                    try Task.checkCancellation()
+                    
+                    Task { @MainActor in
+                        self.sheetViewValues[shp]?.isLoading = false
+                        self.sheetViewValues[shp]?.loadingNode?.removeFromParent()
+                        self.sheetViewValues[shp]?.loadingNode = nil
+                        
+                        guard self.sheetID(at: shp) == sid,
+                              self.sheetViewValues[shp] != nil else { return }
+                        self.updateWithIsFullEdit(in: sheetView)
+                        sheetRecord.willwriteClosure = { [weak sheetView, weak self,
+                                                          weak historyRecord] (record) in
+                            if let sheetView {
+                                record.value = sheetView.model
+                                historyRecord?.value = sheetView.history
+                                historyRecord?.isPreparedWrite = true
+                                self?.makeThumbnailRecord(at: sid, with: sheetView,
+                                                          isPreparedWrite: true)// -> write
+                            }
+                        }
+                        
+                        self.sheetView(at: shp)?.node.removeFromParent()
+                        self.sheetViewValues[shp] = .init(sheetID: sid, sheetView: sheetView, task: nil)
+                        if sheetView.node.parent == nil {
+                            self.sheetsNode.append(child: sheetView.node)
+                            sheetView.node.enableCache = true
+                        }
+                        
+                        self.thumbnailNodeValues[shp]?.node?.removeFromParent()
+                        
+                        self.updateSelects()
+                        self.updateFindingNodes(at: shp)
+                        if shp == self.sheetPosition(at: self.convertScreenToWorld(self.cursorPoint)) {
+                            self.updateTextCursor()
                         }
                     }
-                    
-                    self.sheetView(at: shp)?.node.removeFromParent()
-                    self.sheetViewValues[shp] = .init(sheetID: sid, sheetView: sheetView, task: nil)
-                    if sheetView.node.parent == nil {
-                        self.sheetsNode.append(child: sheetView.node)
-                        sheetView.node.enableCache = true
-                    }
-                    self.thumbnailNodeValues[shp]?.node?.removeFromParent()
-                    
-                    self.updateSelects()
-                    self.updateFindingNodes(at: shp)
-                    if shp == self.sheetPosition(at: self.convertScreenToWorld(self.cursorPoint)) {
-                        self.updateTextCursor()
+                } onCancel: {
+                    Task { @MainActor in
+                        self.sheetViewValues[shp]?.loadingNode?.removeFromParent()
+                        self.sheetViewValues[shp]?.loadingNode = nil
+                        self.sheetViewValues[shp] = nil
                     }
                 }
             }
             sheetViewValues[shp]?.sheetView?.node.removeFromParent()
+            sheetViewValues[shp]?.loadingNode?.removeFromParent()
             sheetViewValues[shp]?.sheetView?.cancelTasks()
-            sheetViewValues[shp] = .init(sheetID: sid, sheetView: nil, task: task)
+            sheetViewValues[shp] = .init(sheetID: sid, sheetView: nil, isLoading: true, task: task)
         }
     }
     
@@ -2439,6 +2475,9 @@ final class RootView: View, @unchecked Sendable {
         sheetView.node.enableCache = true
         updateWithIsFullEdit(in: sheetView)
         
+        sheetView.contentsView.elementViews.forEach { $0.updateSpectrogram() }
+        sheetView.scoreView.updateSpectrogram()
+        
         sheetRecord.willwriteClosure = { [weak sheetView, weak sheetHistoryRecord, weak self] (record) in
             if let sheetView = sheetView {
                 record.value = sheetView.model
@@ -2451,6 +2490,7 @@ final class RootView: View, @unchecked Sendable {
         
         self.sheetView(at: shp)?.node.removeFromParent()
         sheetViewValues[shp]?.sheetView?.node.removeFromParent()
+        sheetViewValues[shp]?.loadingNode?.removeFromParent()
         sheetViewValues[shp] = .init(sheetID: sid, sheetView: sheetView, task: nil)
         sheetsNode.append(child: sheetView.node)
         updateMap()
@@ -2561,6 +2601,7 @@ final class RootView: View, @unchecked Sendable {
         
         if let sheetViewValue = sheetViewValues[shp] {
             sheetViewValue.sheetView?.node.removeFromParent()
+            sheetViewValue.loadingNode?.removeFromParent()
             sheetViewValue.sheetView?.cancelTasks()
             sheetViewValues[shp] = nil
         }
