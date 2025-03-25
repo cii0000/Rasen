@@ -864,8 +864,16 @@ extension FormantFilter {
             return n
         case .sokuon:
             return withSelfA(to: .ɯ).toSokuon()
-        case .haBreath:
-            return withSelfA(to: .a).toFricative(isO: false).toNoise().toBreath()
+        case .haBreath, .hiBreath, .hɯBreath, .heBreath, .hoBreath:
+            let nPhoneme: Phoneme = switch phoneme {
+            case .haBreath: .a
+            case .hiBreath: .i
+            case .hɯBreath: .ɯ
+            case .heBreath: .e
+            case .hoBreath: .o
+            default: fatalError()
+            }
+            return withSelfA(to: nPhoneme).toFricative(isO: false).toNoise().toBreath()
         case .aBreath, .iBreath, .ɯBreath, .eBreath, .oBreath:
             let nPhoneme: Phoneme = switch phoneme {
             case .aBreath: .ha
@@ -875,7 +883,7 @@ extension FormantFilter {
             case .oBreath: .ho
             default: fatalError()
             }
-            return withSelfA(to: nPhoneme).applyNoise(nPhoneme).toBreath()
+            return withSelfA(to: nPhoneme).applyNoise(nPhoneme).toNoise().toBreath()
         default: return self
         }
     }
@@ -919,7 +927,7 @@ extension FormantFilter {
             n.fillEsNoise(1, at: 2)
             n[3].fillVolm(0.125)
             n[3].fillNoise(1)
-            n.fillEsVolm(0.125, at: 3)
+            n.fillEsVolm(0.25, at: 3)
             n.fillEsNoise(1, at: 3)
             n[4].fillVolm(0.0625)
             n[4].fillNoise(1)
@@ -939,14 +947,14 @@ extension FormantFilter {
             n[2].fillVolm(0.25)
             n.formFillEsVolm(0.3, at: 2)
             n[3].fillVolm(0.4)
-            n.formFillEsVolm(0.65, at: 3)
+            n.formFillEsVolm(0.5, at: 3)
             n[4].sVolm = 0.7
             n[4].eVolm = 0.8
             n.formFillEsVolm(0.85, at: 4)
             n[5].sVolm = 0.8
             n[5].eVolm = 0.65
             n[5].edVolm = 0.4
-            return .linear(self, n, t: opacity)
+            return .linear(self, n.multiplyAllVolm(0.85), t: opacity)
         case .ɕ, .dʒ, .tɕ:
             var n = toNoise(from: 2)
             if phoneme.isDakuon {
@@ -1045,8 +1053,11 @@ extension FormantFilter {
     }
     func toBreath() -> Self {
         var n = offVolm(from: 4)
+        n[0].sdNoise = 0
         n[0].sdVolm = 0
         n[0].fillVolm(n[2].volm * 0.7)
+        n[0].formMultiplyVolm(0.25)
+        n[1].sdVolm = n[1].volm * 0.5
         n[1].fillNoise(1)
         n[2].formMultiplyVolm(0.85)
         n[2].fillNoise(1)
@@ -1199,8 +1210,8 @@ struct Mora: Hashable, Codable {
                 [.init(ff, sec: 0)]
             }
             return
-        case .haBreath:
-            let ff = baseFf.withSelfA(to: .haBreath)
+        case .haBreath, .hiBreath, .hɯBreath, .heBreath, .hoBreath:
+            let ff = baseFf.withSelfA(to: phonemes.last!)
             keyFormantFilters = if let preFf = previousFormantFilter {
                 [.init(preFf, durSec: 0.06, sec: -0.06), .init(ff, durSec: 0)]
             } else {
@@ -1210,7 +1221,7 @@ struct Mora: Hashable, Codable {
         case .aBreath, .iBreath, .ɯBreath, .eBreath, .oBreath:
             let ff = baseFf.withSelfA(to: phonemes.last!)
             keyFormantFilters = if let preFf = previousFormantFilter {
-                [.init(preFf,durSec: 0.06,  sec: -0.06), .init(ff, durSec: 0)]
+                [.init(preFf,durSec: 0.08,  sec: -0.08), .init(ff, durSec: 0)]
             } else {
                 [.init(ff, durSec: 0)]
             }
@@ -1465,13 +1476,13 @@ struct Mora: Hashable, Codable {
                 ff0[1].dPitch *= 2
                 ff0[1].edPitch *= 1.25
                 
-                kffs.append(.init(ff0, durSec: paddingSec * 0.25, pitch: pitch * 4 / 5))
+                kffs.append(.init(ff0, durSec: paddingSec * 0.35, pitch: pitch * 4 / 5))
                 
                 var ff1 = ff0.mid(nextFf)
                 ff1[1].pitch = .linear(ff0[1].pitch, nextFf[1].pitch, t: 0.25)
                 ff1[1].fillVolm(ff0[1].volm)
                 
-                kffs.append(.init(ff1, durSec: paddingSec * 0.5, pitch: pitch / 2))
+                kffs.append(.init(ff1, durSec: paddingSec * 0.4, pitch: pitch / 3))
                 centerI = kffs.count
                 if let youonFf {
                     kffs.append(.init(youonFf, durSec: youonDurSec))
@@ -1503,7 +1514,7 @@ struct Mora: Hashable, Codable {
                 ff0[1] = .linear(onsetFf[1], nextFf[1], t: 0.5)
                 ff0[1].fillVolm(.linear(onsetFf[1].volm, nextFf[1].volm, t: 0.75))
                 
-                kffs.append(.init(ff0, durSec: 0.03))
+                kffs.append(.init(ff0, durSec: 0.03, pitch: -pitch / 8))
                 centerI = kffs.count
                 if let youonFf {
                     kffs.append(.init(youonFf, durSec: youonDurSec))
@@ -1527,8 +1538,8 @@ struct Mora: Hashable, Codable {
                     ff0[4] = nextFf[4]
                     ff0[5] = nextFf[5]
                     
+                    kffs.append(.init(ff0, durSec: 0.02, pitch: -pitch / 8))
                     centerI = kffs.count
-                    kffs.append(.init(ff0, durSec: 0.02))
                 }
                 kffs.append(.init(vowelFf, durSec: 0))
             case .ta, .tj, .tβ, .te, .to, .tɕ, .ts:
@@ -1630,7 +1641,7 @@ enum Phoneme: String, Hashable, Codable, CaseIterable {
          ɕRes = "/ɕ", sβRes = "/sβ",
          tɕRes = "/tɕ", tsRes = "/ts",
          sokuon = "_", off = ".", voiceless = ",",
-         haBreath = "~a",
+         haBreath = "~a", hiBreath = "~i", hɯBreath = "~ɯ", heBreath = "~e", hoBreath = "~o",
          aBreath = "^a", iBreath = "^i", ɯBreath = "^ɯ", eBreath = "^e", oBreath = "^o"
 }
 extension Phoneme {
@@ -1892,6 +1903,10 @@ extension Phoneme {
         case "ん", "n", "nn": [.ɴ]
         case "っ", "xtu", "_": [.sokuon]
         case "~a": [.haBreath]
+        case "~i": [.hiBreath]
+        case "~u": [.hɯBreath]
+        case "~e": [.heBreath]
+        case "~o": [.hoBreath]
         case "^a": [.aBreath]
         case "^i": [.iBreath]
         case "^u": [.ɯBreath]

@@ -1475,9 +1475,14 @@ final class MoveContentAction: DragEventAction {
                     let isShownSpectrogram = contentView.isShownSpectrogram(at: contentP)
                     contentView.isShownSpectrogram = isShownSpectrogram
                 case .position:
-                    let np = beganContent.origin + sheetP - beganInP
-                    let maxBounds = sheetView.bounds.inset(by: Sheet.textPadding)
-                    let nnp = maxBounds.clipped(Rect(origin: np, size: content.size)).origin
+                    let np = rootView.roundedPoint(from: beganContent.origin + sheetP - beganInP)
+                    var nnp = np
+                    let contentFrame = Rect(origin: np, size: content.size)
+                    let sb = sheetView.bounds.inset(by: Sheet.textPadding)
+                    if !sb.intersects(contentFrame) {
+                        let nFrame = sb.moveOutline(contentFrame)
+                        nnp += nFrame.origin - contentFrame.origin
+                    }
                     contentView.origin = nnp
                     rootView.updateSelects()
                 }

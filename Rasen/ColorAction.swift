@@ -566,12 +566,12 @@ final class ColorAction: Action {
             let t = (p.y / maxLightnessHeight).clipped(min: 0, max: 1)
             let volm = (scoreResult?.isStereo ?? false) ?
             Double.linear(Volm.minVolm, Volm.safeVolm, t: t) : Double.linear(0, 1, t: t)
-            let volmScale = beganVolm == 0 ? 0 : volm / beganVolm
-            func newVolm(from otherVolm: Double) -> Double {
+            let volmScale = beganVolm == 0 ? 1 : volm / beganVolm
+            func newVolm(from otherVolm: Double, _ volmRange: ClosedRange<Double>) -> Double {
                 if beganVolm == otherVolm {
                     volm
                 } else {
-                    (otherVolm * volmScale).clipped(Volm.volmRange)
+                    (otherVolm * volmScale).clipped(volmRange)
                 }
             }
             
@@ -580,7 +580,7 @@ final class ColorAction: Action {
             if let scoreResult {
                 switch scoreResult {
                 case .reverbEarlyRVolm:
-                    let volm = newVolm(from: beganEnvelope.reverb.earlyVolm)
+                    let volm = newVolm(from: beganEnvelope.reverb.earlyVolm, Volm.volmRange)
                     var eivs = [IndexValue<Envelope>](capacity: beganNotes.count)
                     for (noteI, beganNote) in beganNotes {
                         var envelope = beganNote.envelope
@@ -591,7 +591,7 @@ final class ColorAction: Action {
                     }
                     scoreView.replace(eivs)
                 case .reverbLateRVolm:
-                    let volm = newVolm(from: beganEnvelope.reverb.lateVolm)
+                    let volm = newVolm(from: beganEnvelope.reverb.lateVolm, Volm.volmRange)
                     var eivs = [IndexValue<Envelope>](capacity: beganNotes.count)
                     for (noteI, beganNote) in beganNotes {
                         var envelope = beganNote.envelope
@@ -609,7 +609,7 @@ final class ColorAction: Action {
                                 nvs[noteI] = nv.note
                             }
                             nv.pits.forEach { (pitI, beganPit) in
-                                nvs[noteI]?.pits[pitI].stereo.volm = newVolm(from: beganPit.pit.stereo.volm)
+                                nvs[noteI]?.pits[pitI].stereo.volm = newVolm(from: beganPit.pit.stereo.volm, Volm.safeVolmRange)
                                 nvs[noteI]?.pits[pitI].stereo.id = v.nid
                             }
                         }
@@ -624,7 +624,8 @@ final class ColorAction: Action {
                                 nvs[noteI] = nv.note
                             }
                             nv.pits.forEach { (pitI, beganPit) in
-                                let nVolm = newVolm(from: beganPit.pit.tone.overtone[.evenAmp])
+                                let nVolm = newVolm(from: beganPit.pit.tone.overtone[.evenAmp],
+                                                    Volm.volmRange)
                                 nvs[noteI]?.pits[pitI].tone.overtone[.evenAmp] = nVolm
                                 nvs[noteI]?.pits[pitI].tone.id = v.nid
                             }
@@ -640,7 +641,8 @@ final class ColorAction: Action {
                                 nvs[noteI] = nv.note
                             }
                             nv.pits.forEach { (pitI, beganPit) in
-                                let nVolm = newVolm(from: beganPit.pit.tone.overtone[.oddVolm])
+                                let nVolm = newVolm(from: beganPit.pit.tone.overtone[.oddVolm],
+                                                    Volm.volmRange)
                                 nvs[noteI]?.pits[pitI].tone.overtone[.oddVolm] = nVolm
                                 nvs[noteI]?.pits[pitI].tone.id = v.nid
                             }
@@ -657,7 +659,8 @@ final class ColorAction: Action {
                             }
                             nv.pits.forEach { (pitI, beganPit) in
                                 for sprolI in beganPit.sprolIs {
-                                    let nVolm = newVolm(from: beganPit.pit.tone.spectlope.sprols[sprolI].volm)
+                                    let nVolm = newVolm(from: beganPit.pit.tone.spectlope.sprols[sprolI].volm,
+                                                        Volm.volmRange)
                                     nvs[noteI]?.pits[pitI].tone.spectlope.sprols[sprolI].volm = nVolm
                                 }
                                 nvs[noteI]?.pits[pitI].tone.id = v.nid
@@ -682,7 +685,8 @@ final class ColorAction: Action {
                 for (ci, beganContent) in beganContents {
                     guard ci < sheetView.contentsView.elementViews.count else { continue }
                     let contentView = sheetView.contentsView.elementViews[ci]
-                    contentView.stereo = .init(volm: newVolm(from: beganContent.stereo.volm),
+                    contentView.stereo = .init(volm: newVolm(from: beganContent.stereo.volm,
+                                                             Volm.volmRange),
                                                pan: contentView.stereo.pan)
                 }
             }
@@ -1353,11 +1357,11 @@ final class ColorAction: Action {
             let t = (p.y / maxLightnessHeight).clipped(min: 0, max: 1)
             let volm = Double.linear(0, 1, t: t)
             let volmScale = beganVolm == 0 ? 0 : volm / beganVolm
-            func newVolm(from otherVolm: Double) -> Double {
+            func newVolm(from otherVolm: Double, _ volmRange: ClosedRange<Double>) -> Double {
                 if beganVolm == otherVolm {
                     volm
                 } else {
-                    (otherVolm * volmScale).clipped(Volm.volmRange)
+                    (otherVolm * volmScale).clipped(volmRange)
                 }
             }
             
@@ -1373,7 +1377,7 @@ final class ColorAction: Action {
                                 nvs[noteI] = nv.note
                             }
                             nv.pits.forEach { (pitI, beganPit) in
-                                nvs[noteI]?.pits[pitI].tone.overtone.evenAmp = newVolm(from: beganPit.pit.tone.overtone.evenAmp)
+                                nvs[noteI]?.pits[pitI].tone.overtone.evenAmp = newVolm(from: beganPit.pit.tone.overtone.evenAmp, Volm.safeVolmRange)
                                 nvs[noteI]?.pits[pitI].tone.id = v.nid
                             }
                         }

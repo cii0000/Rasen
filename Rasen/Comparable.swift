@@ -77,21 +77,7 @@ extension Range where Bound: SignedNumeric {
     }
     
     static func union(_ bRange: Self, in aRanges: inout [Self]) {
-        var removeIs = [Int](), bRange = bRange
-        for (i, aRange) in aRanges.enumerated() {
-            if aRange.intersects(bRange) || aRange.start == bRange.end || aRange.end == bRange.start {
-                if aRange.start < bRange.start {
-                    bRange.start = aRange.start
-                }
-                if aRange.end > bRange.end {
-                    bRange.start = aRange.start
-                }
-                removeIs.append(i)
-            }
-        }
-        aRanges.remove(at: removeIs)
-        aRanges.append(bRange)
-        aRanges.sort { $0.start < $1.start }
+        aRanges = Array(RangeSet(aRanges).union(.init(bRange)).ranges)
     }
 }
 extension ClosedRange where Bound: SignedNumeric {

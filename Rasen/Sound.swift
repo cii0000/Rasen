@@ -438,9 +438,9 @@ struct Spectlope: Hashable, Codable {
     var sprols = [Sprol(pitch: 12 * 0, volm: 0.5, noise: 0),
                   Sprol(pitch: 12 * 1.5, volm: 1, noise: 0),
                   Sprol(pitch: 12 * 2.5, volm: 0.85, noise: 0),
-                  Sprol(pitch: 12 * 4, volm: 0.6, noise: 0),
-                  Sprol(pitch: 12 * 6, volm: 0.4, noise: 0),
-                  Sprol(pitch: 12 * 10, volm: 0.15, noise: 0)]
+                  Sprol(pitch: 12 * 4, volm: 0.3, noise: 0),
+                  Sprol(pitch: 12 * 7, volm: 0.01, noise: 0),
+                  Sprol(pitch: 12 * 10, volm: 0.01, noise: 0)]
 }
 extension Spectlope: Protobuf {
     init(_ pb: PBSpectlope) throws {
@@ -860,7 +860,14 @@ extension Tone {
         Self.init(overtone: .init(evenAmp: 0, oddVolm: 0),
                   spectlope: .init(sprols: [.init(pitch: 0, volm: 1, noise: 0)]))
     }
-    static func noise() -> Self {
+    static func minNoise() -> Self {
+        Self.init(overtone: .init(evenAmp: 1, oddVolm: 1),
+                  spectlope: .init(sprols: [Sprol(pitch: 12 * 1, volm: 0, noise: 1),
+                                            Sprol(pitch: 12 * 2, volm: 1, noise: 1),
+                                            Sprol(pitch: 12 * 3, volm: 1, noise: 1),
+                                            Sprol(pitch: 12 * 4, volm: 0, noise: 1)]))
+    }
+    static func maxNoise() -> Self {
         Self.init(overtone: .init(evenAmp: 1, oddVolm: 1),
                   spectlope: .init(sprols: [Sprol(pitch: 12 * 5, volm: 0, noise: 1),
                                             Sprol(pitch: 12 * 6, volm: 0.5, noise: 1),
@@ -1281,7 +1288,8 @@ extension Note {
         } else {
             let maxSumVolm = pits.maxValue { $0.tone.spectlope.sumVolm } ?? 0
             var result = pitResult(atBeat: .init(beat))
-            result.stereo.volm *= maxSumVolm == 0 ? 0 : result.sumTone / maxSumVolm
+            result.stereo.volm = (result.stereo.volm * (maxSumVolm == 0 ? 1 : result.sumTone / maxSumVolm))
+                .clipped(Volm.volmRange)
             return result
         }
     }
@@ -2049,7 +2057,8 @@ extension Audiotrack {
 }
 
 struct Volm: Hashable, Codable {
-    static let minVolm = 0.0, safeVolm = 0.75, maxVolm = 1.0, volmRange = minVolm ... maxVolm
+    static let minVolm = 0.0, safeVolm = 0.75, maxVolm = 1.0
+    static let safeVolmRange = minVolm ... safeVolm, volmRange = minVolm ... maxVolm
 }
 extension Volm {
     /// cutDb = -40, a = -cutDb, amp = (.exp(a * volm / 8.7) - 1) / (.exp(a / 8.7) - 1)

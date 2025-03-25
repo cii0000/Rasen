@@ -490,29 +490,20 @@ extension Range where Bound == Double {
 }
 
 extension Movie {
-    static func m4aFromMP4(from fromUrl: URL, to toUrl: URL, isRemoveFromUrl: Bool = true) async throws {
+    static func m4aFromMP4(from fromUrl: URL, to toUrl: URL,
+                           isRemoveFromUrl: Bool = true) async throws {
         let fileManager = FileManager.default
         if fileManager.fileExists(atPath: toUrl.path) {
             try fileManager.removeItem(at: toUrl)
         }
         
         let asset = AVURLAsset(url: fromUrl)
-        guard let session = AVAssetExportSession(asset: asset, presetName: AVAssetExportPresetPassthrough)
+        guard let session = AVAssetExportSession(asset: asset,
+                                                 presetName: AVAssetExportPresetPassthrough)
         else { throw Self.exportError }
-        session.outputFileType = AVFileType.m4a
-        session.outputURL = toUrl
-        
-        await session.export()
-        
-        switch session.status {
-        case .completed:
-            if isRemoveFromUrl {
-                try fileManager.removeItem(at: fromUrl)
-            }
-        default:
-            if let error = session.error {
-                throw error
-            }
+        try await session.export(to: toUrl, as: .m4a)
+        if isRemoveFromUrl {
+            try fileManager.removeItem(at: fromUrl)
         }
     }
 }
@@ -533,15 +524,15 @@ extension Movie {
 }
 extension Movie {
     static func size(from url: URL) async throws -> Size? {
-        let asset = AVAsset(url: url)
+        let asset = AVURLAsset(url: url)
         return try await asset.load(.tracks).first?.load(.naturalSize).my
     }
     static func durSec(from url: URL) async throws -> Rational {
-        let asset = AVAsset(url: url)
+        let asset = AVURLAsset(url: url)
         return try await asset.load(.duration).my
     }
     static func frameRate(from url: URL) async throws -> Float? {
-        let asset = AVAsset(url: url)
+        let asset = AVURLAsset(url: url)
         return try await asset.load(.tracks).first?.load(.nominalFrameRate)
     }
 }
@@ -554,7 +545,7 @@ extension CMTime {
 
 extension Movie {
     static func toMP4(from url: URL, to outputURL: URL) async throws {
-        let asset = AVAsset(url: url)
+        let asset = AVURLAsset(url: url)
         
         let mTracks = try await asset.loadTracks(withMediaType: .video)
         guard !mTracks.isEmpty else { throw Self.exportError }
@@ -582,29 +573,15 @@ extension Movie {
         guard let session = AVAssetExportSession(asset: comp,
                                                  presetName: AVAssetExportPresetHighestQuality)
         else { throw Self.exportError }
-        
-        session.outputURL = outputURL
-        session.outputFileType = .mp4
-        
+        try await session.export(to: outputURL, as: .mp4)
         try FileManager.default.removeItem(at: url)
-        
-        await session.export()
-        
-        switch session.status {
-        case .completed: break
-        case .failed:
-            if let error = session.error {
-                throw error
-            }
-        default: break
-        }
     }
 }
 
 final class MoviePlayer {
     struct MoviePlayerError: Error {}
     static func images(url: URL, handler: (Double, CGImage) -> ()) async throws {
-        let asset = AVAsset(url: url)
+        let asset = AVURLAsset(url: url)
         
         let reader = try AVAssetReader(asset: asset)
         let vTracks = try await asset.loadTracks(withMediaType: .video)

@@ -444,17 +444,9 @@ extension Text {
                                   from range: Range<Int>, clipFrame sb: Rect) {
         let oldRange = string.range(fromInt: range)
         string.replaceSubrange(oldRange, with: nString)
-        if let textFrame = frame, !sb.contains(textFrame) {
-            let nFrame = sb.clipped(textFrame)
+        if let textFrame = frame, !sb.intersects(textFrame) {
+            let nFrame = sb.moveOutline(textFrame)
             origin += nFrame.origin - textFrame.origin
-            
-            if let textFrame = frame, !sb.outset(by: 1).contains(textFrame) {
-                let scale = min(sb.width / textFrame.width,
-                                sb.height / textFrame.height)
-                let dp = sb.clipped(textFrame).origin - textFrame.origin
-                size *= scale
-                origin += dp
-            }
         }
     }
 }

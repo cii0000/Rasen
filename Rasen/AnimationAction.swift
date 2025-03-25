@@ -651,11 +651,6 @@ final class PlayAction: InputKeyEventAction {
                             sec = score.sec(fromBeat: beat)
                             secRange = score.secRange
                             ids.insert(scoreTrackItem.id)
-                        } else if let noteI = scoreView.noteIndex(at: scoreP, scale: rootView.screenToWorldScale) {
-                            let beat = score.notes[noteI].beatRange.start + score.beatRange.start
-                            sec = score.sec(fromBeat: beat)
-                            secRange = score.secRange
-                            ids.insert(scoreTrackItem.id)
                         } else if scoreView.containsMainLine(scoreP, scale: rootView.screenToWorldScale) {
                             ids.insert(scoreTrackItem.id)
                         }

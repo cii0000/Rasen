@@ -912,11 +912,13 @@ final class LineAction: Action {
                 let beatInterval = rootView.currentBeatInterval
                 let beat = scoreView.beat(atX: inP.x, interval: beatInterval)
                 let beatRange = beat ..< beat
-                let isNoise = pitch == Score.maxPitch
-                firstTone = pitch == Score.maxPitch ? Tone.noise() : (isStraight ? Tone.empty() : Tone())
-                firstReverb = isNoise ? Reverb(earlySec: 0, earlyVolm: 1,
-                                               lateSec: 0, lateVolm: 1, releaseSec: 0) : Reverb()
-                firstSpectlopeHeight = pitch == Score.maxPitch ?
+                let isMinNoise = pitch == Score.minPitch, isMaxNoise = pitch == Score.maxPitch
+                firstTone = isMinNoise ?
+                Tone.minNoise() :
+                (isMaxNoise ? Tone.maxNoise() : (isStraight ? Tone.empty() : Tone()))
+                firstReverb = isMinNoise || isMaxNoise ?
+                Reverb(earlySec: 0, earlyVolm: 1, lateSec: 0, lateVolm: 1, releaseSec: 0) : Reverb()
+                firstSpectlopeHeight = isMinNoise || isMaxNoise ?
                 Sheet.spectlopeHeight.mid(Sheet.maxSpectlopeHeight) :
                 Sheet.spectlopeHeight
                 let note = Note(beatRange: beatRange, pitch: pitch,

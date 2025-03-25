@@ -492,7 +492,7 @@ final class SubNSApplication: NSApplication {
         }
         let url = Bundle.main.url(forResource: "Acknowledgments",
                                   withExtension: "txt")!
-        let string = try! String(contentsOf: url)
+        let string = try! String(contentsOf: url, encoding: .utf8)
         acknowledgmentsPanel = AppDelegate.makePanel(from: string, title: "Acknowledgments".localized)
     }
     

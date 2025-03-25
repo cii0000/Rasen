@@ -2032,7 +2032,7 @@ final class PastableAction: Action {
                     if let imf = imageFrame {
                         rect = imf
                     } else {
-                        let maxSize = sheetFrame.bounds.inset(by: Sheet.textPadding).size
+                        let maxSize = Size(width: 100000, height: 100000)
                         var size = image.size / 2
                         if size.width > maxSize.width || size.height > maxSize.height {
                             size *= min(maxSize.width / size.width, maxSize.height / size.height)
@@ -2492,15 +2492,6 @@ final class PastableAction: Action {
                 if let textFrame = text.frame, !sb.intersects(textFrame) {
                     let nFrame = sb.moveOutline(textFrame)
                     text.origin += nFrame.origin - textFrame.origin
-                    
-                    if let textFrame = text.frame, !sb.outset(by: 1).contains(textFrame) {
-                        
-                        let scale = min(sb.width / textFrame.width,
-                                        sb.height / textFrame.height)
-                        let dp = sb.clipped(textFrame).origin - textFrame.origin
-                        text.size *= scale
-                        text.origin += dp
-                    }
                 }
                 
                 updateUndoGroup(with: nshp)
@@ -2866,7 +2857,7 @@ final class PastableAction: Action {
             }
             
             content.size = content.size * scale
-            let maxSize = rootView.sheetFrame(with: shp).bounds.inset(by: Sheet.textPadding).size
+            let maxSize = Size(width: 100000, height: 100000)
             if content.size.width > maxSize.width || content.size.height > maxSize.height {
                 content.size *= min(maxSize.width / content.size.width, maxSize.height / content.size.height)
             }
@@ -2891,7 +2882,7 @@ final class PastableAction: Action {
             
             var content = Content(directoryName: sheetView.id.uuidString, name: name, origin: nnp)
             if let size = content.image?.size {
-                let maxSize = rootView.sheetFrame(with: shp).bounds.inset(by: Sheet.textPadding).size
+                let maxSize = Size(width: 100000, height: 100000)
                 var size = size / 2
                 if size.width > maxSize.width || size.height > maxSize.height {
                     size *= min(maxSize.width / size.width, maxSize.height / size.height)

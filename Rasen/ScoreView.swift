@@ -748,7 +748,10 @@ extension ScoreView {
         var cbpts = [(beatRange: Range<Rational>, pitchAndTypers: [PitchAndTyper])]()
         for (chordBeatRange, pitchs) in trs {
             let pitchs = pitchs.sorted()
-            guard let chord = Chord(pitchs: pitchs) else { continue }
+            guard let chord = Chord(pitchs: pitchs) else {
+                cbpts.append((chordBeatRange, []))
+                continue
+            }
             let typers = chord.typers.sorted(by: { $0.type.rawValue > $1.type.rawValue })
             let unisonsSet = typers.reduce(into: Set<Int>()) { $0.formUnion($1.unisons) }
             let pitchAndTypers: [PitchAndTyper] = intPitchRange.compactMap { pitch in
@@ -1922,12 +1925,18 @@ extension ScoreView {
             let ney = noteY(atBeat: note.beatRange.end, from: note)
             let nw = nex - nsx
             let nMaxDSq = note.pits.count == 1 && nw / 4 < maxD ? (nw / 4).squared : maxDSq
+            var prePitP: Point?
             for pitI in note.pits.count.range {
                 let pitP = pitPosition(atPit: pitI, from: note)
                 let dSq = pitP.distanceSquared(p)
                 if dSq <= minDSq && dSq < nMaxDSq {
                     let pdSq = pointline.minDistanceSquared(at: p)
-                    if let minPDSq = pds[pitP] {
+                    if prePitP == pitP && pitP.x < p.x {
+                        pds[pitP] = pdSq
+                        minDSq = dSq
+                        minResult = (noteI, .pit(pitI: pitI))
+                        isPit = true
+                    } else if let minPDSq = pds[pitP] {
                         if pdSq < minPDSq {
                             pds[pitP] = pdSq
                             minDSq = dSq
@@ -1941,6 +1950,7 @@ extension ScoreView {
                         isPit = true
                     }
                 }
+                prePitP = pitP
             }
             if note.pits.last?.beat != note.beatRange.length {
                 let pitP = Point(nex, ney)
@@ -2189,12 +2199,17 @@ extension ScoreView {
             let nex = x(atBeat: note.beatRange.end)
             let nw = nex - nsx
             let nMaxDSq = note.pits.count == 1 && nw / 4 < maxD ? (nw / 4).squared : maxDSq
+            var prePitP: Point?
             for pitI in note.pits.count.range {
                 let pitP = pitPosition(atPit: pitI, from: note)
                 let dSq = pitP.distanceSquared(p)
                 if dSq <= minDSq && dSq < nMaxDSq {
                     let pdSq = pointline.minDistanceSquared(at: p)
-                    if let minPDSq = pds[pitP] {
+                    if prePitP == pitP && pitP.x < p.x {
+                        pds[pitP] = pdSq
+                        minDSq = dSq
+                        minResult = (noteI, .pit(pitI: pitI))
+                    } else if let minPDSq = pds[pitP] {
                         if pdSq < minPDSq {
                             pds[pitP] = pdSq
                             minDSq = dSq
@@ -2206,6 +2221,7 @@ extension ScoreView {
                         minResult = (noteI, .pit(pitI: pitI))
                     }
                 }
+                prePitP = pitP
             }
             
             let hnh = pitchHeight / 2
