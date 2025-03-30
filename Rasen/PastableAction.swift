@@ -1159,7 +1159,9 @@ final class PastableAction: Action {
                                  note.pits[pitI + 1].beat : note.beatRange.length) - pit.beat
                     nPits.append(.init(beat: currentBeat, pitch: pit.pitch, stereo: pit.stereo,
                                        tone: pit.tone, lyric: pit.lyric))
-                    currentBeat += dBeat
+                    if dBeat < 0 {
+                        currentBeat += dBeat
+                    }
                 }
                 let startBeat = note.pits[pitIs[0]].beat + note.beatRange.start
                 var nNote = Note(beatRange: startBeat ..< (startBeat + currentBeat),

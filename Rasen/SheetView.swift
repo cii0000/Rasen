@@ -6209,9 +6209,14 @@ final class SheetView: BindableView, @unchecked Sendable {
     }
     func textIndexes(from selections: [Selection]) -> [Int] {
         textsView.elementViews.enumerated().compactMap { (ti, textView) in
-            if let b = textView.transformedBounds, selections.contains(where: {
-                Path(convertFromWorld($0.rect))
-                    .intersects(b)
+            if textView.transformedBounds != nil, selections.contains(where: {
+                let nRect = textView.convertFromWorld($0.rect)
+                guard textView.intersectsHalf(nRect) else { return false }
+                let tfp = textView.convertFromWorld($0.firstOrigin)
+                let tlp = textView.convertFromWorld($0.lastOrigin)
+                guard textView.characterIndexWithOutOfBounds(for: tfp) != nil,
+                      textView.characterIndexWithOutOfBounds(for: tlp) != nil else { return false }
+                return true
             }) { ti } else { nil }
         }
     }
