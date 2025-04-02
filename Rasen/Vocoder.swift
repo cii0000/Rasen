@@ -121,6 +121,7 @@ extension Waveclip {
         } else {
             aAmp = 1
         }
+        
         if let releaseStartSec, sec >= releaseStartSec {
             let nSec = sec - releaseStartSec
             return if releaseSec > 0 && nSec < releaseSec {
@@ -135,20 +136,59 @@ extension Waveclip {
 }
 
 struct EnvelopeMemo: Hashable, Codable {
-    let attackSec, decaySec, sustainVolm, releaseSec, maxSec: Double
+    let attackSec, decaySec, sustainAmp, releaseSec, maxSec: Double
     let rAttackSec, rDecaySec, rReleaseSec: Double
     let reverb: Reverb
     
     init(_ envelope: Envelope) {
         attackSec = max(envelope.attackSec, 0)
         decaySec = max(envelope.decaySec, 0)
-        sustainVolm = envelope.sustainVolm
+        sustainAmp = Volm.amp(fromVolm: envelope.sustainVolm)
         releaseSec = max(envelope.releaseSec, 0)
         rAttackSec = 1 / attackSec
         rDecaySec = 1 / decaySec
         rReleaseSec = 1 / releaseSec
         reverb = envelope.reverb
         maxSec = releaseSec + (envelope.reverb.isEmpty ? 0 : envelope.reverb.durSec)
+    }
+}
+extension EnvelopeMemo {
+    func amp(atSec sec: Double, attackStartSec: Double?, releaseStartSec: Double?) -> Double {
+        guard attackStartSec != nil || releaseStartSec != nil else { return 1 }
+        let aAmp: Double
+        if let attackStartSec {
+            if sec <= attackStartSec {
+                return 0
+            }
+            let nSec = sec - attackStartSec
+            
+            if attackSec > 0 && nSec < attackSec {
+                aAmp = nSec * rAttackSec
+            } else {
+                let nSec = nSec - attackSec
+                aAmp = if decaySec > 0 && nSec < decaySec {
+                    .linear(1, sustainAmp, t: nSec * rDecaySec)
+                } else {
+                    sustainAmp
+                }
+            }
+        } else {
+            aAmp = 1
+        }
+        
+        if let releaseStartSec, sec >= releaseStartSec {
+            if sec <= releaseStartSec {
+                return aAmp
+            }
+            let nSec = sec - releaseStartSec
+            return if releaseSec > 0 && nSec < releaseSec {
+                .linear(aAmp, 0, t: nSec * rReleaseSec)
+            } else {
+                0
+            }
+        } else {
+            return aAmp
+        }
     }
 }
 

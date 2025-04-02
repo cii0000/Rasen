@@ -461,18 +461,11 @@ extension Spectlope {
     }
     static func random(pitch: Double) -> Self {
         Spectlope(sprols: [Sprol(pitch: 12 * 0, volm: 0.5, noise: 0),
-                           Sprol(pitch: 12 * 2, volm: 1, noise: 0),
-                           Sprol(pitch: 12 * 2.5, volm: 0.75, noise: 0),
-                           Sprol(pitch: 12 * 4, volm: 0.45, noise: 0),
-                           Sprol(pitch: 12 * 4.5, volm: .random(in: 0.25 ..< 0.425), noise: 0),
-                           Sprol(pitch: 12 * 5, volm: .random(in: 0.35 ..< 0.7), noise: 0),
-                           Sprol(pitch: 12 * 5.5, volm: .random(in: 0 ..< 0.35), noise: 0),
-                           Sprol(pitch: 12 * 6, volm: .random(in: 0.275 ..< 0.5), noise: 0),
-                           Sprol(pitch: 12 * 6.5, volm: .random(in: 0 ..< 0.275), noise: 0),
-                           Sprol(pitch: 12 * 7, volm: .random(in: 0.2 ..< 0.5), noise: 0),
-                           Sprol(pitch: 12 * 7.5, volm: .random(in: 0 ..< 0.2), noise: 0),
-                           Sprol(pitch: 12 * 8, volm: .random(in: 0.125 ..< 0.2), noise: 0),
-                           Sprol(pitch: 12 * 10, volm: 0.125, noise: 0)])
+                           Sprol(pitch: 12 * 1.5, volm: .random(in: 0.5 ... 1), noise: 0),
+                           Sprol(pitch: 12 * 2.5, volm: .random(in: 0.35 ... 1), noise: 0),
+                           Sprol(pitch: 12 * 4, volm: .random(in: 0.3 ... 1), noise: 0),
+                           Sprol(pitch: 12 * 7, volm: 0.01, noise: 0),
+                           Sprol(pitch: 12 * 10, volm: 0.01, noise: 0)])
     }
 }
 extension Spectlope {
