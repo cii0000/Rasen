@@ -159,8 +159,8 @@ final class ScoreView: TimelineView, @unchecked Sendable {
         }
     }
     
-    let currentPeakVolmNode = Node(lineWidth: 2, lineType: .color(.background))
-    let timeNode = Node(lineWidth: 3, lineType: .color(.content))
+    let currentPeakVolmNode = Node(lineWidth: 1.25, lineType: .color(.background))
+    let timeNode = Node(lineWidth: 2, lineType: .color(.content))
     
     var peakVolm = 0.0 {
         didSet {
@@ -831,13 +831,20 @@ extension ScoreView {
         }
     }
     
-    func octaveNode(fromPitch pitch: Rational, noteIs: [Int], _ color: Color = .border) -> Node {
-        let node = Node(children: noteIs.map { notesNode.children[$0].children[0].clone })
-        node.children.forEach { $0.fillType = .color(color) }
-        return octaveNode(fromPitch: pitch, node, color)
+    func octaveNode(noteIs: [Int], _ color: Color = .border) -> Node {
+        let nodes = noteIs.flatMap {
+            let node = notesNode.children[$0].children[0].clone
+            return octaveNodes(fromPitch: model.notes[$0].firstPitch, node, color)
+        }
+        return Node(children: nodes)
     }
     func octaveNode(fromPitch pitch: Rational, _ noteNode: Node, enabledPitchLine: Bool = true,
-                    _ color: Color = .border) -> Node {
+                     _ color: Color = .border) -> Node {
+        Node(children: octaveNodes(fromPitch: pitch, noteNode,
+                                   enabledPitchLine: enabledPitchLine, color))
+    }
+    func octaveNodes(fromPitch pitch: Rational, _ noteNode: Node, enabledPitchLine: Bool = true,
+                     _ color: Color = .border) -> [Node] {
         let pitchRange = Score.pitchRange
         guard pitchRange.contains(pitch) else { return .init() }
         
@@ -876,7 +883,7 @@ extension ScoreView {
                                                width: ex - sx, height: plw)),
                               fillType: .color(color)))
         }
-        return Node(children: nodes)
+        return nodes
     }
     
     func keyBeatEdge(fromBeat beat: Rational) -> Edge {

@@ -142,8 +142,8 @@ extension ContentView {
         if model.timeOption != nil {
             timelineNode.children = self.timelineNode(with: model)
             
-            let timeNode = Node(lineWidth: 3, lineType: .color(.content))
-            let volmNode = Node(lineWidth: 2, lineType: .color(.background))
+            let timeNode = Node(lineWidth: 2, lineType: .color(.content))
+            let volmNode = Node(lineWidth: 1.25, lineType: .color(.background))
             timeNode.append(child: volmNode)
             timelineNode.children.append(timeNode)
             self.timeNode = timeNode

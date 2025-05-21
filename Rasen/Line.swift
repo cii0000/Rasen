@@ -740,18 +740,6 @@ extension Line {
     }
 }
 extension Line {
-    func normalized() -> Line {
-        var line = self
-        if line.count <= 1 {
-            line.controls.append(.init(point: .init(0, 0)))
-            line.controls.append(.init(point: .init(1, 0)))
-        }
-        line.controls[.first].point.x = 0
-        line.controls[.last].point.x = 1
-        return line
-    }
-}
-extension Line {
     struct EasingElement {
         var point = Point(), pressure = 1.0, easing = Easing.easeInOutSin
         
@@ -1885,36 +1873,36 @@ extension Line {
         return values
     }
     
-    var centerPosition: Point {
-        if controls.count == 1 {
-            return firstPoint
-        } else if controls.count == 2 {
-            return firstPoint.mid(lastPoint)
-        } else if controls.count == 3 {
-            return bezier(at: 0).position(withT: 0.5)
-        } else {
-            let i = maxBezierIndex / 2
-            return bezier(at: i).p1
+    func normalized() -> Self {
+        let centerP = Point(controls.mean { $0.point.x } ?? 0,
+                            controls.mean { $0.point.y } ?? 0)
+        var n = self
+        n.controls = n.controls.map {
+            var n = $0
+            n.point -= centerP
+            return n
         }
+        let scale = max(controls.maxValue { abs($0.point.x) } ?? 0,
+                        controls.maxValue { abs($0.point.y) } ?? 0)
+        guard scale > 0 else { return self }
+        let rScale = 1 / scale
+        n.controls = n.controls.map {
+            var n = $0
+            n.point *= rScale
+            return n
+        }
+        n.size *= rScale
+        return n
     }
-    func noCrossLine(_ otherLine: Line) -> Line {
-        let midP0 = self.centerPosition, midP1 = otherLine.centerPosition
-        let flEdge00 = Edge(self.firstPoint, midP0)
-        let flEdge01 = Edge(midP0, self.lastPoint)
-        let flEdge10 = Edge(otherLine.firstPoint, midP1)
-        let flEdge11 = Edge(midP1, otherLine.lastPoint)
-        let flrEdge00 = flEdge00
-        let flrEdge01 = flEdge01
-        let flrEdge10 = Edge(midP1, otherLine.firstPoint)
-        let flrEdge11 = Edge(otherLine.lastPoint, midP1)
-        
-        let a0 = abs(flEdge00.angle(flEdge10)) + abs(flEdge01.angle(flEdge11))
-        let a1 = abs(flrEdge00.angle(flrEdge10)) + abs(flrEdge01.angle(flrEdge11))
-        if a0 < a1 {
-            return self
-        } else {
-            return self.reversed()
-        }
+    func noCrossLine(_ otherLine: Self) -> Self {
+        let count = max(controls.count, otherLine.controls.count)
+        guard count > 1 else { return self }
+        let l0 = with(count: count).normalized()
+        let l1 = otherLine.with(count: count).normalized()
+        let l1r = l1.reversed()
+        let l0l1d = count.range.sum { l0.controls[$0].distance(l1.controls[$0]) }
+        let l0l1rd = count.range.sum { l0.controls[$0].distance(l1r.controls[$0]) }
+        return l0l1d < l0l1rd ? self : reversed()
     }
     
     func points(fromBezierCount bCount: Int) -> [Point] {

@@ -178,12 +178,14 @@ final class LineAction: Action {
         guard c1.point.distance(c2.point) > 3 else { return nil }
         let dr = abs(Point.differenceAngle(c0.point, c1.point, c2.point))
         if dr > angle {
-            return c1
+            var nc = c1
+            nc.pressure = lc.pressure
+            return nc
         } else if dr > lowAngle {
             let t = 1 - (dr - lowAngle) / (angle - lowAngle)
             return Line.Control(point: Point.linear(c1.point, c2.point, t: t),
                                 weight: 0.5,
-                                pressure: Double.linear(c1.pressure, c2.pressure, t: t))
+                                pressure: c2.pressure)
         } else {
             return nil
         }
@@ -593,7 +595,7 @@ final class LineAction: Action {
                                 break
                             }
                             let dr = abs(Point.differenceAngle(p0, p1, p2))
-                            if dr > .pi * 0.3 {
+                            if dr > .pi * 0.75 {
                                 let nCount = nLine.controls.count - i
                                 nLine.controls.removeLast(nCount)
                                 times.removeLast(nCount)
@@ -1092,8 +1094,7 @@ final class LineAction: Action {
                 
                 let pitch = scoreView.pitch(atY: scoreP.y, interval: rootView.currentPitchInterval)
                 let score = scoreView.model
-                let interval = rootView.currentBeatInterval
-                let beat = scoreView.beat(atX: scoreP.x, interval: interval)
+                let beat = scoreView.beat(atX: scoreP.x, interval: rootView.currentBeatInterval)
                 let notes: [Note] = nis.map {
                     var note = score.notes[$0]
                     note.pitch -= pitch
@@ -1101,7 +1102,7 @@ final class LineAction: Action {
                     return note
                 }
                 
-                Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: notes))]
+                Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: notes, deltaPitch: pitch))]
                 sheetView.newUndoGroup()
                 sheetView.removeNote(at: nis)
             }

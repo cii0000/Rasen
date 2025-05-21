@@ -191,15 +191,15 @@ extension Picture {
                     oldVs.enumerated().forEach { (oi, oldV) in
                         let ds = oldV.centroid.distanceSquared(newCentroid) / oldV.area.mid(newArea)
                         let x0 = ds.squareRoot()
-                        if x0 < 2 {
-                            let x1 = (oldV.area.absRatio(newArea) - 1).squareRoot()
+                        if x0 < 3 {
+                            let x1 = oldV.area.absRatio(newArea).squareRoot() - 1
                             if x1 < 5 {
                                 let oxs = oldV.oxs, oys = oldV.oys
                                 let dxs = nxs - oxs
                                 let dys = nys - oys
                                 let x2 = (dxs * dxs + dys * dys).squareRoot().sum()
-                                let x3 = nps.contains(where: { oldV.pSet.contains($0) }) ? 0.0 : 10000.0
-                                let s = x0 * 100 + x1 * 100 + x2 + x3
+                                let x3 = nps.contains(where: { oldV.pSet.contains($0) }) ? 0.0 : 100000.0
+                                let s = x0 * 100 + x1 * 1000 + x2 * 1 + x3 * 1
                                 vs.append((oi, ni, s))
                             }
                         }

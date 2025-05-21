@@ -1404,14 +1404,31 @@ extension CPUNode {
         ctx.restoreGState()
     }
     
-    func renderedAntialiasFillImage(in bounds: Rect, to size: Size, _ colorSpace: ColorSpace) -> Image? {
-        let backgroundColor = if case .color(let color) = fillType {
+    func renderedAntialiasFillImage(in bounds: Rect, to size: Size,
+                                    isBackgroundColor: Bool = true,
+                                    _ colorSpace: ColorSpace) -> Image? {
+        let backgroundColor: Color? = if !isBackgroundColor {
+            nil
+        } else if case .color(let color) = fillType {
             color
         } else {
             Color.background
         }
         guard children.contains(where: { $0.fillType != nil }) else {
-            return image(in: bounds, size: size, backgroundColor: backgroundColor, .sRGB)
+            if children.contains(where: { $0.children.contains(where: { $0.fillType != nil }) }) {
+                var nImage: Image?
+                children.forEach {
+                    guard let nnImage = $0.renderedAntialiasFillImage(in: bounds, to: size, isBackgroundColor: nImage == nil, colorSpace) else { return }
+                    if nImage == nil {
+                        nImage = nnImage
+                    } else {
+                        nImage = nImage?.drawn(nnImage, in: Rect(size: size))
+                    }
+                }
+                return nImage
+            } else {
+                return image(in: bounds, size: size, backgroundColor: backgroundColor, .sRGB)
+            }
         }
         guard let oImage = image(in: bounds, size: size * 2, backgroundColor: backgroundColor,
                                  colorSpace, isAntialias: false,

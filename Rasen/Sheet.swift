@@ -1947,7 +1947,7 @@ extension Animation: BeatRangeType {
         loopIndex(atRoot: rootIndex)
     }
     func loopIndex(atRoot rootI: Int) -> Int {
-        rootI / keyframes.count
+        rootI.divFloor(keyframes.count)
     }
     func loopIndex(atRootBeat rootBeat: Rational) -> Int {
         loopIndex(atRoot: rootIndex(atRootBeat: rootBeat))

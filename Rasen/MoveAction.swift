@@ -66,10 +66,10 @@ final class MoveAction: DragEventAction {
                     type = .score(MoveScoreAction(rootAction))
                 } else if rootView.isSelect(at: p) {
                     type = .sheet(MoveSheetAction(rootAction))
-                } else if sheetView.contentIndex(at: sheetP, scale: rootView.screenToWorldScale) != nil {
-                    type = .content(MoveContentAction(rootAction))
                 } else if sheetView.textIndex(at: sheetP, scale: rootView.screenToWorldScale) != nil {
                     type = .text(MoveTextAction(rootAction))
+                } else if sheetView.contentIndex(at: sheetP, scale: rootView.screenToWorldScale) != nil {
+                    type = .content(MoveContentAction(rootAction))
                 } else if sheetView.lineTuple(at: sheetP,
                                               isSmall: false,
                                               scale: rootView.screenToWorldScale) != nil {
@@ -454,8 +454,7 @@ final class MoveScoreAction: DragEventAction {
                         
                         updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
                         
-                        let octaveNode = scoreView.octaveNode(fromPitch: note.pitch,
-                                                              noteIs: [noteI],
+                        let octaveNode = scoreView.octaveNode(noteIs: [noteI],
                                                               .octave)
                         octaveNode.attitude.position
                         = sheetView.convertToWorld(scoreView.node.attitude.position)
@@ -653,8 +652,7 @@ final class MoveScoreAction: DragEventAction {
                         
                         updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
                         
-                        let octaveNode = scoreView.octaveNode(fromPitch: note.pitch,
-                                                              noteIs: beganNotes.keys.sorted(),
+                        let octaveNode = scoreView.octaveNode(noteIs: beganNotes.keys.sorted(),
                                                               .octave)
                         octaveNode.attitude.position
                         = sheetView.convertToWorld(scoreView.node.attitude.position)
@@ -705,8 +703,7 @@ final class MoveScoreAction: DragEventAction {
                         
                         updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
                         
-                        let octaveNode = scoreView.octaveNode(fromPitch: note.pitch,
-                                                              noteIs: beganNotes.keys.sorted(),
+                        let octaveNode = scoreView.octaveNode(noteIs: beganNotes.keys.sorted(),
                                                               .octave)
                         octaveNode.attitude.position
                         = sheetView.convertToWorld(scoreView.node.attitude.position)
@@ -803,8 +800,7 @@ final class MoveScoreAction: DragEventAction {
                             
                             oldBeat = nsBeat
                             
-                            octaveNode?.children = scoreView.octaveNode(fromPitch: pitch,
-                                                                        noteIs: beganNotes.keys.sorted(),
+                            octaveNode?.children = scoreView.octaveNode(noteIs: beganNotes.keys.sorted(),
                                                                         .octave).children
                             
                             if pitch != oldPitch {
@@ -854,8 +850,7 @@ final class MoveScoreAction: DragEventAction {
                             
                             oldBeat = neBeat
                             
-                            octaveNode?.children = scoreView.octaveNode(fromPitch: pitch,
-                                                                        noteIs: beganNotes.keys.sorted(),
+                            octaveNode?.children = scoreView.octaveNode(noteIs: beganNotes.keys.sorted(),
                                                                         .octave).children
                             
                             if pitch != oldPitch {
@@ -905,8 +900,7 @@ final class MoveScoreAction: DragEventAction {
                             
                             oldBeat = nsBeat
                             
-                            octaveNode?.children = scoreView.octaveNode(fromPitch: pitch,
-                                                                        noteIs: beganNotes.keys.sorted(),
+                            octaveNode?.children = scoreView.octaveNode(noteIs: beganNotes.keys.sorted(),
                                                                         .octave).children
                             
                             if pitch != oldPitch {
@@ -1070,8 +1064,7 @@ final class MoveScoreAction: DragEventAction {
                             
                             oldBeat = nsBeat
                             
-                            octaveNode?.children = scoreView.octaveNode(fromPitch: pitch,
-                                                                        noteIs: [noteI],
+                            octaveNode?.children = scoreView.octaveNode(noteIs: [noteI],
                                                                         .octave).children
                             
                             if pitch != oldPitch {

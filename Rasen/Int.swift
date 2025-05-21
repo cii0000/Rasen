@@ -85,6 +85,21 @@ extension Int {
     func mod(_ other: Self) -> Self {
         ((self % other) + other) % other
     }
+    func divFloor(_ other: Self) -> Self {
+        if other < 0 {
+            if self < 0 {
+                (-self + 1) / -other - 1
+            } else {
+                -self / -other
+            }
+        } else {
+            if self < 0 {
+                (self + 1) / other - 1
+            } else {
+                self / other
+            }
+        }
+    }
     func loop(_ range: Range<Self>) -> Self {
         loop(start: range.lowerBound, end: range.upperBound)
     }

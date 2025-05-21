@@ -569,6 +569,8 @@ final class PlayAction: InputKeyEventAction {
         case .began:
             rootView.cursor = .arrow
             
+            rootAction.rootView.closeLookingUp()
+            
             sheetView = rootView.sheetView(at: p)
             let cShp = rootView.sheetPosition(at: p)
             if let cSheetView = rootView.sheetView(at: cShp) {
@@ -591,26 +593,39 @@ final class PlayAction: InputKeyEventAction {
                     }
                 }
                 
-                if let aSheetView = sheetView(at: .init(cShp.x - 1, cShp.y)) {
-                    cSheetView.previousSheetView = aSheetView
+                var ncShp = cShp, psvs = [WeakElement<SheetView>]()
+                ncShp.x -= 1
+                while let aSheetView = sheetView(at: ncShp) {
+                    psvs.append(.init(element: aSheetView))
                     
-                    if let aaSheetView = sheetView(at: .init(cShp.x - 1, cShp.y - 1)) {
+                    if let aaSheetView = sheetView(at: .init(ncShp.x, ncShp.y - 1)) {
                         aSheetView.bottomSheetView = aaSheetView
                     }
-                    if let aaSheetView = sheetView(at: .init(cShp.x - 1, cShp.y + 1)) {
+                    if let aaSheetView = sheetView(at: .init(ncShp.x, ncShp.y + 1)) {
                         aSheetView.topSheetView = aaSheetView
                     }
-                }
-                if let aSheetView = sheetView(at: .init(cShp.x + 1, cShp.y)) {
-                    cSheetView.nextSheetView = aSheetView
                     
-                    if let aaSheetView = sheetView(at: .init(cShp.x + 1, cShp.y - 1)) {
+                    ncShp.x -= 1
+                }
+                cSheetView.previousSheetViews = psvs.reversed()
+                
+                var nsvs = [WeakElement<SheetView>]()
+                ncShp = cShp
+                ncShp.x += 1
+                while let aSheetView = sheetView(at: ncShp) {
+                    nsvs.append(.init(element: aSheetView))
+                    
+                    if let aaSheetView = sheetView(at: .init(ncShp.x, ncShp.y - 1)) {
                         aSheetView.bottomSheetView = aaSheetView
                     }
-                    if let aaSheetView = sheetView(at: .init(cShp.x + 1, cShp.y + 1)) {
+                    if let aaSheetView = sheetView(at: .init(ncShp.x, ncShp.y + 1)) {
                         aSheetView.topSheetView = aaSheetView
                     }
+                    
+                    ncShp.x += 1
                 }
+                cSheetView.nextSheetViews = nsvs
+                
                 if let aSheetView = sheetView(at: .init(cShp.x, cShp.y - 1)) {
                     cSheetView.bottomSheetView = aSheetView
                 }
@@ -618,15 +633,14 @@ final class PlayAction: InputKeyEventAction {
                     cSheetView.topSheetView = aSheetView
                 }
                 
+                let scale = rootView.screenToWorldScale
                 let sheetP = cSheetView.convertFromWorld(p)
-                if let (_, contentView) = cSheetView.contentIndexAndView(at: sheetP,
-                                                    scale: rootView.screenToWorldScale),
+                if let (_, contentView) = cSheetView.contentIndexAndView(at: sheetP, scale: scale),
                    contentView.model.type == .movie,
-                   !contentView.containsTimeline(contentView.convertFromWorld(p),
-                                                 scale: rootView.screenToWorldScale) {
+                   !contentView.containsTimeline(contentView.convertFromWorld(p), scale: scale) {
                     
                     let sec = contentView.model.sec(fromBeat: contentView.model.beat)
-                    cSheetView.play(atSec: sec, inSec: nil, otherTimelineIDs: [])
+                    cSheetView.play(atSec: sec)
                 } else if !(rootAction.containsAllTimelines(with: event)
                     || (!cSheetView.model.enabledAnimation && cSheetView.model.enabledMusic)) {
                     
@@ -637,29 +651,20 @@ final class PlayAction: InputKeyEventAction {
                     }
                 } else {
                     let sheetP = cSheetView.convertFromWorld(p)
-                    var ids = Set<UUID>()
-                    var secRange: Range<Rational>?
-                    var sec: Rational = cSheetView.sec(at: sheetP, scale: rootView.screenToWorldScale,
-                                                       interval: rootView.currentBeatInterval)
                     let scoreView = cSheetView.scoreView
-                    if scoreView.model.enabled, let scoreTrackItem = scoreView.scoreTrackItem {
-                        let scoreP = scoreView.convertFromWorld(p)
+                    let sec: Rational
+                    if scoreView.model.enabled,
+                       let (noteI, pitI) = scoreView.noteAndPitI(at: scoreView.convertFromWorld(p),
+                                                                 scale: scale) {
                         let score = scoreView.model
-                        if let (noteI, pitI) = scoreView.noteAndPitI(at: scoreP, scale: rootView.screenToWorldScale) {
-                            let beat = score.notes[noteI].pits[pitI].beat
-                            + score.notes[noteI].beatRange.start + score.beatRange.start
-                            sec = score.sec(fromBeat: beat)
-                            secRange = score.secRange
-                            ids.insert(scoreTrackItem.id)
-                        } else if scoreView.containsMainLine(scoreP, scale: rootView.screenToWorldScale) {
-                            ids.insert(scoreTrackItem.id)
-                        }
-                        if secRange != nil {
-                            cSheetView.previousSheetView = nil
-                            cSheetView.nextSheetView = nil
-                        }
+                        let beat = score.notes[noteI].pits[pitI].beat
+                        + score.notes[noteI].beatRange.start + score.beatRange.start
+                        sec = score.sec(fromBeat: beat)
+                    } else {
+                        sec = cSheetView.sec(at: sheetP, scale: scale,
+                                             interval: rootView.currentBeatInterval)
                     }
-                    cSheetView.play(atSec: sec, inSec: secRange, otherTimelineIDs: ids)
+                    cSheetView.play(atSec: sec)
                 }
             }
         case .changed:
@@ -786,7 +791,7 @@ final class InsertKeyframeAction: InputKeyEventAction {
                             if iBeat != 0 {
                                 return iBeat
                             } else {
-                                let nextBeat = animation.keyframes[i].containsInterpolated ?
+                                let nextBeat = !animation.keyframes[i].isKey ?
                                 animation.localBeat(at: animation.index(atInter: animation.interIndex(at: i) + 1)) :
                                 animation.localBeat(at: i + 1)
                                 let nb = nextBeat - animation.localBeat(at: i)
@@ -797,13 +802,13 @@ final class InsertKeyframeAction: InputKeyEventAction {
                                 }
                             }
                         } ()
-                        if iBeat != 0 && !animation.keyframes[i].containsInterpolated {
+                        if iBeat != 0 && animation.keyframes[i].isKey {
                             let nBeat = animation.keyframes[i].beat + iBeat
                             let keyframe = Keyframe(beat: nBeat)
                             animationView.selectedFrameIndexes = []
                             sheetView.newUndoGroup(enabledKeyframeIndex: false)
                             sheetView.insert([IndexValue(value: keyframe, index: i + 1)])
-                        } else if animation.keyframes[i].containsInterpolated {
+                        } else if !animation.keyframes[i].isKey {
                             let idivs: [IndexValue<InterOption>] = (0 ..< animation.keyframes[i].picture.lines.count).compactMap {
                                 
                                 let option = animation.keyframes[i].picture.lines[$0].interOption
@@ -1159,7 +1164,7 @@ final class InterpolateAction: InputKeyEventAction {
                     if idSet.contains(line.interOption.id) {
                         interOption = line.interOption
                     } else {
-                        if lineIDSet.contains(ios[$0].id) {
+                        if line.interOption.interType != .none || lineIDSet.contains(ios[$0].id) {
                             return nil
                         }
                         interOption = ios[$0]

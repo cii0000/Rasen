@@ -1223,12 +1223,12 @@ final class IOAction: Action {
                         let b = isMainFrame ? (sheet.mainFrame ?? rendering.bounds) : rendering.bounds
                         
                         let allDurBeat = sheet.allDurBeat
-                        let duration = sheet.animation.sec(fromBeat: allDurBeat == 0 ? 1 : allDurBeat)
+                        let durSec = sheet.animation.sec(fromBeat: allDurBeat == 0 ? 1 : allDurBeat)
                         let frameCount = sheet.animation.count(fromBeat: allDurBeat == 0 ? 1 : allDurBeat,
                                                                frameRate: frameRate)
                         
                         movie.writeMovie(frameCount: frameCount,
-                                         duration: duration,
+                                         duration: durSec,
                                          frameRate: frameRate) { (sec) -> (Image?) in
                             //tempo -> startTime
                             let beat = sheet.animation.beat(fromSec: sec)

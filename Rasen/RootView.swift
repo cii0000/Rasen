@@ -1958,6 +1958,39 @@ final class RootView: View, @unchecked Sendable {
          .init(centerShp.x - 1, centerShp.y - 1),
          .init(centerShp.x - 1, centerShp.y + 1)]
     }
+    func groupSheetPositions(at cp: IntPoint) -> [IntPoint] {
+        guard sheetID(at: cp) != nil else { return [] }
+        var p = cp, ps = [IntPoint]()
+        while sheetID(at: p) != nil { p.x -= 1 }
+        p.x += 1
+        while sheetID(at: p) != nil {
+            ps.append(p)
+            var np = p
+            np.y += 1
+            while sheetID(at: np) != nil {
+                ps.append(np)
+                np.y += 1
+            }
+            np = p
+            np.y -= 1
+            while sheetID(at: np) != nil {
+                ps.append(np)
+                np.y -= 1
+            }
+            
+            p.x += 1
+        }
+        return ps
+    }
+    func groupAndAroundSheetPositions(at cp: IntPoint) -> [IntPoint] {
+        var shps = [cp] + aroundSheetPositions(atCenter: cp)
+        shps = groupSheetPositions(at: cp)
+        if let leshp = lastEditedIntPoint {
+            shps.append(leshp)
+            shps += groupSheetPositions(at: leshp)
+        }
+        return shps
+    }
     
     var cursorSHP = IntPoint()
     var centerSHPs = [IntPoint]()
@@ -1971,13 +2004,15 @@ final class RootView: View, @unchecked Sendable {
         cursorSHP = shp
         var shps = [shp] + aroundSheetPositions(atCenter: shp)
         centerSHPs = shps
+        var groupSheetPs = groupSheetPositions(at: shp)
         if let leshp = lastEditedIntPoint {
             shps.append(leshp)
+            groupSheetPs += groupSheetPositions(at: leshp)
         }
         
         var nshps = sheetViewValues
         let oshps = nshps
-        for shp in shps {
+        for shp in shps + groupSheetPs {
             nshps[shp] = nil
         }
         nshps.forEach { readAndClose(.none, at: $0.value.sheetID, $0.key) }
@@ -2331,37 +2366,6 @@ final class RootView: View, @unchecked Sendable {
         }
         
         return sheetView
-    }
-    
-    func firstAudiotracks(from shp: IntPoint) -> [Audiotrack] {
-        guard let sheetView = sheetViewValue(at: shp)?.sheetView else { return [] }
-        var firstAudiotracks = [Audiotrack]()
-        var nshp = IntPoint((sheetView.previousSheetView != nil ? -2 : -1) + shp.x, shp.y)
-        while true {
-            if let sid = sheetID(at: nshp), let sheet = model.sheet(at: sid) {
-                firstAudiotracks.append(sheet.audiotrack)
-                
-                nshp.x -= 1
-            } else {
-                break
-            }
-        }
-        return firstAudiotracks
-    }
-    func lastAudiotracks(from shp: IntPoint) -> [Audiotrack] {
-        guard let sheetView = sheetViewValue(at: shp)?.sheetView else { return [] }
-        var lastAudiotracks = [Audiotrack]()
-        var nshp = IntPoint((sheetView.nextSheetView != nil ? 2 : 1) + shp.x, shp.y)
-        while true {
-            if let sid = sheetID(at: nshp), let sheet = model.sheet(at: sid) {
-                lastAudiotracks.append(sheet.audiotrack)
-                
-                nshp.x += 1
-            } else {
-                break
-            }
-        }
-        return lastAudiotracks
     }
     
     func sheetPosition(at sid: UUID) -> IntPoint? {

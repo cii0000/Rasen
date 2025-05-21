@@ -3215,9 +3215,20 @@ struct PBNotesValue: Sendable {
 
   var notes: [PBNote] = []
 
+  var deltaPitch: PBRational {
+    get {return _deltaPitch ?? PBRational()}
+    set {_deltaPitch = newValue}
+  }
+  /// Returns true if `deltaPitch` has been explicitly set.
+  var hasDeltaPitch: Bool {return self._deltaPitch != nil}
+  /// Clears the value of `deltaPitch`. Subsequent reads from it will return its default value.
+  mutating func clearDeltaPitch() {self._deltaPitch = nil}
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
+
+  fileprivate var _deltaPitch: PBRational? = nil
 }
 
 struct PBInterOptionsValue: Sendable {
@@ -9286,6 +9297,7 @@ extension PBNotesValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
   static let protoMessageName: String = "PBNotesValue"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "notes"),
+    2: .same(proto: "deltaPitch"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -9295,20 +9307,29 @@ extension PBNotesValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeRepeatedMessageField(value: &self.notes) }()
+      case 2: try { try decoder.decodeSingularMessageField(value: &self._deltaPitch) }()
       default: break
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
+    // The use of inline closures is to circumvent an issue where the compiler
+    // allocates stack space for every if/case branch local when no optimizations
+    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+    // https://github.com/apple/swift-protobuf/issues/1182
     if !self.notes.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.notes, fieldNumber: 1)
     }
+    try { if let v = self._deltaPitch {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 2)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: PBNotesValue, rhs: PBNotesValue) -> Bool {
     if lhs.notes != rhs.notes {return false}
+    if lhs._deltaPitch != rhs._deltaPitch {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

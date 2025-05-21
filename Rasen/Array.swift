@@ -88,6 +88,10 @@ extension RangeReplaceableCollection where Element: Equatable {
     }
 }
 
+struct WeakElement<Element: AnyObject> {
+    weak var element: Element?
+}
+
 extension Sequence {
     func sum<Result>(_ nextPartialResult: (Element) throws -> Result)
     rethrows -> Result where Result: AdditiveArithmetic {

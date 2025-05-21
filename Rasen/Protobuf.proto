@@ -639,6 +639,7 @@ message PBPlanesValue {
 }
 message PBNotesValue {
     repeated PBNote notes = 1;
+    PBRational deltaPitch = 2;
 }
 message PBInterOptionsValue {
     repeated PBInterOption ids = 1;

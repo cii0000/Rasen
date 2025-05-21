@@ -75,13 +75,8 @@ final class RootAction: Action {
         || sheetView.containsOtherTimeline(inP, scale: rootView.screenToWorldScale)
     }
     func isPlaying(with event: any Event) -> Bool {
-        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor ?? event.screenPoint
-        let p = rootView.convertScreenToWorld(sp)
-        if let sheetView = rootView.sheetView(at: p), sheetView.isPlaying {
-            return true
-        }
-        for shp in rootView.aroundSheetPositions(atCenter: rootView.sheetPosition(at: p)) {
-            if let sheetView = rootView.sheetView(at: shp), sheetView.isPlaying {
+        for (_, v) in rootView.sheetViewValues {
+            if v.sheetView?.isPlaying ?? false {
                 return true
             }
         }
@@ -1015,7 +1010,7 @@ final class DraftAction: Action {
                                     sheetView.newUndoGroup()
                                     sheetView.removeDraftNotes(at: nis)
                                     
-                                    Pasteboard.shared.copiedObjects = [.notesValue(.init(notes: notes))]//
+                                    Pasteboard.shared.copiedObjects = [.notesValue(.init(notes: notes, deltaPitch: pitch))]//
                                 }
                             } else {
                                 let line = Line(selection.rect.inset(by: -0.5))
@@ -1053,7 +1048,7 @@ final class DraftAction: Action {
                             sheetView.newUndoGroup()
                             sheetView.removeDraftNotes(at: nis)
                             
-                            Pasteboard.shared.copiedObjects = [.notesValue(.init(notes: notes))]//
+                            Pasteboard.shared.copiedObjects = [.notesValue(.init(notes: notes, deltaPitch: pitch))]//
                         }
                     } else if sheetView.animationView.containsTimeline(inP, scale: rootView.screenToWorldScale),
                        let ki = sheetView.animationView.keyframeIndex(at: inP) {

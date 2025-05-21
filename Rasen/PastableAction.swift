@@ -56,14 +56,17 @@ extension PlanesValue: Protobuf {
 
 struct NotesValue: Codable {
     var notes: [Note]
+    var deltaPitch: Rational
 }
 extension NotesValue: Protobuf {
     init(_ pb: PBNotesValue) throws {
         notes = try pb.notes.map { try Note($0) }
+        deltaPitch = (try? .init(pb.deltaPitch)) ?? 0
     }
     var pb: PBNotesValue {
         .with {
             $0.notes = notes.map { $0.pb }
+            $0.deltaPitch = deltaPitch.pb
         }
     }
 }
@@ -707,7 +710,7 @@ final class PastableAction: Action {
                         nNote.beatRange.start -= beat
                         
                         if isSendPasteboard {
-                            Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [nNote]))]
+                            Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [nNote], deltaPitch: pitch))]
                         }
                         let rects = rootView.isSelectedText ?
                         rootView.selectedFrames :
@@ -742,7 +745,7 @@ final class PastableAction: Action {
                         return note
                     }
                     if isSendPasteboard {
-                        Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: notes))]
+                        Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: notes, deltaPitch: pitch))]
                     }
                     let rects = rootView.isSelectedText ?
                     rootView.selectedFrames :
@@ -1036,7 +1039,7 @@ final class PastableAction: Action {
                 note.beatRange.start -= beat
                 
                 if isSendPasteboard {
-                    Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [note]))]
+                    Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [note], deltaPitch: pitch))]
                 }
                 let lines = [scoreView.pointline(from: score.notes[noteI])]
                     .map { scoreView.convertToWorld($0) }
@@ -1176,7 +1179,7 @@ final class PastableAction: Action {
                 nNote.pitch -= pitch
                 nNote.beatRange.start -= beat
                 
-                Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [nNote]))]
+                Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [nNote], deltaPitch: pitch))]
                 
                 let pitISet = Set(pitIs)
                 var pits = note.pits
@@ -1282,7 +1285,7 @@ final class PastableAction: Action {
                             return note
                         }
                         
-                        Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: notes))]
+                        Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: notes, deltaPitch: pitch))]
                         
                         sheetView.newUndoGroup()
                         sheetView.removeNote(at: nis)
@@ -1445,7 +1448,7 @@ final class PastableAction: Action {
                 note.pitch -= pitch
                 note.beatRange.start -= beat
                 
-                Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [note]))]
+                Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [note], deltaPitch: pitch))]
                 
                 sheetView.newUndoGroup()
                 sheetView.removeNote(at: noteI)
@@ -1527,7 +1530,7 @@ final class PastableAction: Action {
                 note.pitch -= pitch
                 note.beatRange.start -= beat
                 
-                Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [note]))]
+                Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [note], deltaPitch: pitch))]
                 
                 sheetView.newUndoGroup()
                 sheetView.removeNote(at: noteI)
@@ -1633,7 +1636,7 @@ final class PastableAction: Action {
     
     private var oldScale: Double?, firstRotation = 0.0,
                 oldSnapP: Point?, oldFillSnapP: Point?, beganPitch = Rational(0),
-                octaveNode: Node?, beganNotes = [Int: Note](),
+                octaveNode: Node?, beganNotes = [Int: Note](), beganSheetView: SheetView?,
                 textNode: Node?, imageNode: Node?, textFrame: Rect?, textScale = 1.0
     var snapDistance = 1.0
     private var notePlayer: NotePlayer?, playerBeatNoteIndexes = [Int](), oldPitch: Rational?
@@ -2034,7 +2037,7 @@ final class PastableAction: Action {
                     if let imf = imageFrame {
                         rect = imf
                     } else {
-                        let maxSize = Size(width: 100000, height: 100000)
+                        let maxSize = Sheet.defaultBounds.inset(by: Sheet.textPadding).size
                         var size = image.size / 2
                         if size.width > maxSize.width || size.height > maxSize.height {
                             size *= min(maxSize.width / size.width, maxSize.height / size.height)
@@ -2055,8 +2058,11 @@ final class PastableAction: Action {
                 selectingLineNode.children[0].attitude = Attitude(position: p, scale: .init(square: scale))
             }
         }
-        func updateNotes(_ notes: [Note]) {
-            guard let sheetView = rootView.madeSheetView(at: shp) else { return }
+        func updateNotes(_ notes: [Note], deltaPitch: Rational) {
+            if phase == .began {
+                beganSheetView = rootView.madeSheetView(at: shp)
+            }
+            guard let sheetView = beganSheetView else { return }
             let scoreView = sheetView.scoreView
             let scoreP = scoreView.convertFromWorld(p)
             let pitchInterval = rootView.currentPitchInterval
@@ -2088,8 +2094,7 @@ final class PastableAction: Action {
                 }
                 sheetView.append(notes)
                 
-                let octaveNode = scoreView.octaveNode(fromPitch: pitch,
-                                                      noteIs: Array(count ..< count + notes.count),
+                let octaveNode = scoreView.octaveNode(noteIs: Array(count ..< count + notes.count),
                                                       .octave)
                 octaveNode.attitude.position = sheetView.convertToWorld(scoreView.node.attitude.position)
                 self.octaveNode = octaveNode
@@ -2126,8 +2131,7 @@ final class PastableAction: Action {
                 }
                 scoreView.replace(notes.enumerated().map { .init(value: $0.element, index: $0.offset + scoreView.model.notes.count - notes.count) })
                 
-                octaveNode?.children = scoreView.octaveNode(fromPitch: pitch,
-                                                            noteIs: Array(scoreView.model.notes.count - notes.count ..< scoreView.model.notes.count),
+                octaveNode?.children = scoreView.octaveNode(noteIs: Array(scoreView.model.notes.count - notes.count ..< scoreView.model.notes.count),
                                                             .octave).children
                 
                 if pitch != oldPitch {
@@ -2145,7 +2149,7 @@ final class PastableAction: Action {
 //            }
             
             rootView.cursor = .circle(string: Pitch(value: pitch)
-                .octaveString(deltaPitch: pitch - beganPitch))
+                .octaveString(deltaPitch: pitch - deltaPitch))
         }
         
         switch pasteObject {
@@ -2188,7 +2192,7 @@ final class PastableAction: Action {
         case .normalizationRationalValue:
             break
         case .notesValue(let notesValue):
-            updateNotes(notesValue.notes)
+            updateNotes(notesValue.notes, deltaPitch: notesValue.deltaPitch)
         case .stereo:
             break
         case .tone:
@@ -2884,7 +2888,7 @@ final class PastableAction: Action {
             
             var content = Content(directoryName: sheetView.id.uuidString, name: name, origin: nnp)
             if let size = content.image?.size {
-                let maxSize = Size(width: 100000, height: 100000)
+                let maxSize = Sheet.defaultBounds.inset(by: Sheet.textPadding).size
                 var size = size / 2
                 if size.width > maxSize.width || size.height > maxSize.height {
                     size *= min(maxSize.width / size.width, maxSize.height / size.height)
@@ -2931,7 +2935,7 @@ final class PastableAction: Action {
             octaveNode?.removeFromParent()
             octaveNode = nil
             
-            guard let sheetView = rootView.sheetView(at: shp) else { return }
+            guard let sheetView = beganSheetView else { return }
             let scoreView = sheetView.scoreView
             let score = scoreView.model
             var noteIVs = [IndexValue<Note>](), oldNoteIVs = [IndexValue<Note>]()
