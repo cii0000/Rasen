@@ -1708,12 +1708,11 @@ final class SheetView: BindableView, @unchecked Sendable {
     private var playingCaptions = [Caption](),
                 playingCaption: Caption?, playingCaptionNodes = [Node]()
     private var playingSheetIndex = 0
-    private var playingOldBottomKeyframeIndex: Int?,
-                playingOldTopKeyframeIndex: Int?
     var previousSheetViews = [WeakElement<SheetView>]()
     var nextSheetViews = [WeakElement<SheetView>]()
-    weak var bottomSheetView: SheetView?, topSheetView: SheetView?
-    private var bottomNode: Node?, centerNode: Node?, topNode: Node?
+    var bottomSheetViews = [WeakElement<SheetView>]()
+    var topSheetViews = [WeakElement<SheetView>]()
+    private var bottomNodes = [Node](), centerNode: Node?, topNodes = [Node]()
     private var timeNode: Node?
     private(set) var sequencer: Sequencer?
     private var firstSec: Rational?
@@ -1750,11 +1749,11 @@ final class SheetView: BindableView, @unchecked Sendable {
 //            loopCount = model.loopCount
             
             playingOldKeyframeIndex = nil
-            playingOldTopKeyframeIndex = nil
-            playingOldBottomKeyframeIndex = nil
-            bottomNode = nil
+            bottomSheetViews.forEach { $0.element?.playingOldKeyframeIndex = nil }
+            topSheetViews.forEach { $0.element?.playingOldKeyframeIndex = nil }
+            bottomNodes = bottomSheetViews.count.range.map { _ in Node() }
             centerNode = nil
-            topNode = nil
+            topNodes = topSheetViews.count.range.map { _ in Node() }
             
             showOtherTimeNode(atBeat: model.animation.mainBeat)
             
@@ -1798,11 +1797,15 @@ final class SheetView: BindableView, @unchecked Sendable {
                 guard let sheetView = weakElement.element,
                       sheetView.model.enabledTimeline else { continue }
                 var seqTrack = sheetView.sequencerTrack
-                if let aSeqTrack = sheetView.bottomSheetView?.sequencerTrack {
-                    seqTrack += aSeqTrack
+                sheetView.bottomSheetViews.forEach {
+                    if let aSeqTrack = $0.element?.sequencerTrack {
+                        seqTrack += aSeqTrack
+                    }
                 }
-                if let aSeqTrack = sheetView.topSheetView?.sequencerTrack {
-                    seqTrack += aSeqTrack
+                sheetView.topSheetViews.forEach {
+                    if let aSeqTrack = $0.element?.sequencerTrack {
+                        seqTrack += aSeqTrack
+                    }
                 }
                 if sheetView.model.enabledAnimation {
                     seqTrack.scoreTrackItems.append(.init(rendnotes: [], sampleRate: Audio.defaultSampleRate,
@@ -1818,11 +1821,15 @@ final class SheetView: BindableView, @unchecked Sendable {
             
             if model.enabledTimeline {
                 var seqTrack = sequencerTrack
-                if let aSeqTrack = bottomSheetView?.sequencerTrack {
-                    seqTrack += aSeqTrack
+                bottomSheetViews.forEach {
+                    if let aSeqTrack = $0.element?.sequencerTrack {
+                        seqTrack += aSeqTrack
+                    }
                 }
-                if let aSeqTrack = topSheetView?.sequencerTrack {
-                    seqTrack += aSeqTrack
+                topSheetViews.forEach {
+                    if let aSeqTrack = $0.element?.sequencerTrack {
+                        seqTrack += aSeqTrack
+                    }
                 }
                 if model.enabledAnimation {
                     seqTrack.scoreTrackItems.append(.init(rendnotes: [], sampleRate: Audio.defaultSampleRate,
@@ -1840,11 +1847,15 @@ final class SheetView: BindableView, @unchecked Sendable {
                 guard let sheetView = weakElement.element,
                       sheetView.model.enabledTimeline else { continue }
                 var seqTrack = sheetView.sequencerTrack
-                if let aSeqTrack = sheetView.bottomSheetView?.sequencerTrack {
-                    seqTrack += aSeqTrack
+                sheetView.bottomSheetViews.forEach {
+                    if let aSeqTrack = $0.element?.sequencerTrack {
+                        seqTrack += aSeqTrack
+                    }
                 }
-                if let aSeqTrack = sheetView.topSheetView?.sequencerTrack {
-                    seqTrack += aSeqTrack
+                sheetView.topSheetViews.forEach {
+                    if let aSeqTrack = $0.element?.sequencerTrack {
+                        seqTrack += aSeqTrack
+                    }
                 }
                 if sheetView.model.enabledAnimation {
                     seqTrack.scoreTrackItems.append(.init(rendnotes: [], sampleRate: Audio.defaultSampleRate,
@@ -1919,11 +1930,11 @@ final class SheetView: BindableView, @unchecked Sendable {
             playingSheetIndex = 0
             playingSec = nil
             playingOldKeyframeIndex = nil
-            playingOldTopKeyframeIndex = nil
-            playingOldBottomKeyframeIndex = nil
-            bottomNode = nil
+            bottomSheetViews.forEach { $0.element?.playingOldKeyframeIndex = nil }
+            topSheetViews.forEach { $0.element?.playingOldKeyframeIndex = nil }
+            bottomNodes = []
             centerNode = nil
-            topNode = nil
+            topNodes = []
 //            playingCaptions = []
 //            playingCaption = nil
 //            linesView.node.isHidden = false
@@ -1984,17 +1995,21 @@ final class SheetView: BindableView, @unchecked Sendable {
             
             var children = [Node]()
             
-            if let bottomSheetView = sheetView.bottomSheetView {
-                let i = bottomSheetView.model.animation.index(atSec: playingSec)
-                if playingOldBottomKeyframeIndex != i {
-                    bottomNode = bottomSheetView.animationView.elementViews[i].node.clone
-                    playingOldBottomKeyframeIndex = i
+            if !sheetView.bottomSheetViews.isEmpty {
+                for (si, bottomSheetViewE) in sheetView.bottomSheetViews.enumerated() {
+                    guard let bottomSheetView = bottomSheetViewE.element else { continue }
+                    let i = bottomSheetView.model.animation.index(atSec: playingSec)
+                    if bottomSheetView.playingOldKeyframeIndex != i {
+                        if si < bottomNodes.count {
+                            bottomNodes[si]
+                            = bottomSheetView.animationView.elementViews[i].node.clone
+                        }
+                        bottomSheetView.playingOldKeyframeIndex = i
+                    }
                 }
+                children += bottomNodes
             } else {
-                bottomNode = nil
-            }
-            if let bottomNode {
-                children.append(bottomNode)
+                bottomNodes = []
             }
             
             let i = sheetView.model.animation.index(atSec: playingSec)
@@ -2007,18 +2022,21 @@ final class SheetView: BindableView, @unchecked Sendable {
                 children.append(centerNode)
             }
             
-            if let topSheetView = sheetView.topSheetView {
-                let i = topSheetView.model.animation.index(atSec: playingSec)
-                if playingOldTopKeyframeIndex != i {
-                    topNode = topSheetView.animationView
-                        .elementViews[i].node.clone
-                    playingOldTopKeyframeIndex = i
+            if !sheetView.topSheetViews.isEmpty {
+                for (si, topSheetViewE) in sheetView.topSheetViews.enumerated() {
+                    guard let topSheetView = topSheetViewE.element else { continue }
+                    let i = topSheetView.model.animation.index(atSec: playingSec)
+                    if topSheetView.playingOldKeyframeIndex != i {
+                        if si < topNodes.count {
+                            topNodes[si]
+                            = topSheetView.animationView.elementViews[i].node.clone
+                        }
+                        topSheetView.playingOldKeyframeIndex = i
+                    }
                 }
+                children += topNodes
             } else {
-                topNode = nil
-            }
-            if let topNode {
-                children.append(topNode)
+                topNodes = []
             }
             
             if !children.isEmpty {
@@ -2138,8 +2156,16 @@ final class SheetView: BindableView, @unchecked Sendable {
             
             if playingSheetIndex != oldPlayingSheetIndex {
                 playingOldKeyframeIndex = nil
-                playingOldBottomKeyframeIndex = nil
-                playingOldTopKeyframeIndex = nil
+                bottomSheetViews.forEach { $0.element?.playingOldKeyframeIndex = nil }
+                topSheetViews.forEach { $0.element?.playingOldKeyframeIndex = nil }
+                bottomNodes = bottomSheetViews.count.range.map { _ in Node() }
+                topNodes = topSheetViews.count.range.map { _ in Node() }
+                
+                let nSheetView = playingSheetView
+                nSheetView.bottomSheetViews.forEach { $0.element?.playingOldKeyframeIndex = nil }
+                nSheetView.topSheetViews.forEach { $0.element?.playingOldKeyframeIndex = nil }
+                bottomNodes = nSheetView.bottomSheetViews.count.range.map { _ in Node() }
+                topNodes = nSheetView.topSheetViews.count.range.map { _ in Node() }
             }
             
             if playingSecRange != nil || playingSheetIndex <= 0 {

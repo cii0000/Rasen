@@ -1992,6 +1992,30 @@ final class RootView: View, @unchecked Sendable {
         return shps
     }
     
+    struct SheetFramePosition {
+        var shp: IntPoint, frame: Rect
+    }
+    func sheetFramePositions(at p: Point, isUnselect: Bool) -> [SheetFramePosition] {
+        if isSelectSelectedNoneCursor(at: p), !isSelectedText {
+            let vs: [SheetFramePosition] = world.sheetIDs.keys.compactMap { shp in
+                let frame = sheetFrame(with: shp)
+                return multiSelection.intersects(frame) ?
+                    SheetFramePosition(shp: shp, frame: frame) : nil
+            }
+            if isUnselect {
+                selections = []
+            }
+            return vs
+        } else {
+            let shp = sheetPosition(at: p)
+            if sheetID(at: shp) != nil {
+                return [.init(shp: shp, frame: sheetFrame(with: shp))]
+            } else {
+                return []
+            }
+        }
+    }
+    
     var cursorSHP = IntPoint()
     var centerSHPs = [IntPoint]()
     func updateWithCursorPosition() {

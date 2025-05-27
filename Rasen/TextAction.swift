@@ -1074,13 +1074,6 @@ final class TextAction: InputTextEventAction {
         editingSheetView = sheetView
         textView.removeCharacters(in: removeRange)
         textView.unmark()
-        let sb = sheetView.bounds.inset(by: Sheet.textPadding)
-        if let textFrame = textView.model.frame,
-           !sb.contains(textFrame) {
-           
-            let nFrame = sb.clipped(textFrame)
-            textView.model.origin += nFrame.origin - textFrame.origin
-        }
         if let value = captureString.difference(to: textView.model.string) {
             sheetView.newUndoGroup()
             sheetView.capture(intRange: value.intRange,

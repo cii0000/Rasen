@@ -598,12 +598,21 @@ final class PlayAction: InputKeyEventAction {
                 while let aSheetView = sheetView(at: ncShp) {
                     psvs.append(.init(element: aSheetView))
                     
-                    if let aaSheetView = sheetView(at: .init(ncShp.x, ncShp.y - 1)) {
-                        aSheetView.bottomSheetView = aaSheetView
+                    var nncShp = ncShp, npsvs = [WeakElement<SheetView>]()
+                    nncShp.y -= 1
+                    while let aaSheetView = sheetView(at: nncShp) {
+                        npsvs.append(.init(element: aaSheetView))
+                        nncShp.y -= 1
                     }
-                    if let aaSheetView = sheetView(at: .init(ncShp.x, ncShp.y + 1)) {
-                        aSheetView.topSheetView = aaSheetView
+                    aSheetView.bottomSheetViews = npsvs.reversed()
+                    nncShp = ncShp
+                    npsvs = []
+                    nncShp.y += 1
+                    while let aaSheetView = sheetView(at: nncShp) {
+                        npsvs.append(.init(element: aaSheetView))
+                        nncShp.y += 1
                     }
+                    aSheetView.topSheetViews = npsvs
                     
                     ncShp.x -= 1
                 }
@@ -615,23 +624,41 @@ final class PlayAction: InputKeyEventAction {
                 while let aSheetView = sheetView(at: ncShp) {
                     nsvs.append(.init(element: aSheetView))
                     
-                    if let aaSheetView = sheetView(at: .init(ncShp.x, ncShp.y - 1)) {
-                        aSheetView.bottomSheetView = aaSheetView
+                    var nncShp = ncShp, npsvs = [WeakElement<SheetView>]()
+                    nncShp.y -= 1
+                    while let aaSheetView = sheetView(at: nncShp) {
+                        npsvs.append(.init(element: aaSheetView))
+                        nncShp.y -= 1
                     }
-                    if let aaSheetView = sheetView(at: .init(ncShp.x, ncShp.y + 1)) {
-                        aSheetView.topSheetView = aaSheetView
+                    aSheetView.bottomSheetViews = npsvs.reversed()
+                    nncShp = ncShp
+                    npsvs = []
+                    nncShp.y += 1
+                    while let aaSheetView = sheetView(at: nncShp) {
+                        npsvs.append(.init(element: aaSheetView))
+                        nncShp.y += 1
                     }
+                    aSheetView.topSheetViews = npsvs
                     
                     ncShp.x += 1
                 }
                 cSheetView.nextSheetViews = nsvs
                 
-                if let aSheetView = sheetView(at: .init(cShp.x, cShp.y - 1)) {
-                    cSheetView.bottomSheetView = aSheetView
+                var nncShp = cShp, npsvs = [WeakElement<SheetView>]()
+                nncShp.y -= 1
+                while let aaSheetView = sheetView(at: nncShp) {
+                    npsvs.append(.init(element: aaSheetView))
+                    nncShp.y -= 1
                 }
-                if let aSheetView = sheetView(at: .init(cShp.x, cShp.y + 1)) {
-                    cSheetView.topSheetView = aSheetView
+                cSheetView.bottomSheetViews = npsvs.reversed()
+                nncShp = cShp
+                npsvs = []
+                nncShp.y += 1
+                while let aaSheetView = sheetView(at: nncShp) {
+                    npsvs.append(.init(element: aaSheetView))
+                    nncShp.y += 1
                 }
+                cSheetView.topSheetViews = npsvs
                 
                 let scale = rootView.screenToWorldScale
                 let sheetP = cSheetView.convertFromWorld(p)

@@ -26,6 +26,7 @@ final class MoveAction: DragEventAction {
     }
     
     enum MoveType {
+        case sheets(MoveSheetsAction)
         case animation(MoveAnimationAction)
         case sheet(MoveSheetAction)
         case line(MoveLineAction)
@@ -39,6 +40,7 @@ final class MoveAction: DragEventAction {
     
     func updateNode() {
         switch type {
+        case .sheets(let action): action.updateNode()
         case .animation(let action): action.updateNode()
         case .sheet(let action): action.updateNode()
         case .line(let action): action.updateNode()
@@ -55,30 +57,33 @@ final class MoveAction: DragEventAction {
             let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor ?? event.screenPoint
             let p = rootView.convertScreenToWorld(sp)
             
-            if let sheetView = rootView.sheetView(at: p) {
+            if !rootView.isEditingSheet {
+                type = .sheets(MoveSheetsAction(rootAction))
+            } else if let sheetView = rootView.sheetView(at: p) {
                 let sheetP = sheetView.convertFromWorld(p)
-                if sheetView.containsTempo(sheetP, maxDistance: rootView.worldKnobEditDistance * 0.5) {
+                if rootView.isSelect(at: p) {
+                    type = .sheet(MoveSheetAction(rootAction))
+                } else if sheetView.lineTuple(at: sheetP,
+                                              scale: rootView.screenToWorldScale) != nil {
+                    type = .line(MoveLineAction(rootAction))
+                } else if sheetView.textIndex(at: sheetP, scale: rootView.screenToWorldScale) != nil {
+                    type = .text(MoveTextAction(rootAction))
+                } else if sheetView.contentIndex(at: sheetP, scale: rootView.screenToWorldScale) != nil {
+                    type = .content(MoveContentAction(rootAction))
+                } else if sheetView.containsTempo(sheetP, maxDistance: rootView.worldKnobEditDistance * 0.5) {
                     type = .tempo(MoveTempoAction(rootAction))
                 } else if sheetView.animationView.containsTimeline(sheetP, scale: rootView.screenToWorldScale) {
                     type = .animation(MoveAnimationAction(rootAction))
                 } else if sheetView.scoreView.contains(sheetView.scoreView.convertFromWorld(p),
                                                        scale: rootView.screenToWorldScale) {
                     type = .score(MoveScoreAction(rootAction))
-                } else if rootView.isSelect(at: p) {
-                    type = .sheet(MoveSheetAction(rootAction))
-                } else if sheetView.textIndex(at: sheetP, scale: rootView.screenToWorldScale) != nil {
-                    type = .text(MoveTextAction(rootAction))
-                } else if sheetView.contentIndex(at: sheetP, scale: rootView.screenToWorldScale) != nil {
-                    type = .content(MoveContentAction(rootAction))
-                } else if sheetView.lineTuple(at: sheetP,
-                                              isSmall: false,
-                                              scale: rootView.screenToWorldScale) != nil {
-                    type = .line(MoveLineAction(rootAction))
                 }
             }
         }
         
         switch type {
+        case .sheets(let action):
+            action.flow(with: event)
         case .animation(let action):
             action.flow(with: event)
         case .sheet(let action):
@@ -101,6 +106,152 @@ final class MoveAction: DragEventAction {
             case .ended:
                 rootView.cursor = rootView.defaultCursor
             }
+        }
+    }
+}
+
+final class MoveSheetsAction: DragEventAction {
+    let rootAction: RootAction, rootView: RootView
+    
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
+    }
+    
+    private var contentView: SheetContentView? {
+        guard let sheetView, let contentI,
+              contentI < sheetView.contentsView.elementViews.count else { return nil }
+        return sheetView.contentsView.elementViews[contentI]
+    }
+    private var beganContentBeat: Rational = 0, oldContentBeat: Rational = 0
+    private let indexInterval = 10.0
+    private var oldDeltaI: Int?
+    
+    private var sheetView: SheetView?, contentI: Int?, beganContent: Content?
+    private var beganSP = Point(), beganInP = Point(), beganContentEndP = Point()
+    
+    private var beganIsShownSpectrogram = false
+    var pasteSheetNode = Node(), selectingLineNode = Node(), firstScale = 1.0
+    var editingSP = Point(), editingP = Point()
+    var csv = CopiedSheetsValue(), isNewUndoGroup = false
+    func flow(with event: DragEvent) {
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
+            ?? event.screenPoint
+        switch event.phase {
+        case .began:
+            rootView.cursor = .arrow
+            
+            if rootAction.isPlaying(with: event) {
+                rootAction.stopPlaying(with: event)
+            }
+            
+            let p = rootView.convertScreenToWorld(sp)
+            let vs = rootView.sheetFramePositions(at: p, isUnselect: true)
+            var csv = CopiedSheetsValue()
+            for value in vs {
+                if let sid = rootView.sheetID(at: value.shp) {
+                    csv.sheetIDs[value.shp] = sid
+                }
+            }
+            if !csv.sheetIDs.isEmpty {
+                csv.deltaPoint = p
+            }
+            self.csv = csv
+            if !vs.isEmpty {
+                let shps = vs.map { $0.shp }
+                rootView.cursorPoint = sp
+                rootView.close(from: shps)
+                isNewUndoGroup = true
+                rootView.newUndoGroup()
+                rootView.removeSheets(at: shps)
+            }
+            
+            firstScale = rootView.worldToScreenScale
+            editingSP = sp
+            editingP = rootView.convertScreenToWorld(sp)
+            selectingLineNode.fillType = .color(.subSelected)
+            selectingLineNode.lineType = .color(.selected)
+            selectingLineNode.lineWidth = rootView.worldLineWidth
+            
+            rootView.node.append(child: selectingLineNode)
+            rootView.node.append(child: pasteSheetNode)
+            
+            updateWithPasteSheet(at: sp, phase: event.phase)
+        case .changed:
+            updateWithPasteSheet(at: sp, phase: event.phase)
+        case .ended:
+            pasteSheet(at: sp)
+            selectingLineNode.removeFromParent()
+            pasteSheetNode.removeFromParent()
+            
+            rootView.updateSelects()
+            rootView.updateWithFinding()
+            
+            rootView.cursor = rootView.defaultCursor
+        }
+    }
+    func updateWithPasteSheet(at sp: Point, phase: Phase) {
+        let lw = Line.defaultLineWidth / rootView.worldToScreenScale
+        pasteSheetNode.children = csv.sheetIDs.map {
+            let fillType = rootView.readFillType(at: $0.value)
+                ?? .color(.disabled)
+            
+            let sf = rootView.sheetFrame(with: $0.key)
+            return Node(attitude: Attitude(position: sf.origin),
+                        path: Path(Rect(size: sf.size)),
+                        lineWidth: lw,
+                        lineType: .color(.selected), fillType: fillType)
+        }
+        
+        let p = rootView.convertScreenToWorld(sp)
+        var children = [Node]()
+        for (shp, _) in csv.sheetIDs {
+            var sf = rootView.sheetFrame(with: shp)
+            sf.origin += p - csv.deltaPoint
+            let nshp = rootView.sheetPosition(at: Point(Sheet.width / 2, Sheet.height / 2) + sf.origin)
+            let nsf = Rect(origin: rootView.sheetFrame(with: nshp).origin,
+                          size: sf.size)
+            let lw = Line.defaultLineWidth / rootView.worldToScreenScale
+            children.append(Node(attitude: Attitude(position: nsf.origin),
+                                 path: Path(Rect(size: nsf.size)),
+                                 lineWidth: lw,
+                                 lineType: selectingLineNode.lineType,
+                                 fillType: selectingLineNode.fillType))
+        }
+        selectingLineNode.children = children
+        
+        pasteSheetNode.attitude.position = p - csv.deltaPoint
+    }
+    func pasteSheet(at sp: Point) {
+        rootView.cursorPoint = sp
+        let p = rootView.convertScreenToWorld(sp)
+        var nIndexes = [IntPoint: UUID]()
+        var removeIndexes = [IntPoint]()
+        for (shp, sid) in csv.sheetIDs {
+            var sf = rootView.sheetFrame(with: shp)
+            sf.origin += p - csv.deltaPoint
+            let nshp = rootView.sheetPosition(at: Point(Sheet.width / 2, Sheet.height / 2) + sf.origin)
+            
+            if rootView.sheetID(at: nshp) != nil {
+                removeIndexes.append(nshp)
+            }
+            if rootView.sheetPosition(at: sid) != nil {
+                nIndexes[nshp] = rootView.duplicateSheet(from: sid)
+            } else {
+                nIndexes[nshp] = sid
+            }
+        }
+        if !removeIndexes.isEmpty || !nIndexes.isEmpty {
+            if !isNewUndoGroup {
+                rootView.newUndoGroup()
+            }
+            if !removeIndexes.isEmpty {
+                rootView.removeSheets(at: removeIndexes)
+            }
+            if !nIndexes.isEmpty {
+                rootView.append(nIndexes)
+            }
+            rootView.updateNode()
         }
     }
 }

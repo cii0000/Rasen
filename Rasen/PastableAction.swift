@@ -3250,32 +3250,7 @@ final class PastableAction: Action {
         }
     }
     
-    struct Value {
-        var shp: IntPoint, frame: Rect
-    }
-    func values(at p: Point, isCut: Bool) -> [Value] {
-        if rootView.isSelectSelectedNoneCursor(at: p), !rootView.isSelectedText {
-            let vs: [Value] = rootView.world.sheetIDs.keys.compactMap { shp in
-                let frame = rootView.sheetFrame(with: shp)
-                return rootView.multiSelection.intersects(frame) ?
-                    Value(shp: shp, frame: frame) : nil
-            }
-            if isCut {
-                rootView.selections = []
-            }
-            return vs
-        } else {
-            let shp = rootView.sheetPosition(at: p)
-            if rootView.sheetID(at: shp) != nil {
-                return [Value(shp: shp,
-                              frame: rootView.sheetFrame(with: shp))]
-            } else {
-                return []
-            }
-        }
-    }
-    
-    func updateWithCopySheet(at dp: Point, from values: [Value]) {
+    func updateWithCopySheet(at dp: Point, from values: [RootView.SheetFramePosition]) {
         var csv = CopiedSheetsValue()
         for value in values {
             if let sid = rootView.sheetID(at: value.shp) {
@@ -3368,7 +3343,7 @@ final class PastableAction: Action {
             editingSP = sp
             editingP = rootView.convertScreenToWorld(sp)
             let p = rootView.convertScreenToWorld(sp)
-            let values = self.values(at: p, isCut: true)
+            let values = rootView.sheetFramePositions(at: p, isUnselect: true)
             updateWithCopySheet(at: p, from: values)
             if !values.isEmpty {
                 let shps = values.map { $0.shp }
@@ -3402,7 +3377,7 @@ final class PastableAction: Action {
             selectingLineNode.lineWidth = rootView.worldLineWidth
             
             let p = rootView.convertScreenToWorld(sp)
-            let values = self.values(at: p, isCut: false)
+            let values = rootView.sheetFramePositions(at: p, isUnselect: false)
             selectingLineNode.children = values.map {
                 let sf = $0.frame
                 return Node(attitude: Attitude(position: sf.origin),
