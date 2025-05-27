@@ -61,7 +61,9 @@ final class MoveAction: DragEventAction {
                 type = .sheets(MoveSheetsAction(rootAction))
             } else if let sheetView = rootView.sheetView(at: p) {
                 let sheetP = sheetView.convertFromWorld(p)
-                if rootView.isSelect(at: p) {
+                if rootView.isSelect(at: p)
+                    && !sheetView.scoreView.containsNote(sheetView.scoreView.convertFromWorld(p),
+                                                         scale: rootView.screenToWorldScale) {
                     type = .sheet(MoveSheetAction(rootAction))
                 } else if sheetView.lineTuple(at: sheetP,
                                               scale: rootView.screenToWorldScale) != nil {
