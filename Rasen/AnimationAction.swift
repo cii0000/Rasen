@@ -955,6 +955,8 @@ final class InsertKeyframeAction: InputKeyEventAction {
                     sheetView.newUndoGroup(enabledKeyframeIndex: false)
                     sheetView.set(beat: 0, at: 0)
                     var option = sheetView.model.animation.option
+                    option.timelineY = inP.y.clipped(min: Sheet.timelineY,
+                                                     max: Sheet.height - Sheet.timelineY)
                     option.enabled = true
                     sheetView.set(option)
                 }

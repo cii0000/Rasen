@@ -96,7 +96,6 @@ final class LookUpAction: InputKeyEventAction {
         }
     }
     func show(for p: Point) {
-        let d = 5 / rootView.worldToScreenScale
         if !rootView.isEditingSheet {
             if let sid = rootView.sheetID(at: rootView.sheetPosition(at: p)),
                let recoder = rootView.model.sheetRecorders[sid],
@@ -167,9 +166,9 @@ final class LookUpAction: InputKeyEventAction {
                     rootView.show("No selection".localized, at: p)
                 }
             }
-        } else if let (_, _) = rootView.worldBorder(at: p, distance: d) {
+        } else if let (_, _) = rootView.worldBorder(at: p) {
             rootView.show("Border".localized, at: p)
-        } else if let (_, _, _) = rootView.border(at: p, distance: d) {
+        } else if let (_, _, _, _) = rootView.border(at: p) {
             rootView.show("Border".localized, at: p)
         } else if let sheetView = rootView.sheetView(at: p),
                   let lineView = sheetView.lineTuple(at: sheetView.convertFromWorld(p), scale: 1 / rootView.worldToScreenScale)?.lineView {

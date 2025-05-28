@@ -4077,6 +4077,15 @@ final class SheetView: BindableView, @unchecked Sendable {
         append(undo: undoItem, redo: redoItem)
         set(redoItem)
     }
+    func capture(_ border: Border, old oldBorder: Border, at i: Int) {
+        let undoItem1 = SheetUndoItem.insertBorders([IndexValue(value: oldBorder, index: i)])
+        let redoItem1 = SheetUndoItem.removeBorders(borderIndexes: [i])
+        append(undo: undoItem1, redo: redoItem1)
+        
+        let undoItem0 = SheetUndoItem.removeBorders(borderIndexes: [i])
+        let redoItem0 = SheetUndoItem.insertBorders([IndexValue(value: border, index: i)])
+        append(undo: undoItem0, redo: redoItem0)
+    }
     
     func insert(_ kivs: [IndexValue<Keyframe>]) {
         let undoItem = SheetUndoItem.removeKeyframes(keyframeIndexes: kivs.map { $0.index })
@@ -6204,7 +6213,7 @@ final class SheetView: BindableView, @unchecked Sendable {
                     return (linesView.elementViews[i], i)
                 }
             } else {
-                let nd = isSmall ? (line.size / 2 + ds) / 4 : line.size / 2 + ds * 5
+                let nd = isSmall ? (line.size / 2 + ds) / 8 : line.size / 2 + ds * 5
                 let ldSquared = nd * nd
                 let dSquared = line.minDistanceSquared(at: p)
                 if dSquared < minDSquared && dSquared < ldSquared {

@@ -1298,7 +1298,11 @@ final class AddScoreAction: InputKeyEventAction {
             
             if let sheetView = rootView.madeSheetView(at: p) {
                 let inP = sheetView.convertFromWorld(p)
+                let ph = Sheet.pitchHeight * .init(Score.pitchRange.length)
+                + Sheet.isShownSpectrogramHeight
                 let option = ScoreOption(tempo: sheetView.nearestTempo(at: inP) ?? Music.defaultTempo,
+                                         timelineY: inP.y.clipped(min: Sheet.timelineY,
+                                                                  max: Sheet.height - Sheet.timelineY - ph),
                                          enabled: true)
                 
                 sheetView.newUndoGroup()

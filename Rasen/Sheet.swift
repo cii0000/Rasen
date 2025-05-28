@@ -2562,4 +2562,53 @@ extension Sheet {
         }
         self.init(texts: [text])
     }
+    
+    static func snappableBorderLocations(from orientation: Orientation,
+                                         with sb: Rect) -> [Double] {
+        switch orientation {
+        case .horizontal:
+             [204, sb.height - 204,
+              217, sb.height - 217,
+              230, sb.height - 230,
+              243, sb.height - 243,
+              (1 * sb.height / 4).rounded(),
+              (2 * sb.height / 4).rounded(),
+              (3 * sb.height / 4).rounded()].sorted()
+        case .vertical:
+             [48, sb.width - 48,
+              (1 * sb.width / 4).rounded(),
+              (2 * sb.width / 4).rounded(),
+              (3 * sb.width / 4).rounded()].sorted()
+        }
+    }
+    static func borderSnappedPoint(_ p: Point, with sb: Rect, distance d: Double,
+                                   oldBorder: Border) -> (isSnapped: Bool,
+                                                          point: Point) {
+        func snapped(_ v: Double, values: [Double]) -> (Bool, Double) {
+            for value in values {
+                if v > value - d && v < value + d {
+                    return (true, value)
+                }
+            }
+            if oldBorder.location != 0 {
+                let value = oldBorder.location
+                if v > value - d && v < value + d {
+                    return (true, value)
+                }
+            }
+            return (false, v)
+        }
+        switch oldBorder.orientation {
+        case .horizontal:
+            let values = snappableBorderLocations(from: oldBorder.orientation,
+                                                  with: sb)
+            let (iss, y) = snapped(p.y, values: values)
+            return (iss, Point(p.x, y).rounded())
+        case .vertical:
+            let values = snappableBorderLocations(from: oldBorder.orientation,
+                                                  with: sb)
+            let (iss, x) = snapped(p.x, values: values)
+            return (iss, Point(x, p.y).rounded())
+        }
+    }
 }

@@ -2808,8 +2808,8 @@ final class RootView: View, @unchecked Sendable {
         }
     }
     
-    func worldBorder(at p: Point,
-                     distance d: Double) -> (border: Border, edge: Edge)? {
+    func worldBorder(at p: Point) -> (border: Border, edge: Edge)? {
+        let d = 5 * screenToWorldScale
         let shp = sheetPosition(at: p)
         let b = sheetFrame(with: shp)
         let topEdge = b.topEdge
@@ -2830,8 +2830,9 @@ final class RootView: View, @unchecked Sendable {
         }
         return nil
     }
-    func border(at p: Point,
-                distance d: Double) -> (border: Border, index: Int, edge: Edge)? {
+    func border(at p: Point) -> (border: Border, index: Int,
+                                 sheetView: SheetView, edge: Edge)? {
+        let d = 5 * screenToWorldScale
         let shp = sheetPosition(at: p)
         guard let sheetView = sheetView(at: shp) else { return nil }
         let b = sheetFrame(with: shp)
@@ -2840,13 +2841,13 @@ final class RootView: View, @unchecked Sendable {
             switch border.orientation {
             case .horizontal:
                 if abs(inP.y - border.location) < d {
-                    return (border, i,
+                    return (border, i, sheetView,
                             Edge(Point(0, border.location) + b.origin,
                                  Point(b.width, border.location) + b.origin))
                 }
             case .vertical:
                 if abs(inP.x - border.location) < d {
-                    return (border, i,
+                    return (border, i, sheetView,
                             Edge(Point(border.location, 0) + b.origin,
                                  Point(border.location, b.height) + b.origin))
                 }

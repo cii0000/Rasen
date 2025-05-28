@@ -593,59 +593,8 @@ final class PastableAction: Action {
         }
     }
     
-    func snappableBorderLocations(from orientation: Orientation,
-                                  with sb: Rect) -> [Double] {
-        switch orientation {
-        case .horizontal:
-             [204, sb.height - 204,
-              217, sb.height - 217,
-              230, sb.height - 230,
-              243, sb.height - 243,
-              (1 * sb.height / 4).rounded(),
-              (2 * sb.height / 4).rounded(),
-              (3 * sb.height / 4).rounded()].sorted()
-        case .vertical:
-             [48, sb.width - 48,
-              (1 * sb.width / 4).rounded(),
-              (2 * sb.width / 4).rounded(),
-              (3 * sb.width / 4).rounded()].sorted()
-        }
-    }
-    func borderSnappedPoint(_ p: Point, with sb: Rect, distance d: Double,
-                            oldBorder: Border) -> (isSnapped: Bool,
-                                                   point: Point) {
-        func snapped(_ v: Double, values: [Double]) -> (Bool, Double) {
-            for value in values {
-                if v > value - d && v < value + d {
-                    return (true, value)
-                }
-            }
-            if oldBorder.location != 0 {
-                let value = oldBorder.location
-                if v > value - d && v < value + d {
-                    return (true, value)
-                }
-            }
-            return (false, v)
-        }
-        switch oldBorder.orientation {
-        case .horizontal:
-            let values = snappableBorderLocations(from: oldBorder.orientation,
-                                                  with: sb)
-            let (iss, y) = snapped(p.y, values: values)
-            return (iss, Point(p.x, y).rounded())
-        case .vertical:
-            let values = snappableBorderLocations(from: oldBorder.orientation,
-                                                  with: sb)
-            let (iss, x) = snapped(p.x, values: values)
-            return (iss, Point(x, p.y).rounded())
-        }
-    }
-    
     @discardableResult
     func updateWithCopy(for p: Point, isSendPasteboard: Bool, isCutColor: Bool) -> Bool {
-        let d = 5 / rootView.worldToScreenScale
-        
         if let sheetView = rootView.sheetView(at: p),
            sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p), scale: rootView.screenToWorldScale),
            let ki = sheetView.animationView.keyframeIndex(at: sheetView.convertFromWorld(p)) {
@@ -1078,7 +1027,7 @@ final class PastableAction: Action {
                     return true
                 }
             }
-        } else if let (sBorder, edge) = rootView.worldBorder(at: p, distance: d) {
+        } else if let (sBorder, edge) = rootView.worldBorder(at: p) {
             if isSendPasteboard {
                 Pasteboard.shared.copiedObjects = [.border(sBorder)]
             }
@@ -1087,7 +1036,7 @@ final class PastableAction: Action {
             selectingLineNode.lineWidth = rootView.worldLineWidth
             selectingLineNode.path = Path([Pathline([edge.p0, edge.p1])])
             return true
-        } else if let (border, _, edge) = rootView.border(at: p, distance: d) {
+        } else if let (border, _, _, edge) = rootView.border(at: p) {
             if isSendPasteboard {
                 Pasteboard.shared.copiedObjects = [.border(border)]
             }
@@ -1149,8 +1098,6 @@ final class PastableAction: Action {
     
     @discardableResult
     func cut(at p: Point) -> Bool {
-        let d = 5 / rootView.worldToScreenScale
-        
         func cutPit(fromPit pitIs: [Int], at noteI: Int,
                     from scoreView: ScoreView, _ sheetView: SheetView) -> Bool {
             let note = scoreView.model.notes[noteI]
@@ -1573,9 +1520,7 @@ final class PastableAction: Action {
                     }
                 }
             }
-        } else if let (border, i, edge) = rootView.border(at: p, distance: d),
-                  let sheetView = rootView.sheetView(at: p) {
-            
+        } else if let (border, i, sheetView, edge) = rootView.border(at: p) {
             Pasteboard.shared.copiedObjects = [.border(border)]
             
             selectingLineNode.path = Path([Pathline([edge.p0, edge.p1])])
@@ -1905,8 +1850,8 @@ final class PastableAction: Action {
             }
             
             var paths = [Path]()
-            let values = snappableBorderLocations(from: oldBorder.orientation,
-                                                  with: sheetFrame)
+            let values = Sheet.snappableBorderLocations(from: oldBorder.orientation,
+                                                        with: sheetFrame)
             switch oldBorder.orientation {
             case .horizontal:
                 func append(_ p0: Point, _ p1: Point, lw: Double) {
@@ -1936,9 +1881,9 @@ final class PastableAction: Action {
             }
             
             let inP = p - sheetFrame.origin
-            let bnp = borderSnappedPoint(inP, with: sheetFrame,
-                                         distance: 3 / rootView.worldToScreenScale,
-                                         oldBorder: oldBorder)
+            let bnp = Sheet.borderSnappedPoint(inP, with: sheetFrame,
+                                               distance: 3 / rootView.worldToScreenScale,
+                                               oldBorder: oldBorder)
             isSnapped = bnp.isSnapped
             let np = bnp.point + sheetFrame.origin
             var nBorder = oldBorder
@@ -2686,9 +2631,9 @@ final class PastableAction: Action {
             } else if let sheetView = rootView.madeSheetView(at: shp) {
                 let sb = rootView.sheetFrame(with: shp)
                 let inP = sheetView.convertFromWorld(p)
-                let np = borderSnappedPoint(inP, with: sb,
-                                            distance: 3 / rootView.worldToScreenScale,
-                                            oldBorder: border).point
+                let np = Sheet.borderSnappedPoint(inP, with: sb,
+                                                  distance: 3 / rootView.worldToScreenScale,
+                                                  oldBorder: border).point
                 sheetView.newUndoGroup()
                 sheetView.append(Border(position: np, border: border))
             }

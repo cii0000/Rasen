@@ -34,6 +34,7 @@ final class MoveAction: DragEventAction {
         case content(MoveContentAction)
         case text(MoveTextAction)
         case tempo(MoveTempoAction)
+        case border(MoveBorderAction)
         case none
     }
     private var type = MoveType.none
@@ -48,6 +49,7 @@ final class MoveAction: DragEventAction {
         case .content(let action): action.updateNode()
         case .text(let action): action.updateNode()
         case .tempo(let action): action.updateNode()
+        case .border(let action): action.updateNode()
         case .none: break
         }
     }
@@ -79,6 +81,8 @@ final class MoveAction: DragEventAction {
                 } else if sheetView.scoreView.contains(sheetView.scoreView.convertFromWorld(p),
                                                        scale: rootView.screenToWorldScale) {
                     type = .score(MoveScoreAction(rootAction))
+                } else if rootView.border(at: p) != nil {
+                    type = .border(MoveBorderAction(rootAction))
                 }
             }
         }
@@ -99,6 +103,8 @@ final class MoveAction: DragEventAction {
         case .text(let action):
             action.flow(with: event)
         case .tempo(let action):
+            action.flow(with: event)
+        case .border(let action):
             action.flow(with: event)
         case .none:
             switch event.phase {
@@ -2389,6 +2395,165 @@ final class MoveLineZAction: DragEventAction {
                 }
             }
 
+            rootView.cursor = rootView.defaultCursor
+        }
+    }
+}
+
+final class MoveBorderAction: DragEventAction {
+    let rootAction: RootAction, rootView: RootView
+    let isEditingSheet: Bool
+    
+    func updateNode() {
+        if snapLineNode.children.isEmpty {
+            snapLineNode.lineWidth = rootView.worldLineWidth
+        } else {
+            let w = rootView.worldLineWidth
+            for node in snapLineNode.children {
+                node.lineWidth = w
+            }
+        }
+    }
+    
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
+        isEditingSheet = rootView.isEditingSheet
+    }
+    
+    private var sheetView: SheetView?, borderI: Int?, beganBorder: Border?
+    private var beganSP = Point(), beganInP = Point(),
+                shp = IntPoint(), snapLineNode = Node()
+    
+    private var isSnapped = false {
+        didSet {
+            guard isSnapped != oldValue else { return }
+            if isSnapped {
+                Feedback.performAlignment()
+            }
+        }
+    }
+    
+    func flow(with event: DragEvent) {
+        guard isEditingSheet else {
+            rootAction.keepOut(with: event)
+            return
+        }
+        let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor
+            ?? event.screenPoint
+        let p = rootView.convertScreenToWorld(sp)
+        switch event.phase {
+        case .began:
+            rootView.cursor = .arrow
+            
+            if let (border, i, sheetView, _) = rootView.border(at: p),
+            let shp = rootView.sheetPosition(from: sheetView) {
+                
+                let sheetP = sheetView.convertFromWorld(p)
+                beganSP = sp
+                beganInP = sheetP
+                self.sheetView = sheetView
+                beganBorder = border
+                borderI = i
+                
+                self.shp = shp
+                
+                snapLineNode.lineType = .color(.subBorder)
+                rootView.node.append(child: snapLineNode)
+            }
+        case .changed:
+            if let sheetView, let borderI, borderI < sheetView.bordersView.elementViews.count,
+               let oldBorder = beganBorder {
+               
+                let lw = rootView.screenToWorldScale < 0.5 ? rootView.screenToWorldScale * 2 : 1
+                snapLineNode.lineWidth = lw
+                
+                let sheetFrame = rootView.sheetFrame(with: shp)
+                var paths = [Path]()
+                let values = Sheet.snappableBorderLocations(from: oldBorder.orientation,
+                                                            with: sheetFrame)
+                switch oldBorder.orientation {
+                case .horizontal:
+                    func append(_ p0: Point, _ p1: Point, lw: Double) {
+                        paths.append(Path(Rect(x: p0.x, y: p0.y - lw / 2,
+                                               width: p1.x - p0.x, height: lw)))
+                    }
+                    for value in values {
+                        append(Point(sheetFrame.minX, sheetFrame.minY + value),
+                               Point(sheetFrame.maxX, sheetFrame.minY + value), lw: lw * 1.5)
+                    }
+                    append(Point(sheetFrame.minX, sheetFrame.minY + oldBorder.location),
+                           Point(sheetFrame.maxX, sheetFrame.minY + oldBorder.location), lw: lw * 0.5)
+                case .vertical:
+                    func append(_ p0: Point, _ p1: Point, lw: Double) {
+                        paths.append(Path(Rect(x: p0.x - lw / 2, y: p0.y,
+                                               width: lw, height: p1.y - p0.y)))
+                    }
+                    for value in values {
+                        append(Point(sheetFrame.minX + value, sheetFrame.minY),
+                               Point(sheetFrame.minX + value, sheetFrame.maxY), lw: lw * 1.5)
+                    }
+                    append(Point(sheetFrame.minX + oldBorder.location, sheetFrame.minY),
+                           Point(sheetFrame.minX + oldBorder.location, sheetFrame.maxY), lw: lw * 0.5)
+                }
+                snapLineNode.children = paths.map {
+                    Node(path: $0, fillType: .color(.subSelected))
+                }
+                
+                let inP = p - sheetFrame.origin
+                let bnp = Sheet.borderSnappedPoint(inP, with: sheetFrame,
+                                                   distance: 3 / rootView.worldToScreenScale,
+                                                   oldBorder: oldBorder)
+                isSnapped = bnp.isSnapped
+                
+                let borderView = sheetView.bordersView.elementViews[borderI]
+                
+                let np = bnp.point + sheetFrame.origin, sb = sheetView.bounds
+                var nBorder = oldBorder
+                switch oldBorder.orientation {
+                case .horizontal:
+                    nBorder.location = (np.y - sheetFrame.minY).clipped(min: sb.minY, max: sb.maxY)
+                case .vertical:
+                    nBorder.location = (np.x - sheetFrame.minX).clipped(min: sb.minX, max: sb.maxX)
+                }
+                borderView.model = nBorder
+                
+                let borders = sheetView.model.borders
+                if borders.count == 4 && borders.reduce(0, { $0 + ($1.orientation == .horizontal ? 1 : 0) }) == 2 {
+                    var xs = [Double](), ys = [Double]()
+                    func append(border: Border) {
+                        if border.orientation == .horizontal {
+                            ys.append(border.location)
+                        } else {
+                            xs.append(border.location)
+                        }
+                    }
+                    borders.forEach { append(border: $0) }
+                    let nxs = xs.sorted(), nys = ys.sorted()
+                    let width = nxs[1] - nxs[0], height = nys[1] - nys[0]
+                    let nString = nBorder.location.string(digitsCount: 1, enabledZeroInteger: false)
+                    rootView.cursor = rootView.cursor(from: "\(nString) (\(LookUpAction.sizeString(from: .init(width: width, height: height))))")
+                } else {
+                    let nString = nBorder.location.string(digitsCount: 1, enabledZeroInteger: false)
+                    rootView.cursor = switch nBorder.orientation {
+                    case .horizontal: rootView.cursor(from: nString)
+                    case .vertical: rootView.cursor(from: nString)
+                    }
+                }
+            }
+        case .ended:
+            snapLineNode.removeFromParent()
+            
+            if let sheetView, let beganBorder,
+               let borderI, borderI < sheetView.bordersView.elementViews.count {
+               
+                let borderView = sheetView.bordersView.elementViews[borderI]
+                if borderView.model != beganBorder {
+                    sheetView.newUndoGroup()
+                    sheetView.capture(borderView.model, old: beganBorder, at: borderI)
+                }
+            }
+            
             rootView.cursor = rootView.defaultCursor
         }
     }
