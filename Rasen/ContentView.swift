@@ -251,6 +251,13 @@ extension ContentView {
         Animation.timeString(fromTime: model.beat,
                              frameRate: isInter ? 12 : model.frameRateBeat ?? 1)
     }
+    func currentTimeProgress() -> Double? {
+        if let durBeat = model.durBeat, durBeat != 0 {
+            .init(model.beat / durBeat)
+        } else {
+            nil
+        }
+    }
     
     func set(_ timeOption: ContentTimeOption?, origin: Point) {
         binder[keyPath: keyPath].timeOption = timeOption

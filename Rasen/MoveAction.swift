@@ -321,10 +321,12 @@ final class MoveAnimationAction: DragEventAction {
                         
                         beganAnimationOption = sheetView.model.animation.option
                         beganBeatX = animationView.x(atBeat: sheetView.model.animation.beatRange.end)
+                        
+                        rootView.cursor = rootView.cursor(from: sheetView.timeString(fromBeat: sheetView.model.animation.beatRange.end),
+                                                          isArrow: true)
                     } else if let minI = animationView
                         .slidableKeyframeIndex(at: inP,
-                                               maxDistance: rootView.worldKnobEditDistance,
-                                               enabledKeyOnly: true) {
+                                               maxDistance: rootView.worldKnobEditDistance * 2) {
                         type = .key
                         
                         keyframeIndex = minI
@@ -341,6 +343,9 @@ final class MoveAnimationAction: DragEventAction {
                         } else {
                             beganKeyframeOptions = [keyframeIndex: keyframe.option]
                         }
+                        
+                        rootView.cursor = rootView.cursor(from: sheetView.timeString(fromBeat: keyframe.beat),
+                                                          isArrow: true)
                     } else {
                         beganAnimationOption = sheetView.model.animation.option
                         type = .all
@@ -391,6 +396,9 @@ final class MoveAnimationAction: DragEventAction {
                             
                             animationView.beatRange?.end = nkBeat
                         }
+                        
+                        rootView.cursor = rootView.cursor(from: sheetView.timeString(fromBeat: sheetView.model.animation.beatRange.end),
+                                                          isArrow: true)
                     }
                 case .key:
                     let interval = rootView.currentKeyframeBeatInterval
@@ -430,6 +438,9 @@ final class MoveAnimationAction: DragEventAction {
                         
                         sheetView.rootBeatIndex = rootBeatIndex
                         sheetView.animationView.updateTimeline()
+                        
+                        rootView.cursor = rootView.cursor(from: sheetView.timeString(fromBeat: beat),
+                                                          isArrow: true)
                     }
                 case .none: break
                 }

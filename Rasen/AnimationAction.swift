@@ -18,6 +18,7 @@
 import struct Foundation.UUID
 import struct Foundation.URL
 import struct Foundation.Data
+import Dispatch
 
 final class GoPreviousAction: InputKeyEventAction {
     let rootAction: RootAction, rootView: RootView
@@ -67,7 +68,7 @@ final class GoPreviousAction: InputKeyEventAction {
             }
             
             rootView.cursor = rootView.cursor(from: contentView?.currentTimeString(isInter: true)
-                                              ?? sheetView?.currentTimeString()
+                                              ?? sheetView?.currentKeyframeString()
                                               ?? Animation.timeString(fromTime: 0, frameRate: 0))
         case .changed:
             if event.isRepeat, let sheetView {
@@ -81,7 +82,7 @@ final class GoPreviousAction: InputKeyEventAction {
                     sheetView.showOtherTimeNodeFromMainBeat()
                     sheetView.animationView.shownInterTypeKeyframeIndex = sheetView.animationView.model.index
                     
-                    rootView.cursor = .circle(string: sheetView.currentTimeString())
+                    rootView.cursor = .circle(string: sheetView.currentKeyframeString())
                 }
             }
         case .ended:
@@ -152,7 +153,7 @@ final class GoNextAction: InputKeyEventAction {
             }
             
             rootView.cursor = rootView.cursor(from: contentView?.currentTimeString(isInter: true)
-                                              ?? sheetView?.currentTimeString()
+                                              ?? sheetView?.currentKeyframeString()
                                               ?? Animation.timeString(fromTime: 0, frameRate: 0))
         case .changed:
             if event.isRepeat, let sheetView {
@@ -166,7 +167,7 @@ final class GoNextAction: InputKeyEventAction {
                     sheetView.showOtherTimeNodeFromMainBeat()
                     sheetView.animationView.shownInterTypeKeyframeIndex = sheetView.animationView.model.index
                     
-                    rootView.cursor = rootView.cursor(from: sheetView.currentTimeString())
+                    rootView.cursor = rootView.cursor(from: sheetView.currentKeyframeString())
                 }
             }
         case .ended:
@@ -235,7 +236,7 @@ final class GoPreviousFrameAction: InputKeyEventAction {
             }
             
             rootView.cursor = rootView.cursor(from: contentView?.currentTimeString(isInter: false)
-                                              ?? sheetView?.currentTimeString()
+                                              ?? sheetView?.currentKeyframeString()
                                               ?? Animation.timeString(fromTime: 0, frameRate: 0))
         case .changed:
             if event.isRepeat, let sheetView {
@@ -249,7 +250,7 @@ final class GoPreviousFrameAction: InputKeyEventAction {
                     sheetView.showOtherTimeNodeFromMainBeat()
                     sheetView.animationView.shownInterTypeKeyframeIndex = sheetView.animationView.model.index
                     
-                    rootView.cursor = rootView.cursor(from: sheetView.currentTimeString())
+                    rootView.cursor = rootView.cursor(from: sheetView.currentKeyframeString())
                 }
             }
         case .ended:
@@ -319,7 +320,7 @@ final class GoNextFrameAction: InputKeyEventAction {
             }
             
             rootView.cursor = rootView.cursor(from: contentView?.currentTimeString(isInter: false)
-                                              ?? sheetView?.currentTimeString()
+                                              ?? sheetView?.currentKeyframeString()
                                               ?? Animation.timeString(fromTime: 0, frameRate: 0))
         case .changed:
             if event.isRepeat, let sheetView {
@@ -333,7 +334,7 @@ final class GoNextFrameAction: InputKeyEventAction {
                     sheetView.showOtherTimeNodeFromMainBeat()
                     sheetView.animationView.shownInterTypeKeyframeIndex = sheetView.animationView.model.index
                     
-                    rootView.cursor = rootView.cursor(from: sheetView.currentTimeString())
+                    rootView.cursor = rootView.cursor(from: sheetView.currentKeyframeString())
                 }
             }
         case .ended:
@@ -363,8 +364,16 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
         isEditingSheet = rootView.isEditingSheet
     }
     
-    private let indexInterval = 5.0
+    private let indexInterval = 5.0, animationIndexInterval = 0.5
     private let correction = 3.5
+    
+    enum MoveType {
+        case frame, time
+    }
+    
+    var type = MoveType.time
+    
+    private var cursorTimer: (any DispatchSourceTimer)?
     
     private var sheetView: SheetView?, contentIndex: Int?
     private var contentView: SheetContentView? {
@@ -375,11 +384,15 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
     private var beganContentBeat: Rational = 0, oldContentBeat: Rational = 0
     private var oldDeltaI: Int?
     private var beganSP = Point(), preSP = Point(),
-                beganRootI = 0, beganBeat = Rational(0),
+                beganRootI = 0, beganRootBeat: Rational = 0, beganBeat = Rational(0),
                 beganSelectedFrameIndexes = [Int](), beganEventTime = 0.0, preEventTime: Double?
     private var preMoveEventTime: Double?
     private var allDX = 0.0
     private var snapEventTime: Double?
+    private let progressWidth = {
+        let text = Text(string: "00.00", size: Font.defaultSize)
+        return text.frame?.width ?? 40
+    } ()
     
     func flow(with event: DragEvent) {
         if event.phase == .began {
@@ -417,7 +430,6 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
                     if let contentView {
                         beganContentBeat = contentView.model.beat
                         oldContentBeat = beganContentBeat
-                        rootView.cursor = rootView.cursor(from: contentView.currentTimeString(isInter: true))
                     }
                 }
                 
@@ -425,12 +437,11 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
                     if sheetView.model.enabledAnimation {
                         let animationView = sheetView.animationView
                         beganRootI = animationView.rootKeyframeIndex
+                        beganRootBeat = animationView.rootBeat
                         beganBeat = animationView.model.localBeat
                         beganSelectedFrameIndexes = animationView.selectedFrameIndexes
                         animationView.shownInterTypeKeyframeIndex = animationView.model.index
                     }
-                    
-                    rootView.cursor = rootView.cursor(from: sheetView.currentTimeString())
                 }
             } else {
                 rootView.cursor = rootView.cursor(from: Animation.timeString(fromTime: 0, frameRate: 0))
@@ -453,12 +464,10 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
                             oldContentBeat = nBeat
                             
                             contentView.beat = nBeat
-                            
-                            rootView.cursor = .circle(string: contentView.currentTimeString(isInter: false))
                         }
                     }
                 } else {
-                    if let snapEventTime {
+                    if type == .frame, let snapEventTime {
                         if event.time - snapEventTime > 0.25 {
                             self.snapEventTime = nil
                         } else {
@@ -482,22 +491,50 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
                             }
                         }
                         
-                        let beganI = animation.index(atRoot: beganRootI)
-                        var x = widths[beganI] / 2, nRootI = beganRootI
-                        while abs(x) < abs(allDX) {
-                            nRootI = allDX < 0 ?
-                            nRootI.subtractingReportingOverflow(1).partialValue :
-                            nRootI.addingReportingOverflow(1).partialValue
-                            let i = animation.index(atRoot: nRootI)
-                            x += widths[i]
+                        let oldKI = animationView.model.index
+                        var isChangedRootI = false
+                        switch type {
+                        case .frame:
+                            var nRootI = beganRootI
+                            let beganI = animation.index(atRoot: beganRootI)
+                            var x = widths[beganI] / 2
+                            while abs(x) < abs(allDX) {
+                                nRootI = allDX < 0 ?
+                                nRootI.subtractingReportingOverflow(1).partialValue :
+                                nRootI.addingReportingOverflow(1).partialValue
+                                let i = animation.index(atRoot: nRootI)
+                                x += widths[i]
+                            }
+                            if animationView.rootKeyframeIndex != nRootI {
+                                if sheetView.isPlaying {
+                                    sheetView.stop()
+                                }
+                                sheetView.rootKeyframeIndex = nRootI
+                                isChangedRootI = true
+                                sheetView.showOtherTimeNodeFromMainBeat()
+                            }
+                        case .time:
+                            let deltaI = Int((allDX / animationIndexInterval).rounded())
+                            if deltaI != oldDeltaI {
+                                oldDeltaI = deltaI
+                                
+                                let frameBeat = Sheet.fullEditBeatInterval
+                                let nBeat = (beganRootBeat + .init(deltaI) * frameBeat)
+                                    .interval(scale: frameBeat)
+                                
+                                let oldRKI = animationView.rootKeyframeIndex
+                                if sheetView.isPlaying {
+                                    sheetView.stop()
+                                }
+                                sheetView.rootBeat = nBeat
+                                if oldRKI != sheetView.rootKeyframeIndex {
+                                    sheetView.showOtherTimeNodeFromMainBeat()
+                                    isChangedRootI = true
+                                }
+                            }
                         }
                         
-                        let oldKI = animationView.model.index
-                        if animationView.rootKeyframeIndex != nRootI {
-                            if sheetView.isPlaying {
-                                sheetView.stop()
-                            }
-                            sheetView.rootKeyframeIndex = nRootI
+                        if isChangedRootI {
                             if preEventTime == nil || event.time - preEventTime! > 0.1,
                                animationView.currentKeyframe.isKey
                                 || (!animationView.currentKeyframe.isKey && animationView.model.keyframes[oldKI].isKey)
@@ -524,22 +561,40 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
                                 animationView.model.index(atRoot: lineAction.beganAnimationRootIndex)
                                 lineAction.tempLineNode?.lineType = .color(isSelect ? lineColor.with(opacity: 0.1) : lineColor)
                             }
-                            
-                            rootView.cursor = rootView.cursor(from: sheetView.currentTimeString())
-                            sheetView.showOtherTimeNodeFromMainBeat()
                         }
                     }
                 }
             }
         case .ended:
-            rootView.cursor = rootView.defaultCursor
-            
             if let sheetView {
                 let animationView = sheetView.animationView
                 animationView.shownInterTypeKeyframeIndex = nil
                 
                 sheetView.hideOtherTimeNode()
             }
+        }
+        
+        switch event.phase {
+        case .began:
+            cursorTimer = DispatchSource.scheduledTimer(withTimeInterval: 1 / 60) { [weak self] in
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, !(self.cursorTimer?.isCancelled ?? true) else { return }
+                    if let contentView = self.contentView {
+                        self.rootView.cursor = .circle(progress: contentView.currentTimeProgress(),
+                                                       progressWidth: self.progressWidth,
+                                                  string: contentView.currentTimeString(isInter: false))
+                    } else if let sheetView = self.sheetView {
+                        self.rootView.cursor = self.rootView.cursor(from: sheetView.currentKeyframeString(),
+                                                          progress: sheetView.currentTimeProgress(),
+                                                          progressWidth: self.progressWidth)
+                    }
+                }
+            }
+        case .changed: break
+        case .ended:
+            cursorTimer?.cancel()
+            
+            rootView.cursor = rootView.defaultCursor
         }
     }
 }
@@ -673,7 +728,7 @@ final class PlayAction: InputKeyEventAction {
                     
                     if cSheetView.model.enabledTimeline {
                         cSheetView.play()
-                        rootView.cursor = rootView.cursor(from: cSheetView.currentTimeString() + "...",
+                        rootView.cursor = rootView.cursor(from: cSheetView.currentKeyframeString() + "...",
                                                           isArrow: true)
                     }
                 } else {
@@ -859,6 +914,15 @@ final class InsertKeyframeAction: InputKeyEventAction {
                             animationView.updateTimeline()
                         }
                     }
+                    
+                    let progressWidth = {
+                        let text = Text(string: "00.00", size: Font.defaultSize)
+                        return text.frame?.width ?? 40
+                    } ()
+                    rootView.cursor = rootView.cursor(from: sheetView.currentKeyframeString(),
+                                                      isArrow: true,
+                                                      progress: sheetView.currentTimeProgress(),
+                                                      progressWidth: progressWidth)
                 } else if sheetView.model.score.enabled {
                     let scoreView = sheetView.scoreView
                     let scoreP = sheetView.scoreView.convertFromWorld(p)

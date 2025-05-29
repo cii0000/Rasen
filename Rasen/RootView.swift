@@ -3159,14 +3159,15 @@ final class RootView: View, @unchecked Sendable {
         oldMapType = mapType
     }
     
-    func cursor(from string: String, isArrow: Bool = false) -> Cursor {
+    func cursor(from string: String, isArrow: Bool = false,
+                progress: Double? = nil, progressWidth: Double = 40) -> Cursor {
         if isArrow {
             .arrowWith(string: string)
         } else if pov.rotation != 0 {
-            .rotate(string: string,
+            .rotate(progress: progress, progressWidth: progressWidth, string: string,
                     rotation: -pov.rotation + .pi / 2)
         } else {
-            .circle(string: string)
+            .circle(progress: progress, progressWidth: progressWidth, string: string)
         }
     }
 }

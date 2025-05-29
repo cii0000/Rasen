@@ -4024,6 +4024,7 @@ struct Cursor {
     static let circleDefaultSize = 7.0, circleDefaultLineWidth = 1.5
     static func circle(size s: Double = circleDefaultSize,
                        scale: Double = 1,
+                       progress: Double? = nil, progressWidth: Double = 40.0,
                        string: String = "",
                        lightColor: Color = .content,
                        lightOutlineColor: Color = .background,
@@ -4033,7 +4034,6 @@ struct Cursor {
             subLineWidth = 1.125 * scale
         let d = (subLineWidth + lineWidth / 2).rounded(.up)
         let r = s / 2
-        let b = Rect(x: d, y: d, width: s, height: s)
         
         let tPath: Path?, tSize: Size
         if !string.isEmpty {
@@ -4048,30 +4048,46 @@ struct Cursor {
         
         let hotSpot = Point(d + s / 2, -d - s / 2)
         
+        let ph = progress != nil ? lineWidth + subLineWidth * 2 + 2 : 0
+        let ah = tSize.height + ph
+        let bcp = Point(d + r, d + r + ah)
         func node(color: Color, outlineColor: Color) -> Node {
             let outlineNode = Node(path: Path(circleRadius: r + (subLineWidth + lineWidth) / 2,
-                                              position: b.centerPoint + Point(0, tSize.height)),
+                                              position: bcp),
                                    lineWidth: lineWidth,
                                    lineType: .color(outlineColor))
-            let inlineNode = Node(path: Path(circleRadius: r, position: b.centerPoint + Point(0, tSize.height)),
+            let inlineNode = Node(path: Path(circleRadius: r, position: bcp),
                                   lineWidth: lineWidth,
                                   lineType: .color(color))
+            
+            func progressNodes(fromWidth progressW: Double) -> [Node] {
+                guard let progress else { return [] }
+                let bp = Point(d, d + (subLineWidth + lineWidth) / 2)
+                return [Node(path: Path([bp, Point(progressW * progress, 0) + bp]),
+                             lineWidth: lineWidth + subLineWidth * 2,
+                             lineType: .color(outlineColor)),
+                        Node(path: Path([bp, Point(progressW * progress, 0) + bp]),
+                             lineWidth: lineWidth,
+                             lineType: .color(color))]
+            }
+            let progressNodes = progressNodes(fromWidth: progressWidth)
+             
             let nodes: [Node]
             if let tPath {
                 nodes = [outlineNode, inlineNode,
-                         Node(attitude: Attitude(position: Point(d, b.centerPoint.y)),
+                         Node(attitude: Attitude(position: Point(d, d + r + ph)),
                                path: tPath,
                                lineWidth: lineWidth + subLineWidth,
                                lineType: .color(outlineColor)),
-                         Node(attitude: Attitude(position: Point(d, b.centerPoint.y)),
+                         Node(attitude: Attitude(position: Point(d, d + r + ph)),
                                path: tPath,
-                               fillType: .color(color))]
+                              fillType: .color(color))] + progressNodes
             } else {
-                nodes = [outlineNode, inlineNode]
+                nodes = [outlineNode, inlineNode] + progressNodes
             }
             
-            let size = Size(width: max(s, tSize.width) + d * 2,
-                            height: s + d * 2 + tSize.height)
+            let size = Size(width: max(s, tSize.width, progressWidth) + d * 2,
+                            height: s + d * 2 + ah)
             return Node(children: nodes,
                         path: Path(Rect(origin: Point(), size: size)))
         }
@@ -4084,6 +4100,7 @@ struct Cursor {
     }
     static func rotate(size s: Double = circleDefaultSize,
                        scale: Double = 1,
+                       progress: Double? = nil, progressWidth: Double = 40.0,
                        string: String = "",
                        rotation angle: Double,
                        rotationLength l: Double = 5,
@@ -4095,7 +4112,6 @@ struct Cursor {
         let d = max(l + subLineWidth / 2 + lineWidth / 2,
                     subLineWidth + lineWidth / 2).rounded(.up)
         let r = s / 2
-        let b = Rect(x: d, y: d, width: s, height: s)
         
         let tPath: Path?, tSize: Size
         if !string.isEmpty {
@@ -4108,16 +4124,18 @@ struct Cursor {
             tPath = nil
         }
         
-        let fp = b.centerPoint.movedWith(distance: s / 2 + subLineWidth, angle: angle) + Point(0, tSize.height)
-        let lp = b.centerPoint.movedWith(distance: s / 2 + l, angle: angle) + Point(0, tSize.height)
+        let ph = progress != nil ? lineWidth + subLineWidth * 2 + 2 : 0
+        let ah = tSize.height + ph
+        let bcp = Point(d + r, d + r + ah)
+        let fp = bcp.movedWith(distance: s / 2 + subLineWidth, angle: angle)
+        let lp = bcp.movedWith(distance: s / 2 + l, angle: angle)
         let hotSpot = Point(d + s / 2, -d - s / 2)
-        
         func node(color: Color, outlineColor: Color) -> Node {
             let outlineNode =  Node(path: Path(circleRadius: r + (subLineWidth + lineWidth) / 2,
-                                               position: b.centerPoint + Point(0, tSize.height)),
+                                               position: bcp),
                                     lineWidth: lineWidth,
                                     lineType: .color(outlineColor))
-            let inlineNode = Node(path: Path(circleRadius: r, position: b.centerPoint + Point(0, tSize.height)),
+            let inlineNode = Node(path: Path(circleRadius: r, position: bcp),
                                   lineWidth: lineWidth,
                                   lineType: .color(color))
             let arrowOutlineNode = Node(path: Path([fp, lp], isClosed: false),
@@ -4127,22 +4145,34 @@ struct Cursor {
                                        lineWidth: lineWidth,
                                        lineType: .color(color))
             
+            func progressNodes(fromWidth progressW: Double) -> [Node] {
+                guard let progress else { return [] }
+                let bp = Point(d, d + (subLineWidth + lineWidth) / 2)
+                return [Node(path: Path([bp, Point(progressW * progress, 0) + bp]),
+                             lineWidth: lineWidth + subLineWidth * 2,
+                             lineType: .color(outlineColor)),
+                        Node(path: Path([bp, Point(progressW * progress, 0) + bp]),
+                             lineWidth: lineWidth,
+                             lineType: .color(color))]
+            }
+            let progressNodes = progressNodes(fromWidth: progressWidth)
+            
             let nodes: [Node]
             if let tPath {
                 nodes = [arrowOutlineNode, outlineNode, arrowInlineNode, inlineNode,
-                         Node(attitude: Attitude(position: Point(d, b.centerPoint.y)),
+                         Node(attitude: Attitude(position: Point(d, d + r + ph)),
                                path: tPath,
                                lineWidth: lineWidth + subLineWidth,
                                lineType: .color(outlineColor)),
-                         Node(attitude: Attitude(position: Point(d, b.centerPoint.y)),
+                         Node(attitude: Attitude(position: Point(d, d + r + ph)),
                                path: tPath,
-                               fillType: .color(color))]
+                               fillType: .color(color))] + progressNodes
             } else {
-                nodes = [arrowOutlineNode, outlineNode, arrowInlineNode, inlineNode]
+                nodes = [arrowOutlineNode, outlineNode, arrowInlineNode, inlineNode] + progressNodes
             }
             
-            let size = Size(width: max(s, tSize.width) + d * 2,
-                            height: s + d * 2 + tSize.height)
+            let size = Size(width: max(s, tSize.width, progressWidth) + d * 2,
+                            height: s + d * 2 + ah)
             return Node(children: nodes,
                         path: Path(Rect(origin: Point(), size: size)))
         }

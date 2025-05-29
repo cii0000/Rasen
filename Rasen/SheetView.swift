@@ -596,7 +596,7 @@ final class AnimationView: TimelineView, @unchecked Sendable {
     func updateTimelineAtCurrentKeyframe() {
         updateTimelime(atKeyframe: model.index)
     }
-    let paddingTimelineHeight = Sheet.timelineY * 2, interpolatedKnobHeight = 4.0, paddingWidth = 5.0
+    let paddingTimelineHeight = Sheet.timelineY * 2, interpolatedKnobHeight = 6.0, paddingWidth = 5.0
     func timelineNodes() -> [Node] {
         let beatRange = model.beatRange
         let sBeat = max(beatRange.start, -10000),
@@ -632,7 +632,7 @@ final class AnimationView: TimelineView, @unchecked Sendable {
             let kx = x(atBeat: keyframe.beat + beatRange.start)
             
             let nKnobH = keyframe.isKey ? knobH : iKnobH
-            let nKnobW = keyframe.beat % .init(1, 12) == 0 ? knobW : knobW / 2
+            let nKnobW = (keyframe.beat + beatRange.start) % .init(1, 12) == 0 ? knobW : knobW / 2
             let topD: Double
             if !keyframe.draftPicture.isEmpty {
                 let pathline = Pathline(Rect(x: kx - nKnobW / 2,
@@ -658,12 +658,12 @@ final class AnimationView: TimelineView, @unchecked Sendable {
                 } else {
                     contentPathlines.append(pathline)
                 }
-                bottomD = knobW * 2
+                bottomD = keyframe.isKey ? knobW * 2 : knobW * 1.5
             } else {
                 bottomD = 0
             }
             
-            let niKnobW = keyframe.beat % .init(1, 12) == 0 ? iKnobW : iKnobW / 2
+            let niKnobW = (keyframe.beat + beatRange.start) % .init(1, 12) == 0 ? iKnobW : iKnobW / 2
             let pathline = keyframe.isKey ?
             Pathline(Rect(x: kx - nKnobW / 2,
                           y: centerY - nKnobH / 2 + bottomD,
@@ -678,32 +678,39 @@ final class AnimationView: TimelineView, @unchecked Sendable {
             }
         }
         let kx = ex
-        contentPathlines.append(.init(Rect(x: kx - knobW / 2,
+        let nKnobW = eBeat % .init(1, 12) == 0 ? knobW : knobW / 2
+        contentPathlines.append(.init(Rect(x: kx - nKnobW / 2,
                                            y: centerY - knobH / 2 - 1,
-                                           width: knobW, height: knobH + 2)))
+                                           width: nKnobW, height: knobH + 2)))
         
         if isSelected {
-            let d = if let (i, iBeat) = model.indexAndInternalBeat(atRootBeat: model.localBeat) {
-                iBeat == 0 ? (model.keyframes[i].isKey ? knobH / 2 : iKnobH / 2) : lw / 2
-            } else {
-                lw / 2
-            }
+            let d = knobH / 2
+            let kx = x(atBeat: model.currentKeyframe.beat + beatRange.start)
+            let kd = model.currentKeyframe.isKey ? knobH / 2 : iKnobH / 2
+            contentPathlines.append(.init(Rect(x: kx - lw / 2,
+                                               y: sy,
+                                               width: lw,
+                                               height: (centerY - kd - knobW / 2) - sy)))
+            contentPathlines.append(.init(Rect(x: kx - lw / 2,
+                                               y: centerY + kd + knobW / 2,
+                                               width: lw,
+                                               height: ey - (centerY + kd + knobW / 2))))
             
             contentPathlines.append(.init(Rect(x: mainBeatX - lw / 2,
                                                y: sy,
                                                width: lw,
-                                               height: (centerY - d - knobW) - sy)))
-            contentPathlines.append(.init(Rect(x: mainBeatX - lw * 3,
-                                               y: sy - lw,
-                                               width: lw * 6,
+                                               height: (centerY - d - knobW / 2) - sy)))
+            contentPathlines.append(.init(Rect(x: mainBeatX - lw * 2,
+                                               y: sy,
+                                               width: lw * 4,
                                                height: lw)))
             contentPathlines.append(.init(Rect(x: mainBeatX - lw / 2,
-                                               y: centerY + d + knobW,
+                                               y: centerY + d + knobW / 2,
                                                width: lw,
-                                               height: ey - (centerY + d + knobW))))
-            contentPathlines.append(.init(Rect(x: mainBeatX - lw * 3,
-                                               y: ey,
-                                               width: lw * 6,
+                                               height: ey - (centerY + d + knobW / 2))))
+            contentPathlines.append(.init(Rect(x: mainBeatX - lw * 2,
+                                               y: ey - lw,
+                                               width: lw * 4,
                                                height: lw)))
         }
         
@@ -812,40 +819,22 @@ final class AnimationView: TimelineView, @unchecked Sendable {
         }
     }
     
-    func slidableKeyframeIndex(atRootBeat: Rational, maxDistance: Double,
-                               enabledKeyOnly: Bool = false) -> Int? {
+    func slidableKeyframeIndex(atRootBeat: Rational, maxDistance: Double) -> Int? {
         slidableKeyframeIndex(at: Point(x(atBeat: model.localBeat(atRootBeat: atRootBeat)), 0),
-                              maxDistance: maxDistance,
-                              enabledKeyOnly: enabledKeyOnly)
+                              maxDistance: maxDistance)
     }
-    func slidableKeyframeIndex(at inP: Point, maxDistance: Double,
-                               enabledKeyOnly: Bool = false) -> Int? {
+    func slidableKeyframeIndex(at inP: Point, maxDistance: Double) -> Int? {
         guard abs(inP.y - model.timelineY) < paddingTimelineHeight * 5 / 16 else { return nil }
         let animation = model
-        var minD = maxDistance, minI: Int?
         let beatRange = animation.beatRange
-        if enabledKeyOnly {
-            var i = 0
-            while i < animation.keyframes.count {
-                while i + 1 < animation.keyframes.count && !animation.keyframes[i + 1].isKey {
-                    i += 1
-                }
-                let x = x(atBeat: animation.keyframes[i].beat + beatRange.start)
-                let d = abs(inP.x - x)
-                if d < minD {
-                    minD = d
-                    minI = i
-                }
-                i += 1
-            }
-        } else {
-            for (i, keyframe) in animation.keyframes.enumerated() {
-                let x = x(atBeat: keyframe.beat + beatRange.start)
-                let d = abs(inP.x - x)
-                if d < minD {
-                    minD = d
-                    minI = i
-                }
+        
+        var minD = maxDistance, minI: Int?
+        for (i, keyframe) in animation.keyframes.enumerated() {
+            let x = x(atBeat: keyframe.beat + beatRange.start)
+            let d = abs(inP.x - x)
+            if d < minD {
+                minD = d
+                minI = i
             }
         }
         
@@ -859,6 +848,7 @@ final class AnimationView: TimelineView, @unchecked Sendable {
             }
             return animation.keyframes.count - 1
         }
+        
         return minI
     }
     func keyframeIndex(at inP: Point, isEnabledCount: Bool = false) -> Int? {
@@ -1485,10 +1475,17 @@ final class SheetView: BindableView, @unchecked Sendable {
                        isKey: animationView.model.currentKeyframe.isKey,
                        frameRate: Rational(animationView.frameRate))
     }
-    func currentTimeString() -> String {
-        Animation.timeString(fromTime: model.animation.localBeat,
+    func currentKeyframeString() -> String {
+        Animation.timeString(fromTime: model.animation.currentKeyframe.beat,
                              frameRate: Rational(frameRate))
         + (model.animation.currentKeyframe.isKey ? "" : "i")
+    }
+    func timeString(fromBeat beat: Rational) -> String {
+        Animation.timeString(fromTime: beat, frameRate: Rational(frameRate))
+    }
+    func currentTimeProgress() -> Double? {
+        model.animation.localDurBeat != 0 && model.enabledAnimation ?
+            .init(model.animation.localBeat / model.animation.localDurBeat) : nil
     }
     func currentTimeNodes() -> [Node] {
         Self.timeNodes(duration: model.animation.currentDurBeat,
