@@ -1052,7 +1052,7 @@ extension ScoreView {
                 .init(x, y)
             }
         }
-        func triangleStrip(_ wps: [LinePoint]) -> TriangleStrip {
+        func triangleStrip(_ wps: [LinePoint], isSnap: Bool = false) -> TriangleStrip {
             var ps = [Point](capacity: wps.count * 4)
             guard wps.count >= 2 else {
                 return .init(points: wps.isEmpty ? [] : [wps[0].point])
@@ -1073,14 +1073,46 @@ extension ScoreView {
                         ps.append(wp.point - p)
                     }
                 } else {
-                    let angle0 = Edge(wps[i - 1].point, wps[i].point).angle()
-                    let angle1 = Edge(wps[i].point, wps[i + 1].point).angle()
-                    let p0 = PolarPoint(wp.h, angle0 + .pi / 2).rectangular
-                    ps.append(wp.point + p0)
-                    ps.append(wp.point - p0)
-                    let p1 = PolarPoint(wp.h, angle1 + .pi / 2).rectangular
-                    ps.append(wp.point + p1)
-                    ps.append(wp.point - p1)
+                    if isSnap {
+                        let angle0 = Edge(wps[i - 1].point, wps[i].point).angle()
+                        let angle1 = Edge(wps[i].point, wps[i + 1].point).angle()
+                        if wps[i - 1].point.y == wps[i].point.y {
+                            ps.append(wp.point + Point(0, wp.h))
+                            ps.append(wp.point - Point(0, wp.h))
+                            ps.append(wp.point + Point(0, wp.h))
+                            ps.append(wp.point - Point(0, wp.h))
+                        } else if wps[i].point.y == wps[i + 1].point.y {
+                            ps.append(wp.point + Point(0, wp.h))
+                            ps.append(wp.point - Point(0, wp.h))
+                            ps.append(wp.point + Point(0, wp.h))
+                            ps.append(wp.point - Point(0, wp.h))
+                        } else if abs(Point.differenceAngle(wps[i - 1].point,
+                                                            wps[i].point,
+                                                            wps[i + 1].point)) < .pi / 4 {
+                            let p0 = PolarPoint(wp.h, angle0 + .pi / 2).rectangular
+                            let p1 = PolarPoint(wp.h, angle1 + .pi / 2).rectangular
+                            ps.append(wp.point + p0.mid(p1))
+                            ps.append(wp.point - p0.mid(p1))
+                            ps.append(wp.point + p0.mid(p1))
+                            ps.append(wp.point - p0.mid(p1))
+                        } else {
+                            let p0 = PolarPoint(wp.h, angle0 + .pi / 2).rectangular
+                            ps.append(wp.point + p0)
+                            ps.append(wp.point - p0)
+                            let p1 = PolarPoint(wp.h, angle1 + .pi / 2).rectangular
+                            ps.append(wp.point + p1)
+                            ps.append(wp.point - p1)
+                        }
+                    } else {
+                        let angle0 = Edge(wps[i - 1].point, wps[i].point).angle()
+                        let angle1 = Edge(wps[i].point, wps[i + 1].point).angle()
+                        let p0 = PolarPoint(wp.h, angle0 + .pi / 2).rectangular
+                        ps.append(wp.point + p0)
+                        ps.append(wp.point - p0)
+                        let p1 = PolarPoint(wp.h, angle1 + .pi / 2).rectangular
+                        ps.append(wp.point + p1)
+                        ps.append(wp.point - p1)
+                    }
                 }
             }
             return .init(points: ps)
@@ -1268,7 +1300,7 @@ extension ScoreView {
                                         && (note.pitch + $0.pitch).isInteger ? knobR : knobR / 2,
                                         $0.tone.baseColor()) }
             
-            stereoLinePath = .init(triangleStrip(ps))
+            stereoLinePath = .init(triangleStrip(ps, isSnap: true))
             stereoLineColors = colors(ps)
             
             mainLinePath = .init(triangleStrip(mps))
@@ -1353,15 +1385,17 @@ extension ScoreView {
                         let nx = x(atBeat: note.pits[pi].beat + note.beatRange.start)
                         let p = Point(nx, y)
                         let sprols = pitbend.pits[pi].tone.spectlope.sprols
-                        let sprolYs = sprols.map { tonePanelPitchY(fromPitch: $0.pitch, atY: p.y) }
-                        sprolKnobPAndRs += sprols.enumerated().map { (spi, sprol) in
-                            let d0 = spi + 1 < sprols.count ? (sprolYs[spi + 1] - sprolYs[spi]) / 2 : sprolR
-                            let d1 = spi - 1 >= 0 ? (sprolYs[spi] - sprolYs[spi - 1]) / 2 : sprolR
-                            return (Point(p.x, sprolYs[spi]),
+                        
+                        let sprolYs = sprols.enumerated().map { (tonePanelPitchY(fromPitch: $0.element.pitch, atY: p.y),
+                                                                 $0.offset > 0 && sprols[$0.offset - 1].pitch > $0.element.pitch,
+                                                                 $0.element) }.sorted { $0.0 < $1.0 }
+                        sprolKnobPAndRs += sprolYs.enumerated().map { (spi, v) in
+                            let sprol = v.2
+                            let d0 = spi + 1 < sprols.count ? (sprolYs[spi + 1].0 - sprolYs[spi].0) / 2 : sprolR
+                            let d1 = spi - 1 >= 0 ? (sprolYs[spi].0 - sprolYs[spi - 1].0) / 2 : sprolR
+                            return (Point(p.x, sprolYs[spi].0),
                                     min(d0, d1).clipped(min: 0.015625 / 2, max: sprolR),
-                                    sprol.volm == 0 ?
-                                    Color.subBorder :
-                                        (spi > 0 && sprols[spi - 1].pitch > sprol.pitch ? Color.warning : Color.background))
+                                    v.1 ? Color.warning : (sprol.volm == 0 ? Color.subBorder : Color.background))
                         }
                         
                         let knobPRC = knobPRCs[pi]
@@ -1479,15 +1513,16 @@ extension ScoreView {
             
             let sprols = note.firstTone.spectlope.sprols
             let noteY = spectlopeY
-            let sprolYs = sprols.map { tonePanelPitchY(fromPitch: $0.pitch, atY: noteY) }
-            let sprolKnobPRCs = sprols.enumerated().map { (spi, sprol) in
-                let d0 = spi + 1 < sprols.count ? (sprolYs[spi + 1] - sprolYs[spi]) / 2 : sprolR
-                let d1 = spi - 1 >= 0 ? (sprolYs[spi] - sprolYs[spi - 1]) / 2 : sprolR
-                return (Point(fPitNx, sprolYs[spi]),
+            let sprolYs = sprols.enumerated().map { (tonePanelPitchY(fromPitch: $0.element.pitch, atY: noteY),
+                                                     $0.offset > 0 && sprols[$0.offset - 1].pitch > $0.element.pitch,
+                                                     $0.element) }.sorted { $0.0 < $1.0 }
+            let sprolKnobPRCs = sprolYs.enumerated().map { (spi, v) in
+                let sprol = v.2
+                let d0 = spi + 1 < sprols.count ? (sprolYs[spi + 1].0 - sprolYs[spi].0) / 2 : sprolR
+                let d1 = spi - 1 >= 0 ? (sprolYs[spi].0 - sprolYs[spi - 1].0) / 2 : sprolR
+                return (Point(fPitNx, sprolYs[spi].0),
                         min(d0, d1).clipped(min: 0.015625 / 2, max: sprolR),
-                        sprol.volm == 0 ?
-                        Color.subBorder :
-                            (spi > 0 && sprols[spi - 1].pitch > sprol.pitch ? Color.border : Color.background))
+                        v.1 ? Color.warning : (sprol.volm == 0 ? Color.subBorder : Color.background))
             }
             tonePanelKnobPRCs = sprolKnobPRCs
             
@@ -1713,7 +1748,7 @@ extension ScoreView {
         Color(lightness: lightness(fromScale: scale))
     }
     static func color(fromScale scale: Double, noise: Double) -> Color {
-        color(fromLightness: lightness(fromScale: scale * 0.65), noise: noise)
+        color(fromLightness: lightness(fromScale: scale * 0.75), noise: noise)
     }
     static func color(fromLightness l: Double, noise: Double) -> Color {
         let br = Double(Color(lightness: l, opacity: 0.1).rgba.r)
@@ -1731,11 +1766,11 @@ extension ScoreView {
                                      newMin: 100, newMax: Color.content.lightness)
         let l = Double(Color(lightness: lightness).rgba.r)
         return if pan == 0 {
-            Color(red: l, green: l, blue: l)
+            Color(red: 0.0, green: 0, blue: 0, opacity: 1 - l)
         } else if pan > 0 {
-            Color(red: pan * Spectrogram.editRedRatio * (1 - l) + l, green: l, blue: l)
+            Color(red: pan * Spectrogram.editRedRatio, green: 0, blue: 0, opacity: 1 - l)
         } else {
-            Color(red: l, green: -pan * Spectrogram.editGreenRatio * (1 - l) + l, blue: l)
+            Color(red: 0, green: -pan * Spectrogram.editGreenRatio, blue: 0, opacity: 1 - l)
         }
     }
     

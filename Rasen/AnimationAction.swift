@@ -387,7 +387,7 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
                 beganRootI = 0, beganRootBeat: Rational = 0, beganBeat = Rational(0),
                 beganSelectedFrameIndexes = [Int](), beganEventTime = 0.0, preEventTime: Double?
     private var preMoveEventTime: Double?
-    private var allDX = 0.0
+    private var allDX = 0.0, co = 0
     private var snapEventTime: Double?
     private let progressWidth = {
         let text = Text(string: "00.00", size: Font.defaultSize)
@@ -576,7 +576,7 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
         
         switch event.phase {
         case .began:
-            cursorTimer = DispatchSource.scheduledTimer(withTimeInterval: 1 / 60) { [weak self] in
+            cursorTimer = DispatchSource.scheduledTimer(withTimeInterval: 1 / 30) { [weak self] in
                 DispatchQueue.main.async { [weak self] in
                     guard let self, !(self.cursorTimer?.isCancelled ?? true) else { return }
                     if let contentView = self.contentView {
