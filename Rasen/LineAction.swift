@@ -925,7 +925,6 @@ final class LineAction: Action {
                 Sheet.spectlopeHeight
                 let note = Note(beatRange: beatRange, pitch: pitch,
                                 pits: .init([.init(beat: 0, pitch: 0, tone: firstTone)]),
-                                envelope: .init(reverb: firstReverb),
                                 spectlopeHeight: firstSpectlopeHeight)
                 
                 noteI = count
@@ -979,7 +978,6 @@ final class LineAction: Action {
                 let beatRange = beat > nsBeat ? nsBeat ..< beat : beat ..< nsBeat
                 let note = Note(beatRange: beatRange, pitch: pitch,
                                 pits: [.init(beat: 0, pitch: 0, tone: firstTone)],
-                                envelope: .init(reverb: firstReverb),
                                 spectlopeHeight: firstSpectlopeHeight)
                 let isNote = oldPitch != pitch
                 
@@ -1065,12 +1063,10 @@ final class LineAction: Action {
                         let nNote0 = Note(beatRange: note.beatRange.start ..< (pit.beat + note.beatRange.start),
                                           pitch: note.pitch,
                                           pits: Array(note.pits[...pitI]) + (isLastAppend ? [pit] : []),
-                                          envelope: note.envelope,
                                           spectlopeHeight: note.spectlopeHeight, id: note.id)
                         let nNote1 = Note(beatRange: (pit.beat + note.beatRange.start) ..< note.beatRange.end,
                                           pitch: note.pitch,
                                           pits: nPits,
-                                          envelope: note.envelope,
                                           spectlopeHeight: note.spectlopeHeight, id: .init())
                         replaceIVs.append(.init(value: nNote0, index: noteI))
                         notes.append(nNote1)
@@ -1229,6 +1225,7 @@ final class LineAction: Action {
                     let events = self.drawLineEvents
                     self.oldDrawLineEventsCount = events.count
                     let snapLines = self.snapLines, clipBounds = self.clipBounds
+                    
                     DispatchQueue.global().async { [weak self] in
                         let (tempLine, isSnapStraight) = Self.line(from: events,
                                                                    firstSnapLines: snapLines,
@@ -1237,6 +1234,7 @@ final class LineAction: Action {
                                                                    isStraight: isStraight)
                         let path = Path(tempLine)
                         let (linePathData, linePathBufferVertexCounts) = path.linePointsDataWith(lineWidth: tempLine.size)
+                        
                         DispatchQueue.main.async { [weak self] in
                             guard let self, !(self.drawLineTimer?.isCancelled ?? true) else { return }
                             guard events.count > self.drawLineEventsCount else { return }

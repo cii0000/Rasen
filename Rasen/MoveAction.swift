@@ -70,12 +70,12 @@ final class MoveAction: DragEventAction {
                 } else if sheetView.lineTuple(at: sheetP,
                                               scale: rootView.screenToWorldScale) != nil {
                     type = .line(MoveLineAction(rootAction))
+                } else if sheetView.containsTempo(sheetP, maxDistance: rootView.worldKnobEditDistance * 0.5) {
+                    type = .tempo(MoveTempoAction(rootAction))
                 } else if sheetView.textIndex(at: sheetP, scale: rootView.screenToWorldScale) != nil {
                     type = .text(MoveTextAction(rootAction))
                 } else if sheetView.contentIndex(at: sheetP, scale: rootView.screenToWorldScale) != nil {
                     type = .content(MoveContentAction(rootAction))
-                } else if sheetView.containsTempo(sheetP, maxDistance: rootView.worldKnobEditDistance * 0.5) {
-                    type = .tempo(MoveTempoAction(rootAction))
                 } else if sheetView.animationView.containsTimeline(sheetP, scale: rootView.screenToWorldScale) {
                     type = .animation(MoveAnimationAction(rootAction))
                 } else if sheetView.scoreView.contains(sheetView.scoreView.convertFromWorld(p),
@@ -498,7 +498,7 @@ final class MoveScoreAction: DragEventAction {
     enum SlideType {
         case keyBeats, allBeat, endBeat, isShownSpectrogram, scale,
              startNoteBeat, endNoteBeat, note,
-             pit, reverbEarlyRSec, reverbEarlyAndLateRSec, reverbDurSec,
+             pit,
              even, sprol, spectlopeHeight
     }
     
@@ -633,57 +633,6 @@ final class MoveScoreAction: DragEventAction {
                                                  
                         rootView.cursor = .circle(string: Pitch(value: beganPitch).octaveString())
                         
-                    case .reverbEarlyRSec:
-                        type = .reverbEarlyRSec
-                        
-                        if rootView.isSelect(at: p) {
-                            let noteIs = sheetView.noteIndexes(from: rootView.selections)
-                            beganNotes = noteIs.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
-                        } else {
-                            let id = score.notes[noteI].envelope.id
-                            beganNotes = score.notes.enumerated().reduce(into: [Int: Note]()) {
-                                if id == $1.element.envelope.id {
-                                    $0[$1.offset] = $1.element
-                                }
-                            }
-                        }
-                        beganNotes[noteI] = score.notes[noteI]
-                        
-                        beganEnvelope = score.notes[noteI].envelope
-                    case .reverbEarlyAndLateRSec:
-                        type = .reverbEarlyAndLateRSec
-                        
-                        if rootView.isSelect(at: p) {
-                            let noteIs = sheetView.noteIndexes(from: rootView.selections)
-                            beganNotes = noteIs.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
-                        } else {
-                            let id = score.notes[noteI].envelope.id
-                            beganNotes = score.notes.enumerated().reduce(into: [Int: Note]()) {
-                                if id == $1.element.envelope.id {
-                                    $0[$1.offset] = $1.element
-                                }
-                            }
-                        }
-                        beganNotes[noteI] = score.notes[noteI]
-                        
-                        beganEnvelope = score.notes[noteI].envelope
-                    case .reverbDurSec:
-                        type = .reverbDurSec
-                        
-                        if rootView.isSelect(at: p) {
-                            let noteIs = sheetView.noteIndexes(from: rootView.selections)
-                            beganNotes = noteIs.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
-                        } else {
-                            let id = score.notes[noteI].envelope.id
-                            beganNotes = score.notes.enumerated().reduce(into: [Int: Note]()) {
-                                if id == $1.element.envelope.id {
-                                    $0[$1.offset] = $1.element
-                                }
-                            }
-                        }
-                        beganNotes[noteI] = score.notes[noteI]
-                        
-                        beganEnvelope = score.notes[noteI].envelope
                     case .even(let pitI):
                         type = .even
                         
@@ -1251,54 +1200,6 @@ final class MoveScoreAction: DragEventAction {
                             rootView.updateSelects()
                         }
                     }
-                case .reverbEarlyRSec:
-                    let dBeat = scoreView.durBeat(atWidth: sheetP.x - beganSheetP.x)
-                    let sec = (beganEnvelope.reverb.earlySec + score.sec(fromBeat: dBeat))
-                        .clipped(min: 0, max: 10)
-                    
-                    let nid = UUID()
-                    var eivs = [IndexValue<Envelope>](capacity: beganNotes.count)
-                    for noteI in beganNotes.keys {
-                        guard noteI < score.notes.count else { continue }
-                        var envelope = scoreView.model.notes[noteI].envelope
-                        envelope.reverb.earlySec = sec
-                        envelope.reverb.seedID = nid
-                        envelope.id = nid
-                        eivs.append(.init(value: envelope, index: noteI))
-                    }
-                    scoreView.replace(eivs)
-                case .reverbEarlyAndLateRSec:
-                    let dBeat = scoreView.durBeat(atWidth: sheetP.x - beganSheetP.x)
-                    let sec = (beganEnvelope.reverb.lateSec + score.sec(fromBeat: dBeat))
-                        .clipped(min: 0, max: 10)
-                    
-                    let nid = UUID()
-                    var eivs = [IndexValue<Envelope>](capacity: beganNotes.count)
-                    for noteI in beganNotes.keys {
-                        guard noteI < score.notes.count else { continue }
-                        var envelope = scoreView.model.notes[noteI].envelope
-                        envelope.reverb.lateSec = sec
-                        envelope.reverb.seedID = nid
-                        envelope.id = nid
-                        eivs.append(.init(value: envelope, index: noteI))
-                    }
-                    scoreView.replace(eivs)
-                case .reverbDurSec:
-                    let dBeat = scoreView.durBeat(atWidth: sheetP.x - beganSheetP.x)
-                    let sec = (beganEnvelope.reverb.releaseSec + score.sec(fromBeat: dBeat))
-                        .clipped(min: 0, max: 10)
-                    
-                    let nid = UUID()
-                    var eivs = [IndexValue<Envelope>](capacity: beganNotes.count)
-                    for noteI in beganNotes.keys {
-                        guard noteI < score.notes.count else { continue }
-                        var envelope = scoreView.model.notes[noteI].envelope
-                        envelope.reverb.releaseSec = sec
-                        envelope.reverb.seedID = nid
-                        envelope.id = nid
-                        eivs.append(.init(value: envelope, index: noteI))
-                    }
-                    scoreView.replace(eivs)
                 case .even:
                     if let noteI, noteI < score.notes.count, let pitI {
                         let note = score.notes[noteI]

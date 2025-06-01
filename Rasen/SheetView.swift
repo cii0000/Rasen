@@ -3971,20 +3971,6 @@ final class SheetView: BindableView, @unchecked Sendable {
         set(redoItem)
     }
     
-    func replace(_ envelope: Envelope, at ni: Int) {
-        var note = model.score.notes[ni]
-        note.envelope = envelope
-        replace(note, at: ni)
-    }
-    func replace(_ envelope: Envelope, at nis: [Int]) {
-        let nivs = nis.map {
-            var note = model.score.notes[$0]
-            note.envelope = envelope
-            return IndexValue(value: note, index: $0)
-        }
-        replace(nivs)
-    }
-    
     func insertDraft(_ nivs: [IndexValue<Note>]) {
         let undoItem = SheetUndoItem.removeDraftNotes(noteIndexes: nivs.map { $0.index })
         let redoItem = SheetUndoItem.insertDraftNotes(nivs)

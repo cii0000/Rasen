@@ -350,7 +350,7 @@ extension Rendnote {
                   noiseSeed0: seed0, noiseSeed1: seed1,
                   pitbend: pitbend,
                   secRange: sSec ..< eSec,
-                  reverb: note.envelope.reverb)
+                  reverb: .full)
     }
     
     var isStft: Bool {

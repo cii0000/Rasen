@@ -994,6 +994,9 @@ extension Reverb: Protobuf {
     }
 }
 extension Reverb {
+    static let empty = Self.init(earlySec: 0, earlyVolm: 0, lateSec: 0, lateVolm: 0, releaseSec: 0)
+    static let full = Self.init(earlySec: 0, earlyVolm: 1, lateSec: 0, lateVolm: 1, releaseSec: 0)
+    
     var isEmpty: Bool {
         (earlySec == 0 && lateSec == 0 && releaseSec == 0) || (earlyVolm == 0 && lateVolm == 0)
     }
@@ -1099,7 +1102,6 @@ struct Note {
     var beatRange = 0 ..< Rational(1, 4)
     var pitch = Rational(0)
     var pits = [Pit()]
-    var envelope = Envelope()
     var spectlopeHeight = Sheet.spectlopeHeight
     var id = UUID()
 }
@@ -1111,7 +1113,6 @@ extension Note: Protobuf {
         if pits.isEmpty {
             pits = [Pit()]
         }
-        envelope = (try? Envelope(pb.envelope)) ?? .init()
         spectlopeHeight = ((try? pb.spectlopeHeight.notNaN()) ?? 0)
             .clipped(min: Sheet.spectlopeHeight, max: Sheet.maxSpectlopeHeight)
         id = (try? UUID(pb.id)) ?? UUID()
@@ -1121,7 +1122,6 @@ extension Note: Protobuf {
             $0.beatRange = RationalRange(value: beatRange).pb
             $0.pitch = pitch.pb
             $0.pits = pits.map { $0.pb }
-            $0.envelope = envelope.pb
             $0.spectlopeHeight = spectlopeHeight
             $0.id = id.pb
         }
@@ -1146,8 +1146,7 @@ extension Note {
     }
     var firstPitResult: PitResult {
         .init(notePitch: pitch, pitch: .rational(firstPit.pitch), stereo: firstStereo,
-              tone: firstTone, lyric: firstPit.lyric,
-              envelope: envelope, id: id)
+              tone: firstTone, lyric: firstPit.lyric, id: id)
     }
     
     var noiseRatio: Double {
@@ -1212,7 +1211,6 @@ extension Note {
     func isEqualOtherThanBeatRange(_ other: Self) -> Bool {
         pitch == other.pitch
         && pits == other.pits
-        && envelope == other.envelope
         && id == other.id
     }
     
@@ -1238,7 +1236,7 @@ extension Note {
     }
     struct PitResult: Hashable {
         var notePitch: Rational, pitch: ResultPitch, stereo: Stereo,
-            tone: Tone, lyric: String, envelope: Envelope, id: UUID
+            tone: Tone, lyric: String, id: UUID
         
         var sumTone: Double {
             tone.spectlope.sumVolm
@@ -1248,19 +1246,16 @@ extension Note {
         if pits.count == 1 || beat <= .init(pits[0].beat) {
             let pit = pits[0]
             return .init(notePitch: pitch, pitch: .rational(pit.pitch), stereo: pit.stereo,
-                         tone: pit.tone, lyric: pit.lyric,
-                         envelope: envelope, id: id)
+                         tone: pit.tone, lyric: pit.lyric, id: id)
         } else if let pit = pits.last, beat >= .init(pit.beat) {
             return .init(notePitch: pitch, pitch: .rational(pit.pitch), stereo: pit.stereo,
-                         tone: pit.tone, lyric: pit.lyric,
-                         envelope: envelope, id: id)
+                         tone: pit.tone, lyric: pit.lyric, id: id)
         }
         for pitI in 0 ..< pits.count - 1 {
             let pit = pits[pitI], nextPit = pits[pitI + 1]
             if beat >= .init(pit.beat) && beat < .init(nextPit.beat) && pit.isEqualWithoutBeat(nextPit) {
                 return .init(notePitch: pitch, pitch: .rational(pit.pitch), stereo: pit.stereo,
-                             tone: pit.tone, lyric: pit.lyric,
-                             envelope: envelope, id: id)
+                             tone: pit.tone, lyric: pit.lyric, id: id)
             }
         }
         
@@ -1271,7 +1266,7 @@ extension Note {
                      tone: .init(overtone: pitbend.overtone(atSec: sec),
                                  spectlope: pitbend.spectlope(atSec: sec),
                                  id: .init()), lyric: "",
-                     envelope: envelope, id: id)
+                     id: id)
     }
     func normarizedPitResult(atBeat beat: Double) -> PitResult {
         let firstSpectlope = pits.first!.tone.spectlope

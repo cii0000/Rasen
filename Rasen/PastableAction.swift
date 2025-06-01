@@ -111,7 +111,6 @@ enum PastableObject: Sendable {
     case notesValue(_ notesValue: NotesValue)
     case stereo(_ stereo: Stereo)
     case tone(_ tone: Tone)
-    case envelope(_ envelope: Envelope)
 }
 extension PastableObject {
     static func typeName(with obj: Any) -> String {
@@ -168,8 +167,6 @@ extension PastableObject {
              PastableObject.typeName(with: stereo)
         case .tone(let tone):
              PastableObject.typeName(with: tone)
-        case .envelope(let envelope):
-             PastableObject.typeName(with: envelope)
         }
     }
     init(data: Data, typeName: String) throws {
@@ -217,8 +214,6 @@ extension PastableObject {
             self = .stereo(try Stereo(serializedData: data))
         case PastableObject.objectTypeName(with: Tone.self):
             self = .tone(try Tone(serializedData: data))
-        case PastableObject.objectTypeName(with: Envelope.self):
-            self = .envelope(try Envelope(serializedData: data))
         default:
             throw PastableObject.PastableError()
         }
@@ -263,8 +258,6 @@ extension PastableObject {
              try? stereo.serializedData()
         case .tone(let tone):
              try? tone.serializedData()
-        case .envelope(let envelope):
-             try? envelope.serializedData()
         }
     }
 }
@@ -312,8 +305,6 @@ extension PastableObject: Protobuf {
             self = .stereo(try Stereo(stereo))
         case .tone(let tone):
             self = .tone(try Tone(tone))
-        case .envelope(let envelope):
-            self = .envelope(try Envelope(envelope))
         }
     }
     var pb: PBPastableObject {
@@ -357,8 +348,6 @@ extension PastableObject: Protobuf {
                 $0.value = .stereo(stereo.pb)
             case .tone(let tone):
                 $0.value = .tone(tone.pb)
-            case .envelope(let envelope):
-                $0.value = .envelope(envelope.pb)
             }
         }
     }
@@ -384,7 +373,6 @@ extension PastableObject: Codable {
         case notesValue = "13"
         case stereo = "22"
         case tone = "14"
-        case envelope = "21"
     }
     init(from decoder: any Decoder) throws {
         var container = try decoder.unkeyedContainer()
@@ -428,8 +416,6 @@ extension PastableObject: Codable {
             self = .stereo(try container.decode(Stereo.self))
         case .tone:
             self = .tone(try container.decode(Tone.self))
-        case .envelope:
-            self = .envelope(try container.decode(Envelope.self))
         }
     }
     func encode(to encoder: any Encoder) throws {
@@ -492,9 +478,6 @@ extension PastableObject: Codable {
         case .tone(let tone):
             try container.encode(CodingTypeKey.tone)
             try container.encode(tone)
-        case .envelope(let envelope):
-            try container.encode(CodingTypeKey.envelope)
-            try container.encode(envelope)
         }
     }
 }
@@ -647,8 +630,7 @@ final class PastableAction: Action {
                         }
                         let startBeat = note.pits[pitIs[0]].beat + note.beatRange.start
                         var nNote = Note(beatRange: startBeat ..< (startBeat + currentBeat),
-                                         pitch: note.pitch, pits: nPits,
-                                         envelope: note.envelope, id: .init())
+                                         pitch: note.pitch, pits: nPits, id: .init())
                         
                         let scoreP = scoreView.convertFromWorld(p)
                         let pitchInterval = rootView.currentPitchInterval
@@ -910,33 +892,6 @@ final class PastableAction: Action {
                     }
                 }
                 show(ps)
-            case .reverbEarlyRSec:
-                let envelope = score.notes[noteI].envelope
-                if isSendPasteboard {
-                    Pasteboard.shared.copiedObjects = [.envelope(envelope)]
-                }
-                let ps = score.notes.compactMap {
-                    $0.envelope.id == envelope.id ? scoreView.earlyReverbPosition(from: $0) : nil
-                }
-                show(ps)
-            case .reverbEarlyAndLateRSec:
-                let envelope = score.notes[noteI].envelope
-                if isSendPasteboard {
-                    Pasteboard.shared.copiedObjects = [.envelope(envelope)]
-                }
-                let ps = score.notes.compactMap {
-                    $0.envelope.id == envelope.id ? scoreView.lateReverbPosition(from: $0) : nil
-                }
-                show(ps)
-            case .reverbDurSec:
-                let envelope = score.notes[noteI].envelope
-                if isSendPasteboard {
-                    Pasteboard.shared.copiedObjects = [.envelope(envelope)]
-                }
-                let ps = score.notes.compactMap {
-                    $0.envelope.id == envelope.id ? scoreView.durReverbPosition(from: $0) : nil
-                }
-                show(ps)
             case .even(let pitI):
                 let note = score.notes[noteI]
                 let tone = note.pits[pitI].tone
@@ -1115,8 +1070,7 @@ final class PastableAction: Action {
                 }
                 let startBeat = note.pits[pitIs[0]].beat + note.beatRange.start
                 var nNote = Note(beatRange: startBeat ..< (startBeat + currentBeat),
-                                 pitch: note.pitch, pits: nPits,
-                                 envelope: note.envelope, id: .init())
+                                 pitch: note.pitch, pits: nPits, id: .init())
                 
                 let scoreP = scoreView.convertFromWorld(p)
                 let pitchInterval = rootView.currentPitchInterval
@@ -1420,15 +1374,6 @@ final class PastableAction: Action {
                     sheetView.updatePlaying()
                     return true
                 }
-            case .reverbEarlyRSec, .reverbEarlyAndLateRSec, .reverbDurSec:
-                let envelope = score.notes[noteI].envelope
-                Pasteboard.shared.copiedObjects = [.envelope(envelope)]
-                
-                sheetView.newUndoGroup()
-                sheetView.replace(Envelope(), at: noteI)
-                
-                sheetView.updatePlaying()
-                return true
             case .sprol(let pitI, let sprolI, _):
                 let oldTone = score.notes[noteI].pits[pitI].tone
                 var tone = oldTone
@@ -2141,8 +2086,6 @@ final class PastableAction: Action {
         case .stereo:
             break
         case .tone:
-            break
-        case .envelope:
             break
         }
     }
@@ -2977,30 +2920,6 @@ final class PastableAction: Action {
                     }
                 }
             }
-        case .envelope(let envelope):
-            guard let sheetView = rootView.sheetView(at: shp) else { return }
-            if sheetView.model.score.enabled {
-                let scoreView = sheetView.scoreView
-                if let noteI = scoreView.noteIndex(at: scoreView.convertFromWorld(p),
-                                                scale: rootView.screenToWorldScale) {
-                    let score = scoreView.model
-                    if rootView.isSelect(at: p) {
-                        let nis = sheetView.noteIndexes(from: rootView.selections)
-                            .filter { score.notes[$0].envelope != envelope }
-                        if !nis.isEmpty {
-                            sheetView.newUndoGroup()
-                            sheetView.replace(envelope, at: nis)
-                            
-                            sheetView.updatePlaying()
-                        }
-                    } else if score.notes[noteI].envelope != envelope {
-                        sheetView.newUndoGroup()
-                        sheetView.replace(envelope, at: noteI)
-                        
-                        sheetView.updatePlaying()
-                    }
-                }
-            }
         }
     }
     
@@ -3025,7 +2944,6 @@ final class PastableAction: Action {
         case .notesValue: true
         case .stereo: false
         case .tone: false
-        case .envelope: false
         }
     }
     

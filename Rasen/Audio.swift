@@ -104,7 +104,7 @@ final class NotePlayer {
                                         overtone: note.tone.overtone,
                                         spectlope: note.tone.spectlope),
                          secRange: -.infinity ..< .infinity,
-                         reverb: note.envelope.reverb)
+                         reverb: .full)
         }
         rendnotes.forEach { noteIDs.insert($0.id) }
         
@@ -127,8 +127,7 @@ final class NotePlayer {
         
         isPlaying = false
         
-        timer.start(afterTime: max(NotePlayer.stopEngineSec, 
-                                   (notes.maxValue { $0.envelope.releaseSec + $0.envelope.reverb.durSec }) ?? 0),
+        timer.start(afterTime: max(NotePlayer.stopEngineSec, Waveclip.releaseSec),
                     dispatchQueue: .main) {
         } waitClosure: {
         } cancelClosure: {
