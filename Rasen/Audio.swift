@@ -441,7 +441,7 @@ struct ScoreTrackItem {
     fileprivate(set) var notewaveDic = [UUID: Notewave]()
     fileprivate(set) var isChanged = false
     fileprivate(set) var lufs = 0.0
-    fileprivate(set) var sampless = [[Double]]()
+    fileprivate(set) var sampless = [[Double]](), sampleStartI = 0
     var sampleCount: Int {
         sampless.isEmpty ? 0 : sampless[0].count
     }
@@ -569,16 +569,17 @@ extension ScoreTrackItem {
     mutating func updateSamples(targetLoudnessDb: Double = -14) {
         guard isEnabledSamples else { return }
         let ranges = rendnotes.map { $0.releasedRange(sampleRate: sampleRate, startSec: startSec) }
-        let count = ranges.maxValue { $0.end } ?? 0
+        let startI = ranges.minValue { $0.start } ?? 0
+        let endI = ranges.maxValue { $0.end } ?? 0
+        let count = endI - startI
         var sampless = [[Double](repeating: 0, count: count),
                         [Double](repeating: 0, count: count)]
         for (rendnote, range) in zip(rendnotes, ranges) {
             guard let notewave = notewave(from: rendnote),
                   range.length <= notewave.sampleCount else { continue }
             for i in range {
-                guard i >= 0 else { continue }
-                sampless[0][i] += notewave.sampless[0][i - range.start]
-                sampless[1][i] += notewave.sampless[1][i - range.start]
+                sampless[0][i - startI] += notewave.sampless[0][i - range.start]
+                sampless[1][i - startI] += notewave.sampless[1][i - range.start]
             }
         }
         
@@ -593,6 +594,7 @@ extension ScoreTrackItem {
         sampless = PCMBuffer.compress(sampless: sampless, sampleRate: sampleRate)
         
         self.sampless = sampless
+        self.sampleStartI = -startI
     }
 }
 
@@ -771,7 +773,6 @@ final class ScoreNoder: ObjectHashable {
                             mi -= notewave.sampleCount
                         }
                     }
-                    //fir
                 }
             } else {
                 let seqDurSec = seq.durSec
@@ -780,28 +781,34 @@ final class ScoreNoder: ObjectHashable {
                 let loopStartI = (frameStartI / maxCount) * maxCount
                 let loopedFrameRange = loopedFrameStartI ..< loopedFrameStartI + frameCount
                 let preLoopedFrameRange = loopedFrameRange - maxCount
+                let nextLoopedFrameRange = loopedFrameRange + maxCount
                 let isLooped = type == .loop && frameStartI >= maxCount - frameCount
                 
                 let beganPauseI = endSampleTime != nil ? Int(endSampleTime! - startSampleTime) + seqStartI : nil
                 
                 _ = {
                     let scoreDurSec = Double(scoreTrackItem.durSec)
-                    let loopedNoteRange = Range(start: Int((startSec * sampleRate).rounded(.down)),
+                    let loopedNoteRange = Range(start: Int((startSec * sampleRate).rounded(.down)) - scoreTrackItem.sampleStartI,
                                                 length: scoreTrackItem.sampleCount)
                     if let beganPauseI, beganPauseI < loopedNoteRange.lowerBound + loopStartI { return }
                     
                     let preLoopedNoteRange = loopedNoteRange - maxCount
+                    let nextLoopedNoteRange = loopedNoteRange + maxCount
                     let cLoopedNoteRange = loopedNoteRange.clamped(to: 0 ..< maxCount)
                     let cPreLoopedNoteRange = preLoopedNoteRange.clamped(to: 0 ..< maxCount)
+                    let cNextLoopedNoteRange = nextLoopedNoteRange.clamped(to: 0 ..< maxCount)
                     
                     guard loopedFrameRange.intersects(cLoopedNoteRange)
                             || (type == .loop && preLoopedFrameRange.intersects(cLoopedNoteRange))
+                            || (type == .loop && nextLoopedFrameRange.intersects(cLoopedNoteRange))
                             || (isLooped && loopedFrameRange.intersects(cPreLoopedNoteRange))
-                            || (isLooped && preLoopedFrameRange.intersects(cPreLoopedNoteRange)) else { return }
+                            || (isLooped && preLoopedFrameRange.intersects(cPreLoopedNoteRange))
+                            || (loopedFrameRange.intersects(cNextLoopedNoteRange))
+                            || (nextLoopedFrameRange.intersects(cNextLoopedNoteRange)) else { return }
                     
                     let isFirstCross = loopedNoteRange.lowerBound < 0
                     let isLastCross = loopedNoteRange.upperBound > maxCount
-                    let allAttackStartSec = type != .loopNote && isFirstCross ? 0.0 : nil
+                    let allAttackStartSec = type == .normal && isFirstCross ? 0.0 : nil
                     let allReleaseStartSec = type == .normal && isLastCross ? seqDurSec - Waveclip.releaseSec : nil
                     
                     let noteRange = loopedNoteRange + loopStartI
@@ -815,24 +822,35 @@ final class ScoreNoder: ObjectHashable {
                     Double(beganPauseI!) * rSampleRate : nil
                     
                     let preNoteRange = noteRange - maxCount
-                    
                     let prePlayingReleaseStartSec = beganPauseI != nil
                     && (preNoteRange.lowerBound != beganPauseI && preNoteRange.contains(beganPauseI!)) ?
                     Double(beganPauseI!) * rSampleRate : nil
+                    
+                    let nextNoteRange = noteRange + maxCount
+                    let nextPlayingAttackStartSec = !isLooped
+                    && nextNoteRange.lowerBound != seqStartI && nextNoteRange.contains(seqStartI) ?
+                    Double(seqStartI) * rSampleRate : nil
+                    
+                    let nextPlayingReleaseStartSec = beganPauseI != nil
+                    && (nextNoteRange.lowerBound != beganPauseI && nextNoteRange.contains(beganPauseI!)) ?
+                    Double(beganPauseI!) * rSampleRate : nil
+                    
                     guard !(beganPauseI != nil && noteRange.lowerBound >= beganPauseI!)
-                            || !(beganPauseI != nil && preNoteRange.lowerBound >= beganPauseI!) else { return }
+                            || !(beganPauseI != nil && preNoteRange.lowerBound >= beganPauseI!)
+                            || !(beganPauseI != nil && nextNoteRange.lowerBound >= beganPauseI!) else { return }
                     
                     contains = true
                     
                     let sampleCount = scoreTrackItem.sampleCount
                     func update(envelopeMemo: EnvelopeMemo, startSec: Double, releaseSec: Double?,
+                                playingAttackStartSec: Double?,
                                 playingReleaseStartSec: Double?,
                                 range: Range<Int>, startI: Int) {
                         var i = loopedFrameStartI
                         for ni in 0 ..< Int(frameCount) {
                             if range.contains(i) {
                                 let mi = i - startI
-                                if mi < sampleCount {
+                                if mi >= 0 && mi < sampleCount {
                                     updateF(i: i, ui: ni + frameStartI, mi: mi, ni: ni,
                                             sampless: scoreTrackItem.sampless,
                                             isPremultipliedEnvelope: true,
@@ -851,10 +869,12 @@ final class ScoreNoder: ObjectHashable {
                     }
                     
                     if cLoopedNoteRange.intersects(loopedFrameRange)
-                        || cLoopedNoteRange.intersects(preLoopedFrameRange) {
+                        || cLoopedNoteRange.intersects(preLoopedFrameRange)
+                        || cLoopedNoteRange.intersects(nextLoopedFrameRange) {
                         update(envelopeMemo: .init(.init()),
                                startSec: startSec,
                                releaseSec: startSec + scoreDurSec,
+                               playingAttackStartSec: playingAttackStartSec,
                                playingReleaseStartSec: playingReleaseStartSec,
                                range: cLoopedNoteRange, startI: loopedNoteRange.start)
                     }
@@ -864,8 +884,19 @@ final class ScoreNoder: ObjectHashable {
                         update(envelopeMemo: .init(.init()),
                                startSec: startSec - seqDurSec,
                                releaseSec: startSec + scoreDurSec - seqDurSec,
+                               playingAttackStartSec: playingAttackStartSec,
                                playingReleaseStartSec: prePlayingReleaseStartSec,
                                range: cPreLoopedNoteRange, startI: preLoopedNoteRange.start)
+                    }
+                    if type == .loop,
+                       cNextLoopedNoteRange.intersects(loopedFrameRange)
+                        || cNextLoopedNoteRange.intersects(nextLoopedFrameRange) {
+                        update(envelopeMemo: .init(.init()),
+                               startSec: startSec - seqDurSec,
+                               releaseSec: startSec + scoreDurSec - seqDurSec,
+                               playingAttackStartSec: nextPlayingAttackStartSec,
+                               playingReleaseStartSec: nextPlayingReleaseStartSec,
+                               range: cNextLoopedNoteRange, startI: nextLoopedNoteRange.start)
                     }
                 } ()
             }

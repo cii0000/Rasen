@@ -22,120 +22,167 @@ extension Note {
     mutating func replace(lyric: String, at oi: Int, tempo: Rational,
                           beatInterval: Rational = Sheet.fullEditBeatInterval,
                           pitchInterval: Rational = Sheet.fullEditPitchInterval) {
-        let oldLyric = pits[oi].lyric
-        self.pits[oi].lyric = lyric
-        
-        let i: Int
-        if !oldLyric.isEmpty {
-            if oi > 0 {
-                let maxI = oi
-                var minI = oi
-                for j in maxI.range.reversed() {
-                    if (!pits[j].lyric.isEmpty && pits[j].lyric != "[") || pits[j].lyric == "]" { break }
-                    if pits[j].lyric == "[" {
-                        minI = j
+        func update(lyric: String, at oi: Int) -> Int {
+            let oldLyric = pits[oi].lyric
+            self.pits[oi].lyric = lyric
+            
+            var isFirst = false
+            let i: Int
+            if !oldLyric.isEmpty {
+                if oi > 0 {
+                    let maxI = oi
+                    var minI = oi
+                    for j in maxI.range.reversed() {
+                        if (!pits[j].lyric.isEmpty && pits[j].lyric != "[") || pits[j].lyric == "]" { break }
+                        if pits[j].lyric == "[" {
+                            isFirst = j == 0
+                            if !isFirst && pits[j].pitch != pits[oi].pitch {
+                                minI = j + 1
+                                pits[j].beat = pits[oi].beat
+                            } else {
+                                minI = j
+                            }
+                            
+                            if !isFirst {
+                                pits[oi].tone = pits[j].tone
+                                pits[j].lyric = ""
+                            }
+                            break
+                        }
+                    }
+                    if minI < maxI {
+                        pits.remove(at: Array(minI ..< maxI))
+                        i = oi - (maxI - minI)
+                    } else {
+                        i = oi
+                    }
+                } else {
+                    i = oi
+                }
+                
+                let minI = i + 1
+                var maxI = i
+                for j in minI ..< pits.count {
+                    if (!pits[j].lyric.isEmpty && pits[j].lyric != "]") || pits[j].lyric == "[" { break }
+                    if pits[j].lyric == "]" {
+                        maxI = j
                         break
                     }
                 }
-                if minI < maxI {
-                    pits.remove(at: Array(minI ..< maxI))
-                    i = oi - (maxI - minI)
-                } else {
-                    i = oi
+                if minI <= maxI {
+                    pits.remove(at: Array(minI ... maxI))
                 }
             } else {
                 i = oi
             }
             
-            let minI = i + 1
-            var maxI = i
-            for j in minI ..< pits.count {
-                if (!pits[j].lyric.isEmpty && pits[j].lyric != "]") || pits[j].lyric == "[" { break }
-                if pits[j].lyric == "]" {
-                    maxI = j
-                    break
+            if isFirst {
+                print(pits.count, pits[i].beat)
+                if pits[i].beat > 0 {
+                    let dBeat = pits[i].beat
+                    pits = pits.map {
+                        var n = $0
+                        n.beat -= dBeat
+                        return n
+                    }
+                    beatRange.start += dBeat
+                    beatRange.length -= dBeat
                 }
             }
-            if minI <= maxI {
+            
+            if lyric.isEmpty { return i }
+            
+            let previousPhoneme: Phoneme?, previousFormantFilter: FormantFilter?, previousID: UUID?
+            if let preI = i.range.reversed().first(where: { !pits[$0].lyric.isEmpty }) {
+                previousPhoneme = Phoneme.phonemes(fromHiragana: pits[preI].lyric).last
+                previousFormantFilter = .init(spectlope: pits[preI].tone.spectlope)
+                previousID = pits[preI].tone.id
+            } else {
+                previousPhoneme = nil
+                previousFormantFilter = nil
+                previousID = nil
+            }
+            
+            var ni = i
+            if let mora = Mora(hiragana: lyric,
+                               previousPhoneme: previousPhoneme,
+                               previousFormantFilter: previousFormantFilter, previousID: previousID) {
+                let beat = pits[i].beat
+                let fBeat = Score.beat(fromSec: mora.keyFormantFilters.first?.sec ?? 0,
+                                       tempo: tempo, interval: beatInterval) + beat
+                let lBeat = Score.beat(fromSec: mora.keyFormantFilters.last?.sec ?? 0,
+                                       tempo: tempo, interval: beatInterval) + beat
+                var minI = i, maxI = i
+                for j in i.range.reversed() {
+                    if pits[j].beat < fBeat {
+                        minI = j + 1
+                        break
+                    }
+                }
+                for j in i + 1 ..< pits.count {
+                    if pits[j].beat > lBeat {
+                        maxI = j - 1
+                        break
+                    }
+                }
+                
+                var ivps = [IndexValue<Pit>]()
+                for (fi, ff) in mora.keyFormantFilters.enumerated() {
+                    let fBeat = Score.beat(fromSec: ff.sec, tempo: tempo, interval: beatInterval) + beat
+                    let result = self.pitResult(atBeat: Double(fBeat))
+                    
+                    let isLyric = mora.keyFormantFilters.count == 1 || ff.sec == 0
+                    let lyric = if isLyric {
+                        lyric
+                    } else if fi == 0 {
+                        "["
+                    } else if fi == mora.keyFormantFilters.count - 1 {
+                        "]"
+                    } else {
+                        ""
+                    }
+                    if isLyric {
+                        ni = fi + minI
+                    }
+                    
+                    ivps.append(.init(value: .init(beat: fBeat,
+                                                   pitch: result.pitch.rationalValue(intervalScale: pitchInterval) + ff.pitch,
+                                                   stereo: .init(volm: pits[i].stereo.volm,
+                                                                 pan: result.stereo.pan,
+                                                                 id: result.stereo.id),
+                                                   tone: .init(spectlope: ff.formantFilter.spectlope, id: ff.id),
+                                                   lyric: lyric),
+                                      index: fi + minI))
+                }
                 pits.remove(at: Array(minI ... maxI))
-            }
-        } else {
-            i = oi
-        }
-        if lyric.isEmpty { return }
-        
-        let previousPhoneme: Phoneme?, previousFormantFilter: FormantFilter?, previousID: UUID?
-        if let preI = i.range.reversed().first(where: { !pits[$0].lyric.isEmpty }) {
-            previousPhoneme = Phoneme.phonemes(fromHiragana: pits[preI].lyric).last
-            previousFormantFilter = .init(spectlope: pits[preI].tone.spectlope)
-            previousID = pits[preI].tone.id
-        } else {
-            previousPhoneme = nil
-            previousFormantFilter = nil
-            previousID = nil
-        }
-        
-        if let mora = Mora(hiragana: lyric,
-                           previousPhoneme: previousPhoneme,
-                           previousFormantFilter: previousFormantFilter, previousID: previousID) {
-            let beat = pits[i].beat
-            let fBeat = Score.beat(fromSec: mora.keyFormantFilters.first?.sec ?? 0,
-                                   tempo: tempo, interval: beatInterval) + beat
-            let lBeat = Score.beat(fromSec: mora.keyFormantFilters.last?.sec ?? 0,
-                                   tempo: tempo, interval: beatInterval) + beat
-            var minI = i, maxI = i
-            for j in i.range.reversed() {
-                if pits[j].beat < fBeat {
-                    minI = j + 1
-                    break
-                }
-            }
-            for j in i + 1 ..< pits.count {
-                if pits[j].beat > lBeat {
-                    maxI = j - 1
-                    break
-                }
-            }
-            
-            var ivps = [IndexValue<Pit>]()
-            for (fi, ff) in mora.keyFormantFilters.enumerated() {
-                let fBeat = Score.beat(fromSec: ff.sec, tempo: tempo, interval: beatInterval) + beat
-                let result = self.pitResult(atBeat: Double(fBeat))
+                pits.insert(ivps)
                 
-                let lyric = if mora.keyFormantFilters.count == 1 || ff.sec == 0 {
-                    lyric
-                } else if fi == 0 {
-                    "["
-                } else if fi == mora.keyFormantFilters.count - 1 {
-                    "]"
-                } else {
-                    ""
+                let fdBeat = ivps.first?.value.beat ?? 0
+                if fdBeat < 0 {
+                    self.beatRange = beatRange.start + fdBeat ..< beatRange.end
+                
+                    for i in pits.count.range {
+                        pits[i].beat -= fdBeat
+                    }
                 }
                 
-                ivps.append(.init(value: .init(beat: fBeat,
-                                               pitch: result.pitch.rationalValue(intervalScale: pitchInterval) + ff.pitch,
-                                               stereo: .init(volm: pits[i].stereo.volm,
-                                                             pan: result.stereo.pan,
-                                                             id: result.stereo.id),
-                                               tone: .init(spectlope: ff.formantFilter.spectlope, id: ff.id),
-                                               lyric: lyric),
-                                  index: fi + minI))
-            }
-            pits.remove(at: Array(minI ... maxI))
-            pits.insert(ivps)
-            
-            let fdBeat = ivps.first?.value.beat ?? 0
-            if fdBeat < 0 {
-                self.beatRange = beatRange.start + fdBeat ..< beatRange.end
-            
-                for i in pits.count.range {
-                    pits[i].beat -= fdBeat
+                let ldBeat = ivps.last?.value.beat ?? 0
+                if ldBeat > beatRange.length {
+                    self.beatRange = beatRange.start ..< beatRange.start + ldBeat
                 }
             }
-            
-            let ldBeat = ivps.last?.value.beat ?? 0
-            if ldBeat > beatRange.length {
-                self.beatRange = beatRange.start ..< beatRange.start + ldBeat
+            return ni
+        }
+        
+        let ni = update(lyric: lyric, at: oi)
+        
+        for j in (ni + 1) ..< pits.count {
+            if !pits[j].lyric.isEmpty && pits[j].lyric != "[" && pits[j].lyric != "]",
+               Phoneme.phonemes(fromHiragana: lyric).last
+                != Phoneme.phonemes(fromHiragana: pits[j].lyric).last {
+                
+                _ = update(lyric: pits[j].lyric, at: j)
+                break
             }
         }
     }

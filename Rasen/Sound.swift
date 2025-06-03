@@ -877,7 +877,7 @@ extension Tone {
         .init(overtone: overtone, spectlope: spectlope.with(count: spectlopeCount), id: id)
     }
     var isDefault: Bool {
-        overtone == .init() && spectlope == .init()
+        spectlope == .init()
     }
     
     func baseColor(lightness: Double = 85) -> Color {

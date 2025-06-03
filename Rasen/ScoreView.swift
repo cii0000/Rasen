@@ -771,22 +771,22 @@ extension ScoreView {
                     case .power: .init(red: 0.8, green: 0.8, blue: 0.68)
                         
                     case .major: .init(red: 0.9, green: 0.8, blue: 0)
-                    case .major3: .init(red: 0.9, green: 0.8, blue: 0).with(lightness: 93)
+                    case .major3: .init(red: 0.9, green: 0.8, blue: 0).with(lightness: 95)
                         
                     case .suspended: .init(red: 0.25, green: 0.9, blue: 0)
                         
                     case .minor: .init(red: 0.0, green: 0.8, blue: 0.95)
-                    case .minor3: .init(red: 0.0, green: 0.8, blue: 0.95).with(lightness: 90)
+                    case .minor3: .init(red: 0.0, green: 0.8, blue: 0.95).with(lightness: 93)
                         
                     case .augmented: .init(red: 0.75, green: 0.5, blue: 1.0)
                         
                     case .flatfive: .init(red: 1.0, green: 0.6, blue: 1.0)
                         
-                    case .wholeTone: .init(red: 0.25, green: 0.9, blue: 0).with(lightness: 93)
+                    case .wholeTone: .init(red: 0.25, green: 0.9, blue: 0).with(lightness: 95)
                     case .semitone: .init(red: 1.0, green: 0.65, blue: 0.2)
                         
                     case .diminish: .init(red: 1.0, green: 0.5, blue: 0.5)
-                    case .tritone: .init(red: 1.0, green: 0.5, blue: 0.5).with(lightness: 80)
+                    case .tritone: .init(red: 1.0, green: 0.5, blue: 0.5).with(lightness: 85)
                     }
                 }
                 
@@ -963,7 +963,7 @@ extension ScoreView {
         let nsx = x(atBeat: note.beatRange.start)
         let ny = y(fromPitch: note.firstPitch)
         let nw = width(atDurBeat: max(note.beatRange.length, Sheet.fullEditBeatInterval))
-        let attackW = width(atDurSec: Waveclip.attackSec)
+        let attackW = 0.0
         let decayW = 0.0
         let releaseW = 0.0
         let attackX = nsx + attackW, decayX = nsx + attackW + decayW, releaseX = nsx + nw + releaseW

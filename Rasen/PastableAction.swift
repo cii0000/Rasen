@@ -1082,18 +1082,14 @@ final class PastableAction: Action {
                 
                 Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: [nNote], deltaPitch: pitch))]
                 
-                let pitISet = Set(pitIs)
                 var pits = note.pits
-                let lastPitI = pits.count.range.reversed().first(where: { !pitISet.contains($0) }) ?? 0
-                let lastBeat = (lastPitI + 1 < note.pits.count ?
-                                note.pits[lastPitI + 1].beat : note.beatRange.length)
                 pits.remove(at: pitIs)
                 let fBeat = pits[0].beat
                 for i in pits.count.range {
                     pits[i].beat -= fBeat
                 }
                 var nnNote = note
-                nnNote.beatRange = (nnNote.beatRange.start + fBeat) ..< (nnNote.beatRange.start + lastBeat)
+                nnNote.beatRange = (nnNote.beatRange.start + fBeat) ..< note.beatRange.end
                 nnNote.pits = pits
                 
                 sheetView.newUndoGroup()

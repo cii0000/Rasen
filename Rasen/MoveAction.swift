@@ -742,8 +742,9 @@ final class MoveScoreAction: DragEventAction {
                         }
                         
                         beganPitch = note.pitch
-                        let dBeat = note.beatRange.start - note.beatRange.start.interval(scale: interval)
-                        beganDeltaNoteBeat = -dBeat
+                        let isInterval = note.pits.contains(where: { ($0.beat + note.beatRange.start) % Sheet.beatInterval == 0 })
+                        let dBeat = isInterval ? (note.beatRange.start - note.beatRange.start.interval(scale: interval)) : 0
+                        beganDeltaNoteBeat = dBeat
                         beganBeatRange = note.beatRange
                         oldPitch = note.pitch
                         
@@ -805,8 +806,11 @@ final class MoveScoreAction: DragEventAction {
                         self.noteI = noteI
                         type = .note
                         beganPitch = note.pitch
-                        let dBeat = note.beatRange.start - note.beatRange.start.interval(scale: interval)
-                        beganDeltaNoteBeat = -dBeat
+                        
+                        let isInterval = note.pits.contains(where: { ($0.beat + note.beatRange.start) % Sheet.beatInterval == 0 })
+                        let dBeat = isInterval ? (note.beatRange.start - note.beatRange.start.interval(scale: interval)) : 0
+                        beganDeltaNoteBeat = dBeat
+                        
                         beganBeatRange = note.beatRange
                         oldPitch = note.pitch
                         beganBeatX = scoreView.x(atBeat: note.beatRange.start)
@@ -996,7 +1000,7 @@ final class MoveScoreAction: DragEventAction {
                         let nsBeat = scoreView.beat(atX: beganBeatX + sheetP.x - beganSheetP.x,
                                                     interval: beatInterval)
                         if pitch != oldPitch || nsBeat != oldBeat {
-                            let dBeat = nsBeat - beganBeatRange.start
+                            let dBeat = nsBeat - beganBeatRange.start + beganDeltaNoteBeat
                             let dPitch = pitch - beganPitch
                             
                             let startBeat = sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: beatInterval)
