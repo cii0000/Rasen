@@ -408,7 +408,7 @@ extension Rendnote {
             }
             return samples
         }
-        if reverb.isFull {
+        if reverb.isFull && pitbend.isFullNoise {
             var noiseSeed2 = noiseSeed0
             _ = Random.next(seed: &noiseSeed2)
             _ = Random.next(seed: &noiseSeed2)

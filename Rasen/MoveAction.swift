@@ -65,7 +65,8 @@ final class MoveAction: DragEventAction {
                 let sheetP = sheetView.convertFromWorld(p)
                 if rootView.isSelect(at: p)
                     && !sheetView.scoreView.containsNote(sheetView.scoreView.convertFromWorld(p),
-                                                         scale: rootView.screenToWorldScale) {
+                                                         scale: rootView.screenToWorldScale,
+                                                         enabledTone: true) {
                     type = .sheet(MoveSheetAction(rootAction))
                 } else if sheetView.lineTuple(at: sheetP,
                                               scale: rootView.screenToWorldScale) != nil {
@@ -565,7 +566,63 @@ final class MoveScoreAction: DragEventAction {
                 }
                 
                 let scoreP = scoreView.convert(sheetP, from: sheetView.node)
-                if let (noteI, result) = scoreView.hitTestPoint(scoreP, scale: rootView.screenToWorldScale) {
+                let v = scoreView.hitTestPoint(scoreP, scale: rootView.screenToWorldScale)
+                let selectedNoteIs = !(v?.result.isStartEndBeat ?? false)
+                && rootView.isSelect(at: p) ? sheetView.containedNotes(from: rootView.selections) : []
+                if !selectedNoteIs.isEmpty {
+                    let noteIs = selectedNoteIs
+                    beganNotes = noteIs.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
+                    let interval = rootView.currentBeatInterval
+                    let nsBeat = scoreView.beat(atX: sheetP.x, interval: interval)
+                    
+                    let minBV = beganNotes.min(by: { $0.value.beatRange.start < $1.value.beatRange.start })
+                    let maxBV = beganNotes.max(by: { $0.value.beatRange.end < $1.value.beatRange.end })
+                    let minBeat = minBV?.value.beatRange.start ?? 0
+                    let maxBeat = maxBV?.value.beatRange.end ?? 0
+                    let noteI = !beganNotes.contains(where: { nsBeat >= $0.value.beatRange.start }) ?
+                    minBV?.key :
+                    (!beganNotes.contains(where: { nsBeat < $0.value.beatRange.end }) ? maxBV?.key : beganNotes.first(where: { $0.value.beatRange.contains(nsBeat) })?.key)
+                    if let noteI {
+                        let score = scoreView.model
+                        let note = score.notes[noteI]
+                        
+                        beganStartBeat = nsBeat
+                        beganNote = note
+                        
+                        self.noteI = noteI
+                        type = .note
+                        beganPitch = note.pitch
+                        
+                        let isInterval = note.pits.contains(where: { ($0.beat + note.beatRange.start) % Sheet.beatInterval == 0 })
+                        let dBeat = isInterval ? (note.beatRange.start - note.beatRange.start.interval(scale: interval)) : 0
+                        beganDeltaNoteBeat = dBeat
+                        
+                        beganBeatRange = note.beatRange
+                        oldPitch = note.pitch
+                        beganBeatX = scoreView.x(atBeat: note.beatRange.start)
+                        beganPitchY = scoreView.y(fromPitch: note.pitch)
+                        
+                        beganNotes[noteI] = score.notes[noteI]
+                        
+                        let playerBeat: Rational = nsBeat.clipped(min: minBeat, max: maxBeat)
+                        let selectedNoteIs = sheetView.noteAndPitAndSprolIs(from: rootView.selections).map { $0.key }
+                        let noteIs = Set(beganNotes.keys).intersection(selectedNoteIs).sorted()
+                        let vs = score.noteIAndNormarizedPits(atBeat: playerBeat, selectedNoteI: noteI, in: noteIs)
+                        playerBeatNoteIndexes = vs.map { $0.noteI }
+                        
+                        updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
+                        
+                        let octaveNode = scoreView.octaveNode(noteIs: beganNotes.keys.sorted())
+                        octaveNode.attitude.position
+                        = sheetView.convertToWorld(scoreView.node.attitude.position)
+                        self.octaveNode = octaveNode
+                        rootView.node.append(child: octaveNode)
+                        
+                        let result = note.pitResult(atBeat: Double(nsBeat - note.beatRange.start))
+                        let cPitch = result.notePitch + result.pitch.rationalValue(intervalScale: Sheet.fullEditBeatInterval)
+                        rootView.cursor = .circle(string: Pitch(value: cPitch).octaveString())
+                    }
+                } else if let (noteI, result) = v {
                     self.noteI = noteI
                     
                     let score = scoreView.model
@@ -582,7 +639,7 @@ final class MoveScoreAction: DragEventAction {
                     }
                     
                     switch result {
-                    case .pit(let pitI):
+                    case .pit(let pitI), .lyric(let pitI):
                         type = .pit
                         
                         let pit = note.pits[pitI]
@@ -597,7 +654,10 @@ final class MoveScoreAction: DragEventAction {
                         beganPitchY = scoreView.y(fromPitch: note.pitch + pit.pitch)
                         
                         var noteAndPitIs: [Int: [Int]]
-                        if rootView.isSelect(at: p) {
+                        if case .lyric = result {
+                            let note = score.notes[noteI]
+                            noteAndPitIs = [noteI: note.lyricRange(at: pitI)?.map { $0 } ?? [pitI]]
+                        } else if rootView.isSelect(at: p) {
                             noteAndPitIs = sheetView.noteAndPitIndexes(from: rootView.selections,
                                                                        enabledAllPits: false)
                             if noteAndPitIs[noteI] != nil {
@@ -624,8 +684,7 @@ final class MoveScoreAction: DragEventAction {
                         
                         updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
                         
-                        let octaveNode = scoreView.octaveNode(noteIs: [noteI],
-                                                              .octave)
+                        let octaveNode = scoreView.octaveNode(noteIs: [noteI])
                         octaveNode.attitude.position
                         = sheetView.convertToWorld(scoreView.node.attitude.position)
                         self.octaveNode = octaveNode
@@ -772,62 +831,7 @@ final class MoveScoreAction: DragEventAction {
                         
                         updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
                         
-                        let octaveNode = scoreView.octaveNode(noteIs: beganNotes.keys.sorted(),
-                                                              .octave)
-                        octaveNode.attitude.position
-                        = sheetView.convertToWorld(scoreView.node.attitude.position)
-                        self.octaveNode = octaveNode
-                        rootView.node.append(child: octaveNode)
-                        
-                        let result = note.pitResult(atBeat: Double(nsBeat - note.beatRange.start))
-                        let cPitch = result.notePitch + result.pitch.rationalValue(intervalScale: Sheet.fullEditBeatInterval)
-                        rootView.cursor = .circle(string: Pitch(value: cPitch).octaveString())
-                    }
-                } else if rootView.isSelect(at: p) {
-                    let noteIs = sheetView.noteIndexes(from: rootView.selections)
-                    beganNotes = noteIs.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
-                    let interval = rootView.currentBeatInterval
-                    let nsBeat = scoreView.beat(atX: sheetP.x, interval: interval)
-                    
-                    let minBV = beganNotes.min(by: { $0.value.beatRange.start < $1.value.beatRange.start })
-                    let maxBV = beganNotes.max(by: { $0.value.beatRange.end < $1.value.beatRange.end })
-                    let minBeat = minBV?.value.beatRange.start ?? 0
-                    let maxBeat = maxBV?.value.beatRange.end ?? 0
-                    let noteI = !beganNotes.contains(where: { nsBeat >= $0.value.beatRange.start }) ?
-                    minBV?.key :
-                    (!beganNotes.contains(where: { nsBeat < $0.value.beatRange.end }) ? maxBV?.key : beganNotes.first(where: { $0.value.beatRange.contains(nsBeat) })?.key)
-                    if let noteI {
-                        let score = scoreView.model
-                        let note = score.notes[noteI]
-                        
-                        beganStartBeat = nsBeat
-                        beganNote = note
-                        
-                        self.noteI = noteI
-                        type = .note
-                        beganPitch = note.pitch
-                        
-                        let isInterval = note.pits.contains(where: { ($0.beat + note.beatRange.start) % Sheet.beatInterval == 0 })
-                        let dBeat = isInterval ? (note.beatRange.start - note.beatRange.start.interval(scale: interval)) : 0
-                        beganDeltaNoteBeat = dBeat
-                        
-                        beganBeatRange = note.beatRange
-                        oldPitch = note.pitch
-                        beganBeatX = scoreView.x(atBeat: note.beatRange.start)
-                        beganPitchY = scoreView.y(fromPitch: note.pitch)
-                        
-                        beganNotes[noteI] = score.notes[noteI]
-                        
-                        let playerBeat: Rational = nsBeat.clipped(min: minBeat, max: maxBeat)
-                        let selectedNoteIs = sheetView.noteAndPitAndSprolIs(from: rootView.selections).map { $0.key }
-                        let noteIs = Set(beganNotes.keys).intersection(selectedNoteIs).sorted()
-                        let vs = score.noteIAndNormarizedPits(atBeat: playerBeat, selectedNoteI: noteI, in: noteIs)
-                        playerBeatNoteIndexes = vs.map { $0.noteI }
-                        
-                        updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
-                        
-                        let octaveNode = scoreView.octaveNode(noteIs: beganNotes.keys.sorted(),
-                                                              .octave)
+                        let octaveNode = scoreView.octaveNode(noteIs: beganNotes.keys.sorted())
                         octaveNode.attitude.position
                         = sheetView.convertToWorld(scoreView.node.attitude.position)
                         self.octaveNode = octaveNode
@@ -909,6 +913,7 @@ final class MoveScoreAction: DragEventAction {
                                 
                                 var note = beganNote
                                 note.pitch = (dPitch + beganNote.pitch)
+                                    .interval(scale: rootView.currentPitchInterval)
                                     .clipped(min: Score.pitchRange.start, max: Score.pitchRange.end)
                                 
                                 let nsBeat = min(beganNote.beatRange.start + dBeat, endBeat)
@@ -923,8 +928,7 @@ final class MoveScoreAction: DragEventAction {
                             
                             oldBeat = nsBeat
                             
-                            octaveNode?.children = scoreView.octaveNode(noteIs: beganNotes.keys.sorted(),
-                                                                        .octave).children
+                            octaveNode?.children = scoreView.octaveNode(noteIs: beganNotes.keys.sorted()).children
                             
                             if pitch != oldPitch {
                                 notePlayer?.notes = playerBeatNoteIndexes.map {
@@ -960,6 +964,7 @@ final class MoveScoreAction: DragEventAction {
                                 
                                 var note = beganNote
                                 note.pitch = (dPitch + beganNote.pitch)
+                                    .interval(scale: rootView.currentPitchInterval)
                                     .clipped(min: Score.pitchRange.start, max: Score.pitchRange.end)
                                 
                                 let nsBeat = beganNote.beatRange.start
@@ -973,8 +978,7 @@ final class MoveScoreAction: DragEventAction {
                             
                             oldBeat = neBeat
                             
-                            octaveNode?.children = scoreView.octaveNode(noteIs: beganNotes.keys.sorted(),
-                                                                        .octave).children
+                            octaveNode?.children = scoreView.octaveNode(noteIs: beganNotes.keys.sorted()).children
                             
                             if pitch != oldPitch {
                                 notePlayer?.notes = playerBeatNoteIndexes.map {
@@ -1014,7 +1018,9 @@ final class MoveScoreAction: DragEventAction {
                                 
                                 var note = beganNote
                                 note.pitch = (dPitch + beganNote.pitch)
+                                    .interval(scale: rootView.currentPitchInterval)
                                     .clipped(min: Score.pitchRange.start, max: Score.pitchRange.end)
+                                
                                 note.beatRange.start = max(min(nBeat, endBeat), startBeat - beganNote.beatRange.length)
                                 
                                 nivs.append(.init(value: note, index: noteI))
@@ -1023,8 +1029,7 @@ final class MoveScoreAction: DragEventAction {
                             
                             oldBeat = nsBeat
                             
-                            octaveNode?.children = scoreView.octaveNode(noteIs: beganNotes.keys.sorted(),
-                                                                        .octave).children
+                            octaveNode?.children = scoreView.octaveNode(noteIs: beganNotes.keys.sorted()).children
                             
                             if pitch != oldPitch {
                                 let beat: Rational = scoreView.beat(atX: scoreP.x)
@@ -1157,7 +1162,8 @@ final class MoveScoreAction: DragEventAction {
                                 for (pitI, beganPit) in nv.pits {
                                     guard pitI < score.notes[noteI].pits.count else { continue }
                                     note.pits[pitI].beat = dBeat + beganPit.beat
-                                    note.pits[pitI].pitch = dPitch + beganPit.pitch
+                                    note.pits[pitI].pitch = (dPitch + beganPit.pitch)
+                                        .interval(scale: rootView.currentPitchInterval)
                                 }
                                 if nv.pits[0] != nil {
                                     let dBeat = note.pits.first!.beat
@@ -1187,8 +1193,7 @@ final class MoveScoreAction: DragEventAction {
                             
                             oldBeat = nsBeat
                             
-                            octaveNode?.children = scoreView.octaveNode(noteIs: [noteI],
-                                                                        .octave).children
+                            octaveNode?.children = scoreView.octaveNode(noteIs: [noteI]).children
                             
                             if pitch != oldPitch {
                                 let note = scoreView[noteI]

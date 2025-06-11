@@ -231,8 +231,8 @@ extension TimelineView {
                            fullEditBorderPathlines: inout [Pathline],
                            borderPathlines: inout [Pathline]) {
         let roundedSBeat = beatRange.start.rounded(.down)
-        let deltaBeat = Rational(1, 72)
-        let beatR1 = Rational(1, 12)
+        let deltaBeat = Rational(1, 128)
+        let beatR1 = Rational(1, 8)
         let beat0 = Rational(1)
         var cBeat = roundedSBeat
         while cBeat <= beatRange.end {
@@ -632,7 +632,7 @@ final class AnimationView: TimelineView, @unchecked Sendable {
             let kx = x(atBeat: keyframe.beat + beatRange.start)
             
             let nKnobH = keyframe.isKey ? knobH : iKnobH
-            let nKnobW = (keyframe.beat + beatRange.start) % .init(1, 12) == 0 ? knobW : knobW / 2
+            let nKnobW = (keyframe.beat + beatRange.start) % Sheet.beatInterval == 0 ? knobW : knobW / 2
             let topD: Double
             if !keyframe.draftPicture.isEmpty {
                 let pathline = Pathline(Rect(x: kx - nKnobW / 2,
@@ -663,7 +663,7 @@ final class AnimationView: TimelineView, @unchecked Sendable {
                 bottomD = 0
             }
             
-            let niKnobW = (keyframe.beat + beatRange.start) % .init(1, 12) == 0 ? iKnobW : iKnobW / 2
+            let niKnobW = (keyframe.beat + beatRange.start) % Sheet.beatInterval == 0 ? iKnobW : iKnobW / 2
             let pathline = keyframe.isKey ?
             Pathline(Rect(x: kx - nKnobW / 2,
                           y: centerY - nKnobH / 2 + bottomD,
@@ -678,7 +678,7 @@ final class AnimationView: TimelineView, @unchecked Sendable {
             }
         }
         let kx = ex
-        let nKnobW = eBeat % .init(1, 12) == 0 ? knobW : knobW / 2
+        let nKnobW = eBeat % Sheet.beatInterval == 0 ? knobW : knobW / 2
         contentPathlines.append(.init(Rect(x: kx - nKnobW / 2,
                                            y: centerY - knobH / 2 - 1,
                                            width: nKnobW, height: knobH + 2)))
@@ -1462,6 +1462,10 @@ final class SheetView: BindableView, @unchecked Sendable {
     }
     func timeString(fromBeat beat: Rational) -> String {
         Animation.timeString(fromTime: beat, frameRate: Rational(frameRate))
+    }
+    func currentTimeString() -> String {
+        Animation.timeString(fromTime: model.animation.localBeat,
+                             frameRate: Rational(frameRate))
     }
     func currentTimeProgress() -> Double? {
         model.animation.localDurBeat != 0 && model.enabledAnimation ?
@@ -6234,6 +6238,14 @@ final class SheetView: BindableView, @unchecked Sendable {
             .map { scoreView.convertFromWorld($0) }
         return (0 ..< scoreView.model.notes.count).compactMap { i in
             fs.contains(where: { scoreView.intersectsNote($0, at: i) }) ? i : nil
+        }
+    }
+    func containedNotes(from selections: [Selection]) -> [Int] {
+        let fs = selections
+            .map { $0.rect }
+            .map { scoreView.convertFromWorld($0) }
+        return (0 ..< scoreView.model.notes.count).compactMap { i in
+            fs.contains(where: { scoreView.containsNote($0, at: i) }) ? i : nil
         }
     }
     func noteAndPitIndexes(from selections: [Selection], enabledAllPits: Bool = true) -> [Int: [Int]] {

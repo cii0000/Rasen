@@ -583,7 +583,7 @@ extension ScoreTrackItem {
             }
         }
         
-        let lufs = (try? Loudness(sampleRate: sampleRate).integratedLoudnessDb(data: sampless)) ?? 0
+        let lufs = (try? Loudness(sampleRate: sampleRate).integratedLoudnessDb(data: sampless)) ?? targetLoudnessDb
         self.lufs = lufs
         if lufs > targetLoudnessDb {
             let gain = Loudness.normalizeLoudnessScale(inputLoudness: lufs, targetLoudness: targetLoudnessDb)

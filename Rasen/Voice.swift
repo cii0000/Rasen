@@ -19,6 +19,27 @@ import RealModule
 import struct Foundation.UUID
 
 extension Note {
+    func lyricRange(at i: Int) -> ClosedRange<Int>? {
+        guard !pits[i].lyric.isEmpty
+                && pits[i].lyric != "[" && pits[i].lyric != "]" else { return nil }
+        var minI = i
+        var maxI = i
+        for j in i.range.reversed() {
+            if (!pits[j].lyric.isEmpty && pits[j].lyric != "[") || pits[j].lyric == "]" { break }
+            if pits[j].lyric == "[" {
+                minI = j
+                break
+            }
+        }
+        for j in i + 1 ..< pits.count {
+            if (!pits[j].lyric.isEmpty && pits[j].lyric != "]") || pits[j].lyric == "[" { break }
+            if pits[j].lyric == "]" {
+                maxI = j
+                break
+            }
+        }
+        return minI <= maxI ? minI ... maxI : nil
+    }
     mutating func replace(lyric: String, at oi: Int, tempo: Rational,
                           beatInterval: Rational = Sheet.fullEditBeatInterval,
                           pitchInterval: Rational = Sheet.fullEditPitchInterval) {
@@ -77,7 +98,6 @@ extension Note {
             }
             
             if isFirst {
-                print(pits.count, pits[i].beat)
                 if pits[i].beat > 0 {
                     let dBeat = pits[i].beat
                     pits = pits.map {
@@ -97,6 +117,10 @@ extension Note {
                 previousPhoneme = Phoneme.phonemes(fromHiragana: pits[preI].lyric).last
                 previousFormantFilter = .init(spectlope: pits[preI].tone.spectlope)
                 previousID = pits[preI].tone.id
+            } else if i > 0 {
+                previousPhoneme = .a
+                previousFormantFilter = FormantFilter().withSelfA(to: .a)
+                previousID = .init()
             } else {
                 previousPhoneme = nil
                 previousFormantFilter = nil
@@ -104,7 +128,7 @@ extension Note {
             }
             
             var ni = i
-            if let mora = Mora(hiragana: lyric,
+            if var mora = Mora(hiragana: lyric,
                                previousPhoneme: previousPhoneme,
                                previousFormantFilter: previousFormantFilter, previousID: previousID) {
                 let beat = pits[i].beat
@@ -112,21 +136,35 @@ extension Note {
                                        tempo: tempo, interval: beatInterval) + beat
                 let lBeat = Score.beat(fromSec: mora.keyFormantFilters.last?.sec ?? 0,
                                        tempo: tempo, interval: beatInterval) + beat
-                var minI = i, maxI = i
+                var minI = i, maxI = i, minSec: Double?, maxSec: Double?
                 for j in i.range.reversed() {
-                    if pits[j].beat < fBeat {
+                    let isMin = (!pits[j].lyric.isEmpty && pits[j].lyric != "[")
+                    || pits[j].lyric == "]"
+                    if isMin {
+                        minSec = -.init(Score.sec(fromBeat: pits[i].beat - pits[j].beat,
+                                                  tempo: tempo)) * 0.95
+                    }
+                    if isMin || pits[j].beat < fBeat {
                         minI = j + 1
                         break
                     }
                 }
                 for j in i + 1 ..< pits.count {
-                    if pits[j].beat > lBeat {
+                    let isMax = (!pits[j].lyric.isEmpty && pits[j].lyric != "]")
+                    || pits[j].lyric == "["
+                    if isMax {
+                        maxSec = .init(Score.sec(fromBeat: pits[j].beat - pits[i].beat,
+                                                 tempo: tempo)) * 0.95
+                    }
+                    if isMax || pits[j].beat > lBeat {
                         maxI = j - 1
                         break
                     }
                 }
+                mora.set(minSec: minSec, maxSec: maxSec)
                 
-                var ivps = [IndexValue<Pit>]()
+                let oldPit = pits[i]
+                var ivps = [IndexValue<Pit>](), isRemoved = false
                 for (fi, ff) in mora.keyFormantFilters.enumerated() {
                     let fBeat = Score.beat(fromSec: ff.sec, tempo: tempo, interval: beatInterval) + beat
                     let result = self.pitResult(atBeat: Double(fBeat))
@@ -147,14 +185,22 @@ extension Note {
                     
                     ivps.append(.init(value: .init(beat: fBeat,
                                                    pitch: result.pitch.rationalValue(intervalScale: pitchInterval) + ff.pitch,
-                                                   stereo: .init(volm: pits[i].stereo.volm,
+                                                   stereo: .init(volm: oldPit.stereo.volm,
                                                                  pan: result.stereo.pan,
                                                                  id: result.stereo.id),
                                                    tone: .init(spectlope: ff.formantFilter.spectlope, id: ff.id),
                                                    lyric: lyric),
                                       index: fi + minI))
+                    if !isRemoved && !isLyric && fi == 0 {
+                        pits.remove(at: Array(minI ..< i))
+                        isRemoved = true
+                    }
                 }
-                pits.remove(at: Array(minI ... maxI))
+                if !isRemoved {
+                    pits.remove(at: Array(minI ... maxI))
+                } else if i <= maxI {
+                    pits.remove(at: Array(i - (i - minI) ... maxI - (i - minI)))
+                }
                 pits.insert(ivps)
                 
                 let fdBeat = ivps.first?.value.beat ?? 0
@@ -178,8 +224,8 @@ extension Note {
         
         for j in (ni + 1) ..< pits.count {
             if !pits[j].lyric.isEmpty && pits[j].lyric != "[" && pits[j].lyric != "]",
-               Phoneme.phonemes(fromHiragana: lyric).last
-                != Phoneme.phonemes(fromHiragana: pits[j].lyric).last {
+               Phoneme.firstVowel(Phoneme.phonemes(fromHiragana: lyric))
+                != Phoneme.firstVowel(Phoneme.phonemes(fromHiragana: pits[j].lyric)) {
                 
                 _ = update(lyric: pits[j].lyric, at: j)
                 break
@@ -1604,7 +1650,7 @@ struct Mora: Hashable, Codable {
                     kffs.append(.init(onsetFf.multiplyAllVolm(0), durSec: offSec, pitch: pitch))
                 }
                 kffs.append(.init(onsetFf.multiplyAllVolm(0), durSec: onsetDurSec, pitch: pitch))
-                kffs.append(.init(onsetFf, durSec: onsetLastDurSec, pitch: pitch))
+                kffs.append(.init(onsetFf, durSec: onsetLastDurSec, pitch: -pitch / 4))
                 centerI = kffs.count
                 if let youonFf {
                     kffs.append(.init(youonFf, durSec: youonDurSec))
@@ -1628,7 +1674,7 @@ struct Mora: Hashable, Codable {
                     kffs.append(.init(ff1, durSec: paddingSec))
                 }
                 kffs.append(.init(nFf, durSec: onsetDurSec, pitch: pitch))
-                kffs.append(.init(nFf, durSec: paddingSec, pitch: pitch))
+                kffs.append(.init(nFf, durSec: paddingSec, pitch: -pitch / 4))
                 centerI = kffs.count
                 if let youonFf {
                     kffs.append(.init(youonFf, durSec: youonDurSec))
@@ -1668,6 +1714,25 @@ struct Mora: Hashable, Codable {
             sec += kffs[i].durSec
         }
         self.keyFormantFilters = kffs
+    }
+    
+    mutating func set(minSec: Double?, maxSec: Double?) {
+        let oMinSec = keyFormantFilters.minValue { $0.sec } ?? 0
+        let oMaxSec = keyFormantFilters.maxValue { $0.sec } ?? 0
+        if let minSec, minSec <= 0, oMinSec < 0, oMinSec < minSec {
+            let scale = minSec / oMinSec
+            for (fi, ff) in keyFormantFilters.enumerated() {
+                keyFormantFilters[fi].sec *= scale
+                if ff.sec >= 0 { break }
+            }
+        }
+        if let maxSec, maxSec >= 0, oMaxSec > 0, oMaxSec > maxSec {
+            let scale = maxSec / oMaxSec
+            for (fi, ff) in keyFormantFilters.enumerated().reversed() {
+                keyFormantFilters[fi].sec *= scale
+                if ff.sec <= 0 { break }
+            }
+        }
     }
 }
 
@@ -1832,10 +1897,10 @@ extension Phoneme {
         case "と", "to": [.to, .o]
         case "てぃ", "thi": [.tj, .i]
         case "とぅ", "twu": [.tβ, .ɯ]
-        case "ちゃ", "cya", "cha": [.tɕ, .ja, .a]
-        case "ちゅ", "cyu", "chu": [.tɕ, .j, .ɯ]
-        case "ちぇ", "cye", "che": [.tɕ, .j, .e]
-        case "ちょ", "cyo", "cho": [.tɕ, .j, .o]
+        case "ちゃ", "tya", "cya", "cha": [.tɕ, .ja, .a]
+        case "ちゅ", "tyu", "cyu", "chu": [.tɕ, .j, .ɯ]
+        case "ちぇ", "tye", "cye", "che": [.tɕ, .j, .e]
+        case "ちょ", "tyo", "cyo", "cho": [.tɕ, .j, .o]
         case "つぁ", "tuxa": [.ts, .β, .a]
         case "つぃ", "tuxi": [.ts, .β, .i]
         case "つぇ", "tuxe": [.ts, .β, .e]
@@ -1966,5 +2031,24 @@ extension Phoneme {
     }
     static func isJapaneseVowel(_ phonemes: [Phoneme]) -> Bool {
         phonemes.count == 1 && phonemes[0].isJapaneseVowel
+    }
+    
+    static func firstVowel(_ phonemes: [Phoneme]) -> Self? {
+        let vowel: Phoneme
+        var phonemes = phonemes
+        switch phonemes.last {
+        case .a, .i, .ɯ, .e, .o, .ɴ, .sokuon, .off,
+                .haBreath, .hiBreath, .hɯBreath, .heBreath, .hoBreath,
+                .aBreath, .iBreath, .ɯBreath, .eBreath, .oBreath:
+            vowel = phonemes.last!
+            phonemes.removeLast()
+        default:
+            return nil
+        }
+        
+        return switch phonemes.last {
+        case .j, .ja, .β: phonemes.last!
+        default: vowel
+        }
     }
 }

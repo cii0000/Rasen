@@ -953,8 +953,7 @@ final class LineAction: Action {
 //                    rootView.node.insert(child: noteNode,
 //                                             at: rootView.accessoryNodeIndex)
                 
-                let octaveNode = scoreView.octaveNode(fromPitch: pitch, scoreView.notesNode.children.last!.children[0].clone,
-                                                  .subInterpolated)
+                let octaveNode = scoreView.octaveNode(fromPitch: pitch, scoreView.notesNode.children.last!.children[0].clone)
                 octaveNode.attitude.position
                 = sheetView.convertToWorld(scoreView.node.attitude.position)
                 self.octaveNode = octaveNode
@@ -986,14 +985,14 @@ final class LineAction: Action {
                     self.oldPitch = pitch
                 }
                 
-                scoreView[noteI] = note
 //                    tempLineNode?.children
 //                        = scoreView.noteNode(from: note).children
                 
                 if isNote || beat != oldBeat {
+                    scoreView[noteI] = note
+                    
                     octaveNode?.children = scoreView.octaveNode(fromPitch: pitch,
-                                                                scoreView.notesNode.children.last!.children[0].clone,
-                                                                .octave).children
+                                                                scoreView.notesNode.children.last!.children[0].clone).children
                     oldBeat = beat
                 }
                 

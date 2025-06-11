@@ -728,7 +728,7 @@ final class PlayAction: InputKeyEventAction {
                     
                     if cSheetView.model.enabledTimeline {
                         cSheetView.play()
-                        rootView.cursor = rootView.cursor(from: cSheetView.currentKeyframeString() + "...",
+                        rootView.cursor = rootView.cursor(from: cSheetView.currentTimeString() + "...",
                                                           isArrow: true)
                     }
                 } else {
@@ -1076,6 +1076,7 @@ final class InterpolateAction: InputKeyEventAction {
                         var nNote = noteIAndNotes.first!.1
                         var preLastPit = nNote.pits.last!
                         preLastPit.beat = nNote.beatRange.length
+                        preLastPit.lyric = ""
                         for i in 1 ..< noteIAndNotes.count {
                             let (_, note) = noteIAndNotes[i]
                             if preBeat <= note.beatRange.start {
@@ -1090,6 +1091,7 @@ final class InterpolateAction: InputKeyEventAction {
                                 preLastPit = note.pits.last!
                                 preLastPit.beat = note.beatRange.end - nNote.beatRange.start
                                 preLastPit.pitch += note.pitch - nNote.pitch
+                                preLastPit.lyric = ""
                                 nNote.beatRange.length = preLastPit.beat
                                 isAppend = true
                             }

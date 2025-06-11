@@ -18,6 +18,11 @@
 import struct Foundation.UUID
 import struct Foundation.Data
 
+//#if os(macOS) && os(iOS) && os(watchOS) && os(tvOS) && os(visionOS)
+import Accelerate.vecLib.vDSP
+//#elseif os(linux) && os(windows)
+//#endif
+
 struct LyricsUnison: Hashable, Codable {
     enum Step: Int32, Hashable, Codable, CaseIterable {
         case c = 0, d = 2, e = 4, f = 5, g = 7, a = 9, b = 11
@@ -117,7 +122,7 @@ extension Pitch {
     }
     func octaveString(hidableDecimal: Bool = true, deltaPitch: Rational = 0) -> String {
         let octavePitch = value / 12
-        let iPart = octavePitch.rounded(.down)
+        let iPart = octavePitch.rounded(.down)        
         let dPart = (octavePitch - iPart) * 12
         let dPartStr = String(format: "%02d", Int(dPart))
         
@@ -136,7 +141,7 @@ extension Pitch {
         } else if hidableDecimal && deltaPitch.decimalPart == 0 {
             deltaStr = " (\(deltaDPartStr))"
         } else {
-            let ddPart = deltaPitch.decimalPart * 12
+            let ddPart = deltaPitch.decimalPart * 16
             let ddPartStr = ddPart.decimalPart == 0 ? String(format: "%d", Int(abs(ddPart))) : "\(abs(ddPart.decimalPart))"
             deltaStr = " (\(deltaDPartStr).\(ddPartStr))"
         }
@@ -144,7 +149,7 @@ extension Pitch {
         if hidableDecimal && dPart.decimalPart == 0 {
             return "\(iPart).\(dPartStr)" + deltaStr
         } else {
-            let ddPart = dPart.decimalPart * 12
+            let ddPart = dPart.decimalPart * 16
             let ddPartStr = ddPart.decimalPart == 0 ? String(format: "%d", Int(ddPart)) : "\(ddPart.decimalPart)"
             return "\(iPart).\(dPartStr).\(ddPartStr)" + deltaStr
         }
@@ -152,12 +157,7 @@ extension Pitch {
 }
 
 enum MusicScaleType: Int32, Hashable, Codable, CaseIterable {
-    case major, minor,
-         hexaMajor, hexaMinor,
-         pentaMajor, pentaMinor,
-         dorian,
-         wholeTone, chromatic,
-         none
+    case popular, hexaPopular, pentaPopular, wholeTone, chromatic
 }
 extension MusicScaleType {
     private static let selfDic: [Set<Int>: Self] = {
@@ -175,36 +175,26 @@ extension MusicScaleType {
     
     var unisons: [Int] {
         switch self {
-        case .major: [0, 2, 4, 5, 7, 9, 11]
-        case .minor: [0, 2, 3, 5, 7, 8, 10]
-        case .hexaMajor: [0, 2, 4, 7, 9, 11]
-        case .hexaMinor: [0, 3, 5, 7, 8, 10]
-        case .pentaMajor: [0, 2, 4, 7, 9]
-        case .pentaMinor: [0, 3, 5, 7, 10]
-        case .dorian: [0, 2, 3, 5, 7, 9, 10]
+        case .popular: [0, 2, 4, 5, 7, 9, 11]
+        case .hexaPopular: [0, 2, 4, 7, 9, 11]
+        case .pentaPopular: [0, 2, 4, 7, 9]
         case .wholeTone: [0, 2, 4, 6, 8, 10]
         case .chromatic: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
-        case .none: []
+        }
+    }
+    var isPopular: Bool {
+        switch self {
+        case .popular, .hexaPopular, .pentaPopular: true
+        default: false
         }
     }
     var name: String {
         switch self {
-        case .major: "Major".localized
-        case .minor: "Minor".localized
-        case .hexaMajor: "Hexa Major".localized
-        case .hexaMinor: "Hexa Minor".localized
-        case .pentaMajor: "Penta Major".localized
-        case .pentaMinor: "Penta Minor".localized
-        case .dorian: "Dorian".localized
+        case .popular: "Popular".localized
+        case .hexaPopular: "Hexa Popular".localized
+        case .pentaPopular: "Hexa Popular".localized
         case .wholeTone: "Whole Tone".localized
         case .chromatic: "Chromatic".localized
-        case .none: ""
-        }
-    }
-    var isMinor: Bool {
-        switch self {
-        case .minor, .hexaMinor, .pentaMinor: true
-        default: false
         }
     }
 }
@@ -436,11 +426,11 @@ extension Sprol {
 
 struct Spectlope: Hashable, Codable {
     var sprols = [Sprol(pitch: 12 * 0, volm: 0.5, noise: 0),
-                  Sprol(pitch: 12 * 1.5, volm: 1, noise: 0),
-                  Sprol(pitch: 12 * 2.5, volm: 0.85, noise: 0),
-                  Sprol(pitch: 12 * 4, volm: 0.3, noise: 0),
-                  Sprol(pitch: 12 * 7, volm: 0.01, noise: 0),
-                  Sprol(pitch: 12 * 10, volm: 0.01, noise: 0)]
+                  Sprol(pitch: 12 * 1.5, volm: 0.85, noise: 0),
+                  Sprol(pitch: 12 * 2.5, volm: 1, noise: 0),
+                  Sprol(pitch: 12 * 3.5, volm: 1, noise: 0),
+                  Sprol(pitch: 12 * 7, volm: 0.5, noise: 0),
+                  Sprol(pitch: 12 * 10, volm: 0, noise: 0)]
 }
 extension Spectlope: Protobuf {
     init(_ pb: PBSpectlope) throws {
@@ -630,6 +620,29 @@ extension Spectlope {
             let dPitch = nextPitch - prePitch
             return (nextVolm + preVolm) * dPitch / 2
         }
+    }
+    
+    var sumNoise: Double {
+        guard !sprols.isEmpty else { return 0 }
+        
+        let noiseVolms = vDSP.multiply(sprols.map { $0.volm }, sprols.map { $0.noise })
+        var dPitchs = [Double](capacity: sprols.count + 1)
+        var dVolms = [Double](capacity: sprols.count + 1)
+        let dNoises = (0 ... sprols.count).map {
+            let (prePitch, preNoise, preVolm) = $0 == 0 ?
+            (Score.doubleMinPitch, noiseVolms[$0], sprols[$0].volm) :
+            (sprols[$0 - 1].pitch, noiseVolms[$0 - 1], sprols[$0 - 1].volm)
+            let (nextPitch, nextNoise, nextVolm) = $0 == sprols.count ?
+            (Score.doubleMaxPitch, noiseVolms[$0 - 1], sprols[$0 - 1].volm) :
+            (sprols[$0].pitch, noiseVolms[$0], sprols[$0].volm)
+            let dPitch = nextPitch - prePitch
+            dPitchs.append(dPitch)
+            dVolms.append(nextVolm + preVolm)
+            return nextNoise + preNoise
+        }
+        let allPitchs = vDSP.sum(vDSP.multiply(dPitchs, dVolms))
+        if allPitchs == 0 { return 0 }
+        return vDSP.sum(vDSP.multiply(dPitchs, dNoises)) / allPitchs
     }
     
     var formants: [Formant] {
@@ -1179,32 +1192,60 @@ extension Note {
         if pits.count >= 2 {
             var ns = [(beatRange: Range<Rational>, roundedPitch: Int)]()
             var preBeat = beatRange.start, prePitch = Int((pitch + pits[0].pitch).rounded())
-            if preBeat < pits[0].beat + beatRange.start {
+            var preVolm = pits[0].stereo.volm
+            var prePit = pits[0]
+            if preBeat < pits[0].beat + beatRange.start
+                && prePit.tone.spectlope.sumNoise < 0.75
+                && prePit.stereo.volm > 0.1 {
                 ns.append((preBeat ..< pits[0].beat + beatRange.start, prePitch))
             }
             var isPreEqual = false
             for i in 1 ..< pits.count {
                 let pit = pits[i]
                 let pitch = Int((pitch + pit.pitch).rounded())
+                let volm = pit.stereo.volm
                 if pitch != prePitch {
+                    let pPit = pits[i - 1]
+                    let pBeat = pPit.beat + beatRange.start
+                    if isPreEqual && preBeat < pBeat
+                        && prePit.tone.spectlope.mid(pPit.tone.spectlope).sumNoise < 0.75
+                        && prePit.stereo.volm.mid(pPit.stereo.volm) > 0.1 {
+                        ns.append((preBeat ..< pBeat, prePitch))
+                    }
                     let beat = pit.beat + beatRange.start
-                    if isPreEqual && preBeat < beat {
-                        ns.append((preBeat ..< beat, prePitch))
+                    preBeat = beat
+                    prePitch = pitch
+                    preVolm = volm
+                    prePit = pit
+                    
+                    isPreEqual = false
+                } else if volm != preVolm {
+                    let beat = pit.beat + beatRange.start
+                    if preBeat < beat
+                        && prePit.tone.spectlope.mid(pit.tone.spectlope).sumNoise < 0.75
+                        && preVolm.mid(volm) > 0.1 {
+                        ns.append((preBeat ..< beat, pitch))
                     }
                     preBeat = beat
                     prePitch = pitch
+                    preVolm = volm
+                    prePit = pit
                     
                     isPreEqual = false
                 } else {
                     isPreEqual = true
                 }
             }
-            if preBeat < beatRange.end {
+            if preBeat < beatRange.end
+                && prePit.tone.spectlope.sumNoise < 0.75
+                && prePit.stereo.volm > 0.1 {
                 ns.append((preBeat ..< beatRange.end, prePitch))
             }
             return ns.filter { $0.beatRange.length >= minBeatLength }
         } else {
-            return beatRange.length >= minBeatLength ? [(beatRange, firstRoundedPitch)] : []
+            return beatRange.length >= minBeatLength
+            && firstTone.spectlope.sumNoise < 0.75
+            && firstStereo.volm > 0.1 ? [(beatRange, firstRoundedPitch)] : []
         }
     }
     
@@ -1684,6 +1725,16 @@ extension Chord {
         default: 0
         }
     }
+    static func unisonFromApproximationJustIntonation5Limit(pitch: Rational) -> Int? {
+        let unison = pitch.mod(12)
+        let dUnison = unison.decimalPart
+        for i in 1 ... 11 {
+            if approximationJustIntonation5Limit(unison: Rational(i)) - Rational(i) == dUnison {
+                return i
+            }
+        }
+        return nil
+    }
     static func justIntonationRatio5Limit(unison: Int) -> Rational {
         switch unison {
         case 1: .init(16, 15)
@@ -1709,7 +1760,7 @@ extension Chord: CustomStringConvertible {
 
 struct ScoreOption {
     var beatRange = Music.defaultBeatRange
-    var keyBeats = [Rational]()
+    var keyBeats: [Rational] = [4, 8, 12]
     var scales: [Rational] = [0, 2, 4, 5, 7, 9, 11]
     var tempo = Music.defaultTempo
     var timelineY = Sheet.timelineY
@@ -1806,6 +1857,10 @@ extension Score {
                                 progressHandler: { _, _ in })
     }
     
+    var musicScale: MusicScale? {
+        .init(pitchs: scales.map { Int($0.rounded()) })
+    }
+    
     var localMaxBeatRange: Range<Rational>? {
         guard !notes.isEmpty else { return nil }
         let minV = notes.min(by: { $0.beatRange.lowerBound < $1.beatRange.lowerBound })!.beatRange.lowerBound
@@ -1826,28 +1881,7 @@ extension Score {
                 }
             }
         }
-        let length = range.length / 3
-        return pitchLengths.filter { $0.value.sum { $0.length } >= length }.keys.sorted()
-    }
-    
-    func scaleBeatLengths(from noteIs: [Int]) -> [Int: Rational] {
-        var ranges = [Int: [Range<Rational>]]()
-        noteIs.forEach {
-            for rangeAndPitchs in notes[$0].chordBeatRangeAndRoundedPitchs() {
-                let pitch = rangeAndPitchs.roundedPitch.mod(12)
-                if ranges[pitch] != nil {
-                    ranges[pitch]?.append(rangeAndPitchs.beatRange)
-                } else {
-                    ranges[pitch] = [rangeAndPitchs.beatRange]
-                }
-            }
-        }
-        
-        return ranges.reduce(into: .init()) {
-            var pitchLengths = [Range<Rational>]()
-            $1.value.forEach { Range.union($0, in: &pitchLengths) }
-            $0[$1.key] = pitchLengths.sum { $0.length }
-        }
+        return pitchLengths.keys.sorted()
     }
     
     func noteIAndPits(atBeat beat: Rational,

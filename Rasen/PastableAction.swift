@@ -892,6 +892,8 @@ final class PastableAction: Action {
                     }
                 }
                 show(ps)
+            case .lyric:
+                break
             case .even(let pitI):
                 let note = score.notes[noteI]
                 let tone = note.pits[pitI].tone
@@ -1353,6 +1355,8 @@ final class PastableAction: Action {
                 sheetView.updatePlaying()
                 return true
                 
+            case .lyric:
+                break
             case .even(let pitI):
                 if !scoreView.model.notes[noteI].isEmpty {
                     var pits = score.notes[noteI].pits
@@ -1429,37 +1433,35 @@ final class PastableAction: Action {
         } else if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled,
                   sheetView.scoreView.contains(sheetView.scoreView.convertFromWorld(p),
                                                scale: rootView.screenToWorldScale) {
-            var option = sheetView.model.score.option
-            if sheetView.scoreView.model.notes.isEmpty {
+            if let result = sheetView.scoreView
+                .hitTestOption(sheetView.scoreView.convertFromWorld(p),
+                               scale: rootView.screenToWorldScale) {
+                switch result {
+                case .keyBeat(let keyBeatI):
+                    var option = sheetView.model.score.option
+                    option.keyBeats.remove(at: keyBeatI)
+                    
+                    Pasteboard.shared.copiedObjects = [.border(.init(.vertical))]
+                    
+                    sheetView.newUndoGroup()
+                    sheetView.set(option)
+                    return true
+                case .scale(let scaleI, _):
+                    var option = sheetView.model.score.option
+                    option.scales.remove(at: scaleI)
+                    
+                    Pasteboard.shared.copiedObjects = [.border(.init(.horizontal))]
+                    
+                    sheetView.newUndoGroup()
+                    sheetView.set(option)
+                    return true
+                }
+            } else if sheetView.scoreView.model.notes.isEmpty {
+                var option = sheetView.model.score.option
                 option.enabled = false
                 sheetView.newUndoGroup()
                 sheetView.set(option)
                 return true
-            } else {
-                if let result = sheetView.scoreView
-                    .hitTestOption(sheetView.scoreView.convertFromWorld(p),
-                                   scale: rootView.screenToWorldScale) {
-                    switch result {
-                    case .keyBeat(let keyBeatI):
-                        var option = sheetView.model.score.option
-                        option.keyBeats.remove(at: keyBeatI)
-                        
-                        Pasteboard.shared.copiedObjects = [.border(.init(.vertical))]
-                        
-                        sheetView.newUndoGroup()
-                        sheetView.set(option)
-                        return true
-                    case .scale(let scaleI, _):
-                        var option = sheetView.model.score.option
-                        option.scales.remove(at: scaleI)
-                        
-                        Pasteboard.shared.copiedObjects = [.border(.init(.horizontal))]
-                        
-                        sheetView.newUndoGroup()
-                        sheetView.set(option)
-                        return true
-                    }
-                }
             }
         } else if let (border, i, sheetView, edge) = rootView.border(at: p) {
             Pasteboard.shared.copiedObjects = [.border(border)]
@@ -1980,8 +1982,7 @@ final class PastableAction: Action {
                 }
                 sheetView.append(notes)
                 
-                let octaveNode = scoreView.octaveNode(noteIs: Array(count ..< count + notes.count),
-                                                      .octave)
+                let octaveNode = scoreView.octaveNode(noteIs: Array(count ..< count + notes.count))
                 octaveNode.attitude.position = sheetView.convertToWorld(scoreView.node.attitude.position)
                 self.octaveNode = octaveNode
                 rootView.node.append(child: octaveNode)
@@ -2017,8 +2018,7 @@ final class PastableAction: Action {
                 }
                 scoreView.replace(notes.enumerated().map { .init(value: $0.element, index: $0.offset + scoreView.model.notes.count - notes.count) })
                 
-                octaveNode?.children = scoreView.octaveNode(noteIs: Array(scoreView.model.notes.count - notes.count ..< scoreView.model.notes.count),
-                                                            .octave).children
+                octaveNode?.children = scoreView.octaveNode(noteIs: Array(scoreView.model.notes.count - notes.count ..< scoreView.model.notes.count)).children
                 
                 if pitch != oldPitch {
                     notePlayer?.notes = playerBeatNoteIndexes.map {
