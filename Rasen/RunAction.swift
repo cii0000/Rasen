@@ -92,7 +92,9 @@ final class RunAction: InputKeyEventAction {
         case .began:
             rootView.cursor = .arrow
             
-            rootView.closeAllPanels(at: p)
+            defer {
+                rootView.closeAllPanels(at: p)
+            }
             
             let shp = rootView.sheetPosition(at: p)
             guard let sheetView = rootView.sheetView(at: shp) else { break }
@@ -262,6 +264,50 @@ final class RunAction: InputKeyEventAction {
                                 progressPanel.closePanel()
                             }
                         case .cancel: break
+                        }
+                    }
+                    return
+                } else if text.string == "justIntonation =" {
+                    if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled {
+                        let scoreView = sheetView.scoreView
+                        let score = scoreView.model
+                        
+                        let scoreP = scoreView.convertFromWorld(p)
+                        if let noteI = scoreView.noteIndex(at: scoreP,
+                                                           scale: rootView.screenToWorldScale) {
+                            let beat: Double = scoreView.beat(atX: scoreP.x)
+                            let result = score.notes[noteI].pitResult(atBeat: beat)
+                            let pitch = result.pitch.rationalValue(intervalScale: rootView.currentPitchInterval) + result.notePitch
+                            var nivs = [IndexValue<Note>]()
+                            let nis = sheetView.noteIndexes(from: rootView.selections)
+                                .filter { $0 != noteI }
+                            if nis.count == 1 && score.notes[nis[0]].pits.count > 1 {
+                                var note = score.notes[nis[0]]
+                                let oldNote = note
+                                let pitIs = note.pits.count.range.filter {
+                                    let p = scoreView.convertToWorld(scoreView.pitPosition(atPit: $0, from: note))
+                                    return rootView.selections.contains(where: { $0.rect.contains(p) })
+                                }
+                                for pitI in pitIs {
+                                    note.pits[pitI].pitch = Chord.approximationJustIntonation5Limit(pitch: (note.pits[pitI].pitch + note.pitch).rounded() - pitch) + pitch - note.pitch
+                                }
+                                if oldNote != note {
+                                    nivs.append(.init(value: note, index: nis[0]))
+                                }
+                            } else {
+                                for ni in nis {
+                                    var note = score.notes[ni]
+                                    let oldPitch = note.pitch
+                                    note.pitch = Chord.approximationJustIntonation5Limit(pitch: note.firstPitch.rounded() - pitch) + pitch
+                                    if oldPitch != note.pitch {
+                                        nivs.append(.init(value: note, index: ni))
+                                    }
+                                }
+                            }
+                            if !nivs.isEmpty {
+                                sheetView.newUndoGroup()
+                                sheetView.replace(nivs)
+                            }
                         }
                     }
                     return

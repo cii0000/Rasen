@@ -190,7 +190,7 @@ extension InputKeyType {
     var isText: Bool {
         switch self {
         case .click, .subClick, .threeFingersTap, .fourFingersTap,
-             .space, .enter, .tab, .delete,
+                .space, .enter, .carriageReturn, .tab, .delete,
              .escape, .command, .shift, .option, .control, .function,
              .up, .down, .left, .right,
              .f1, .f2, .f3, .f4, .f5, .f6, .f7, .f8, .f9, .f10,
@@ -395,7 +395,7 @@ extension Quasimode {
     static let addScore = Self(modifier: [.shift, .command], .e)
     
     static let interpolate = Self(modifier: [.command], .s)
-    static let crossErase = Self(modifier: [.shift, .command], .s)
+    static let disconnect = Self(modifier: [.shift, .command], .s)
 }
 
 protocol Event {
@@ -577,8 +577,8 @@ extension ActionList {
                                       [.init(name: "Interpolate".localized,
                                               quasimode: .interpolate,
                                               isEnableRoot: false),
-                                       .init(name: "Cross Erase".localized,
-                                              quasimode: .crossErase,
+                                       .init(name: "Disconnect".localized,
+                                              quasimode: .disconnect,
                                               isEnableRoot: false)]])
 }
 extension ActionList {

@@ -71,7 +71,7 @@
 "Add Score" = "楽譜を追加";
 
 "Interpolate" = "補間";
-"Cross Erase" = "交差消去";
+"Disconnect" = "切断";
 
 "Making Faces" = "面を作成中";
 "Stopping Task" = "タスクを停止中";

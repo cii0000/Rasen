@@ -311,7 +311,7 @@ final class RootAction: Action {
         case .insertKeyframe: InsertKeyframeAction(self)
         case .addScore: AddScoreAction(self)
         case .interpolate, .controlInterpolate: InterpolateAction(self)
-        case .crossErase: CrossEraseAction(self)
+        case .disconnect: DisconnectAction(self)
         case .stop: StopAction(self)
         default: nil
         }
@@ -932,7 +932,11 @@ final class DraftAction: Action {
                 if let sheetView = rootView.sheetView(at: p) {
                     let inP = sheetView.convertFromWorld(p)
                     if sheetView.model.score.enabled {
-                        let nis = (0 ..< sheetView.model.score.notes.count).map { $0 }
+                        let nis = if let i = sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p), scale: rootView.screenToWorldScale) {
+                            [i]
+                        } else {
+                            (0 ..< sheetView.model.score.notes.count).map { $0 }
+                        }
                         if !nis.isEmpty {
                             sheetView.newUndoGroup()
                             sheetView.changeToDraft(withNoteInexes: nis)
@@ -992,7 +996,11 @@ final class DraftAction: Action {
                            let sheetView = rootView.sheetView(at: shp) {
                            
                             if sheetView.model.score.enabled {
-                                let nis = sheetView.draftNoteIndexes(from: rootView.selections)
+                                let nis = if let i = sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p), scale: rootView.screenToWorldScale) {
+                                    [i]
+                                } else {
+                                    sheetView.draftNoteIndexes(from: rootView.selections)
+                                }
                                 if !nis.isEmpty {
                                     let scoreView = sheetView.scoreView
                                     let scoreP = scoreView.convertFromWorld(p)
@@ -1136,23 +1144,31 @@ final class FaceAction: Action {
             
             if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled {
                 let score = sheetView.scoreView.model
-                let nis = rootView.isSelectNoneCursor(at: p) && !rootView.isSelectedText ?
-                sheetView.noteIndexes(from: rootView.selections) :
-                Array(score.notes.count.range)
+                let nis = if rootView.isSelectNoneCursor(at: p) && !rootView.isSelectedText {
+                    sheetView.noteIndexes(from: rootView.selections)
+                } else if let i = sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p), scale: rootView.screenToWorldScale) {
+                    [i]
+                } else {
+                    Array(score.notes.count.range)
+                }
                 let nnis = nis.filter { score.notes[$0].isDefaultTone }.sorted()
                 if !nnis.isEmpty {
                     var tones = [UUID: Tone]()
                     var nivs = [IndexValue<Note>]()
                     for ni in nnis {
                         var note = score.notes[ni]
-                        for (pi, pit) in note.pits.enumerated() {
-                            if let tone = tones[pit.tone.id] {
-                                note.pits[pi].tone = tone
-                            } else if pit.tone.isDefault {
-                                let pitch = Double(pit.pitch + note.pitch)
-                                let tone = Tone(spectlope: .random(pitch: pitch))
-                                tones[pit.tone.id] = tone
-                                note.pits[pi].tone = tone
+                        if note.isSimpleLyric {
+                            note = note.withRendable(tempo: score.tempo)
+                        } else {
+                            for (pi, pit) in note.pits.enumerated() {
+                                if let tone = tones[pit.tone.id] {
+                                    note.pits[pi].tone = tone
+                                } else if pit.tone.isDefault {
+                                    let pitch = Double(pit.pitch + note.pitch)
+                                    let tone = Tone(spectlope: .random(pitch: pitch))
+                                    tones[pit.tone.id] = tone
+                                    note.pits[pi].tone = tone
+                                }
                             }
                         }
                         nivs.append(.init(value: note, index: ni))
@@ -1210,9 +1226,13 @@ final class FaceAction: Action {
             
             if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled {
                 let score = sheetView.scoreView.model
-                let nis = rootView.isSelectNoneCursor(at: p) && !rootView.isSelectedText ?
-                sheetView.noteIndexes(from: rootView.selections) :
-                Array(score.notes.count.range)
+                let nis = if rootView.isSelectNoneCursor(at: p) && !rootView.isSelectedText {
+                    sheetView.noteIndexes(from: rootView.selections)
+                } else if let i = sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p), scale: rootView.screenToWorldScale) {
+                    [i]
+                } else {
+                    Array(score.notes.count.range)
+                }
                 let nnis = nis
                     .filter { !score.notes[$0].isOneOvertone && !score.notes[$0].isFullNoise }
                     .sorted()
@@ -1220,9 +1240,13 @@ final class FaceAction: Action {
                     var nivs = [IndexValue<Note>]()
                     for ni in nnis {
                         var note = score.notes[ni]
-                        for (pi, pit) in note.pits.enumerated() {
-                            if !pit.tone.overtone.isOne && !pit.tone.spectlope.isFullNoise {
-                                note.pits[pi].tone = .init()
+                        if note.isRendableFromLyric {
+                            note = note.withSimpleLyric
+                        } else {
+                            for (pi, pit) in note.pits.enumerated() {
+                                if !pit.tone.overtone.isOne && !pit.tone.spectlope.isFullNoise {
+                                    note.pits[pi].tone = .init()
+                                }
                             }
                         }
                         nivs.append(.init(value: note, index: ni))

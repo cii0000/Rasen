@@ -40,10 +40,13 @@ extension Note {
         }
         return minI <= maxI ? minI ... maxI : nil
     }
+    @discardableResult
     mutating func replace(lyric: String, at oi: Int, tempo: Rational,
                           beatInterval: Rational = Sheet.fullEditBeatInterval,
-                          pitchInterval: Rational = Sheet.fullEditPitchInterval) {
-        func update(lyric: String, at oi: Int) -> Int {
+                          pitchInterval: Rational = Sheet.fullEditPitchInterval,
+                          isUpdateNext: Bool = true) -> Int {
+        func update(lyric: String, at oi: Int, isOld: Bool = true) -> Int {
+            let oldNote = self
             let oldLyric = pits[oi].lyric
             self.pits[oi].lyric = lyric
             
@@ -167,7 +170,7 @@ extension Note {
                 var ivps = [IndexValue<Pit>](), isRemoved = false
                 for (fi, ff) in mora.keyFormantFilters.enumerated() {
                     let fBeat = Score.beat(fromSec: ff.sec, tempo: tempo, interval: beatInterval) + beat
-                    let result = self.pitResult(atBeat: Double(fBeat))
+                    let result = (isOld ? oldNote : self).pitResult(atBeat: Double(fBeat))
                     
                     let isLyric = mora.keyFormantFilters.count == 1 || ff.sec == 0
                     let lyric = if isLyric {
@@ -179,7 +182,7 @@ extension Note {
                     } else {
                         ""
                     }
-                    if isLyric {
+                    if fi == mora.keyFormantFilters.count - 1 {
                         ni = fi + minI
                     }
                     
@@ -220,17 +223,19 @@ extension Note {
             return ni
         }
         
-        let ni = update(lyric: lyric, at: oi)
-        
-        for j in (ni + 1) ..< pits.count {
-            if !pits[j].lyric.isEmpty && pits[j].lyric != "[" && pits[j].lyric != "]",
-               Phoneme.firstVowel(Phoneme.phonemes(fromHiragana: lyric))
-                != Phoneme.firstVowel(Phoneme.phonemes(fromHiragana: pits[j].lyric)) {
-                
-                _ = update(lyric: pits[j].lyric, at: j)
-                break
+        var ni = update(lyric: lyric, at: oi)
+        if isUpdateNext {
+            for j in (ni + 1) ..< pits.count {
+                if pits[j].isLyric,
+                   Phoneme.firstVowel(Phoneme.phonemes(fromHiragana: lyric))
+                    != Phoneme.firstVowel(Phoneme.phonemes(fromHiragana: pits[j].lyric)) {
+                    
+                    ni = update(lyric: pits[j].lyric, at: j, isOld: false)
+                    break
+                }
             }
         }
+        return ni
     }
 }
 
@@ -773,6 +778,7 @@ extension FormantFilter {
             var n = self
             n[0].sdPitch *= 1.5
             n[0].pitch += -19
+            n[0].formMultiplyVolm(0.85)
             n[0].edPitch *= 1.7
             n.formMultiplyEsVolm(0.37, at: 0)
             n[1].pitch += 0.875
@@ -796,6 +802,7 @@ extension FormantFilter {
             var n = self
             n[0].sdPitch *= 1.5
             n[0].pitch += -13
+            n[0].formMultiplyVolm(1.25)
             n[0].edPitch *= 1.7
             n[0].eVolm *= 0.75
             n.formMultiplyEsVolm(0.125, at: 0)
@@ -1387,7 +1394,7 @@ struct Mora: Hashable, Codable {
                 paddingSec = 0.03
             case .ɾ, .ɾj:
                 onsetDurSec = 0.0075
-                pitch = -2
+                pitch = -1
                 paddingSec = 0.035
             case .p, .pj:
                 onsetDurSec = 0.03
@@ -1485,16 +1492,22 @@ struct Mora: Hashable, Codable {
                 kffs.append(.init(nFf, durSec: paddingSec, pitch: pitch))
                 centerI = kffs.count
                 if let youonFf {
-                    kffs.append(.init(youonFf, durSec: youonDurSec))
-                    kffs.append(.init(vowelFf, durSec: 0))
+                    kffs.append(.init(youonFf, durSec: 0.025))
+                    kffs.append(.init(.linear(youonFf, vowelFf,
+                                              t: 0.025 / youonDurSec),
+                                      durSec: 0.025, pitch: -pitch / 8))
+                    kffs.append(.init(.linear(youonFf, vowelFf,
+                                              t: 0.05 / youonDurSec),
+                                      durSec: youonDurSec - 0.05))
                 } else {
                     var ff0 = nextFf
                     ff0[1].fillVolm(.linear(nextFf[1].volm, nFf[1].volm, t: 0.75))
                     ff0[1].pitch = .linear(nextFf[1].pitch, nFf[1].pitch, t: 0.75)
                     
-                    kffs.append(.init(ff0, durSec: paddingSec * 1.5))
-                    kffs.append(.init(vowelFf, durSec: 0))
+                    kffs.append(.init(ff0, durSec: 0.025))
+                    kffs.append(.init(ff0, durSec: 0.025, pitch: -pitch / 8))
                 }
+                kffs.append(.init(vowelFf, durSec: 0))
             case .ha, .ç, .ɸ, .he, .ho:
                 let onsetFf = nFf.applyNoise(oph)
                 if let preFf = previousFormantFilter, let id = previousID {
@@ -1509,7 +1522,8 @@ struct Mora: Hashable, Codable {
                 ff0[4].fillVolm(onsetFf[4].edVolm)
                 
                 kffs.append(.init(ff0, durSec: onsetDurSec, pitch: pitch))
-                kffs.append(.init(onsetFf, durSec: paddingSec, pitch: pitch))
+                kffs.append(.init(onsetFf, durSec: paddingSec * 2 / 3, pitch: pitch))
+                kffs.append(.init(.linear(onsetFf, nextFf, t: 2 / 3), durSec: paddingSec / 3, pitch: -pitch / 8))
                 centerI = kffs.count
                 if let youonFf {
                     kffs.append(.init(youonFf, durSec: youonDurSec))
@@ -1548,7 +1562,16 @@ struct Mora: Hashable, Codable {
                 kffs.append(.init(ff1, durSec: paddingSec * 0.5, pitch: pitch / 2))
                 centerI = kffs.count
                 if let youonFf {
-                    kffs.append(.init(youonFf, durSec: youonDurSec))
+                    kffs.append(.init(youonFf, durSec: 0.0125))
+                    kffs.append(.init(.linear(youonFf, vowelFf,
+                                              t: 0.00625 / youonDurSec),
+                                      durSec: 0.00625, pitch: -pitch / 4))
+                    kffs.append(.init(.linear(youonFf, vowelFf,
+                                              t: 0.0125 / youonDurSec),
+                                      durSec: youonDurSec - 0.0125))
+                } else {
+                    kffs.append(.init(vowelFf, durSec: 0.00625))
+                    kffs.append(.init(vowelFf, durSec: 0.00625, pitch: -pitch / 4))
                 }
                 kffs.append(.init(vowelFf, durSec: 0))
             case .ga, .gj, .gβ, .ge, .go:
@@ -1607,7 +1630,8 @@ struct Mora: Hashable, Codable {
                 ff0[1] = .linear(onsetFf[1], nextFf[1], t: 0.5)
                 ff0[1].fillVolm(.linear(onsetFf[1].volm, nextFf[1].volm, t: 0.75))
                 
-                kffs.append(.init(ff0, durSec: 0.03, pitch: -pitch / 8))
+                kffs.append(.init(ff0, durSec: 0.015, pitch: pitch * 2 / 3))
+                kffs.append(.init(.linear(ff0, nextFf, t: 0.5), durSec: 0.015, pitch: -pitch / 8))
                 centerI = kffs.count
                 if let youonFf {
                     kffs.append(.init(youonFf, durSec: youonDurSec))
@@ -1621,8 +1645,9 @@ struct Mora: Hashable, Codable {
                     kffs.append(.init(onsetFf.multiplyAllVolm(0), durSec: 0.05, pitch: pitch))
                 }
                 kffs.append(.init(onsetFf, durSec: onsetDurSec, pitch: pitch))
-                kffs.append(.init(onsetFf, durSec: 0.05, pitch: pitch))
+                kffs.append(.init(onsetFf, durSec: 0.025, pitch: pitch))
                 if let youonFf {
+                    kffs.append(.init(.linear(onsetFf, youonFf, t: 0.5), durSec: 0.025, pitch: -pitch / 8))
                     centerI = kffs.count
                     kffs.append(.init(youonFf, durSec: youonDurSec))
                 } else {
@@ -1631,7 +1656,8 @@ struct Mora: Hashable, Codable {
                     ff0[4] = nextFf[4]
                     ff0[5] = nextFf[5]
                     
-                    kffs.append(.init(ff0, durSec: 0.02, pitch: -pitch / 8))
+                    kffs.append(.init(ff0, durSec: 0.02, pitch: pitch * 2 / 3))
+                    kffs.append(.init(.linear(ff0, nextFf, t: 0.5), durSec: 0.025, pitch: -pitch / 8))
                     centerI = kffs.count
                 }
                 kffs.append(.init(vowelFf, durSec: 0))
@@ -1689,6 +1715,31 @@ struct Mora: Hashable, Codable {
                     kffs.append(.init(ff0, durSec: paddingSec * 2))
                     kffs.append(.init(vowelFf, durSec: 0))
                 }
+            case .b, .bj:
+                if let preFf = previousFormantFilter, let id = previousID {
+                    kffs.append(.init(preFf, durSec: paddingSec, id: id))
+                }
+                kffs.append(.init(nFf, durSec: onsetDurSec, pitch: pitch))
+                kffs.append(.init(nFf, durSec: paddingSec * 0.75, pitch: pitch))
+                kffs.append(.init(.linear(nFf, nextFf, t: 0.75), durSec: paddingSec * 0.25, pitch: -pitch / 8))
+                centerI = kffs.count
+                if let youonFf {
+                    kffs.append(.init(youonFf, durSec: youonDurSec))
+                }
+                kffs.append(.init(vowelFf, durSec: 0))
+            case .p, .pj:
+                if let preFf = previousFormantFilter, let id = previousID {
+                    kffs.append(.init(preFf, durSec: paddingSec, id: id))
+                }
+                kffs.append(.init(nFf, durSec: onsetDurSec, pitch: pitch))
+                kffs.append(.init(nFf, durSec: paddingSec * 2 / 3, pitch: pitch))
+                kffs.append(.init(.linear(nFf, nextFf, t: 2 / 3), durSec: paddingSec / 6, pitch: pitch / 2))
+                kffs.append(.init(.linear(nFf, nextFf, t: 5 / 6), durSec: paddingSec / 6, pitch: -pitch / 2))
+                centerI = kffs.count
+                if let youonFf {
+                    kffs.append(.init(youonFf, durSec: youonDurSec))
+                }
+                kffs.append(.init(vowelFf, durSec: 0))
             default:
                 if let preFf = previousFormantFilter, let id = previousID {
                     kffs.append(.init(preFf, durSec: paddingSec, id: id))

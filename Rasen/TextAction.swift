@@ -667,7 +667,7 @@ final class TextAction: InputTextEventAction {
                 if event.inputKeyType == .delete, !lyric.isEmpty {
                     lyric.removeLast()
                 } else if event.inputKeyType.isText {
-                    if lyric == "[" {
+                    if lyric == "[" || lyric == "]" {
                         lyric = ""
                     }
                     lyric += key
@@ -677,7 +677,11 @@ final class TextAction: InputTextEventAction {
                         rootAction.stopPlaying(with: event)
                     }
                     
-                    note.replace(lyric: lyric, at: pitI, tempo: scoreView.model.tempo)
+                    if note.isRendableFromLyric {
+                        note.replace(lyric: lyric, at: pitI, tempo: scoreView.model.tempo)
+                    } else {
+                        note.pits[pitI].lyric = lyric
+                    }
                     if isNewUndoGroup {
                         sheetView.newUndoGroup()
                     }

@@ -75,6 +75,14 @@ extension Array {
         }
         return ns
     }
+    
+    init(optional: Element?) {
+        if let v = optional {
+            self = [v]
+        } else {
+            self = []
+        }
+    }
 }
 extension RangeReplaceableCollection where Element: Equatable {
     static func - (lhs: Self, rhs: Self) -> Self {

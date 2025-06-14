@@ -368,8 +368,9 @@ extension ScoreView {
     func pitResult(atBeat beat: Rational, at noteI: Int) -> Note.PitResult {
         self[noteI].pitResult(atBeat: .init(beat - self[noteI].beatRange.start))
     }
-    func normarizedPitResult(atBeat beat: Rational, at noteI: Int) -> Note.PitResult {
-        self[noteI].normarizedPitResult(atBeat: .init(beat - self[noteI].beatRange.start))
+    func rendableNormarizedPitResult(atBeat beat: Rational, at noteI: Int) -> Note.PitResult {
+        let note = self[noteI].withRendable(tempo: model.tempo)
+        return note.normarizedPitResult(atBeat: .init(beat - note.beatRange.start))
     }
     
     var option: ScoreOption {
@@ -629,7 +630,8 @@ extension ScoreView {
         let pitchRange = Score.pitchRange
         guard let intPitchRange = Range<Int>(pitchRange) else { return [] }
         
-        let chordBeats = score.notes.reduce(into: Set<Rational>()) {
+        let notes = score.chordNotes
+        let chordBeats = notes.reduce(into: Set<Rational>()) {
             let vs = $1.chordBeatRangeAndRoundedPitchs()
             for v in vs {
                 if score.beatRange.contains(v.beatRange.start) {
@@ -651,7 +653,7 @@ extension ScoreView {
         chordRanges.append(preBeat ..< score.beatRange.end)
         
         var chordEdges = [(edge: Edge, typers: [Chord.ChordTyper])]()
-        let trs = chordRanges.map { ($0, score.chordPitches(atBeat: $0)) }
+        let trs = chordRanges.map { ($0, score.chordPitches(atBeat: $0, from: notes)) }
         for (tr, pitchs) in trs {
             let pitchs = pitchs.sorted()
             guard let chord = Chord(pitchs: pitchs) else { continue }
@@ -693,7 +695,8 @@ extension ScoreView {
             }
         }
         
-        let chordBeats = score.notes.reduce(into: Set<Rational>()) {
+        let notes = score.chordNotes
+        let chordBeats = notes.reduce(into: Set<Rational>()) {
             let vs = $1.chordBeatRangeAndRoundedPitchs()
             for v in vs {
                 if score.beatRange.contains(v.beatRange.start) {
@@ -717,7 +720,7 @@ extension ScoreView {
         struct PitchAndTyper: Hashable {
             var pitch: Int, typers: [Chord.ChordTyper]
         }
-        let trs = chordRanges.map { ($0, score.chordPitches(atBeat: $0)) }
+        let trs = chordRanges.map { ($0, score.chordPitches(atBeat: $0, from: notes)) }
         var cbpts = [(beatRange: Range<Rational>, pitchAndTypers: [PitchAndTyper])]()
         for (chordBeatRange, pitchs) in trs {
             let pitchs = pitchs.sorted()
@@ -974,7 +977,7 @@ extension ScoreView {
         let evenY = Sheet.evenY + spectlopeY
         let spectlopeMaxY = spectlopeY + spectlopeH
         
-        var stereoLinePath, mainLinePath: Path, mainEvenLinePath: Path?, lyricLinePathlines = [Pathline]()
+        var stereoLinePath, mainLinePath: Path, lyricLinePath: Path?, mainEvenLinePath: Path?, lyricLinePathlines = [Pathline]()
         var spectlopeFqLinePathlines = [Pathline](), spectlopeLinePathlines = [Pathline]()
         var spectlopeTonePanelNodes = [Node](), backSpectlopeNodes = [Node]()
         let knobR = 0.25, sprolR = 0.125
@@ -1001,9 +1004,10 @@ extension ScoreView {
                     let lh = fHeight * 2
                     lyricLinePathlines.append(.init(Rect(x: p.x - 0.25, y: p.y - lh,
                                                          width: 0.5, height: lh)))
-                    return .init(attitude: .init(position: .init(p.x - typesetter.width / 2,
-                                                                 p.y - lh - typesetter.height / 2)),
-                                 path: typesetter.path(), fillType: .color(color ?? .content))
+                    let isEnabledLyric = !Phoneme.phonemes(fromHiragana: pit.lyric).isEmpty
+                    return .init(attitude: .init(position: .init(p.x + 1,
+                                                                 p.y - lh + typesetter.height / 2)),
+                                 path: typesetter.path(), fillType: .color(color ?? (isEnabledLyric ? .content : .interpolated)))
                 }
             } else {
                 return nil
@@ -1159,14 +1163,10 @@ extension ScoreView {
         var mainEvenLineColors, stereoLineColors: [Color], knobPRCs: [(p: Point, r: Double, color: Color)]
         var toneFrames = [Rect]()
         var tonePanelKnobPRCs: [(p: Point, r: Double, color: Color)]
-        if note.pits.count >= 2 {
-            let pitbend = note.pitbend(fromTempo: model.tempo)
-            
-            let t = note.spectlopeHeight.clipped(min: Sheet.spectlopeHeight,
-                                                 max: Sheet.maxSpectlopeHeight,
-                                                 newMin: 0, newMax: 1)
-            let toneMaxY = toneMaxY(from: note)
-            
+        
+        func beatsAndPitIsDic(from note: Note,
+                              _ pitbend: Pitbend) -> (beats: [Rational],
+                                                      pitIsDic: [Rational: [Int]]) {
             var beatSet = Set<Rational>(minimumCapacity: Int(note.beatRange.length / .init(1, 72)))
             var nBeat = note.beatRange.start
             while nBeat <= note.beatRange.end {
@@ -1187,6 +1187,57 @@ extension ScoreView {
             let pitBeatSet = Set(pitbend.pits.map { note.beatRange.start + $0.beat })
             beatSet.formUnion(pitBeatSet)
             let beats = beatSet.sorted()
+            return (beats, pitIsDic)
+        }
+        
+        if note.isSimpleLyric {
+            let nNote = note.withRendable(tempo: model.tempo)
+            let pitbend = nNote.pitbend(fromTempo: model.tempo)
+            let (beats, pitIsDic) = beatsAndPitIsDic(from: nNote, pitbend)
+            let lHalfH = mainLineHalfH / 2
+            var lmps = [LinePoint]()
+            lmps.append(.init(x(atBeat: nNote.beatRange.start),
+                              y(fromPitch: nNote.firstPitch), lHalfH, .content))
+            var preBeatY: Double?
+            for beat in beats {
+                let noteX = x(atBeat: beat), noteY = noteY(atBeat: beat, from: nNote)
+                if (pitIsDic[beat]?.count ?? 0) >= 2, let preBeatY {
+                    lmps.append(.init(noteX, preBeatY, lHalfH, .content))
+                }
+                lmps.append(.init(noteX, noteY, lHalfH, .content))
+                preBeatY = noteY
+            }
+            lmps.append(.init(x(atBeat: nNote.beatRange.end),
+                              noteY(atBeat: nNote.beatRange.end, from: nNote), lHalfH, .content))
+            
+            for (pitI, pit) in nNote.pits.enumerated() {
+                let p = pitPosition(atPit: pitI, from: nNote)
+                let lh = 0.25, w = 1.0, h = 2.0
+                if pit.lyric == "[" {
+                    lyricLinePathlines.append(.init(Rect(x: p.x - lh / 2, y: p.y - h,
+                                                         width: lh, height: h)))
+                    lyricLinePathlines.append(.init(Rect(x: p.x - lh / 2, y: p.y - h - lh,
+                                                         width: w, height: lh)))
+                } else if pit.lyric == "]" {
+                    lyricLinePathlines.append(.init(Rect(x: p.x - lh / 2, y: p.y - h,
+                                                         width: lh, height: h)))
+                    lyricLinePathlines.append(.init(Rect(x: p.x + lh / 2 - w, y: p.y - h - lh,
+                                                         width: w, height: lh)))
+                }
+            }
+            
+            lyricLinePath = .init(triangleStrip(lmps))
+        }
+        
+        if note.pits.count >= 2 {
+            let pitbend = note.pitbend(fromTempo: model.tempo)
+            
+            let t = note.spectlopeHeight.clipped(min: Sheet.spectlopeHeight,
+                                                 max: Sheet.maxSpectlopeHeight,
+                                                 newMin: 0, newMax: 1)
+            let toneMaxY = toneMaxY(from: note)
+            
+            let (beats, pitIsDic) = beatsAndPitIsDic(from: note, pitbend)
             
             var ps = [LinePoint](), eps = [LinePoint](), mps = [LinePoint](), meps = [LinePoint]()
             ps.append(.init(nsx, ny, halfNH, Self.color(from: note.firstStereo)))
@@ -1278,6 +1329,17 @@ extension ScoreView {
                                         (note.beatRange.start + $0.beat) % Sheet.beatInterval == 0
                                         && (note.pitch + $0.pitch).isInteger ? knobR : knobR / 2,
                                         $0.tone.baseColor()) }
+            knobPRCs += note.pits.enumerated().map {
+                let nextBeat = $0.offset + 1 < note.pits.count ?
+                note.pits[$0.offset + 1].beat : note.beatRange.length
+                let nextPitch = note.pits[min($0.offset + 1,  note.pits.count - 1)].pitch
+                let beat = $0.element.beat.mid(nextBeat)
+                let pitch = $0.element.beat == nextBeat ?
+                Double(note.pitch + $0.element.pitch.mid(nextPitch)) :
+                Double(note.pitch) + note.pitResult(atBeat: Double(beat)).pitch.doubleValue
+                return (.init(x(atBeat: note.beatRange.start + beat), y(fromPitch: pitch)),
+                        knobR / 2, Color.octave)
+            }
             
             stereoLinePath = .init(triangleStrip(ps, isSnap: true))
             stereoLineColors = colors(ps)
@@ -1547,6 +1609,9 @@ extension ScoreView {
         let isHiddenFullEdit = isMinSpectlopeHeight ? !isFullEdit : !isEditTone
         
         var nodes = [Node]()
+        if let lyricLinePath {
+            nodes.append(.init(path: lyricLinePath, fillType: .color(.interpolated)))
+        }
         nodes.append(.init(path: stereoLinePath,
                            fillType: color != nil ? .color(color!) : (stereoLineColors.count == 1 ? .color(stereoLineColors[0]) : .gradient(stereoLineColors))))
         nodes.append(.init(path: mainLinePath, fillType: .color(.content)))
@@ -1821,11 +1886,22 @@ extension ScoreView {
         }
         return minI
     }
+    func nearestNoteIndexes(at p: Point) -> [Int] {
+        var ivs = [Double: Int]()
+        for (noteI, note) in model.notes.enumerated().reversed() {
+            let dSq = pointline(from: note).minDistanceSquared(at: p)
+            ivs[dSq] = noteI
+        }
+        return ivs
+            .sorted { $0.key < $1.key }
+            .map { $0.value }
+    }
     
     enum PointHitResult {
         case note
         case startBeat
         case endBeat
+        case mid(pitI: Int)
         case pit(pitI: Int)
         case lyric(pitI: Int)
         case even(pitI: Int)
@@ -1948,6 +2024,40 @@ extension ScoreView {
                 }
             }
             
+            note.pits.enumerated().forEach {
+                let nextBeat = $0.offset + 1 < note.pits.count ?
+                note.pits[$0.offset + 1].beat : note.beatRange.length
+                let nextPitch = note.pits[min($0.offset + 1,  note.pits.count - 1)].pitch
+                let beat = $0.element.beat.mid(nextBeat)
+                let pitch = $0.element.beat == nextBeat ?
+                Double(note.pitch + $0.element.pitch.mid(nextPitch)) :
+                Double(note.pitch) + note.pitResult(atBeat: Double(beat)).pitch.doubleValue
+                let pitP = Point(x(atBeat: note.beatRange.start + beat),
+                                 y(fromPitch: pitch))
+                let dSq = pitP.distanceSquared(p)
+                if dSq <= minDSq && dSq < nMaxDSq {
+                    let pdSq = pointline.minDistanceSquared(at: p)
+                    if prePitP == pitP && pitP.x < p.x {
+                        pds[pitP] = pdSq
+                        minDSq = dSq
+                        minResult = (noteI, .mid(pitI: $0.offset))
+                        isPit = true
+                    } else if let minPDSq = pds[pitP] {
+                        if pdSq < minPDSq {
+                            pds[pitP] = pdSq
+                            minDSq = dSq
+                            minResult = (noteI, .mid(pitI: $0.offset))
+                            isPit = true
+                        }
+                    } else {
+                        pds[pitP] = pdSq
+                        minDSq = dSq
+                        minResult = (noteI, .mid(pitI: $0.offset))
+                        isPit = true
+                    }
+                }
+            }
+            
             let noteD = noteH(from: note) / 2
             let maxPitD = Sheet.knobEditDistance * scale + noteD
             if !isPit {
@@ -2036,6 +2146,7 @@ extension ScoreView {
     
     enum ColorHitResult {
         case note
+        case mid(pitI: Int)
         case pit(pitI: Int)
         case allEven
         case evenAmp(pitI: Int)
@@ -2159,6 +2270,37 @@ extension ScoreView {
                     }
                 }
                 prePitP = pitP
+            }
+            
+            note.pits.enumerated().forEach {
+                let nextBeat = $0.offset + 1 < note.pits.count ?
+                note.pits[$0.offset + 1].beat : note.beatRange.length
+                let nextPitch = note.pits[min($0.offset + 1,  note.pits.count - 1)].pitch
+                let beat = $0.element.beat.mid(nextBeat)
+                let pitch = $0.element.beat == nextBeat ?
+                Double(note.pitch + $0.element.pitch.mid(nextPitch)) :
+                Double(note.pitch) + note.pitResult(atBeat: Double(beat)).pitch.doubleValue
+                let pitP = Point(x(atBeat: note.beatRange.start + beat),
+                                 y(fromPitch: pitch))
+                let dSq = pitP.distanceSquared(p)
+                if dSq <= minDSq && dSq < nMaxDSq {
+                    let pdSq = pointline.minDistanceSquared(at: p)
+                    if prePitP == pitP && pitP.x < p.x {
+                        pds[pitP] = pdSq
+                        minDSq = dSq
+                        minResult = (noteI, .mid(pitI: $0.offset))
+                    } else if let minPDSq = pds[pitP] {
+                        if pdSq < minPDSq {
+                            pds[pitP] = pdSq
+                            minDSq = dSq
+                            minResult = (noteI, .mid(pitI: $0.offset))
+                        }
+                    } else {
+                        pds[pitP] = pdSq
+                        minDSq = dSq
+                        minResult = (noteI, .mid(pitI: $0.offset))
+                    }
+                }
             }
             
             let hnh = pitchHeight / 2

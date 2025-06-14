@@ -366,7 +366,8 @@ final class ColorAction: Action {
                     notePlayer?.play()
                 }
                 
-                func updatePitsWithSelection(noteI: Int, pitI: Int?, sprolI: Int?, _ type: PitIDType) {
+                func updatePitsWithSelection(noteI: Int, pitI: Int?, pitIs: [Int] = [],
+                                             sprolI: Int?, _ type: PitIDType) {
                     var noteAndPitIs: [Int: [Int: Set<Int>]]
                     if let sprolI {
                         if rootView.isSelect(at: p) {
@@ -405,7 +406,9 @@ final class ColorAction: Action {
                             }
                         }
                     } else {
-                        if let pitI {
+                        if !pitIs.isEmpty {
+                            noteAndPitIs = [noteI: pitIs.reduce(into: [Int: Set<Int>]()) { $0[$1] = [] }]
+                        } else if let pitI {
                             let id = score.notes[noteI].pits[pitI][type]
                             noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) {
                                 $0[$1.offset] = $1.element.pits.enumerated().reduce(into: [Int: Set<Int>]()) { (v, ip) in
@@ -474,6 +477,13 @@ final class ColorAction: Action {
                         beganVolm = score.notes[noteI].pits[pitI].stereo.volm
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .stereo)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
+                    case .mid(let pitI):
+                        let note = score.notes[noteI]
+                        let (pitIs, beat) = pitI + 1 < note.pits.count ? ([pitI, pitI + 1], note.pits[pitI].beat.mid(note.pits[pitI + 1].beat)) : ([pitI], note.pits[pitI].beat.mid(note.beatRange.length))
+                        beganVolm = score.notes[noteI].pitResult(atBeat: Double(beat)).stereo.volm
+                        updatePitsWithSelection(noteI: noteI, pitI: pitI, pitIs: pitIs,
+                                                sprolI: nil, .stereo)
+                        beganBeat = beat + note.beatRange.start
                     case .evenAmp(let pitI):
                         beganVolm = score.notes[noteI].pits[pitI].tone.overtone.evenAmp
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .tone)
@@ -535,7 +545,7 @@ final class ColorAction: Action {
             let volmScale = beganVolm == 0 ? 1 : volm / beganVolm
             func newVolm(from otherVolm: Double, _ volmRange: ClosedRange<Double>) -> Double {
                 if beganVolm == otherVolm {
-                    volm
+                    volm.clipped(volmRange)
                 } else {
                     (otherVolm * volmScale).clipped(volmRange)
                 }
@@ -545,7 +555,7 @@ final class ColorAction: Action {
             
             if let scoreResult {
                 switch scoreResult {
-                case .note, .pit:
+                case .note, .pit, .mid:
                     var nvs = [Int: Note]()
                     for (_, v) in beganNotePits {
                         for (noteI, nv) in v.dic {
@@ -618,11 +628,11 @@ final class ColorAction: Action {
                 switch scoreResult {
                 case .sprol, .allSprol, .oddVolm, .evenAmp, .allEven:
                     notePlayer?.notes = playerBeatNoteIndexes.map {
-                        scoreView.normarizedPitResult(atBeat: beganBeat, at: $0)
+                        scoreView.rendableNormarizedPitResult(atBeat: beganBeat, at: $0)
                     }
                 default:
                     notePlayer?.changeStereo(from: playerBeatNoteIndexes.map {
-                        scoreView.normarizedPitResult(atBeat: beganBeat, at: $0)
+                        scoreView.rendableNormarizedPitResult(atBeat: beganBeat, at: $0)
                     })
                 }
             } else if !beganContents.isEmpty {
@@ -781,7 +791,8 @@ final class ColorAction: Action {
                     notePlayer?.play()
                 }
                 
-                func updatePitsWithSelection(noteI: Int, pitI: Int?, sprolI: Int?, _ type: PitIDType) {
+                func updatePitsWithSelection(noteI: Int, pitI: Int?, pitIs: [Int] = [],
+                                             sprolI: Int?, _ type: PitIDType) {
                     var noteAndPitIs: [Int: [Int: Set<Int>]]
                     if let sprolI {
                         if rootView.isSelect(at: p) {
@@ -820,7 +831,9 @@ final class ColorAction: Action {
                             }
                         }
                     } else {
-                        if let pitI {
+                        if !pitIs.isEmpty {
+                            noteAndPitIs = [noteI: pitIs.reduce(into: [Int: Set<Int>]()) { $0[$1] = [] }]
+                        } else if let pitI {
                             let id = score.notes[noteI].pits[pitI][type]
                             noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) {
                                 $0[$1.offset] = $1.element.pits.enumerated().reduce(into: [Int: Set<Int>]()) { (v, ip) in
@@ -890,6 +903,14 @@ final class ColorAction: Action {
                         beganStereo = note.pits[pitI].stereo
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .stereo)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
+                    case .mid(let pitI):
+                        beganStereo = scoreView.stereo(atX: scoreP.x, at: noteI)
+                        let note = score.notes[noteI]
+                        let (pitIs, beat) = pitI + 1 < note.pits.count ? ([pitI, pitI + 1], note.pits[pitI].beat.mid(note.pits[pitI + 1].beat)) : ([pitI], note.pits[pitI].beat.mid(note.beatRange.length))
+                        beganVolm = score.notes[noteI].pitResult(atBeat: Double(beat)).stereo.volm
+                        updatePitsWithSelection(noteI: noteI, pitI: pitI, pitIs: pitIs,
+                                                sprolI: nil, .stereo)
+                        beganBeat = beat + note.beatRange.start
                     case .evenAmp, .oddVolm, .allEven: return
                     case .allSprol(let sprolI, let sprol):
                         let volm = sprol.volm
@@ -984,7 +1005,7 @@ final class ColorAction: Action {
                 let noiseScale = beganNoise == 0 ? 0 : noise / beganNoise
                 func newNoise(from otherNoise: Double) -> Double {
                     if beganNoise == otherNoise {
-                        noise
+                        noise.clipped(min: 0, max: 1)
                     } else {
                         (otherNoise * noiseScale).clipped(min: 0, max: 1)
                     }
@@ -1013,7 +1034,7 @@ final class ColorAction: Action {
                 colorPointNode.attitude.position = .init(panWidth * noise, 0)
                 
                 notePlayer?.notes = playerBeatNoteIndexes.map {
-                    scoreView.normarizedPitResult(atBeat: beganBeat, at: $0)
+                    scoreView.rendableNormarizedPitResult(atBeat: beganBeat, at: $0)
                 }
             } else {
                 let oPan = beganPan + (sp.x - rootView.convertWorldToScreen(beganWorldP).x) / (panWidth / 2)
@@ -1059,7 +1080,7 @@ final class ColorAction: Action {
                     scoreView.replace(nivs)
                     
                     notePlayer?.changeStereo(from: playerBeatNoteIndexes.map {
-                        scoreView.normarizedPitResult(atBeat: beganBeat, at: $0)
+                        scoreView.rendableNormarizedPitResult(atBeat: beganBeat, at: $0)
                     })
                 } else if !beganContents.isEmpty {
                     for (ci, beganContent) in beganContents {
@@ -1174,7 +1195,8 @@ final class ColorAction: Action {
                     notePlayer?.play()
                 }
                 
-                func updatePitsWithSelection(noteI: Int, pitI: Int?, sprolI: Int?, _ type: PitIDType) {
+                func updatePitsWithSelection(noteI: Int, pitI: Int?, pitIs: [Int] = [],
+                                             sprolI: Int?, _ type: PitIDType) {
                     var noteAndPitIs: [Int: [Int: Set<Int>]]
                     if let sprolI {
                         if rootView.isSelect(at: p) {
@@ -1207,7 +1229,9 @@ final class ColorAction: Action {
                             }
                         }
                     } else {
-                        if let pitI {
+                        if !pitIs.isEmpty {
+                            noteAndPitIs = [noteI: pitIs.reduce(into: [Int: Set<Int>]()) { $0[$1] = [] }]
+                        } else if let pitI {
                             let id = score.notes[noteI].pits[pitI][type]
                             noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) {
                                 $0[$1.offset] = $1.element.pits.enumerated().reduce(into: [Int: Set<Int>]()) { (v, ip) in
@@ -1269,6 +1293,13 @@ final class ColorAction: Action {
                         beganVolm = score.notes[noteI].pits[pitI].tone.overtone.evenAmp
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .tone)
                         beganBeat = note.pits[pitI].beat + note.beatRange.start
+                    case .mid(let pitI):
+                        let note = score.notes[noteI]
+                        let (pitIs, beat) = pitI + 1 < note.pits.count ? ([pitI, pitI + 1], note.pits[pitI].beat.mid(note.pits[pitI + 1].beat)) : ([pitI], note.pits[pitI].beat.mid(note.beatRange.length))
+                        beganVolm = score.notes[noteI].pitResult(atBeat: Double(beat)).stereo.volm
+                        updatePitsWithSelection(noteI: noteI, pitI: pitI, pitIs: pitIs,
+                                                sprolI: nil, .stereo)
+                        beganBeat = beat + note.beatRange.start
                     default: break
                     }
                     
@@ -1302,7 +1333,7 @@ final class ColorAction: Action {
             let volmScale = beganVolm == 0 ? 0 : volm / beganVolm
             func newVolm(from otherVolm: Double, _ volmRange: ClosedRange<Double>) -> Double {
                 if beganVolm == otherVolm {
-                    volm
+                    volm.clipped(volmRange)
                 } else {
                     (otherVolm * volmScale).clipped(volmRange)
                 }
@@ -1312,7 +1343,7 @@ final class ColorAction: Action {
             
             if let scoreResult {
                 switch scoreResult {
-                case .note, .pit:
+                case .note, .pit, .mid:
                     var nvs = [Int: Note]()
                     for (_, v) in beganNotePits {
                         for (noteI, nv) in v.dic {
@@ -1333,7 +1364,7 @@ final class ColorAction: Action {
                 switch scoreResult {
                 case .note, .pit:
                     notePlayer?.notes = playerBeatNoteIndexes.map {
-                        scoreView.normarizedPitResult(atBeat: beganBeat, at: $0)
+                        scoreView.rendableNormarizedPitResult(atBeat: beganBeat, at: $0)
                     }
                 default: break
                 }

@@ -965,6 +965,9 @@ extension Pit {
     func isEqualWithoutBeat(_ other: Self) -> Bool {
         pitch == other.pitch && stereo == other.stereo && tone == other.tone && lyric == other.lyric
     }
+    var isLyric: Bool {
+        !lyric.isEmpty && lyric != "[" && lyric != "]"
+    }
 }
 enum PitIDType {
     case stereo, tone
@@ -1352,6 +1355,63 @@ extension Note {
     }
     var isFullNoise: Bool {
         pits.allSatisfy { $0.tone.spectlope.isFullNoise }
+    }
+    
+    var isSimpleLyric: Bool {
+        isDefaultTone && pits.contains(where: { !$0.lyric.isEmpty })
+    }
+    var isRendableFromLyric: Bool {
+        !isDefaultTone && pits.contains(where: { !$0.lyric.isEmpty })
+    }
+    func withRendable(tempo: Rational) -> Self {
+        guard isSimpleLyric else { return self }
+        var n = self, i = 0, oldTone = n.pits[0].tone
+        while i < n.pits.count {
+            if n.pits[i].isLyric {
+                i = n.replace(lyric: n.pits[i].lyric, at: i, tempo: tempo, isUpdateNext: false)
+                oldTone = n.pits[i].tone
+            } else {
+                n.pits[i].tone = oldTone
+            }
+            i += 1
+        }
+        return n
+    }
+    var withSimpleLyric: Self {
+        var n = self
+        var nPits = [Pit](capacity: pits.count)
+        let oPits = pits.filter { $0.isLyric }
+        var prePit: Pit?
+        for pit in oPits {
+            if let prePitch = prePit?.pitch, pit.pitch != prePitch {
+                var nPit = pit
+                nPit.pitch = prePitch
+                nPit.lyric = ""
+                nPit.tone = .init()
+                nPits.append(nPit)
+            }
+            var pit = pit
+            pit.tone = .init()
+            nPits.append(pit)
+            prePit = pit
+        }
+        if nPits.isEmpty {
+            n.pits = [n.pits[0]]
+        }
+        n.pits = nPits
+        
+        let dBeat = nPits[0].beat
+        if dBeat > 0 {
+            n.beatRange.start += dBeat
+            n.beatRange.length -= dBeat
+            n.pits = n.pits.map {
+                var nPit = $0
+                nPit.beat -= dBeat
+                return nPit
+            }
+        }
+        
+        return n
     }
 }
 extension Note {
@@ -1868,9 +1928,9 @@ extension Score {
         return minV ..< maxV
     }
     
-    func chordPitches(atBeat range: Range<Rational>) -> [Int] {
+    func chordPitches(atBeat range: Range<Rational>, from notes: [Note]) -> [Int] {
         var pitchLengths = [Int: [Range<Rational>]]()
-        for note in notes + draftNotes {
+        for note in notes {
             for (beatRange, roundedPitch) in note.chordBeatRangeAndRoundedPitchs() {
                 if let iRange = beatRange.intersection(range) {
                     if pitchLengths[roundedPitch] != nil {
@@ -1897,6 +1957,7 @@ extension Score {
     }
     func noteIAndNormarizedPits(atBeat beat: Rational, selectedNoteI: Int?,
                                 in noteIs: [Int]) -> [(noteI: Int, pitResult: Note.PitResult)] {
+        let notes = notes.map { $0.isSimpleLyric ? $0.withRendable(tempo: tempo) : $0 }
         let firstOrlast: FirstOrLast?
         if let selectedNoteI {
             let note = notes[selectedNoteI]
@@ -1929,6 +1990,12 @@ extension Score {
             }
             return nil
         }
+    }
+    
+    var chordNotes: [Note] {
+        (notes + draftNotes)
+            .filter { !$0.isOneOvertone && !$0.isFullNoise }
+            .map { $0.withRendable(tempo: tempo) }
     }
 }
 extension Score {

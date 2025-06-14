@@ -1066,41 +1066,50 @@ final class InterpolateAction: InputKeyEventAction {
             rootView.cursor = .arrow
             
             if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled {
+                let nis: [Int]
                 if rootView.isSelectNoneCursor(at: p), !rootView.isSelectedText {
-                    let nis = sheetView.noteIndexes(from: rootView.selections)
-                    if !nis.isEmpty {
-                        let noteIAndNotes = nis
-                            .map { ($0, sheetView.scoreView.model.notes[$0]) }
-                            .sorted { $0.1.beatRange.start < $1.1.beatRange.start }
-                        var preBeat = noteIAndNotes.first!.1.beatRange.end, isAppend = false
-                        var nNote = noteIAndNotes.first!.1
-                        var preLastPit = nNote.pits.last!
-                        preLastPit.beat = nNote.beatRange.length
-                        preLastPit.lyric = ""
-                        for i in 1 ..< noteIAndNotes.count {
-                            let (_, note) = noteIAndNotes[i]
-                            if preBeat <= note.beatRange.start {
-                                nNote.pits.append(preLastPit)
-                                nNote.pits += note.pits.map {
-                                    var pit = $0
-                                    pit.beat += note.beatRange.start - nNote.beatRange.start
-                                    pit.pitch += note.pitch - nNote.pitch
-                                    return pit
-                                }
-                                preBeat = note.beatRange.end
-                                preLastPit = note.pits.last!
-                                preLastPit.beat = note.beatRange.end - nNote.beatRange.start
-                                preLastPit.pitch += note.pitch - nNote.pitch
-                                preLastPit.lyric = ""
-                                nNote.beatRange.length = preLastPit.beat
-                                isAppend = true
+                    nis = sheetView.noteIndexes(from: rootView.selections)
+                } else {
+                    let onis = sheetView.scoreView
+                        .nearestNoteIndexes(at: sheetView.scoreView.convertFromWorld(p))
+                    if onis.count >= 2 {
+                        nis = [onis[0], onis[1]]
+                    } else {
+                        nis = []
+                    }
+                }
+                if nis.count >= 2 {
+                    let noteIAndNotes = nis
+                        .map { ($0, sheetView.scoreView.model.notes[$0]) }
+                        .sorted { $0.1.beatRange.start < $1.1.beatRange.start }
+                    var preBeat = noteIAndNotes.first!.1.beatRange.end, isAppend = false
+                    var nNote = noteIAndNotes.first!.1
+                    var preLastPit = nNote.pits.last!
+                    preLastPit.beat = nNote.beatRange.length
+                    preLastPit.lyric = ""
+                    for i in 1 ..< noteIAndNotes.count {
+                        let (_, note) = noteIAndNotes[i]
+                        if preBeat <= note.beatRange.start {
+                            nNote.pits.append(preLastPit)
+                            nNote.pits += note.pits.map {
+                                var pit = $0
+                                pit.beat += note.beatRange.start - nNote.beatRange.start
+                                pit.pitch += note.pitch - nNote.pitch
+                                return pit
                             }
+                            preBeat = note.beatRange.end
+                            preLastPit = note.pits.last!
+                            preLastPit.beat = note.beatRange.end - nNote.beatRange.start
+                            preLastPit.pitch += note.pitch - nNote.pitch
+                            preLastPit.lyric = ""
+                            nNote.beatRange.length = preLastPit.beat
+                            isAppend = true
                         }
-                        if isAppend {
-                            sheetView.newUndoGroup()
-                            sheetView.removeNote(at: noteIAndNotes.map { $0.0 }.sorted())
-                            sheetView.append(nNote)
-                        }
+                    }
+                    if isAppend {
+                        sheetView.newUndoGroup()
+                        sheetView.removeNote(at: noteIAndNotes.map { $0.0 }.sorted())
+                        sheetView.append(nNote)
                     }
                 }
                 return
@@ -1669,7 +1678,7 @@ extension SheetView {
     }
 }
 
-final class CrossEraseAction: InputKeyEventAction {
+final class DisconnectAction: InputKeyEventAction {
     let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
@@ -1695,6 +1704,51 @@ final class CrossEraseAction: InputKeyEventAction {
         switch event.phase {
         case .began:
             rootView.cursor = .arrow
+            
+            if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled {
+                let scoreView = sheetView.scoreView
+                let scoreP = sheetView.scoreView.convertFromWorld(p)
+                if let noteI = sheetView.scoreView.noteIndex(at: scoreP,
+                                                             scale: rootView.screenToWorldScale,
+                                                             enabledTone: true) {
+                    let scoreP = scoreView.convertFromWorld(p)
+                    
+                    let nis = [noteI]
+                    var notes = [Note](), replaceIVs = [IndexValue<Note>]()
+                    for noteI in nis {
+                        let note = scoreView.model.notes[noteI]
+                        let beat = scoreView.beat(atX: scoreP.x,
+                                                  interval: rootView.currentBeatInterval) - note.beatRange.start
+                        if note.pits.count > 1,
+                           beat >= 0 && beat < note.beatRange.length,
+                           let pitI = note.pits.enumerated().reversed().first(where: { $0.element.beat <= beat })?.offset,
+                           pitI > 0 && pitI + 1 < note.pits.count {
+                           
+                            let nextPitI = pitI + 1
+                            let nPits = note.pits[nextPitI...].map {
+                                var nPit = $0
+                                nPit.beat -= note.pits[nextPitI].beat
+                                return nPit
+                            }
+                            let nNote0 = Note(beatRange: note.beatRange.start ..< (note.pits[pitI].beat + note.beatRange.start),
+                                              pitch: note.pitch,
+                                              pits: Array(note.pits[..<pitI]),
+                                              spectlopeHeight: note.spectlopeHeight, id: note.id)
+                            let nNote1 = Note(beatRange: (note.pits[nextPitI].beat + note.beatRange.start) ..< note.beatRange.end,
+                                              pitch: note.pitch,
+                                              pits: nPits,
+                                              spectlopeHeight: note.spectlopeHeight, id: .init())
+                            replaceIVs.append(.init(value: nNote0, index: noteI))
+                            notes.append(nNote1)
+                        }
+                    }
+                    if !replaceIVs.isEmpty {
+                        sheetView.newUndoGroup()
+                        sheetView.replace(replaceIVs)
+                        sheetView.append(notes)
+                    }
+                }
+            }
             
             let (_, sheetView, _, _) = rootView.sheetViewAndFrame(at: p)
             if let sheetView = sheetView {

@@ -339,6 +339,7 @@ struct Rendnote {
 }
 extension Rendnote {
     init(note: Note, score: Score, snapBeatScale: Rational = .init(1, 4)) {
+        let note = note.isSimpleLyric ? note.withRendable(tempo: score.tempo) : note
         let sSec = Double(score.sec(fromBeat: note.beatRange.start))
         let eSec = Double(score.sec(fromBeat: note.beatRange.end))
         

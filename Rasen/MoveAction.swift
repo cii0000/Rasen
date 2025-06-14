@@ -499,7 +499,7 @@ final class MoveScoreAction: DragEventAction {
     enum SlideType {
         case keyBeats, allBeat, endBeat, isShownSpectrogram, scale,
              startNoteBeat, endNoteBeat, note,
-             pit,
+             pit, mid,
              even, sprol, spectlopeHeight
     }
     
@@ -639,8 +639,8 @@ final class MoveScoreAction: DragEventAction {
                     }
                     
                     switch result {
-                    case .pit(let pitI), .lyric(let pitI):
-                        type = .pit
+                    case .pit(let pitI), .mid(let pitI), .lyric(let pitI):
+                        type = if case .mid = result { .mid } else { .pit }
                         
                         let pit = note.pits[pitI]
                         self.pitI = pitI
@@ -653,10 +653,17 @@ final class MoveScoreAction: DragEventAction {
                         beganBeatX = scoreView.x(atBeat: note.beatRange.start + pit.beat)
                         beganPitchY = scoreView.y(fromPitch: note.pitch + pit.pitch)
                         
+                        var playerBeat = beganBeat
+                        
                         var noteAndPitIs: [Int: [Int]]
                         if case .lyric = result {
                             let note = score.notes[noteI]
                             noteAndPitIs = [noteI: note.lyricRange(at: pitI)?.map { $0 } ?? [pitI]]
+                        } else if case .mid = result {
+                            let note = score.notes[noteI]
+                            let (pitIs, beat) = pitI + 1 < note.pits.count ? ([pitI, pitI + 1], note.pits[pitI].beat.mid(note.pits[pitI + 1].beat)) : ([pitI], note.pits[pitI].beat.mid(note.beatRange.length))
+                            noteAndPitIs = [noteI: pitIs]
+                            playerBeat = note.beatRange.start + beat
                         } else if rootView.isSelect(at: p) {
                             noteAndPitIs = sheetView.noteAndPitIndexes(from: rootView.selections,
                                                                        enabledAllPits: false)
@@ -679,7 +686,7 @@ final class MoveScoreAction: DragEventAction {
                         }
                         
                         let noteIs = Set(beganNotePits.keys).intersection(selectedNoteIs).sorted()
-                        let vs = score.noteIAndNormarizedPits(atBeat: beganBeat, selectedNoteI: noteI, in: noteIs)
+                        let vs = score.noteIAndNormarizedPits(atBeat: playerBeat, selectedNoteI: noteI, in: noteIs)
                         playerBeatNoteIndexes = vs.map { $0.noteI }
                         
                         updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
@@ -932,7 +939,7 @@ final class MoveScoreAction: DragEventAction {
                             
                             if pitch != oldPitch {
                                 notePlayer?.notes = playerBeatNoteIndexes.map {
-                                    scoreView.normarizedPitResult(atBeat: nsBeat, at: $0)
+                                    scoreView.rendableNormarizedPitResult(atBeat: nsBeat, at: $0)
                                 }
                                 oldPitch = pitch
                                 
@@ -982,7 +989,7 @@ final class MoveScoreAction: DragEventAction {
                             
                             if pitch != oldPitch {
                                 notePlayer?.notes = playerBeatNoteIndexes.map {
-                                    scoreView.normarizedPitResult(atBeat: neBeat, at: $0)
+                                    scoreView.rendableNormarizedPitResult(atBeat: neBeat, at: $0)
                                 }
                                 oldPitch = pitch
                                 
@@ -1034,7 +1041,7 @@ final class MoveScoreAction: DragEventAction {
                             if pitch != oldPitch {
                                 let beat: Rational = scoreView.beat(atX: scoreP.x)
                                 notePlayer?.notes = playerBeatNoteIndexes.map {
-                                    scoreView.normarizedPitResult(atBeat: beat, at: $0)
+                                    scoreView.rendableNormarizedPitResult(atBeat: beat, at: $0)
                                 }
                                 oldPitch = pitch
                                 
@@ -1140,18 +1147,14 @@ final class MoveScoreAction: DragEventAction {
                     let isShownSpectrogram = scoreView.isShownSpectrogram(at: scoreP)
                     scoreView.isShownSpectrogram = isShownSpectrogram
                     
-                case .pit:
+                case .pit, .mid:
                     if let noteI, noteI < score.notes.count, let pitI {
-                        let note = score.notes[noteI]
-                        let preBeat = pitI > 0 ? note.pits[pitI - 1].beat + note.beatRange.start : .min
-                        let nextBeat = pitI + 1 < note.pits.count ? note.pits[pitI + 1].beat + note.beatRange.start : .max
                         let beatInterval = rootView.currentBeatInterval
                         let pitchInterval = rootView.currentPitchInterval
                         let pitch = scoreView.pitch(atY: beganPitchY + sheetP.y - beganSheetP.y,
                                                     interval: pitchInterval)
                         let nsBeat = scoreView.beat(atX: beganBeatX + sheetP.x - beganSheetP.x,
                                                     interval: beatInterval)
-                            .clipped(min: preBeat, max: nextBeat)
                         if pitch != oldPitch || nsBeat != oldBeat {
                             let dBeat = nsBeat - beganBeat
                             let dPitch = pitch - beganPitch
@@ -1161,7 +1164,14 @@ final class MoveScoreAction: DragEventAction {
                                 var note = nv.note
                                 for (pitI, beganPit) in nv.pits {
                                     guard pitI < score.notes[noteI].pits.count else { continue }
-                                    note.pits[pitI].beat = dBeat + beganPit.beat
+                                    
+                                    let preI = (0 ..< pitI).reversed().first { nv.pits[$0] == nil }
+                                    let preBeat = preI != nil ? note.pits[preI!].beat : .min
+                                    let nextI = (pitI ..< note.pits.count).first(where: { nv.pits[$0] == nil })
+                                    let nextBeat = nextI != nil ? note.pits[nextI!].beat : .max
+                                    
+                                    note.pits[pitI].beat = (dBeat + beganPit.beat)
+                                        .clipped(min: preBeat, max: nextBeat)
                                     note.pits[pitI].pitch = (dPitch + beganPit.pitch)
                                         .interval(scale: rootView.currentPitchInterval)
                                 }
@@ -1197,9 +1207,14 @@ final class MoveScoreAction: DragEventAction {
                             
                             if pitch != oldPitch {
                                 let note = scoreView[noteI]
-                                let pBeat = note.pits[pitI].beat + note.beatRange.start
+                                
+                                let beat = type == .mid && pitI + 1 < note.pits.count ?
+                                note.pits[pitI].beat.mid(note.pits[pitI + 1].beat) :
+                                note.pits[pitI].beat.mid(note.beatRange.length)
+                                
+                                let pBeat = beat + note.beatRange.start
                                 notePlayer?.notes = playerBeatNoteIndexes.map {
-                                    scoreView.normarizedPitResult(atBeat: pBeat, at: $0)
+                                    scoreView.rendableNormarizedPitResult(atBeat: pBeat, at: $0)
                                 }
                                 
                                 oldPitch = pitch
@@ -1281,7 +1296,7 @@ final class MoveScoreAction: DragEventAction {
                         scoreView.replace(nivs)
                         
                         notePlayer?.notes = playerBeatNoteIndexes.map {
-                            scoreView.normarizedPitResult(atBeat: beganStartBeat, at: $0)
+                            scoreView.rendableNormarizedPitResult(atBeat: beganStartBeat, at: $0)
                         }
                         
                         rootView.cursor = .circle(string: Pitch(value: .init(nPitch, intervalScale: Sheet.fullEditPitchInterval)).octaveString(hidableDecimal: false))

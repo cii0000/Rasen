@@ -931,7 +931,7 @@ final class PastableAction: Action {
                                 lineType: .color(.selected))
                 selectingLineNode.children = [node]
                 Pasteboard.shared.copiedObjects = [.normalizationValue(note.spectlopeHeight)]
-            case .note, .startBeat, .endBeat:
+            case .note, .startBeat, .endBeat, .mid:
                 let scoreView = sheetView.scoreView
                 let score = scoreView.model
                 let scoreP = scoreView.convertFromWorld(p)
@@ -1066,7 +1066,7 @@ final class PastableAction: Action {
                                  note.pits[pitI + 1].beat : note.beatRange.length) - pit.beat
                     nPits.append(.init(beat: currentBeat, pitch: pit.pitch, stereo: pit.stereo,
                                        tone: pit.tone, lyric: pit.lyric))
-                    if dBeat < 0 {
+                    if dBeat > 0 {
                         currentBeat += dBeat
                     }
                 }
@@ -1411,7 +1411,7 @@ final class PastableAction: Action {
                     Pasteboard.shared.copiedObjects = [.normalizationValue(note.spectlopeHeight)]
                     return true
                 }
-            case .note, .startBeat, .endBeat:
+            case .note, .startBeat, .endBeat, .mid:
                 let scoreP = scoreView.convertFromWorld(p)
                 
                 let pitchInterval = rootView.currentPitchInterval
@@ -2022,7 +2022,7 @@ final class PastableAction: Action {
                 
                 if pitch != oldPitch {
                     notePlayer?.notes = playerBeatNoteIndexes.map {
-                        scoreView.normarizedPitResult(atBeat: beat, at: $0)
+                        scoreView.rendableNormarizedPitResult(atBeat: beat, at: $0)
                     }
                     oldPitch = pitch
                 }
