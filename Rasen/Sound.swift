@@ -422,6 +422,29 @@ extension Sprol {
     var noiseVolm: Double {
         volm * noise
     }
+    
+    static func / (lhs: Self, rhs: Self) -> Self {
+        .init(pitch: lhs.pitch - rhs.pitch,
+              volm: rhs.volm == 0 ? 0 : lhs.volm / rhs.volm,
+              noise: rhs.noise == 0 ? 0 : lhs.noise / rhs.noise)
+    }
+    static func * (lhs: Self, rhs: Self) -> Self {
+        .init(pitch: lhs.pitch + rhs.pitch,
+              volm: lhs.volm * rhs.volm,
+              noise: lhs.noise * rhs.noise)
+    }
+    static func *= (lhs: inout Self, rhs: Self) {
+        lhs = lhs * rhs
+    }
+    
+    func clipped() -> Self {
+        .init(pitch: pitch.clipped(Score.doublePitchRange),
+              volm: volm.clipped(min: 0, max: 1),
+              noise: noise.clipped(min: 0, max: 1))
+    }
+    mutating func clip() {
+        self = clipped()
+    }
 }
 
 struct Spectlope: Hashable, Codable {
@@ -840,6 +863,23 @@ extension Spectlope: MonoInterpolatable {
         let l2 = f2.with(count: count)
         return .init(sprols: .lastMonospline(l0.sprols, l1.sprols, l2.sprols, with: ms))
     }
+    
+    static func / (lhs: Self, rhs: Self) -> Self {
+        .init(sprols: Swift.min(lhs.count, rhs.count).range.map { lhs.sprols[$0] / rhs.sprols[$0] })
+    }
+    static func * (lhs: Self, rhs: Self) -> Self {
+        .init(sprols: Swift.min(lhs.count, rhs.count).range.map { lhs.sprols[$0] * rhs.sprols[$0] })
+    }
+    static func *= (lhs: inout Self, rhs: Self) {
+        lhs = lhs * rhs
+    }
+    
+    func clipped() -> Self {
+        .init(sprols: sprols.map { $0.clipped() })
+    }
+    mutating func clip() {
+        self = clipped()
+    }
 }
 
 struct Tone: Hashable, Codable {
@@ -935,7 +975,7 @@ extension Tone: MonoInterpolatable {
 }
 
 struct Pit: Codable, Hashable {
-    var beat = Rational(0), pitch = Rational(0), stereo = Stereo(volm: 0.375), tone = Tone(), lyric = ""
+    var beat = Rational(0), pitch = Rational(0), stereo = Stereo(volm: 0.4375), tone = Tone(), lyric = ""
 }
 extension Pit: Protobuf {
     init(_ pb: PBPit) throws {
@@ -1311,6 +1351,25 @@ extension Note {
                                  spectlope: pitbend.spectlope(atSec: sec),
                                  id: .init()), lyric: "",
                      id: id)
+    }
+    func tone(atBeat beat: Double) -> Tone {
+        if pits.count == 1 || beat <= .init(pits[0].beat) {
+            return pits[0].tone
+        } else if let pit = pits.last, beat >= .init(pit.beat) {
+            return pit.tone
+        }
+        for pitI in 0 ..< pits.count - 1 {
+            let pit = pits[pitI], nextPit = pits[pitI + 1]
+            if beat >= .init(pit.beat) && beat < .init(nextPit.beat) && pit.tone == nextPit.tone {
+                return pit.tone
+            }
+        }
+        
+        let sec = beat * 60 / 120
+        let pitbend = pitbend(fromTempo: 120)
+        return .init(overtone: pitbend.overtone(atSec: sec),
+                     spectlope: pitbend.spectlope(atSec: sec),
+                     id: .init())
     }
     func normarizedPitResult(atBeat beat: Double) -> PitResult {
         let firstSpectlope = pits.first!.tone.spectlope
@@ -1992,8 +2051,8 @@ extension Score {
         }
     }
     
-    var chordNotes: [Note] {
-        (notes + draftNotes)
+    static func chordNotes(from notes: [Note], tempo: Rational) -> [Note] {
+        notes
             .filter { !$0.isOneOvertone && !$0.isFullNoise }
             .map { $0.withRendable(tempo: tempo) }
     }

@@ -550,14 +550,9 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     private let debugNode = Node(attitude: Attitude(position: Point(5, 5)),
                                  fillType: .color(.content))
     
-    private var sheetActionNode, rootActionNode: Node?,
-                actionIsEditingSheet = true
-    private var actionNode: Node? {
-        actionIsEditingSheet ? sheetActionNode : rootActionNode
-    }
+    private var actionNode: Node?
     var isHiddenActionList = true {
         didSet {
-            
             guard isHiddenActionList != oldValue else { return }
             updateActionList()
             if isShownTrackpadAlternative {
@@ -565,8 +560,8 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             }
         }
     }
-    private func makeActionNode(isEditingSheet: Bool) -> Node {
-        let actionNode = ActionList.default.node(isEditingSheet: isEditingSheet)
+    private func makeActionNode() -> Node {
+        let actionNode = ActionList.default.node()
         let b = rootView.screenBounds
         let w = b.maxX - (actionNode.bounds?.maxX ?? 0)
         let h = b.midY - (actionNode.bounds?.midY ?? 0)
@@ -575,13 +570,10 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     private func updateActionList() {
         if isHiddenActionList {
-            sheetActionNode = nil
-            rootActionNode = nil
-        } else if sheetActionNode == nil || rootActionNode == nil {
-            sheetActionNode = makeActionNode(isEditingSheet: true)
-            rootActionNode = makeActionNode(isEditingSheet: false)
+            actionNode = nil
+        } else if actionNode == nil {
+            actionNode = makeActionNode()
         }
-        actionIsEditingSheet = rootView.isEditingSheet
         update()
     }
     
@@ -702,9 +694,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         rootView.povNotifications.append { [weak self] (_, _) in
             guard let self else { return }
             if !self.isHiddenActionList {
-                if self.actionIsEditingSheet != self.rootView.isEditingSheet {
-                    self.updateActionList()
-                }
+                self.updateActionList()
             }
             self.update()
         }
@@ -1435,10 +1425,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
                 let h = b.midY - (node.bounds?.midY ?? 0)
                 node.attitude.position = Point(w, h)
             }
-            if let actionNode = sheetActionNode {
-                update(actionNode)
-            }
-            if let actionNode = rootActionNode {
+            if let actionNode {
                 update(actionNode)
             }
         }

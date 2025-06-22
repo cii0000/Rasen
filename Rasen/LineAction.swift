@@ -945,6 +945,7 @@ final class LineAction: Action {
                 notePlayer?.play()
                 
                 scoreView.append(note)
+                rootView.updateOtherAround(from: sheetView, isUpdateAlways: true)
 //                    let noteNode = scoreView.noteNode(from: note)
 //                    noteNode.attitude.position
 //                        = scoreView.node.attitude.position
@@ -990,6 +991,7 @@ final class LineAction: Action {
                 
                 if isNote || beat != oldBeat {
                     scoreView[noteI] = note
+                    rootView.updateOtherAround(from: sheetView, isUpdateAlways: true)
                     
                     octaveNode?.children = scoreView.octaveNode(fromPitch: pitch,
                                                                 scoreView.notesNode.children.last!.children[0].clone).children
@@ -1075,6 +1077,7 @@ final class LineAction: Action {
                     sheetView.newUndoGroup()
                     sheetView.replace(replaceIVs)
                     sheetView.append(notes)
+                    rootView.updateOtherAround(from: sheetView, isUpdateAlways: true)
                 }
                 return
             }
@@ -1100,6 +1103,7 @@ final class LineAction: Action {
                 Pasteboard.shared.copiedObjects = [.notesValue(NotesValue(notes: notes, deltaPitch: pitch))]
                 sheetView.newUndoGroup()
                 sheetView.removeNote(at: nis)
+                rootView.updateOtherAround(from: sheetView, isUpdateAlways: true)
             }
         }
     }

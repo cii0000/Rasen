@@ -461,7 +461,12 @@ extension TouchEvent {
 }
 
 struct ActionItem {
-    var name: String, quasimode: Quasimode, isEnableRoot = true
+    var name: String, quasimode: Quasimode
+    
+    init(name: String, _ quasimode: Quasimode) {
+        self.name = name
+        self.quasimode = quasimode
+    }
 }
 struct ActionList {
     typealias Group = [ActionItem]
@@ -475,114 +480,60 @@ struct ActionList {
     }
 }
 extension ActionList {
-    static let `default` = ActionList([[.init(name: "Draw Line".localized,
-                                              quasimode: .drawLine,
-                                              isEnableRoot: false),
-                                       .init(name: "Draw Straight Line".localized,
-                                              quasimode: .drawStraightLine,
-                                              isEnableRoot: false)],
-                                      
-                                      [.init(name: "Lasso Cut".localized,
-                                              quasimode: .lassoCut),
-                                       .init(name: "Select Version".localized,
-                                              quasimode: .selectVersion)],
-                                      
-                                      [.init(name: "Change Lightness".localized,
-                                              quasimode: .changeLightness,
-                                              isEnableRoot: false),
-                                       .init(name: "Change Tint".localized,
-                                              quasimode: .changeTint,
-                                              isEnableRoot: false),
-                                       .init(name: "Change Opacity".localized,
-                                              quasimode: .changeOpacity,
-                                              isEnableRoot: false)],
-                                      
-                                      [.init(name: "Move".localized,
-                                              quasimode: .move,
-                                              isEnableRoot: false),
-                                       .init(name: "Move Line Z".localized,
-                                              quasimode: .moveLineZ,
-                                              isEnableRoot: false)],
-                                      
-                                      [.init(name: "Select Frame".localized,
-                                              quasimode: .selectFrame,
-                                              isEnableRoot: false),
-                                       .init(name: "Play".localized,
-                                              quasimode: .play,
-                                              isEnableRoot: false)],
-                                      
-                                      [.init(name: "Zoom".localized,
-                                             quasimode: .zoom),
-                                       .init(name: "Scroll".localized,
-                                              quasimode: .scroll),
-                                       .init(name: "Rotate".localized,
-                                              quasimode: .rotate)],
-                                      
-                                      [.init(name: "Look Up".localized,
-                                              quasimode: .lookUp),
-                                       .init(name: "Select by Range".localized,
-                                              quasimode: .selectByRange),
-                                       .init(name: "Open Menu".localized,
-                                              quasimode: .openMenu),
-                                       .init(name: "Input Character".localized,
-                                              quasimode: .inputCharacter,
-                                              isEnableRoot: false)],
-                                      
-                                      [.init(name: "Undo".localized,
-                                              quasimode: .undo),
-                                       .init(name: "Redo".localized,
-                                              quasimode: .redo)],
-                                      
-                                      [.init(name: "Cut".localized,
-                                              quasimode: .cut),
-                                       .init(name: "Copy".localized,
-                                              quasimode: .copy),
-                                       .init(name: "Copy Line Color".localized,
-                                              quasimode: .copyLineColor),
-                                       .init(name: "Paste".localized,
-                                              quasimode: .paste),],
-                                      
-                                      [.init(name: "Find".localized,
-                                              quasimode: .find,
-                                              isEnableRoot: false)],
-                                      
-                                      [.init(name: "Change to Draft".localized,
-                                              quasimode: .changeToDraft,
-                                              isEnableRoot: false),
-                                       .init(name: "Cut Draft".localized,
-                                              quasimode: .cutDraft,
-                                              isEnableRoot: false)],
-                                      
-                                      [.init(name: "Make Faces".localized,
-                                              quasimode: .makeFaces,
-                                              isEnableRoot: false),
-                                       .init(name: "Cut Faces".localized,
-                                              quasimode: .cutFaces,
-                                              isEnableRoot: false)],
-                                      
-                                      [.init(name: "Change to Vertical Text".localized,
-                                              quasimode: .changeToVerticalText,
-                                              isEnableRoot: false),
-                                       .init(name: "Change to Horizontal Text".localized,
-                                              quasimode: .changeToHorizontalText,
-                                              isEnableRoot: false)],
-                                      
-                                      [.init(name: "Insert Keyframe".localized,
-                                              quasimode: .insertKeyframe,
-                                              isEnableRoot: false),
-                                       .init(name: "Add Score".localized,
-                                              quasimode: .addScore,
-                                              isEnableRoot: false)],
-                                      
-                                      [.init(name: "Interpolate".localized,
-                                              quasimode: .interpolate,
-                                              isEnableRoot: false),
-                                       .init(name: "Disconnect".localized,
-                                              quasimode: .disconnect,
-                                              isEnableRoot: false)]])
+    static let `default` = ActionList([
+        [.init(name: "Draw Line".localized, .drawLine),
+         .init(name: "Draw Straight Line".localized, .drawStraightLine)],
+        
+        [.init(name: "Lasso Cut".localized, .lassoCut),
+         .init(name: "Select Version".localized, .selectVersion)],
+        
+        [.init(name: "Change Lightness".localized, .changeLightness),
+         .init(name: "Change Tint".localized, .changeTint),
+         .init(name: "Change Opacity".localized, .changeOpacity)],
+        
+        [.init(name: "Move".localized, .move),
+         .init(name: "Move Line Z".localized, .moveLineZ)],
+        
+        [.init(name: "Select Frame".localized, .selectFrame),
+         .init(name: "Play".localized, .play)],
+        
+        [.init(name: "Zoom".localized, .zoom),
+         .init(name: "Scroll".localized, .scroll),
+         .init(name: "Rotate".localized, .rotate)],
+        
+        [.init(name: "Look Up".localized, .lookUp),
+         .init(name: "Select by Range".localized, .selectByRange),
+         .init(name: "Open Menu".localized, .openMenu),
+         .init(name: "Input Character".localized, .inputCharacter)],
+        
+        [.init(name: "Undo".localized, .undo),
+         .init(name: "Redo".localized, .redo)],
+        
+        [.init(name: "Cut".localized, .cut),
+         .init(name: "Copy".localized, .copy),
+         .init(name: "Copy Line Color".localized, .copyLineColor),
+         .init(name: "Paste".localized, .paste),],
+        
+        [.init(name: "Find".localized, .find)],
+        
+        [.init(name: "Change to Draft".localized, .changeToDraft),
+         .init(name: "Cut Draft".localized, .cutDraft)],
+        
+        [.init(name: "Make Faces".localized, .makeFaces),
+         .init(name: "Cut Faces".localized, .cutFaces)],
+        
+        [.init(name: "Change to Vertical Text".localized, .changeToVerticalText),
+         .init(name: "Change to Horizontal Text".localized, .changeToHorizontalText)],
+        
+        [.init(name: "Insert Keyframe".localized, .insertKeyframe),
+         .init(name: "Add Score".localized, .addScore)],
+        
+        [.init(name: "Interpolate".localized, .interpolate),
+         .init(name: "Disconnect".localized, .disconnect)]
+    ])
 }
 extension ActionList {
-    func node(isEditingSheet: Bool) -> Node {
+    func node() -> Node {
         let fontSize = 12.0
         let padding = fontSize / 2, lineWidth = 1.0, cornerRadius = 8.0
         let margin = fontSize / 2 + 1.0, imagePadding = 3.0
@@ -606,8 +557,7 @@ extension ActionList {
         for (i, actionGroup) in actionGroups.reversed().enumerated() {
             var isDraw = false
             for action in actionGroup.reversed() {
-                let color: Color = !isEditingSheet && !action.isEnableRoot ?
-                Color(lightness: Color.content.lightness, opacity: 0.3) : .content
+                let color = Color.content
                 guard let (nts, nNode) = textNode(with: action.name, color: color),
                       let (its, iNode)
                         = textNode(with: action.quasimode.inputDisplayString, color: color) else { continue }

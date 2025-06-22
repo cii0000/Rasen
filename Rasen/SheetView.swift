@@ -1684,6 +1684,43 @@ final class SheetView: BindableView, @unchecked Sendable {
         self.rootBeat = Rational.saftyAdd(rootBeat, deltaTime)
     }
     
+    weak var left, right, top, bottom: SheetView?
+    func updateScoreViewFromAround() {
+        let nBeatRange = self.scoreView.model.beatRange
+        var nNotes = [Note]()
+        if let scoreView = left?.scoreView, scoreView.model.enabled {
+            let beatRange = scoreView.model.beatRange
+            nNotes += scoreView.model.notes.filter { $0.beatRange.end > beatRange.end }.map {
+                var n = $0
+                n.beatRange.start -= beatRange.end
+                return n
+            }
+        }
+        if let scoreView = right?.scoreView, scoreView.model.enabled {
+            let startBeat = scoreView.model.beatRange.start
+            nNotes += scoreView.model.notes.filter { $0.beatRange.start < startBeat }.map {
+                var n = $0
+                n.beatRange.start += nBeatRange.end
+                return n
+            }
+        }
+        self.scoreView.otherNotes = nNotes
+    }
+    func updateScoreViewFromOtherAround() {
+        if let left {
+            left.updateScoreViewFromAround()
+        }
+        if let right {
+            right.updateScoreViewFromAround()
+        }
+        if let top {
+            top.updateScoreViewFromAround()
+        }
+        if let bottom {
+            bottom.updateScoreViewFromAround()
+        }
+    }
+    
     private var playingTimer: (any DispatchSourceTimer)?,
                 playingOldKeyframeIndex: Int?
     private var playingCaptions = [Caption](),
@@ -3658,12 +3695,15 @@ final class SheetView: BindableView, @unchecked Sendable {
     
     private func insertNode(_ nivs: [IndexValue<Note>]) {
         scoreView.insert(nivs)
+        updateScoreViewFromOtherAround()
     }
     private func replaceNode(_ nivs: [IndexValue<Note>]) {
         scoreView.replace(nivs)
+        updateScoreViewFromOtherAround()
     }
     private func removeNotesNode(at noteIndexes: [Int]) {
         scoreView.remove(at: noteIndexes)
+        updateScoreViewFromOtherAround()
     }
     
     private func insertDraftNode(_ nivs: [IndexValue<Note>]) {

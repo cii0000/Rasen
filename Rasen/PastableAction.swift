@@ -871,7 +871,7 @@ final class PastableAction: Action {
             let scoreView = sheetView.scoreView
             let score = scoreView.model
             
-            let nlw = max(0.5, 10 * rootView.screenToWorldScale)
+            let nlw = max(0.5, 7 * rootView.screenToWorldScale)
             func show(_ ps: [Point]) {
                 let node = Node(attitude: .init(position: scoreView.node.convertToWorld(Point())),
                                 path: Path(ps.map { Pathline(circleRadius: nlw, position: $0) }),
@@ -914,12 +914,50 @@ final class PastableAction: Action {
                     Pasteboard.shared.copiedObjects = [.tone(tone)]
                 }
                 let ps = score.notes.flatMap { note in
-                    note.pits.enumerated().compactMap {
-                        $0.element.tone.id == tone.id ?
-                        scoreView.pitPosition(atPit: $0.offset, from: note) : nil
+                    scoreView.toneFrames(from: note).flatMap { (pitIs, f) in
+                        pitIs.flatMap { pitI in
+                            let pit = note.pits[pitI]
+                            return pit.tone.id == tone.id ?
+                                [scoreView.pitPosition(atPit: pitI, from: note)]
+                                + pit.tone.spectlope.sprols.count.range.map {
+                                    scoreView.sprolPosition(atSprol: $0, atPit: pitI,
+                                                            from: note, atY: f.minY)
+                                } : []
+                        }
                     }
                 }
                 show(ps)
+            case .allSprol(_, _, let toneY):
+                let scoreP = scoreView.convertFromWorld(p)
+                let beat: Double = scoreView.beat(atX: scoreP.x)
+                
+                let note = score.notes[noteI]
+                let tone = note.tone(atBeat: beat - Double(note.beatRange.start))
+                
+                if isSendPasteboard {
+                    Pasteboard.shared.copiedObjects = [.tone(tone)]
+                }
+                let p0 = Point(scoreP.x, toneY)
+                let p1 = Point(scoreP.x, toneY + score.notes[noteI].spectlopeHeight)
+                let nps = [p0 + .init(0.125, 0), p0 - .init(0.125, 0),
+                           p1 - .init(0.125, 0), p1 + .init(0.125, 0)]
+                let ps = score.notes.flatMap { note in
+                    scoreView.toneFrames(from: note).flatMap { (pitIs, f) in
+                        pitIs.flatMap { pitI in
+                            let pit = note.pits[pitI]
+                            return pit.tone.id == tone.id ?
+                            [scoreView.pitPosition(atPit: pitI, from: note)]
+                            + pit.tone.spectlope.sprols.count.range.map {
+                                scoreView.sprolPosition(atSprol: $0, atPit: pitI,
+                                                        from: note, atY: f.minY)
+                            } : []
+                        }
+                    }
+                }
+                let pathlines = [Pathline(nps.map { scoreView.node.convertToWorld($0) })]
+                + ps.map { Pathline(circleRadius: nlw, position: scoreView.convertToWorld($0)) }
+                let node = Node(path: Path(pathlines), fillType: .color(.selected))
+                selectingLineNode.children = [node]
             case .spectlopeHeight:
                 let note = score.notes[noteI]
                 let toneFrames = scoreView.toneFrames(at: noteI)
@@ -1403,6 +1441,8 @@ final class PastableAction: Action {
                 sheetView.newUndoGroup()
                 sheetView.replace(nivs)
                 return true
+            case .allSprol:
+                break
             case .spectlopeHeight:
                 var note = score.notes[noteI]
                 if note.spectlopeHeight != Sheet.spectlopeHeight {
@@ -2879,40 +2919,71 @@ final class PastableAction: Action {
             guard let sheetView = rootView.sheetView(at: shp) else { return }
             if sheetView.model.score.enabled {
                 let scoreView = sheetView.scoreView
-                if let (noteI, pitI) = scoreView.noteAndPitIEnabledNote(at: scoreView.convertFromWorld(p),
-                                                                        scale: rootView.screenToWorldScale) {
-                    if rootView.isSelect(at: p) {
-                        let score = scoreView.model
-                        let nis = sheetView.noteAndPitIndexes(from: rootView.selections)
-                        var nivs = [IndexValue<Note>]()
-                        for (noteI, pitIs) in nis {
-                            var note = score.notes[noteI], isChanged = false
-                            for pitI in pitIs {
-                                if note.pits[pitI].tone != tone {
-                                    note.pits[pitI].tone = tone
-                                    isChanged = true
-                                }
-                            }
-                            if isChanged {
-                                nivs.append(.init(value: note, index: noteI))
+                if rootView.isSelect(at: p) {
+                    let score = scoreView.model
+                    let nis = sheetView.noteAndPitIndexes(from: rootView.selections)
+                    var nivs = [IndexValue<Note>]()
+                    for (noteI, pitIs) in nis {
+                        var note = score.notes[noteI], isChanged = false
+                        for pitI in pitIs {
+                            if note.pits[pitI].tone != tone {
+                                note.pits[pitI].tone = tone
+                                isChanged = true
                             }
                         }
-                        if !nivs.isEmpty {
-                            sheetView.newUndoGroup()
-                            sheetView.replace(nivs)
-                            
-                            sheetView.updatePlaying()
+                        if isChanged {
+                            nivs.append(.init(value: note, index: noteI))
                         }
-                    } else {
+                    }
+                    if !nivs.isEmpty {
+                        sheetView.newUndoGroup()
+                        sheetView.replace(nivs)
+                        
+                        sheetView.updatePlaying()
+                    }
+                } else if let (noteI, result) = scoreView
+                    .hitTestPoint(scoreView.convertFromWorld(p),
+                                  scale: rootView.screenToWorldScale) {
+                    switch result {
+                    case .note:
                         var note = scoreView.model.notes[noteI]
-                        if note.pits[pitI].tone != tone {
-                            note.pits[pitI].tone = tone
-                            
+                        let oldNote = note
+                        
+                        let beat: Rational = scoreView.beat(atX: scoreView.convertFromWorld(p).x)
+                        let oldTone = scoreView.pitResult(atBeat: beat, at: noteI).tone
+                        let dSpectlope = tone.spectlope / oldTone.spectlope
+                        
+                        for (pitI, _) in note.pits.enumerated() {
+                            note.pits[pitI].tone.spectlope *= dSpectlope
+                            note.pits[pitI].tone.spectlope.clip()
+                        }
+                        
+                        if note != oldNote {
                             sheetView.newUndoGroup()
                             sheetView.replace(note, at: noteI)
                             
                             sheetView.updatePlaying()
                         }
+                    case .pit(let pitI), .mid(let pitI), .sprol(let pitI, _, _):
+                        var note = scoreView.model.notes[noteI]
+                        var isChanged = false
+                        if note.pits[pitI].tone != tone {
+                            note.pits[pitI].tone = tone
+                            isChanged = true
+                        }
+                        if case .mid = result, pitI + 1 < note.pits.count,
+                            note.pits[pitI + 1].tone != tone {
+                            
+                            note.pits[pitI + 1].tone = tone
+                            isChanged = true
+                        }
+                        if isChanged {
+                            sheetView.newUndoGroup()
+                            sheetView.replace(note, at: noteI)
+                            
+                            sheetView.updatePlaying()
+                        }
+                    default: break
                     }
                 }
             }

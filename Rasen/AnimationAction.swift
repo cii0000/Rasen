@@ -923,6 +923,32 @@ final class InsertKeyframeAction: InputKeyEventAction {
                                                       isArrow: true,
                                                       progress: sheetView.currentTimeProgress(),
                                                       progressWidth: progressWidth)
+                } else if let ci = sheetView.contentIndex(at: inP, scale: rootView.screenToWorldScale) {
+                    let contentView = sheetView.contentsView.elementViews[ci]
+                    if contentView.model.timeOption == nil {
+                        var content = contentView.model
+                        let startBeat: Rational = sheetView.animationView.beat(atX: content.origin.x)
+                        content.timeOption = .init(beatRange: startBeat ..< (4 + startBeat),
+                                                   tempo: sheetView.nearestTempo(at: inP) ?? Music.defaultTempo)
+                        
+                        sheetView.newUndoGroup()
+                        sheetView.replace(IndexValue(value: content, index: ci))
+                        
+                        sheetView.updatePlaying()
+                    }
+                } else if let ti = sheetView.textIndex(at: inP, scale: rootView.screenToWorldScale) {
+                    let textView = sheetView.textsView.elementViews[ti]
+                    if textView.model.timeOption == nil {
+                        var text = textView.model
+                        let startBeat: Rational = sheetView.animationView.beat(atX: text.origin.x)
+                        text.timeOption = .init(beatRange: startBeat ..< (4 + startBeat),
+                                                tempo: sheetView.nearestTempo(at: inP) ?? Music.defaultTempo)
+                        
+                        sheetView.newUndoGroup()
+                        sheetView.replace([IndexValue(value: text, index: ti)])
+                        
+                        sheetView.updatePlaying()
+                    }
                 } else if sheetView.model.score.enabled {
                     let scoreView = sheetView.scoreView
                     let scoreP = sheetView.scoreView.convertFromWorld(p)
@@ -988,32 +1014,6 @@ final class InsertKeyframeAction: InputKeyEventAction {
                         option.keyBeats.sort()
                         sheetView.newUndoGroup()
                         sheetView.set(option)
-                    }
-                } else if let ci = sheetView.contentIndex(at: inP, scale: rootView.screenToWorldScale) {
-                    let contentView = sheetView.contentsView.elementViews[ci]
-                    if contentView.model.timeOption == nil {
-                        var content = contentView.model
-                        let startBeat: Rational = sheetView.animationView.beat(atX: content.origin.x)
-                        content.timeOption = .init(beatRange: startBeat ..< (4 + startBeat),
-                                                   tempo: sheetView.nearestTempo(at: inP) ?? Music.defaultTempo)
-                        
-                        sheetView.newUndoGroup()
-                        sheetView.replace(IndexValue(value: content, index: ci))
-                        
-                        sheetView.updatePlaying()
-                    }
-                } else if let ti = sheetView.textIndex(at: inP, scale: rootView.screenToWorldScale) {
-                    let textView = sheetView.textsView.elementViews[ti]
-                    if textView.model.timeOption == nil {
-                        var text = textView.model
-                        let startBeat: Rational = sheetView.animationView.beat(atX: text.origin.x)
-                        text.timeOption = .init(beatRange: startBeat ..< (4 + startBeat),
-                                                tempo: sheetView.nearestTempo(at: inP) ?? Music.defaultTempo)
-                        
-                        sheetView.newUndoGroup()
-                        sheetView.replace([IndexValue(value: text, index: ti)])
-                        
-                        sheetView.updatePlaying()
                     }
                 } else if !sheetView.model.enabledAnimation {
                     sheetView.newUndoGroup(enabledKeyframeIndex: false)

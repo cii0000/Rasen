@@ -2302,6 +2302,9 @@ final class RootView: View, @unchecked Sendable {
                             sheetView.node.enableCache = true
                         }
                         
+                        self.updateAround(in: sheetView, at: shp)
+                        self.updateOtherAround(from: sheetView)
+                        
                         self.thumbnailNodeValues[shp]?.node?.removeFromParent()
                         
                         self.updateSelects()
@@ -2506,6 +2509,9 @@ final class RootView: View, @unchecked Sendable {
         sheetView.contentsView.elementViews.forEach { $0.updateSpectrogram() }
         sheetView.scoreView.updateSpectrogram()
         
+        updateAround(in: sheetView, at: shp)
+        updateOtherAround(from: sheetView)
+        
         sheetRecord.willwriteClosure = { [weak sheetView, weak sheetHistoryRecord, weak self] (record) in
             if let sheetView = sheetView {
                 record.value = sheetView.model
@@ -2634,6 +2640,78 @@ final class RootView: View, @unchecked Sendable {
             sheetViewValues[shp] = nil
         }
         updateMap()
+    }
+    
+    func updateAround(in sheetView: SheetView, at shp: IntPoint, isUpdateAlways: Bool = false) {
+        var isUpdate = false
+        if let nSheetView = sheetViewValue(at: .init(shp.x - 1, shp.y))?.sheetView,
+           sheetView.left != nSheetView {
+            sheetView.left = nSheetView
+            isUpdate = true
+            
+            if sheetView.right == nil {
+                var nShp = shp, lastSheetView: SheetView?
+                nShp.x -= 1
+                while let nSheetView = sheetViewValue(at: nShp)?.sheetView {
+                    lastSheetView = nSheetView
+                    nShp.x -= 1
+                }
+                if let lastSheetView, sheetView.right != lastSheetView {
+                    sheetView.right = lastSheetView
+                    isUpdate = true
+                }
+            }
+        }
+        if let nSheetView = sheetViewValue(at: .init(shp.x + 1, shp.y))?.sheetView,
+           sheetView.right != nSheetView {
+            sheetView.right = nSheetView
+            isUpdate = true
+            
+            if sheetView.left == nil {
+                var nShp = shp, lastSheetView: SheetView?
+                nShp.x += 1
+                while let nSheetView = sheetViewValue(at: nShp)?.sheetView {
+                    lastSheetView = nSheetView
+                    nShp.x += 1
+                }
+                if let lastSheetView, sheetView.left != lastSheetView {
+                    sheetView.left = lastSheetView
+                    isUpdate = true
+                }
+            }
+        }
+        if let nSheetView = sheetViewValue(at: .init(shp.x, shp.y - 1))?.sheetView,
+           sheetView.bottom != nSheetView {
+            sheetView.bottom = nSheetView
+            isUpdate = true
+        }
+        if let nSheetView = sheetViewValue(at: .init(shp.x, shp.y + 1))?.sheetView,
+           sheetView.top != nSheetView {
+            sheetView.top = nSheetView
+            isUpdate = true
+        }
+        
+        if isUpdate || isUpdateAlways {
+            sheetView.updateScoreViewFromAround()
+        }
+    }
+    func updateOtherAround(from sheetView: SheetView, isUpdateAlways: Bool = false) {
+        if let nSheetView = sheetView.left,
+           let shp = sheetPosition(from: nSheetView) {
+            updateAround(in: nSheetView, at: shp, isUpdateAlways: isUpdateAlways)
+        }
+        if let nSheetView = sheetView.right,
+           let shp = sheetPosition(from: nSheetView) {
+            updateAround(in: nSheetView, at: shp, isUpdateAlways: isUpdateAlways)
+        }
+        if let nSheetView = sheetView.top,
+           let shp = sheetPosition(from: nSheetView) {
+            updateAround(in: nSheetView, at: shp, isUpdateAlways: isUpdateAlways)
+        }
+        if let nSheetView = sheetView.bottom,
+           let shp = sheetPosition(from: nSheetView) {
+            updateAround(in: nSheetView, at: shp, isUpdateAlways: isUpdateAlways)
+        }
     }
     
     func updateLastEditedIntPoint(fromScreen screenPoint: Point) {

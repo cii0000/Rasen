@@ -786,6 +786,65 @@ final class MoveScoreAction: DragEventAction {
                         updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
                         
                         rootView.cursor = .circle(string: Pitch(value: .init(beganTone.spectlope.sprols[sprolI].pitch, intervalScale: Sheet.fullEditPitchInterval)).octaveString(hidableDecimal: false))
+                    case .allSprol(let sprolI, let sprol, let spectlopeY):
+                        type = .sprol
+                        
+                        beganBeat = scoreView.beat(atX: scoreP.x)
+                        beganTone = score.notes[noteI].pitResult(atBeat: Double(beganBeat)).tone
+                        self.sprolI = sprolI
+                        self.beganSpectlopeY = spectlopeY
+                        self.beganSprol = sprol
+//                        self.beganSprol = scoreView.nearestSprol(at: scoreP, at: noteI)
+                        self.beganSprolPitch = scoreView.spectlopePitch(at: scoreP, at: noteI, y: spectlopeY)
+                        self.noteI = noteI
+                        
+                        func updatePitsWithSelection() {
+                            var noteAndPitIs: [Int: [Int: Set<Int>]]
+                            if rootView.isSelect(at: p) {
+                                noteAndPitIs = sheetView.noteAndPitAndSprolIs(from: rootView.selections)
+                            } else {
+                                if let pitI {
+                                    let id = score.notes[noteI].pits[pitI].tone.id
+                                    noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) {
+                                        $0[$1.offset] = $1.element.pits.enumerated().reduce(into: [Int: Set<Int>]()) { (v, ip) in
+                                            if ip.element.tone.id == id {
+                                                v[ip.offset] = sprolI < ip.element.tone.spectlope.count ? [sprolI] : []
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    noteAndPitIs = [noteI: score.notes[noteI].pits.enumerated().reduce(into: [Int: Set<Int>]()) { (v, ip) in
+                                        v[ip.offset] = sprolI < ip.element.tone.spectlope.count ? [sprolI] : []
+                                    }]
+                                }
+                            }
+                            
+                            beganNoteSprols = noteAndPitIs.reduce(into: .init()) {
+                                for (pitI, sprolIs) in $1.value {
+                                    let pit = score.notes[$1.key].pits[pitI]
+                                    let id = pit.tone.id
+                                    if $0[id] != nil {
+                                        if $0[id]!.dic[$1.key] != nil {
+                                            $0[id]!.dic[$1.key]!.pits[pitI] = (pit, sprolIs)
+                                        } else {
+                                            $0[id]!.dic[$1.key] = (score.notes[$1.key], [pitI: (pit, sprolIs)])
+                                        }
+                                    } else {
+                                        $0[id] = (UUID(), [$1.key: (score.notes[$1.key], [pitI: (pit, sprolIs)])])
+                                    }
+                                }
+                            }
+                        }
+                        
+                        updatePitsWithSelection()
+                        
+                        let noteIs = Set(beganNoteSprols.values.flatMap { $0.dic.keys }).intersection(selectedNoteIs).sorted()
+                        let vs = score.noteIAndNormarizedPits(atBeat: beganBeat, selectedNoteI: noteI, in: noteIs)
+                        playerBeatNoteIndexes = vs.map { $0.noteI }
+                        
+                        updatePlayer(from: vs.map { $0.pitResult }, in: sheetView)
+                        
+                        rootView.cursor = .circle(string: Pitch(value: .init(sprol.pitch, intervalScale: Sheet.fullEditPitchInterval)).octaveString(hidableDecimal: false))
                     case .spectlopeHeight:
                         type = .spectlopeHeight
                         
@@ -932,6 +991,7 @@ final class MoveScoreAction: DragEventAction {
                                 nivs.append(.init(value: note, index: noteI))
                             }
                             scoreView.replace(nivs)
+                            rootView.updateOtherAround(from: sheetView, isUpdateAlways: true)
                             
                             oldBeat = nsBeat
                             
@@ -982,6 +1042,7 @@ final class MoveScoreAction: DragEventAction {
                                 nivs.append(.init(value: note, index: noteI))
                             }
                             scoreView.replace(nivs)
+                            rootView.updateOtherAround(from: sheetView, isUpdateAlways: true)
                             
                             oldBeat = neBeat
                             
@@ -1033,6 +1094,7 @@ final class MoveScoreAction: DragEventAction {
                                 nivs.append(.init(value: note, index: noteI))
                             }
                             scoreView.replace(nivs)
+                            rootView.updateOtherAround(from: sheetView, isUpdateAlways: true)
                             
                             oldBeat = nsBeat
                             
@@ -1148,7 +1210,7 @@ final class MoveScoreAction: DragEventAction {
                     scoreView.isShownSpectrogram = isShownSpectrogram
                     
                 case .pit, .mid:
-                    if let noteI, noteI < score.notes.count, let pitI {
+                    if let noteI, noteI < score.notes.count {
                         let beatInterval = rootView.currentBeatInterval
                         let pitchInterval = rootView.currentPitchInterval
                         let pitch = scoreView.pitch(atY: beganPitchY + sheetP.y - beganSheetP.y,
@@ -1199,6 +1261,7 @@ final class MoveScoreAction: DragEventAction {
                                 }
                                 
                                 scoreView[noteI] = note
+                                rootView.updateOtherAround(from: sheetView, isUpdateAlways: true)
                             }
                             
                             oldBeat = nsBeat
@@ -1208,9 +1271,13 @@ final class MoveScoreAction: DragEventAction {
                             if pitch != oldPitch {
                                 let note = scoreView[noteI]
                                 
-                                let beat = type == .mid && pitI + 1 < note.pits.count ?
-                                note.pits[pitI].beat.mid(note.pits[pitI + 1].beat) :
-                                note.pits[pitI].beat.mid(note.beatRange.length)
+                                let beat = if let pitI {
+                                    type == .mid && pitI + 1 < note.pits.count ?
+                                    note.pits[pitI].beat.mid(note.pits[pitI + 1].beat) :
+                                    note.pits[pitI].beat.mid(note.beatRange.length)
+                                } else {
+                                    nsBeat
+                                }
                                 
                                 let pBeat = beat + note.beatRange.start
                                 notePlayer?.notes = playerBeatNoteIndexes.map {
@@ -1267,15 +1334,11 @@ final class MoveScoreAction: DragEventAction {
                         }
                     }
                 case .sprol:
-                    if let noteI, noteI < score.notes.count,
-                       let pitI, pitI < score.notes[noteI].pits.count,
-                       let sprolI, sprolI < score.notes[noteI].pits[pitI].tone.spectlope.count {
-                       
+                    if let noteI, noteI < score.notes.count {
                         let pitch = scoreView.spectlopePitch(at: scoreP, at: noteI, y: beganSpectlopeY)
                         let dPitch = pitch - beganSprolPitch
-                        let nPitch = (beganTone.spectlope.sprols[sprolI].pitch + dPitch)
+                        let nPitch = (beganSprol.pitch + dPitch)
                             .clipped(min: Score.doubleMinPitch, max: Score.doubleMaxPitch)
-                        
                         var nvs = [Int: Note]()
                         for (_, v) in beganNoteSprols {
                             for (noteI, nv) in v.dic {
