@@ -45,7 +45,7 @@ extension Note {
                           beatInterval: Rational = Sheet.fullEditBeatInterval,
                           pitchInterval: Rational = Sheet.fullEditPitchInterval,
                           isUpdateNext: Bool = true) -> Int {
-        func update(lyric: String, at oi: Int, isOld: Bool = true) -> Int {
+        func update(lyric: String, at oi: Int, isOld: Bool = true) -> (lyricI: Int, isNext: Bool) {
             let oldNote = self
             let oldLyric = pits[oi].lyric
             self.pits[oi].lyric = lyric
@@ -113,11 +113,27 @@ extension Note {
                 }
             }
             
-            if lyric.isEmpty { return i }
+            let nextPhonemes: [Phoneme] = {
+                if lyric == "n" || lyric == "ん" {
+                    for j in (i + 1) ..< pits.count {
+                        if pits[j].isLyric {
+                            return Phoneme.phonemes(fromHiragana: pits[j].lyric,
+                                                    nextPhoneme: nil)
+                        }
+                    }
+                }
+                return []
+            } ()
+            let currentPhonemes = Phoneme.phonemes(fromHiragana: pits[i].lyric,
+                                                   nextPhoneme: nextPhonemes.first)
+            
+            let isNext = Phoneme.firstVowel(nextPhonemes) != Phoneme.firstVowel(currentPhonemes)
+            if lyric.isEmpty { return (i, isNext) }
             
             let previousPhoneme: Phoneme?, previousFormantFilter: FormantFilter?, previousID: UUID?
             if let preI = i.range.reversed().first(where: { !pits[$0].lyric.isEmpty }) {
-                previousPhoneme = Phoneme.phonemes(fromHiragana: pits[preI].lyric).last
+                previousPhoneme = Phoneme.phonemes(fromHiragana: pits[preI].lyric,
+                                                   nextPhoneme: currentPhonemes.first).last
                 previousFormantFilter = .init(spectlope: pits[preI].tone.spectlope)
                 previousID = pits[preI].tone.id
             } else if i > 0 {
@@ -133,7 +149,8 @@ extension Note {
             var ni = i
             if var mora = Mora(hiragana: lyric,
                                previousPhoneme: previousPhoneme,
-                               previousFormantFilter: previousFormantFilter, previousID: previousID) {
+                               previousFormantFilter: previousFormantFilter, previousID: previousID,
+                               nextPhoneme: nextPhonemes.first) {
                 let beat = pits[i].beat
                 let fBeat = Score.beat(fromSec: mora.keyFormantFilters.first?.sec ?? 0,
                                        tempo: tempo, interval: beatInterval) + beat
@@ -220,17 +237,17 @@ extension Note {
                     self.beatRange = beatRange.start ..< beatRange.start + ldBeat
                 }
             }
-            return ni
+            return (ni, isNext)
         }
         
-        var ni = update(lyric: lyric, at: oi)
-        if isUpdateNext {
+        //previous is n
+        
+        var (ni, isNext) = update(lyric: lyric, at: oi)
+        
+        if isUpdateNext && isNext {
             for j in (ni + 1) ..< pits.count {
-                if pits[j].isLyric,
-                   Phoneme.firstVowel(Phoneme.phonemes(fromHiragana: lyric))
-                    != Phoneme.firstVowel(Phoneme.phonemes(fromHiragana: pits[j].lyric)) {
-                    
-                    ni = update(lyric: pits[j].lyric, at: j, isOld: false)
+                if pits[j].isLyric {
+                    ni = update(lyric: pits[j].lyric, at: j, isOld: false).lyricI
                     break
                 }
             }
@@ -688,14 +705,6 @@ extension FormantFilter {
     func to(_ toPhoneme: Phoneme, from fromPhoneme: Phoneme) -> Self {
         toA(from: fromPhoneme).withSelfA(to: toPhoneme)
     }
-    func withSelfA(toLyric: String) -> Self {
-        let phonemes = Phoneme.phonemes(fromHiragana: toLyric)
-        return if let phoneme = phonemes.last, phoneme.isJapaneseVowel {
-            withSelfA(to: phoneme)
-        } else {
-            self
-        }
-    }
     func withSelfA(to phoneme: Phoneme) -> Self {
         switch phoneme {
         case .a: return self
@@ -774,6 +783,32 @@ extension FormantFilter {
             n[2].pitch += 1
             n[3].pitch += 0.5
             return n
+        case .ã, .ĩ, .ɯ̃, .ẽ, .õ:
+            let nPhoneme: Phoneme = switch phoneme {
+            case .ã: .a
+            case .ĩ: .i
+            case .ɯ̃: .ɯ
+            case .ẽ: .e
+            case .õ: .o
+            default: fatalError()
+            }
+            var n = withSelfA(to: nPhoneme)
+            n[0].formMultiplyVolm(0.85)
+            n.formMultiplyEsVolm(0.37, at: 0)
+            n[1].formMultiplyVolm(0.43)
+            n.formMultiplyEsVolm(0.34, at: 1)
+            n[2].formMultiplyVolm(0.4)
+            n.formMultiplyEsVolm(0.06, at: 2)
+            n[3].formMultiplyVolm(0.3)
+            n.formMultiplyEsVolm(0.05, at: 3)
+            n[4].formMultiplyVolm(0.25)
+            n.formMultiplyEsVolm(0.05, at: 4)
+            n[2].formMultiplyNoise(1.25)
+            n[3].formMultiplyNoise(1.5)
+            n[4].formMultiplyNoise(1.75)
+            n[5].formMultiplyVolm(0.0625)
+            n.formMultiplyEsVolm(0, at: 5)
+            return n
         case .ɴ:
             var n = self
             n[0].sdPitch *= 1.5
@@ -798,11 +833,34 @@ extension FormantFilter {
             n[5].formMultiplyVolm(0.0625)
             n.formMultiplyEsVolm(0, at: 5)
             return n
+        case .ŋ:
+            var n = self
+            n[0].sdPitch *= 1.5
+            n[0].pitch += -20
+            n[0].formMultiplyVolm(0.85)
+            n[0].edPitch *= 1.7
+            n.formMultiplyEsVolm(0.37, at: 0)
+            n[1].pitch += 0.875
+            n[1].formMultiplyVolm(0.43)
+            n.formMultiplyEsVolm(0.34, at: 1)
+            n[2].pitch += -0.375
+            n[2].formMultiplyVolm(0.4)
+            n.formMultiplyEsVolm(0.06, at: 2)
+            n[3].pitch += -0.17
+            n[3].formMultiplyVolm(0.125)
+            n.formMultiplyEsVolm(0.05, at: 3)
+            n[4].formMultiplyVolm(0.125)
+            n.formMultiplyEsVolm(0.05, at: 4)
+            n[2].formMultiplyNoise(1.25)
+            n[3].formMultiplyNoise(1.5)
+            n[4].formMultiplyNoise(1.75)
+            n[5].formMultiplyVolm(0.0625)
+            n.formMultiplyEsVolm(0, at: 5)
+            return n
         case .n:
             var n = self
             n[0].sdPitch *= 1.5
             n[0].pitch += -13
-            n[0].formMultiplyVolm(1.25)
             n[0].edPitch *= 1.7
             n[0].eVolm *= 0.75
             n.formMultiplyEsVolm(0.125, at: 0)
@@ -962,6 +1020,10 @@ extension FormantFilter {
             n[3].formMultiplyNoise(0.6)
             n[4].formMultiplyNoise(0.5)
             return n
+        case .kjRes, .tɕRes, .pjRes, .çRes, .ɕRes:
+            return withSelfA(to: .i).multiplyAllVolm(0.03125)
+        case .kβRes, .tsRes, .pβRes, .ɸRes, .sβRes:
+            return withSelfA(to: .ɯ).multiplyAllVolm(0.03125)
         case .sokuon:
             return withSelfA(to: .ɯ).toSokuon()
         case .haBreath, .hiBreath, .hɯBreath, .heBreath, .hoBreath:
@@ -1011,7 +1073,7 @@ extension FormantFilter {
             n[5].fillVolm(0.125)
             n[5].fillNoise(1)
             return .linear(self, n, t: opacity)
-        case .ka, .kj, .kβ, .ke, .ko, .ga, .gj, .gβ, .ge, .go:
+        case .ka, .kj, .kβ, .ke, .ko, .ga, .gj, .gβ, .ge, .go, .kjRes, .kβRes:
             var n = offVolm(from: 4)
             switch phoneme {
             case .ka, .kj, .kβ, .ke, .ko:
@@ -1033,7 +1095,7 @@ extension FormantFilter {
             n[4].fillNoise(1)
             n[5].fillVolm(0)
             return .linear(self, n, t: opacity)
-        case .sa, .sβ, .se, .so, .dza, .dzβ, .dze, .dzo, .ts:
+        case .sa, .sβ, .se, .so, .dza, .dzβ, .dze, .dzo, .ts, .sβRes:
             var n = toNoise(from: 2)
             if phoneme.isDakuon {
                 n[0].fillAllVolm(0.6)
@@ -1055,7 +1117,7 @@ extension FormantFilter {
             n[5].eVolm = 0.65
             n[5].edVolm = 0.4
             return .linear(self, n.multiplyAllVolm(0.85), t: opacity)
-        case .ɕ, .dʒ, .tɕ:
+        case .ɕ, .dʒ, .tɕ, .ɕRes, .tɕRes:
             var n = toNoise(from: 2)
             if phoneme.isDakuon {
                 n[0].fillAllVolm(0.6)
@@ -1089,7 +1151,7 @@ extension FormantFilter {
             n[3].fillNoise(1)
             n[3].fillVolm(0.1)
             return .linear(self, n, t: opacity)
-        case .ç:
+        case .ç, .çRes:
             var n = toNoise()
             n[0].sdVolm *= 0.56
             n[0].sdNoise = 0
@@ -1109,7 +1171,7 @@ extension FormantFilter {
             n[5].fillVolm(0.4)
             n[5].edVolm = 0.125
             return .linear(self, n.multiplyAllVolm(0.5), t: opacity)
-        case .ɸ:
+        case .ɸ, .ɸRes:
             var n = toNoise()
             n[0].sdVolm *= 0.56
             n[0].sdNoise = 0
@@ -1177,7 +1239,7 @@ extension FormantFilter {
         return n
     }
     func toSokuon() -> Self {
-        multiplyAllVolm(0.25)
+        multiplyAllVolm(0.03125)
     }
     
     func toNoise(to i: Int) -> Self {
@@ -1189,8 +1251,10 @@ extension FormantFilter {
     }
     func toNoise(from i: Int) -> Self {
         var n = self
-        for i in i ..< n.count {
-            n[i].fillAllNoise(1)
+        if i < n.count {
+            for i in i ..< n.count {
+                n[i].fillAllNoise(1)
+            }
         }
         return n
     }
@@ -1216,8 +1280,10 @@ extension FormantFilter {
     }
     func offVolm(from i: Int) -> Self {
         var n = self
-        for i in i ..< n.count {
-            n[i].fillAllVolm(0)
+        if i < n.count {
+            for i in i ..< n.count {
+                n[i].fillAllVolm(0)
+            }
         }
         return n
     }
@@ -1287,8 +1353,8 @@ struct KeyFormantFilter: Hashable, Codable {
 struct Mora: Hashable, Codable {
     var keyFormantFilters: [KeyFormantFilter]
     
-    init?(hiragana: String, previousPhoneme: Phoneme?, previousFormantFilter: FormantFilter?, previousID: UUID?) {
-        var phonemes = Phoneme.phonemes(fromHiragana: hiragana)
+    init?(hiragana: String, previousPhoneme: Phoneme?, previousFormantFilter: FormantFilter?, previousID: UUID?, nextPhoneme: Phoneme?) {
+        var phonemes = Phoneme.phonemes(fromHiragana: hiragana, nextPhoneme: nextPhoneme)
         guard !phonemes.isEmpty else { return nil }
         
         let baseFf: FormantFilter = if let previousPhoneme, let previousFormantFilter {
@@ -1299,7 +1365,7 @@ struct Mora: Hashable, Codable {
         
         let vowel: Phoneme
         switch phonemes.last {
-        case .a, .i, .ɯ, .e, .o, .ɴ, .off:
+        case .a, .i, .ɯ, .e, .o, .ɴ, .off, .n, .m, .ŋ, .ã, .ĩ, .ɯ̃, .ẽ, .õ:
             vowel = phonemes.last!
             phonemes.removeLast()
         case .sokuon:
@@ -1310,6 +1376,12 @@ struct Mora: Hashable, Codable {
                 [.init(ff, sec: 0)]
             }
             return
+        case .kjRes, .kβRes, .tɕRes, .tsRes, .pjRes, .pβRes, .çRes, .ɸRes, .ɕRes, .sβRes:
+            let phoneme = phonemes.last!
+            vowel = switch phoneme {
+            case .kjRes, .tɕRes, .pjRes, .çRes, .ɕRes: .i
+            default: .ɯ
+            }
         case .haBreath, .hiBreath, .hɯBreath, .heBreath, .hoBreath:
             let ff = baseFf.withSelfA(to: phonemes.last!)
             keyFormantFilters = if let preFf = previousFormantFilter {
@@ -1396,7 +1468,7 @@ struct Mora: Hashable, Codable {
                 onsetDurSec = 0.0075
                 pitch = -1
                 paddingSec = 0.035
-            case .p, .pj:
+            case .p, .pj, .pjRes, .pβRes:
                 onsetDurSec = 0.03
                 pitch = -2
                 paddingSec = 0.05
@@ -1404,7 +1476,7 @@ struct Mora: Hashable, Codable {
                 onsetDurSec = 0.01
                 pitch = -2
                 paddingSec = 0.05
-            case .sa, .ɕ, .sβ, .se, .so:
+            case .sa, .ɕ, .sβ, .se, .so, .ɕRes, .sβRes:
                 onsetDurSec = 0.065 * onsetScale
                 pitch = -3
                 paddingSec = 0.05
@@ -1416,11 +1488,11 @@ struct Mora: Hashable, Codable {
                 onsetDurSec = 0.02 * onsetScale
                 pitch = -3
                 paddingSec = 0.05
-            case .ç:
+            case .ç, .çRes:
                 onsetDurSec = 0.04 * onsetScale
                 pitch = -3
                 paddingSec = 0.05
-            case .ɸ:
+            case .ɸ, .ɸRes:
                 onsetDurSec = 0.02 * onsetScale
                 pitch = -3
                 paddingSec = 0.05
@@ -1436,11 +1508,11 @@ struct Mora: Hashable, Codable {
                 onsetDurSec = 0.01
                 pitch = -3
                 paddingSec = 0.03
-            case .tɕ:
+            case .tɕ, .tɕRes:
                 onsetDurSec = 0.05 * onsetScale
                 pitch = -3
                 paddingSec = 0.05
-            case .ts:
+            case .ts, .tsRes:
                 onsetDurSec = 0.03 * onsetScale
                 pitch = -3
                 paddingSec = 0.05
@@ -1508,7 +1580,10 @@ struct Mora: Hashable, Codable {
                     kffs.append(.init(ff0, durSec: 0.025, pitch: -pitch / 8))
                 }
                 kffs.append(.init(vowelFf, durSec: 0))
-            case .ha, .ç, .ɸ, .he, .ho:
+            case .ha, .ç, .ɸ, .he, .ho, .çRes, .ɸRes:
+                let nextFf = oph.isVowelReduction ? nextFf.multiplyAllVolm(0.03125) : nextFf
+                let vowelFf = oph.isVowelReduction ? vowelFf.multiplyAllVolm(0.03125) : vowelFf
+                
                 let onsetFf = nFf.applyNoise(oph)
                 if let preFf = previousFormantFilter, let id = previousID {
                     var ff0 =  preFf
@@ -1529,7 +1604,10 @@ struct Mora: Hashable, Codable {
                     kffs.append(.init(youonFf, durSec: youonDurSec))
                 }
                 kffs.append(.init(vowelFf, durSec: 0))
-            case .ka, .kj, .kβ, .ke, .ko:
+            case .ka, .kj, .kβ, .ke, .ko, .kjRes, .kβRes:
+                let nextFf = oph.isVowelReduction ? nextFf.multiplyAllVolm(0.03125) : nextFf
+                let vowelFf = oph.isVowelReduction ? vowelFf.multiplyAllVolm(0.03125) : vowelFf
+                
                 if let preFf = previousFormantFilter, let id = previousID {
                     let nnFf = FormantFilter.linear(preFf, nFf, t: 0.75)
                     kffs.append(.init(preFf, durSec: 0.03, id: id))
@@ -1604,7 +1682,10 @@ struct Mora: Hashable, Codable {
                     kffs.append(.init(youonFf, durSec: youonDurSec))
                 }
                 kffs.append(.init(vowelFf, durSec: 0))
-            case .sa, .ɕ, .sβ, .se, .so:
+            case .sa, .ɕ, .sβ, .se, .so, .ɕRes, .sβRes:
+                let nextFf = oph.isVowelReduction ? nextFf.multiplyAllVolm(0.03125) : nextFf
+                let vowelFf = oph.isVowelReduction ? vowelFf.multiplyAllVolm(0.03125) : vowelFf
+                
                 let onsetFf = nFf.applyNoise(oph)
                 if let preFf = previousFormantFilter, let id = previousID {
                     var ff00 = preFf.mid(onsetFf)
@@ -1661,7 +1742,10 @@ struct Mora: Hashable, Codable {
                     centerI = kffs.count
                 }
                 kffs.append(.init(vowelFf, durSec: 0))
-            case .ta, .tj, .tβ, .te, .to, .tɕ, .ts:
+            case .ta, .tj, .tβ, .te, .to, .tɕ, .ts, .tɕRes, .tsRes:
+                let nextFf = oph.isVowelReduction ? nextFf.multiplyAllVolm(0.03125) : nextFf
+                let vowelFf = oph.isVowelReduction ? vowelFf.multiplyAllVolm(0.03125) : vowelFf
+                
                 let offSec = switch oph {
                 case .tɕ, .ts: 0.02
                 default: 0.035
@@ -1727,7 +1811,10 @@ struct Mora: Hashable, Codable {
                     kffs.append(.init(youonFf, durSec: youonDurSec))
                 }
                 kffs.append(.init(vowelFf, durSec: 0))
-            case .p, .pj:
+            case .p, .pj, .pjRes, .pβRes:
+                let nextFf = oph.isVowelReduction ? nextFf.multiplyAllVolm(0.03125) : nextFf
+                let vowelFf = oph.isVowelReduction ? vowelFf.multiplyAllVolm(0.03125) : vowelFf
+                
                 if let preFf = previousFormantFilter, let id = previousID {
                     kffs.append(.init(preFf, durSec: paddingSec, id: id))
                 }
@@ -1798,11 +1885,12 @@ enum Phoneme: String, Hashable, Codable, CaseIterable {
          dza, dʒ, dzβ, dze, dzo,
          ta, tj, tβ, te, to, tɕ, ts,
          da, dj, dβ, de, `do`,
-         çRes = "/ç", ɸRes = "/ɸ",
-         pjRes = "/pj", pRes = "/p",
-         kjRes = "/kj", kβRes = "/kβ",
-         ɕRes = "/ɕ", sβRes = "/sβ",
-         tɕRes = "/tɕ", tsRes = "/ts",
+         ŋ, ã, ĩ, ɯ̃, ẽ, õ,
+         çRes = "ç/", ɸRes = "ɸ/",
+         pjRes = "pj/", pβRes = "pβ/",
+         kjRes = "kj/", kβRes = "kβ/",
+         ɕRes = "ɕ/", sβRes = "sβ/",
+         tɕRes = "tɕ/", tsRes = "ts/",
          sokuon = "_", off = ".", voiceless = ",",
          haBreath = "~a", hiBreath = "~i", hɯBreath = "~ɯ", heBreath = "~e", hoBreath = "~o",
          aBreath = "^a", iBreath = "^i", ɯBreath = "^ɯ", eBreath = "^e", oBreath = "^o"
@@ -1810,7 +1898,7 @@ enum Phoneme: String, Hashable, Codable, CaseIterable {
 extension Phoneme {
     var isJapaneseVowel: Bool {
         switch self {
-        case .a, .i, .ɯ, .e, .o, .ɴ, .off: true
+        case .a, .i, .ɯ, .e, .o, .ɴ, .off, .ã, .ĩ, .ɯ̃, .ẽ, .õ: true
         default: false
         }
     }
@@ -1829,17 +1917,17 @@ extension Phoneme {
     }
     var isHaretsu: Bool {
         switch self {
-        case .ka, .kj, .kβ, .ke, .ko,
-                .sa, .ɕ, .sβ, .se, .so,
-                .ta, .tj, .tβ, .te, .to, .tɕ, .ts,
-                .ha, .ç, .ɸ, .he, .ho,
-                .p, .pj: true
+        case .ka, .kj, .kβ, .ke, .ko, .kjRes, .kβRes,
+                .sa, .ɕ, .sβ, .se, .so, .ɕRes, .sβRes,
+                .ta, .tj, .tβ, .te, .to, .tɕ, .ts, .tɕRes, .tsRes,
+                .ha, .ç, .ɸ, .he, .ho, .çRes, .ɸRes,
+                .p, .pj, .pjRes, .pβRes: true
         default: false
         }
     }
     var isBiohuru: Bool {
         switch self {
-        case .n, .nj, .m, .mj, .ɾ: true
+        case .n, .nj, .m, .mj, .ɾ, .ŋ: true
         default: false
         }
     }
@@ -1851,7 +1939,7 @@ extension Phoneme {
     }
     var isVowelReduction: Bool {
         switch self {
-        case .kjRes, .kβRes, .tɕRes, .tsRes, .pjRes, .pRes, .çRes, .ɸRes, .ɕRes, .sβRes: true
+        case .kjRes, .kβRes, .tɕRes, .tsRes, .pjRes, .pβRes, .çRes, .ɸRes, .ɕRes, .sβRes: true
         default: false
         }
     }
@@ -1880,9 +1968,15 @@ extension Phoneme {
         default: false
         }
     }
+    var isH: Bool {
+        switch self {
+        case .ha, .ç, .ɸ, .he, .ho, .çRes, .ɸRes: true
+        default: false
+        }
+    }
 }
 extension Phoneme {
-    static func phonemes(fromHiragana hiragana: String) -> [Phoneme] {
+    static func phonemes(fromHiragana hiragana: String, nextPhoneme: Phoneme?) -> [Phoneme] {
         switch hiragana {
         case "あ", "a": [.a]
         case "い", "i": [.i]
@@ -2063,13 +2157,44 @@ extension Phoneme {
         case "うぃ", "wi", "whi": [.β, .i]
         case "うぇ", "we", "whe": [.β, .e]
         case "うぉ", "who": [.β, .o]
-        case "ん", "n", "nn": [.ɴ]
+        case "ん", "n":
+            switch nextPhoneme {
+            case .p, .pj, .pjRes, .pβRes, .b, .bj, .m, .mj: [.m]
+            case .ta, .tj, .tɕ, .tβ, .ts, .te, .to, .tɕRes, .tsRes,
+                    .dza, .dʒ, .dzβ, .dze, .dzo, .n, .nj, .ɾ, .ɾj: [.n]
+            case .ka, .kj, .kβ, .ke, .ko, .kjRes, .kβRes, .ga, .gj, .gβ, .ge, .go: [.ŋ]
+            case .a, .sa, .ha: [.ã]
+            case .i, .j, .ja, .ɕ, .ɕRes, .ç, .çRes: [.ĩ]
+            case .ɯ, .β, .sβ, .sβRes, .ɸ, .ɸRes, .sokuon: [.ɯ̃]
+            case .e, .se, .he: [.ẽ]
+            case .o, .so, .ho: [.õ]
+            default: [.ɴ]
+            }
+        case "nn": [.n]
+        case "nm": [.m]
+        case "ng": [.ŋ]
+        case "n.": [.ɴ]
+        case "ひ/", "hi/": [.çRes]
+        case "ふ/", "hu/", "fu/": [.ɸRes]
+        case "ぴ/", "pi/": [.pjRes]
+        case "ぷ/", "pu/": [.pβRes]
+        case "き/", "ki/": [.kjRes]
+        case "く/", "ku/": [.kβRes]
+        case "し/", "si/", "shi/": [.ɕRes]
+        case "す/", "su/": [.sβRes]
+        case "ち/", "ti/", "chi/": [.tɕRes]
+        case "つ/", "tu/", "tsu/": [.tsRes]
         case "っ", "xtu", "_": [.sokuon]
-        case "~a": [.haBreath]
-        case "~i": [.hiBreath]
-        case "~u": [.hɯBreath]
-        case "~e": [.heBreath]
-        case "~o": [.hoBreath]
+        case "~a": [.ã]
+        case "~i": [.ĩ]
+        case "~u": [.ɯ̃]
+        case "~e": [.ẽ]
+        case "~o": [.õ]
+        case "-a": [.haBreath]
+        case "-i": [.hiBreath]
+        case "-u": [.hɯBreath]
+        case "-e": [.heBreath]
+        case "-o": [.hoBreath]
         case "^a": [.aBreath]
         case "^i": [.iBreath]
         case "^u": [.ɯBreath]
@@ -2089,6 +2214,7 @@ extension Phoneme {
         var phonemes = phonemes
         switch phonemes.last {
         case .a, .i, .ɯ, .e, .o, .ɴ, .sokuon, .off,
+                .ã, .ĩ, .ɯ̃, .ẽ, .õ,
                 .haBreath, .hiBreath, .hɯBreath, .heBreath, .hoBreath,
                 .aBreath, .iBreath, .ɯBreath, .eBreath, .oBreath:
             vowel = phonemes.last!

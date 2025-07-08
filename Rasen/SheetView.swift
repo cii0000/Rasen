@@ -6209,8 +6209,7 @@ final class SheetView: BindableView, @unchecked Sendable {
                    removingUUColor: UUColor? = nil,
                    scale: Double) -> (lineView: SheetLineView,
                                       lineIndex: Int)? {
-        let isSmall = ois ??
-            (sheetColorOwnerFromPlane(at: p).uuColor != Sheet.defalutBackgroundUUColor || textTuple(at: p) != nil)
+        let isSmall = ois ?? (sheetColorOwnerFromPlane(at: p).uuColor != Sheet.defalutBackgroundUUColor)
         let ds = Line.defaultLineWidth * 3 * scale
         var minI: Int?, minDSquared = Double.infinity
         for (i, line) in model.picture.lines.enumerated().reversed() {

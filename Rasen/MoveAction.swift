@@ -570,6 +570,8 @@ final class MoveScoreAction: DragEventAction {
                 let selectedNoteIs = !(v?.result.isStartEndBeat ?? false)
                 && rootView.isSelect(at: p) ? sheetView.containedNotes(from: rootView.selections) : []
                 if !selectedNoteIs.isEmpty {
+                    rootView.selections = []
+                    
                     let noteIs = selectedNoteIs
                     beganNotes = noteIs.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
                     let interval = rootView.currentBeatInterval
@@ -674,6 +676,7 @@ final class MoveScoreAction: DragEventAction {
                             } else {
                                 noteAndPitIs[noteI] = [pitI]
                             }
+                            rootView.selections = []
                         } else {
                             noteAndPitIs = [noteI: [pitI]]
                         }
@@ -722,6 +725,7 @@ final class MoveScoreAction: DragEventAction {
                             } else {
                                 noteAndPitIs[noteI] = [pitI]
                             }
+                            rootView.selections = []
                         } else {
                             noteAndPitIs = [noteI: [pitI]]
                         }
@@ -749,6 +753,7 @@ final class MoveScoreAction: DragEventAction {
                             var noteAndPitIs: [Int: [Int: Set<Int>]]
                             if rootView.isSelect(at: p) {
                                 noteAndPitIs = sheetView.noteAndPitAndSprolIs(from: rootView.selections)
+                                rootView.selections = []
                             } else {
                                 let id = score.notes[noteI].pits[pitI][.tone]
                                 noteAndPitIs = score.notes.enumerated().reduce(into: [Int: [Int: Set<Int>]]()) {
@@ -802,6 +807,7 @@ final class MoveScoreAction: DragEventAction {
                             var noteAndPitIs: [Int: [Int: Set<Int>]]
                             if rootView.isSelect(at: p) {
                                 noteAndPitIs = sheetView.noteAndPitAndSprolIs(from: rootView.selections)
+                                rootView.selections = []
                             } else {
                                 if let pitI {
                                     let id = score.notes[noteI].pits[pitI].tone.id
@@ -853,6 +859,7 @@ final class MoveScoreAction: DragEventAction {
                         if rootView.isSelect(at: p) {
                             let noteIs = sheetView.noteIndexes(from: rootView.selections)
                             beganNotes = noteIs.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
+                            rootView.selections = []
                         }
                         beganNotes[noteI] = score.notes[noteI]
                     case .note, .startBeat, .endBeat:
@@ -883,6 +890,7 @@ final class MoveScoreAction: DragEventAction {
                         if rootView.isSelect(at: p) {
                             let noteIs = sheetView.noteIndexes(from: rootView.selections)
                             beganNotes = noteIs.reduce(into: [Int: Note]()) { $0[$1] = score.notes[$1] }
+                            rootView.selections = []
                         }
                         beganNotes[noteI] = score.notes[noteI]
                         

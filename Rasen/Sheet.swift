@@ -1492,7 +1492,7 @@ struct Keyframe: Picable {
     }
 }
 extension Keyframe {
-    static let defaultFrameRate = 12
+    static let defaultFrameRate = 8
     static let defaultDurBeat = Rational(1, defaultFrameRate)
     static let minDurBeat = defaultDurBeat / 2
 }

@@ -1019,7 +1019,8 @@ extension ScoreView {
                     let lh = fHeight * 2
                     lyricLinePathlines.append(.init(Rect(x: p.x - 0.25, y: p.y - lh,
                                                          width: 0.5, height: lh)))
-                    let isEnabledLyric = !Phoneme.phonemes(fromHiragana: pit.lyric).isEmpty
+                    let isEnabledLyric = !Phoneme.phonemes(fromHiragana: pit.lyric,
+                                                           nextPhoneme: nil).isEmpty
                     return .init(attitude: .init(position: .init(p.x + 1,
                                                                  p.y - lh + typesetter.height / 2)),
                                  path: typesetter.path(), fillType: .color(color ?? (isEnabledLyric ? .content : .interpolated)))

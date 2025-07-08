@@ -1210,7 +1210,7 @@ final class InterpolateAction: InputKeyEventAction {
                sheetView.id == sheetID {
                 
                 let animationView = sheetView.animationView
-                var isNewUndoGroup = false
+                var isNewUndoGroup = true
 //                if oldRootKeyframeIndex != animationView.rootKeyframeIndex {
 //                    let beat = animationView.model.localBeat
 //                    let count = ((animationView.rootBeat - beat) / animationView.model.localDurBeat).rounded(.towardZero)
@@ -1328,6 +1328,12 @@ final class InterpolateAction: InputKeyEventAction {
                     }
                 }
                 
+                func updateUndoGroup() {
+                    if isNewUndoGroup {
+                        sheetView.newUndoGroup()
+                        isNewUndoGroup = false
+                    }
+                }
                 if !nidivs.isEmpty {
                     let scale = 1 / rootView.worldToScreenScale
                     let lw = Line.defaultLineWidth
@@ -1337,11 +1343,14 @@ final class InterpolateAction: InputKeyEventAction {
                              lineType: .color(.selected))
                     }
                     
-                    if !isNewUndoGroup {
-                        sheetView.newUndoGroup()
-                        isNewUndoGroup = true
+                    let idivLines = sheetView.model.animation
+                        .keyframes[animationView.model.index].picture.lines
+                    if idivs.contains(where: {
+                        idivLines[$0.index].interOption != $0.value
+                    }) {
+                        updateUndoGroup()
+                        sheetView.set([IndexValue(value: idivs, index: animationView.model.index)])
                     }
-                    sheetView.set([IndexValue(value: idivs, index: animationView.model.index)])
                     
                     let oldLineDic = oldLines.reduce(into: [UUID: Line]()) { $0[$1.id] = $1 }
                     struct UUKey: Hashable {
@@ -1368,6 +1377,7 @@ final class InterpolateAction: InputKeyEventAction {
                     for (uuKey, cv) in colorValuesDic {
                         var oldCV = cv
                         oldCV.uuColor = uuKey.fromUUColor
+                        updateUndoGroup()
                         sheetView.set(cv, oldColorValue: oldCV)
                     }
                     
@@ -1386,7 +1396,7 @@ final class InterpolateAction: InputKeyEventAction {
                     let nids = idivs.map { $0.value.id }
                     sheetView.interpolation(nids.enumerated().map { (i, v) in (v, [v]) },
                                             rootKeyframeIndex: oldRootKeyframeIndex,
-                                            isNewUndoGroup: false)
+                                            isNewUndoGroup: isNewUndoGroup)
                     
                     let iNodes = animationView.interpolationNodes(from: nids, scale: scale)
                     linesNode.children = iNodes + noNodes + nodes
@@ -1656,7 +1666,11 @@ extension SheetView {
         
         let repValues = repLIVs.sorted(by: { $0.key < $1.key }).map {
             IndexValue(value: $0.value.sorted(by: { $0.index < $1.index }), index: $0.key)
+        }.filter {
+            let lines = model.animation.keyframes[$0.index].picture.lines
+            return $0.value.contains { lines[$0.index] != $0.value }
         }
+        
         if !insertValues.isEmpty || !repValues.isEmpty {
             if isNewUndoGroup {
                 newUndoGroup()

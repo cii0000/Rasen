@@ -496,7 +496,7 @@ final class RotateAction: RotateEventAction {
     private var cursorTimer: (any DispatchSourceTimer)?
     private var oldRotation = 0.0
     
-    let correction = .pi / 30.0, clipD = .pi / 8.0
+    let correction = .pi / 50.0, clipD = .pi / 8.0
     var isClipped = false, worldCenterP = Point()
     func flow(with event: RotateEvent) {
         switch event.phase {

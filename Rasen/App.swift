@@ -4306,6 +4306,7 @@ struct Cursor {
     }
     
     static func ban(size s: Double = 12,
+                    string: String = "Under development".localized,
                     lightColor: Color = .content,
                     lightOutlineColor: Color = .background,
                     darkColor: Color = .background,
@@ -4313,26 +4314,57 @@ struct Cursor {
         let lineWidth = 2.0, subLineWidth = 1.25
         let d = (subLineWidth + lineWidth / 2).rounded(.up)
         let r = s / 2
-        let b = Rect(x: d, y: d, width: s, height: s)
-        let lPath = Path([b.centerPoint.movedWith(distance: r, angle: .pi * 3 / 4),
-                          b.centerPoint.movedWith(distance: r, angle: -.pi / 4)], isClosed: false)
+        
+        let tPath: Path?, tSize: Size
+        if !string.isEmpty {
+            let text = Text(string: string, size: Font.defaultSize)
+            let tb = text.frame ?? Rect()
+            tSize = tb.size + Size(width: 0, height: 5)
+            tPath = text.typesetter.path()
+        } else {
+            tSize = .init()
+            tPath = nil
+        }
+        
         let hotSpot = Point(d + s / 2, -d - s / 2)
         
+        let ph = 0.0
+        let ah = tSize.height + ph
+        let bcp = Point(d + r, d + r + ah)
+        let lPath = Path([bcp.movedWith(distance: r, angle: .pi * 3 / 4),
+                          bcp.movedWith(distance: r, angle: -.pi / 4)], isClosed: false)
+        
         func node(color: Color, outlineColor: Color) -> Node {
-            let outlineNode = Node(path: Path(circleRadius: r, position: b.centerPoint),
+            let outlineNode = Node(path: Path(circleRadius: r, position: bcp),
                                    lineWidth: lineWidth + subLineWidth * 2,
                                    lineType: .color(outlineColor))
             let lOutlineNode = Node(path: lPath,
                                     lineWidth: lineWidth + subLineWidth * 2,
                                     lineType: .color(outlineColor))
-            let inlineNode = Node(path: Path(circleRadius: r, position: b.centerPoint),
+            let inlineNode = Node(path: Path(circleRadius: r, position: bcp),
                                   lineWidth: lineWidth,
                                   lineType: .color(color))
             let lInlineNode = Node(path: lPath,
                                    lineWidth: lineWidth,
                                    lineType: .color(color))
-            let size = Size(width: s + d * 2, height: s + d * 2)
-            return Node(children: [outlineNode, lOutlineNode, inlineNode, lInlineNode],
+            
+            let nodes: [Node]
+            if let tPath {
+                nodes = [outlineNode, lOutlineNode, inlineNode, lInlineNode,
+                         Node(attitude: Attitude(position: Point(d, d + r + ph)),
+                               path: tPath,
+                               lineWidth: lineWidth + subLineWidth,
+                               lineType: .color(outlineColor)),
+                         Node(attitude: Attitude(position: Point(d, d + r + ph)),
+                               path: tPath,
+                              fillType: .color(color))]
+            } else {
+                nodes = [outlineNode, lOutlineNode, inlineNode, lInlineNode]
+            }
+            
+            let size = Size(width: max(s, tSize.width) + d * 2,
+                            height: s + d * 2 + ah)
+            return Node(children: nodes,
                         path: Path(Rect(origin: Point(), size: size)))
         }
         
