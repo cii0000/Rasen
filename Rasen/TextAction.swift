@@ -19,15 +19,21 @@ import struct Foundation.UUID
 
 final class FindAction: InputKeyEventAction {
     let rootAction: RootAction, rootView: RootView
+    let isEditingSheet: Bool
     
     init(_ rootAction: RootAction) {
         self.rootAction = rootAction
         rootView = rootAction.rootView
+        isEditingSheet = rootView.isEditingSheet
     }
     
     func flow(with event: InputKeyEvent) {
         switch event.phase {
         case .began:
+            guard isEditingSheet else {
+                rootAction.keepOut(with: event)
+                return
+            }
             rootView.cursor = .arrow
             
             let p = rootView.convertScreenToWorld(event.screenPoint)
@@ -268,16 +274,17 @@ final class LookUpAction: InputKeyEventAction {
         let widthStr = width.string(digitsCount: 1, enabledZeroInteger: false)
         let heightStr = height.string(digitsCount: 1, enabledZeroInteger: false)
         let iWidth = max(Int(width.rounded()), 1), iHeight = max(Int(height.rounded()), 1)
+        let wScale = height == 0 ? "" : String(format: "%.2f:1", width / height)
         return if Rational(iWidth, iHeight) == Rational(16, 9) {
-            "\(widthStr) x \(heightStr) 16:9"
+            "\(widthStr) x \(heightStr) \(wScale) 16:9"
         } else if Rational(iWidth, iHeight) == Rational(16, 10) {
-            "\(widthStr) x \(heightStr) 16:10"
+            "\(widthStr) x \(heightStr) \(wScale) 16:10"
         } else if Rational(iWidth, iHeight) == Rational(16, 11) {
-            "\(widthStr) x \(heightStr) 16:11"
+            "\(widthStr) x \(heightStr) \(wScale) 16:11"
         } else if Rational(iWidth, iHeight) == Rational(4, 3) {
-            "\(widthStr) x \(heightStr) 4:3"
+            "\(widthStr) x \(heightStr) \(wScale) 4:3"
         } else {
-            "\(widthStr) x \(heightStr)"
+            "\(widthStr) x \(heightStr) \(wScale)"
         }
     }
 }

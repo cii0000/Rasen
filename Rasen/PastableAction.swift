@@ -2697,11 +2697,11 @@ final class PastableAction: Action {
             
             let currentIndex = sheetView.model.animation.index(atRoot: sheetView.rootKeyframeIndex)
             let count = (sheetView.rootKeyframeIndex - currentIndex) / sheetView.model.animation.keyframes.count
-            let nextBeat = ni < sheetView.model.animation.keyframes.count ? sheetView.model.animation.keyframes[ni].beat : sheetView.model.animation.beatRange.upperBound
+            let nextBeat = ni < sheetView.model.animation.keyframes.count ? sheetView.model.animation.keyframes[ni].beat : sheetView.model.animation.beatRange.length
             var ki = ni
             let kivs: [IndexValue<Keyframe>] = animation.keyframes.compactMap {
                 var keyframe = $0
-                keyframe.beat += beat
+                keyframe.beat += beat - sheetView.model.animation.beatRange.start
                 if keyframe.beat >= nextBeat {
                     return nil
                 }

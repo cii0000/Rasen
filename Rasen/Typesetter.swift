@@ -771,6 +771,7 @@ extension Typesetter {
     }
     
     func characterBounds(at i: String.Index) -> Rect? {
+        guard i < string.endIndex else { return nil }
         for typeline in typelines {
             let ei = string.index(after: i)
             if let bounds = typeline.typoBounds(for: i ..< ei) {

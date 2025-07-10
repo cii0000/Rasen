@@ -523,6 +523,11 @@ struct Selected: Hashable {
     }
 }
 extension Selected {
+    func lastO() -> O {
+        ranges.reduce(o) {
+            O.at($0, $1)
+        }
+    }
     func rounded(_ rule: FloatingPointRoundingRule = .toNearestOrAwayFromZero) -> Selected {
         Selected(o.rounded(rule), ranges: ranges.rounded(rule))
     }
@@ -607,6 +612,13 @@ struct F: Hashable, Sendable {
              random, asLabel, asString, asError, isError,
              send, showAboutRun, showAllDefinitions,
              draw, drawAxes, plot, flip, map, filter, reduce, custom
+        
+        var isSelectable: Bool {
+            switch self {
+            case .select, .set, .insert, .remove, .makeMatrix, .releaseMatrix: true
+            default: false
+            }
+        }
     }
     
     let precedence: Int, associativity: AssociativityType
@@ -763,6 +775,19 @@ extension F {
     }
     
     func run(_ args: [O]) -> O? {
+        if !runType.isSelectable, args.count >= 1, case .selected(let a) = args[0] {
+            var nArgs = args
+            nArgs[0] = a.lastO()
+            return if let no = aRun(nArgs) {
+                O.set(args[0], no)
+            } else {
+                nil
+            }
+        } else {
+            return aRun(args)
+        }
+    }
+    private func aRun(_ args: [O]) -> O? {
         switch runType {
         case .pow: args[0] ** args[1]
         case .apow: .apow(args[0], args[1])
@@ -1322,11 +1347,11 @@ extension O {
                F(140, left: 1, right: 1, .at))
         append(selectName, OKeyInfo(arrayGroup, "Select.".localized),
                F(140, left: 1, right: 1, .select))
-        append(setName, OKeyInfo(arrayGroup, "Replace, e.g. (3 4 5)/.1 <- 2 = (3 2 5)".localized),
+        append(setName, OKeyInfo(arrayGroup, "Replace, e.g. (3 4 5);1 <- 2 = (3 2 5)".localized),
                F(140, left: 1, right: 1, .set))
-        append(insertName, OKeyInfo(arrayGroup, "Append, e.g. (3 4)/.1 ++ 5 = (3 5 4), (3 4) ++ 5 = (3 4 5)".localized),
+        append(insertName, OKeyInfo(arrayGroup, "Append, e.g. (3 4);1 ++ 5 = (3 5 4), (3 4) ++ 5 = (3 4 5)".localized),
                F(140, left: 1, right: 1, .insert))
-        append(removeName, OKeyInfo(arrayGroup, "Remove, e.g. (3 4 5)/.1 -- = (3 5)".localized),
+        append(removeName, OKeyInfo(arrayGroup, "Remove, e.g. (3 4 5);1 -- = (3 5)".localized),
                F(140, left: 1, .remove))
         append(makeMatrixName, OKeyInfo(arrayGroup, "Make matrix".localized),
                F(140, left: 1, .makeMatrix))
@@ -3230,7 +3255,7 @@ extension O {
         }
     }
     
-    static let selectName = "/."
+    static let selectName = ";"
     static func select(_ ao: O, _ bo: O) -> O {
         switch ao {
         case .selected(var a):
@@ -3385,7 +3410,28 @@ extension O {
         var oss = [(o: O, i: O)]()
         oss.reserveCapacity(ios.count)
         iosLoop: for (i, io) in ios.enumerated() {
-            if case .sheet(var ss) = no,
+            
+            if case .sheet(var ss) = no,//
+               case .string(let str) = io, i < ios.count, str == linesName {
+                
+                let array = bo.asArray
+                if array.count > 1 {
+                    let nLines = array.compactMap({ $0.asLine })
+                    let nnLines = zip(nLines, ss.value.picture.lines).map {
+                        var nLine = $0.1
+                        nLine.controls = $0.0.controls
+                        return nLine
+                    }
+                    ss.removeLines(at: Array(ss.value.picture.lines.count.range))
+                    ss.append(nnLines)
+                    if oss.isEmpty {
+                        return O(ss)
+                    } else {
+                        oss[.last].i = O(ss)
+                    }
+                    break iosLoop
+                }
+            } else if case .sheet(var ss) = no,
                case .string(let str) = io, i < ios.count - 1 {
                 
                 if str == linesName {
@@ -4302,7 +4348,7 @@ extension O {
         }
     }
     
-    static let makeMatrixName = ";"
+    static let makeMatrixName = ";+"
     static func makeMatrix(_ ao: O) -> O {
         switch ao {
         case .array(let a):
@@ -4779,76 +4825,76 @@ extension O {
         
         let s0 = """
 \("Bool".localized)
-    false
-    true
+	false
+	true
 
 \("Rational number".localized)
-    0
-    1
-    +3
-    -20
-    1/2
+	0
+	1
+	+3
+	-20
+	1/2
 
 \("Real number".localized)
-    0.0
-    1.3
-    +1.02
-    -20.0
+	0.0
+	1.3
+	+1.02
+	-20.0
 
 \("Infinity".localized)
-    ∞ -∞ +∞ (\("Key input".localized): ⌥ 5)
+	∞ -∞ +∞ (\("Key input".localized): ⌥ 5)
 
 \("String".localized)
-    "A AA" -> A AA
-    "AA\"A" -> AA"A
-    "AAAAA\\nAA" ->
-        AAAAA
-        AA
+	"A AA" -> A AA
+	"AA\"A" -> AA"A
+	"AAAAA\\nAA" ->
+		AAAAA
+		AA
 
 \("Array".localized)
-    a b c
-    (a b c)
-    (a b (c d))
+	a b c
+	(a b c)
+	(a b (c d))
 
 \("Dictionary".localized)
-    (a: d  b: e  c: f)
-    = ((\"a\"): d  (\"b\"): e  (\"c\"): f)
+	(a: d  b: e  c: f)
+	= ((\"a\"): d  (\"b\"): e  (\"c\"): f)
 
 \("Function".localized)
-    (1 + 2) = 3
-    (a: 1  b: 2  c: 3 | a + b + c) = 6
-    (a(b c): b + c | a 1 2 + 3) = 6
-    ((b)a(c): b + c | 1 a 2 + 3) = 6
-    ((b)a(c: d): b + d | 1 a c: 2 + 3) = 6
-    ((b)a(c)100: b + c | 2 a 2 * 3 + 1) = 9
-        \("Precedence".localized): 100  \("Associaticity".localized): \("Left".localized)
-    ((b)a(c)150r: b / c | 1 a 2 a 3 + 1) = 5 / 2
-        \("Precedence".localized): 150  \("Associaticity".localized): \("Right".localized)
+	(1 + 2) = 3
+	(a: 1  b: 2  c: 3 | a + b + c) = 6
+	(a(b c): b + c | a 1 2 + 3) = 6
+	((b)a(c): b + c | 1 a 2 + 3) = 6
+	((b)a(c: d): b + d | 1 a c: 2 + 3) = 6
+	((b)a(c)100: b + c | 2 a 2 * 3 + 1) = 9
+		\("Precedence".localized): 100  \("Associaticity".localized): \("Left".localized)
+	((b)a(c)150r: b / c | 1 a 2 a 3 + 1) = 5 / 2
+		\("Precedence".localized): 150  \("Associaticity".localized): \("Right".localized)
 
 \("Block function".localized)
-    (| 1 + 2) send () = 3
-    (| a: 1  b: 2  c: 3 | a + b + c) send () = 6
-    (a b c | a + b + c) send (1 2 3) = 6
-    (a b c | d: a + b | d + c) send (1 2 3) = 6
+	(| 1 + 2) send () = 3
+	(| a: 1  b: 2  c: 3 | a + b + c) send () = 6
+	(a b c | a + b + c) send (1 2 3) = 6
+	(a b c | d: a + b | d + c) send (1 2 3) = 6
 
 \("Conditional function".localized)
-        1 == 2
-        -> 3
-        -! 4
-    = 4,
-        1 == 2
-        -> 3
-        -!
-        4 * 5
-        case 10      -> 100
-        case 10 + 10 -> 200
-        -! 300
-    = 200,
-        "a"
-        case "a" -> 1
-        case "b" -> 2
-        case "c" -> 3
-    = 1
+		1 == 2
+		-> 3
+		-! 4
+	= 4,
+		1 == 2
+		-> 3
+		-!
+		4 * 5
+		case 10      -> 100
+		case 10 + 10 -> 200
+		-! 300
+	= 200,
+		"a"
+		case "a" -> 1
+		case "b" -> 2
+		case "c" -> 3
+	= 1
 """
         // Issue?: if 1 == 2
         // switch "a"
@@ -4861,48 +4907,48 @@ extension O {
         }
         let s1 = """
 \("Set".localized)
-    \(setS)
+	\(setS)
 
 \("Lines bracket".localized)
-    a + b +
-        c +
-            d + e
-    = a + b + (c + (d + e))
+	a + b +
+		c +
+			d + e
+	= a + b + (c + (d + e))
 
 \("Split".localized)
-    (a + b, b + c, c) = ((a + b) (b + c) (c))
+	(a + b, b + c, c) = ((a + b) (b + c) (c))
 
 \("Separator".localized) (\("Separator character".localized) \(O.defaultLiteralSeparator)):
-    abc12+3 = abc12 + 3
-    abc12++3 = abc12 ++ 3
+	abc12+3 = abc12 + 3
+	abc12++3 = abc12 ++ 3
 
 \("Union".localized)
-    a + b+c = a + (b + c)
-    a+b*c + d/e = (a + b * c) + (d / e)
+	a + b+c = a + (b + c)
+	a+b*c + d/e = (a + b * c) + (d / e)
 
 \("Omit multiplication sign".localized)
-    3a + b = 3 * a + b
-    3a\("12".toSubscript)c\("3".toSubscript) + b = 3 * a\("12".toSubscript) * c\("3".toSubscript) + b
-    a\("2".toSubscript)''b\("2".toSubscript)c'd = a\("2".toSubscript)'' * b\("2".toSubscript) * c' * d
-    (x + 1)(x - 1) = (x + 1) * (x - 1)
+	3a + b = 3 * a + b
+	3a\("12".toSubscript)c\("3".toSubscript) + b = 3 * a\("12".toSubscript) * c\("3".toSubscript) + b
+	a\("2".toSubscript)''b\("2".toSubscript)c'd = a\("2".toSubscript)'' * b\("2".toSubscript) * c' * d
+	(x + 1)(x - 1) = (x + 1) * (x - 1)
 
 \("Pow".localized)
-    x\("1+2".toSuperscript) = x ** (1 + 2)
+	x\("2".toSuperscript) = x ** 2
 
 \("Get".localized)
-    a.b.c = a . "b" . "c"
+	a.b.c = a . "b" . "c"
 
 \("Select".localized)
-    a/.b.c = a /. "b" /. "c"
+	a;b.c = a ; "b" ; "c"
 
 \("xyzw".localized)
-    a is Array -> a.x = a . 0
-    a is Array -> a.y = a . 1
-    a is Array -> a.z = a . 2
-    a is Array -> a.w = a . 3
+	a is Array -> a.x = a . 0
+	a is Array -> a.y = a . 1
+	a is Array -> a.z = a . 2
+	a is Array -> a.w = a . 3
 
 \("Sheet bond".localized)
-    \("Put '+' string beside the frame of the sheet you want to connect.".localized)
+	\("Put '+' string beside the frame of the sheet you want to connect.".localized)
 """ // + xxxx -> border bond
         
         let t4 = Text(string: s1, origin: p + Point(size4.width + lPadding * 2, 0))
@@ -5361,9 +5407,7 @@ extension O {
                 let s = $1.asString
                 $0 += $0.isEmpty ? s : (s.count > 10 ? "\n" : " ") + s
             }
-            return a.dimension > 1 ?
-                "((" + bs + ") ;)" :
-                "(" + bs + ")"
+            return a.dimension > 1 ? "((" + bs + ") \(O.makeMatrixName))" : "(" + bs + ")"
         case .range(let a):
             let d = a.delta
             switch a.type {
@@ -5439,14 +5483,10 @@ extension O {
         case .generics(let a): return a.description
         case .selected(let a):
             if a.ranges.count == 1 {
-                return a.o.asString + "/." + a.ranges[0].asString
+                return a.o.asString + O.selectName + a.ranges[0].asString
             } else {
-                let bs = a.ranges.reduce(into: "") {
-                    let s = $1.asString
-                    $0 += $0.isEmpty ? s : (s.count > 10 ? "\n" : " ") + s
-                }
-                let rangeStr = "(" + bs + ")"
-                return a.o.asString + "/." + rangeStr
+                return a.o.asString
+                + a.ranges.reduce(into: "") { $0 += O.selectName + $1.asString }
             }
         case .f(let a): return a.description
         case .label(let a): return a.description

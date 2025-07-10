@@ -2448,43 +2448,43 @@ extension Sheet {
         }
     }
     
-    var animationDurBeat: Rational {
-        animation.enabled ? animation.beatRange.upperBound : 0
+    var animationEndBeat: Rational {
+        animation.enabled ? animation.beatRange.end : 0
     }
-    var animationDurSec: Rational {
-        animation.enabled ? animation.secRange.upperBound : 0
+    var animationEndSec: Rational {
+        animation.enabled ? animation.secRange.end : 0
     }
     
-    var musicDurBeat: Rational {
+    var musicEndBeat: Rational {
         var v = Rational(0)
         if score.enabled {
-            v = max(v, score.beatRange.upperBound)
+            v = max(v, score.beatRange.end)
         }
         v = contents.reduce(into: v) {
             if let timeOption = $1.timeOption {
-                $0 = max($0, timeOption.beatRange.upperBound)
+                $0 = max($0, timeOption.beatRange.end)
             }
         }
         v = texts.reduce(into: v) {
             if let timeOption = $1.timeOption {
-                $0 = max($0, timeOption.beatRange.upperBound)
+                $0 = max($0, timeOption.beatRange.end)
             }
         }
         return v
     }
-    var musicDurSec: Rational {
+    var musicEndSec: Rational {
         var v = Rational(0)
         if score.enabled {
-            v = max(v, score.secRange.upperBound)
+            v = max(v, score.secRange.end)
         }
         v = contents.reduce(into: v) {
             if let timeOption = $1.timeOption {
-                $0 = max($0, timeOption.secRange.upperBound)
+                $0 = max($0, timeOption.secRange.end)
             }
         }
         v = texts.reduce(into: v) {
             if let timeOption = $1.timeOption {
-                $0 = max($0, timeOption.secRange.upperBound)
+                $0 = max($0, timeOption.secRange.end)
             }
         }
         return v
@@ -2523,14 +2523,14 @@ extension Sheet {
         Caption.caption(atBeat: beat, in: captions)
     }
     
-    var allDurBeat: Rational {
-        max(animationDurBeat, musicDurBeat)
+    var allEndBeat: Rational {
+        max(animationEndBeat, musicEndBeat)
     }
-    var allBeatRange: Range<Rational> { 0 ..< allDurBeat }
-    var allDurSec: Rational {
-        max(animationDurSec, musicDurSec)
+    var allBeatRange: Range<Rational> { 0 ..< allEndBeat }
+    var allEndSec: Rational {
+        max(animationEndSec, musicEndSec)
     }
-    var allSecTimeRange: Range<Rational> { 0 ..< allDurSec }
+    var allSecTimeRange: Range<Rational> { 0 ..< allEndSec }
     
     var mainFrame: Rect? {
         guard enabledAnimation else { return nil }

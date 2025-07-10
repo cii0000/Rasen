@@ -635,24 +635,16 @@ final class PlayAction: InputKeyEventAction {
                     }
                 }
                 
-                var filledShps = Set<IntPoint>()
                 func sheetView(at shp: IntPoint) -> SheetView? {
-                    if !filledShps.contains(shp),
-                       let aSheetView = rootView.sheetView(at: shp),
+                    if let aSheetView = rootView.sheetView(at: shp),
                        aSheetView.model.enabledTimeline {
                         
-                        filledShps.insert(shp)
-                        return aSheetView
+                        aSheetView
                     } else {
-                        return nil
+                        nil
                     }
                 }
-                
-                var ncShp = cShp, psvs = [WeakElement<SheetView>]()
-                ncShp.x -= 1
-                while let aSheetView = sheetView(at: ncShp) {
-                    psvs.append(.init(element: aSheetView))
-                    
+                func topAndBottom(at ncShp: IntPoint, in aSheetView: SheetView) {
                     var nncShp = ncShp, npsvs = [WeakElement<SheetView>]()
                     nncShp.y -= 1
                     while let aaSheetView = sheetView(at: nncShp) {
@@ -668,52 +660,31 @@ final class PlayAction: InputKeyEventAction {
                         nncShp.y += 1
                     }
                     aSheetView.topSheetViews = npsvs
-                    
-                    ncShp.x -= 1
                 }
-                cSheetView.previousSheetViews = psvs.reversed()
                 
-                var nsvs = [WeakElement<SheetView>]()
-                ncShp = cShp
-                ncShp.x += 1
-                while let aSheetView = sheetView(at: ncShp) {
-                    nsvs.append(.init(element: aSheetView))
+                let shps = rootView.groupSheetPositions(at: cShp)
+                for cShp in shps {
+                    guard let cSheetView = sheetView(at: cShp) else { continue }
                     
-                    var nncShp = ncShp, npsvs = [WeakElement<SheetView>]()
-                    nncShp.y -= 1
-                    while let aaSheetView = sheetView(at: nncShp) {
-                        npsvs.append(.init(element: aaSheetView))
-                        nncShp.y -= 1
-                    }
-                    aSheetView.bottomSheetViews = npsvs.reversed()
-                    nncShp = ncShp
-                    npsvs = []
-                    nncShp.y += 1
-                    while let aaSheetView = sheetView(at: nncShp) {
-                        npsvs.append(.init(element: aaSheetView))
-                        nncShp.y += 1
-                    }
-                    aSheetView.topSheetViews = npsvs
+                    topAndBottom(at: cShp, in: cSheetView)
                     
-                    ncShp.x += 1
+                    var ncShp = cShp, psvs = [WeakElement<SheetView>]()
+                    while let preShp = rootView.maxVerticalSheetPosition(at: ncShp, deltaX: -1) {
+                        guard let ncSheetView = sheetView(at: preShp) else { break }
+                        psvs.append(.init(element: ncSheetView))
+                        ncShp = preShp
+                    }
+                    cSheetView.previousSheetViews = psvs
+                    
+                    ncShp = cShp
+                    var nsvs = [WeakElement<SheetView>]()
+                    while let nextShp = rootView.maxVerticalSheetPosition(at: ncShp, deltaX: 1) {
+                        guard let ncSheetView = sheetView(at: nextShp) else { break }
+                        nsvs.append(.init(element: ncSheetView))
+                        ncShp = nextShp
+                    }
+                    cSheetView.nextSheetViews = nsvs
                 }
-                cSheetView.nextSheetViews = nsvs
-                
-                var nncShp = cShp, npsvs = [WeakElement<SheetView>]()
-                nncShp.y -= 1
-                while let aaSheetView = sheetView(at: nncShp) {
-                    npsvs.append(.init(element: aaSheetView))
-                    nncShp.y -= 1
-                }
-                cSheetView.bottomSheetViews = npsvs.reversed()
-                nncShp = cShp
-                npsvs = []
-                nncShp.y += 1
-                while let aaSheetView = sheetView(at: nncShp) {
-                    npsvs.append(.init(element: aaSheetView))
-                    nncShp.y += 1
-                }
-                cSheetView.topSheetViews = npsvs
                 
                 let scale = rootView.screenToWorldScale
                 let sheetP = cSheetView.convertFromWorld(p)
@@ -856,7 +827,6 @@ final class InsertKeyframeAction: InputKeyEventAction {
                     let oBeat = animationView.beat(atX: inP.x, interval: interval)
                     let beat = (oBeat - animation.beatRange.start)
                         .clipped(min: 0, max: animation.beatRange.length)
-                    + animation.beatRange.start
                     
                     var rootBP = animation.rootBeatPosition
                     rootBP.beat = beat

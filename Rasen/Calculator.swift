@@ -901,7 +901,7 @@ extension O {
                 if vs[fi].isMatrix {
                     vs[fi].strs.insert(fstr.substring("(", si ... si),
                                        at: vs[fi].strs.startIndex)
-                    vs[li].strs.append(lstr.substring(";", ei ... ei))
+                    vs[li].strs.append(lstr.substring(O.makeMatrixName, ei ... ei))
                     vs[li].strs.append(lstr.substring(")", ei ... ei))
                 }
             }
@@ -1135,13 +1135,14 @@ extension O {
         }
         enum CurrentType {
             case none
-            case integral, dot, decimal
+            case integral, dot, semi, decimal
             case separator, o, string, s, subS, superS
             var idType: IDType {
                 switch self {
                 case .none: .none
                 case .integral: .int
                 case .dot: .none
+                case .semi: .none
                 case .decimal: .real
                 case .separator: .separator
                 case .o: .o
@@ -1162,7 +1163,7 @@ extension O {
         func append() {
             if case id(var id)? = os.last, id.key == OKey(".") {
                 if isSelect {
-                    id.key = OKey("/.")
+                    id.key = OKey(O.selectName)
                     os[.last] = O(id)
                 }
             }
@@ -1213,7 +1214,7 @@ extension O {
                         os.append(O(String(tss)))
                     }
                     isPreviousOneValue = false
-                } else if case id(let id)? = os.last, id.key == OKey("/.") {
+                } else if case id(let id)? = os.last, id.key == OKey(O.selectName) {
                     if let i = Int(tss) {
                         os.append(O(i))
                     } else {
@@ -1280,6 +1281,9 @@ extension O {
                 os.append(o)
                 isPreviousOneValue = true
             case .separator:
+                if tss == O.selectName {
+                    isSelect = true
+                }
                 os.append(O(v(tss)))
                 isPreviousOneValue = false
             case .none:
@@ -1308,11 +1312,12 @@ extension O {
         var isDot = false
         func analyzeLiteral(from s: Character, _ sType: SType) {
             if isDot {
-                if (s == "." && currentType == .dot) || (s != "." && sType != .num) {
+                if ((s == "." || s == ";") && (currentType == .dot || currentType == .semi))
+                    || ((s != "." && s != ";") && sType != .num) {
                     isDot = false
                 }
             } else {
-                if s == "." && currentType != .integral {
+                if (s == "." || s == ";") && currentType != .integral {
                     isDot = true
                 }
             }
@@ -1329,9 +1334,9 @@ extension O {
                 switch sType {
                 case .num: break
                 case .separator:
-                    if s == "." {
+                    if s == "." || s == ";" {
                         var ni = ts.index(after: tmpei), isSplit = false
-                        if ni < ts.endIndex && ts[ni] == "." {
+                        if ni < ts.endIndex && (ts[ni] == "." || ts[ni] == ";") {
                             append()
                             currentType = .separator
                         } else {
@@ -1342,7 +1347,7 @@ extension O {
                                     let ns = ts[ni]
                                     let sType = SType(ns, separator: separator)
                                     if sType != .num {
-                                        if ns == "." {
+                                        if ns == "." || ns == ";" {
                                             isSplit = true
                                         }
                                         break
@@ -1355,7 +1360,7 @@ extension O {
                                 append()
                                 currentType = .separator
                             } else {
-                                currentType = .dot
+                                currentType = s == "." ? .dot : .semi
                             }
                         }
                     } else {
@@ -1372,7 +1377,7 @@ extension O {
                     append()
                     currentType = .superS
                 }
-            case .dot:
+            case .dot, .semi:
                 switch sType {
                 case .num:
                     currentType = .decimal
@@ -1518,7 +1523,7 @@ extension O {
                 case .integral, .decimal,
                         .separator, .o, .string, .s, .subS, .superS:
                     append()
-                case .dot:
+                case .dot, .semi:
                     currentType = .none
                     append()
                 }
@@ -1537,7 +1542,7 @@ extension O {
                     case .integral, .decimal,
                             .separator, .o, .string, .s, .subS, .superS:
                         append()
-                    case .dot:
+                    case .dot, .semi:
                         currentType = .none
                         append()
                     }
@@ -2238,6 +2243,19 @@ struct Calculator {
                                        _ oDic: inout [OKey: O],
                                        _ memoRPN: inout [UUID: RPN],
                                        _ handler: Handler) -> O {
+        if !runType.isSelectable, args.count >= 1, case .selected(let a) = args[0] {
+            var nArgs = args
+            nArgs[0] = a.lastO()
+            let no = aOperateSpecial(runType, id, args: nArgs, &oDic, &memoRPN, handler)
+            return O.set(args[0], no)
+        } else {
+            return aOperateSpecial(runType, id, args: args, &oDic, &memoRPN, handler)
+        }
+    }
+    private static func aOperateSpecial(_ runType: F.RunType, _ id: ID?, args: [O],
+                                        _ oDic: inout [OKey: O],
+                                        _ memoRPN: inout [UUID: RPN],
+                                        _ handler: Handler) -> O {
         switch runType {
         case .flip: O.flip(args[0], &oDic)
         case .showAllDefinitions: O.showAllDefinitions(args[0], &oDic)

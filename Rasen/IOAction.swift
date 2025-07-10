@@ -1222,7 +1222,7 @@ final class IOAction: Action {
                         let ot = t
                         let b = isMainFrame ? (sheet.mainFrame ?? rendering.bounds) : rendering.bounds
                         
-                        let allDurBeat = sheet.allDurBeat
+                        let allDurBeat = sheet.allEndBeat
                         let durSec = sheet.animation.sec(fromBeat: allDurBeat == 0 ? 1 : allDurBeat)
                         let frameCount = sheet.animation.count(fromBeat: allDurBeat == 0 ? 1 : allDurBeat,
                                                                frameRate: frameRate)

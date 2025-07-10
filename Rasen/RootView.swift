@@ -1958,29 +1958,47 @@ final class RootView: View, @unchecked Sendable {
          .init(centerShp.x - 1, centerShp.y - 1),
          .init(centerShp.x - 1, centerShp.y + 1)]
     }
-    func groupSheetPositions(at cp: IntPoint) -> [IntPoint] {
-        guard sheetID(at: cp) != nil else { return [] }
-        var p = cp, ps = [IntPoint]()
-        while sheetID(at: p) != nil { p.x -= 1 }
-        p.x += 1
-        while sheetID(at: p) != nil {
-            ps.append(p)
-            var np = p
-            np.y += 1
-            while sheetID(at: np) != nil {
-                ps.append(np)
-                np.y += 1
-            }
-            np = p
-            np.y -= 1
-            while sheetID(at: np) != nil {
-                ps.append(np)
-                np.y -= 1
-            }
-            
-            p.x += 1
+    func sheetPositionFromVertical(at shp: IntPoint, handler: (IntPoint) -> ()) {
+        handler(shp)
+        var nShp = shp
+        nShp.y += 1
+        while sheetID(at: nShp) != nil {
+            handler(nShp)
+            nShp.y += 1
         }
-        return ps
+        nShp = shp
+        nShp.y -= 1
+        while sheetID(at: nShp) != nil {
+            handler(nShp)
+            nShp.y -= 1
+        }
+    }
+    func maxVerticalSheetPosition(at shp: IntPoint, deltaX: Int) -> IntPoint? {
+        var maxShp: IntPoint?
+        sheetPositionFromVertical(at: shp) { nShp in
+            let dShp = IntPoint(nShp.x + deltaX, nShp.y)
+            if sheetID(at: dShp) != nil {
+                maxShp = maxShp != nil ? (dShp.y > maxShp!.y ? dShp : maxShp!) : dShp
+            }
+        }
+        return maxShp
+    }
+    func groupSheetPositions(at cShp: IntPoint) -> [IntPoint] {
+        guard sheetID(at: cShp) != nil else { return [] }
+        
+        var shp = cShp, shps = [IntPoint]()
+        sheetPositionFromVertical(at: shp) { shps.append($0) }
+        while let preShp = maxVerticalSheetPosition(at: shp, deltaX: -1) {
+            sheetPositionFromVertical(at: preShp) { shps.append($0) }
+            shp = preShp
+        }
+        shp = cShp
+        while let nextShp = maxVerticalSheetPosition(at: shp, deltaX: 1) {
+            sheetPositionFromVertical(at: nextShp) { shps.append($0) }
+            shp = nextShp
+        }
+        
+        return shps
     }
     func groupAndAroundSheetPositions(at cp: IntPoint) -> [IntPoint] {
         var shps = [cp] + aroundSheetPositions(atCenter: cp)
