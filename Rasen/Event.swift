@@ -343,7 +343,6 @@ extension Quasimode {
     static let selectFrame = Self(.swipe)
     static let keySelectFrame = Self(modifier: [.control, .command], .drag)
     static let play = Self(.fourFingersTap)
-    static let keyPlay = Self(modifier: [.control, .command], .click)
     
     static let goPrevious = Self(modifier: [.control], .z)//
     static let goNext = Self(modifier: [.control], .x)//
@@ -351,6 +350,7 @@ extension Quasimode {
     static let goNextFrame = Self(modifier: [.control, .option], .x)//
     static let controlCopy = Self(modifier: [.control], .c)//
     static let controlInterpolate = Self(modifier: [.control], .s)//
+    static let controlPlay = Self(modifier: [.control], .a)//
     
     static let zoom = Self(.pinch)
     static let keyZoom = Self(modifier: [.control, .option, .command], .drag)

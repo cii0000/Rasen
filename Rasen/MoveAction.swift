@@ -2547,13 +2547,15 @@ final class MoveBorderAction: DragEventAction {
                     borders.forEach { append(border: $0) }
                     let nxs = xs.sorted(), nys = ys.sorted()
                     let width = nxs[1] - nxs[0], height = nys[1] - nys[0]
-                    let nString = nBorder.location.string(digitsCount: 1, enabledZeroInteger: false)
-                    rootView.cursor = rootView.cursor(from: "\(nString) (\(LookUpAction.sizeString(from: .init(width: width, height: height))))")
+                    let nString0 = nBorder.location.string(digitsCount: 1, enabledZeroInteger: false)
+                    let nString1 = ((nBorder.orientation == .horizontal ? sheetFrame.width : sheetFrame.height) - nBorder.location).string(digitsCount: 1, enabledZeroInteger: false)
+                    rootView.cursor = rootView.cursor(from: "\(nString0):\(nString1) (\(LookUpAction.sizeString(from: .init(width: width, height: height))))")
                 } else {
-                    let nString = nBorder.location.string(digitsCount: 1, enabledZeroInteger: false)
+                    let nString0 = nBorder.location.string(digitsCount: 1, enabledZeroInteger: false)
+                    let nString1 = ((nBorder.orientation == .horizontal ? sheetFrame.width : sheetFrame.height) - nBorder.location).string(digitsCount: 1, enabledZeroInteger: false)
                     rootView.cursor = switch nBorder.orientation {
-                    case .horizontal: rootView.cursor(from: nString)
-                    case .vertical: rootView.cursor(from: nString)
+                    case .horizontal: rootView.cursor(from: "\(nString0):\(nString1)")
+                    case .vertical: rootView.cursor(from: "\(nString0):\(nString1)")
                     }
                 }
             }

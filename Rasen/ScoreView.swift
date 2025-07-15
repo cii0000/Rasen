@@ -1013,7 +1013,7 @@ extension ScoreView {
                                                          width: 1.5, height: 0.5)))
                     return nil
                 } else {
-                    let fHeight = 4.0
+                    let fHeight = 5.0
                     let lyricText = Text(string: pit.lyric, size: fHeight)
                     let typesetter = lyricText.typesetter
                     let lh = fHeight * 2

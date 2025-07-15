@@ -81,7 +81,7 @@ extension Size {
         width >= other.width || height >= other.height
     }
     
-    func snapped(_ maxSize: Size) -> Size {
+    func snapped(max maxSize: Size) -> Size {
         if width <= 0 || height <= 0 || self == maxSize {
             return self
         } else {
@@ -92,6 +92,33 @@ extension Size {
                 let w = width * maxSize.height / height
                 return Size(width: w, height: maxSize.height)
             }
+        }
+    }
+    func snapped(min minSize: Size) -> Size {
+        if width <= 0 || height <= 0 || self == minSize {
+            return self
+        } else {
+            let h = height * minSize.width / width
+            if h > minSize.height {
+                return Size(width: minSize.width, height: h)
+            } else {
+                let w = width * minSize.height / height
+                return Size(width: w, height: minSize.height)
+            }
+        }
+    }
+    func snapped(width: Double) -> Size {
+        if self.width <= 0 || height <= 0 || width == self.width {
+            self
+        } else {
+            .init(width: width, height: height * width / self.width)
+        }
+    }
+    func snapped(height: Double) -> Size {
+        if width <= 0 || self.height <= 0 || height == self.height {
+            self
+        } else {
+            .init(width: width * height / self.height, height: height)
         }
     }
     
@@ -117,8 +144,8 @@ extension Size {
         lhs.height /= rhs
     }
     
-    func rounded() -> Size {
-        Size(width: width.rounded(), height: height.rounded())
+    func rounded(_ rule: FloatingPointRoundingRule = .toNearestOrAwayFromZero) -> Size {
+        Size(width: width.rounded(rule), height: height.rounded(rule))
     }
     mutating func round(decimalPlaces: Int) {
         self = Size(width: width.rounded(decimalPlaces: decimalPlaces),

@@ -453,7 +453,7 @@ final class Node: @unchecked Sendable {
             color = .background
         }
         isRenderCache = false
-        let texture = renderedTexture(in: bounds, to: bounds.size * 2,
+        let texture = renderedTexture(in: bounds, to: bounds.size * 2 * 512 / RootView.baseMinThumbnailWidth,
                                       backgroundColor: color,
                                       sampleCount: owner?.sampleCount ?? 1,
                                       mipmapped: true)

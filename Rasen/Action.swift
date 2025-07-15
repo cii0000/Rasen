@@ -303,7 +303,7 @@ final class RootAction: Action {
         case .cutDraft: CutDraftAction(self)
         case .makeFaces: MakeFacesAction(self)
         case .cutFaces: CutFacesAction(self)
-        case .keyPlay: PlayAction(self)
+        case .controlPlay: PlayAction(self)
         case .goPrevious: GoPreviousAction(self)
         case .goNext: GoNextAction(self)
         case .goPreviousFrame: GoPreviousFrameAction(self)

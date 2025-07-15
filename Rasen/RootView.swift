@@ -443,6 +443,9 @@ final class RootView: View, @unchecked Sendable {
                 sheetView.bounds = Rect(size: frame.size)
                 sheetView.node.allChildrenAndSelf { $0.updateDatas() }
                 
+                sheetView.contentsView.elementViews.forEach { $0.updateSpectrogram() }
+                sheetView.scoreView.updateSpectrogram()
+                
                 makeThumbnailRecord(at: sheetID, with: sheetView)
                 syncSave()
             }
@@ -1730,11 +1733,11 @@ final class RootView: View, @unchecked Sendable {
         }
     }
     
-    let thumbnail4Scale = 2.0 ** -8
-    let thumbnail16Scale = 2.0 ** -6
-    let thumbnail64Scale = 2.0 ** -4
-    let thumbnail256Scale = 2.0 ** -2
-    let thumbnail1024Scale = 2.0 ** 0
+    let thumbnail4Scale = 2.0 ** -8 * baseThumbnailScale
+    let thumbnail16Scale = 2.0 ** -6 * baseThumbnailScale
+    let thumbnail64Scale = 2.0 ** -4 * baseThumbnailScale
+    let thumbnail256Scale = 2.0 ** -2 * baseThumbnailScale
+    let thumbnail1024Scale = 2.0 ** 0 * baseThumbnailScale
     func thumbnailType(withScale scale: Double) -> Model.ThumbnailType {
         if scale < thumbnail4Scale {
             .w4
@@ -1883,8 +1886,10 @@ final class RootView: View, @unchecked Sendable {
         updateStringRecord(at: sid, with: sheetView,
                            isPreparedWrite: isPreparedWrite)
     }
+    static let baseMinThumbnailWidth = min(Sheet.width, Sheet.height)
+    static let baseThumbnailScale = 512 / baseMinThumbnailWidth
     func thumbnailMipmap(from sheetView: SheetView) -> ThumbnailMipmap? {
-        var size = sheetView.bounds.size * (2.0 ** 1)
+        var size = sheetView.bounds.size.snapped(min: .init(square: 512)) * (2.0 ** 1)
         let bColor = sheetView.model.backgroundUUColor.value
         let baseImage = sheetView.node.imageInBounds(size: size, backgroundColor: bColor,
                                                      ColorSpace.export)

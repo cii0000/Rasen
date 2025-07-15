@@ -880,16 +880,29 @@ final class AnimationView: TimelineView, @unchecked Sendable {
         }
     }
     
-    func isInterpolated(atLineIndex li: Int) -> Bool {
+    func isInterpolated(atLineI li: Int, atKeyframeI fki: Int) -> Bool {
         guard model.keyframes.count >= 2 else { return false }
-        let fki = model.index
-        let id = model.currentKeyframe.picture.lines[li].id
+        let id = model.keyframes[fki].picture.lines[li].id
         return model.keyframes.enumerated().contains(where: { (ki, kf) in
             guard ki != fki else { return false }
             return kf.picture.lines.enumerated().contains(where: {
                 $0.element.id == id
             })
         })
+    }
+    func enabledFirstOrLastInterpolated(atLineI li: Int,
+                                        atRootKI: Int, fromRootKI: Int) -> Bool {
+        guard model.keyframes.count >= 2 else { return false }
+        let ki = model.index(atRoot: atRootKI)
+        let id = model.keyframes[ki].picture.lines[li].id
+        func isID(at ki: Int) -> Bool {
+            model.keyframes[ki].picture.lines.contains { $0.id == id }
+        }
+        return if fromRootKI <= atRootKI {
+            !(fromRootKI ..< atRootKI).contains(where: { isID(at: model.index(atRoot: $0)) })
+        } else {
+            !(atRootKI + 1 ... fromRootKI).contains(where: { isID(at: model.index(atRoot: $0)) })
+        }
     }
     var shownInterTypeKeyframeIndex: Int? {
         didSet {
@@ -921,12 +934,20 @@ final class AnimationView: TimelineView, @unchecked Sendable {
     }
     func interpolationNodes(from ids: [UUID], scale: Double,
                             removeLineIndex: Int? = nil,
+                            oldRootKeyframeIndex orki: Int? = nil,
+                            newRootKeyframeIndex nrki: Int? = nil,
                             isConvertToWorld: Bool = true) -> [Node] {
         guard !ids.isEmpty else { return [] }
         let idSet = Set(ids)
         let ki = model.index, lw = Line.defaultLineWidth
         
-        let nlw = max(lw * 0.5, lw * scale), blw = lw * 4
+        let boldKISet: Set<Int> = if let orki, let nrki {
+            Set((orki < nrki ? (orki ... nrki) : (nrki ... orki)).map { model.index(atRoot: $0) })
+        } else {
+            []
+        }
+        
+        let nlw = max(lw * 0.5, lw * scale), blw = lw * 4, nblw = lw * 2
         let color: Color = removeLineIndex != nil ?
             .removing : .subSelected
         var nodes = [Node]()
@@ -945,7 +966,7 @@ final class AnimationView: TimelineView, @unchecked Sendable {
                     } else {
                         let nLine = isConvertToWorld ? convertToWorld(line) : line
                         let node = Node(path: Path(nLine),
-                                        lineWidth: nlw,
+                                        lineWidth: boldKISet.contains(i) ? nblw : nlw,
                                         lineType: .color(color))
                         nodes.append(node)
                         lineNodeDic[line.controls] = node
@@ -6236,31 +6257,88 @@ final class SheetView: BindableView, @unchecked Sendable {
         }
         return n
     }
+    
     func lineTuple(at p: Point, isSmall ois: Bool? = nil,
                    removingUUColor: UUColor? = nil,
                    scale: Double) -> (lineView: SheetLineView,
                                       lineIndex: Int)? {
-        let isSmall = ois ?? (sheetColorOwnerFromPlane(at: p).uuColor != Sheet.defalutBackgroundUUColor)
+        guard let v = lineTuple(at: p, isSmall: ois, removingUUColor: removingUUColor,
+                                enabledPreviousNext: false, scale: scale) else { return nil }
+        return (v.lineView, v.lineI)
+    }
+    func lineTuple(at p: Point, isSmall ois: Bool? = nil,
+                   removingUUColor: UUColor? = nil,
+                   enabledPreviousNext: Bool,
+                   minEnabledDistance med: Double = 10,
+                   scale: Double) -> (lineView: SheetLineView, lineI: Int, rootKeyframeI: Int)? {
+        let smallScale: Double? = if let ois {
+            ois ? 2.0 : nil
+        } else if sheetColorOwnerFromPlane(at: p).uuColor != Sheet.defalutBackgroundUUColor {
+            8.0
+        } else if textTuple(at: p) != nil {
+            2.0
+        } else {
+            nil
+        }
+        
         let ds = Line.defaultLineWidth * 3 * scale
-        var minI: Int?, minDSquared = Double.infinity
-        for (i, line) in model.picture.lines.enumerated().reversed() {
-            guard line.uuColor != removingUUColor else { continue }
-            if line.uuColor != Line.defaultUUColor && isSmall {
+        var minI: Int?, minRKI: Int?, minDSquared = Double.infinity
+        func update(at i: Int, rki: Int, from line: Line) -> (lineView: SheetLineView, lineI: Int, rootKeyframeI: Int)? {
+            guard line.uuColor != removingUUColor else { return nil }
+            if line.uuColor != Line.defaultUUColor && smallScale != nil {
                 if line.containsPressure(at: p) {
-                    return (linesView.elementViews[i], i)
+                    return (linesView.elementViews[i], i, rki)
                 }
             } else {
-                let nd = isSmall ? (line.size / 2 + ds) / 8 : line.size / 2 + ds * 5
+                let nd = smallScale != nil ?
+                (line.size / 2 + ds) / smallScale! : line.size / 2 + ds * 5
                 let ldSquared = nd * nd
                 let dSquared = line.minDistanceSquared(at: p)
                 if dSquared < minDSquared && dSquared < ldSquared {
                     minI = i
+                    minRKI = rki
                     minDSquared = dSquared
                 }
             }
+            return nil
         }
-        if let i = minI {
-            return (linesView.elementViews[i], i)
+        let rki = model.animation.rootIndex
+        for (i, line) in model.picture.lines.enumerated().reversed() {
+            if let n = update(at: i, rki: rki, from: line) {
+                return n
+            }
+        }
+        
+        let mds = med * scale
+        if enabledPreviousNext && minDSquared >= mds * mds && model.animation.keyframes.count > 1 {
+            let pn = model.animation.currentKeyframe.previousNext
+            if pn == .previous || pn == .previousAndNext {
+                let rii = model.animation.rootInterIndex - 1
+                let ki = model.animation.index(atRootInter: rii)
+                let ri = model.animation.rootIndex(atRootInter: rii)
+                for (i, line) in model.animation.keyframes[ki].picture.lines.enumerated().reversed() {
+                    if let n = update(at: i, rki: ri, from: line) {
+                        return n
+                    }
+                }
+            }
+            if pn == .next || pn == .previousAndNext {
+                let rii = model.animation.rootInterIndex + 1
+                let ki = model.animation.index(atRootInter: rii)
+                let ri = model.animation.rootIndex(atRootInter: rii)
+                for (i, line) in model.animation.keyframes[ki].picture.lines.enumerated().reversed() {
+                    if let n = update(at: i, rki: ri, from: line) {
+                        return n
+                    }
+                }
+            }
+        }
+        
+        if let i = minI, let rki = minRKI {
+            let linesView = rki == model.animation.rootIndex ?
+            self.linesView :
+            animationView.elementViews[model.animation.index(atRoot: rki)].linesView
+            return (linesView.elementViews[i], i, rki)
         } else {
             return nil
         }

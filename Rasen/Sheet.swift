@@ -2166,19 +2166,19 @@ extension Sheet: Protobuf {
 }
 extension Sheet: Hashable, Codable {}
 extension Sheet {
-    static let width = 512.0, height = 720.0
+    static let width = 720.0, height = 720.0
     static let defaultBounds = Rect(width: width, height: height)
     static let defalutBackgroundUUColor = UU(Color.background, id: .zero)
     static let textPadding = Size(width: 16, height: 15)
     static let textPaddingBounds = defaultBounds.inset(by: textPadding)
-    static let beatWidth = 30.0, secPadding = 16.0
+    static let beatWidth = 43.0, secPadding = 16.0
     static let timelineHalfHeight = 12.0
     static let knobWidth = 2.0, knobHeight = 12.0, rulerHeight = 4.0
     static let knobEditDistance = 20.0
     static let timelineY = 18.0
     static let fullEditPitchInterval = Rational(1, 16), pitchInterval = Rational(1)
     static let fullEditBeatInterval = Rational(1, 128), beatInterval = Rational(1, 8)
-    static let pitchHeight = 3.75
+    static let pitchHeight = 5.375
     static let noteHeight = 1.75
     static let tonePadding = 2.0
     static let evenY = 1.0
@@ -2564,15 +2564,12 @@ extension Sheet {
                                          with sb: Rect) -> [Double] {
         switch orientation {
         case .horizontal:
-             [204, sb.height - 204,
-              217, sb.height - 217,
-              230, sb.height - 230,
-              243, sb.height - 243,
+             [104, sb.height - 104,
               (1 * sb.height / 4).rounded(),
               (2 * sb.height / 4).rounded(),
               (3 * sb.height / 4).rounded()].sorted()
         case .vertical:
-             [48, sb.width - 48,
+             [104, sb.width - 104,
               (1 * sb.width / 4).rounded(),
               (2 * sb.width / 4).rounded(),
               (3 * sb.width / 4).rounded()].sorted()

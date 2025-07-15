@@ -2078,7 +2078,7 @@ extension Score {
 }
 
 struct Music {
-    static let defaultTempo: Rational = 120
+    static let defaultTempo: Rational = 135
     static let minTempo = Rational(1, 4), maxTempo: Rational = 10000
     static let tempoRange = minTempo ... maxTempo
     static let defaultDurBeat = Rational(16)

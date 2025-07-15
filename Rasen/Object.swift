@@ -5161,6 +5161,15 @@ extension O {
                 let line = Line(controls: dps.map { .init(point: $0.point, pressure: 1) },
                                 size: lineWidth ?? Line.defaultLineWidth)
                 return drawLine(line, &oDic)
+            } else if let originO = a[O("origin")], let r = a[O("r")]?.asDouble,
+                      case .array(let originOs) = originO,
+                        originOs.count == 2, let x = originOs[0].asDouble, let y = originOs[1].asDouble {
+                       
+                let path = Path([Pathline(circleRadius: r, position: .init(x, y))])
+                let (dps, _) = path.pathDistancePoints(lineWidth: 1)
+                let line = Line(controls: dps.map { .init(point: $0.point, pressure: 1) },
+                                size: lineWidth ?? Line.defaultLineWidth)
+                return drawLine(line, &oDic)
             } else if let originO = a[O("origin")], let sizeO = a[O("size")],
                case .array(let originOs) = originO, case .dic(let sizeDic) = sizeO,
                 originOs.count == 2, let x = originOs[0].asDouble, let y = originOs[1].asDouble,

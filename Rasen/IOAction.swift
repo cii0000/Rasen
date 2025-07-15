@@ -835,8 +835,8 @@ final class IOAction: Action {
             case .image4K:
                 if renderings.count == 1, let node = renderings[0].renderableMainSheetNode() {
                     let nSize = size.width > size.height ?
-                    size.snapped(Size(width: 3840, height: 2160)).rounded() :
-                    size.snapped(Size(width: 2160, height: 3840)).rounded()
+                    size.snapped(height: 2160).rounded(.down) :
+                    size.snapped(max: Size(width: 2160, height: 3840)).rounded(.down)
                     let image = node.renderedAntialiasFillImage(in: renderings[0].bounds, to: nSize, colorSpace)
                     return image?.data(.png)?.count ?? 0
                 } else {
@@ -892,25 +892,25 @@ final class IOAction: Action {
                                 size: nSize, at: ioResult)
                 case .image4K:
                     let nSize = size.width > size.height ?
-                    size.snapped(Size(width: 3840, height: 2160)).rounded() :
-                    size.snapped(Size(width: 2160, height: 3840)).rounded()
+                    size.snapped(height: 2160).rounded(.down) :
+                    size.snapped(max: Size(width: 2160, height: 3840)).rounded(.down)
                     exportImage(from: renderings, unionFrame: unionFrame, is4K: true, colorSpace,
                                 size: nSize, at: ioResult)
                 case .pdf:
                     exportPDF(from: renderings, unionFrame: unionFrame, size: size, at: ioResult)
                 case .gif:
-                    let nSize = size.snapped(Size(width: 800, height: 1200)).rounded()
+                    let nSize = size.snapped(max: Size(width: 800, height: 1200)).rounded(.down)
                     exportGIF(from: renderings, unionFrame: unionFrame, colorSpace, size: nSize, at: ioResult)
                 case .movie:
                     let nSize = size.width > size.height ?
-                    size.snapped(Size(width: 1920, height: 1080).rounded()) :
-                    size.snapped(Size(width: 1200, height: 1920).rounded())
+                    size.snapped(height: 1080).rounded(.down) :
+                    size.snapped(max: Size(width: 1200, height: 1920).rounded(.down))
                     exportMovie(from: renderings, is4K: false, isAlphaChannel: isAlphaChannel,
                                 colorSpace, size: nSize, at: ioResult)
                 case .movie4K:
                     let nSize = size.width > size.height ?
-                    size.snapped(Size(width: 3840, height: 2160)).rounded() :
-                    size.snapped(Size(width: 2160, height: 3840)).rounded()
+                    size.snapped(height: 2160).rounded(.down) :
+                    size.snapped(max: Size(width: 2160, height: 3840)).rounded(.down)
                     exportMovie(from: renderings, is4K: true, isAlphaChannel: isAlphaChannel,
                                 colorSpace, size: nSize, at: ioResult)
                 case .sound:
