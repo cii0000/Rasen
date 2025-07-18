@@ -1759,6 +1759,7 @@ final class SheetView: BindableView, @unchecked Sendable {
     private var playingFrameRate: Rational = 24, firstDeltaSec: Rational = 0
     private var waringClock: SuspendingClock.Instant?, beganPlaySec: SuspendingClock.Instant?
     private var audioPauseTask: Task<(), any Error>?
+    private var mainDurSec: Rational = 0
     let frameRate = Keyframe.defaultFrameRate
     var isPlaying = false {
         didSet {
@@ -1852,10 +1853,12 @@ final class SheetView: BindableView, @unchecked Sendable {
                 let topEndSec = sheetView.topSheetViews.reduce(Rational(0)) {
                     max($0, $1.element?.model.allEndSec ?? 0)
                 }
+                let mainDurSec = max(sheetView.model.allEndSec, bottomEndSec, topEndSec,
+                                     seqTrack.durSec)
+                sheetView.mainDurSec = mainDurSec
                 seqTrack.scoreTrackItems.append(.init(rendnotes: [], sampleRate: Audio.defaultSampleRate,
                                                       startSec: 0,
-                                                      durSec: max(sheetView.model.allEndSec,
-                                                                  bottomEndSec, topEndSec)))
+                                                      durSec: mainDurSec))
                 seqTracks.append(seqTrack)
                 deltaSec += seqTrack.durSec
                 
@@ -1881,10 +1884,13 @@ final class SheetView: BindableView, @unchecked Sendable {
                 let topEndSec = topSheetViews.reduce(Rational(0)) {
                     max($0, $1.element?.model.allEndSec ?? 0)
                 }
+                
+                let mainDurSec = max(model.allEndSec, bottomEndSec, topEndSec,
+                                     seqTrack.durSec)
+                self.mainDurSec = mainDurSec
                 seqTrack.scoreTrackItems.append(.init(rendnotes: [], sampleRate: Audio.defaultSampleRate,
                                                       startSec: 0,
-                                                      durSec: max(model.allEndSec,
-                                                                  bottomEndSec, topEndSec)))
+                                                      durSec: mainDurSec))
                 seqTracks.append(seqTrack)
             }
             
@@ -1912,10 +1918,12 @@ final class SheetView: BindableView, @unchecked Sendable {
                 let topEndSec = sheetView.topSheetViews.reduce(Rational(0)) {
                     max($0, $1.element?.model.allEndSec ?? 0)
                 }
+                let mainDurSec = max(sheetView.model.allEndSec, bottomEndSec, topEndSec,
+                                     seqTrack.durSec)
+                sheetView.mainDurSec = mainDurSec
                 seqTrack.scoreTrackItems.append(.init(rendnotes: [], sampleRate: Audio.defaultSampleRate,
                                                       startSec: 0,
-                                                      durSec: max(sheetView.model.allEndSec,
-                                                                  bottomEndSec, topEndSec)))
+                                                      durSec: mainDurSec))
                 seqTracks.append(seqTrack)
                 
                 minFrameRate = min(minFrameRate, sheetView.model.mainFrameRate)
@@ -2039,7 +2047,7 @@ final class SheetView: BindableView, @unchecked Sendable {
             let sheetView = playingSheetView
             
             let playingBeat = sheetView.model.animation
-                .beat(fromSec: Double(playingSec - sheetView.model.animation.secRange.start), beatRate: 60)
+                .beat(fromSec: Double(playingSec), beatRate: 60)
             
             if sheetView == self {
                 showOtherTimeNode(atBeat: playingBeat, isEnabledMovie: true)
@@ -2052,13 +2060,18 @@ final class SheetView: BindableView, @unchecked Sendable {
             if !sheetView.bottomSheetViews.isEmpty {
                 for (si, bottomSheetViewE) in sheetView.bottomSheetViews.enumerated() {
                     guard let bottomSheetView = bottomSheetViewE.element else { continue }
-                    let i = bottomSheetView.model.animation.index(atSec: playingSec - bottomSheetView.model.animation.secRange.start)
-                    if bottomSheetView.playingOldKeyframeIndex != i {
-                        if si < bottomNodes.count {
-                            bottomNodes[si]
-                            = bottomSheetView.animationView.elementViews[i].node.clone
+                    let i = bottomSheetView.model.animation.indexInBeatRange(atSec: playingSec)
+                    if let i {
+                        if bottomSheetView.playingOldKeyframeIndex != i {
+                            if si < bottomNodes.count {
+                                bottomNodes[si]
+                                = bottomSheetView.animationView.elementViews[i].node.clone
+                            }
+                            bottomSheetView.playingOldKeyframeIndex = i
                         }
-                        bottomSheetView.playingOldKeyframeIndex = i
+                    } else if si < bottomNodes.count {
+                        bottomNodes[si] = .init()
+                        bottomSheetView.playingOldKeyframeIndex = nil
                     }
                 }
                 children += bottomNodes
@@ -2066,11 +2079,16 @@ final class SheetView: BindableView, @unchecked Sendable {
                 bottomNodes = []
             }
             
-            let i = sheetView.model.animation.index(atSec: playingSec - sheetView.model.animation.secRange.start)
-            if playingOldKeyframeIndex != i {
-                let node = sheetView.animationView.elementViews[i].node
-                centerNode = playingSheetIndex == 0 ? node : node.clone
-                playingOldKeyframeIndex = i
+            let i = sheetView.model.animation.indexInBeatRange(atSec: playingSec)
+            if let i {
+                if playingOldKeyframeIndex != i {
+                    let node = sheetView.animationView.elementViews[i].node
+                    centerNode = playingSheetIndex == 0 ? node : node.clone
+                    playingOldKeyframeIndex = i
+                }
+            } else {
+                centerNode = nil
+                playingOldKeyframeIndex = nil
             }
             if let centerNode {
                 children.append(centerNode)
@@ -2079,13 +2097,18 @@ final class SheetView: BindableView, @unchecked Sendable {
             if !sheetView.topSheetViews.isEmpty {
                 for (si, topSheetViewE) in sheetView.topSheetViews.enumerated() {
                     guard let topSheetView = topSheetViewE.element else { continue }
-                    let i = topSheetView.model.animation.index(atSec: playingSec - topSheetView.model.animation.secRange.start)
-                    if topSheetView.playingOldKeyframeIndex != i {
-                        if si < topNodes.count {
-                            topNodes[si]
-                            = topSheetView.animationView.elementViews[i].node.clone
+                    let i = topSheetView.model.animation.indexInBeatRange(atSec: playingSec)
+                    if let i {
+                        if topSheetView.playingOldKeyframeIndex != i {
+                            if si < topNodes.count {
+                                topNodes[si]
+                                = topSheetView.animationView.elementViews[i].node.clone
+                            }
+                            topSheetView.playingOldKeyframeIndex = i
                         }
-                        topSheetView.playingOldKeyframeIndex = i
+                    } else if si < topNodes.count {
+                        topNodes[si] = .init()
+                        topSheetView.playingOldKeyframeIndex = nil
                     }
                 }
                 children += topNodes
@@ -2135,7 +2158,7 @@ final class SheetView: BindableView, @unchecked Sendable {
             return sheetView
         } else if playingSheetIndex > 0, playingSheetIndex <= nextSheetViews.count,
             let sheetView = nextSheetViews[playingSheetIndex - 1].element {
-        
+            
             return sheetView
         } else {
             return self
@@ -2146,11 +2169,10 @@ final class SheetView: BindableView, @unchecked Sendable {
         if sequencer != nil, let beganPlaySec {
             let ddSec = beganPlaySec.duration(to: .now).sec
             let dSec = Rational(ddSec, intervalScale: .init(1, 60))
-            let preDurSecs = previousSheetViews.map { $0.element?.model.allEndSec ?? 0 }
+            let preDurSecs = previousSheetViews.map { $0.element?.mainDurSec ?? 0 }
             let preDurSec = preDurSecs.sum()
-            let mainDurSec = model.allEndSec
             guard mainDurSec > 0 else { return }
-            let nextDurSecs = nextSheetViews.map { $0.element?.model.allEndSec ?? 0 }
+            let nextDurSecs = nextSheetViews.map { $0.element?.mainDurSec ?? 0 }
             let nexrDurSec = nextDurSecs.sum()
             let oldPlayingSheetIndex = playingSheetIndex
             if preDurSec == 0 && nexrDurSec == 0 {
@@ -2169,7 +2191,7 @@ final class SheetView: BindableView, @unchecked Sendable {
                         }
                     } else if i < 0 {
                         let durSec = preDurSecs[preDurSecs.count - (-i - 1) - 1]
-                        sec += preDurSec
+                        sec += durSec
                         if nSec < sec && durSec > 0 {
                             nPlayingSec = (nSec - oldSec) % durSec
                             break
@@ -2212,7 +2234,7 @@ final class SheetView: BindableView, @unchecked Sendable {
         let nSec = willPlaySec + 1 / playingFrameRate
         
         let sheetView = playingSheetView
-        let maxSec = playingSecRange != nil ? playingSecRange!.end : sheetView.model.allEndSec
+        let maxSec = playingSecRange != nil ? playingSecRange!.end : sheetView.mainDurSec
         if nSec >= maxSec {
             let oldPlayingSheetIndex = playingSheetIndex
             

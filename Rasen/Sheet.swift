@@ -1848,6 +1848,10 @@ extension Animation: BeatRangeType {
     func index(atSec sec: Rational) -> Int {
         index(atRootBeat: beat(fromSec: sec) - beatRange.start)
     }
+    func indexInBeatRange(atSec sec: Rational) -> Int? {
+        let beat = beat(fromSec: sec)
+        return beatRange.contains(beat) ? index(atRootBeat: beat - beatRange.start) : nil
+    }
     func indexAndInternalBeat(atRootBeat beat: Rational) -> (index: Int, internalBeat: Rational)? {
         let beat = localBeat(atRootBeat: beat)
         guard !keyframes.isEmpty else { return nil }

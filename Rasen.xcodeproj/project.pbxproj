@@ -20,6 +20,8 @@
 		234F2A522382798A00107A1D /* VersionAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 234F2A512382798A00107A1D /* VersionAction.swift */; };
 		2359E7AC2CCB996500925D48 /* IOAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2359E7AB2CCB996500925D48 /* IOAction.swift */; };
 		235BF0CC21771B0F00EEFABE /* Shaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = 235BF0CB21771B0F00EEFABE /* Shaders.metal */; };
+		235F1FE72E29292A00D8BF58 /* NotoSansSymbols-Medium.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 235F1FE52E29292A00D8BF58 /* NotoSansSymbols-Medium.ttf */; };
+		235F1FE82E29292A00D8BF58 /* NotoSansSymbols2-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 235F1FE62E29292A00D8BF58 /* NotoSansSymbols2-Regular.ttf */; };
 		236195A42B7C7EBB00CF0B2F /* ScoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 236195A32B7C7EBB00CF0B2F /* ScoreView.swift */; };
 		236195A62B7C7EC500CF0B2F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 236195A52B7C7EC500CF0B2F /* ContentView.swift */; };
 		2362827021905D1E0080C224 /* Arc.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2362826F21905D1E0080C224 /* Arc.swift */; };
@@ -102,6 +104,8 @@
 		234F2A512382798A00107A1D /* VersionAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VersionAction.swift; sourceTree = "<group>"; };
 		2359E7AB2CCB996500925D48 /* IOAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOAction.swift; sourceTree = "<group>"; };
 		235BF0CB21771B0F00EEFABE /* Shaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = Shaders.metal; sourceTree = "<group>"; };
+		235F1FE52E29292A00D8BF58 /* NotoSansSymbols-Medium.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "NotoSansSymbols-Medium.ttf"; sourceTree = "<group>"; };
+		235F1FE62E29292A00D8BF58 /* NotoSansSymbols2-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "NotoSansSymbols2-Regular.ttf"; sourceTree = "<group>"; };
 		236195A32B7C7EBB00CF0B2F /* ScoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScoreView.swift; sourceTree = "<group>"; };
 		236195A52B7C7EC500CF0B2F /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		2362826F21905D1E0080C224 /* Arc.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Arc.swift; sourceTree = "<group>"; };
@@ -191,6 +195,8 @@
 				23C5B4122B903EB60081127C /* GensenJP-Medium.otf */,
 				23C5B4112B903EB50081127C /* GensenKR-Medium.otf */,
 				23C5B4132B903EB60081127C /* GensenTW-Medium.otf */,
+				235F1FE52E29292A00D8BF58 /* NotoSansSymbols-Medium.ttf */,
+				235F1FE62E29292A00D8BF58 /* NotoSansSymbols2-Regular.ttf */,
 			);
 			path = Fonts;
 			sourceTree = "<group>";
@@ -333,7 +339,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastSwiftUpdateCheck = 1000;
-				LastUpgradeCheck = 1500;
+				LastUpgradeCheck = 1640;
 				ORGANIZATIONNAME = Cii;
 				TargetAttributes = {
 					23A72872216CF1B5000A7350 = {
@@ -378,6 +384,8 @@
 				2331701521F439DF008F21D6 /* InfoPlist.strings in Resources */,
 				23C5B4152B903EB60081127C /* GensenHK-Medium.otf in Resources */,
 				23C5B4172B903EB60081127C /* GensenJP-Medium.otf in Resources */,
+				235F1FE72E29292A00D8BF58 /* NotoSansSymbols-Medium.ttf in Resources */,
+				235F1FE82E29292A00D8BF58 /* NotoSansSymbols2-Regular.ttf in Resources */,
 				23C5B4182B903EB60081127C /* GensenTW-Medium.otf in Resources */,
 				2321DCF121AD1B5400F8B5C5 /* Localizable.strings in Resources */,
 				23C5B4162B903EB60081127C /* GensenKR-Medium.otf in Resources */,
@@ -525,6 +533,7 @@
 				COPY_PHASE_STRIP = NO;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 5E525WVLU9;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -607,6 +616,7 @@
 				COPY_PHASE_STRIP = NO;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 5E525WVLU9;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -654,7 +664,6 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 0.5.0;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = 5E525WVLU9;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GCC_OPTIMIZATION_LEVEL = 3;
 				GCC_PREPROCESSOR_DEFINITIONS = (
@@ -705,7 +714,6 @@
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 0.5.0;
 				DEAD_CODE_STRIPPING = YES;
-				DEVELOPMENT_TEAM = 5E525WVLU9;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"ACCELERATE_NEW_LAPACK=1",

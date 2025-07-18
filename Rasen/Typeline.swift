@@ -78,12 +78,14 @@ struct Font {
     static let hkName = "GensenHK-Medium"
     static let krName = "GensenKR-Medium"
     static let twName = "GensenTW-Medium"
+    static let symbolsName = "NotoSansSymbols-Medium"
+    static let symbols2Name = "NotoSansSymbols2-Regular"
     static let defaultName = jpName
-    static let defaultCascadeNames = [jpName, cnName, hkName, krName, twName]
-    static let cnCascadeNames = [cnName, jpName, hkName, krName, twName]
-    static let hkCascadeNames = [hkName, jpName, cnName, krName, twName]
-    static let krCascadeNames = [krName, jpName, cnName, hkName, twName]
-    static let twCascadeNames = [twName, jpName, cnName, hkName, krName]
+    static let defaultCascadeNames = [jpName, cnName, hkName, krName, twName, symbolsName, symbols2Name]
+    static let cnCascadeNames = [cnName, jpName, hkName, krName, twName, symbolsName, symbols2Name]
+    static let hkCascadeNames = [hkName, jpName, cnName, krName, twName, symbolsName, symbols2Name]
+    static let krCascadeNames = [krName, jpName, cnName, hkName, twName, symbolsName, symbols2Name]
+    static let twCascadeNames = [twName, jpName, cnName, hkName, krName, symbolsName, symbols2Name]
     
     static let smallSize = 8.0
     static let defaultSize = 12.0
@@ -311,18 +313,8 @@ extension Typesetter {
         }
         
         let attributes = typobute.attributes()
-        if str.contains(where: { ":;ー〜〰０１２３４５６７８９".contains($0) }) {
-            var sFont = typobute.font
-            sFont.size = typobute.font.size * 3 / 4
-            
-            var superSet = attributes
-            superSet[.ctBaselineOffset] = typobute.font.xHeight * 0.9
-            superSet[.ctFont] = sFont.ctFont
-            
-            var subSet = attributes
-            subSet[.ctBaselineOffset] = -typobute.font.size * 0.25
-            subSet[.ctFont] = sFont.ctFont
-            
+        let isSuperOrSub = str.contains(where: { $0.isSubscript || $0.isSuperscript })
+        if str.contains(where: { ":;ー〜〰０１２３４５６７８９".contains($0) }) || isSuperOrSub {
             let attributedString = NSMutableAttributedString()
             attributedString.beginEditing()
             
@@ -333,9 +325,43 @@ extension Typesetter {
                 endWaveDash()
                 endWavyDash()
                 guard !tempStr.isEmpty else { return }
-                attributedString
-                    .append(NSAttributedString(string: tempStr.nsBased,
-                                               attributes: attributes))
+                
+                if isSuperOrSub {
+                    var sFont = typobute.font
+                    sFont.size = typobute.font.size * 3 / 5
+                    
+                    var superSet = attributes
+                    superSet[.ctBaselineOffset] = typobute.font.xHeight * 0.8
+                    superSet[.ctFont] = sFont.ctFont
+                    
+                    var subSet = attributes
+                    subSet[.ctBaselineOffset] = -typobute.font.size * 0.25
+                    subSet[.ctFont] = sFont.ctFont
+                    
+                    for c in tempStr {
+                        if let nc = c.fromSubscript,
+                           !Character.subscriptsInFont.contains(c) {
+
+                            attributedString
+                                .append(NSAttributedString(string: String(nc).nsBased,
+                                                           attributes: subSet))
+                        } else if let nc = c.fromSuperscript,
+                                  !Character.superscriptsInFont.contains(c) {
+                            attributedString
+                                .append(NSAttributedString(string: String(nc).nsBased,
+                                                           attributes: superSet))
+                        } else {
+                            attributedString
+                                .append(NSAttributedString(string: String(c).nsBased,
+                                                           attributes: attributes))
+                        }
+                    }
+                } else {
+                    attributedString
+                        .append(NSAttributedString(string: tempStr.nsBased,
+                                                   attributes: attributes))
+                }
+                
                 tempStr = ""
                 numberCount = 0
             }

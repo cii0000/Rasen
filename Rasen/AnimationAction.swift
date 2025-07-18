@@ -486,8 +486,8 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
                                 var cBeat = roundedSBeat
                                 while cBeat < beatRange.end {
                                     if cBeat >= beatRange.start {
-                                        if bws[cBeat] == nil {
-                                            bws[cBeat] = 0.125 * 50
+                                        if bws[cBeat - beatRange.start] == nil {
+                                            bws[cBeat - beatRange.start] = 0.125 * 50
                                         }
                                     }
                                     cBeat += deltaBeat
@@ -700,7 +700,7 @@ final class PlayAction: InputKeyEventAction {
                         psvs.append(.init(element: ncSheetView))
                         ncShp = preShp
                     }
-                    cSheetView.previousSheetViews = psvs
+                    cSheetView.previousSheetViews = psvs.reversed()
                     
                     ncShp = cShp
                     var nsvs = [WeakElement<SheetView>]()

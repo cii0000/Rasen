@@ -193,6 +193,8 @@ extension Character {
         "7": "⁷",
         "8": "⁸",
         "9": "⁹",
+        "(": "⁽",
+        ")": "⁾",
     ]
     static let fromSuperscriptDic = toSuperscriptDic.swap()
     static let toSubscriptDic: [Character: Character] = [
@@ -206,8 +208,19 @@ extension Character {
         "7": "₇",
         "8": "₈",
         "9": "₉",
+        "(": "₍",
+        ")": "₎",
     ]
     static let fromSubscriptDic = toSubscriptDic.swap()
+    
+    static let superscriptsInFont: Set<Character> = [
+        "¹",
+        "²",
+        "³",
+        "⁴",
+    ]
+    static let subscriptsInFont: Set<Character> = [
+    ]
     
     var isSuperscript: Bool {
         fromSuperscript != nil
