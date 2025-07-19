@@ -2144,7 +2144,10 @@ extension TempoType {
         / ii
     }
     func count(fromBeat beat: Rational, frameRate: Int) -> Int {
-        Int(Double(beat) * 60 / Double(tempo) * Double(frameRate))
+        Int(Double(beat * 60 / tempo * .init(frameRate)))
+    }
+    func count(fromSec sec: Rational, frameRate: Int) -> Int {
+        Int(Double(sec * .init(frameRate)))
     }
 }
 protocol BeatRangeType: TempoType {
@@ -2181,10 +2184,11 @@ struct Audiotrack {
         }
     }
     var values = [Value]()
+    var durSec: Rational?
 }
 extension Audiotrack {
-    var durSec: Rational {
-        values.reduce(0) { max($0, $1.secRange.upperBound) }
+    var allDurSec: Rational {
+        max(values.reduce(0) { max($0, $1.secRange.upperBound) }, durSec ?? 0)
     }
     static func + (lhs: Self, rhs: Self) -> Self {
         .init(values: lhs.values + rhs.values)

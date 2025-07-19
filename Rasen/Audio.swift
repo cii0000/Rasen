@@ -964,7 +964,7 @@ final class Sequencer {
         
         var tracks = [Track]()
         for audiotrack in audiotracks {
-            let durSec = audiotrack.durSec
+            let durSec = audiotrack.allDurSec
             guard durSec > 0 else { continue }
             
             var track = Track()

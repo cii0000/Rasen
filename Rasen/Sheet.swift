@@ -1845,6 +1845,9 @@ extension Animation: BeatRangeType {
     func index(atRootBeat rootBeat: Rational) -> Int {
         index(atRoot: rootIndex(atRootBeat: rootBeat))
     }
+    func indexInBeatRange(atRootBeat beat: Rational) -> Int? {
+        beatRange.contains(beat) ? index(atRootBeat: beat - beatRange.start) : nil
+    }
     func index(atSec sec: Rational) -> Int {
         index(atRootBeat: beat(fromSec: sec) - beatRange.start)
     }
@@ -2052,8 +2055,11 @@ extension Animation: BeatRangeType {
         guard let i = index(atBeat: beat) else { return Keyframe() }
         return keyframes[i]
     }
-    func keyframe(atRootBeat rootBeat: Rational) -> Keyframe {
-        keyframes[index(atRootBeat: rootBeat)]
+    func keyframe(atRootBeat rootBeat: Rational) -> Keyframe? {
+        if let i = indexInBeatRange(atRootBeat: rootBeat) { keyframes[i] } else { nil }
+    }
+    func keyframe(atSec sec: Rational) -> Keyframe? {
+        if let i = indexInBeatRange(atSec: sec) { keyframes[i] } else { nil }
     }
     func keyframe(atRoot rootI: Int) -> Keyframe {
         keyframes[index(atRootBeat: rootBeat(atRoot: rootI))]
@@ -2388,11 +2394,13 @@ extension Sheet {
              attitude: attitude,
              in: bounds)
     }
-    func node(isBorder: Bool, atRootBeat rootBeat: Rational,
+    func node(isBorder: Bool, atSec sec: Rational,
               renderingCaptionFrame: Rect? = nil,
               isBackground: Bool = true,
               attitude: Attitude = .init(),
               in bounds: Rect) -> CPUNode {
+        let rootBeat = animation.beat(fromSec: sec)
+        
         let captionNodes: [CPUNode]
         if let renderingCaptionFrame = renderingCaptionFrame,
            let caption = captions.first(where: { $0.beatRange.contains(rootBeat) }) {
@@ -2403,7 +2411,7 @@ extension Sheet {
         
         let k = animation.keyframe(atRootBeat: rootBeat)
         return node(isBorder: isBorder, captionNodes: captionNodes,
-                    picture: k.picture, draftPicture: k.draftPicture,
+                    picture: k?.picture ?? .init(), draftPicture: k?.draftPicture ?? .init(),
                     isBackground: isBackground,
                     attitude: attitude,
                     in: bounds)

@@ -1121,16 +1121,17 @@ final class IOAction: Action {
                 for rendering in renderings {
                     if let sheet = rendering.mainItem.decodedSheet() {
                         let ot = t
-                        var beat = Rational(0)
+                        var sec = Rational(0)
                         for (i, _) in sheet.animation.keyframes.enumerated() {
-                            let node = sheet.node(isBorder: false, atRootBeat: beat,
+                            let node = sheet.node(isBorder: false, atSec: sec,
                                                   attitude: .init(position: rendering.mainItem.frame.origin),
                                                   in: rendering.bounds)
                             let durBeat = sheet.animation.rendableKeyframeDurBeat(at: i)
+                            let durSec = sheet.animation.sec(fromBeat: durBeat)
                             if let image = node.renderedAntialiasFillImage(in: rendering.bounds, to: size, colorSpace) {
-                                images.append((image, sheet.animation.sec(fromBeat: durBeat)))
+                                images.append((image, durSec))
                             }
-                            beat += durBeat
+                            sec += durSec
                             let d = Double(i) / Double(sheet.animation.keyframes.count - 1)
                             t = ot + d / Double(allC)
                             progressHandler(t, &isStop)
@@ -1201,20 +1202,24 @@ final class IOAction: Action {
                 let movie = try Movie(url: ioResult.url, renderSize: size, isAlphaChannel: isAlphaChannel,
                                       isLinearPCM: is4K, colorSpace)
                 var isStop = false, t = 0.0
+                var durSecs = [Rational]()
                 for rendering in renderings {
                     if let sheet = rendering.mainItem.decodedSheet() {
                         var frameRate = sheet.mainFrameRate
                         var bottomSheets = [(sheet: Sheet, bounds: Rect)]()
+                        var maxEndSec: Rational = 0
                         for item in rendering.bottomItems {
-                            guard let sheet = item.decodedSheet(), sheet.enabledAnimation else { break }
+                            guard let sheet = item.decodedSheet(), sheet.enabledTimeline else { break }
                             frameRate = max(frameRate, sheet.mainFrameRate)
                             bottomSheets.append((sheet, item.frame.bounds))
+                            maxEndSec = max(sheet.allEndSec, maxEndSec)
                         }
                         var topSheets = [(sheet: Sheet, bounds: Rect)] ()
                         for item in rendering.topItems {
-                            guard let sheet = item.decodedSheet(), sheet.enabledAnimation else { break }
+                            guard let sheet = item.decodedSheet(), sheet.enabledTimeline else { break }
                             frameRate = max(frameRate, sheet.mainFrameRate)
                             topSheets.append((sheet, item.frame.bounds))
+                            maxEndSec = max(sheet.allEndSec, maxEndSec)
                         }
                         
                         let sheetBounds = rendering.mainItem.frame.bounds
@@ -1222,31 +1227,31 @@ final class IOAction: Action {
                         let ot = t
                         let b = isMainFrame ? (sheet.mainFrame ?? rendering.bounds) : rendering.bounds
                         
-                        let allDurBeat = sheet.allEndBeat
-                        let durSec = sheet.animation.sec(fromBeat: allDurBeat == 0 ? 1 : allDurBeat)
-                        let frameCount = sheet.animation.count(fromBeat: allDurBeat == 0 ? 1 : allDurBeat,
+                        maxEndSec = max(sheet.allEndSec, maxEndSec)
+                    
+                        durSecs.append(maxEndSec)
+                        let frameCount = sheet.animation.count(fromSec: maxEndSec,
                                                                frameRate: frameRate)
                         
                         movie.writeMovie(frameCount: frameCount,
-                                         duration: durSec,
+                                         duration: maxEndSec,
                                          frameRate: frameRate) { (sec) -> (Image?) in
                             //tempo -> startTime
-                            let beat = sheet.animation.beat(fromSec: sec)
                             let node: CPUNode
                             if !bottomSheets.isEmpty || !topSheets.isEmpty {
                                 var children = [CPUNode]()
                                 for (bottomSheet, sheetBounds) in bottomSheets.reversed() {
-                                    children.append(bottomSheet.node(isBorder: false, atRootBeat: beat,
+                                    children.append(bottomSheet.node(isBorder: false, atSec: sec,
                                                                      renderingCaptionFrame: b,
                                                                      isBackground: false,
                                                                      in: sheetBounds))
                                 }
-                                children.append(sheet.node(isBorder: false, atRootBeat: beat,
+                                children.append(sheet.node(isBorder: false, atSec: sec,
                                                            renderingCaptionFrame: b,
                                                            isBackground: false,
                                                            in: sheetBounds))
                                 for (topSheet, sheetBounds) in topSheets {
-                                    children.append(topSheet.node(isBorder: false, atRootBeat: beat,
+                                    children.append(topSheet.node(isBorder: false, atSec: sec,
                                                                   renderingCaptionFrame: b,
                                                                   isBackground: false,
                                                                   in: sheetBounds))
@@ -1254,7 +1259,7 @@ final class IOAction: Action {
                                 node = CPUNode(children: children, attitude: .init(position: origin),
                                                path: Path(sheetBounds))
                             } else {
-                                node = sheet.node(isBorder: false, atRootBeat: beat,
+                                node = sheet.node(isBorder: false, atSec: sec,
                                                   renderingCaptionFrame: b,
                                                   attitude: .init(position: origin),
                                                   in: sheetBounds)
@@ -1271,10 +1276,10 @@ final class IOAction: Action {
                     } else {
                         let ot = t
                         let node = CPUNode(path: Path(rendering.bounds), fillType: .color(.background))
+                        let duration = Animation.sec(fromBeat: Keyframe.defaultDurBeat,
+                                                    tempo: Music.defaultTempo)
                         if let image = node.image(in: rendering.bounds, size: size,
                                                   backgroundColor: .background, colorSpace) {
-                            let duration = Animation.sec(fromBeat: Keyframe.defaultDurBeat,
-                                                        tempo: Music.defaultTempo)
                             let frameCount = Animation.count(fromBeat: Keyframe.defaultDurBeat,
                                                          tempo: Music.defaultTempo,
                                                          frameRate: 24)
@@ -1290,6 +1295,7 @@ final class IOAction: Action {
                                 }
                             }
                         }
+                        durSecs.append(duration)
                     }
                     
                     if isStop { break }
@@ -1299,6 +1305,8 @@ final class IOAction: Action {
                 
                 if !isStop {
                     for (i, rendering) in renderings.enumerated() {
+                        let durSec = durSecs[i]
+                        
                         var audiotrack: Audiotrack?
                         if let sheet = rendering.mainItem.decodedSheet() {
                             audiotrack += sheet.audiotrack
@@ -1311,6 +1319,7 @@ final class IOAction: Action {
                             guard let sheet = item.decodedSheet(), sheet.enabledTimeline else { break }
                             audiotrack += sheet.audiotrack
                         }
+                        audiotrack?.durSec = durSec
                         if let audiotrack {
                             audiotracks.append(audiotrack)
                         }
