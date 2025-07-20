@@ -1564,6 +1564,15 @@ struct PBAnimationOption: Sendable {
   /// Clears the value of `beatRange`. Subsequent reads from it will return its default value.
   mutating func clearBeatRange() {self._beatRange = nil}
 
+  var loopDurBeat: PBRational {
+    get {return _loopDurBeat ?? PBRational()}
+    set {_loopDurBeat = newValue}
+  }
+  /// Returns true if `loopDurBeat` has been explicitly set.
+  var hasLoopDurBeat: Bool {return self._loopDurBeat != nil}
+  /// Clears the value of `loopDurBeat`. Subsequent reads from it will return its default value.
+  mutating func clearLoopDurBeat() {self._loopDurBeat = nil}
+
   var tempo: PBRational {
     get {return _tempo ?? PBRational()}
     set {_tempo = newValue}
@@ -1582,6 +1591,7 @@ struct PBAnimationOption: Sendable {
   init() {}
 
   fileprivate var _beatRange: PBRationalRange? = nil
+  fileprivate var _loopDurBeat: PBRational? = nil
   fileprivate var _tempo: PBRational? = nil
 }
 
@@ -1621,6 +1631,15 @@ struct PBAnimation: @unchecked Sendable {
   var hasBeatRange: Bool {return _storage._beatRange != nil}
   /// Clears the value of `beatRange`. Subsequent reads from it will return its default value.
   mutating func clearBeatRange() {_uniqueStorage()._beatRange = nil}
+
+  var loopDurBeat: PBRational {
+    get {return _storage._loopDurBeat ?? PBRational()}
+    set {_uniqueStorage()._loopDurBeat = newValue}
+  }
+  /// Returns true if `loopDurBeat` has been explicitly set.
+  var hasLoopDurBeat: Bool {return _storage._loopDurBeat != nil}
+  /// Clears the value of `loopDurBeat`. Subsequent reads from it will return its default value.
+  mutating func clearLoopDurBeat() {_uniqueStorage()._loopDurBeat = nil}
 
   var tempo: PBRational {
     get {return _storage._tempo ?? PBRational()}
@@ -5862,6 +5881,7 @@ extension PBAnimationOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   static let protoMessageName: String = "PBAnimationOption"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "beatRange"),
+    5: .same(proto: "loopDurBeat"),
     2: .same(proto: "tempo"),
     3: .same(proto: "timelineY"),
     4: .same(proto: "enabled"),
@@ -5877,6 +5897,7 @@ extension PBAnimationOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
       case 2: try { try decoder.decodeSingularMessageField(value: &self._tempo) }()
       case 3: try { try decoder.decodeSingularDoubleField(value: &self.timelineY) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self.enabled) }()
+      case 5: try { try decoder.decodeSingularMessageField(value: &self._loopDurBeat) }()
       default: break
       }
     }
@@ -5899,11 +5920,15 @@ extension PBAnimationOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     if self.enabled != false {
       try visitor.visitSingularBoolField(value: self.enabled, fieldNumber: 4)
     }
+    try { if let v = self._loopDurBeat {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: PBAnimationOption, rhs: PBAnimationOption) -> Bool {
     if lhs._beatRange != rhs._beatRange {return false}
+    if lhs._loopDurBeat != rhs._loopDurBeat {return false}
     if lhs._tempo != rhs._tempo {return false}
     if lhs.timelineY != rhs.timelineY {return false}
     if lhs.enabled != rhs.enabled {return false}
@@ -5919,6 +5944,7 @@ extension PBAnimation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
     8: .same(proto: "zipper"),
     2: .same(proto: "rootBeat"),
     3: .same(proto: "beatRange"),
+    9: .same(proto: "loopDurBeat"),
     4: .same(proto: "tempo"),
     5: .same(proto: "isPlaying"),
     6: .same(proto: "timelineY"),
@@ -5930,6 +5956,7 @@ extension PBAnimation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
     var _zipper: PBAnimationZipper? = nil
     var _rootBeat: PBRational? = nil
     var _beatRange: PBRationalRange? = nil
+    var _loopDurBeat: PBRational? = nil
     var _tempo: PBRational? = nil
     var _isPlaying: Bool = false
     var _timelineY: Double = 0
@@ -5952,6 +5979,7 @@ extension PBAnimation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
       _zipper = source._zipper
       _rootBeat = source._rootBeat
       _beatRange = source._beatRange
+      _loopDurBeat = source._loopDurBeat
       _tempo = source._tempo
       _isPlaying = source._isPlaying
       _timelineY = source._timelineY
@@ -5982,6 +6010,7 @@ extension PBAnimation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
         case 6: try { try decoder.decodeSingularDoubleField(value: &_storage._timelineY) }()
         case 7: try { try decoder.decodeSingularBoolField(value: &_storage._enabled) }()
         case 8: try { try decoder.decodeSingularMessageField(value: &_storage._zipper) }()
+        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._loopDurBeat) }()
         default: break
         }
       }
@@ -6018,6 +6047,9 @@ extension PBAnimation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
       try { if let v = _storage._zipper {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
       } }()
+      try { if let v = _storage._loopDurBeat {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -6031,6 +6063,7 @@ extension PBAnimation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
         if _storage._zipper != rhs_storage._zipper {return false}
         if _storage._rootBeat != rhs_storage._rootBeat {return false}
         if _storage._beatRange != rhs_storage._beatRange {return false}
+        if _storage._loopDurBeat != rhs_storage._loopDurBeat {return false}
         if _storage._tempo != rhs_storage._tempo {return false}
         if _storage._isPlaying != rhs_storage._isPlaying {return false}
         if _storage._timelineY != rhs_storage._timelineY {return false}

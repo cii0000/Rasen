@@ -1563,7 +1563,8 @@ final class PastableAction: Action {
     }
     
     private var oldScale: Double?, firstRotation = 0.0,
-                oldSnapP: Point?, oldFillSnapP: Point?, beganPitch = Rational(0),
+                oldSnapP: Point?, oldFillSnapP: Point?,
+                beganPitch = Rational(0), beganBeat = Rational(0),
                 octaveNode: Node?, beganNotes = [Int: Note](), beganSheetView: SheetView?,
                 textNode: Node?, imageNode: Node?, textFrame: Rect?, textScale = 1.0
     var snapDistance = 1.0
@@ -1998,11 +1999,13 @@ final class PastableAction: Action {
             let scoreP = scoreView.convertFromWorld(p)
             let pitchInterval = rootView.currentPitchInterval
             let pitch = scoreView.pitch(atY: scoreP.y, interval: pitchInterval)
+            - Score.pitchRange.start
             let beatInterval = rootView.currentBeatInterval
             let beat = scoreView.beat(atX: scoreP.x, interval: beatInterval)
             
             if phase == .began {
                 beganPitch = pitch
+                beganBeat = beat
                 
                 sheetView.newUndoGroup()
                 if !sheetView.scoreView.model.enabled {
@@ -2014,15 +2017,13 @@ final class PastableAction: Action {
                 let count = scoreView.model.notes.count
                 beganNotes = notes.enumerated().reduce(into: .init()) {
                     var note = $1.element
+                    note.pitch += pitch
+                    note.beatRange.start += beat
                     note.id = .init()
                     $0[count + $1.offset] = note
                 }
                 
-                var notes = beganNotes.sorted(by: { $0.key < $1.key }).map { $0.value }
-                for j in 0 ..< notes.count {
-                    notes[j].pitch += pitch - Score.pitchRange.start
-                    notes[j].beatRange.start += beat
-                }
+                let notes = beganNotes.sorted(by: { $0.key < $1.key }).map { $0.value }
                 sheetView.append(notes)
                 
                 let octaveNode = scoreView.octaveNode(noteIs: Array(count ..< count + notes.count))
@@ -2056,8 +2057,9 @@ final class PastableAction: Action {
             } else {
                 var notes = beganNotes.sorted(by: { $0.key < $1.key }).map { $0.value }
                 for j in 0 ..< notes.count {
-                    notes[j].pitch += pitch - Score.pitchRange.start
-                    notes[j].beatRange.start += beat
+                    notes[j].pitch += pitch - beganPitch
+                    notes[j].beatRange.start += beat - beganBeat
+                    notes[j].id = .init()
                 }
                 scoreView.replace(notes.enumerated().map { .init(value: $0.element, index: $0.offset + scoreView.model.notes.count - notes.count) })
                 

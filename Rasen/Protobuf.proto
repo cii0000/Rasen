@@ -326,6 +326,7 @@ message PBAnimationZipper {
 
 message PBAnimationOption {
     PBRationalRange beatRange = 1;
+    PBRational loopDurBeat = 5;
     PBRational tempo = 2;
     double timelineY = 3;
     bool enabled = 4;
@@ -335,6 +336,7 @@ message PBAnimation {
     PBAnimationZipper zipper = 8;
     PBRational rootBeat = 2;
     PBRationalRange beatRange = 3;
+    PBRational loopDurBeat = 9;
     PBRational tempo = 4;
     bool isPlaying = 5;
     double timelineY = 6;

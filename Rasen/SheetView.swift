@@ -571,7 +571,7 @@ final class AnimationView: TimelineView, @unchecked Sendable {
     func updateTimeline() {
         if model.enabled {
             let btsx = x(atBeat: model.beatRange.lowerBound) - paddingWidth
-            let btex = x(atBeat: model.beatRange.upperBound) + paddingWidth
+            let btex = x(atBeat: model.endLoopDurBeat) + paddingWidth
             paddingTimelineBounds = Rect(x: btsx, y: -paddingTimelineHeight / 2,
                                          width: btex - btsx,
                                          height: paddingTimelineHeight)
@@ -598,7 +598,7 @@ final class AnimationView: TimelineView, @unchecked Sendable {
     }
     let paddingTimelineHeight = Sheet.timelineY * 2, interpolatedKnobHeight = 6.0, paddingWidth = 5.0
     func timelineNodes() -> [Node] {
-        let beatRange = model.beatRange
+        let beatRange = model.beatRange, loopDurBeat = model.loopDurBeat
         let sBeat = max(beatRange.start, -10000),
             eBeat = min(beatRange.end, 10000)
         let sx = x(atBeat: sBeat), ex = x(atBeat: eBeat)
@@ -621,7 +621,7 @@ final class AnimationView: TimelineView, @unchecked Sendable {
         contentPathlines.append(.init(Rect(x: sx, y: centerY - lw / 2,
                                            width: w, height: lw)))
         
-        makeBeatPathlines(in: beatRange, sy: sy, ey: ey,
+        makeBeatPathlines(in: beatRange.start ..< beatRange.end + loopDurBeat, sy: sy, ey: ey,
                           subBorderPathlines: &subBorderPathlines,
                           fullEditBorderPathlines: &fullEditBorderPathlines,
                           borderPathlines: &borderPathlines)
@@ -679,9 +679,40 @@ final class AnimationView: TimelineView, @unchecked Sendable {
         }
         let kx = ex
         let nKnobW = eBeat % Sheet.beatInterval == 0 ? knobW : knobW / 2
+        let eKnobMinY = centerY - knobH / 2 - 1
         contentPathlines.append(.init(Rect(x: kx - nKnobW / 2,
-                                           y: centerY - knobH / 2 - 1,
+                                           y: eKnobMinY,
                                            width: nKnobW, height: knobH + 2)))
+        
+        let loopKnobH = 4.0
+        if loopDurBeat > 0 {
+            let neBeat = eBeat + loopDurBeat
+            let lkx = x(atBeat: neBeat)
+            let nKnobW = neBeat % Sheet.beatInterval == 0 ? knobW : knobW / 2
+            contentPathlines.append(.init(Rect(x: lkx - nKnobW / 2,
+                                               y: eKnobMinY,
+                                               width: nKnobW, height: ey + loopKnobH - eKnobMinY)))
+            contentPathlines.append(.init(Rect(x: ex, y: ey - lw / 2,
+                                               width: lkx - ex, height: lw)))
+            contentPathlines.append(.init(Rect(x: ex, y: centerY - lw / 2,
+                                               width: lkx - ex, height: lw)))
+            var beat = eBeat
+            loop: while beat < neBeat {
+                for keyframe in model.keyframes {
+                    let nBeat = keyframe.beat + beat
+                    guard nBeat < neBeat else { break loop }
+                    let kx = x(atBeat: nBeat)
+                    contentPathlines.append(.init(Rect(x: kx - 0.5,
+                                                       y: centerY - 2,
+                                                       width: 1, height: 4)))
+                }
+                beat += beatRange.length
+            }
+        } else {
+            contentPathlines.append(.init(Rect(x: kx - nKnobW / 2,
+                                               y: ey - loopKnobH / 2,
+                                               width: knobW, height: loopKnobH)))
+        }
         
         if isSelected {
             let d = knobH / 2
@@ -1068,11 +1099,24 @@ final class AnimationView: TimelineView, @unchecked Sendable {
         model.localBeatRange
     }
     
+    var endLoopDurBeat: Rational? {
+        get { model.endLoopDurBeat }
+        set {
+            guard let newValue else { return }
+            binder[keyPath: keyPath].endLoopDurBeat = newValue
+            updateTimeline()
+        }
+    }
+    
     func isStartBeat(at p: Point, scale: Double) -> Bool {
         abs(p.x - x(atBeat: model.beatRange.start)) < 10.0 * scale
     }
     func isEndBeat(at p: Point, scale: Double) -> Bool {
         abs(p.x - x(atBeat: model.beatRange.end)) < 10.0 * scale
+    }
+    func isLoopDurBeat(at p: Point, scale: Double) -> Bool {
+        p.y > timelineY + Sheet.timelineHalfHeight - 3
+        && abs(p.x - x(atBeat: model.endLoopDurBeat)) < 10.0 * scale
     }
     
     func tempoPositionBeat(_ p: Point, scale: Double) -> Rational? {
@@ -1143,10 +1187,10 @@ final class SheetView: BindableView, @unchecked Sendable {
                                 keyPath: keyPath.appending(path: \Model.borders))
         
         node = Node(children: [opacityNode,
-                               scoreView.node,
                                contentsView.node,
                                animationView.node,
                                animationView.previousNextNode,
+                               scoreView.node,
                                textsView.node,
                                bordersView.node,
                                animationView.timelineNode,
@@ -1752,7 +1796,7 @@ final class SheetView: BindableView, @unchecked Sendable {
     var bottomSheetViews = [WeakElement<SheetView>]()
     var topSheetViews = [WeakElement<SheetView>]()
     private var bottomNodes = [Node](), centerNode: Node?, topNodes = [Node]()
-    private var timeNode: Node?
+    private var timeNode: Node?, musicBackgroundNode: Node?
     private(set) var sequencer: Sequencer?
     private var firstSec: Rational?
     private var willPlaySec: Rational?, playingOtherTimelineIDs = Set<UUID>()
@@ -1892,6 +1936,10 @@ final class SheetView: BindableView, @unchecked Sendable {
                                                       startSec: 0,
                                                       durSec: mainDurSec))
                 seqTracks.append(seqTrack)
+                
+                if model.enabledMusic {
+                    musicBackgroundNode = Node(path: .init(bounds), fillType: .color(.subRemoving))
+                }
             }
             
             let mainSec = model.animation.sec(fromBeat: beat)
@@ -1997,6 +2045,7 @@ final class SheetView: BindableView, @unchecked Sendable {
             bottomNodes = []
             centerNode = nil
             topNodes = []
+            musicBackgroundNode = nil
 //            playingCaptions = []
 //            playingCaption = nil
 //            linesView.node.isHidden = false
@@ -2114,6 +2163,10 @@ final class SheetView: BindableView, @unchecked Sendable {
                 children += topNodes
             } else {
                 topNodes = []
+            }
+            
+            if let musicBackgroundNode {
+                children += [musicBackgroundNode]
             }
             
             if !children.isEmpty {
@@ -5201,7 +5254,7 @@ final class SheetView: BindableView, @unchecked Sendable {
                 let oldNIVS = nivs.map { IndexValue(value: model.score.notes[$0.index],
                                                     index: $0.index) }
                 if oldNIVS != nivs {
-                    print("InsertNotesUndoError", model.score.notes.count, oldNIVS, nivs)
+                    print("InsertNotesUndoError", model.score.notes.count, oldNIVS.count, nivs.count, oldNIVS, nivs)
                     history[result.version].values[result.valueIndex]
                         .saveUndoItemValue?.set(.insertNotes(oldNIVS), type: reversedType)
                 }

@@ -1560,6 +1560,7 @@ extension Keyframe: Protobuf {
 
 struct AnimationOption {
     var beatRange = Music.defaultBeatRange
+    var loopDurBeat: Rational = 0
     var tempo = Music.defaultTempo
     var timelineY = Sheet.timelineY
     var enabled = false
@@ -1567,6 +1568,7 @@ struct AnimationOption {
 extension AnimationOption: Protobuf {
     init(_ pb: PBAnimationOption) throws {
         beatRange = (try? RationalRange(pb.beatRange).value) ?? Music.defaultBeatRange
+        loopDurBeat = (try? Rational(pb.loopDurBeat)) ?? 0
         tempo = (try? Rational(pb.tempo))?.clipped(Music.tempoRange) ?? Music.defaultTempo
         timelineY = pb.timelineY
         enabled = pb.enabled
@@ -1574,6 +1576,7 @@ extension AnimationOption: Protobuf {
     var pb: PBAnimationOption {
         .with {
             $0.beatRange = RationalRange(value: beatRange).pb
+            $0.loopDurBeat = loopDurBeat.pb
             $0.tempo = tempo.pb
             $0.timelineY = timelineY
             $0.enabled = enabled
@@ -1581,6 +1584,11 @@ extension AnimationOption: Protobuf {
     }
 }
 extension AnimationOption: Hashable, Codable {}
+extension AnimationOption {
+    var endLoopDurBeat: Rational {
+        beatRange.end + loopDurBeat
+    }
+}
 
 struct KeyframeKey {
     var lineIs = [Int](), planeIs = [Int]()
@@ -1643,6 +1651,7 @@ struct Animation {
     private(set) var index = 0
     
     var beatRange = Music.defaultBeatRange
+    var loopDurBeat: Rational = 0
     var tempo = Music.defaultTempo
     var timelineY = Sheet.timelineY
     var enabled = false
@@ -1650,6 +1659,7 @@ struct Animation {
     init(keyframes: [Keyframe] = [],
          rootBeat: Rational = 0,
          beatRange: Range<Rational> = Music.defaultBeatRange,
+         loopDurBeat: Rational = 0,
          tempo: Rational = Music.defaultTempo,
          timelineY: Double = Sheet.timelineY,
          enabled: Bool = false) {
@@ -1657,6 +1667,7 @@ struct Animation {
         self.keyframes = keyframes
         self.rootBeat = rootBeat
         self.beatRange = beatRange
+        self.loopDurBeat = loopDurBeat
         self.tempo = tempo
         self.timelineY = timelineY
         self.enabled = enabled
@@ -1700,6 +1711,7 @@ extension Animation: Protobuf {
         
         rootBeat = (try? Rational(pb.rootBeat)) ?? 0
         beatRange = (try? RationalRange(pb.beatRange).value) ?? Music.defaultBeatRange
+        loopDurBeat = (try? Rational(pb.loopDurBeat)) ?? 0
         tempo = (try? Rational(pb.tempo))?.clipped(Music.tempoRange) ?? Music.defaultTempo
         timelineY = pb.timelineY.clipped(min: Sheet.timelineY,
                                          max: Sheet.height - Sheet.timelineY)
@@ -1775,6 +1787,7 @@ extension Animation: Protobuf {
             
             $0.rootBeat = rootBeat.pb
             $0.beatRange = RationalRange(value: beatRange).pb
+            $0.loopDurBeat = loopDurBeat.pb
             $0.tempo = tempo.pb
             $0.timelineY = timelineY
             $0.enabled = enabled
@@ -1788,6 +1801,18 @@ extension Animation: BeatRangeType {
     
     var mainBeat: Rational {
         rootBeat.loop(0 ..< localDurBeat) + beatRange.start
+    }
+    
+    var endLoopDurBeat: Rational {
+        get {
+            beatRange.end + loopDurBeat
+        }
+        set {
+            loopDurBeat = max(0, newValue - beatRange.end)
+        }
+    }
+    var loopDurSec: Rational {
+        sec(fromBeat: loopDurBeat)
     }
     
     var localDurBeat: Rational {
@@ -1846,14 +1871,18 @@ extension Animation: BeatRangeType {
         index(atRoot: rootIndex(atRootBeat: rootBeat))
     }
     func indexInBeatRange(atRootBeat beat: Rational) -> Int? {
-        beatRange.contains(beat) ? index(atRootBeat: beat - beatRange.start) : nil
+        if loopDurBeat > 0 && beatRange.length > 0 {
+            if (beatRange.end ..< (beatRange.end + loopDurBeat)).contains(beat) {
+                return index(atRootBeat: (beat - beatRange.end).mod(beatRange.length))
+            }
+        }
+        return beatRange.contains(beat) ? index(atRootBeat: beat - beatRange.start) : nil
     }
     func index(atSec sec: Rational) -> Int {
         index(atRootBeat: beat(fromSec: sec) - beatRange.start)
     }
     func indexInBeatRange(atSec sec: Rational) -> Int? {
-        let beat = beat(fromSec: sec)
-        return beatRange.contains(beat) ? index(atRootBeat: beat - beatRange.start) : nil
+        indexInBeatRange(atRootBeat: beat(fromSec: sec))
     }
     func indexAndInternalBeat(atRootBeat beat: Rational) -> (index: Int, internalBeat: Rational)? {
         let beat = localBeat(atRootBeat: beat)
@@ -1914,7 +1943,7 @@ extension Animation: BeatRangeType {
         return nBeat > halfBeat ? rootI + 1 : rootI
     }
     var rootIndex: Int {
-        get { loopIndex(atRootBeat: rootBeat) * keyframes.count + index }
+        get { rootLoopIndex(atRootBeat: rootBeat) * keyframes.count + index }
         set {
             rootBeat = self.rootBeat(atRoot: newValue)
             let index = index(atRoot: newValue)
@@ -1950,16 +1979,16 @@ extension Animation: BeatRangeType {
         }
     }
     
-    var loopIndex: Int {
-        loopIndex(atRoot: rootIndex)
+    var rootLoopIndex: Int {
+        rootLoopIndex(atRoot: rootIndex)
     }
-    func loopIndex(atRoot rootI: Int) -> Int {
+    func rootLoopIndex(atRoot rootI: Int) -> Int {
         rootI.divFloor(keyframes.count)
     }
-    func loopIndex(atRootBeat rootBeat: Rational) -> Int {
-        loopIndex(atRoot: rootIndex(atRootBeat: rootBeat))
+    func rootLoopIndex(atRootBeat rootBeat: Rational) -> Int {
+        rootLoopIndex(atRoot: rootIndex(atRootBeat: rootBeat))
     }
-    func loopIndexBeat(atLoop loopI: Int) -> Rational {
+    func rootLoopIndexBeat(atRootLoop loopI: Int) -> Rational {
         localDurBeat * Rational(loopI)
     }
     
@@ -1970,7 +1999,7 @@ extension Animation: BeatRangeType {
         get {
             .init(internalBeat: internalBeat,
                   index: index,
-                  loopIndex: loopIndex(atRoot: rootIndex))
+                  loopIndex: rootLoopIndex(atRoot: rootIndex))
         }
         set {
             rootBeat = rootBeat(at: newValue)
@@ -1982,7 +2011,7 @@ extension Animation: BeatRangeType {
     func rootBeat(at rootBeatIndex: RootBeatIndex) -> Rational {
         rootBeatIndex.internalBeat
         + localBeat(at: rootBeatIndex.index)
-        + loopIndexBeat(atLoop: rootBeatIndex.loopIndex)
+        + rootLoopIndexBeat(atRootLoop: rootBeatIndex.loopIndex)
     }
     
     struct RootBeatPosition: Hashable, Codable {
@@ -1990,7 +2019,7 @@ extension Animation: BeatRangeType {
     }
     var rootBeatPosition: RootBeatPosition {
         get {
-            .init(beat: localBeat, loopIndex: loopIndex(atRoot: rootIndex))
+            .init(beat: localBeat, loopIndex: rootLoopIndex(atRoot: rootIndex))
         }
         set {
             rootBeat = rootBeat(at: newValue)
@@ -2000,7 +2029,7 @@ extension Animation: BeatRangeType {
         (index(atBeat: rootBP.beat) ?? 0) + rootBeatIndex.loopIndex * keyframes.count
     }
     func rootBeat(at rootBP: RootBeatPosition) -> Rational {
-        rootBP.beat + loopIndexBeat(atLoop: rootBP.loopIndex)
+        rootBP.beat + rootLoopIndexBeat(atRootLoop: rootBP.loopIndex)
     }
     
     var interIndexes: [Int] {
@@ -2095,11 +2124,12 @@ extension Animation: BeatRangeType {
 extension Animation {
     var option: AnimationOption {
         get {
-            .init(beatRange: beatRange, tempo: tempo,
+            .init(beatRange: beatRange, loopDurBeat: loopDurBeat, tempo: tempo,
                   timelineY: timelineY, enabled: enabled)
         }
         set {
             beatRange = newValue.beatRange
+            loopDurBeat = newValue.loopDurBeat
             tempo = newValue.tempo
             timelineY = newValue.timelineY
             enabled = newValue.enabled
@@ -2461,10 +2491,10 @@ extension Sheet {
     }
     
     var animationEndBeat: Rational {
-        animation.enabled ? animation.beatRange.end : 0
+        animation.enabled ? animation.beatRange.end + animation.loopDurBeat : 0
     }
     var animationEndSec: Rational {
-        animation.enabled ? animation.secRange.end : 0
+        animation.enabled ? animation.secRange.end + animation.loopDurSec : 0
     }
     
     var musicEndBeat: Rational {

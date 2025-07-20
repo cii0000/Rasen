@@ -503,7 +503,7 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
                                         break
                                     }
                                 }
-                                var nRootBeat = animation.loopIndexBeat(atLoop: animation.loopIndex(atRootBeat: beganRootBeat))
+                                var nRootBeat = animation.rootLoopIndexBeat(atRootLoop: animation.rootLoopIndex(atRootBeat: beganRootBeat))
                                 + beatAndWidths[bwI].key
                                 var x = beatAndWidths[bwI].value / 2
                                 

@@ -276,7 +276,7 @@ final class MoveAnimationAction: DragEventAction {
     }
     
     enum SlideType {
-        case key, all, startBeat, endBeat, none
+        case key, all, startBeat, endBeat, loopDurBeat, none
     }
     
     private let indexInterval = 10.0
@@ -317,7 +317,15 @@ final class MoveAnimationAction: DragEventAction {
                 if sheetView.animationView.containsTimeline(inP, scale: rootView.screenToWorldScale) {
                     let animationView = sheetView.animationView
                     
-                    if animationView.isEndBeat(at: inP, scale: rootView.screenToWorldScale) {
+                    if animationView.isLoopDurBeat(at: inP, scale: rootView.screenToWorldScale) {
+                        type = .loopDurBeat
+                        
+                        beganAnimationOption = sheetView.model.animation.option
+                        beganBeatX = animationView.x(atBeat: sheetView.model.animation.endLoopDurBeat)
+                        
+                        rootView.cursor = rootView.cursor(from: sheetView.timeString(fromBeat: sheetView.model.animation.endLoopDurBeat),
+                                                          isArrow: true)
+                    } else if animationView.isEndBeat(at: inP, scale: rootView.screenToWorldScale) {
                         type = .endBeat
                         
                         beganAnimationOption = sheetView.model.animation.option
@@ -410,6 +418,22 @@ final class MoveAnimationAction: DragEventAction {
                         rootView.cursor = rootView.cursor(from: sheetView.timeString(fromBeat: sheetView.model.animation.beatRange.end),
                                                           isArrow: true)
                     }
+                case .loopDurBeat:
+                    if let beganAnimationOption {
+                        let interval = rootView.currentBeatInterval
+                        let nBeat = animationView.beat(atX: beganBeatX + sheetP.x - beganSheetP.x,
+                                                       interval: interval)
+                        if nBeat != animationView.endLoopDurBeat {
+                            let dBeat = nBeat - beganAnimationOption.endLoopDurBeat
+                            let startBeat = sheetView.animationView.beat(atX: Sheet.textPadding.width, interval: interval)
+                            let nkBeat = max(beganAnimationOption.endLoopDurBeat + dBeat, startBeat)
+                            
+                            animationView.endLoopDurBeat = nkBeat
+                        }
+                        
+                        rootView.cursor = rootView.cursor(from: sheetView.timeString(fromBeat: sheetView.model.animation.endLoopDurBeat),
+                                                          isArrow: true)
+                    }
                 case .key:
                     let interval = rootView.currentKeyframeBeatInterval
                     let durBeat = animationView.model.beatRange.length
@@ -467,7 +491,7 @@ final class MoveAnimationAction: DragEventAction {
                     }
                 }
                 switch type {
-                case .all, .startBeat, .endBeat:
+                case .all, .startBeat, .endBeat, .loopDurBeat:
                     if let beganAnimationOption, sheetView.model.animation.option != beganAnimationOption {
                         updateUndoGroup()
                         sheetView.capture(option: sheetView.model.animation.option,
