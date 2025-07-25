@@ -530,7 +530,7 @@ final class MoveScoreAction: DragEventAction {
     }
     
     enum SlideType {
-        case keyBeats, allBeat, endBeat, isShownSpectrogram, scale,
+        case keyBeats, allBeat, endBeat, loopDurBeat, isShownSpectrogram, scale,
              startNoteBeat, endNoteBeat, note,
              pit, mid,
              even, sprol, spectlopeHeight
@@ -952,6 +952,14 @@ final class MoveScoreAction: DragEventAction {
                     type = .isShownSpectrogram
                     
                     beganScoreOption = scoreView.model.option
+                } else if scoreView.isLoopDurBeat(at: scoreP, scale: rootView.screenToWorldScale) {
+                    type = .loopDurBeat
+                    
+                    beganScoreOption = sheetView.model.score.option
+                    beganBeatX = scoreView.x(atBeat: sheetView.model.score.endLoopDurBeat)
+                    
+                    rootView.cursor = rootView.cursor(from: sheetView.timeString(fromBeat: sheetView.model.score.endLoopDurBeat),
+                                                      isArrow: true)
                 } else if abs(scoreP.x - scoreView.x(atBeat: score.beatRange.end)) < rootView.worldKnobEditDistance
                             && abs(scoreP.y - scoreView.timelineCenterY) < Sheet.timelineHalfHeight {
                     type = .endBeat
@@ -1230,6 +1238,22 @@ final class MoveScoreAction: DragEventAction {
                         scoreView.option = option
                         rootView.updateSelects()
                     }
+                case .loopDurBeat:
+                    if let beganScoreOption {
+                        let interval = rootView.currentBeatInterval
+                        let nBeat = scoreView.beat(atX: beganBeatX + sheetP.x - beganSheetP.x,
+                                                   interval: interval)
+                        if nBeat != scoreView.endLoopDurBeat {
+                            let dBeat = nBeat - beganScoreOption.endLoopDurBeat
+                            let startBeat = sheetView.scoreView.beat(atX: Sheet.textPadding.width, interval: interval)
+                            let nkBeat = max(beganScoreOption.endLoopDurBeat + dBeat, startBeat)
+                            
+                            scoreView.endLoopDurBeat = nkBeat
+                        }
+                        
+                        rootView.cursor = rootView.cursor(from: sheetView.timeString(fromBeat: sheetView.model.score.endLoopDurBeat),
+                                                          isArrow: true)
+                    }
                 case .endBeat:
                     if let beganScoreOption {
                         let interval = rootView.currentBeatInterval
@@ -1429,6 +1453,7 @@ final class MoveScoreAction: DragEventAction {
             
             if let sheetView {
                 if type == .keyBeats || type == .scale
+                    || type == .loopDurBeat
                     || type == .endBeat || type == .isShownSpectrogram {
                     
                     sheetView.updatePlaying()
@@ -2153,10 +2178,15 @@ final class MoveLineAction: DragEventAction {
         isEditingSheet = rootView.isEditingSheet
     }
     
+    enum MoveType {
+        case point, warp, all
+    }
+    
     private var sheetView: SheetView?, lineIndex = 0, pointIndex = 0
     private var beganLine = Line(), beganMainP = Point(), beganSheetP = Point(), isPressure = false
     private var pressures = [(time: Double, pressure: Double)]()
     private var node = Node()
+    private var type = MoveType.point
     
     func flow(with event: DragEvent) {
         guard isEditingSheet else {
@@ -2179,8 +2209,7 @@ final class MoveLineAction: DragEventAction {
                 let sheetP = sheetView.convertFromWorld(p)
                 
                 if let (lineView, li) = sheetView.lineTuple(at: sheetP,
-                                                                   isSmall: false,
-                                                                   scale: rootView.screenToWorldScale),
+                                                            scale: rootView.screenToWorldScale),
                           let pi = lineView.model.mainPointSequence.nearestIndex(at: sheetP) {
                     
                     self.sheetView = sheetView
@@ -2189,18 +2218,30 @@ final class MoveLineAction: DragEventAction {
                     pointIndex = pi
                     beganMainP = beganLine.mainPoint(at: pi)
                     beganSheetP = sheetP
+                    
+                    let d = beganLine.minDistanceSquared(at: sheetP).squareRoot()
+                    type = if d < beganLine.size + 1 * rootView.screenToWorldScale {
+                        .point
+                    } else if d < beganLine.size + 20 * rootView.screenToWorldScale {
+                        .warp
+                    } else {
+                        .all
+                    }
+                    
                     let pressure = event.pressure
                         .clipped(min: 0.4, max: 1, newMin: 0, newMax: 1)
                     pressures.append((event.time, pressure))
                     
-                    node.children = beganLine.mainPointSequence.flatMap {
-                        let p = sheetView.convertToWorld($0)
-                        return [Node(path: .init(circleRadius: 0.25 * 1.5 * beganLine.size, position: p),
-                                     fillType: .color(.content)),
-                                Node(path: .init(circleRadius: 0.25 * beganLine.size, position: p),
-                                     fillType: .color(.background))]
+                    if type == .point {
+                        node.children = beganLine.mainPointSequence.flatMap {
+                            let p = sheetView.convertToWorld($0)
+                            return [Node(path: .init(circleRadius: 0.35 * 1.5 * beganLine.size, position: p),
+                                         fillType: .color(.content)),
+                                    Node(path: .init(circleRadius: 0.35 * beganLine.size, position: p),
+                                         fillType: .color(.background))]
+                        }
+                        rootView.node.append(child: node)
                     }
-                    rootView.node.append(child: node)
                 }
             }
         case .changed:
@@ -2208,36 +2249,55 @@ final class MoveLineAction: DragEventAction {
                 if lineIndex < sheetView.linesView.elementViews.count {
                     let lineView = sheetView.linesView.elementViews[lineIndex]
                     
-                    var line = lineView.model
-                    if pointIndex < line.mainPointCount {
-                        let inP = sheetView.convertFromWorld(p)
-                        let op = inP - beganSheetP + beganMainP
-                        let np = line.mainPoint(withMainCenterPoint: op,
-                                                at: pointIndex)
-                        let pressure = event.pressure
-                            .clipped(min: 0.4, max: 1, newMin: 0, newMax: 1)
-                        pressures.append((event.time, pressure))
-                        
-                        line.controls[pointIndex].point = np
-                        
-                        if isPressure || (!isPressure && (event.time - (pressures.first?.time ?? 0) > 1 && (pressures.allSatisfy { $0.pressure <= 0.5 }))) {
-                            isPressure = true
+                    switch type {
+                    case .point:
+                        var line = lineView.model
+                        if pointIndex < line.mainPointCount {
+                            let sheetP = sheetView.convertFromWorld(p)
+                            let op = sheetP - beganSheetP + beganMainP
+                            let np = line.mainPoint(withMainCenterPoint: op,
+                                                    at: pointIndex)
+                            let pressure = event.pressure
+                                .clipped(min: 0.4, max: 1, newMin: 0, newMax: 1)
+                            pressures.append((event.time, pressure))
                             
-                            let nPressures = pressures
-                                .filter { (0.04 ..< 0.4).contains(event.time - $0.time) }
-                            let nPressure = nPressures.mean { $0.pressure } ?? pressures.first!.pressure
-                            line.controls[pointIndex].pressure = nPressure
+                            line.controls[pointIndex].point = np
+                            
+                            if isPressure || (!isPressure && (event.time - (pressures.first?.time ?? 0) > 1 && (pressures.allSatisfy { $0.pressure <= 0.5 }))) {
+                                isPressure = true
+                                
+                                let nPressures = pressures
+                                    .filter { (0.04 ..< 0.4).contains(event.time - $0.time) }
+                                let nPressure = nPressures.mean { $0.pressure } ?? pressures.first!.pressure
+                                line.controls[pointIndex].pressure = nPressure
+                            }
+                            
+                            lineView.model = line
+                            
+                            node.children = line.mainPointSequence.flatMap {
+                                let p = sheetView.convertToWorld($0)
+                                return [Node(path: .init(circleRadius: 0.35 * 1.5 * line.size, position: p),
+                                             fillType: .color(.content)),
+                                        Node(path: .init(circleRadius: 0.35 * line.size, position: p),
+                                             fillType: .color(.background))]
+                            }
                         }
-                        
+                    case .warp:
+                        var line = beganLine
+                        let sheetP = sheetView.convertFromWorld(p)
+                        let dp = sheetP - beganSheetP
+                        line = line.warpedWith(deltaPoint: dp, at: pointIndex)
                         lineView.model = line
-                        
-                        node.children = line.mainPointSequence.flatMap {
-                            let p = sheetView.convertToWorld($0)
-                            return [Node(path: .init(circleRadius: 0.25 * 1.5 * line.size, position: p),
-                                         fillType: .color(.content)),
-                                    Node(path: .init(circleRadius: 0.25 * line.size, position: p),
-                                         fillType: .color(.background))]
+                    case .all:
+                        var line = beganLine
+                        let sheetP = sheetView.convertFromWorld(p)
+                        let dp = sheetP - beganSheetP
+                        line.controls = line.controls.map {
+                            var n = $0
+                            n.point += dp
+                            return n
                         }
+                        lineView.model = line
                     }
                 }
             }
@@ -2294,7 +2354,6 @@ final class MoveLineZAction: DragEventAction {
             if let sheetView = rootView.sheetView(at: p) {
                 let inP = sheetView.convertFromWorld(p)
                 if let (lineView, li) = sheetView.lineTuple(at: inP,
-                                                            isSmall: false,
                                                             scale: rootView.screenToWorldScale) {
                     
                     self.sheetView = sheetView

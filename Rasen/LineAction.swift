@@ -1176,7 +1176,7 @@ final class LineAction: Action {
             phase: Phase
     }
     private var drawLineTimer: (any DispatchSourceTimer)?
-    private var  oldDrawLineEventsCount = 0
+    private var  oldDrawLineEventsCount = 0, beganTime = 0.0
     private var drawLineEvents = [DrawLineEvent](), drawLineEventsCount = 0, snapLines = [Line]()
     var textView: SheetTextView?
     private(set) var beganLineColor: Color?, beganSheetID: UUID?, beganAnimationRootIndex = 0
@@ -1198,6 +1198,8 @@ final class LineAction: Action {
             
             let sheetView = rootView.sheetView(at: centerSHP)
             snapLines = sheetView?.model.picture.lines ?? []
+            
+            beganTime = event.time
             
             if let sheetView, sheetView.model.enabledAnimation {
                 beganSheetID = sheetView.id
@@ -1275,7 +1277,9 @@ final class LineAction: Action {
                                      clipBounds: clipBounds,
                                      isStraight: isStraight).line
             
-            guard let lb = tempLine.bounds else {
+            guard !(tempLine.length() * rootView.worldToScreenScale < (event.isTablet ? 0.1 : 0.5) &&
+                  event.time - beganTime < 1),
+                  let lb = tempLine.bounds else {
                 tempLineNode?.removeFromParent()
                 tempLineNode = nil
                 if isStraight {

@@ -802,7 +802,7 @@ final class PastableAction: Action {
             selectingLineNode.lineWidth = rootView.worldLineWidth
             selectingLineNode.path = Path(textView.convertToWorld(tf))
         } else if let sheetView = rootView.sheetView(at: p),
-                  let lineView = sheetView.lineTuple(at: sheetView.convertFromWorld(p),
+                  let lineView = sheetView.lineTuple(at: sheetView.convertFromWorld(p), isSmall: nil,
                                                      scale: 1 / rootView.worldToScreenScale)?.lineView {
             let t = Transform(translation: -sheetView.convertFromWorld(p))
             let ssv = SheetValue(lines: [lineView.model],
@@ -1173,8 +1173,7 @@ final class PastableAction: Action {
                 sheetView.insert([IndexValue(value: keyframe, index: 0)])
                 sheetView.removeKeyframes(at: indexes)
                 
-                var option = sheetView.model.animation.option
-                option.enabled = false
+                let option = AnimationOption(enabled: false)
                 sheetView.set(option)
                 
                 sheetView.rootKeyframeIndex = 0
@@ -1497,8 +1496,7 @@ final class PastableAction: Action {
                     return true
                 }
             } else if sheetView.scoreView.model.notes.isEmpty {
-                var option = sheetView.model.score.option
-                option.enabled = false
+                let option = ScoreOption(enabled: false)
                 sheetView.newUndoGroup()
                 sheetView.set(option)
                 return true

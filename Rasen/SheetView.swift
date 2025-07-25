@@ -685,13 +685,9 @@ final class AnimationView: TimelineView, @unchecked Sendable {
                                            width: nKnobW, height: knobH + 2)))
         
         let loopKnobH = 4.0
+        let neBeat = eBeat + loopDurBeat
+        let lkx = x(atBeat: neBeat)
         if loopDurBeat > 0 {
-            let neBeat = eBeat + loopDurBeat
-            let lkx = x(atBeat: neBeat)
-            let nKnobW = neBeat % Sheet.beatInterval == 0 ? knobW : knobW / 2
-            contentPathlines.append(.init(Rect(x: lkx - nKnobW / 2,
-                                               y: eKnobMinY,
-                                               width: nKnobW, height: ey + loopKnobH - eKnobMinY)))
             contentPathlines.append(.init(Rect(x: ex, y: ey - lw / 2,
                                                width: lkx - ex, height: lw)))
             contentPathlines.append(.init(Rect(x: ex, y: centerY - lw / 2,
@@ -708,11 +704,10 @@ final class AnimationView: TimelineView, @unchecked Sendable {
                 }
                 beat += beatRange.length
             }
-        } else {
-            contentPathlines.append(.init(Rect(x: kx - nKnobW / 2,
-                                               y: ey - loopKnobH / 2,
-                                               width: knobW, height: loopKnobH)))
         }
+        contentPathlines.append(.init(Rect(x: lkx - nKnobW / 2,
+                                           y: ey - loopKnobH / 2,
+                                           width: nKnobW, height: loopKnobH)))
         
         if isSelected {
             let d = knobH / 2
@@ -2617,7 +2612,7 @@ final class SheetView: BindableView, @unchecked Sendable {
                          removingUUColor: UUColor? = Line.defaultUUColor,
                          scale: Double) -> (isLine: Bool, value: SheetColorOwner) {
         if let (lineView, li) = lineTuple(at: p,
-                                          removingUUColor: removingUUColor,
+                                          isSmall: nil, removingUUColor: removingUUColor,
                                           scale: scale) {
             let uuColor = lineView.model.uuColor
             
@@ -6333,7 +6328,7 @@ final class SheetView: BindableView, @unchecked Sendable {
         return n
     }
     
-    func lineTuple(at p: Point, isSmall ois: Bool? = nil,
+    func lineTuple(at p: Point, isSmall ois: Bool? = false,
                    removingUUColor: UUColor? = nil,
                    scale: Double) -> (lineView: SheetLineView,
                                       lineIndex: Int)? {
@@ -6341,14 +6336,16 @@ final class SheetView: BindableView, @unchecked Sendable {
                                 enabledPreviousNext: false, scale: scale) else { return nil }
         return (v.lineView, v.lineI)
     }
-    func lineTuple(at p: Point, isSmall ois: Bool? = nil,
+    func lineTuple(at p: Point, isSmall ois: Bool? = false,
                    removingUUColor: UUColor? = nil,
                    enabledPreviousNext: Bool,
                    minEnabledDistance med: Double = 10,
                    scale: Double) -> (lineView: SheetLineView, lineI: Int, rootKeyframeI: Int)? {
+        let isNoneDefaultColorPlane = !model.picture.planes.isEmpty
+        && sheetColorOwnerFromPlane(at: p).uuColor != Sheet.defalutBackgroundUUColor
         let smallScale: Double? = if let ois {
             ois ? 2.0 : nil
-        } else if sheetColorOwnerFromPlane(at: p).uuColor != Sheet.defalutBackgroundUUColor {
+        } else if isNoneDefaultColorPlane {
             8.0
         } else if textTuple(at: p) != nil {
             2.0
@@ -6356,11 +6353,11 @@ final class SheetView: BindableView, @unchecked Sendable {
             nil
         }
         
-        let ds = Line.defaultLineWidth * 3 * scale
+        let ds = Line.defaultLineWidth * 6 * scale
         var minI: Int?, minRKI: Int?, minDSquared = Double.infinity
         func update(at i: Int, rki: Int, from line: Line) -> (lineView: SheetLineView, lineI: Int, rootKeyframeI: Int)? {
             guard line.uuColor != removingUUColor else { return nil }
-            if line.uuColor != Line.defaultUUColor && smallScale != nil {
+            if line.uuColor != Line.defaultUUColor && isNoneDefaultColorPlane {
                 if line.containsPressure(at: p) {
                     return (linesView.elementViews[i], i, rki)
                 }

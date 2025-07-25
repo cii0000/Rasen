@@ -435,6 +435,9 @@ struct ScoreTrackItem {
     var durSec = Rational(0) {
         didSet { isChanged = true }
     }
+    var loopDurSec = Rational(0) {
+        didSet { isChanged = true }
+    }
     let id = UUID()
     var isEnabledSamples = true
     
@@ -453,6 +456,7 @@ extension ScoreTrackItem {
         self.sampleRate = sampleRate
         self.startSec = startSec
         durSec = score.secRange.end
+        loopDurSec = score.sec(fromBeat: score.loopDurBeat)
         self.isEnabledSamples = isEnabledSamples
         if isUpdateNotewaveDic {
             isChanged = true
@@ -786,9 +790,10 @@ final class ScoreNoder: ObjectHashable {
                 
                 let beganPauseI = endSampleTime != nil ? Int(endSampleTime! - startSampleTime) + seqStartI : nil
                 
-                _ = {
-                    let scoreDurSec = Double(scoreTrackItem.durSec)
-                    let loopedNoteRange = Range(start: Int((startSec * sampleRate).rounded(.down)) - scoreTrackItem.sampleStartI,
+                let scoreDurSec = Double(scoreTrackItem.durSec + scoreTrackItem.loopDurSec)
+                
+                func make(dSampleI: Int) {
+                    let loopedNoteRange = Range(start: Int((startSec * sampleRate).rounded(.down)) - scoreTrackItem.sampleStartI + dSampleI,
                                                 length: scoreTrackItem.sampleCount)
                     if let beganPauseI, beganPauseI < loopedNoteRange.lowerBound + loopStartI { return }
                     
@@ -898,7 +903,17 @@ final class ScoreNoder: ObjectHashable {
                                playingReleaseStartSec: nextPlayingReleaseStartSec,
                                range: cNextLoopedNoteRange, startI: nextLoopedNoteRange.start)
                     }
-                } ()
+                }
+                if scoreTrackItem.loopDurSec > 0 {
+                    var sec: Rational = 0
+                    while sec < scoreTrackItem.durSec + scoreTrackItem.loopDurSec {
+                        let dSampleI = Int(((Double(sec) + startSec) * sampleRate).rounded(.down))
+                        make(dSampleI: dSampleI)
+                        sec += scoreTrackItem.durSec
+                    }
+                } else {
+                    make(dSampleI: 0)
+                }
             }
             
             if !contains {
@@ -928,7 +943,8 @@ final class Sequencer {
         var pcmTrackItems = [PCMTrackItem]()
         
         var durSec: Rational {
-            max(scoreTrackItems.maxValue { $0.durSec } ?? 0, pcmTrackItems.maxValue { $0.durSec } ?? 0)
+            max(scoreTrackItems.maxValue { $0.durSec + $0.loopDurSec } ?? 0,
+                pcmTrackItems.maxValue { $0.durSec } ?? 0)
         }
         
         static func + (lhs: Self, rhs: Self) -> Self {

@@ -262,6 +262,7 @@ struct ModifierKeys: OptionSet {
     static let option = ModifierKeys(rawValue: 1 << 2)
     static let command = ModifierKeys(rawValue: 1 << 3)
     static let function = ModifierKeys(rawValue: 1 << 4)
+    static let numericPad = ModifierKeys(rawValue: 1 << 5)
 }
 extension ModifierKeys: Hashable {}
 extension ModifierKeys {
@@ -281,6 +282,9 @@ extension ModifierKeys {
         }
         if contains(.command) {
             str.append("⌘")
+        }
+        if contains(.numericPad) {
+            str.append("🖩")
         }
         return str
     }
@@ -411,13 +415,14 @@ struct InputKeyEvent: Event {
 }
 
 struct DragEvent: Event {
-    var screenPoint: Point, time: Double, pressure: Double, phase: Phase
+    var screenPoint: Point, time: Double, pressure: Double, isTablet: Bool, phase: Phase
 }
 extension DragEvent {
     init(_ event: InputKeyEvent) {
         screenPoint = event.screenPoint
         time = event.time
         pressure = 1
+        isTablet = false
         phase = event.phase
     }
 }

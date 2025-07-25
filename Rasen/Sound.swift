@@ -1879,6 +1879,7 @@ extension Chord: CustomStringConvertible {
 
 struct ScoreOption {
     var beatRange = Music.defaultBeatRange
+    var loopDurBeat: Rational = 0
     var keyBeats: [Rational] = [4, 8, 12]
     var scales: [Rational] = [0, 2, 4, 5, 7, 9, 11]
     var tempo = Music.defaultTempo
@@ -1889,6 +1890,7 @@ struct ScoreOption {
 extension ScoreOption: Protobuf {
     init(_ pb: PBScoreOption) throws {
         beatRange = (try? RationalRange(pb.beatRange).value) ?? Music.defaultBeatRange
+        loopDurBeat = (try? Rational(pb.loopDurBeat)) ?? 0
         keyBeats = pb.keyBeats.compactMap { try? Rational($0) }
         scales = pb.scales.compactMap { try? Rational($0) }
         tempo = (try? Rational(pb.tempo))?.clipped(Music.tempoRange) ?? Music.defaultTempo
@@ -1900,6 +1902,7 @@ extension ScoreOption: Protobuf {
     var pb: PBScoreOption {
         .with {
             $0.beatRange = RationalRange(value: beatRange).pb
+            $0.loopDurBeat = loopDurBeat.pb
             $0.keyBeats = keyBeats.map { $0.pb }
             $0.scales = scales.map { $0.pb }
             if tempo != Music.defaultTempo {
@@ -1912,6 +1915,11 @@ extension ScoreOption: Protobuf {
     }
 }
 extension ScoreOption: Hashable, Codable {}
+extension ScoreOption {
+    var endLoopDurBeat: Rational {
+        beatRange.end + loopDurBeat
+    }
+}
 
 struct Score: BeatRangeType {
     static let minPitch = Rational(0, 12), maxPitch = Rational(10 * 12)
@@ -1924,6 +1932,7 @@ struct Score: BeatRangeType {
     var notes = [Note]()
     var draftNotes = [Note]()
     var beatRange = Music.defaultBeatRange
+    var loopDurBeat: Rational = 0
     var tempo = Music.defaultTempo
     var timelineY = Sheet.timelineY
     var keyBeats = [Rational]()
@@ -1937,6 +1946,7 @@ extension Score: Protobuf {
         notes = pb.notes.compactMap { try? Note($0) }
         draftNotes = pb.draftNotes.compactMap { try? Note($0) }
         beatRange = (try? RationalRange(pb.beatRange).value) ?? Music.defaultBeatRange
+        loopDurBeat = (try? Rational(pb.loopDurBeat)) ?? 0
         keyBeats = pb.keyBeats.compactMap { try? Rational($0) }
         scales = pb.scales.compactMap { try? Rational($0) }
         tempo = (try? Rational(pb.tempo))?.clipped(Music.tempoRange) ?? Music.defaultTempo
@@ -1951,6 +1961,7 @@ extension Score: Protobuf {
             $0.notes = notes.map { $0.pb }
             $0.draftNotes = draftNotes.map { $0.pb }
             $0.beatRange = RationalRange(value: beatRange).pb
+            $0.loopDurBeat = loopDurBeat.pb
             $0.keyBeats = keyBeats.map { $0.pb }
             $0.scales = scales.map { $0.pb }
             $0.tempo = tempo.pb
@@ -1974,6 +1985,22 @@ extension Score {
         let seq = Sequencer(audiotracks: [.init(values: [.score(self)])], type: .normal)
         return try? seq?.buffer(sampleRate: Audio.defaultSampleRate,
                                 progressHandler: { _, _ in })
+    }
+    
+    var endLoopDurBeat: Rational {
+        get {
+            beatRange.end + loopDurBeat
+        }
+        set {
+            loopDurBeat = max(0, newValue - beatRange.end)
+        }
+    }
+    var loopDurSec: Rational {
+        sec(fromBeat: loopDurBeat)
+    }
+    
+    var allBeatRange: Range<Rational> {
+        beatRange.start ..< (beatRange.end + loopDurBeat)
     }
     
     var musicScale: MusicScale? {
@@ -2060,13 +2087,15 @@ extension Score {
 extension Score {
     var option: ScoreOption {
         get {
-            .init(beatRange: beatRange, keyBeats: keyBeats, scales: scales,
+            .init(beatRange: beatRange, loopDurBeat: loopDurBeat,
+                  keyBeats: keyBeats, scales: scales,
                   tempo: tempo, timelineY: timelineY,
                   enabled: enabled,
                   isShownSpectrogram: isShownSpectrogram)
         }
         set {
             beatRange = newValue.beatRange
+            loopDurBeat = newValue.loopDurBeat
             keyBeats = newValue.keyBeats
             scales = newValue.scales
             tempo = newValue.tempo
@@ -2172,7 +2201,7 @@ struct Audiotrack {
         }
         var beatRange: Range<Rational> {
             switch self {
-            case .score(let score): score.beatRange
+            case .score(let score): score.allBeatRange
             case .sound(let content): content.timeOption?.beatRange ?? 0 ..< 0
             }
         }

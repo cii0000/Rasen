@@ -240,6 +240,7 @@ message PBNote {
 
 message PBScoreOption {
     PBRationalRange beatRange = 6;
+    PBRational loopDurBeat = 9;
     PBRational tempo = 2;
     double timelineY = 7;
     repeated PBRational keyBeats = 4;
@@ -251,6 +252,7 @@ message PBScore {
     repeated PBNote notes = 1;
     repeated PBNote draftNotes = 6;
     PBRationalRange beatRange = 9;
+    PBRational loopDurBeat = 12;
     PBRational tempo = 3;
     double timelineY = 10;
     repeated PBRational keyBeats = 7;

@@ -71,6 +71,12 @@ extension Size {
     var area: Double {
         width * height
     }
+    var minElement: Double {
+        min(width, height)
+    }
+    var maxElement: Double {
+        max(width, height)
+    }
     var diagonal: Double {
         .hypot(width, height)
     }

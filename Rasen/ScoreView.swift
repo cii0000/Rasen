@@ -356,6 +356,20 @@ extension ScoreView {
         model.localMaxBeatRange
     }
     
+    var endLoopDurBeat: Rational? {
+        get { model.endLoopDurBeat }
+        set {
+            guard let newValue else { return }
+            let oldDurBeat = model.endLoopDurBeat
+            binder[keyPath: keyPath].endLoopDurBeat = newValue
+            updateTimeline()
+            if oldDurBeat != newValue {
+                scoreTrackItem?.loopDurSec = model.sec(fromBeat: model.loopDurBeat)
+            }
+            scoreTrackItem?.changeTempo(with: model)
+        }
+    }
+    
     var pitchStartY: Double {
         timelineCenterY + Sheet.timelineHalfHeight + Sheet.isShownSpectrogramHeight
     }
@@ -525,13 +539,13 @@ extension ScoreView {
         var borderPathlines = [Pathline]()
         var fullEditBorderPathlines = [Pathline]()
         
-        makeBeatPathlines(in: score.beatRange, sy: sy, ey: ey,
+        makeBeatPathlines(in: score.allBeatRange, sy: sy, ey: ey,
                           subBorderBeats: Set(score.keyBeats),
                           subBorderPathlines: &subBorderPathlines,
                           fullEditBorderPathlines: &fullEditBorderPathlines,
                           borderPathlines: &borderPathlines)
         
-        makeBeatPathlines(in: score.beatRange, 
+        makeBeatPathlines(in: score.allBeatRange, 
                           sy: self.y(fromPitch: pitchRange.start),
                           ey: self.y(fromPitch: pitchRange.end),
                           subBorderBeats: Set(score.keyBeats),
@@ -582,13 +596,29 @@ extension ScoreView {
         
         for keyBeat in score.keyBeats {
             let nx = x(atBeat: keyBeat)
-            contentPathlines.append(.init(Rect(x: nx - knobW / 2, y: y - knobH / 2,
-                                               width: knobW, height: knobH)))
+            let nKnobW = keyBeat % Sheet.beatInterval == 0 ? knobW : knobW / 2
+            contentPathlines.append(.init(Rect(x: nx - nKnobW / 2, y: y - knobH / 2,
+                                               width: nKnobW, height: knobH)))
         }
-        contentPathlines.append(.init(Rect(x: ex - knobW / 2, y: y - knobH / 2,
-                                           width: knobW, height: knobH)))
+        let nKnobW = eBeat % Sheet.beatInterval == 0 ? knobW : knobW / 2
+        contentPathlines.append(.init(Rect(x: ex - nKnobW / 2, y: y - knobH / 2,
+                                           width: nKnobW, height: knobH)))
         contentPathlines.append(.init(Rect(x: sx, y: y - lw / 2,
                                            width: ex - sx, height: lw)))
+        
+        let loopKnobH = 4.0
+        let neBeat = eBeat + score.loopDurBeat
+        let lkx = x(atBeat: neBeat)
+        let nnKnobW = neBeat % Sheet.beatInterval == 0 ? knobW : knobW / 2
+        if score.loopDurBeat > 0 {
+            contentPathlines.append(.init(Rect(x: ex, y: ey - lw / 2,
+                                               width: lkx - ex, height: lw)))
+            contentPathlines.append(.init(Rect(x: ex, y: y - lw / 2,
+                                               width: lkx - ex, height: lw)))
+        }
+        contentPathlines.append(.init(Rect(x: lkx - nnKnobW / 2,
+                                           y: ey - loopKnobH / 2,
+                                           width: nnKnobW, height: loopKnobH)))
         
         let secRange = score.secRange
         for sec in Int(secRange.start.rounded(.up)) ..< Int(secRange.end.rounded(.up)) {
@@ -606,6 +636,7 @@ extension ScoreView {
                                               y: np.y + 1,
                                               width: 1,
                                               height: sprH - 2)))
+        
         if score.isShownSpectrogram {
             contentPathlines.append(Pathline(Rect(x: np.x - sprKnobW / 2,
                                                   y: np.y + sprH - 1 - sprKbobH / 2,
@@ -1843,7 +1874,7 @@ extension ScoreView {
     }
     var timelineFrame: Rect {
         let sx = self.x(atBeat: model.beatRange.start)
-        let ex = self.x(atBeat: model.beatRange.end)
+        let ex = self.x(atBeat: model.endLoopDurBeat)
         return Rect(x: sx, y: timelineCenterY - Sheet.timelineHalfHeight,
                     width: ex - sx, height: Sheet.timelineHalfHeight * 2)
     }
@@ -2871,6 +2902,10 @@ extension ScoreView {
             .contains(p)
     }
     
+    func isLoopDurBeat(at p: Point, scale: Double) -> Bool {
+        p.y > timelineCenterY + Sheet.timelineHalfHeight - 3
+        && abs(p.x - x(atBeat: model.endLoopDurBeat)) < 10.0 * scale
+    }
     func isShownSpectrogram(at p :Point) -> Bool {
         p.y > timelineCenterY + Sheet.timelineHalfHeight + Sheet.isShownSpectrogramHeight / 2
     }

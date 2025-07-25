@@ -1204,6 +1204,15 @@ struct PBScoreOption: Sendable {
   /// Clears the value of `beatRange`. Subsequent reads from it will return its default value.
   mutating func clearBeatRange() {self._beatRange = nil}
 
+  var loopDurBeat: PBRational {
+    get {return _loopDurBeat ?? PBRational()}
+    set {_loopDurBeat = newValue}
+  }
+  /// Returns true if `loopDurBeat` has been explicitly set.
+  var hasLoopDurBeat: Bool {return self._loopDurBeat != nil}
+  /// Clears the value of `loopDurBeat`. Subsequent reads from it will return its default value.
+  mutating func clearLoopDurBeat() {self._loopDurBeat = nil}
+
   var tempo: PBRational {
     get {return _tempo ?? PBRational()}
     set {_tempo = newValue}
@@ -1228,62 +1237,91 @@ struct PBScoreOption: Sendable {
   init() {}
 
   fileprivate var _beatRange: PBRationalRange? = nil
+  fileprivate var _loopDurBeat: PBRational? = nil
   fileprivate var _tempo: PBRational? = nil
 }
 
-struct PBScore: Sendable {
+struct PBScore: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
 
-  var notes: [PBNote] = []
+  var notes: [PBNote] {
+    get {return _storage._notes}
+    set {_uniqueStorage()._notes = newValue}
+  }
 
-  var draftNotes: [PBNote] = []
+  var draftNotes: [PBNote] {
+    get {return _storage._draftNotes}
+    set {_uniqueStorage()._draftNotes = newValue}
+  }
 
   var beatRange: PBRationalRange {
-    get {return _beatRange ?? PBRationalRange()}
-    set {_beatRange = newValue}
+    get {return _storage._beatRange ?? PBRationalRange()}
+    set {_uniqueStorage()._beatRange = newValue}
   }
   /// Returns true if `beatRange` has been explicitly set.
-  var hasBeatRange: Bool {return self._beatRange != nil}
+  var hasBeatRange: Bool {return _storage._beatRange != nil}
   /// Clears the value of `beatRange`. Subsequent reads from it will return its default value.
-  mutating func clearBeatRange() {self._beatRange = nil}
+  mutating func clearBeatRange() {_uniqueStorage()._beatRange = nil}
+
+  var loopDurBeat: PBRational {
+    get {return _storage._loopDurBeat ?? PBRational()}
+    set {_uniqueStorage()._loopDurBeat = newValue}
+  }
+  /// Returns true if `loopDurBeat` has been explicitly set.
+  var hasLoopDurBeat: Bool {return _storage._loopDurBeat != nil}
+  /// Clears the value of `loopDurBeat`. Subsequent reads from it will return its default value.
+  mutating func clearLoopDurBeat() {_uniqueStorage()._loopDurBeat = nil}
 
   var tempo: PBRational {
-    get {return _tempo ?? PBRational()}
-    set {_tempo = newValue}
+    get {return _storage._tempo ?? PBRational()}
+    set {_uniqueStorage()._tempo = newValue}
   }
   /// Returns true if `tempo` has been explicitly set.
-  var hasTempo: Bool {return self._tempo != nil}
+  var hasTempo: Bool {return _storage._tempo != nil}
   /// Clears the value of `tempo`. Subsequent reads from it will return its default value.
-  mutating func clearTempo() {self._tempo = nil}
+  mutating func clearTempo() {_uniqueStorage()._tempo = nil}
 
-  var timelineY: Double = 0
+  var timelineY: Double {
+    get {return _storage._timelineY}
+    set {_uniqueStorage()._timelineY = newValue}
+  }
 
-  var keyBeats: [PBRational] = []
+  var keyBeats: [PBRational] {
+    get {return _storage._keyBeats}
+    set {_uniqueStorage()._keyBeats = newValue}
+  }
 
-  var scales: [PBRational] = []
+  var scales: [PBRational] {
+    get {return _storage._scales}
+    set {_uniqueStorage()._scales = newValue}
+  }
 
-  var enabled: Bool = false
+  var enabled: Bool {
+    get {return _storage._enabled}
+    set {_uniqueStorage()._enabled = newValue}
+  }
 
-  var isShownSpectrogram: Bool = false
+  var isShownSpectrogram: Bool {
+    get {return _storage._isShownSpectrogram}
+    set {_uniqueStorage()._isShownSpectrogram = newValue}
+  }
 
   var id: PBUUID {
-    get {return _id ?? PBUUID()}
-    set {_id = newValue}
+    get {return _storage._id ?? PBUUID()}
+    set {_uniqueStorage()._id = newValue}
   }
   /// Returns true if `id` has been explicitly set.
-  var hasID: Bool {return self._id != nil}
+  var hasID: Bool {return _storage._id != nil}
   /// Clears the value of `id`. Subsequent reads from it will return its default value.
-  mutating func clearID() {self._id = nil}
+  mutating func clearID() {_uniqueStorage()._id = nil}
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
 
-  fileprivate var _beatRange: PBRationalRange? = nil
-  fileprivate var _tempo: PBRational? = nil
-  fileprivate var _id: PBUUID? = nil
+  fileprivate var _storage = _StorageClass.defaultInstance
 }
 
 struct PBAudio: @unchecked Sendable {
@@ -5209,6 +5247,7 @@ extension PBScoreOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
   static let protoMessageName: String = "PBScoreOption"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     6: .same(proto: "beatRange"),
+    9: .same(proto: "loopDurBeat"),
     2: .same(proto: "tempo"),
     7: .same(proto: "timelineY"),
     4: .same(proto: "keyBeats"),
@@ -5230,6 +5269,7 @@ extension PBScoreOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
       case 6: try { try decoder.decodeSingularMessageField(value: &self._beatRange) }()
       case 7: try { try decoder.decodeSingularDoubleField(value: &self.timelineY) }()
       case 8: try { try decoder.decodeRepeatedMessageField(value: &self.scales) }()
+      case 9: try { try decoder.decodeSingularMessageField(value: &self._loopDurBeat) }()
       default: break
       }
     }
@@ -5261,11 +5301,15 @@ extension PBScoreOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
     if !self.scales.isEmpty {
       try visitor.visitRepeatedMessageField(value: self.scales, fieldNumber: 8)
     }
+    try { if let v = self._loopDurBeat {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: PBScoreOption, rhs: PBScoreOption) -> Bool {
     if lhs._beatRange != rhs._beatRange {return false}
+    if lhs._loopDurBeat != rhs._loopDurBeat {return false}
     if lhs._tempo != rhs._tempo {return false}
     if lhs.timelineY != rhs.timelineY {return false}
     if lhs.keyBeats != rhs.keyBeats {return false}
@@ -5283,6 +5327,7 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
     1: .same(proto: "notes"),
     6: .same(proto: "draftNotes"),
     9: .same(proto: "beatRange"),
+    12: .same(proto: "loopDurBeat"),
     3: .same(proto: "tempo"),
     10: .same(proto: "timelineY"),
     7: .same(proto: "keyBeats"),
@@ -5292,76 +5337,141 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
     5: .same(proto: "id"),
   ]
 
+  fileprivate class _StorageClass {
+    var _notes: [PBNote] = []
+    var _draftNotes: [PBNote] = []
+    var _beatRange: PBRationalRange? = nil
+    var _loopDurBeat: PBRational? = nil
+    var _tempo: PBRational? = nil
+    var _timelineY: Double = 0
+    var _keyBeats: [PBRational] = []
+    var _scales: [PBRational] = []
+    var _enabled: Bool = false
+    var _isShownSpectrogram: Bool = false
+    var _id: PBUUID? = nil
+
+    #if swift(>=5.10)
+      // This property is used as the initial default value for new instances of the type.
+      // The type itself is protecting the reference to its storage via CoW semantics.
+      // This will force a copy to be made of this reference when the first mutation occurs;
+      // hence, it is safe to mark this as `nonisolated(unsafe)`.
+      static nonisolated(unsafe) let defaultInstance = _StorageClass()
+    #else
+      static let defaultInstance = _StorageClass()
+    #endif
+
+    private init() {}
+
+    init(copying source: _StorageClass) {
+      _notes = source._notes
+      _draftNotes = source._draftNotes
+      _beatRange = source._beatRange
+      _loopDurBeat = source._loopDurBeat
+      _tempo = source._tempo
+      _timelineY = source._timelineY
+      _keyBeats = source._keyBeats
+      _scales = source._scales
+      _enabled = source._enabled
+      _isShownSpectrogram = source._isShownSpectrogram
+      _id = source._id
+    }
+  }
+
+  fileprivate mutating func _uniqueStorage() -> _StorageClass {
+    if !isKnownUniquelyReferenced(&_storage) {
+      _storage = _StorageClass(copying: _storage)
+    }
+    return _storage
+  }
+
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
-    while let fieldNumber = try decoder.nextFieldNumber() {
-      // The use of inline closures is to circumvent an issue where the compiler
-      // allocates stack space for every case branch when no optimizations are
-      // enabled. https://github.com/apple/swift-protobuf/issues/1034
-      switch fieldNumber {
-      case 1: try { try decoder.decodeRepeatedMessageField(value: &self.notes) }()
-      case 3: try { try decoder.decodeSingularMessageField(value: &self._tempo) }()
-      case 4: try { try decoder.decodeSingularBoolField(value: &self.enabled) }()
-      case 5: try { try decoder.decodeSingularMessageField(value: &self._id) }()
-      case 6: try { try decoder.decodeRepeatedMessageField(value: &self.draftNotes) }()
-      case 7: try { try decoder.decodeRepeatedMessageField(value: &self.keyBeats) }()
-      case 8: try { try decoder.decodeSingularBoolField(value: &self.isShownSpectrogram) }()
-      case 9: try { try decoder.decodeSingularMessageField(value: &self._beatRange) }()
-      case 10: try { try decoder.decodeSingularDoubleField(value: &self.timelineY) }()
-      case 11: try { try decoder.decodeRepeatedMessageField(value: &self.scales) }()
-      default: break
+    _ = _uniqueStorage()
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      while let fieldNumber = try decoder.nextFieldNumber() {
+        // The use of inline closures is to circumvent an issue where the compiler
+        // allocates stack space for every case branch when no optimizations are
+        // enabled. https://github.com/apple/swift-protobuf/issues/1034
+        switch fieldNumber {
+        case 1: try { try decoder.decodeRepeatedMessageField(value: &_storage._notes) }()
+        case 3: try { try decoder.decodeSingularMessageField(value: &_storage._tempo) }()
+        case 4: try { try decoder.decodeSingularBoolField(value: &_storage._enabled) }()
+        case 5: try { try decoder.decodeSingularMessageField(value: &_storage._id) }()
+        case 6: try { try decoder.decodeRepeatedMessageField(value: &_storage._draftNotes) }()
+        case 7: try { try decoder.decodeRepeatedMessageField(value: &_storage._keyBeats) }()
+        case 8: try { try decoder.decodeSingularBoolField(value: &_storage._isShownSpectrogram) }()
+        case 9: try { try decoder.decodeSingularMessageField(value: &_storage._beatRange) }()
+        case 10: try { try decoder.decodeSingularDoubleField(value: &_storage._timelineY) }()
+        case 11: try { try decoder.decodeRepeatedMessageField(value: &_storage._scales) }()
+        case 12: try { try decoder.decodeSingularMessageField(value: &_storage._loopDurBeat) }()
+        default: break
+        }
       }
     }
   }
 
   func traverse<V: SwiftProtobuf.Visitor>(visitor: inout V) throws {
-    // The use of inline closures is to circumvent an issue where the compiler
-    // allocates stack space for every if/case branch local when no optimizations
-    // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
-    // https://github.com/apple/swift-protobuf/issues/1182
-    if !self.notes.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.notes, fieldNumber: 1)
-    }
-    try { if let v = self._tempo {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
-    } }()
-    if self.enabled != false {
-      try visitor.visitSingularBoolField(value: self.enabled, fieldNumber: 4)
-    }
-    try { if let v = self._id {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
-    } }()
-    if !self.draftNotes.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.draftNotes, fieldNumber: 6)
-    }
-    if !self.keyBeats.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.keyBeats, fieldNumber: 7)
-    }
-    if self.isShownSpectrogram != false {
-      try visitor.visitSingularBoolField(value: self.isShownSpectrogram, fieldNumber: 8)
-    }
-    try { if let v = self._beatRange {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
-    } }()
-    if self.timelineY.bitPattern != 0 {
-      try visitor.visitSingularDoubleField(value: self.timelineY, fieldNumber: 10)
-    }
-    if !self.scales.isEmpty {
-      try visitor.visitRepeatedMessageField(value: self.scales, fieldNumber: 11)
+    try withExtendedLifetime(_storage) { (_storage: _StorageClass) in
+      // The use of inline closures is to circumvent an issue where the compiler
+      // allocates stack space for every if/case branch local when no optimizations
+      // are enabled. https://github.com/apple/swift-protobuf/issues/1034 and
+      // https://github.com/apple/swift-protobuf/issues/1182
+      if !_storage._notes.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._notes, fieldNumber: 1)
+      }
+      try { if let v = _storage._tempo {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+      } }()
+      if _storage._enabled != false {
+        try visitor.visitSingularBoolField(value: _storage._enabled, fieldNumber: 4)
+      }
+      try { if let v = _storage._id {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+      } }()
+      if !_storage._draftNotes.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._draftNotes, fieldNumber: 6)
+      }
+      if !_storage._keyBeats.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._keyBeats, fieldNumber: 7)
+      }
+      if _storage._isShownSpectrogram != false {
+        try visitor.visitSingularBoolField(value: _storage._isShownSpectrogram, fieldNumber: 8)
+      }
+      try { if let v = _storage._beatRange {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
+      } }()
+      if _storage._timelineY.bitPattern != 0 {
+        try visitor.visitSingularDoubleField(value: _storage._timelineY, fieldNumber: 10)
+      }
+      if !_storage._scales.isEmpty {
+        try visitor.visitRepeatedMessageField(value: _storage._scales, fieldNumber: 11)
+      }
+      try { if let v = _storage._loopDurBeat {
+        try visitor.visitSingularMessageField(value: v, fieldNumber: 12)
+      } }()
     }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: PBScore, rhs: PBScore) -> Bool {
-    if lhs.notes != rhs.notes {return false}
-    if lhs.draftNotes != rhs.draftNotes {return false}
-    if lhs._beatRange != rhs._beatRange {return false}
-    if lhs._tempo != rhs._tempo {return false}
-    if lhs.timelineY != rhs.timelineY {return false}
-    if lhs.keyBeats != rhs.keyBeats {return false}
-    if lhs.scales != rhs.scales {return false}
-    if lhs.enabled != rhs.enabled {return false}
-    if lhs.isShownSpectrogram != rhs.isShownSpectrogram {return false}
-    if lhs._id != rhs._id {return false}
+    if lhs._storage !== rhs._storage {
+      let storagesAreEqual: Bool = withExtendedLifetime((lhs._storage, rhs._storage)) { (_args: (_StorageClass, _StorageClass)) in
+        let _storage = _args.0
+        let rhs_storage = _args.1
+        if _storage._notes != rhs_storage._notes {return false}
+        if _storage._draftNotes != rhs_storage._draftNotes {return false}
+        if _storage._beatRange != rhs_storage._beatRange {return false}
+        if _storage._loopDurBeat != rhs_storage._loopDurBeat {return false}
+        if _storage._tempo != rhs_storage._tempo {return false}
+        if _storage._timelineY != rhs_storage._timelineY {return false}
+        if _storage._keyBeats != rhs_storage._keyBeats {return false}
+        if _storage._scales != rhs_storage._scales {return false}
+        if _storage._enabled != rhs_storage._enabled {return false}
+        if _storage._isShownSpectrogram != rhs_storage._isShownSpectrogram {return false}
+        if _storage._id != rhs_storage._id {return false}
+        return true
+      }
+      if !storagesAreEqual {return false}
+    }
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

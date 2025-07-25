@@ -846,12 +846,14 @@ extension Line {
                         id: id, uuColor: uuColor)
         }
     }
+    
     func toVertical() -> Line {
         Line(controls: controls.map { Control(point: $0.point.inverted(),
                                               weight: $0.weight,
                                               pressure: $0.pressure) },
              size: size, id: id, uuColor: uuColor)
     }
+    
     func splited(startIndex: Int, endIndex: Int) -> Line {
         Line(controls: Array(controls[startIndex ... endIndex]),
              size: size, id: id, uuColor: uuColor)
@@ -950,29 +952,43 @@ extension Line {
             return Line(controls: cs, size: size, id: id, uuColor: uuColor)
         }
     }
-    func warpedWith(deltaPoint dp: Point, _ firstOrLast: FirstOrLast) -> Line {
-        var allD = 0.0, oldP = firstPoint
-        for i in 1 ..< controls.count {
-            let p = controls[i].point
-            allD += p.distanceSquared(oldP).squareRoot()
-            oldP = p
-        }
-        oldP = firstPoint
-        let invertAllD = allD > 0 ? 1 / allD : 0
-        var cs = [Control]()
-        var allAD = 0.0
-        for i in 0 ..< controls.count {
-            let p = controls[i].point
-            allAD += p.distanceSquared(oldP).squareRoot()
-            oldP = p
-            let t: Double
-            switch firstOrLast {
-            case .first: t = 1 - allAD * invertAllD
-            case .last: t = allAD * invertAllD
+    
+    func warpedWith(deltaPoint dp: Point, at pi: Int) -> Line {
+        var oldP = firstPoint
+        var cs = controls
+        if pi > 0 {
+            let ds = (1 ... pi).map {
+                let p = controls[$0].point
+                let d = p.distance(oldP)
+                oldP = p
+                return d
             }
-            var nc = controls[i]
-            nc.point += dp * t
-            cs.append(nc)
+            let allD = ds.sum()
+            let rAllD = allD > 0 ? 1 / allD : 0
+            var nAllD = 0.0
+            for (i, d) in ds.enumerated() {
+                nAllD += d
+                let t = nAllD * rAllD
+                cs[i + 1].point += dp * t
+            }
+        } else {
+            cs[pi].point += dp
+        }
+        if pi + 1 < controls.count {
+            let ds = (pi + 1 ..< controls.count).map {
+                let p = controls[$0].point
+                let d = p.distance(oldP)
+                oldP = p
+                return d
+            }
+            let allD = ds.sum()
+            let rAllD = allD > 0 ? 1 / allD : 0
+            var nAllD = 0.0
+            for (i, d) in ds.enumerated() {
+                nAllD += d
+                let t = 1 - nAllD * rAllD
+                cs[i + pi + 1].point += dp * t
+            }
         }
         return Line(controls: cs, size: size, id: id, uuColor: uuColor)
     }
