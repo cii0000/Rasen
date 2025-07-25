@@ -3367,6 +3367,62 @@ final class PastableAction: Action {
     }
 }
 
+final class CutLinePointAction: InputKeyEventAction {
+    let rootAction: RootAction, rootView: RootView
+    let isEditingSheet: Bool
+    
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
+        isEditingSheet = rootView.isEditingSheet
+    }
+    
+    var node = Node()
+    
+    func flow(with event: InputKeyEvent) {
+        guard isEditingSheet else {
+            return
+        }
+        let sp = rootView.selectedScreenPositionNoneCursor
+            ?? event.screenPoint
+        switch event.phase {
+        case .began:
+            rootView.cursor = .arrow
+            
+            let p = rootView.convertScreenToWorld(sp)
+            if let sheetView = rootView.madeSheetView(at: p) {
+                let inP = sheetView.convertFromWorld(p)
+                
+                if let (lineView, li) = sheetView.lineTuple(at: inP,
+                                                            scale: rootView.screenToWorldScale),
+                   let pi = lineView.model.mainPointSequence.nearestIndex(at: inP) {
+                    
+                    var line = lineView.model
+                    line.controls.remove(at: pi)
+                    sheetView.newUndoGroup()
+                    sheetView.removeLines(at: [li])
+                    sheetView.insert([.init(value: line, index: li)])
+                    
+                    node.children = line.mainPointSequence.flatMap {
+                        let p = sheetView.convertToWorld($0)
+                        return [Node(path: .init(circleRadius: 0.35 * 1.5 * line.size, position: p),
+                                     fillType: .color(.content)),
+                                Node(path: .init(circleRadius: 0.35 * line.size, position: p),
+                                     fillType: .color(.background))]
+                    }
+                }
+            }
+            rootView.node.append(child: node)
+        case .changed:
+            break
+        case .ended:
+            node.removeFromParent()
+            
+            rootView.cursor = rootView.defaultCursor
+        }
+    }
+}
+
 final class CopyLineColorAction: InputKeyEventAction {
     let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool

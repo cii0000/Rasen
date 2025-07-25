@@ -380,6 +380,7 @@ extension Quasimode {
     static let redo = Self(modifier: [.shift, .command], .z)
     
     static let cut = Self(modifier: [.command], .x)
+    static let cutLinePoint = Self(modifier: [.option, .command], .x)
     static let copy = Self(modifier: [.command], .c)
     static let copyLineColor = Self(modifier: [.option, .command], .c)
     static let paste = Self(modifier: [.command], .v)

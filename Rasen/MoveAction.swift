@@ -2262,6 +2262,7 @@ final class MoveLineAction: DragEventAction {
                             pressures.append((event.time, pressure))
                             
                             line.controls[pointIndex].point = np
+                            line.controls[pointIndex].weight = 0.5
                             
                             if isPressure || (!isPressure && (event.time - (pressures.first?.time ?? 0) > 1 && (pressures.allSatisfy { $0.pressure <= 0.5 }))) {
                                 isPressure = true

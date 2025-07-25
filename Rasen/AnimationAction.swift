@@ -786,9 +786,35 @@ final class InsertKeyframeAction: InputKeyEventAction {
             
             if let sheetView = rootView.madeSheetView(at: p) {
                 let inP = sheetView.convertFromWorld(p)
-                
                 let animationView = sheetView.animationView
-                if animationView.containsTimeline(inP, scale: rootView.screenToWorldScale),
+                
+                if let (lineView, li) = sheetView.lineTuple(at: inP,
+                                                            scale: rootView.screenToWorldScale) {
+                    
+                    var line = lineView.model
+                    let (bi, t, _, _) = line.nearest(at: inP)
+                    let np = line.bezier(at: bi).position(withT: t)
+                    line.controls.insert(line.controls[bi + 1].mid(line.controls[bi + 2]), at: bi + 2)
+                    
+                    sheetView.newUndoGroup()
+                    sheetView.removeLines(at: [li])
+                    sheetView.insert([.init(value: line, index: li)])
+                    
+                    let rp = sheetView.convertToWorld(np)
+                    
+                    linesNode.children = line.mainPointSequence.flatMap {
+                        let p = sheetView.convertToWorld($0)
+                        return [Node(path: .init(circleRadius: 0.35 * 1.5 * line.size, position: p),
+                                     fillType: .color(.content)),
+                                Node(path: .init(circleRadius: 0.35 * line.size, position: p),
+                                     fillType: .color(.background))]
+                    } + [Node(path: .init(circleRadius: 0.5 * 1.5 * line.size, position: rp),
+                              fillType: .color(.content)),
+                         Node(path: .init(circleRadius: 0.5 * line.size, position: rp),
+                              fillType: .color(.warning))]
+                    
+                    rootView.node.append(child: linesNode)
+                } else if animationView.containsTimeline(inP, scale: rootView.screenToWorldScale),
                    let i = animationView.slidableKeyframeIndex(at: inP,
                                                                maxDistance: rootView.worldKnobEditDistance),
                    sheetView.selectedFrameIndexes.contains(i) {

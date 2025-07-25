@@ -287,6 +287,7 @@ final class RootAction: Action {
     private func inputKeyAction(with quasimode: Quasimode) -> (any InputKeyEventAction)? {
         switch quasimode {
         case .cut: CutAction(self)
+        case .cutLinePoint: CutLinePointAction(self)
         case .copy, .controlCopy: CopyAction(self)
         case .copyLineColor: CopyLineColorAction(self)
         case .paste: PasteAction(self)

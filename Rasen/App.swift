@@ -35,7 +35,7 @@ import UniformTypeIdentifiers
 }
 
 final class SubNSApplication: NSApplication {
-    // AppKit bug: nsEvent.allTouches() returns [] after aleep
+    // AppKit bug: nsEvent.allTouches() returns [] after sleep
     @objc protocol HIDEvent {}
     static let cgHandle = dlopen("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics", RTLD_NOW)
     typealias CGEventCopyIOHIDEventType = @convention(c) (_ cgEvent: CGEvent) -> any HIDEvent
@@ -58,16 +58,12 @@ final class SubNSApplication: NSApplication {
     typealias IOHIDEventGetFloatValueType = @convention(c) (_ event: any AnyObject, UInt32) -> Double
     let IOHIDEventGetFloatValue = unsafeBitCast(dlsym(ioKitHandle, "IOHIDEventGetFloatValue"),
                                                 to: IOHIDEventGetFloatValueType.self)
-//    typealias IOHIDEventGetSenderIDType = @convention(c) (_ event: any AnyObject) -> UInt64
-//    let IOHIDEventGetSenderID = unsafeBitCast(dlsym(ioKitHandle, "IOHIDEventGetSenderID"),
-//                                                to: IOHIDEventGetSenderIDType.self)
     
     private var touchDeviceSizes = [UInt64: Size](), oldTouchEvent: TouchEvent?
     override func sendEvent(_ nsEvent: NSEvent) {
         if nsEvent.type == .gesture {
             if let cgEvent = nsEvent.cgEvent, let view = nsEvent.window?.contentView as? SubMTKView {
                 let ioEvent = CGEventCopyIOHIDEvent(cgEvent)
-//                let id = IOHIDEventGetSenderID(ioEvent)
                 let flags = IOHIDEventGetEventFlags(ioEvent)
                 let flagID = (flags >> 4) & 0xF
                 if let size = nsEvent.allTouches().first?.deviceSize {
@@ -2170,7 +2166,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             endRotate(with: event)
         } else if ps.count >= 2 {
             if touchedIDs.count >= 2,
-               let ps0 = ps[touchedIDs[0]],
+               let ps0 = ps[touchedIDs[0]],//captureTouchedIDs2
                let ps1 = ps[touchedIDs[1]],
                let ops0 = oldTouchPoints[touchedIDs[0]],
                let ops1 = oldTouchPoints[touchedIDs[1]] {
@@ -2623,9 +2619,9 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         let (a, b) = Double.leastSquares(xs: scrollVs[fsi...].map { $0.time },
                             ys: scrollVs[fsi...].map { $0.dp.length() })
         let atb = a * t + b
-        let v = min(atb < 0 ? scrollVs.last?.dp.length() ?? 0 : atb, 700) * 1.25
+        let v = min(atb < 0 ? scrollVs.last?.dp.length() ?? 0 : atb, 700) * 1.125
         let scale = v.clipped(min: 100, max: 700,
-                              newMin: 0.9, newMax: 0.94)
+                              newMin: 0.91, newMax: 0.95)
         let tv = v / timeInterval
         let minTV = 100.0
         let sv = tv / (tv - minTV)
