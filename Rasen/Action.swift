@@ -70,9 +70,11 @@ final class RootAction: Action {
         let sp = rootView.lastEditedSheetScreenCenterPositionNoneCursor ?? event.screenPoint
         let p = rootView.convertScreenToWorld(sp)
         guard let sheetView = rootView.sheetView(at: p) else { return false }
-        let inP = sheetView.convertFromWorld(p)
-        return sheetView.animationView.containsTimeline(inP, scale: rootView.screenToWorldScale)
-        || sheetView.containsOtherTimeline(inP, scale: rootView.screenToWorldScale)
+        let sheetP = sheetView.convertFromWorld(p)
+        let timelineP = sheetView.animationView.timelineNode.convertFromWorld(p)
+        return sheetView.animationView.containsTimeline(timelineP,
+                                                        scale: rootView.screenToWorldScale)
+        || sheetView.containsOtherTimeline(sheetP, scale: rootView.screenToWorldScale)
     }
     func isPlaying(with event: any Event) -> Bool {
         for (_, v) in rootView.sheetViewValues {
@@ -646,7 +648,7 @@ final class SelectByRangeAction: DragEventAction {
         switch event.phase {
         case .began:
             if let sheetView = rootView.sheetView(at: p),
-               sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p),
+               sheetView.animationView.containsTimeline(sheetView.animationView.timelineNode.convertFromWorld(p),
                                                         scale: rootView.screenToWorldScale) {
                 
                 multiSelectFrameAction = .init(rootAction)
@@ -745,7 +747,7 @@ final class MultiSelectFrameAction: DragEventAction {
         case .began:
             rootView.cursor = .arrow
             if let sheetView = rootView.sheetView(at: p),
-               sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p),
+               sheetView.animationView.containsTimeline(sheetView.animationView.timelineNode.convertFromWorld(p),
                                                         scale: rootView.screenToWorldScale) {
                 self.sheetView = sheetView
                 let animationView = sheetView.animationView
@@ -931,7 +933,6 @@ final class DraftAction: Action {
                 }
             } else {
                 if let sheetView = rootView.sheetView(at: p) {
-                    let inP = sheetView.convertFromWorld(p)
                     if sheetView.model.score.enabled {
                         let nis = if let i = sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p), scale: rootView.screenToWorldScale) {
                             [i]
@@ -943,23 +944,6 @@ final class DraftAction: Action {
                             sheetView.changeToDraft(withNoteInexes: nis)
                             rootView.updateSelects()
                         }
-                    } else if sheetView.animationView.containsTimeline(inP, scale: rootView.screenToWorldScale),
-                       let ki = sheetView.animationView.keyframeIndex(at: inP) {
-                        
-                        let animationView = sheetView.animationView
-                        
-                        let isSelected = animationView.selectedFrameIndexes.contains(ki)
-                        let indexes = isSelected ?
-                            animationView.selectedFrameIndexes.sorted() : [ki]
-                        let kiovs: [IndexValue<KeyframeOption>] = indexes.compactMap {
-                            let keyframe = animationView.model.keyframes[$0]
-                            guard keyframe.previousNext != .previousAndNext else { return nil }
-                            let ko = KeyframeOption(beat: keyframe.beat, previousNext: .previousAndNext)
-                            return IndexValue(value: ko, index: $0)
-                        }
-                        
-                        sheetView.newUndoGroup()
-                        sheetView.set(kiovs)
                     } else {
                         sheetView.changeToDraft(with: nil)
                     }
@@ -1037,7 +1021,6 @@ final class DraftAction: Action {
                 rootView.selections = []
             } else {
                 if let sheetView = rootView.sheetView(at: p) {
-                    let inP = sheetView.convertFromWorld(p)
                     if sheetView.model.score.enabled {
                         let nis = (0 ..< sheetView.model.score.draftNotes.count).map { $0 }
                         if !nis.isEmpty {
@@ -1059,24 +1042,6 @@ final class DraftAction: Action {
                             
                             Pasteboard.shared.copiedObjects = [.notesValue(.init(notes: notes, deltaPitch: pitch))]//
                         }
-                    } else if sheetView.animationView.containsTimeline(inP, scale: rootView.screenToWorldScale),
-                       let ki = sheetView.animationView.keyframeIndex(at: inP) {
-                        
-                        let animationView = sheetView.animationView
-                        
-                        let isSelected = animationView.selectedFrameIndexes.contains(ki)
-                        let indexes = isSelected ?
-                            animationView.selectedFrameIndexes.sorted() : [ki]
-                        let kiovs: [IndexValue<KeyframeOption>]
-                        = indexes.compactMap {
-                            let keyframe = animationView.model.keyframes[$0]
-                            guard keyframe.previousNext != .none else { return nil }
-                            let ko = KeyframeOption(beat: keyframe.beat, previousNext: .none)
-                            return IndexValue(value: ko, index: $0)
-                        }
-                        
-                        sheetView.newUndoGroup()
-                        sheetView.set(kiovs)
                     } else {
                         sheetView.cutDraft(with: nil, at: p)
                     }
@@ -1323,11 +1288,8 @@ final class AddScoreAction: InputKeyEventAction {
             
             if let sheetView = rootView.madeSheetView(at: p) {
                 let inP = sheetView.convertFromWorld(p)
-                let ph = Sheet.pitchHeight * .init(Score.pitchRange.length)
-                + Sheet.isShownSpectrogramHeight
                 let option = ScoreOption(tempo: sheetView.nearestTempo(at: inP) ?? Music.defaultTempo,
-                                         timelineY: inP.y.clipped(min: Sheet.timelineY,
-                                                                  max: Sheet.height - Sheet.timelineY - ph),
+                                         timelineY: Sheet.timelineY,
                                          enabled: true)
                 
                 sheetView.newUndoGroup()

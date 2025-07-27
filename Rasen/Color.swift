@@ -142,7 +142,7 @@ extension Color {
     static let subBorder = Color(white: 0.82)
     static let draft = Color(red: 0.1, green: 0.4, blue: 1)
     static let previous = Color(red: 1, green: 0.5, blue: 0.5, opacity: 0.25)
-    static let next = Color(red: 0.2, green: 1, blue: 0.35, opacity: 0.25)
+    static let next = Color(red: 0.2, green: 0.9, blue: 0.35, opacity: 0.25)
     static let disabledText = Color(white: 0.5)
     static let draftLine = Color.rgbLinear(background, draft, t: 0.15)
     

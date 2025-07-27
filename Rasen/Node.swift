@@ -879,6 +879,21 @@ extension Node {
             ctx.setReplaceDepthStencil()
             ctx.setStencilReferenceValue(1)
             children.forEach {
+                let transform: Transform, nTransformBytes: [Float]?
+                if $0.isIdentityFromLocal {
+                    transform = currentTransform
+                    nTransformBytes = currentTransformBytes
+                } else {
+                    transform = $0.worldTransform * rootTransform
+                    nTransformBytes = nil
+                }
+                guard let bounds = $0.drawableBounds else { return }
+                guard (bounds * transform).intersects(Rect(x: -1, y: -1,
+                                                           width: 2, height: 2)) else { return }
+                let transformBytes = nTransformBytes ?? transform.floatData4x4
+                let floatSize = MemoryLayout<Float>.stride
+                let transformLength = transformBytes.count * floatSize
+                
                 $0.updateDatas()
                 if let lineType = $0.lineType, let linePathBuffer = $0.linePathBuffer {
                     switch lineType {

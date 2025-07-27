@@ -154,24 +154,6 @@ extension TextValue: Protobuf {
     }
 }
 
-struct KeyframeOption {
-    var beat = Rational(0)
-    var previousNext = PreviousNext.none
-}
-extension KeyframeOption: Protobuf {
-    init(_ pb: PBKeyframeOption) throws {
-        beat = (try? .init(pb.beat)) ?? 0
-        previousNext = (try? .init(pb.previousNext)) ?? .none
-    }
-    var pb: PBKeyframeOption {
-        .with {
-            $0.beat = beat.pb
-            $0.previousNext = previousNext.pb
-        }
-    }
-}
-extension KeyframeOption: Hashable, Codable {}
-
 struct SheetValue {
     var lines = [Line](), planes = [Plane](),
         texts = [Text](), origin = Point()
@@ -1468,6 +1450,26 @@ protocol Picable {
     var draftPicture: Picture { get set }
 }
 
+struct KeyframeOption {
+    var beat = Rational(0)
+    var previousPosition = Point(), nextPosition = Point()
+}
+extension KeyframeOption: Protobuf {
+    init(_ pb: PBKeyframeOption) throws {
+        beat = (try? .init(pb.beat)) ?? 0
+        previousPosition = (try? .init(pb.previousPosition)) ?? .init()
+        nextPosition = (try? .init(pb.nextPosition)) ?? .init()
+    }
+    var pb: PBKeyframeOption {
+        .with {
+            $0.beat = beat.pb
+            $0.previousPosition = previousPosition.pb
+            $0.nextPosition = nextPosition.pb
+        }
+    }
+}
+extension KeyframeOption: Hashable, Codable {}
+
 struct Keyframe: Picable {
     var picture = Picture() {
         didSet {
@@ -1477,17 +1479,18 @@ struct Keyframe: Picable {
     var draftPicture = Picture()
     
     var beat = Rational()
-    var previousNext = PreviousNext.none
+    var previousPosition = Point(), nextPosition = Point()
     private(set) var isKey = true
     
     init(picture: Picture = Picture(), draftPicture: Picture = Picture(),
          beat: Rational = Keyframe.defaultDurBeat,
-         previousNext: PreviousNext = .none) {
+         previousPosition: Point = .init(), nextPosition: Point = .init()) {
         
         self.picture = picture
         self.draftPicture = draftPicture
         self.beat = beat
-        self.previousNext = previousNext
+        self.previousPosition = previousPosition
+        self.nextPosition = nextPosition
         isKey = (picture.lines.contains { $0.interType != .interpolated }) || picture.isEmpty
     }
 }
@@ -1506,10 +1509,6 @@ extension Keyframe {
     var containsInterpolated: Bool {
         picture.lines.contains { $0.interType == .interpolated }
     }
-    mutating func set(_ option: KeyframeOption) {
-        beat = option.beat
-        previousNext = option.previousNext
-    }
     
 //    var isKey: Bool {
 //        (picture.lines.contains { $0.interType != .interpolated }) || isEmpty
@@ -1524,11 +1523,12 @@ extension Keyframe {
     var option: KeyframeOption {
         get {
             .init(beat: beat,
-                  previousNext: previousNext)
+                  previousPosition: previousPosition, nextPosition: nextPosition)
         }
         set {
             self.beat = newValue.beat
-            self.previousNext = newValue.previousNext
+            self.previousPosition = newValue.previousPosition
+            self.nextPosition = newValue.nextPosition
         }
     }
 }
@@ -1537,7 +1537,8 @@ extension Keyframe: AppliableTransform {
     static func * (lhs: Self, rhs: Transform) -> Self {
         .init(picture: lhs.picture * rhs,
               draftPicture: lhs.draftPicture * rhs,
-              beat: lhs.beat, previousNext: lhs.previousNext)
+              beat: lhs.beat,
+              previousPosition: lhs.previousPosition, nextPosition: lhs.nextPosition)
     }
 }
 extension Keyframe: Protobuf {
@@ -1545,7 +1546,8 @@ extension Keyframe: Protobuf {
         picture = (try? Picture(pb.picture)) ?? Picture()
         draftPicture = (try? Picture(pb.draftPicture)) ?? Picture()
         beat = max((try? Rational(pb.beat)) ?? 1, 0)
-        previousNext = (try? PreviousNext(pb.previousNext)) ?? .none
+        previousPosition = (try? .init(pb.previousPosition)) ?? .init()
+        nextPosition = (try? .init(pb.nextPosition)) ?? .init()
         isKey = (picture.lines.contains { $0.interType != .interpolated }) || picture.isEmpty
     }
     var pb: PBKeyframe {
@@ -1553,7 +1555,8 @@ extension Keyframe: Protobuf {
             $0.picture = picture.pb
             $0.draftPicture = draftPicture.pb
             $0.beat = beat.pb
-            $0.previousNext = previousNext.pb
+            $0.previousPosition = previousPosition.pb
+            $0.nextPosition = nextPosition.pb
         }
     }
 }
@@ -1562,6 +1565,7 @@ struct AnimationOption {
     var beatRange = Music.defaultBeatRange
     var loopDurBeat: Rational = 0
     var tempo = Music.defaultTempo
+    var previousNext = PreviousNext.none
     var timelineY = Sheet.timelineY
     var enabled = false
 }
@@ -1570,6 +1574,7 @@ extension AnimationOption: Protobuf {
         beatRange = (try? RationalRange(pb.beatRange).value) ?? Music.defaultBeatRange
         loopDurBeat = (try? Rational(pb.loopDurBeat)) ?? 0
         tempo = (try? Rational(pb.tempo))?.clipped(Music.tempoRange) ?? Music.defaultTempo
+        previousNext = (try? .init(pb.previousNext)) ?? .none
         timelineY = pb.timelineY
         enabled = pb.enabled
     }
@@ -1578,6 +1583,7 @@ extension AnimationOption: Protobuf {
             $0.beatRange = RationalRange(value: beatRange).pb
             $0.loopDurBeat = loopDurBeat.pb
             $0.tempo = tempo.pb
+            $0.previousNext = previousNext.pb
             $0.timelineY = timelineY
             $0.enabled = enabled
         }
@@ -1594,7 +1600,7 @@ struct KeyframeKey {
     var lineIs = [Int](), planeIs = [Int]()
     var draftLineIs = [Int](), draftPlaneIs = [Int]()
     var beat: Rational = 0
-    var previousNext = PreviousNext.none
+    var previousPosition = Point(), nextPosition = Point()
 }
 extension KeyframeKey: Protobuf {
     init(_ pb: PBKeyframeKey) throws {
@@ -1603,7 +1609,8 @@ extension KeyframeKey: Protobuf {
         draftLineIs = pb.draftLineIs.map { Int($0) }
         draftPlaneIs = pb.draftPlaneIs.map { Int($0) }
         beat = max((try? Rational(pb.beat)) ?? 1, 0)
-        previousNext = (try? PreviousNext(pb.previousNext)) ?? .none
+        previousPosition = (try? .init(pb.previousPosition)) ?? .init()
+        nextPosition = (try? .init(pb.nextPosition)) ?? .init()
     }
     var pb: PBKeyframeKey {
         .with {
@@ -1612,7 +1619,8 @@ extension KeyframeKey: Protobuf {
             $0.draftLineIs = draftLineIs.map { Int64($0) }
             $0.draftPlaneIs = draftPlaneIs.map { Int64($0) }
             $0.beat = beat.pb
-            $0.previousNext = previousNext.pb
+            $0.previousPosition = previousPosition.pb
+            $0.nextPosition = nextPosition.pb
         }
     }
 }
@@ -1653,6 +1661,7 @@ struct Animation {
     var beatRange = Music.defaultBeatRange
     var loopDurBeat: Rational = 0
     var tempo = Music.defaultTempo
+    var previousNext = PreviousNext.none
     var timelineY = Sheet.timelineY
     var enabled = false
     
@@ -1661,6 +1670,7 @@ struct Animation {
          beatRange: Range<Rational> = Music.defaultBeatRange,
          loopDurBeat: Rational = 0,
          tempo: Rational = Music.defaultTempo,
+         previousNext: PreviousNext = .none,
          timelineY: Double = Sheet.timelineY,
          enabled: Bool = false) {
         
@@ -1669,6 +1679,7 @@ struct Animation {
         self.beatRange = beatRange
         self.loopDurBeat = loopDurBeat
         self.tempo = tempo
+        self.previousNext = previousNext
         self.timelineY = timelineY
         self.enabled = enabled
         index = keyframes.isEmpty ?
@@ -1705,7 +1716,8 @@ extension Animation: Protobuf {
                              draftPicture: .init(lines: draftLines,
                                                  planes: draftPlanes),
                              beat: $0.beat,
-                             previousNext: $0.previousNext)
+                             previousPosition: $0.previousPosition,
+                             nextPosition: $0.nextPosition)
             }
         }
         
@@ -1713,6 +1725,7 @@ extension Animation: Protobuf {
         beatRange = (try? RationalRange(pb.beatRange).value) ?? Music.defaultBeatRange
         loopDurBeat = (try? Rational(pb.loopDurBeat)) ?? 0
         tempo = (try? Rational(pb.tempo))?.clipped(Music.tempoRange) ?? Music.defaultTempo
+        previousNext = (try? .init(pb.previousNext)) ?? .none
         timelineY = pb.timelineY.clipped(min: Sheet.timelineY,
                                          max: Sheet.height - Sheet.timelineY)
         enabled = pb.enabled
@@ -1768,7 +1781,8 @@ extension Animation: Protobuf {
                              draftLineIs: draftLineIs,
                              draftPlaneIs: draftPlaneIs,
                              beat: keyframe.beat,
-                             previousNext: keyframe.previousNext)
+                             previousPosition: keyframe.previousPosition,
+                             nextPosition: keyframe.nextPosition)
             }
             
             let lines = lineIs
@@ -1789,6 +1803,7 @@ extension Animation: Protobuf {
             $0.beatRange = RationalRange(value: beatRange).pb
             $0.loopDurBeat = loopDurBeat.pb
             $0.tempo = tempo.pb
+            $0.previousNext = previousNext.pb
             $0.timelineY = timelineY
             $0.enabled = enabled
         }
@@ -2093,6 +2108,9 @@ extension Animation: BeatRangeType {
     func keyframe(atRoot rootI: Int) -> Keyframe {
         keyframes[index(atRootBeat: rootBeat(atRoot: rootI))]
     }
+    func keyframe(atRootInter rootInterI: Int) -> Keyframe {
+        keyframe(atRoot: rootIndex(atRootInter: rootInterI))
+    }
     var currentKeyframe: Keyframe {
         get { keyframes[index] }
         set { keyframes[index] = newValue }
@@ -2103,7 +2121,7 @@ extension Animation: BeatRangeType {
     
     mutating func set(_ koivs: [IndexValue<KeyframeOption>]) {
         koivs.forEach {
-            keyframes[$0.index].set($0.value)
+            keyframes[$0.index].option = $0.value
         }
     }
     
@@ -2125,12 +2143,14 @@ extension Animation {
     var option: AnimationOption {
         get {
             .init(beatRange: beatRange, loopDurBeat: loopDurBeat, tempo: tempo,
+                  previousNext: previousNext,
                   timelineY: timelineY, enabled: enabled)
         }
         set {
             beatRange = newValue.beatRange
             loopDurBeat = newValue.loopDurBeat
             tempo = newValue.tempo
+            previousNext = newValue.previousNext
             timelineY = newValue.timelineY
             enabled = newValue.enabled
         }
@@ -2224,7 +2244,8 @@ extension Sheet {
     static let evenY = 1.0
     static let spectlopeHeight = 2.0, maxSpectlopeHeight = 12.0
     static let reverbHeight = 0.5
-    static let spectrogramX = 10.0, isShownSpectrogramHeight = 6.0
+    static let timelinePadding = 6.0, interpolatedKnobHeight = 6.0
+    static let timelineMargin = 24.0
 }
 extension Sheet {
     var picture: Picture {

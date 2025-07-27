@@ -1526,7 +1526,23 @@ struct PBKeyframe: Sendable {
   /// Clears the value of `beat`. Subsequent reads from it will return its default value.
   mutating func clearBeat() {self._beat = nil}
 
-  var previousNext: PBPreviousNext = .off
+  var previousPosition: PBPoint {
+    get {return _previousPosition ?? PBPoint()}
+    set {_previousPosition = newValue}
+  }
+  /// Returns true if `previousPosition` has been explicitly set.
+  var hasPreviousPosition: Bool {return self._previousPosition != nil}
+  /// Clears the value of `previousPosition`. Subsequent reads from it will return its default value.
+  mutating func clearPreviousPosition() {self._previousPosition = nil}
+
+  var nextPosition: PBPoint {
+    get {return _nextPosition ?? PBPoint()}
+    set {_nextPosition = newValue}
+  }
+  /// Returns true if `nextPosition` has been explicitly set.
+  var hasNextPosition: Bool {return self._nextPosition != nil}
+  /// Clears the value of `nextPosition`. Subsequent reads from it will return its default value.
+  mutating func clearNextPosition() {self._nextPosition = nil}
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
@@ -1535,6 +1551,8 @@ struct PBKeyframe: Sendable {
   fileprivate var _picture: PBPicture? = nil
   fileprivate var _draftPicture: PBPicture? = nil
   fileprivate var _beat: PBRational? = nil
+  fileprivate var _previousPosition: PBPoint? = nil
+  fileprivate var _nextPosition: PBPoint? = nil
 }
 
 struct PBKeyframeKey: Sendable {
@@ -1559,13 +1577,31 @@ struct PBKeyframeKey: Sendable {
   /// Clears the value of `beat`. Subsequent reads from it will return its default value.
   mutating func clearBeat() {self._beat = nil}
 
-  var previousNext: PBPreviousNext = .off
+  var previousPosition: PBPoint {
+    get {return _previousPosition ?? PBPoint()}
+    set {_previousPosition = newValue}
+  }
+  /// Returns true if `previousPosition` has been explicitly set.
+  var hasPreviousPosition: Bool {return self._previousPosition != nil}
+  /// Clears the value of `previousPosition`. Subsequent reads from it will return its default value.
+  mutating func clearPreviousPosition() {self._previousPosition = nil}
+
+  var nextPosition: PBPoint {
+    get {return _nextPosition ?? PBPoint()}
+    set {_nextPosition = newValue}
+  }
+  /// Returns true if `nextPosition` has been explicitly set.
+  var hasNextPosition: Bool {return self._nextPosition != nil}
+  /// Clears the value of `nextPosition`. Subsequent reads from it will return its default value.
+  mutating func clearNextPosition() {self._nextPosition = nil}
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
 
   fileprivate var _beat: PBRational? = nil
+  fileprivate var _previousPosition: PBPoint? = nil
+  fileprivate var _nextPosition: PBPoint? = nil
 }
 
 struct PBAnimationZipper: Sendable {
@@ -1619,6 +1655,8 @@ struct PBAnimationOption: Sendable {
   var hasTempo: Bool {return self._tempo != nil}
   /// Clears the value of `tempo`. Subsequent reads from it will return its default value.
   mutating func clearTempo() {self._tempo = nil}
+
+  var previousNext: PBPreviousNext = .off
 
   var timelineY: Double = 0
 
@@ -1687,6 +1725,11 @@ struct PBAnimation: @unchecked Sendable {
   var hasTempo: Bool {return _storage._tempo != nil}
   /// Clears the value of `tempo`. Subsequent reads from it will return its default value.
   mutating func clearTempo() {_uniqueStorage()._tempo = nil}
+
+  var previousNext: PBPreviousNext {
+    get {return _storage._previousNext}
+    set {_uniqueStorage()._previousNext = newValue}
+  }
 
   var isPlaying: Bool {
     get {return _storage._isPlaying}
@@ -1901,13 +1944,31 @@ struct PBKeyframeOption: Sendable {
   /// Clears the value of `beat`. Subsequent reads from it will return its default value.
   mutating func clearBeat() {self._beat = nil}
 
-  var previousNext: PBPreviousNext = .off
+  var previousPosition: PBPoint {
+    get {return _previousPosition ?? PBPoint()}
+    set {_previousPosition = newValue}
+  }
+  /// Returns true if `previousPosition` has been explicitly set.
+  var hasPreviousPosition: Bool {return self._previousPosition != nil}
+  /// Clears the value of `previousPosition`. Subsequent reads from it will return its default value.
+  mutating func clearPreviousPosition() {self._previousPosition = nil}
+
+  var nextPosition: PBPoint {
+    get {return _nextPosition ?? PBPoint()}
+    set {_nextPosition = newValue}
+  }
+  /// Returns true if `nextPosition` has been explicitly set.
+  var hasNextPosition: Bool {return self._nextPosition != nil}
+  /// Clears the value of `nextPosition`. Subsequent reads from it will return its default value.
+  mutating func clearNextPosition() {self._nextPosition = nil}
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
 
   fileprivate var _beat: PBRational? = nil
+  fileprivate var _previousPosition: PBPoint? = nil
+  fileprivate var _nextPosition: PBPoint? = nil
 }
 
 struct PBIntIndexValue: Sendable {
@@ -5817,7 +5878,8 @@ extension PBKeyframe: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
     1: .same(proto: "picture"),
     2: .same(proto: "draftPicture"),
     3: .same(proto: "beat"),
-    4: .same(proto: "previousNext"),
+    5: .same(proto: "previousPosition"),
+    6: .same(proto: "nextPosition"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -5829,7 +5891,8 @@ extension PBKeyframe: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
       case 1: try { try decoder.decodeSingularMessageField(value: &self._picture) }()
       case 2: try { try decoder.decodeSingularMessageField(value: &self._draftPicture) }()
       case 3: try { try decoder.decodeSingularMessageField(value: &self._beat) }()
-      case 4: try { try decoder.decodeSingularEnumField(value: &self.previousNext) }()
+      case 5: try { try decoder.decodeSingularMessageField(value: &self._previousPosition) }()
+      case 6: try { try decoder.decodeSingularMessageField(value: &self._nextPosition) }()
       default: break
       }
     }
@@ -5849,9 +5912,12 @@ extension PBKeyframe: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
     try { if let v = self._beat {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
     } }()
-    if self.previousNext != .off {
-      try visitor.visitSingularEnumField(value: self.previousNext, fieldNumber: 4)
-    }
+    try { if let v = self._previousPosition {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
+    } }()
+    try { if let v = self._nextPosition {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5859,7 +5925,8 @@ extension PBKeyframe: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
     if lhs._picture != rhs._picture {return false}
     if lhs._draftPicture != rhs._draftPicture {return false}
     if lhs._beat != rhs._beat {return false}
-    if lhs.previousNext != rhs.previousNext {return false}
+    if lhs._previousPosition != rhs._previousPosition {return false}
+    if lhs._nextPosition != rhs._nextPosition {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5873,7 +5940,8 @@ extension PBKeyframeKey: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
     3: .same(proto: "draftLineIs"),
     4: .same(proto: "draftPlaneIs"),
     5: .same(proto: "beat"),
-    6: .same(proto: "previousNext"),
+    7: .same(proto: "previousPosition"),
+    8: .same(proto: "nextPosition"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -5887,7 +5955,8 @@ extension PBKeyframeKey: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
       case 3: try { try decoder.decodeRepeatedInt64Field(value: &self.draftLineIs) }()
       case 4: try { try decoder.decodeRepeatedInt64Field(value: &self.draftPlaneIs) }()
       case 5: try { try decoder.decodeSingularMessageField(value: &self._beat) }()
-      case 6: try { try decoder.decodeSingularEnumField(value: &self.previousNext) }()
+      case 7: try { try decoder.decodeSingularMessageField(value: &self._previousPosition) }()
+      case 8: try { try decoder.decodeSingularMessageField(value: &self._nextPosition) }()
       default: break
       }
     }
@@ -5913,9 +5982,12 @@ extension PBKeyframeKey: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
     try { if let v = self._beat {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
     } }()
-    if self.previousNext != .off {
-      try visitor.visitSingularEnumField(value: self.previousNext, fieldNumber: 6)
-    }
+    try { if let v = self._previousPosition {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 7)
+    } }()
+    try { if let v = self._nextPosition {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 8)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5925,7 +5997,8 @@ extension PBKeyframeKey: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
     if lhs.draftLineIs != rhs.draftLineIs {return false}
     if lhs.draftPlaneIs != rhs.draftPlaneIs {return false}
     if lhs._beat != rhs._beat {return false}
-    if lhs.previousNext != rhs.previousNext {return false}
+    if lhs._previousPosition != rhs._previousPosition {return false}
+    if lhs._nextPosition != rhs._nextPosition {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
@@ -5993,6 +6066,7 @@ extension PBAnimationOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     1: .same(proto: "beatRange"),
     5: .same(proto: "loopDurBeat"),
     2: .same(proto: "tempo"),
+    6: .same(proto: "previousNext"),
     3: .same(proto: "timelineY"),
     4: .same(proto: "enabled"),
   ]
@@ -6008,6 +6082,7 @@ extension PBAnimationOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
       case 3: try { try decoder.decodeSingularDoubleField(value: &self.timelineY) }()
       case 4: try { try decoder.decodeSingularBoolField(value: &self.enabled) }()
       case 5: try { try decoder.decodeSingularMessageField(value: &self._loopDurBeat) }()
+      case 6: try { try decoder.decodeSingularEnumField(value: &self.previousNext) }()
       default: break
       }
     }
@@ -6033,6 +6108,9 @@ extension PBAnimationOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     try { if let v = self._loopDurBeat {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
     } }()
+    if self.previousNext != .off {
+      try visitor.visitSingularEnumField(value: self.previousNext, fieldNumber: 6)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -6040,6 +6118,7 @@ extension PBAnimationOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
     if lhs._beatRange != rhs._beatRange {return false}
     if lhs._loopDurBeat != rhs._loopDurBeat {return false}
     if lhs._tempo != rhs._tempo {return false}
+    if lhs.previousNext != rhs.previousNext {return false}
     if lhs.timelineY != rhs.timelineY {return false}
     if lhs.enabled != rhs.enabled {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
@@ -6056,6 +6135,7 @@ extension PBAnimation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
     3: .same(proto: "beatRange"),
     9: .same(proto: "loopDurBeat"),
     4: .same(proto: "tempo"),
+    10: .same(proto: "previousNext"),
     5: .same(proto: "isPlaying"),
     6: .same(proto: "timelineY"),
     7: .same(proto: "enabled"),
@@ -6068,6 +6148,7 @@ extension PBAnimation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
     var _beatRange: PBRationalRange? = nil
     var _loopDurBeat: PBRational? = nil
     var _tempo: PBRational? = nil
+    var _previousNext: PBPreviousNext = .off
     var _isPlaying: Bool = false
     var _timelineY: Double = 0
     var _enabled: Bool = false
@@ -6091,6 +6172,7 @@ extension PBAnimation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
       _beatRange = source._beatRange
       _loopDurBeat = source._loopDurBeat
       _tempo = source._tempo
+      _previousNext = source._previousNext
       _isPlaying = source._isPlaying
       _timelineY = source._timelineY
       _enabled = source._enabled
@@ -6121,6 +6203,7 @@ extension PBAnimation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
         case 7: try { try decoder.decodeSingularBoolField(value: &_storage._enabled) }()
         case 8: try { try decoder.decodeSingularMessageField(value: &_storage._zipper) }()
         case 9: try { try decoder.decodeSingularMessageField(value: &_storage._loopDurBeat) }()
+        case 10: try { try decoder.decodeSingularEnumField(value: &_storage._previousNext) }()
         default: break
         }
       }
@@ -6160,6 +6243,9 @@ extension PBAnimation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
       try { if let v = _storage._loopDurBeat {
         try visitor.visitSingularMessageField(value: v, fieldNumber: 9)
       } }()
+      if _storage._previousNext != .off {
+        try visitor.visitSingularEnumField(value: _storage._previousNext, fieldNumber: 10)
+      }
     }
     try unknownFields.traverse(visitor: &visitor)
   }
@@ -6175,6 +6261,7 @@ extension PBAnimation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
         if _storage._beatRange != rhs_storage._beatRange {return false}
         if _storage._loopDurBeat != rhs_storage._loopDurBeat {return false}
         if _storage._tempo != rhs_storage._tempo {return false}
+        if _storage._previousNext != rhs_storage._previousNext {return false}
         if _storage._isPlaying != rhs_storage._isPlaying {return false}
         if _storage._timelineY != rhs_storage._timelineY {return false}
         if _storage._enabled != rhs_storage._enabled {return false}
@@ -6519,7 +6606,8 @@ extension PBKeyframeOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   static let protoMessageName: String = "PBKeyframeOption"
   static let _protobuf_nameMap: SwiftProtobuf._NameMap = [
     1: .same(proto: "beat"),
-    2: .same(proto: "previousNext"),
+    3: .same(proto: "previousPosition"),
+    4: .same(proto: "nextPosition"),
   ]
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
@@ -6529,7 +6617,8 @@ extension PBKeyframeOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
       // enabled. https://github.com/apple/swift-protobuf/issues/1034
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularMessageField(value: &self._beat) }()
-      case 2: try { try decoder.decodeSingularEnumField(value: &self.previousNext) }()
+      case 3: try { try decoder.decodeSingularMessageField(value: &self._previousPosition) }()
+      case 4: try { try decoder.decodeSingularMessageField(value: &self._nextPosition) }()
       default: break
       }
     }
@@ -6543,15 +6632,19 @@ extension PBKeyframeOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
     try { if let v = self._beat {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 1)
     } }()
-    if self.previousNext != .off {
-      try visitor.visitSingularEnumField(value: self.previousNext, fieldNumber: 2)
-    }
+    try { if let v = self._previousPosition {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 3)
+    } }()
+    try { if let v = self._nextPosition {
+      try visitor.visitSingularMessageField(value: v, fieldNumber: 4)
+    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: PBKeyframeOption, rhs: PBKeyframeOption) -> Bool {
     if lhs._beat != rhs._beat {return false}
-    if lhs.previousNext != rhs.previousNext {return false}
+    if lhs._previousPosition != rhs._previousPosition {return false}
+    if lhs._nextPosition != rhs._nextPosition {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }

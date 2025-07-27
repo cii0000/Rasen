@@ -785,14 +785,15 @@ final class InsertKeyframeAction: InputKeyEventAction {
             rootView.cursor = .arrow
             
             if let sheetView = rootView.madeSheetView(at: p) {
-                let inP = sheetView.convertFromWorld(p)
+                let sheetP = sheetView.convertFromWorld(p)
                 let animationView = sheetView.animationView
+                let timelineP = animationView.timelineNode.convertFromWorld(p)
                 
-                if let (lineView, li) = sheetView.lineTuple(at: inP,
+                if let (lineView, li) = sheetView.lineTuple(at: sheetP,
                                                             scale: rootView.screenToWorldScale) {
                     
                     var line = lineView.model
-                    let (bi, t, _, _) = line.nearest(at: inP)
+                    let (bi, t, _, _) = line.nearest(at: sheetP)
                     let np = line.bezier(at: bi).position(withT: t)
                     line.controls.insert(line.controls[bi + 1].mid(line.controls[bi + 2]), at: bi + 2)
                     
@@ -814,9 +815,9 @@ final class InsertKeyframeAction: InputKeyEventAction {
                               fillType: .color(.warning))]
                     
                     rootView.node.append(child: linesNode)
-                } else if animationView.containsTimeline(inP, scale: rootView.screenToWorldScale),
-                   let i = animationView.slidableKeyframeIndex(at: inP,
-                                                               maxDistance: rootView.worldKnobEditDistance),
+                } else if animationView.containsTimeline(timelineP, scale: rootView.screenToWorldScale),
+                   let i = animationView.slidableKeyframeIndex(at: timelineP,
+                                                               maxDistance: rootView.worldKnobEditDistance)?.i,
                    sheetView.selectedFrameIndexes.contains(i) {
                     
                     let kis = sheetView.selectedFrameIndexes
@@ -869,14 +870,14 @@ final class InsertKeyframeAction: InputKeyEventAction {
                     sheetView.rootBeat = animationView.model.localDurBeat * count + beat
                     rootAction.updateActionNode()
                     rootView.updateSelects()
-                } else if sheetView.animationView.containsTimeline(inP, scale: rootView.screenToWorldScale) {
+                } else if sheetView.animationView.containsTimeline(timelineP, scale: rootView.screenToWorldScale) {
                     sheetView.selectedFrameIndexes = []
                     
                     let animationView = sheetView.animationView
                     let animation = animationView.model
                     
                     let interval = rootView.currentBeatInterval
-                    let oBeat = animationView.beat(atX: inP.x, interval: interval)
+                    let oBeat = animationView.beat(atX: timelineP.x, interval: interval)
                     let beat = (oBeat - animation.beatRange.start)
                         .clipped(min: 0, max: animation.beatRange.length)
                     
@@ -890,7 +891,7 @@ final class InsertKeyframeAction: InputKeyEventAction {
                     } else if let (i, iBeat) = animation.indexAndInternalBeat(atRootBeat: beat) {
                         let i = iBeat != 0 ?
                         i :
-                        (animationView.beat(atX: inP.x, interval: Rational(1, 60)) < beat ? i - 1 : i)
+                        (animationView.beat(atX: timelineP.x, interval: Rational(1, 60)) < beat ? i - 1 : i)
                         let iBeat = {
                             if iBeat != 0 {
                                 return iBeat
@@ -946,26 +947,26 @@ final class InsertKeyframeAction: InputKeyEventAction {
                                                       isArrow: true,
                                                       progress: sheetView.currentTimeProgress(),
                                                       progressWidth: progressWidth)
-                } else if let ci = sheetView.contentIndex(at: inP, scale: rootView.screenToWorldScale) {
+                } else if let ci = sheetView.contentIndex(at: sheetP, scale: rootView.screenToWorldScale) {
                     let contentView = sheetView.contentsView.elementViews[ci]
                     if contentView.model.timeOption == nil {
                         var content = contentView.model
                         let startBeat: Rational = sheetView.animationView.beat(atX: content.origin.x)
                         content.timeOption = .init(beatRange: startBeat ..< (4 + startBeat),
-                                                   tempo: sheetView.nearestTempo(at: inP) ?? Music.defaultTempo)
+                                                   tempo: sheetView.nearestTempo(at: sheetP) ?? Music.defaultTempo)
                         
                         sheetView.newUndoGroup()
                         sheetView.replace(IndexValue(value: content, index: ci))
                         
                         sheetView.updatePlaying()
                     }
-                } else if let ti = sheetView.textIndex(at: inP, scale: rootView.screenToWorldScale) {
+                } else if let ti = sheetView.textIndex(at: sheetP, scale: rootView.screenToWorldScale) {
                     let textView = sheetView.textsView.elementViews[ti]
                     if textView.model.timeOption == nil {
                         var text = textView.model
                         let startBeat: Rational = sheetView.animationView.beat(atX: text.origin.x)
                         text.timeOption = .init(beatRange: startBeat ..< (4 + startBeat),
-                                                tempo: sheetView.nearestTempo(at: inP) ?? Music.defaultTempo)
+                                                tempo: sheetView.nearestTempo(at: sheetP) ?? Music.defaultTempo)
                         
                         sheetView.newUndoGroup()
                         sheetView.replace([IndexValue(value: text, index: ti)])
@@ -1031,7 +1032,7 @@ final class InsertKeyframeAction: InputKeyEventAction {
                         }
                     } else if scoreView.containsTimeline(scoreP, scale: rootView.screenToWorldScale) {
                         let interval = rootView.currentBeatInterval
-                        let beat = scoreView.beat(atX: inP.x, interval: interval)
+                        let beat = scoreView.beat(atX: sheetP.x, interval: interval)
                         var option = scoreView.model.option
                         option.keyBeats.append(beat)
                         option.keyBeats.sort()
@@ -1042,7 +1043,7 @@ final class InsertKeyframeAction: InputKeyEventAction {
                     sheetView.newUndoGroup(enabledKeyframeIndex: false)
                     sheetView.set(beat: 0, at: 0)
                     var option = sheetView.model.animation.option
-                    option.timelineY = inP.y.clipped(min: Sheet.timelineY,
+                    option.timelineY = sheetP.y.clipped(min: Sheet.timelineY,
                                                      max: Sheet.height - Sheet.timelineY)
                     option.enabled = true
                     sheetView.set(option)
@@ -1314,6 +1315,11 @@ final class InterpolateAction: InputKeyEventAction {
                     return IndexValue(value: interOption, index: lis[$0])
                 }
                 
+                let pnP = nKI != sheetView.model.animation.index ?
+                (oRootKI < nRootKI ?
+                 sheetView.model.animation.currentKeyframe.nextPosition :
+                 sheetView.model.animation.currentKeyframe.previousPosition) : .init()
+                
                 var noNodes = [Node]()
                 if idivs.isEmpty {
                     for li in lis {
@@ -1322,9 +1328,10 @@ final class InterpolateAction: InputKeyEventAction {
                         let blw = max(lw * 1.5, lw * 2.5 * scale, 1 * scale)
                         let line = animationView.model.keyframes[nKI].picture.lines[li]
                         let nLine = sheetView.convertToWorld(line)
-                        noNodes.append(Node(path: Path(nLine),
-                                       lineWidth: blw,
-                                       lineType: .color(.removing)))
+                        noNodes.append(Node(attitude: .init(position: pnP),
+                                            path: Path(nLine),
+                                            lineWidth: blw,
+                                            lineType: .color(.removing)))
                     }
                 }
                 let nidivs = idivs.filter { idiv in
@@ -1341,23 +1348,26 @@ final class InterpolateAction: InputKeyEventAction {
                         let scale = 1 / rootView.worldToScreenScale
                         let blw = max(lw * 1.5, lw * 2.5 * scale, 1 * scale)
                         let nLine = sheetView.convertToWorld(line)
-                        noNodes.append(Node(path: Path(nLine),
-                                       lineWidth: blw,
-                                       lineType: .color(.warning)))
+                        noNodes.append(Node(attitude: .init(position: pnP),
+                                            path: Path(nLine),
+                                            lineWidth: blw,
+                                            lineType: .color(.warning)))
                         return true
                     } else {
                         let lw = Line.defaultLineWidth
                         let scale = 1 / rootView.worldToScreenScale
                         let blw = max(lw * 1.5, lw * 2.5 * scale, 1 * scale)
                         let nLine = sheetView.convertToWorld(line)
-                        noNodes.append(Node(path: Path(nLine),
-                                       lineWidth: blw,
-                                       lineType: .color(.removing)))
+                        noNodes.append(Node(attitude: .init(position: pnP),
+                                            path: Path(nLine),
+                                            lineWidth: blw,
+                                            lineType: .color(.removing)))
                         for line in idLines {
                             let nLine = sheetView.convertToWorld(line)
-                            noNodes.append(Node(path: Path(nLine),
-                                           lineWidth: blw,
-                                           lineType: .color(.removing)))
+                            noNodes.append(Node(attitude: .init(position: pnP),
+                                                path: Path(nLine),
+                                                lineWidth: blw,
+                                                lineType: .color(.removing)))
                         }
                         return false
                     }
@@ -1373,7 +1383,8 @@ final class InterpolateAction: InputKeyEventAction {
                     let scale = 1 / rootView.worldToScreenScale
                     let lw = Line.defaultLineWidth
                     let nodes = lis.map {
-                        Node(path: sheetView.animationView.elementViews[nKI].linesView.elementViews[$0].node.path * sheetView.node.localTransform,
+                        Node(attitude: .init(position: pnP),
+                             path: sheetView.animationView.elementViews[nKI].linesView.elementViews[$0].node.path * sheetView.node.localTransform,
                              lineWidth: max(lw * 1.5, lw * 2.5 * scale, 1 * scale),
                              lineType: .color(.selected))
                     }
@@ -1394,11 +1405,11 @@ final class InterpolateAction: InputKeyEventAction {
                             
                             func append(atKI: Int) -> Bool {
                                 if let li = animationView.model
-                                    .keyframes[currentKI].picture.lines
+                                    .keyframes[atKI].picture.lines
                                     .firstIndex(where: { $0.interOption.id == oldID }) {
                                     
                                     var nIO = animationView.model
-                                        .keyframes[currentKI].picture.lines[li].interOption
+                                        .keyframes[atKI].picture.lines[li].interOption
                                     nIO.id = newID
                                     if vs[atKI] == nil {
                                         vs[atKI] = [.init(value: nIO, index: li)]
@@ -1412,10 +1423,10 @@ final class InterpolateAction: InputKeyEventAction {
                             }
                             
                             let kCount = animationView.model.keyframes.count
-                            var currentKI = nKI - 1 >= 0 ? nKI - 1 : kCount
+                            var currentKI = nKI - 1 >= 0 ? nKI - 1 : kCount - 1
                             while currentKI != nKI {
                                 if !append(atKI: currentKI) { break }
-                                currentKI = currentKI - 1 >= 0 ? currentKI - 1 : kCount
+                                currentKI = currentKI - 1 >= 0 ? currentKI - 1 : kCount - 1
                             }
                             if currentKI != nKI {
                                 currentKI = nKI + 1 < kCount ? nKI + 1 : 0

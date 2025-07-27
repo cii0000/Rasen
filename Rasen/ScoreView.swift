@@ -89,17 +89,12 @@ extension TimelineView {
         sec(atX: x, interval: Rational(1, frameRate))
     }
     
-    func containsSec(_ p: Point, maxDistance: Double) -> Bool {
-        guard let beatRange else { return false }
-        let secRange = model.secRange(fromBeat: beatRange)
-        let sy = timelineCenterY - Sheet.timelineHalfHeight + origin.y
-        for sec in Int(secRange.start.rounded(.up)) ..< Int(secRange.end.rounded(.up)) {
-            let sec = Rational(sec)
-            guard secRange.contains(sec) else { continue }
-            let secX = x(atSec: sec) + origin.x
-            if Point(secX, sy).distance(p) < maxDistance {
-                return true
-            }
+    func containsTempo(_ p: Point, scale: Double) -> Bool {
+        guard let beatRange, model.secRange(fromBeat: beatRange).contains(1) else { return false }
+        let secX = x(atSec: Rational(1)) + origin.x
+        let sy = timelineCenterY - Sheet.timelineHalfHeight - Sheet.rulerHeight / 2 + origin.y
+        if Point(secX, sy).distance(p) < 5 * scale {
+            return true
         }
         return false
     }
@@ -292,6 +287,7 @@ extension ScoreView {
             timelineSubBorderNode.path = .init()
             timelineBorderNode.path = .init()
             timelineFullEditBorderNode.path = .init()
+            node.attitude.position = .init()
         }
     }
     func updateChord() {
@@ -371,7 +367,7 @@ extension ScoreView {
     }
     
     var pitchStartY: Double {
-        timelineCenterY + Sheet.timelineHalfHeight + Sheet.isShownSpectrogramHeight
+        timelineCenterY + Sheet.timelineHalfHeight + Sheet.timelineMargin
     }
     func pitch(atY y: Double) -> Double {
         (y - pitchStartY) / pitchHeight
@@ -621,33 +617,39 @@ extension ScoreView {
                                            width: nnKnobW, height: loopKnobH)))
         
         let secRange = score.secRange
-        for sec in Int(secRange.start.rounded(.up)) ..< Int(secRange.end.rounded(.up)) {
+        for sec in Int(secRange.start.rounded(.up)) ..< Int((secRange.end + score.loopDurSec).rounded(.up)) {
             let sec = Rational(sec)
-            guard secRange.contains(sec) else { continue }
             let secX = x(atSec: sec)
-            contentPathlines.append(.init(Rect(x: secX - lw / 2, y: sy - rulerH / 2,
+            let lw = sec == 1 ? knobW : lw
+            contentPathlines.append(.init(Rect(x: secX - lw / 2, y: sy - rulerH,
                                                width: lw, height: rulerH)))
         }
         
-        let sprH = Sheet.isShownSpectrogramHeight
-        let sprKnobW = knobH, sprKbobH = knobW
-        let np = Point(Sheet.spectrogramX + sx, ey)
-        contentPathlines.append(Pathline(Rect(x: np.x - 1 / 2,
-                                              y: np.y + 1,
-                                              width: 1,
-                                              height: sprH - 2)))
+        let sprH = Sheet.timelineMargin
+        let pnW = 20.0, pnH = 6.0, spnW = 3.0, pnY = ey + sprH / 2
+        contentPathlines.append(.init(Rect(x: sx,
+                                           y: pnY - lw / 2,
+                                           width: pnW + spnW, height: lw)))
         
-        if score.isShownSpectrogram {
-            contentPathlines.append(Pathline(Rect(x: np.x - sprKnobW / 2,
-                                                  y: np.y + sprH - 1 - sprKbobH / 2,
-                                                  width: sprKnobW,
-                                                  height: sprKbobH)))
-        } else {
-            contentPathlines.append(Pathline(Rect(x: np.x - sprKnobW / 2,
-                                                  y: np.y + 1 - sprKbobH / 2,
-                                                  width: sprKnobW,
-                                                  height: sprKbobH)))
-        }
+        contentPathlines.append(.init(Rect(x: sx - lw / 2,
+                                           y: pnY - pnH / 2,
+                                           width: lw, height: pnH)))
+        contentPathlines.append(.init(Rect(x: sx + pnW - lw / 2,
+                                           y: pnY - pnH / 2,
+                                           width: lw, height: pnH)))
+        
+        contentPathlines.append(.init(Rect(x: sx + pnW - spnW,
+                                           y: pnY - pnH / 2 + pnH - lw / 2,
+                                           width: spnW * 2, height: lw)))
+        contentPathlines.append(.init(Rect(x: sx + pnW - spnW,
+                                           y: pnY - pnH / 2 - lw / 2,
+                                           width: spnW * 2, height: lw)))
+        
+        let issx = score.isShownSpectrogram ? pnW * 1 : pnW * 0
+        contentPathlines.append(Pathline(Rect(x: sx + issx - Sheet.knobWidth / 2,
+                                              y: pnY - Sheet.knobHeight / 2,
+                                              width: Sheet.knobWidth,
+                                              height: Sheet.knobHeight)))
         
         return (contentPathlines, subBorderPathlines, borderPathlines, fullEditBorderPathlines)
     }
@@ -2893,13 +2895,27 @@ extension ScoreView {
         }
     }
     
+    func isShownSpectrogramDistance(_ p: Point, scale: Double) -> Double {
+        isShownSpectrogramFrame.distanceSquared(p).squareRoot()
+    }
+    var isShownSpectrogramFrame: Rect {
+        let beatRange = model.beatRange
+        let sBeat = max(beatRange.start, -10000)
+        let sx = x(atBeat: sBeat)
+        let ey = Sheet.timelineHalfHeight
+        let pnW = 20.0, pnnH = 12.0, spnW = 3.0, pnY = ey + 12
+        return Rect(x: sx, y: pnY - pnnH / 2, width: pnW + spnW, height: pnnH)
+    }
+    var paddingIsShownSpectrogramFrame: Rect {
+        isShownSpectrogramFrame.outset(by: Sheet.timelinePadding)
+    }
+    var transformedIsShownSpectrogramFrame: Rect {
+        var f = isShownSpectrogramFrame
+        f.origin.y += timelineY
+        return f
+    }
     func containsIsShownSpectrogram(_ p: Point, scale: Double) -> Bool {
-        Rect(x: x(atBeat: model.beatRange.start) + Sheet.spectrogramX - Sheet.knobHeight / 2,
-                 y: timelineCenterY + Sheet.timelineHalfHeight,
-                 width: Sheet.knobHeight,
-             height: Sheet.isShownSpectrogramHeight)
-            .outset(by: scale * 3)
-            .contains(p)
+        isShownSpectrogramDistance(p, scale: scale) < 3 + scale * 5
     }
     
     func isLoopDurBeat(at p: Point, scale: Double) -> Bool {
@@ -2907,7 +2923,11 @@ extension ScoreView {
         && abs(p.x - x(atBeat: model.endLoopDurBeat)) < 10.0 * scale
     }
     func isShownSpectrogram(at p :Point) -> Bool {
-        p.y > timelineCenterY + Sheet.timelineHalfHeight + Sheet.isShownSpectrogramHeight / 2
+        let beatRange = model.beatRange
+        let sBeat = max(beatRange.start, -10000)
+        let sx = x(atBeat: sBeat)
+        let pnW = 20.0
+        return p.x >= sx + pnW * 0.5
     }
     var isShownSpectrogram: Bool {
         get {

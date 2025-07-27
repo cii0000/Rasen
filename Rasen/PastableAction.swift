@@ -579,8 +579,8 @@ final class PastableAction: Action {
     @discardableResult
     func updateWithCopy(for p: Point, isSendPasteboard: Bool, isCutColor: Bool) -> Bool {
         if let sheetView = rootView.sheetView(at: p),
-           sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p), scale: rootView.screenToWorldScale),
-           let ki = sheetView.animationView.keyframeIndex(at: sheetView.convertFromWorld(p)) {
+           sheetView.animationView.containsTimeline(sheetView.animationView.timelineNode.convertFromWorld(p), scale: rootView.screenToWorldScale),
+           let ki = sheetView.animationView.keyframeIndex(at: sheetView.animationView.timelineNode.convertFromWorld(p)) {
             
             let animationView = sheetView.animationView
             
@@ -1142,8 +1142,8 @@ final class PastableAction: Action {
         }
         
         if let sheetView = rootView.sheetView(at: p),
-           sheetView.animationView.containsTimeline(sheetView.convertFromWorld(p), scale: rootView.screenToWorldScale),
-           let ki = sheetView.animationView.keyframeIndex(at: sheetView.convertFromWorld(p)) {
+           sheetView.animationView.containsTimeline(sheetView.animationView.timelineNode.convertFromWorld(p), scale: rootView.screenToWorldScale),
+           let ki = sheetView.animationView.keyframeIndex(at: sheetView.animationView.timelineNode.convertFromWorld(p)) {
             
             let animationView = sheetView.animationView
             

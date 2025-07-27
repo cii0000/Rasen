@@ -524,8 +524,48 @@ final class AnimationView: TimelineView, @unchecked Sendable {
         node.children = [keyframeView.node]
     }
     
+    func previousNextDistance(_ p: Point, scale: Double) -> Double {
+        previousNextFrame.distanceSquared(p).squareRoot()
+    }
+    var previousNextFrame: Rect {
+        let beatRange = model.beatRange
+        let sBeat = max(beatRange.start, -10000)
+        let sx = x(atBeat: sBeat)
+        let ey = Sheet.timelineHalfHeight
+        let pnW = 20.0, pnnH = 12.0, spnW = 3.0, pnY = ey + 12
+        return Rect(x: sx, y: pnY - pnnH / 2, width: pnW * 3 + spnW, height: pnnH)
+    }
+    var paddingPreviousNextFrame: Rect {
+        previousNextFrame.outset(by: Sheet.timelinePadding)
+    }
+    var transformedPreviousNextFrame: Rect {
+        var f = previousNextFrame
+        f.origin.y += timelineY
+        return f
+    }
+    func containsPreviousNext(_ p: Point, scale: Double) -> Bool {
+        previousNextDistance(p, scale: scale) < 3 + scale * 5
+    }
+    func previousNext(at p: Point) -> PreviousNext {
+        let beatRange = model.beatRange
+        let sBeat = max(beatRange.start, -10000)
+        let sx = x(atBeat: sBeat)
+        let pnW = 20.0
+        return if p.x < sx + pnW * 0.5 {
+            .none
+        } else if p.x < sx + pnW * 1.5 {
+            .previous
+        } else if p.x < sx + pnW * 2.5 {
+            .next
+        } else {
+            .previousAndNext
+        }
+    }
+    
     func containsTimeline(_ p: Point, scale: Double) -> Bool {
-        model.enabled ? (transformedPaddingTimelineBounds?.contains(p) ?? false) : false
+        model.enabled ?
+        ((paddingTimelineBounds?.contains(p) ?? false)
+         || containsPreviousNext(p, scale: scale)) : false
     }
     var transformedPaddingTimelineBounds: Rect? {
         guard var b = paddingTimelineBounds else { return nil }
@@ -535,7 +575,7 @@ final class AnimationView: TimelineView, @unchecked Sendable {
     func transformedKeyframeBounds(at i: Int) -> Rect? {
         let knobW = Sheet.knobWidth, knobH = Sheet.knobHeight
         let iKnobW = width(atDurBeat: Rational(1, frameRate)),
-            iKnobH = interpolatedKnobHeight
+            iKnobH = Sheet.interpolatedKnobHeight
         let centerY = 0.0
         
         let kfBeat = model.beatRange.start + model.localBeat(at: i)
@@ -552,11 +592,9 @@ final class AnimationView: TimelineView, @unchecked Sendable {
                  y: centerY - nKnobH / 2 + model.timelineY,
                  width: iKnobW, height: nKnobH)
     }
-    private(set) var paddingTimelineBounds: Rect?
-    var timelineBounds: Rect? {
-        paddingTimelineBounds?
-            .insetBy(dx: paddingWidth,
-                     dy: paddingTimelineHeight / 8)
+    private(set) var timelineBounds: Rect?
+    var paddingTimelineBounds: Rect? {
+        timelineBounds?.outset(by: Sheet.timelinePadding)
     }
     
     var isFullEdit = false {
@@ -570,15 +608,19 @@ final class AnimationView: TimelineView, @unchecked Sendable {
     
     func updateTimeline() {
         if model.enabled {
-            let btsx = x(atBeat: model.beatRange.lowerBound) - paddingWidth
-            let btex = x(atBeat: model.endLoopDurBeat) + paddingWidth
-            paddingTimelineBounds = Rect(x: btsx, y: -paddingTimelineHeight / 2,
-                                         width: btex - btsx,
-                                         height: paddingTimelineHeight)
-            
+            let btsx = x(atBeat: model.beatRange.lowerBound)
+            let btex = x(atBeat: model.endLoopDurBeat)
+            let timelineBounds = Rect(x: btsx, y: -Sheet.timelineHalfHeight,
+                                      width: btex - btsx,
+                                      height: Sheet.timelineHalfHeight * 2)
+            self.timelineBounds = timelineBounds
+            let af = timelineBounds.outset(by: Sheet.timelinePadding),
+                bf = previousNextFrame.outset(by: Sheet.timelinePadding)
             timelineNode.children = timelineNodes() + [clippingNode]
-            timelineNode.path = .init(paddingTimelineBounds ?? .init())
-            timelineNode.fillType = .color(.background)
+            timelineNode.path = .init([Point(bf.minX, bf.maxY), Point(af.minX, af.minY),
+                                       Point(af.maxX, af.minY), Point(af.maxX, af.maxY),
+                                       Point(bf.maxX, af.maxY), Point(bf.maxX, bf.maxY)])
+            timelineNode.fillType = .color(.subRemoving)
             timelineNode.attitude.position.y = model.timelineY
             
             updateClippingNode()
@@ -586,7 +628,8 @@ final class AnimationView: TimelineView, @unchecked Sendable {
             timelineNode.children = []
             timelineNode.path = .init()
             timelineNode.fillType = nil
-            paddingTimelineBounds = nil
+            timelineBounds = nil
+            timelineNode.attitude.position = .init()
             updateClippingNode()
         }
     }
@@ -596,7 +639,6 @@ final class AnimationView: TimelineView, @unchecked Sendable {
     func updateTimelineAtCurrentKeyframe() {
         updateTimelime(atKeyframe: model.index)
     }
-    let paddingTimelineHeight = Sheet.timelineY * 2, interpolatedKnobHeight = 6.0, paddingWidth = 5.0
     func timelineNodes() -> [Node] {
         let beatRange = model.beatRange, loopDurBeat = model.loopDurBeat
         let sBeat = max(beatRange.start, -10000),
@@ -605,7 +647,7 @@ final class AnimationView: TimelineView, @unchecked Sendable {
         let lw = 1.0
         let knobW = Sheet.knobWidth, knobH = Sheet.knobHeight
         let rulerH = Sheet.rulerHeight
-        let iKnobW = knobW, iKnobH = interpolatedKnobHeight
+        let iKnobW = knobW, iKnobH = Sheet.interpolatedKnobHeight
         let centerY = 0.0
         let sy = centerY - Sheet.timelineHalfHeight
         let ey = centerY + Sheet.timelineHalfHeight
@@ -648,20 +690,7 @@ final class AnimationView: TimelineView, @unchecked Sendable {
                 topD = 0
             }
             
-            let bottomD: Double
-            if keyframe.previousNext != .none {
-                let pathline = Pathline(Rect(x: kx - nKnobW / 2,
-                                             y: centerY - nKnobH / 2,
-                                             width: nKnobW, height: knobW))
-                if iSet.contains(i) {
-                    selectedPathlines.append(pathline)
-                } else {
-                    contentPathlines.append(pathline)
-                }
-                bottomD = keyframe.isKey ? knobW * 2 : knobW * 1.5
-            } else {
-                bottomD = 0
-            }
+            let bottomD = 0.0
             
             let niKnobW = (keyframe.beat + beatRange.start) % Sheet.beatInterval == 0 ? iKnobW : iKnobW / 2
             let pathline = keyframe.isKey ?
@@ -741,13 +770,56 @@ final class AnimationView: TimelineView, @unchecked Sendable {
         }
         
         let secRange = model.secRange
-        for sec in Int(secRange.start.rounded(.up)) ..< Int(secRange.end.rounded(.up)) {
+        for sec in Int(secRange.start.rounded(.up)) ..< Int((secRange.end + model.loopDurSec).rounded(.up)) {
             let sec = Rational(sec)
-            guard secRange.contains(sec) else { continue }
             let secX = x(atSec: sec)
-            contentPathlines.append(.init(Rect(x: secX - lw / 2, y: sy - rulerH / 2,
+            let lw = sec == 1 ? knobW : lw
+            contentPathlines.append(.init(Rect(x: secX - lw / 2, y: sy - rulerH,
                                                width: lw, height: rulerH)))
         }
+        
+        let pnW = 20.0, pnH = 6.0, spnW = 3.0, spnH = 3.0, pnnH = Sheet.knobHeight,
+            pnY = ey + Sheet.timelineMargin / 2
+        contentPathlines.append(.init(Rect(x: sx,
+                                           y: pnY - lw / 2,
+                                           width: pnW * 3 + spnW, height: lw)))
+        
+        contentPathlines.append(.init(Rect(x: sx - lw / 2,
+                                           y: pnY - pnH / 2,
+                                           width: lw, height: pnH)))
+        
+        contentPathlines.append(.init(Rect(x: sx + pnW - spnW - lw / 2,
+                                           y: pnY - spnH / 2,
+                                           width: lw, height: spnH)))
+        contentPathlines.append(.init(Rect(x: sx + pnW - lw / 2,
+                                           y: pnY - pnH / 2,
+                                           width: lw, height: pnH)))
+        
+        contentPathlines.append(.init(Rect(x: sx + pnW * 2 - lw / 2,
+                                           y: pnY - pnH / 2,
+                                           width: lw, height: pnH)))
+        contentPathlines.append(.init(Rect(x: sx + pnW * 2 + spnW - lw / 2,
+                                           y: pnY - spnH / 2,
+                                           width: lw, height: spnH)))
+        
+        contentPathlines.append(.init(Rect(x: sx + pnW * 3 - spnW - lw / 2,
+                                           y: pnY - spnH / 2,
+                                           width: lw, height: spnH)))
+        contentPathlines.append(.init(Rect(x: sx + pnW * 3 - lw / 2,
+                                           y: pnY - pnH / 2,
+                                           width: lw, height: pnH)))
+        contentPathlines.append(.init(Rect(x: sx + pnW * 3 + spnW - lw / 2,
+                                           y: pnY - spnH / 2,
+                                           width: lw, height: spnH)))
+        let pnX = switch model.previousNext {
+        case .none: pnW * 0
+        case .previous: pnW * 1
+        case .next: pnW * 2
+        case .previousAndNext: pnW * 3
+        }
+        contentPathlines.append(.init(Rect(x: pnX + sx - nKnobW / 2,
+                                           y: pnY - pnnH / 2,
+                                           width: Sheet.knobWidth, height: pnnH)))
         
         var nodes = [Node]()
         if !fullEditBorderPathlines.isEmpty {
@@ -777,12 +849,21 @@ final class AnimationView: TimelineView, @unchecked Sendable {
     func updatePreviousNext() {
         guard !isPlaying else { return }
         
-        func otherNode(color: Color, atRootInter i :Int) -> Node {
+        func otherNode(color: Color, _ previousNext: PreviousNext, atRootInter i :Int) -> Node {
             let i = model.index(atRootInter: i)
-            let nodes = model.keyframes[i].picture.lines.map {
-                Node(path: Path($0),
-                     lineWidth: $0.size, lineType: .color(.background))
-            }
+            let keyframeView = elementViews[i]
+            let currentKeyframe = model.keyframe(atRootInter: model.rootInterIndex)
+            let dp = previousNext == .previous ?
+            currentKeyframe.previousPosition : currentKeyframe.nextPosition
+            let nodes = keyframeView.linesView.elementViews.map {
+                let node = $0.node.clone
+                node.attitude.position = dp
+                node.lineType = .color(.background)
+                return node
+            } + (dp != .init() ? keyframeView.model.picture.lines.map {
+                Node(path: Path([$0.firstPoint, $0.firstPoint + dp]),
+                     lineWidth: $0.size * 0.25, lineType: .color(.background))
+            } : [])
             return Node(children: nodes, isClippingChildren: true,
                         path: .init(bounds), fillType: .color(color))
         }
@@ -796,7 +877,7 @@ final class AnimationView: TimelineView, @unchecked Sendable {
             }
             return
         }
-        switch currentKeyframe.previousNext {
+        switch model.previousNext {
         case .none:
             if !previousNextNode.children.isEmpty {
                 previousNextNode.children.forEach {
@@ -805,15 +886,15 @@ final class AnimationView: TimelineView, @unchecked Sendable {
                 previousNextNode.children = []
             }
         case .previous:
-            previousNextNode.children = [otherNode(color: .previous,
+            previousNextNode.children = [otherNode(color: .previous, .previous,
                                                    atRootInter: model.rootInterIndex - 1)]
         case .next:
-            previousNextNode.children = [otherNode(color: .next,
+            previousNextNode.children = [otherNode(color: .next, .next,
                                                    atRootInter: model.rootInterIndex + 1)]
         case .previousAndNext:
-            previousNextNode.children = [otherNode(color: .previous,
+            previousNextNode.children = [otherNode(color: .previous, .previous,
                                                    atRootInter: model.rootInterIndex - 1),
-                                         otherNode(color: .next,
+                                         otherNode(color: .next, .next,
                                                    atRootInter: model.rootInterIndex + 1)]
         }
     }
@@ -845,12 +926,12 @@ final class AnimationView: TimelineView, @unchecked Sendable {
         }
     }
     
-    func slidableKeyframeIndex(atRootBeat: Rational, maxDistance: Double) -> Int? {
+    func slidableKeyframeIndex(atRootBeat: Rational, maxDistance: Double) -> (i: Int, distance: Double)? {
         slidableKeyframeIndex(at: Point(x(atBeat: model.localBeat(atRootBeat: atRootBeat)), 0),
                               maxDistance: maxDistance)
     }
-    func slidableKeyframeIndex(at inP: Point, maxDistance: Double) -> Int? {
-        guard abs(inP.y - model.timelineY) < paddingTimelineHeight * 5 / 16 else { return nil }
+    func slidableKeyframeIndex(at inP: Point, maxDistance: Double) -> (i: Int, distance: Double)? {
+        guard abs(inP.y) < Sheet.timelineHalfHeight * 15 / 16 else { return nil }
         let animation = model
         let beatRange = animation.beatRange
         
@@ -869,15 +950,16 @@ final class AnimationView: TimelineView, @unchecked Sendable {
             
             for i in minI + 1 ..< animation.keyframes.count - 1 {
                 if animation.keyframes[i + 1].beat - animation.keyframes[i].beat > 0 {
-                    return i
+                    return (i, minD)
                 }
             }
-            return animation.keyframes.count - 1
+            return (animation.keyframes.count - 1, minD)
         }
         
-        return minI
+        return if let minI { (minI, minD) } else { nil }
     }
     func keyframeIndex(at inP: Point, isEnabledCount: Bool = false) -> Int? {
+        guard abs(inP.y) < Sheet.timelineHalfHeight * 15 / 16 else { return nil }
         let animation = model
         let count = animation.keyframes.count
         var minD = Double.infinity, minI: Int?
@@ -973,6 +1055,31 @@ final class AnimationView: TimelineView, @unchecked Sendable {
             []
         }
         
+        func draw(orki: Int, nrki: Int, ort: Double, nrt: Double,
+                  pnP: Point, in pnPs: inout [Int: Point]) {
+            let (pri, ot, nri, nt) = orki < nrki ? (orki, ort, nrki, nrt) : (nrki, nrt, orki, ort)
+            (pri ... nri).forEach {
+                let t = Double($0).clipped(min: .init(pri), max: .init(nri), newMin: ot, newMax: nt)
+                pnPs[model.index(atRoot: $0)] = Point.linear(.init(), pnP, t: t)
+            }
+        }
+       
+        var pnPs = [Int: Point]()
+        let pP = model.currentKeyframe.previousPosition
+        if !pP.isEmpty {
+            let preRKI0 = model.rootIndex(atRootInter: model.rootInterIndex - 1)
+            let preRKI1 = model.rootIndex(atRootInter: model.rootInterIndex - 2)
+            draw(orki: preRKI1, nrki: preRKI0, ort: 0, nrt: 1, pnP: pP, in: &pnPs)
+            draw(orki: preRKI0, nrki: model.rootIndex, ort: 1, nrt: 0, pnP: pP, in: &pnPs)
+        }
+        let nP = model.currentKeyframe.nextPosition
+        if !nP.isEmpty {
+            let nextRKI0 = model.rootIndex(atRootInter: model.rootInterIndex + 1)
+            let nextRKI1 = model.rootIndex(atRootInter: model.rootInterIndex + 2)
+            draw(orki: model.rootIndex, nrki: nextRKI0, ort: 0, nrt: 1, pnP: nP, in: &pnPs)
+            draw(orki: nextRKI0, nrki: nextRKI1, ort: 1, nrt: 0, pnP: nP, in: &pnPs)
+        }
+        
         let nlw = max(lw * 0.5, lw * scale), blw = lw * 4, nblw = lw * 2
         let color: Color = removeLineIndex != nil ?
             .removing : .subSelected
@@ -990,8 +1097,10 @@ final class AnimationView: TimelineView, @unchecked Sendable {
                     if let node = lineNodeDic[line.controls] {
                         node.lineWidth = blw
                     } else {
+                        let pnP = pnPs[i] ?? .init()
                         let nLine = isConvertToWorld ? convertToWorld(line) : line
-                        let node = Node(path: Path(nLine),
+                        let node = Node(attitude: .init(position: pnP),
+                                        path: Path(nLine),
                                         lineWidth: boldKISet.contains(i) ? nblw : nlw,
                                         lineType: .color(color))
                         nodes.append(node)
@@ -1009,7 +1118,7 @@ final class AnimationView: TimelineView, @unchecked Sendable {
         
         let knobW = Sheet.knobWidth, knobH = Sheet.knobHeight
         let iKnobW = width(atDurBeat: Rational(1, frameRate)),
-            iKnobH = interpolatedKnobHeight
+            iKnobH = Sheet.interpolatedKnobHeight
         let nb = bounds.insetBy(dx: Sheet.textPadding.width, dy: 0)
         let kfY = nb.minY + timelineY
         
@@ -1030,9 +1139,7 @@ final class AnimationView: TimelineView, @unchecked Sendable {
                               width: iKnobW, height: iKnobH))
             selectedPathlines.append(pathline)
             
-            if keyframe.previousNext != .none
-                || !keyframe.draftPicture.isEmpty {
-                
+            if !keyframe.draftPicture.isEmpty {
                 let pathline = Pathline(Rect(x: kx - knobW / 2,
                                              y: kfY + knobH / 2 + knobW,
                                              width: knobW, height: knobW))
@@ -1049,7 +1156,7 @@ final class AnimationView: TimelineView, @unchecked Sendable {
         
         let knobW = Sheet.knobWidth, knobH = Sheet.knobHeight
         let iKnobW = width(atDurBeat: Rational(1, frameRate)),
-            iKnobH = interpolatedKnobHeight
+            iKnobH = Sheet.interpolatedKnobHeight
         let nb = bounds.insetBy(dx: Sheet.textPadding.width, dy: 0)
         let kfY = nb.minY + timelineY
         
@@ -1066,9 +1173,7 @@ final class AnimationView: TimelineView, @unchecked Sendable {
                                          width: iKnobW, height: iKnobH))
             selectedPathlines.append(pathline)
             
-            if keyframe.previousNext != .none
-                || !keyframe.draftPicture.isEmpty {
-                
+            if !keyframe.draftPicture.isEmpty {
                 let pathline = Pathline(Rect(x: kx - knobW / 2,
                                              y: kfY + knobH / 2 + knobW,
                                              width: knobW, height: knobW))
@@ -1103,21 +1208,61 @@ final class AnimationView: TimelineView, @unchecked Sendable {
         }
     }
     
-    func isStartBeat(at p: Point, scale: Double) -> Bool {
-        abs(p.x - x(atBeat: model.beatRange.start)) < 10.0 * scale
+    var previousNext: PreviousNext {
+        get { model.previousNext }
+        set {
+            guard newValue != previousNext else { return }
+            binder[keyPath: keyPath].previousNext = newValue
+            updatePreviousNext()
+            updateTimeline()
+        }
     }
-    func isEndBeat(at p: Point, scale: Double) -> Bool {
-        abs(p.x - x(atBeat: model.beatRange.end)) < 10.0 * scale
+    
+    enum HitResult {
+        case key(i: Int)
+        case previousNext(PreviousNext)
+        case endBeat
+        case loopDurBeat
+        case all
     }
-    func isLoopDurBeat(at p: Point, scale: Double) -> Bool {
-        p.y > timelineY + Sheet.timelineHalfHeight - 3
-        && abs(p.x - x(atBeat: model.endLoopDurBeat)) < 10.0 * scale
+    func hitTest(_ p: Point, scale: Double) -> HitResult {
+        var minD = Double.infinity, minResult = HitResult.all
+        let pnD = previousNextDistance(p, scale: scale)
+        
+        if pnD < minD && pnD < 3 + scale * 5 {
+            minD = pnD
+            minResult = .previousNext(previousNext(at: p))
+        }
+        
+        if p.y > Sheet.timelineHalfHeight - 3 {
+            let ld = abs(p.x - x(atBeat: model.endLoopDurBeat))
+            if ld < minD && ld < 10.0 * scale {
+                minD = ld
+                minResult = .loopDurBeat
+            }
+        }
+        
+        let ed = abs(p.x - x(atBeat: model.beatRange.end))
+        if ed < minD && ed < 10.0 * scale {
+            minD = ed
+            minResult = .endBeat
+        }
+        
+        let md = Sheet.knobEditDistance * 2 * scale
+        if let (minI, d) = slidableKeyframeIndex(at: p, maxDistance: md) {
+            if d < minD {
+                minD = d
+                minResult = .key(i: minI)
+            }
+        }
+        
+        return minResult
     }
     
     func tempoPositionBeat(_ p: Point, scale: Double) -> Rational? {
         let tempoBeat = model.beatRange.start.rounded(.down) + 1
         if tempoBeat < model.beatRange.end {
-            let sy = model.timelineY - paddingTimelineHeight * 7 / 16
+            let sy = model.timelineY - Sheet.timelineHalfHeight
             let np = Point(x(atBeat: tempoBeat), sy)
             return np.distance(p) < 15 * scale ? tempoBeat : nil
         } else {
@@ -1555,39 +1700,39 @@ final class SheetView: BindableView, @unchecked Sendable {
                      fillType: .color(.content))]
     }
     
-    func containsTempo(_ p: Point, maxDistance: Double) -> Bool {
-        if animationView.containsSec(p, maxDistance: maxDistance) {
+    func containsTempo(_ p: Point, scale: Double) -> Bool {
+        if animationView.containsTempo(p, scale: scale) {
             return true
         }
-        if scoreView.containsSec(p, maxDistance: maxDistance) {
+        if scoreView.containsTempo(p, scale: scale) {
             return true
         }
         for textView in textsView.elementViews {
-            if textView.containsSec(p, maxDistance: maxDistance) {
+            if textView.containsTempo(p, scale: scale) {
                 return true
             }
         }
         for contentView in contentsView.elementViews {
-            if contentView.containsSec(p, maxDistance: maxDistance) {
+            if contentView.containsTempo(p, scale: scale) {
                 return true
             }
         }
         return false
     }
-    func tempo(at p: Point, maxDistance: Double) -> Rational? {
-        if animationView.containsSec(p, maxDistance: maxDistance) {
+    func tempo(at p: Point, scale: Double) -> Rational? {
+        if animationView.containsTempo(p, scale: scale) {
             return animationView.tempo
         }
-        if scoreView.containsSec(p, maxDistance: maxDistance) {
+        if scoreView.containsTempo(p, scale: scale) {
             return scoreView.tempo
         }
         for textView in textsView.elementViews {
-            if textView.containsSec(p, maxDistance: maxDistance) {
+            if textView.containsTempo(p, scale: scale) {
                 return textView.tempo
             }
         }
         for contentView in contentsView.elementViews {
-            if contentView.containsSec(p, maxDistance: maxDistance) {
+            if contentView.containsTempo(p, scale: scale) {
                 return contentView.tempo
             }
         }
@@ -1672,7 +1817,7 @@ final class SheetView: BindableView, @unchecked Sendable {
     func slidableKeyframeIndex(at inP: Point,
                                maxDistance: Double) -> Int? {
         animationView.slidableKeyframeIndex(at: inP,
-                                            maxDistance: maxDistance)
+                                            maxDistance: maxDistance)?.i
     }
     func keyframeIndex(at inP: Point, isEnabledCount: Bool = false) -> Int? {
         animationView.keyframeIndex(at: inP, isEnabledCount: isEnabledCount)
@@ -4242,9 +4387,10 @@ final class SheetView: BindableView, @unchecked Sendable {
         append(undo: undoItem, redo: redoItem)
         set(redoItem)
     }
-    func set(beat: Rational, previousNext: PreviousNext,
+    func set(beat: Rational, previousPosition: Point, nextPosition: Point,
              at i: Int) {
-        let ko = KeyframeOption(beat: beat, previousNext: previousNext)
+        let ko = KeyframeOption(beat: beat,
+                                previousPosition: previousPosition, nextPosition: nextPosition)
         set([IndexValue(value: ko, index: i)])
     }
     func set(beat: Rational, at i: Int) {
@@ -6355,17 +6501,21 @@ final class SheetView: BindableView, @unchecked Sendable {
         
         let ds = Line.defaultLineWidth * 6 * scale
         var minI: Int?, minRKI: Int?, minDSquared = Double.infinity
-        func update(at i: Int, rki: Int, from line: Line) -> (lineView: SheetLineView, lineI: Int, rootKeyframeI: Int)? {
+        func update(at i: Int, rki: Int, dp: Point = .init(), isPNLine: Bool = false,
+                    from line: Line) -> (lineView: SheetLineView, lineI: Int, rootKeyframeI: Int)? {
             guard line.uuColor != removingUUColor else { return nil }
             if line.uuColor != Line.defaultUUColor && isNoneDefaultColorPlane {
-                if line.containsPressure(at: p) {
+                if line.containsPressure(at: p - dp) {
                     return (linesView.elementViews[i], i, rki)
                 }
             } else {
                 let nd = smallScale != nil ?
                 (line.size / 2 + ds) / smallScale! : line.size / 2 + ds * 5
                 let ldSquared = nd * nd
-                let dSquared = line.minDistanceSquared(at: p)
+                let mdSquared = line.minDistanceSquared(at: p - dp)
+                let dSquared = isPNLine ?
+                (min(mdSquared, Edge(line.firstPoint, line.firstPoint - dp).distanceSquared(from: p - dp))) :
+                mdSquared
                 if dSquared < minDSquared && dSquared < ldSquared {
                     minI = i
                     minRKI = rki
@@ -6383,23 +6533,28 @@ final class SheetView: BindableView, @unchecked Sendable {
         
         let mds = med * scale
         if enabledPreviousNext && minDSquared >= mds * mds && model.animation.keyframes.count > 1 {
-            let pn = model.animation.currentKeyframe.previousNext
+            let isPNLine = bounds.contains(p) && !bounds.inset(by: 5 * scale).contains(p)
+            let pn = model.animation.previousNext
             if pn == .previous || pn == .previousAndNext {
+                let pP = model.animation.currentKeyframe.previousPosition
                 let rii = model.animation.rootInterIndex - 1
                 let ki = model.animation.index(atRootInter: rii)
                 let ri = model.animation.rootIndex(atRootInter: rii)
-                for (i, line) in model.animation.keyframes[ki].picture.lines.enumerated().reversed() {
-                    if let n = update(at: i, rki: ri, from: line) {
+                let keyframe = model.animation.keyframes[ki]
+                for (i, line) in keyframe.picture.lines.enumerated().reversed() {
+                    if let n = update(at: i, rki: ri, dp: pP, isPNLine: isPNLine, from: line) {
                         return n
                     }
                 }
             }
             if pn == .next || pn == .previousAndNext {
+                let nP = model.animation.currentKeyframe.nextPosition
                 let rii = model.animation.rootInterIndex + 1
                 let ki = model.animation.index(atRootInter: rii)
                 let ri = model.animation.rootIndex(atRootInter: rii)
-                for (i, line) in model.animation.keyframes[ki].picture.lines.enumerated().reversed() {
-                    if let n = update(at: i, rki: ri, from: line) {
+                let keyframe = model.animation.keyframes[ki]
+                for (i, line) in keyframe.picture.lines.enumerated().reversed() {
+                    if let n = update(at: i, rki: ri, dp: nP, isPNLine: isPNLine, from: line) {
                         return n
                     }
                 }
@@ -7129,22 +7284,10 @@ final class SheetView: BindableView, @unchecked Sendable {
             }
             
             let object = PastableObject.picture(model.draftPicture)
-            let isNewUndGroup: Bool
             if !model.draftPicture.isEmpty {
-                isNewUndGroup = true
                 newUndoGroup()
                 removeDraft()
                 Pasteboard.shared.copiedObjects = [object]
-            } else {
-                isNewUndGroup = false
-            }
-            if model.animation.currentKeyframe.previousNext != .none {
-                if !isNewUndGroup {
-                    newUndoGroup()
-                }
-                set(beat: model.animation.currentKeyframe.beat,
-                    previousNext: .none,
-                    at: model.animation.index)
             }
         }
     }
