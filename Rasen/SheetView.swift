@@ -7488,6 +7488,9 @@ final class SheetColorOwner {
             sheetView.set(colorValue)
         }
     }
+    var oldUUColor: UUColor {
+        oldColorValue.uuColor
+    }
     
     init(sheetView: SheetView, colorValue: ColorValue) {
         self.sheetView = sheetView

@@ -134,9 +134,11 @@ final class RootAction: Action {
     private(set) var oldSwipeEvent: SwipeEvent?, swipeAction: SelectFrameAction?
     func swipe(with event: SwipeEvent) {
         textAction.moveEndInputKey()
+        if !(dragAction is DrawLineAction || dragAction is DrawStraightLineAction) {
+            stopDragEvent()
+        }
         switch event.phase {
         case .began:
-            stopDragEvent()
             stopInputTextEvent()
             updateLastEditedIntPoint(from: event)
             swipeAction = SelectFrameAction(self)

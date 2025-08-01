@@ -93,7 +93,7 @@ final class ChangeLanguageAction: InputKeyEventAction {
         case .began:
             let name: String
             if event.inputKeyType == .abc {
-                name = "A"
+                name = "Ａ"
             } else if event.inputKeyType == .aiu {
                 name = "あ"
             } else {

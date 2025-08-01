@@ -71,7 +71,7 @@ final class ColorAction: Action {
     
     var colorOwners = [SheetColorOwner]()
     var fp = Point()
-    var firstUUColor = UU(Color())
+    var beganUUColor = UU(Color())
     var editingUUColor = UU(Color())
     
     let isEditableMaxLightness = ColorSpace.default.isHDR
@@ -158,7 +158,7 @@ final class ColorAction: Action {
         didSet {
             guard isEditingLightness != oldValue else { return }
             if isEditingLightness {
-                let color = firstUUColor.value
+                let color = beganUUColor.value
                 
                 if isEditableOpacity {
                     let gradient = opacityGradientWith(color: color)
@@ -184,13 +184,13 @@ final class ColorAction: Action {
             }
         }
     }
-    var firstLightnessPosition = Point() {
+    var beganLightnessPosition = Point() {
         didSet {
             lightnessNode.attitude.position = lightnessWorldPosition
         }
     }
     var lightnessWorldPosition: Point {
-        let sfp = rootView.convertWorldToScreen(firstLightnessPosition)
+        let sfp = rootView.convertWorldToScreen(beganLightnessPosition)
         if isEditableOpacity {
             let t = oldEditingLightness
             let dp = Point(0, maxLightnessHeight * t)
@@ -233,7 +233,7 @@ final class ColorAction: Action {
         let p = rootView.convertScreenToWorld(event.screenPoint)
         
         if let (uuColor, owners) = rootView.madeColorOwnersWithSelection(at: p) {
-            self.firstUUColor = uuColor
+            self.beganUUColor = uuColor
             self.colorOwners = owners
         } else {
             self.colorOwners = []
@@ -254,13 +254,24 @@ final class ColorAction: Action {
     }
     
     func capture() {
-        var ssSet = Set<SheetView>()
-        colorOwners.forEach {
-            if ssSet.contains($0.sheetView) {
-                $0.captureUUColor(isNewUndoGroup: false)
+        let ownerDic = colorOwners.reduce(into: [SheetView: [SheetColorOwner]]()) {
+            if $0[$1.sheetView] == nil {
+                $0[$1.sheetView] = [$1]
             } else {
-                ssSet.insert($0.sheetView)
-                $0.captureUUColor(isNewUndoGroup: true)
+                $0[$1.sheetView]?.append($1)
+            }
+        }
+        for (_, owners) in ownerDic {
+            var isNewUndoGroup = true
+            owners.forEach {
+                if $0.uuColor != $0.oldUUColor {
+                    if $0.uuColor.value == $0.oldUUColor.value {
+                        $0.uuColor = $0.oldUUColor
+                    } else {
+                        $0.captureUUColor(isNewUndoGroup: isNewUndoGroup)
+                        isNewUndoGroup = false
+                    }
+                }
             }
         }
     }
@@ -530,7 +541,7 @@ final class ColorAction: Action {
                 lightnessNode.path = Path([Pathline(lightnessPointsWith(splitCount: Int(maxLightnessHeight)))])
                 oldEditingLightness = beganVolm.clipped(min: minV, max: maxV, newMin: 0, newMax: 100)
                 editingLightness = oldEditingLightness
-                firstLightnessPosition = rootView.convertScreenToWorld(fp)
+                beganLightnessPosition = rootView.convertScreenToWorld(fp)
                 isEditingLightness = true
             }
         case .changed:
@@ -1319,7 +1330,7 @@ final class ColorAction: Action {
                 lightnessNode.path = Path([Pathline(lightnessPointsWith(splitCount: Int(maxLightnessHeight)))])
                 oldEditingLightness = beganVolm.clipped(min: minV, max: maxV, newMin: 0, newMax: 100)
                 editingLightness = oldEditingLightness
-                firstLightnessPosition = rootView.convertScreenToWorld(fp)
+                beganLightnessPosition = rootView.convertScreenToWorld(fp)
                 isEditingLightness = true
             }
         case .changed:
@@ -1473,7 +1484,23 @@ final class ColorAction: Action {
             }
         }
         
-        func updateLightness() {
+        switch event.phase {
+        case .began:
+            rootView.cursor = .arrow
+            
+            updateNode()
+            updateOwners(with: event)
+            fp = event.screenPoint
+            let g = lightnessGradientWith(chroma: beganUUColor.value.chroma,
+                                          hue: beganUUColor.value.hue)
+            lightnessNode.lineType = .gradient(g)
+            lightnessNode.path = Path([Pathline(lightnessPointsWith(splitCount: Int(maxLightnessHeight)))])
+            oldEditingLightness = beganUUColor.value.lightness
+            editingLightness = oldEditingLightness
+            beganLightnessPosition = rootView.convertScreenToWorld(fp)
+            editingUUColor = beganUUColor
+            isEditingLightness = true
+        case .changed:
             let wp = rootView.convertScreenToWorld(event.screenPoint)
             let p = lightnessNode.convertFromWorld(wp)
             if isEditableMaxLightness {
@@ -1502,7 +1529,7 @@ final class ColorAction: Action {
                               maxLightness,
                               t: t)
             
-            var uuColor = firstUUColor
+            var uuColor = beganUUColor
             uuColor.value.lightness = lightness
             if isEditableOpacity {
                 uuColor.value.opacity = opacity(atX: p.x)
@@ -1511,25 +1538,6 @@ final class ColorAction: Action {
             colorOwners.forEach { $0.uuColor = uuColor }
             
             editingLightness = lightness
-        }
-        switch event.phase {
-        case .began:
-            rootView.cursor = .arrow
-            
-            updateNode()
-            updateOwners(with: event)
-            fp = event.screenPoint
-            let g = lightnessGradientWith(chroma: firstUUColor.value.chroma,
-                                          hue: firstUUColor.value.hue)
-            lightnessNode.lineType = .gradient(g)
-            lightnessNode.path = Path([Pathline(lightnessPointsWith(splitCount: Int(maxLightnessHeight)))])
-            oldEditingLightness = firstUUColor.value.lightness
-            editingLightness = oldEditingLightness
-            firstLightnessPosition = rootView.convertScreenToWorld(fp)
-            editingUUColor = firstUUColor
-            isEditingLightness = true
-        case .changed:
-            updateLightness()
         case .ended:
             capture()
             colorOwners = []
@@ -1656,13 +1664,30 @@ final class ColorAction: Action {
             }
         }
         
-        func updateTint() {
+        switch event.phase {
+        case .began:
+            rootView.cursor = .arrow
+            
+            updateNode()
+            updateOwners(with: event)
+            if isDrawPoints {
+                updateTintPointNodes(with: event)
+            }
+            fp = event.screenPoint
+            tintLightness = beganUUColor.value.lightness
+            oldEditingTintPosition = PolarPoint(beganUUColor.value.chroma,
+                                              beganUUColor.value.hue).rectangular
+            editingTintPosition = oldEditingTintPosition
+            beganTintPosition = rootView.convertScreenToWorld(fp)
+            editingUUColor = beganUUColor
+            isEditingTint = true
+        case .changed:
             let wp = rootView.convertScreenToWorld(event.screenPoint)
             let p = tintNode.convertFromWorld(wp)
             let fTintP = Point()
             let r = fTintP.distance(p)
             let theta = fTintP.angle(p)
-            var uuColor = firstUUColor
+            var uuColor = beganUUColor
             if r < snappableDistance {
                 if let lastTintSnapTime = lastTintSnapTime {
                     if event.time - lastTintSnapTime > 1 {
@@ -1688,27 +1713,7 @@ final class ColorAction: Action {
             colorOwners.forEach { $0.uuColor = uuColor }
             
             editingTintPosition = PolarPoint(uuColor.value.chroma,
-                                           uuColor.value.hue).rectangular
-        }
-        switch event.phase {
-        case .began:
-            rootView.cursor = .arrow
-            
-            updateNode()
-            updateOwners(with: event)
-            if isDrawPoints {
-                updateTintPointNodes(with: event)
-            }
-            fp = event.screenPoint
-            tintLightness = firstUUColor.value.lightness
-            oldEditingTintPosition = PolarPoint(firstUUColor.value.chroma,
-                                              firstUUColor.value.hue).rectangular
-            editingTintPosition = oldEditingTintPosition
-            beganTintPosition = rootView.convertScreenToWorld(fp)
-            editingUUColor = firstUUColor
-            isEditingTint = true
-        case .changed:
-            updateTint()
+                                             uuColor.value.hue).rectangular
         case .ended:
             capture()
             colorOwners = []
@@ -1751,20 +1756,6 @@ final class ColorAction: Action {
             }
         }
         
-        func updateLightness() {
-            let wp = rootView.convertScreenToWorld(event.screenPoint)
-            let p = lightnessNode.convertFromWorld(wp)
-            let t = (p.y / maxLightnessHeight).clipped(min: 0, max: 1)
-            let opacity = Double.linear(0, 1, t: t)
-            
-            var uuColor = firstUUColor
-            uuColor.value.opacity = opacity
-            
-            editingUUColor = uuColor
-            colorOwners.forEach { $0.uuColor = uuColor }
-            
-            editingLightness = opacity
-        }
         switch event.phase {
         case .began:
             rootView.cursor = .arrow
@@ -1773,15 +1764,26 @@ final class ColorAction: Action {
             updateNode()
             updateOwners(with: event)
             fp = event.screenPoint
-            lightnessNode.lineType = .gradient(opacityGradientWith(color: firstUUColor.value))
+            lightnessNode.lineType = .gradient(opacityGradientWith(color: beganUUColor.value))
             lightnessNode.path = Path([Pathline(opacityPointsWith())])
-            oldEditingLightness = firstUUColor.value.opacity
+            oldEditingLightness = beganUUColor.value.opacity
             editingLightness = oldEditingLightness
-            firstLightnessPosition = rootView.convertScreenToWorld(fp)
-            editingUUColor = firstUUColor
+            beganLightnessPosition = rootView.convertScreenToWorld(fp)
+            editingUUColor = beganUUColor
             isEditingLightness = true
         case .changed:
-            updateLightness()
+            let wp = rootView.convertScreenToWorld(event.screenPoint)
+            let p = lightnessNode.convertFromWorld(wp)
+            let t = (p.y / maxLightnessHeight).clipped(min: 0, max: 1)
+            let opacity = Double.linear(0, 1, t: t)
+            
+            var uuColor = beganUUColor
+            uuColor.value.opacity = opacity
+            
+            editingUUColor = uuColor
+            colorOwners.forEach { $0.uuColor = uuColor }
+            
+            editingLightness = opacity
         case .ended:
             capture()
             colorOwners = []
