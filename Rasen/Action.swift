@@ -316,6 +316,8 @@ final class RootAction: Action {
         case .interpolate, .controlInterpolate: InterpolateAction(self)
         case .disconnect: DisconnectAction(self)
         case .stop: StopAction(self)
+        case .changeABC: ChangeLanguageAction(self)
+        case .changeAIU: ChangeLanguageAction(self)
         default: nil
         }
     }
@@ -333,7 +335,8 @@ final class RootAction: Action {
                 && quasimode != .changeToSubscript
                 && quasimode != .changeToHorizontalText
                 && quasimode != .changeToVerticalText
-                && quasimode != .paste {
+                && quasimode != .paste
+                && quasimode != .changeABC && quasimode != .changeAIU {
                 
                 stopInputTextEvent(isEndEdit: quasimode != .undo && quasimode != .redo)
             }
@@ -722,13 +725,13 @@ final class MultiSelectFrameAction: DragEventAction {
                                 in animationView: AnimationView) {
         var isSelects = [Bool](repeating: false, count: animationView.model.keyframes.count)
         let beganRootIndex = animationView.model.nearestRootIndex(atRootBeat: beganSelectedRootBeat)
-        let ni = animationView.model.nearestRootIndex(atRootBeat: nRootBeat)
+        let ni = animationView.model.rootIndex(atRootBeat: nRootBeat)
         let range = beganRootIndex <= ni ? beganRootIndex ... ni : ni ... beganRootIndex
         for i in range {
             let ki = animationView.model.index(atRoot: i)
             isSelects[ki] = true
         }
-        beganSelectedFrameIndexes.forEach { isSelects[$0] = true }
+        
         let fis = isSelects.enumerated().compactMap { $0.element ? $0.offset : nil }
         animationView.selectedFrameIndexes = fis
     }
@@ -793,17 +796,17 @@ final class MultiSelectFrameAction: DragEventAction {
                     rootAction.updateActionNode()
                     rootView.updateSelects()
                     
-                    lastRootBeats.append((event.time, nRootBeat))
-                    for (i, v) in lastRootBeats.enumerated().reversed() {
-                        if event.time - v.sec > minLastSec {
-                            if i > 0 {
-                                lastRootBeats.removeFirst(i - 1)
-                            }
-                            break
-                        }
-                    }
-                    
                     if oldKI != animationView.model.index {
+                        lastRootBeats.append((event.time, nRootBeat))
+                        for (i, v) in lastRootBeats.enumerated().reversed() {
+                            if event.time - v.sec > minLastSec {
+                                if i > 0 {
+                                    lastRootBeats.removeFirst(i - 1)
+                                }
+                                break
+                            }
+                        }
+                        
                         animationView.shownInterTypeKeyframeIndex = animationView.model.index
                         
                         updateSelected(fromRootBeeat: nRootBeat, in: animationView)

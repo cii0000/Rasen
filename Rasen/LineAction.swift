@@ -425,7 +425,9 @@ final class LineAction: Action {
                 }
                 
                 if isClip, let nSnapDC = snapDC {
-                    if !nSnapDC.isEmpty && time - firstChangedTime < 0.08 {
+                    if !nSnapDC.isEmpty
+                        && time - firstChangedTime < 0.08 {
+                        
                         snapDC?.point *= 0.75
                         p += nSnapDC.point * 0.75
                         
@@ -587,7 +589,7 @@ final class LineAction: Action {
                             let p0 = nLine.controls[i].point,
                                 p1 = nLine.controls[i - 1].point,
                                 p2 = nLine.controls[i - 2].point
-                            l += p0.distance(oldC.point)
+                            l += p1.distance(oldC.point)
                             oldC = nLine.controls[i]
                             if time - times[i] > 0.1
                                 || l * wtsScale > 6
@@ -1277,8 +1279,8 @@ final class LineAction: Action {
                                      clipBounds: clipBounds,
                                      isStraight: isStraight).line
             
-            guard !(tempLine.length() * rootView.worldToScreenScale < (event.isTablet ? 0.1 : 0.5) &&
-                  event.time - beganTime < 1),
+            guard !(tempLine.length() * rootView.worldToScreenScale < (event.isTablet ? 0.1 : 2) &&
+                  event.time - beganTime < 3),
                   let lb = tempLine.bounds else {
                 tempLineNode?.removeFromParent()
                 tempLineNode = nil
@@ -1286,6 +1288,16 @@ final class LineAction: Action {
                     isStraightNode?.removeFromParent()
                     isStraightNode = nil
                 }
+                
+                rootAction.inputKey(with: .init(screenPoint: event.screenPoint,
+                                                time: event.time, pressure: event.pressure,
+                                                phase: .began, isRepeat: false,
+                                                inputKeyType: .click))
+                Sleep.start()
+                rootAction.inputKey(with: .init(screenPoint: event.screenPoint,
+                                                time: event.time, pressure: event.pressure,
+                                                phase: .ended, isRepeat: false,
+                                                inputKeyType: .click))
                 return
             }
             

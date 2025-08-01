@@ -33,6 +33,7 @@ struct InputKeyType {
     static let subClick = InputKeyType(name: "SubClick".localized)
     static let threeFingersTap = InputKeyType(name: "3FingersTap".localized)
     static let fourFingersTap = InputKeyType(name: "4FingersTap".localized)
+    static let osCompliant = InputKeyType(name: "OS compliant".localized)
     
     static let a = InputKeyType(name: "Ａ"), b = InputKeyType(name: "Ｂ")
     static let c = InputKeyType(name: "Ｃ"), d = InputKeyType(name: "Ｄ")
@@ -181,6 +182,9 @@ struct InputKeyType {
     static let f34 = InputKeyType(name: "F34")
     static let f35 = InputKeyType(name: "F35")
     
+    static let abc = InputKeyType(name: "ABC")
+    static let aiu = InputKeyType(name: "あいう")
+    
     static let unknown = InputKeyType(name: "unknown")
     
     var name: String
@@ -190,13 +194,19 @@ extension InputKeyType {
     var isText: Bool {
         switch self {
         case .click, .subClick, .threeFingersTap, .fourFingersTap,
-                .space, .enter, .carriageReturn, .tab, .delete,
+             .space,
              .escape, .command, .shift, .option, .control, .function,
-             .up, .down, .left, .right,
+             .backspace, .carriageReturn, .newline, .enter, .delete, .deleteForward,
+             .up, .down, .left, .right, .pageUp, .pageDown, .home, .end,
+             .prev, .next, .begin, .`break`, .clearDisplay, .clearLine, .deleteCharacter,
+             .deleteLine, .execute, .find, .formFeed, .help, .insert, .insertCharacter,
+             .insertLine, .lineSeparator, .menu, .modeSwitch, .paragraphSeparator, .pause,
+             .print, .printScreen, .redo, .reset, .scrollLock, .select, .stop, .sysReq,
+             .system, .undo, .user,
              .f1, .f2, .f3, .f4, .f5, .f6, .f7, .f8, .f9, .f10,
              .f11, .f12, .f13, .f14, .f15, .f16, .f17, .f18, .f19, .f20,
              .f21, .f22, .f23, .f24, .f25, .f26, .f27, .f28, .f29, .f30,
-             .f31, .f32, .f33, .f34, .f35:
+             .f31, .f32, .f33, .f34, .f35, .abc, .aiu:
             false
         default:
             true
@@ -206,10 +216,14 @@ extension InputKeyType {
         switch self {
         case .click, .subClick, .threeFingersTap, .fourFingersTap,
                 .escape, .command, .shift, .option, .control, .function,
+                .prev, .next, .begin, .execute, .find, .formFeed, .help, .menu,
+                .modeSwitch, .pause, .print, .printScreen,
+                .redo, .reset, .scrollLock,
+                .select, .stop, .sysReq, .system, .undo, .user,
                 .f1, .f2, .f3, .f4, .f5, .f6, .f7, .f8, .f9, .f10,
                 .f11, .f12, .f13, .f14, .f15, .f16, .f17, .f18, .f19, .f20,
                 .f21, .f22, .f23, .f24, .f25, .f26, .f27, .f28, .f29, .f30,
-                .f31, .f32, .f33, .f34, .f35:
+                .f31, .f32, .f33, .f34, .f35, .abc, .aiu:
             false
         default:
             true
@@ -219,11 +233,15 @@ extension InputKeyType {
         switch self {
         case .click, .subClick, .threeFingersTap, .fourFingersTap,
              .escape, .command, .shift, .option, .control, .function,
+             .prev, .next, .begin, .execute, .find, .formFeed, .help, .menu,
+             .modeSwitch, .pause, .print, .printScreen,
+             .redo, .reset, .scrollLock,
+             .select, .stop, .sysReq, .system, .undo, .user,
              .up, .down, .left, .right,
              .f1, .f2, .f3, .f4, .f5, .f6, .f7, .f8, .f9, .f10,
              .f11, .f12, .f13, .f14, .f15, .f16, .f17, .f18, .f19, .f20,
              .f21, .f22, .f23, .f24, .f25, .f26, .f27, .f28, .f29, .f30,
-             .f31, .f32, .f33, .f34, .f35:
+             .f31, .f32, .f33, .f34, .f35, .abc, .aiu:
             false
         default:
             true
@@ -401,6 +419,9 @@ extension Quasimode {
     
     static let interpolate = Self(modifier: [.command], .s)
     static let disconnect = Self(modifier: [.shift, .command], .s)
+    
+    static let changeABC = Self(.abc)
+    static let changeAIU = Self(.aiu)
 }
 
 protocol Event {

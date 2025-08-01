@@ -545,6 +545,7 @@ extension ScoreView {
                           sy: self.y(fromPitch: pitchRange.start),
                           ey: self.y(fromPitch: pitchRange.end),
                           subBorderBeats: Set(score.keyBeats),
+                          enabledBeatExtension: false,
                           subBorderPathlines: &subBorderPathlines,
                           fullEditBorderPathlines: &fullEditBorderPathlines,
                           borderPathlines: &borderPathlines)

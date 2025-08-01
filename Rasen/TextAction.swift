@@ -80,6 +80,40 @@ final class FindAction: InputKeyEventAction {
     }
 }
 
+final class ChangeLanguageAction: InputKeyEventAction {
+    let rootAction: RootAction, rootView: RootView
+    
+    init(_ rootAction: RootAction) {
+        self.rootAction = rootAction
+        rootView = rootAction.rootView
+    }
+    
+    func flow(with event: InputKeyEvent) {
+        switch event.phase {
+        case .began:
+            let name: String
+            if event.inputKeyType == .abc {
+                name = "A"
+            } else if event.inputKeyType == .aiu {
+                name = "あ"
+            } else {
+                return
+            }
+            
+            if rootView.pov.rotation != 0 {
+                rootView.cursor = Cursor.rotate(string: name,
+                                                rotation: -rootView.pov.rotation + .pi / 2)
+            } else {
+                rootView.cursor = .circle(string: name)
+            }
+        case .changed:
+            break
+        case .ended:
+            rootView.cursor = rootView.defaultCursor
+        }
+    }
+}
+
 final class LookUpAction: InputKeyEventAction {
     let rootAction: RootAction, rootView: RootView
     

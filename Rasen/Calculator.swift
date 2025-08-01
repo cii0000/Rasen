@@ -2257,11 +2257,7 @@ struct Calculator {
                                         _ memoRPN: inout [UUID: RPN],
                                         _ handler: Handler) -> O {
         switch runType {
-        case .flip: O.flip(args[0], &oDic)
         case .showAllDefinitions: O.showAllDefinitions(args[0], &oDic)
-        case .drawAxes: O.drawAxes(base: args[0], args[1], args[2], &oDic)
-        case .plot: O.plot(base: args[0], args[1], &oDic)
-        case .draw: O.draw(args[0], &oDic)
         case .map://再帰バグ
             O.map(args[0], args[1]) { calculate($0, id, args: [$1], &oDic, &memoRPN, handler).o }
         case .filter:

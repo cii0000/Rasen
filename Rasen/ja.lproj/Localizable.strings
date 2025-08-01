@@ -14,8 +14,9 @@
 "3FingersScroll" = "３本指スクロール";
 "2FingersPinch" = "２本指ピンチ";
 "2FingersRotate" = "２本指回転";
-"V Pinch" = "V ピンチ";
-"Resize Paste" = "リサイズペースト";
+"VPinch" = "V ピンチ";
+"ResizePaste" = "リサイズペースト";
+"OSCompliant" = "OS準拠";
 
 "Draw Line" = "線を引く";
 "Draw Straight Line" = "直線を引く";
@@ -441,11 +442,11 @@
 "Display position of the execution result." = "実行結果の表示位置。";
 "Show about Run." = "実行についてを表示。";
 "Show all definitions." = "すべての定義を表示。";
-"Draw points $0 on sheet, e.g. draw ((100 100) (200 200))" = "シートに座標配列$0を描画。例: draw ((100 100) (200 200))";
-"Draw axes on the sheet with $0 as the base scale, $1 as the x axis name, $2 as the y axis name, and the center of the sheet as the origin,\ne.g. drawAxes base: 1 \"X\" \"Y\"" = "ベーススケールを$0、X軸名を$1、Y軸名を$2、シートの中心を原点としてシートに座標軸を描画。\n例: drawAxes base: 1 \"X\" \"Y\"";
-"Plot points $1 on the sheet with $0 as the base scale, center of the sheet as the origin,\ne.g. plot base: 1 ((0 0) (1 1))" = "ベーススケールを$0、シートの中心を原点としてシートに座標配列$1を描画。\n例: plot base: 1 ((0 0) (1 1))";
-"Plot complex points $1 on the sheet with $0 as the base scale, center of the sheet as the origin,\ne.g. plotRI base: 2 ((1 + 2¡) (-1))" = "ベーススケールを$0、シートの中心を原点としてシートに複素座標配列$1を描画。\n例: plotRI base: 2 ((1 + 2¡) (-1))";
-"Flip sheet based on $0, e.g. horizontal flip" = "シートを$0を基準にして反転。例: horizontal flip";
+"Draw points $0 on sheet, e.g. sheet draw ((100 100) (200 200))" = "シートに座標配列$0を描画。例: sheet draw ((100 100) (200 200))";
+"Draw axes on the sheet with $0 as the base scale, $1 as the x axis name, $2 as the y axis name, and the center of the sheet as the origin,\ne.g. sheet drawAxes base: 1 \"X\" \"Y\"" = "ベーススケールを$0、X軸名を$1、Y軸名を$2、シートの中心を原点としてシートに座標軸を描画。\n例: sheet drawAxes base: 1 \"X\" \"Y\"";
+"Plot points $1 on the sheet with $0 as the base scale, center of the sheet as the origin,\ne.g. sheet plot base: 1 ((0 0) (1 1))" = "ベーススケールを$0、シートの中心を原点としてシートに座標配列$1を描画。\n例: sheet plot base: 1 ((0 0) (1 1))";
+"Plot complex points $1 on the sheet with $0 as the base scale, center of the sheet as the origin,\ne.g. sheet plotRI base: 2 ((1 + 2¡) (-1))" = "ベーススケールを$0、シートの中心を原点としてシートに複素座標配列$1を描画。\n例: sheet plotRI base: 2 ((1 + 2¡) (-1))";
+"Flip sheet based on $0, e.g. sheet horizontal flip" = "シートを$0を基準にして反転。例: sheet horizontal flip";
 
 "Send $1 to $0. $+$ send (a b) = a + b" = "$0に$1を送る。 $+$ send (a b) = a + b";
 "Get arguments." = "引数を取得。";

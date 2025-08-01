@@ -17,6 +17,7 @@
 
 //#if os(macOS)
 import MetalKit
+import Carbon.HIToolbox
 //#elseif os(iOS) && os(watchOS) && os(tvOS) && os(visionOS) && os(linux) && os(windows)
 //#endif
 
@@ -120,6 +121,10 @@ final class SubNSApplication: NSApplication {
             nsEvent.window?.sendEvent(nsEvent)
         } else if nsEvent.type == .keyUp && nsEvent.modifierFlags.contains(.command) {
             nsEvent.window?.sendEvent(nsEvent)
+        } else if nsEvent.type == .keyDown || nsEvent.type == .keyUp,
+                    nsEvent.keyCode == 102 || nsEvent.keyCode == 104 {
+            nsEvent.window?.sendEvent(nsEvent)
+            super.sendEvent(nsEvent)
         } else {
             super.sendEvent(nsEvent)
         }
@@ -1516,10 +1521,15 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         let trackingArea = NSTrackingArea(rect: bounds,
                                           options: [.mouseEnteredAndExited,
                                                     .mouseMoved,
+                                                    .cursorUpdate,
                                                     .activeWhenFirstResponder],
                                           owner: self, userInfo: nil)
         addTrackingArea(trackingArea)
         self.trackingArea = trackingArea
+    }
+    
+    override func cursorUpdate(with event: NSEvent) {
+        Cursor.current = rootView.cursor
     }
     
     func dragEventWith(indicate nsEvent: NSEvent) -> DragEvent {
@@ -1625,6 +1635,8 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     
     override func mouseMoved(with nsEvent: NSEvent) {
+        Cursor.current = rootView.cursor
+        
         rootAction.indicate(with: dragEventWith(indicate: nsEvent))
         
         if let oldEvent = rootAction.oldInputKeyEvent,
@@ -1785,6 +1797,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         menuAction = StartExportAction(rootAction)
         menuAction?.flow(with: event)
         menu.delegate = self
+        menu.allowsContextMenuPlugIns = false
         menu.addItem(SubNSMenuItem(title: "Import...".localized, closure: { [weak self] in
             guard let self else { return }
             let action = ImportAction(self.rootAction)
@@ -2005,6 +2018,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     var isEnabledCustomTrackpad = true
     
     var oldTouchPoints = [Int: Point]()
+    var beganTouchScreenPoint = Point()
     var touchedIDs = [Int](), beganTouchTime: Double?, oldTouchTime: Double?
     var began2FingersTime: Double?
     var isBeganScroll = false, isFirstChangedScroll = false, beganScrollPosition: Point?, oldScrollPosition: Point?, allScrollPosition = Point()
@@ -2737,13 +2751,20 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     
     override func quickLook(with nsEvent: NSEvent) {
-        guard !isEnabledCustomTrackpad else { return }
+        guard !isEnabledCustomTrackpad
+                || !nsEvent.modifierFlags.isEmpty || nsEvent.type == .leftMouseUp else { return }
         
         guard window?.sheets.isEmpty ?? false else { return }
         
-        rootAction.inputKey(with: inputKeyEventWith(nsEvent, .threeFingersTap, .began))
+        var event = InputKeyEvent(screenPoint: screenPointFromCursor.my,
+                                  time: nsEvent.timestamp,
+                                  pressure: 1, phase: .began, isRepeat: false,
+                                  inputKeyType: .threeFingersTap)
+        let action = LookUpAction(rootAction)
+        action.flow(with: event)
         Sleep.start()
-        rootAction.inputKey(with: inputKeyEventWith(nsEvent, .threeFingersTap, .ended))
+        event.phase = .ended
+        action.flow(with: event)
     }
     
     func windowLevel() -> Int {
@@ -2813,7 +2834,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
            let rect = rootAction.textAction.firstRect(for: range) {
             return convertToTopScreen(rect.cg)
         } else {
-            return NSRect()
+            return NSRect(x: -100, y: -100, width: 0, height: 1)
         }
     }
     func baselineDeltaForCharacter(at nsI: Int) -> CGFloat {
@@ -4743,6 +4764,12 @@ extension NSEvent {
             case .f35: .f35
             default: .unknown
             }
+        }
+        
+        if keyCode == 102 {
+            return .abc
+        } else if keyCode == 104 {
+            return .aiu
         }
         
         guard let charactersIM = self.charactersIgnoringModifiers else { return nil }

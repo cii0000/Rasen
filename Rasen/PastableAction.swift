@@ -802,7 +802,8 @@ final class PastableAction: Action {
             selectingLineNode.lineWidth = rootView.worldLineWidth
             selectingLineNode.path = Path(textView.convertToWorld(tf))
         } else if let sheetView = rootView.sheetView(at: p),
-                  let lineView = sheetView.lineTuple(at: sheetView.convertFromWorld(p), isSmall: nil,
+                  let lineView = sheetView.lineTuple(at: sheetView.convertFromWorld(p),
+                                                     enabledPlane: true,
                                                      scale: 1 / rootView.worldToScreenScale)?.lineView {
             let t = Transform(translation: -sheetView.convertFromWorld(p))
             let ssv = SheetValue(lines: [lineView.model],

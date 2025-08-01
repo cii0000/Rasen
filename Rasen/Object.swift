@@ -848,9 +848,12 @@ extension F {
         case .asString: args[0].asStringO
         case .asError: args[0].asError
         case .isError: args[0].isErrorO
+        case .flip: O.flip(args[0], args[1])
+        case .drawAxes: O.drawAxes(args[0], base: args[1], args[2], args[3])
+        case .plot: O.plot(args[0], base: args[1], args[2])
+        case .draw: O.draw(args[0], args[1])
         case .showAboutRun: .showAboutRun(args[0])
-        case .send, .showAllDefinitions,
-                .draw, .drawAxes, .plot, .flip, .map, .filter, .reduce, .custom: nil
+        case .showAllDefinitions, .send, .map, .filter, .reduce, .custom: nil
         }
     }
     
@@ -1389,13 +1392,13 @@ extension O {
                F(left: 1, .showAboutRun))
         append(showAllDefinitionsName, OKeyInfo(sheetGroup, "Show all definitions.".localized),
                F(left: 1, .showAllDefinitions))
-        append(drawName, OKeyInfo(sheetGroup, "Draw points $0 on sheet, e.g. draw ((100 100) (200 200))".localized),
-               F(left: 1, .draw))
-        append(drawAxesName, OKeyInfo(sheetGroup, "Draw axes on the sheet with $0 as the base scale, $1 as the x axis name, $2 as the y axis name, and the center of the sheet as the origin,\ne.g. drawAxes base: 1 \"X\" \"Y\"".localized),
-               F(left: [], right: ["base", "", ""], .drawAxes))
-        append(plotName, OKeyInfo(sheetGroup, "Plot points $1 on the sheet with $0 as the base scale, center of the sheet as the origin,\ne.g. plot base: 1 ((0 0) (1 1))".localized),
-               F(left: [], right: ["base", ""], .plot))
-        append(flipName, OKeyInfo(sheetGroup, "Flip sheet based on $0, e.g. horizontal flip".localized),
+        append(drawName, OKeyInfo(sheetGroup, "Draw points $0 on sheet, e.g. sheet draw ((100 100) (200 200))".localized),
+               F(left: 1, right: 1, .draw))
+        append(drawAxesName, OKeyInfo(sheetGroup, "Draw axes on the sheet with $0 as the base scale, $1 as the x axis name, $2 as the y axis name, and the center of the sheet as the origin,\ne.g. sheet drawAxes base: 1 \"X\" \"Y\"".localized),
+               F(left: [""], right: ["base", "", ""], .drawAxes))
+        append(plotName, OKeyInfo(sheetGroup, "Plot points $1 on the sheet with $0 as the base scale, center of the sheet as the origin,\ne.g. sheet plot base: 1 ((0 0) (1 1))".localized),
+               F(left: [""], right: ["base", ""], .plot))
+        append(flipName, OKeyInfo(sheetGroup, "Flip sheet based on $0, e.g. sheet horizontal flip".localized),
                F(left: 1, .flip))
         
         let otherGroup = OKeyInfo.Group(name: "Other".localized)
@@ -5147,7 +5150,7 @@ extension O {
     }
     
     static let drawName = "draw"
-    static func draw(_ ao: O, _ oDic: inout [OKey: O]) -> O {
+    static func draw(_ ao: O, _ bo: O) -> O {
         func no(from a: [O: O], lineWidth: Double? = nil) -> O {
             if let rectO = a[O("rect")], case .dic(let rectDic) = rectO, let r = a[O("r")]?.asDouble,
                let originO = rectDic[O("origin")], let sizeO = rectDic[O("size")],
@@ -5160,7 +5163,7 @@ extension O {
                 let (dps, _) = path.pathDistancePoints(lineWidth: 1)
                 let line = Line(controls: dps.map { .init(point: $0.point, pressure: 1) },
                                 size: lineWidth ?? Line.defaultLineWidth)
-                return drawLine(line, &oDic)
+                return drawLine(ao, line)
             } else if let originO = a[O("origin")], let r = a[O("r")]?.asDouble,
                       case .array(let originOs) = originO,
                         originOs.count == 2, let x = originOs[0].asDouble, let y = originOs[1].asDouble {
@@ -5169,7 +5172,7 @@ extension O {
                 let (dps, _) = path.pathDistancePoints(lineWidth: 1)
                 let line = Line(controls: dps.map { .init(point: $0.point, pressure: 1) },
                                 size: lineWidth ?? Line.defaultLineWidth)
-                return drawLine(line, &oDic)
+                return drawLine(ao, line)
             } else if let originO = a[O("origin")], let sizeO = a[O("size")],
                case .array(let originOs) = originO, case .dic(let sizeDic) = sizeO,
                 originOs.count == 2, let x = originOs[0].asDouble, let y = originOs[1].asDouble,
@@ -5181,11 +5184,11 @@ extension O {
                           rect.minXMaxYPoint]
                 let line = Line(controls: ps.map { Line.Control(point: $0) },
                                 size: lineWidth ?? Line.defaultLineWidth)
-                return drawLine(line, &oDic)
+                return drawLine(ao, line)
             }
             return O(OError.undefined(with: "\(self) \(O.drawName)"))
         }
-        switch ao {
+        switch bo {
         case .array(let a):
             if a.count == 2,
                case .dic(let rectDic) = a[0],
@@ -5198,25 +5201,24 @@ extension O {
             }
         case .dic(let a):
             return no(from: a)
-        case .error: return ao
+        case .error: return bo
         default:
-            let ps = ao.asPoints
+            let ps = bo.asPoints
             if ps.isEmpty {
                 return O(OError.undefined(with: "\(self) \(O.drawName)"))
             } else if ps.count == 1 {
-                return drawPoint(ps[0], &oDic)
+                return drawPoint(ao, ps[0])
             } else {
                 let line = Line(controls: ps.map { Line.Control(point: $0) })
-                return drawLine(line, &oDic)
+                return drawLine(ao, line)
             }
         }
     }
     
     static let drawAxesName = "drawAxes"
-    static func drawAxes(base bo: O, _ xo: O, _ yo: O,
-                         _ oDic: inout [OKey: O]) -> O {
+    static func drawAxes(_ ao: O, base bo: O, _ xo: O, _ yo: O) -> O {
+        guard case .sheet(var sheet) = ao else { return O(OError(String(format: "Argument $0 must be sheet, not '%1$@'".localized, ao.name))) }
         guard let base = bo.asDouble, base > 0 else { return O(OError(String(format: "'%1$@' is not positive real".localized, bo.name))) }
-        guard case .sheet(var sheet)? = oDic[OKey(sheetName)] else { return O(OError(String(format: "'%1$@' does not exist".localized, sheetName))) }
         let xName = xo.asTextBasedString, yName = yo.asTextBasedString
         
         let b = sheet.bounds
@@ -5261,29 +5263,28 @@ extension O {
     }
     
     static let plotName = "plot"
-    static func plot(base bo: O, _ ao: O, _ oDic: inout [OKey: O]) -> O {
+    static func plot(_ ao : O, base bo: O, _ co: O) -> O {
         guard let base = bo.asDouble, base > 0 else { return O(OError(String(format: "'%1$@' is not positive real".localized, bo.name))) }
         
-        switch ao {
-        case .error: return ao
+        switch co {
+        case .error: return co
         default:
-            let ps = ao.asPoints
+            let ps = co.asPoints
             let s = 180 / base
             if ps.count == 1 {
                 let np = ps[0] * s + Point(256, 362)
-                return drawPoint(np, name: ao.name, &oDic)
+                return drawPoint(ao, np, name: co.name)
             } else {
                 let line = Line(controls: ps.map {
                     let np = $0 * s + Point(256, 362)
                     return Line.Control(point: np)
                 })
-                return drawLine(line, &oDic)
+                return drawLine(ao, line)
             }
         }
     }
-    static func drawPoint(_ np: Point, name: String? = nil,
-                          _ oDic: inout [OKey: O]) -> O {
-        guard case .sheet(var sheet)? = oDic[OKey(sheetName)] else { return O(OError(String(format: "'%1$@' does not exist".localized, sheetName))) }
+    static func drawPoint(_ ao: O, _ np: Point, name: String? = nil) -> O {
+        guard case .sheet(var sheet) = ao else { return O(OError(String(format: "Argument $0 must be sheet, not '%1$@'".localized, ao.name))) }
         
         let b = sheet.bounds
         let xs = String(intBased: np.x), ys = String(intBased: np.y)
@@ -5295,11 +5296,10 @@ extension O {
             sheet.append(t)
             return O(sheet)
         }
-        return drawEqual(String(format: "'%1$@' is out of bounds".localized,
-                                "(\(xs) \(ys))"), &oDic)
+        return O(OError(String(format: "'%1$@' is out of bounds".localized, "(\(xs) \(ys))")))
     }
-    static func drawLine(_ l: Line, _ oDic: inout [OKey: O]) -> O {
-        guard case .sheet(var sheet)? = oDic[OKey(sheetName)] else { return O(OError(String(format: "'%1$@' does not exist".localized, sheetName))) }
+    static func drawLine(_ ao: O, _ l: Line) -> O {
+        guard case .sheet(var sheet) = ao else { return O(OError(String(format: "Argument $0 must be sheet, not '%1$@'".localized, ao.name))) }
         
         if l.controls.count >= 2 {
             let l = l.controls.count > 10000 ? Line(controls: Array(l.controls[0 ..< 10000])) : l
@@ -5311,29 +5311,22 @@ extension O {
                 return O(sheet)
             }
         }
-        return drawEqual("Line is out of bounds".localized,  &oDic)
+        return O(OError("Line is out of bounds".localized))
     }
-    static func drawText(_ t: Text, _ oDic: inout [OKey: O]) -> O {
-        guard case .sheet(var sheet)? = oDic[OKey(sheetName)] else { return O(OError(String(format: "'%1$@' does not exist".localized, sheetName))) }
+    static func drawText(_ ao: O, _ t: Text) -> O {
+        guard case .sheet(var sheet) = ao else { return O(OError(String(format: "Argument $0 must be sheet, not '%1$@'".localized, ao.name))) }
         
         let b = sheet.bounds
         if let frame = t.frame, b.intersects(frame) {
             sheet.append(t)
             return O(sheet)
         }
-        return drawEqual("Text is out of bounds".localized, &oDic)
-    }
-    static func drawEqual(_ s: String, _ oDic: inout [OKey: O]) -> O {
-        guard case .sheet(var sheet)? = oDic[OKey(sheetName)] else { return O(OError(String(format: "'%1$@' does not exist".localized, sheetName))) }
-        guard let p = oDic[OKey(printPName)]?.asPoint else { return O(OError(String(format: "'%1$@' does not exist".localized, printPName))) }
-        
-        let nt = Text(string: "= " + s, origin: p)
-        sheet.append(nt)
-        return O(sheet)
+        return O(OError("Text is out of bounds".localized))
     }
     
     static let flipName = "flip"
-    static func flip(_ orientationO: O, _ oDic: inout [OKey: O]) -> O {
+    static func flip(_ ao: O, _ orientationO: O) -> O {
+        guard case .sheet(var sheet) = ao else { return O(OError(String(format: "Argument $0 must be sheet, not '%1$@'".localized, ao.name))) }
         guard case .string(let oString) = orientationO else { return O(OError(String(format: "'%1$@' is not string".localized, orientationO.name))) }
         let orientation: Orientation
         if oString == horizontalName {
@@ -5344,7 +5337,6 @@ extension O {
             return O(OError(String(format: "'%1$@' is not horizontal or vertical".localized, orientationO.name)))
         }
         
-        guard case .sheet(var sheet)? = oDic[OKey(sheetName)] else { return O(OError(String(format: "'%1$@' does not exist".localized, sheetName))) }
         let lines = sheet.value.picture.lines
         sheet.removeLines(at: Array(0 ..< lines.count))
         switch orientation {

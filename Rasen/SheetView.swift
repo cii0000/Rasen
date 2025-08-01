@@ -227,6 +227,7 @@ final class KeyframeView: BindableView, @unchecked Sendable {
 extension TimelineView {
     func makeBeatPathlines(in beatRange: Range<Rational>,
                            sy: Double, ey: Double, subBorderBeats: Set<Rational> = [],
+                           enabledBeatExtension: Bool = true,
                            subBorderPathlines: inout [Pathline],
                            fullEditBorderPathlines: inout [Pathline],
                            borderPathlines: inout [Pathline]) {
@@ -247,8 +248,9 @@ extension TimelineView {
                 
                 let beatX = x(atBeat: cBeat)
                 
-                let rect = Rect(x: beatX - lw / 2, y: sy,
-                                width: lw, height: ey - sy)
+                let dlh = enabledBeatExtension && lw == 0.5 ? 3.0 : 0.0
+                let rect = Rect(x: beatX - lw / 2, y: sy - dlh,
+                                width: lw, height: ey - sy + dlh * 2)
                 if subBorderBeats.contains(cBeat) {
                     subBorderPathlines.append(.init(rect))
                 } else if lw == 0.0625 {
@@ -2757,7 +2759,7 @@ final class SheetView: BindableView, @unchecked Sendable {
                          removingUUColor: UUColor? = Line.defaultUUColor,
                          scale: Double) -> (isLine: Bool, value: SheetColorOwner) {
         if let (lineView, li) = lineTuple(at: p,
-                                          isSmall: nil, removingUUColor: removingUUColor,
+                                          enabledPlane: true, removingUUColor: removingUUColor,
                                           scale: scale) {
             let uuColor = lineView.model.uuColor
             
@@ -6474,24 +6476,22 @@ final class SheetView: BindableView, @unchecked Sendable {
         return n
     }
     
-    func lineTuple(at p: Point, isSmall ois: Bool? = false,
+    func lineTuple(at p: Point, enabledPlane: Bool = false,
                    removingUUColor: UUColor? = nil,
                    scale: Double) -> (lineView: SheetLineView,
                                       lineIndex: Int)? {
-        guard let v = lineTuple(at: p, isSmall: ois, removingUUColor: removingUUColor,
+        guard let v = lineTuple(at: p, enabledPlane: enabledPlane, removingUUColor: removingUUColor,
                                 enabledPreviousNext: false, scale: scale) else { return nil }
         return (v.lineView, v.lineI)
     }
-    func lineTuple(at p: Point, isSmall ois: Bool? = false,
+    func lineTuple(at p: Point, enabledPlane: Bool = false,
                    removingUUColor: UUColor? = nil,
                    enabledPreviousNext: Bool,
                    minEnabledDistance med: Double = 10,
                    scale: Double) -> (lineView: SheetLineView, lineI: Int, rootKeyframeI: Int)? {
         let isNoneDefaultColorPlane = !model.picture.planes.isEmpty
         && sheetColorOwnerFromPlane(at: p).uuColor != Sheet.defalutBackgroundUUColor
-        let smallScale: Double? = if let ois {
-            ois ? 2.0 : nil
-        } else if isNoneDefaultColorPlane {
+        let smallScale: Double? = if enabledPlane && isNoneDefaultColorPlane {
             8.0
         } else if textTuple(at: p) != nil {
             2.0

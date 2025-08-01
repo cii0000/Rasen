@@ -84,6 +84,7 @@ final class RunAction: InputKeyEventAction {
             return
         }
         if rootAction.isPlaying(with: event) {
+            rootView.closeAllPanels(at: p)
             rootAction.stopPlaying(with: event)
             return
         }
