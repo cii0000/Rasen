@@ -2002,6 +2002,9 @@ extension Score {
     var allBeatRange: Range<Rational> {
         beatRange.start ..< (beatRange.end + loopDurBeat)
     }
+    var allSecRange: Range<Rational> {
+        secRange.start ..< (secRange.end + loopDurSec)
+    }
     
     var musicScale: MusicScale? {
         .init(pitchs: scales.map { Int($0.rounded()) })

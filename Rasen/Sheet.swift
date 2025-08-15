@@ -2521,7 +2521,7 @@ extension Sheet {
     var musicEndBeat: Rational {
         var v = Rational(0)
         if score.enabled {
-            v = max(v, score.beatRange.end)
+            v = max(v, score.allBeatRange.end)
         }
         v = contents.reduce(into: v) {
             if let timeOption = $1.timeOption {
@@ -2538,7 +2538,7 @@ extension Sheet {
     var musicEndSec: Rational {
         var v = Rational(0)
         if score.enabled {
-            v = max(v, score.secRange.end)
+            v = max(v, score.allSecRange.end)
         }
         v = contents.reduce(into: v) {
             if let timeOption = $1.timeOption {

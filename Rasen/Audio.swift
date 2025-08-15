@@ -907,7 +907,7 @@ final class ScoreNoder: ObjectHashable {
                 if scoreTrackItem.loopDurSec > 0 {
                     var sec: Rational = 0
                     while sec < scoreTrackItem.durSec + scoreTrackItem.loopDurSec {
-                        let dSampleI = Int(((Double(sec) + startSec) * sampleRate).rounded(.down))
+                        let dSampleI = Int((Double(sec) * sampleRate).rounded(.down))
                         make(dSampleI: dSampleI)
                         sec += scoreTrackItem.durSec
                     }

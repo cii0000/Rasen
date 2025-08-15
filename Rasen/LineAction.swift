@@ -892,7 +892,21 @@ final class LineAction: Action {
                 firstSpectlopeHeight = Sheet.spectlopeHeight,
                 beganScore: Score?, beganPitch = Rational(), octaveNode: Node?, oldBeat = Rational(0),
                 noteI: Int?, noteStartBeat: Rational?, notePlayer: NotePlayer?
+    
+    private var beganEvent: DragEvent?
     func drawNote(with event: DragEvent, isStraight: Bool = false) {
+        if event.phase == .began {
+            beganEvent = event
+        }
+        if let beganEvent {
+            guard event.screenPoint.distance(beganEvent.screenPoint) >= 2.5
+                    || event.time - beganEvent.time >= 0.33 else { return }
+            aDrawNote(with: beganEvent, isStraight: isStraight)
+            self.beganEvent = nil
+        }
+        aDrawNote(with: event, isStraight: isStraight)
+    }
+    private func aDrawNote(with event: DragEvent, isStraight: Bool = false) {
         guard isEditingSheet else {
             rootAction.keepOut(with: event)
             return
@@ -1000,8 +1014,10 @@ final class LineAction: Action {
                     oldBeat = beat
                 }
                 
-                rootView.cursor = .circle(string: Pitch(value: pitch)
-                    .octaveString(deltaPitch: pitch - beganPitch))
+                if isNote {
+                    rootView.cursor = .circle(string: Pitch(value: pitch)
+                        .octaveString(deltaPitch: pitch - beganPitch))
+                }
             }
         case .ended:
             tempLineNode?.removeFromParent()

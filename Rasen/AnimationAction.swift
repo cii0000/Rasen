@@ -661,19 +661,10 @@ final class PlayAction: InputKeyEventAction {
                     }
                 }
                 
-                func sheetView(at shp: IntPoint) -> SheetView? {
-                    if let aSheetView = rootView.sheetView(at: shp),
-                       aSheetView.model.enabledTimeline {
-                        
-                        aSheetView
-                    } else {
-                        nil
-                    }
-                }
                 func topAndBottom(at ncShp: IntPoint, in aSheetView: SheetView) {
                     var nncShp = ncShp, npsvs = [WeakElement<SheetView>]()
                     nncShp.y -= 1
-                    while let aaSheetView = sheetView(at: nncShp) {
+                    while let aaSheetView = rootView.sheetView(at: nncShp) {
                         npsvs.append(.init(element: aaSheetView))
                         nncShp.y -= 1
                     }
@@ -681,7 +672,7 @@ final class PlayAction: InputKeyEventAction {
                     nncShp = ncShp
                     npsvs = []
                     nncShp.y += 1
-                    while let aaSheetView = sheetView(at: nncShp) {
+                    while let aaSheetView = rootView.sheetView(at: nncShp) {
                         npsvs.append(.init(element: aaSheetView))
                         nncShp.y += 1
                     }
@@ -690,13 +681,13 @@ final class PlayAction: InputKeyEventAction {
                 
                 let shps = rootView.groupSheetPositions(at: cShp)
                 for cShp in shps {
-                    guard let cSheetView = sheetView(at: cShp) else { continue }
+                    guard let cSheetView = rootView.sheetView(at: cShp) else { continue }
                     
                     topAndBottom(at: cShp, in: cSheetView)
                     
                     var ncShp = cShp, psvs = [WeakElement<SheetView>]()
-                    while let preShp = rootView.maxVerticalSheetPosition(at: ncShp, deltaX: -1) {
-                        guard let ncSheetView = sheetView(at: preShp) else { break }
+                    while let preShp = rootView.nearestVerticalSheetPosition(at: ncShp, deltaX: -1) {
+                        guard let ncSheetView = rootView.sheetView(at: preShp) else { break }
                         psvs.append(.init(element: ncSheetView))
                         ncShp = preShp
                     }
@@ -704,8 +695,8 @@ final class PlayAction: InputKeyEventAction {
                     
                     ncShp = cShp
                     var nsvs = [WeakElement<SheetView>]()
-                    while let nextShp = rootView.maxVerticalSheetPosition(at: ncShp, deltaX: 1) {
-                        guard let ncSheetView = sheetView(at: nextShp) else { break }
+                    while let nextShp = rootView.nearestVerticalSheetPosition(at: ncShp, deltaX: 1) {
+                        guard let ncSheetView = rootView.sheetView(at: nextShp) else { break }
                         nsvs.append(.init(element: ncSheetView))
                         ncShp = nextShp
                     }

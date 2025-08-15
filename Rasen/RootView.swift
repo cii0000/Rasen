@@ -1978,6 +1978,22 @@ final class RootView: View, @unchecked Sendable {
             nShp.y -= 1
         }
     }
+    func floodSheetPositionFromVertical(at shp: IntPoint, handler: (IntPoint) -> (Bool)) {
+        if !handler(shp) { return }
+        var dShp = shp, uShp = shp
+        uShp.y += 1
+        dShp.y -= 1
+        while true {
+            if sheetID(at: uShp) != nil {
+                if !handler(uShp) { return }
+            } else { break }
+            if sheetID(at: dShp) != nil {
+                if !handler(dShp) { return }
+            } else { break }
+            uShp.y += 1
+            dShp.y -= 1
+        }
+    }
     func maxVerticalSheetPosition(at shp: IntPoint, deltaX: Int) -> IntPoint? {
         var maxShp: IntPoint?
         sheetPositionFromVertical(at: shp) { nShp in
@@ -1985,6 +2001,18 @@ final class RootView: View, @unchecked Sendable {
             if sheetID(at: dShp) != nil {
                 maxShp = maxShp != nil ? (dShp.y > maxShp!.y ? dShp : maxShp!) : dShp
             }
+        }
+        return maxShp
+    }
+    func nearestVerticalSheetPosition(at shp: IntPoint, deltaX: Int) -> IntPoint? {
+        var maxShp: IntPoint?
+        floodSheetPositionFromVertical(at: shp) { nShp in
+            let dShp = IntPoint(nShp.x + deltaX, nShp.y)
+            if sheetID(at: dShp) != nil {
+                maxShp = dShp
+                return false
+            }
+            return true
         }
         return maxShp
     }

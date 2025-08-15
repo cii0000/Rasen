@@ -26,7 +26,7 @@ struct Typobute {
     
     var font = Font.default,
         maxTypelineWidth = Font.defaultSize * maxWidthCount,
-        clippedMaxTypelineWidth = Font.defaultSize * maxWidthCount,
+        clippedMaxTypelineWidth = Font.defaultSize * 58,
         spacing: Double?,
         alignment = Alignment.natural,
         orientation = Orientation.horizontal
