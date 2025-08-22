@@ -1362,7 +1362,7 @@ final class ColorAction: Action {
                                 nvs[noteI] = nv.note
                             }
                             nv.pits.forEach { (pitI, beganPit) in
-                                nvs[noteI]?.pits[pitI].tone.overtone.evenAmp = newVolm(from: beganPit.pit.tone.overtone.evenAmp, Volm.safeVolmRange)
+                                nvs[noteI]?.pits[pitI].tone.overtone.evenAmp = newVolm(from: beganPit.pit.tone.overtone.evenAmp, Volm.volmRange)
                                 nvs[noteI]?.pits[pitI].tone.id = v.nid
                             }
                         }

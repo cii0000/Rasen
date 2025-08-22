@@ -221,6 +221,10 @@ extension PCMTrackItem {
         pcmBuffer.format.sampleRate
     }
     
+    var lufs: Double {
+        pcmBuffer.integratedLoudness
+    }
+    
     mutating func change(from timeOption: ContentTimeOption) {
         guard pcmBuffer.sampleRate > 0 else { return }
         let durSec = Double(pcmBuffer.frameLength) / pcmBuffer.sampleRate
@@ -587,6 +591,8 @@ extension ScoreTrackItem {
             }
         }
         
+        sampless = PCMBuffer.compress(sampless: sampless, sampleRate: sampleRate)
+        
         let lufs = (try? Loudness(sampleRate: sampleRate).integratedLoudnessDb(data: sampless)) ?? targetLoudnessDb
         self.lufs = lufs
         if lufs > targetLoudnessDb {
@@ -594,8 +600,6 @@ extension ScoreTrackItem {
             vDSP.multiply(gain, sampless[0], result: &sampless[0])
             vDSP.multiply(gain, sampless[1], result: &sampless[1])
         }
-        
-        sampless = PCMBuffer.compress(sampless: sampless, sampleRate: sampleRate)
         
         self.sampless = sampless
         self.sampleStartI = -startI

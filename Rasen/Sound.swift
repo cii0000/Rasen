@@ -448,12 +448,18 @@ extension Sprol {
 }
 
 struct Spectlope: Hashable, Codable {
-    var sprols = [Sprol(pitch: 12 * 0, volm: 0.5, noise: 0),
-                  Sprol(pitch: 12 * 1.5, volm: 0.85, noise: 0),
-                  Sprol(pitch: 12 * 2.5, volm: 1, noise: 0),
-                  Sprol(pitch: 12 * 3.5, volm: 1, noise: 0),
-                  Sprol(pitch: 12 * 7, volm: 0.5, noise: 0),
-                  Sprol(pitch: 12 * 10, volm: 0, noise: 0)]
+    static func defaultSprols(isRandom: Bool = false) -> [Sprol] {
+        [Sprol(pitch: 12 * 0, volm: 0, noise: 0),
+         Sprol(pitch: 12 * 1.25, volm: 0.5, noise: 0),
+         Sprol(pitch: 12 * 2.25, volm: !isRandom ? 1 : .random(in: 0.5 ... 1), noise: 0),
+         Sprol(pitch: 12 * 6, volm: 0.5, noise: 0),
+         Sprol(pitch: 12 * 7, volm: 0.5, noise: 0),
+         Sprol(pitch: 12 * 7.25, volm: !isRandom ? 0.6 : .random(in: 0.5 ... 0.8), noise: 0),
+         Sprol(pitch: 12 * 8.15, volm: !isRandom ? 0.6 : .random(in: 0.5 ... 0.8), noise: 0),
+         Sprol(pitch: 12 * 10, volm: 0, noise: 0)]
+    }
+    
+    var sprols = Self.defaultSprols()
 }
 extension Spectlope: Protobuf {
     init(_ pb: PBSpectlope) throws {
@@ -472,13 +478,8 @@ extension Spectlope {
     init(noisePitchVolms: [Point]) {
         sprols = noisePitchVolms.map { .init(pitch: $0.x, volm: $0.y, noise: 1) }
     }
-    static func random(pitch: Double) -> Self {
-        Spectlope(sprols: [Sprol(pitch: 12 * 0, volm: 0.5, noise: 0),
-                           Sprol(pitch: 12 * 1.5, volm: .random(in: 0.5 ... 1), noise: 0),
-                           Sprol(pitch: 12 * 2.5, volm: .random(in: 0.35 ... 1), noise: 0),
-                           Sprol(pitch: 12 * 4, volm: .random(in: 0.3 ... 1), noise: 0),
-                           Sprol(pitch: 12 * 7, volm: 0.01, noise: 0),
-                           Sprol(pitch: 12 * 10, volm: 0.01, noise: 0)])
+    static func random() -> Self {
+        .init(sprols: Self.defaultSprols(isRandom: true))
     }
 }
 extension Spectlope {
@@ -1230,17 +1231,28 @@ extension Note {
         return minPitch ..< maxPitch
     }
     
-    func chordBeatRangeAndRoundedPitchs(minBeatLength: Rational = 0) -> [(beatRange: Range<Rational>, roundedPitch: Int)] {
-        guard !isOneOvertone && !isFullNoise else { return [] }
+    struct ChordResult {
+        struct Item {
+            var beatRange: Range<Rational>, roundedPitch: Int
+        }
+        
+        var items: [Item]
+    }
+    func chordResult(minBeatLength: Rational = 0, fromTempo tempo: Rational) -> ChordResult? {
+        guard !isOneOvertone && !isFullNoise else { return nil }
+        return withRendable(tempo: tempo).chordResult(minBeatLength: minBeatLength)
+    }
+    private func chordResult(minBeatLength: Rational = 0) -> ChordResult? {
         if pits.count >= 2 {
-            var ns = [(beatRange: Range<Rational>, roundedPitch: Int)]()
+            var ns = [ChordResult.Item]()
             var preBeat = beatRange.start, prePitch = Int((pitch + pits[0].pitch).rounded())
             var preVolm = pits[0].stereo.volm
             var prePit = pits[0]
             if preBeat < pits[0].beat + beatRange.start
                 && prePit.tone.spectlope.sumNoise < 0.75
                 && prePit.stereo.volm > 0.1 {
-                ns.append((preBeat ..< pits[0].beat + beatRange.start, prePitch))
+                ns.append(.init(beatRange: preBeat ..< pits[0].beat + beatRange.start,
+                                roundedPitch: prePitch))
             }
             var isPreEqual = false
             for i in 1 ..< pits.count {
@@ -1253,7 +1265,8 @@ extension Note {
                     if isPreEqual && preBeat < pBeat
                         && prePit.tone.spectlope.mid(pPit.tone.spectlope).sumNoise < 0.75
                         && prePit.stereo.volm.mid(pPit.stereo.volm) > 0.1 {
-                        ns.append((preBeat ..< pBeat, prePitch))
+                        ns.append(.init(beatRange: preBeat ..< pBeat,
+                                        roundedPitch: prePitch))
                     }
                     let beat = pit.beat + beatRange.start
                     preBeat = beat
@@ -1267,7 +1280,8 @@ extension Note {
                     if preBeat < beat
                         && prePit.tone.spectlope.mid(pit.tone.spectlope).sumNoise < 0.75
                         && preVolm.mid(volm) > 0.1 {
-                        ns.append((preBeat ..< beat, pitch))
+                        ns.append(.init(beatRange: preBeat ..< beat,
+                                        roundedPitch: pitch))
                     }
                     preBeat = beat
                     prePitch = pitch
@@ -1282,13 +1296,16 @@ extension Note {
             if preBeat < beatRange.end
                 && prePit.tone.spectlope.sumNoise < 0.75
                 && prePit.stereo.volm > 0.1 {
-                ns.append((preBeat ..< beatRange.end, prePitch))
+                ns.append(.init(beatRange: preBeat ..< beatRange.end,
+                                roundedPitch: prePitch))
             }
-            return ns.filter { $0.beatRange.length >= minBeatLength }
+            return .init(items: ns.filter { $0.beatRange.length >= minBeatLength })
         } else {
             return beatRange.length >= minBeatLength
             && firstTone.spectlope.sumNoise < 0.75
-            && firstStereo.volm > 0.1 ? [(beatRange, firstRoundedPitch)] : []
+            && firstStereo.volm > 0.1 ?
+                .init(items: [.init(beatRange: beatRange, roundedPitch: firstRoundedPitch)]) :
+                nil
         }
     }
     
@@ -2017,15 +2034,40 @@ extension Score {
         return minV ..< maxV
     }
     
-    func chordPitches(atBeat range: Range<Rational>, from notes: [Note]) -> [Int] {
+    func chordsResult(from chordResults: [Note.ChordResult]) -> [(chordRange: Range<Rational>,
+                                                                  chordPitches: [Int])] {
+        let chordBeats = chordResults.reduce(into: Set<Rational>()) {
+            for v in $1.items {
+                if beatRange.contains(v.beatRange.start) {
+                    $0.insert(v.beatRange.start)
+                }
+                if beatRange.contains(v.beatRange.end) {
+                    $0.insert(v.beatRange.end)
+                }
+            }
+        }.sorted()
+        guard !chordBeats.isEmpty else { return [] }
+        
+        var preBeat = beatRange.start
+        var chordRanges = chordBeats.count.array.map {
+            let v = preBeat ..< chordBeats[$0]
+            preBeat = chordBeats[$0]
+            return v
+        }
+        chordRanges.append(preBeat ..< beatRange.end)
+        
+        return chordRanges.map { ($0, Score.chordPitches(atBeat: $0, from: chordResults)) }
+    }
+    static func chordPitches(atBeat range: Range<Rational>,
+                             from chordResults: [Note.ChordResult]) -> [Int] {
         var pitchLengths = [Int: [Range<Rational>]]()
-        for note in notes {
-            for (beatRange, roundedPitch) in note.chordBeatRangeAndRoundedPitchs() {
-                if let iRange = beatRange.intersection(range) {
-                    if pitchLengths[roundedPitch] != nil {
-                        Range.union(iRange, in: &pitchLengths[roundedPitch]!)
+        for chordResult in chordResults {
+            for item in chordResult.items {
+                if let iRange = item.beatRange.intersection(range) {
+                    if pitchLengths[item.roundedPitch] != nil {
+                        Range.union(iRange, in: &pitchLengths[item.roundedPitch]!)
                     } else {
-                        pitchLengths[roundedPitch] = [iRange]
+                        pitchLengths[item.roundedPitch] = [iRange]
                     }
                 }
             }
@@ -2079,12 +2121,6 @@ extension Score {
             }
             return nil
         }
-    }
-    
-    static func chordNotes(from notes: [Note], tempo: Rational) -> [Note] {
-        notes
-            .filter { !$0.isOneOvertone && !$0.isFullNoise }
-            .map { $0.withRendable(tempo: tempo) }
     }
 }
 extension Score {

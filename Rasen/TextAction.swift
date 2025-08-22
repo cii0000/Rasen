@@ -263,10 +263,14 @@ final class LookUpAction: InputKeyEventAction {
         } else if let sheetView = rootView.sheetView(at: p),
                     let ci = sheetView.contentIndex(at: sheetView.convertFromWorld(p),
                                                     scale: rootView.screenToWorldScale) {
-            let content = sheetView.contentsView.elementViews[ci].model
+            let contentView = sheetView.contentsView.elementViews[ci]
+            let content = contentView.model
             let fileSize = content.url.fileSize ?? 0
+            let lufs = contentView.pcmTrackItem?.lufs ?? 0
             let string = IOResult.fileSizeNameFrom(fileSize: fileSize)
-            rootView.show(content.type.displayName + "\n\t\("File Size".localized): \(string)", at: p)
+            rootView.show(content.type.displayName
+                          + "\n\t\("Loudness".localized): \(lufs) LUFS"
+                          + "\n\t\("File Size".localized): \(string)", at: p)            
         } else if !rootView.isDefaultUUColor(at: p),
                   let sheetView = rootView.sheetView(at: p),
                   let plane = sheetView.plane(at: sheetView.convertFromWorld(p)) {

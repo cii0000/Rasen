@@ -198,12 +198,14 @@ final class ScoreView: TimelineView, @unchecked Sendable {
     var otherNotes = [Note]() {
         didSet {
             guard otherNotes != oldValue else { return }
+            otherChordResults = otherNotes.map { $0.chordResult(fromTempo: model.tempo) }
             updateChord()
             otherNotesNode.children = otherNotes.map {
                 mainLineNoteNode(from: $0, color: .init(white: 0, opacity: 0.5))
             }
         }
     }
+    private var otherChordResults = [Note.ChordResult?]()
     
     let draftNotesNode = Node(), notesNode = Node()
     let timelineContentNode = Node(fillType: .color(.content))
@@ -214,6 +216,7 @@ final class ScoreView: TimelineView, @unchecked Sendable {
     let pitsNode = Node(fillType: .color(.background))
     var tonesNode = Node(), reverbsNode = Node(), spectlopesNode = Node(), otherNotesNode = Node()
     let clippingNode = Node(isHidden: true, lineWidth: 4, lineType: .color(.warning))
+    var chordResults = [Note.ChordResult?]()
     
     var spectrogramNode: Node?
     var spectrogramFqType: Spectrogram.FqType?
@@ -302,11 +305,13 @@ extension ScoreView {
             let vs = model.notes.map { noteNode(from: $0) }
             let nodes = vs.map { $0.node }
             notesNode.children = nodes
+            chordResults = model.notes.map { $0.chordResult(fromTempo: model.tempo) }
             tonesNode.children = vs.map { $0.toneNode }
             reverbsNode.children = vs.map { $0.reverbNode }
             spectlopesNode.children = vs.map { $0.spectlopeNode }
         } else {
             notesNode.children = []
+            chordResults = []
             tonesNode.children = []
             reverbsNode.children = []
             spectlopesNode.children = []
@@ -320,8 +325,8 @@ extension ScoreView {
         }
     }
     func updateScore() {
-        updateChord()
         updateNotes()
+        updateChord()
     }
     
     var frameRate: Int { Keyframe.defaultFrameRate }
@@ -423,6 +428,7 @@ extension ScoreView {
         unupdateModel.notes.append(note)
         let (noteNode, toneNode, reverbNode, spectlopeNode) = noteNode(from: note)
         notesNode.append(child: noteNode)
+        chordResults.append(note.chordResult(fromTempo: model.tempo))
         tonesNode.append(child: toneNode)
         reverbsNode.append(child: reverbNode)
         spectlopesNode.append(child: spectlopeNode)
@@ -433,6 +439,7 @@ extension ScoreView {
         unupdateModel.notes.insert(note, at: noteI)
         let (noteNode, toneNode, reverbNode, spectlopeNode) = noteNode(from: note)
         notesNode.insert(child: noteNode, at: noteI)
+        chordResults.insert(note.chordResult(fromTempo: model.tempo), at: noteI)
         tonesNode.insert(child: toneNode, at: noteI)
         reverbsNode.insert(child: reverbNode, at: noteI)
         spectlopesNode.insert(child: spectlopeNode, at: noteI)
@@ -447,6 +454,8 @@ extension ScoreView {
         let reivs = vs.map { IndexValue(value: $0.value.reverbNode, index: $0.index) }
         let seivs = vs.map { IndexValue(value: $0.value.spectlopeNode, index: $0.index) }
         notesNode.children.insert(noivs)
+        chordResults.insert(nivs.map { .init(value: $0.value.chordResult(fromTempo: model.tempo),
+                                             index: $0.index) })
         tonesNode.children.insert(toivs)
         reverbsNode.children.insert(reivs)
         spectlopesNode.children.insert(seivs)
@@ -461,6 +470,8 @@ extension ScoreView {
         let reivs = vs.map { IndexValue(value: $0.value.reverbNode, index: $0.index) }
         let seivs = vs.map { IndexValue(value: $0.value.spectlopeNode, index: $0.index) }
         notesNode.children.replace(noivs)
+        chordResults.replace(nivs.map { .init(value: $0.value.chordResult(fromTempo: model.tempo),
+                                              index: $0.index) })
         tonesNode.children.replace(toivs)
         reverbsNode.children.replace(reivs)
         spectlopesNode.children.replace(seivs)
@@ -470,6 +481,7 @@ extension ScoreView {
     func remove(at noteI: Int) {
         unupdateModel.notes.remove(at: noteI)
         notesNode.remove(atChild: noteI)
+        chordResults.remove(at: noteI)
         tonesNode.remove(atChild: noteI)
         reverbsNode.remove(atChild: noteI)
         spectlopesNode.remove(atChild: noteI)
@@ -479,6 +491,7 @@ extension ScoreView {
     func remove(at noteIs: [Int]) {
         unupdateModel.notes.remove(at: noteIs)
         noteIs.reversed().forEach { notesNode.remove(atChild: $0) }
+        noteIs.reversed().forEach { chordResults.remove(at: $0) }
         noteIs.reversed().forEach { tonesNode.remove(atChild: $0) }
         noteIs.reversed().forEach { reverbsNode.remove(atChild: $0) }
         noteIs.reversed().forEach { spectlopesNode.remove(atChild: $0) }
@@ -493,6 +506,7 @@ extension ScoreView {
             unupdateModel.notes[noteI] = newValue
             let (noteNode, toneNode, reverbNode, spectlopeNode) = noteNode(from: newValue)
             notesNode.children[noteI] = noteNode
+            chordResults[noteI] = newValue.chordResult(fromTempo: model.tempo)
             tonesNode.children[noteI] = toneNode
             reverbsNode.children[noteI] = reverbNode
             spectlopesNode.children[noteI] = spectlopeNode
@@ -674,30 +688,10 @@ extension ScoreView {
         let pitchRange = Score.pitchRange
         guard let intPitchRange = Range<Int>(pitchRange) else { return [] }
         
-        let notes = Score.chordNotes(from: score.notes + otherNotes, tempo: score.tempo)
-        let chordBeats = notes.reduce(into: Set<Rational>()) {
-            let vs = $1.chordBeatRangeAndRoundedPitchs()
-            for v in vs {
-                if score.beatRange.contains(v.beatRange.start) {
-                    $0.insert(v.beatRange.start)
-                }
-                if score.beatRange.contains(v.beatRange.end) {
-                    $0.insert(v.beatRange.end)
-                }
-            }
-        }.sorted()
-        guard !chordBeats.isEmpty else { return [] }
-        
-        var preBeat = score.beatRange.start
-        var chordRanges = chordBeats.count.array.map {
-            let v = preBeat ..< chordBeats[$0]
-            preBeat = chordBeats[$0]
-            return v
-        }
-        chordRanges.append(preBeat ..< score.beatRange.end)
+        let chordResults = (chordResults + otherChordResults).compactMap() { $0 }
+        let trs = score.chordsResult(from: chordResults)
         
         var chordEdges = [(edge: Edge, typers: [Chord.ChordTyper])]()
-        let trs = chordRanges.map { ($0, score.chordPitches(atBeat: $0, from: notes)) }
         for (tr, pitchs) in trs {
             let pitchs = pitchs.sorted()
             guard let chord = Chord(pitchs: pitchs) else { continue }
@@ -722,44 +716,8 @@ extension ScoreView {
         let pitchRange = Score.pitchRange
         guard let intPitchRange = Range<Int>(pitchRange) else { return [] }
         
-        var colorPathlineDic0 = [Color: [Pathline]](),
-            colorPathlineDic1 = [Color: [Pathline]]()
-        func append0(_ pathline: Pathline, color: Color) {
-            if colorPathlineDic0[color] != nil {
-                colorPathlineDic0[color]?.append(pathline)
-            } else {
-                colorPathlineDic0[color] = [pathline]
-            }
-        }
-        func append1(_ pathline: Pathline, color: Color) {
-            if colorPathlineDic1[color] != nil {
-                colorPathlineDic1[color]?.append(pathline)
-            } else {
-                colorPathlineDic1[color] = [pathline]
-            }
-        }
-        
-        let notes = Score.chordNotes(from: score.notes + otherNotes, tempo: score.tempo)
-        let chordBeats = notes.reduce(into: Set<Rational>()) {
-            let vs = $1.chordBeatRangeAndRoundedPitchs()
-            for v in vs {
-                if score.beatRange.contains(v.beatRange.start) {
-                    $0.insert(v.beatRange.start)
-                }
-                if score.beatRange.contains(v.beatRange.end) {
-                    $0.insert(v.beatRange.end)
-                }
-            }
-        }.sorted()
-        guard !chordBeats.isEmpty else { return [] }
-        
-        var preBeat = score.beatRange.start
-        var chordRanges = chordBeats.count.array.map {
-            let v = preBeat ..< chordBeats[$0]
-            preBeat = chordBeats[$0]
-            return v
-        }
-        chordRanges.append(preBeat ..< score.beatRange.end)
+        let chordResults = (chordResults + otherChordResults).compactMap() { $0 }
+        let trs = score.chordsResult(from: chordResults)
         
         struct PitchAndTyper: Hashable {
             var pitch: Int, typers: [Chord.ChordTyper]
@@ -768,7 +726,6 @@ extension ScoreView {
                 typer.mainUnison == pitch.mod(12)
             }
         }
-        let trs = chordRanges.map { ($0, score.chordPitches(atBeat: $0, from: notes)) }
         var cbpts = [(beatRange: Range<Rational>, pitchAndTypers: [PitchAndTyper])]()
         for (chordBeatRange, pitchs) in trs {
             let pitchs = pitchs.sorted()
@@ -791,6 +748,22 @@ extension ScoreView {
             }
         }
         
+        var colorPathlineDic0 = [Color: [Pathline]](),
+            colorPathlineDic1 = [Color: [Pathline]]()
+        func append0(_ pathline: Pathline, color: Color) {
+            if colorPathlineDic0[color] != nil {
+                colorPathlineDic0[color]?.append(pathline)
+            } else {
+                colorPathlineDic0[color] = [pathline]
+            }
+        }
+        func append1(_ pathline: Pathline, color: Color) {
+            if colorPathlineDic1[color] != nil {
+                colorPathlineDic1[color]?.append(pathline)
+            } else {
+                colorPathlineDic1[color] = [pathline]
+            }
+        }
         for cbpt in cbpts {
             let maxTypersCount = cbpt.pitchAndTypers.maxValue { $0.typers.count } ?? 0
             guard maxTypersCount > 0 else { continue }

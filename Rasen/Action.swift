@@ -986,11 +986,7 @@ final class DraftAction: Action {
                            let sheetView = rootView.sheetView(at: shp) {
                            
                             if sheetView.model.score.enabled {
-                                let nis = if let i = sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p), scale: rootView.screenToWorldScale) {
-                                    [i]
-                                } else {
-                                    sheetView.draftNoteIndexes(from: rootView.selections)
-                                }
+                                let nis = sheetView.draftNoteIndexes(from: rootView.selections)
                                 if !nis.isEmpty {
                                     let scoreView = sheetView.scoreView
                                     let scoreP = scoreView.convertFromWorld(p)
@@ -1135,8 +1131,7 @@ final class FaceAction: Action {
                                 if let tone = tones[pit.tone.id] {
                                     note.pits[pi].tone = tone
                                 } else if pit.tone.isDefault {
-                                    let pitch = Double(pit.pitch + note.pitch)
-                                    let tone = Tone(spectlope: .random(pitch: pitch))
+                                    let tone = Tone(spectlope: .random())
                                     tones[pit.tone.id] = tone
                                     note.pits[pi].tone = tone
                                 }

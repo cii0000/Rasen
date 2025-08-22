@@ -900,7 +900,22 @@ final class LineAction: Action {
         }
         if let beganEvent {
             guard event.screenPoint.distance(beganEvent.screenPoint) >= 2.5
-                    || event.time - beganEvent.time >= 0.33 else { return }
+                    || event.time - beganEvent.time >= 0.33 else {
+                if event.phase == .ended {
+                    rootAction.inputKey(with: .init(screenPoint: event.screenPoint,
+                                                    time: event.time,
+                                                    pressure: event.pressure,
+                                                    phase: .began, isRepeat: false,
+                                                    inputKeyType: .click))
+                    Sleep.start()
+                    rootAction.inputKey(with: .init(screenPoint: event.screenPoint,
+                                                    time: event.time,
+                                                    pressure: event.pressure,
+                                                    phase: .ended, isRepeat: false,
+                                                    inputKeyType: .click))
+                }
+                return
+            }
             aDrawNote(with: beganEvent, isStraight: isStraight)
             self.beganEvent = nil
         }
@@ -1130,6 +1145,30 @@ final class LineAction: Action {
     
     func drawLine(with event: DragEvent) {
         guard isEditingSheet else {
+            if event.phase == .began {
+                beganEvent = event
+            }
+            if let beganEvent {
+                guard event.screenPoint.distance(beganEvent.screenPoint) >= 2.5
+                        || event.time - beganEvent.time >= 0.33 else {
+                    if event.phase == .ended {
+                        rootAction.inputKey(with: .init(screenPoint: event.screenPoint,
+                                                        time: event.time,
+                                                        pressure: event.pressure,
+                                                        phase: .began, isRepeat: false,
+                                                        inputKeyType: .click))
+                        Sleep.start()
+                        rootAction.inputKey(with: .init(screenPoint: event.screenPoint,
+                                                        time: event.time,
+                                                        pressure: event.pressure,
+                                                        phase: .ended, isRepeat: false,
+                                                        inputKeyType: .click))
+                    }
+                    return
+                }
+                rootAction.keepOut(with: beganEvent)
+                self.beganEvent = nil
+            }
             rootAction.keepOut(with: event)
             return
         }

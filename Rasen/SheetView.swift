@@ -1329,9 +1329,9 @@ final class SheetView: BindableView, @unchecked Sendable {
                                 keyPath: keyPath.appending(path: \Model.borders))
         
         node = Node(children: [opacityNode,
-                               contentsView.node,
                                animationView.node,
                                animationView.previousNextNode,
+                               contentsView.node,
                                scoreView.node,
                                textsView.node,
                                bordersView.node,

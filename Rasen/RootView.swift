@@ -759,7 +759,7 @@ final class RootView: View, @unchecked Sendable {
                      selectedLineNodes = [Line: Node]()
     private(set) var selectedNotesNode: Node?, selectedPointsNode: Node?,
                      selectedNoteNodes = [Pointline: Node]()
-    private(set) var isOldSelectedSheet = false, isSelectedText = false
+    private(set) var isOldSelectedSheet = false, isSelectedText = false, isSelectedLine = false
     func updateWithSelections(oldValue: [Selection]) {
         if !selections.isEmpty {
             if oldValue.isEmpty {
@@ -829,7 +829,7 @@ final class RootView: View, @unchecked Sendable {
         }
         let centerSHPs = Set(self.centerSHPs)
         var rectsSet = Set<Rect>()
-        var rects = [Rect](), isSelectedText = false, selectedCount = 0
+        var rects = [Rect](), isSelectedText = false, isSelectedLine = false, selectedCount = 0
         var firstOrientation = Orientation.horizontal, lineNodes = [Node]()
         var sLines = [Line](), sPointlines = [Pointline]()
         var addedLineIndexes = Set<IntPoint>()
@@ -883,6 +883,7 @@ final class RootView: View, @unchecked Sendable {
                                 nLine.uuColor.value = color//
                                 sLines.append(nLine)
                                 addedLineIndexes.insert(sli)
+                                isSelectedLine = true
                             }
                         }
                     }
@@ -1020,6 +1021,7 @@ final class RootView: View, @unchecked Sendable {
         
         selectedFrames = rects
         self.isSelectedText = isSelectedText && selectedCount == 1
+        self.isSelectedLine = isSelectedLine
     }
     func updateSelectedNode() {
         guard !selections.isEmpty else { return }
@@ -1031,7 +1033,7 @@ final class RootView: View, @unchecked Sendable {
         } else {
             selectedClippedNode?.path = Path()
         }
-        selectedNode?.isHidden = isSelectedText
+        selectedNode?.isHidden = isSelectedText && !isSelectedLine
 //        selectedNode?.lineWidth = l
 //        selectedNode?.path = Path(rect)
         selectedNode?.children = selections.map {
@@ -1042,7 +1044,7 @@ final class RootView: View, @unchecked Sendable {
         }
         
         let attitude = Attitude(screenToWorldTransform)
-        selectedOrientationNode?.isHidden = isSelectedText
+        selectedOrientationNode?.isHidden = isSelectedText && !isSelectedLine
         selectedOrientationNode?.children = selections.map {
             var nAttitude = attitude
             switch $0.rectCorner {
