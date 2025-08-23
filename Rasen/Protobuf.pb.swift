@@ -1119,15 +1119,6 @@ struct PBEnvelope: Sendable {
 
   var releaseSec: Double = 0
 
-  var reverb: PBReverb {
-    get {return _reverb ?? PBReverb()}
-    set {_reverb = newValue}
-  }
-  /// Returns true if `reverb` has been explicitly set.
-  var hasReverb: Bool {return self._reverb != nil}
-  /// Clears the value of `reverb`. Subsequent reads from it will return its default value.
-  mutating func clearReverb() {self._reverb = nil}
-
   var id: PBUUID {
     get {return _id ?? PBUUID()}
     set {_id = newValue}
@@ -1141,7 +1132,6 @@ struct PBEnvelope: Sendable {
 
   init() {}
 
-  fileprivate var _reverb: PBReverb? = nil
   fileprivate var _id: PBUUID? = nil
 }
 
@@ -5185,7 +5175,6 @@ extension PBEnvelope: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
     2: .same(proto: "decaySec"),
     3: .same(proto: "sustainVolm"),
     4: .same(proto: "releaseSec"),
-    6: .same(proto: "reverb"),
     5: .same(proto: "id"),
   ]
 
@@ -5200,7 +5189,6 @@ extension PBEnvelope: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
       case 3: try { try decoder.decodeSingularDoubleField(value: &self.sustainVolm) }()
       case 4: try { try decoder.decodeSingularDoubleField(value: &self.releaseSec) }()
       case 5: try { try decoder.decodeSingularMessageField(value: &self._id) }()
-      case 6: try { try decoder.decodeSingularMessageField(value: &self._reverb) }()
       default: break
       }
     }
@@ -5226,9 +5214,6 @@ extension PBEnvelope: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
     try { if let v = self._id {
       try visitor.visitSingularMessageField(value: v, fieldNumber: 5)
     } }()
-    try { if let v = self._reverb {
-      try visitor.visitSingularMessageField(value: v, fieldNumber: 6)
-    } }()
     try unknownFields.traverse(visitor: &visitor)
   }
 
@@ -5237,7 +5222,6 @@ extension PBEnvelope: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
     if lhs.decaySec != rhs.decaySec {return false}
     if lhs.sustainVolm != rhs.sustainVolm {return false}
     if lhs.releaseSec != rhs.releaseSec {return false}
-    if lhs._reverb != rhs._reverb {return false}
     if lhs._id != rhs._id {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true

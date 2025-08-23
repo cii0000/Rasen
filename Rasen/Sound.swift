@@ -1022,13 +1022,13 @@ extension Pit {
     }
 }
 
-struct Reverb: Hashable, Codable {
+struct Reverb: Hashable, Codable, Sendable {
     var earlySec = 0.02
-    var earlyVolm = 0.75
+    var earlyVolm = 0.95
     var lateSec = 0.1
-    var lateVolm = 0.5
-    var releaseSec = 0.2
-    var seedID = UUID()
+    var lateVolm = 0.75
+    var releaseSec = 0.1
+    var seedID = UUID(index: 2)
 }
 extension Reverb: Protobuf {
     init(_ pb: PBReverb) throws {
@@ -1071,7 +1071,19 @@ extension Reverb {
         Int((min(durSec, 1000) * sampleRate).rounded(.up))
     }
     
+    static let defaulrFIR0 = Self.init().aFir(sampleRate: Audio.defaultSampleRate, channel: 0)
+    static let defaulrFIR1 = Self.init().aFir(sampleRate: Audio.defaultSampleRate, channel: 1)
     func fir(sampleRate: Double, channel: Int) -> [Double] {
+        if self == .init() && sampleRate == Audio.defaultSampleRate {
+            if channel == 0 {
+                return Self.defaulrFIR0
+            } else if channel == 1 {
+                return Self.defaulrFIR1
+            }
+        }
+        return aFir(sampleRate: sampleRate, channel: channel)
+    }
+    private func aFir(sampleRate: Double, channel: Int) -> [Double] {
         guard !isEmpty else { return [] }
         
         let durSec = durSec
@@ -1131,7 +1143,6 @@ extension Reverb {
 
 struct Envelope: Hashable, Codable {
     var attackSec = 0.0, decaySec = 0.0, sustainVolm = 1.0, releaseSec = 0.0
-    var reverb = Reverb()
     var id = UUID()
 }
 extension Envelope: Protobuf {
@@ -1140,7 +1151,6 @@ extension Envelope: Protobuf {
         decaySec = max(0, ((try? pb.decaySec.notNaN()) ?? 0))
         sustainVolm = ((try? pb.sustainVolm.notNaN()) ?? 0).clipped(min: 0, max: 1)
         releaseSec = max(0, ((try? pb.releaseSec.notNaN()) ?? 0))
-        reverb = (try? .init(pb.reverb)) ?? .init()
         id = (try? .init(pb.id)) ?? .init()
     }
     var pb: PBEnvelope {
@@ -1149,7 +1159,6 @@ extension Envelope: Protobuf {
             $0.decaySec = decaySec
             $0.sustainVolm = sustainVolm
             $0.releaseSec = releaseSec
-            $0.reverb = reverb.pb
             $0.id = id.pb
         }
     }

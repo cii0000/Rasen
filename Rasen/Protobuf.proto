@@ -226,7 +226,6 @@ message PBEnvelope {
     double decaySec = 2;
     double sustainVolm = 3;
     double releaseSec = 4;
-    PBReverb reverb = 6;
     PBUUID id = 5;
 }
 

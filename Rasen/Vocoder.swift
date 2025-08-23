@@ -138,7 +138,6 @@ extension Waveclip {
 struct EnvelopeMemo: Hashable, Codable {
     let attackSec, decaySec, sustainAmp, releaseSec, maxSec: Double
     let rAttackSec, rDecaySec, rReleaseSec: Double
-    let reverb: Reverb
     
     init(_ envelope: Envelope) {
         attackSec = max(envelope.attackSec, 0)
@@ -148,8 +147,7 @@ struct EnvelopeMemo: Hashable, Codable {
         rAttackSec = 1 / attackSec
         rDecaySec = 1 / decaySec
         rReleaseSec = 1 / releaseSec
-        reverb = envelope.reverb
-        maxSec = releaseSec + (envelope.reverb.isEmpty ? 0 : envelope.reverb.durSec)
+        maxSec = releaseSec
     }
 }
 extension EnvelopeMemo {
@@ -334,6 +332,7 @@ struct Rendnote {
     var pitbend: Pitbend
     var secRange: Range<Double>
     var reverb: Reverb
+    var isStereoNoise = true
     var isRelease = false
     let id = UUID()
 }
@@ -351,7 +350,7 @@ extension Rendnote {
                   noiseSeed0: seed0, noiseSeed1: seed1,
                   pitbend: pitbend,
                   secRange: sSec ..< eSec,
-                  reverb: .full)
+                  reverb: .init())
     }
     
     var isStft: Bool {
@@ -409,7 +408,7 @@ extension Rendnote {
             }
             return samples
         }
-        if reverb.isFull && pitbend.isFullNoise {
+        if isStereoNoise && pitbend.isFullNoise {
             var noiseSeed2 = noiseSeed0
             _ = Random.next(seed: &noiseSeed2)
             _ = Random.next(seed: &noiseSeed2)
