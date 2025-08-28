@@ -1544,11 +1544,16 @@ extension ScoreView {
         } else {
             let sustainHalfH = halfNH
             let color = Self.color(from: note.pits[0].stereo)
-            stereoLinePath = .init(triangleStrip([.init(nsx, ny, halfNH * 0.75, color),
-                                                  .init(attackX, ny, halfNH, color),
-                                                  .init(decayX, ny, sustainHalfH, color),
-                                                  .init(nsx + nw, ny, sustainHalfH, color),
-                                                  .init(releaseX, ny, 0, color)]))
+            var ts: [LinePoint] = [.init(nsx, ny, halfNH * 0.75, color)]
+            if attackX < nsx + nw {
+                ts.append(.init(attackX, ny, halfNH, color))
+            }
+            if decayX < nsx + nw {
+                ts.append(.init(decayX, ny, sustainHalfH, color))
+            }
+            ts += [.init(nsx + nw, ny, sustainHalfH, color),
+                   .init(releaseX, ny, 0, color)]
+            stereoLinePath = .init(triangleStrip(ts))
             stereoLineColors = [color]
             
             mainLinePath = .init(triangleStrip([.init(nsx, ny, mainLineHalfH, .content),

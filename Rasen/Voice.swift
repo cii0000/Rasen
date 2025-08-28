@@ -1115,7 +1115,7 @@ extension FormantFilter {
             n.formFillEsVolm(0.85, at: 4)
             n[5].sVolm = 0.8
             n[5].eVolm = 0.65
-            n[5].edVolm = 0.4
+            n[5].edVolm = 0
             return .linear(self, n.multiplyAllVolm(0.85), t: opacity)
         case .ɕ, .dʒ, .tɕ, .ɕRes, .tɕRes:
             var n = toNoise(from: 2)
@@ -1136,7 +1136,7 @@ extension FormantFilter {
             n[4].fillVolm(0.85)
             n.formFillEsVolm(0.6, at: 4)
             n[5].fillVolm(0.45)
-            n[5].edVolm = 0.4
+            n[5].edVolm = 0
             return .linear(self, n, t: opacity)
         case .ha, .he, .ho:
             var n = toNoise()
@@ -1169,7 +1169,7 @@ extension FormantFilter {
             n[4].fillVolm(0.7)
             n.fillEsVolm(0.4, at: 4)
             n[5].fillVolm(0.4)
-            n[5].edVolm = 0.125
+            n[5].edVolm = 0
             return .linear(self, n.multiplyAllVolm(0.5), t: opacity)
         case .ɸ, .ɸRes:
             var n = toNoise()
@@ -1189,7 +1189,7 @@ extension FormantFilter {
             n[4].fillVolm(0.8)
             n.fillEsVolm(0.6, at: 4)
             n[5].fillVolm(0.5)
-            n[5].edVolm = 0.125
+            n[5].edVolm = 0
             return .linear(self, n.multiplyAllVolm(0.5), t: opacity)
         default:
             return self

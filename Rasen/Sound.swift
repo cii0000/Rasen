@@ -1026,7 +1026,7 @@ struct Reverb: Hashable, Codable, Sendable {
     var earlySec = 0.02
     var earlyVolm = 0.95
     var lateSec = 0.1
-    var lateVolm = 0.75
+    var lateVolm = 0.5
     var releaseSec = 0.1
     var seedID = UUID(index: 2)
 }
@@ -1052,13 +1052,9 @@ extension Reverb: Protobuf {
 }
 extension Reverb {
     static let empty = Self.init(earlySec: 0, earlyVolm: 0, lateSec: 0, lateVolm: 0, releaseSec: 0)
-    static let full = Self.init(earlySec: 0, earlyVolm: 1, lateSec: 0, lateVolm: 1, releaseSec: 0)
     
     var isEmpty: Bool {
         (earlySec == 0 && lateSec == 0 && releaseSec == 0) || (earlyVolm == 0 && lateVolm == 0)
-    }
-    var isFull: Bool {
-        earlySec == 0 && lateSec == 0 && releaseSec == 0 && earlyVolm == 1 && lateVolm == 1
     }
     
     var earlyLateSec: Double {

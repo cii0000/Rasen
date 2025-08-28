@@ -3112,7 +3112,7 @@ final class RootView: View, @unchecked Sendable {
         pov.logScale < -2
     }
     var isFullEditNote: Bool {
-        pov.logScale < -4
+        pov.logScale < -3
     }
     var currentBeatInterval: Rational {
         isFullEditNote ? Sheet.fullEditBeatInterval : Sheet.beatInterval

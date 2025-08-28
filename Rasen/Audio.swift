@@ -104,7 +104,7 @@ final class NotePlayer {
                                         overtone: note.tone.overtone,
                                         spectlope: note.tone.spectlope),
                          secRange: -.infinity ..< .infinity,
-                         reverb: .full)
+                         reverb: .init())
         }
         rendnotes.forEach { noteIDs.insert($0.id) }
         
