@@ -27,7 +27,7 @@
 			<string>Default</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>net.cii0.Rasen.rasendoc</string>
+				<string>cii0000lemma.Rasen.rasendoc</string>
 			</array>
 			<key>LSTypeIsPackage</key>
 			<true/>
@@ -49,7 +49,7 @@
 			<string>Default</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>net.cii0.Rasen.rasendoch</string>
+				<string>cii0000lemma.Rasen.rasendoch</string>
 			</array>
 			<key>LSTypeIsPackage</key>
 			<true/>
@@ -71,7 +71,7 @@
 			<string>Default</string>
 			<key>LSItemContentTypes</key>
 			<array>
-				<string>net.cii0.Rasen.rasendata</string>
+				<string>cii0000lemma.Rasen.rasendata</string>
 			</array>
 			<key>LSTypeIsPackage</key>
 			<true/>
@@ -118,7 +118,7 @@
 				<string>doc</string>
 			</dict>
 			<key>UTTypeIdentifier</key>
-			<string>net.cii0.Rasen.rasendoc</string>
+			<string>cii0000lemma.Rasen.rasendoc</string>
 			<key>UTTypeReferenceURL</key>
 			<string></string>
 			<key>UTTypeTagSpecification</key>
@@ -146,7 +146,7 @@
 				<string>doch</string>
 			</dict>
 			<key>UTTypeIdentifier</key>
-			<string>net.cii0.Rasen.rasendoch</string>
+			<string>cii0000lemma.Rasen.rasendoch</string>
 			<key>UTTypeReferenceURL</key>
 			<string></string>
 			<key>UTTypeTagSpecification</key>
@@ -174,7 +174,7 @@
 				<string>data</string>
 			</dict>
 			<key>UTTypeIdentifier</key>
-			<string>net.cii0.Rasen.rasendata</string>
+			<string>cii0000lemma.Rasen.rasendata</string>
 			<key>UTTypeReferenceURL</key>
 			<string></string>
 			<key>UTTypeTagSpecification</key>
@@ -195,7 +195,7 @@
 			<key>UTTypeIcons</key>
 			<dict/>
 			<key>UTTypeIdentifier</key>
-			<string>net.cii0.Rasen.rasenp</string>
+			<string>cii0000lemma.Rasen.rasenp</string>
 			<key>UTTypeReferenceURL</key>
 			<string></string>
 			<key>UTTypeTagSpecification</key>
@@ -216,7 +216,7 @@
 			<key>UTTypeIcons</key>
 			<dict/>
 			<key>UTTypeIdentifier</key>
-			<string>net.cii0.Rasen.rasenpngs</string>
+			<string>cii0000lemma.Rasen.rasenpngs</string>
 			<key>UTTypeReferenceURL</key>
 			<string></string>
 			<key>UTTypeTagSpecification</key>
@@ -233,40 +233,21 @@
 		<dict>
 			<key>UTTypeConformsTo</key>
 			<array>
-				<string>public.xml</string>
-			</array>
-			<key>UTTypeDescription</key>
-			<string>MusicXML</string>
-			<key>UTTypeIcons</key>
-			<dict/>
-			<key>UTTypeIdentifier</key>
-			<string>com.recordare.musicxml</string>
-			<key>UTTypeTagSpecification</key>
-			<dict>
-				<key>public.filename-extension</key>
-				<array>
-					<string>musicxml</string>
-				</array>
-			</dict>
-		</dict>
-		<dict>
-			<key>UTTypeConformsTo</key>
-			<array>
 				<string>com.apple.package</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>Shikishi Document</string>
+			<string>Old Rasen Document</string>
 			<key>UTTypeIconFile</key>
 			<string>sksdoc</string>
 			<key>UTTypeIcons</key>
 			<dict/>
 			<key>UTTypeIdentifier</key>
-			<string>net.cii0.Shikishi.sksdoc</string>
+			<string>net.cii0.Rasen.rasendoc</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>
 				<array>
-					<string>sksdoc</string>
+					<string>rasendoc</string>
 				</array>
 			</dict>
 		</dict>
@@ -276,16 +257,16 @@
 				<string>com.apple.package</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>Shikishi Document with History</string>
+			<string>Old Rasen Document with History</string>
 			<key>UTTypeIcons</key>
 			<dict/>
 			<key>UTTypeIdentifier</key>
-			<string>net.cii0.Shikishi.skshdoc</string>
+			<string>net.cii0.Rasen.rasendoch</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>
 				<array>
-					<string>skshdoc</string>
+					<string>rasendoch</string>
 				</array>
 			</dict>
 		</dict>
@@ -295,16 +276,16 @@
 				<string>com.apple.package</string>
 			</array>
 			<key>UTTypeDescription</key>
-			<string>Shikishi Data</string>
+			<string>Old Rasen Data</string>
 			<key>UTTypeIcons</key>
 			<dict/>
 			<key>UTTypeIdentifier</key>
-			<string>net.cii0.Shikishi.sksdata</string>
+			<string>net.cii0.Rasen.rasendata</string>
 			<key>UTTypeTagSpecification</key>
 			<dict>
 				<key>public.filename-extension</key>
 				<array>
-					<string>sksdata</string>
+					<string>rasendata</string>
 				</array>
 			</dict>
 		</dict>

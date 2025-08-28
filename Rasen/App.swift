@@ -1055,7 +1055,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
             case .ok:
                 let loadResult = await URL.load(prompt: "Replace".localized,
                                                 fileTypes: [Document.FileType.rasendata,
-                                                            Document.FileType.sksdata])
+                                                            Document.FileType.oldRasendata])
                 switch loadResult {
                 case .complete(let ioResults):
                     replacingDatabase(from: ioResults[0].url)
@@ -3379,11 +3379,11 @@ extension String {
 struct System {
     static let appName = "Rasen".localized
     static let dataName = String(format: "%@ Data".localized, appName)
-    static let id = Bundle.main.bundleIdentifier ?? "net.cii0.Rasen"
+    static let id = Bundle.main.bundleIdentifier ?? "cii0000lemma.Rasen"
     
-    static let oldAppName = "Shikishi".localized
+    static let oldAppName = "Rasen".localized
     static let oldDataName = String(format: "%@ Data".localized, oldAppName)
-    static let oldID = "net.cii0.Shikishi"
+    static let oldID = "net.cii0.Rasen"
 }
 
 final class Pasteboard {

@@ -362,9 +362,9 @@ typealias Document = Root
 
 final class Root: @unchecked Sendable {
     enum FileType: FileTypeProtocol, CaseIterable {
-        case sksdoc
-        case skshdoc
-        case sksdata
+        case oldRasendoc
+        case oldRasendoch
+        case oldRasendata
         
         case rasendoc
         case rasendoch
@@ -372,9 +372,9 @@ final class Root: @unchecked Sendable {
         
         var name: String {
             switch self {
-            case .sksdoc: String(format: "%1$@ Document".localized, System.oldAppName)
-            case .skshdoc: String(format: "%1$@ Document with History".localized, System.oldAppName)
-            case .sksdata: System.oldDataName
+            case .oldRasendoc: String(format: "%1$@ Document".localized, System.oldAppName)
+            case .oldRasendoch: String(format: "%1$@ Document with History".localized, System.oldAppName)
+            case .oldRasendata: System.oldDataName
                 
             case .rasendoc: String(format: "%1$@ Document".localized, System.appName)
             case .rasendoch: String(format: "%1$@ Document with History".localized, System.appName)
@@ -383,9 +383,9 @@ final class Root: @unchecked Sendable {
         }
         var utType: UTType {
             switch self {
-            case .sksdoc: UTType(importedAs: "\(System.oldID).sksdoc")
-            case .skshdoc: UTType(importedAs: "\(System.oldID).skshdoc")
-            case .sksdata: UTType(importedAs: "\(System.oldID).sksdata")
+            case .oldRasendoc: UTType(importedAs: "\(System.oldID).rasendoc")
+            case .oldRasendoch: UTType(importedAs: "\(System.oldID).rasendoch")
+            case .oldRasendata: UTType(importedAs: "\(System.oldID).rasendata")
                 
             case .rasendoc: UTType(exportedAs: "\(System.id).rasendoc")
             case .rasendoch: UTType(exportedAs: "\(System.id).rasendoch")
@@ -394,9 +394,9 @@ final class Root: @unchecked Sendable {
         }
         var filenameExtension: String {
             switch self {
-            case .sksdoc: "sksdoc"
-            case .skshdoc: "skshdoc"
-            case .sksdata: "sksdata"
+            case .oldRasendoc: "rasendoc"
+            case .oldRasendoch: "rasendoch"
+            case .oldRasendata: "rasendata"
                 
             case .rasendoc: "rasendoc"
             case .rasendoch: "rasendoch"
