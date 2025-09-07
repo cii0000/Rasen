@@ -621,7 +621,7 @@ struct Monospline {
     func lastInterpolatedValue(_ f0: Double, _ f1: Double, _ f2: Double) -> Double {
         switch xType {
         case .empty: return f1
-        case .linear: return .linear(f0, f1, t: t)
+        case .linear: return .linear(f1, f2, t: t)
         default: break
         }
         guard f1 != f2 else { return f1 }

@@ -1062,7 +1062,12 @@ final class AnimationView: TimelineView, @unchecked Sendable {
             let (pri, ot, nri, nt) = orki < nrki ? (orki, ort, nrki, nrt) : (nrki, nrt, orki, ort)
             (pri ... nri).forEach {
                 let t = Double($0).clipped(min: .init(pri), max: .init(nri), newMin: ot, newMax: nt)
-                pnPs[model.index(atRoot: $0)] = Point.linear(.init(), pnP, t: t)
+                let i = model.index(atRoot: $0)
+                if let op = pnPs[i] {
+                    pnPs[i] = op + Point.linear(.init(), pnP, t: t)
+                } else {
+                    pnPs[i] = Point.linear(.init(), pnP, t: t)
+                }
             }
         }
        
@@ -1072,14 +1077,18 @@ final class AnimationView: TimelineView, @unchecked Sendable {
             let preRKI0 = model.rootIndex(atRootInter: model.rootInterIndex - 1)
             let preRKI1 = model.rootIndex(atRootInter: model.rootInterIndex - 2)
             draw(orki: preRKI1, nrki: preRKI0, ort: 0, nrt: 1, pnP: pP, in: &pnPs)
-            draw(orki: preRKI0, nrki: model.rootIndex, ort: 1, nrt: 0, pnP: pP, in: &pnPs)
+            if preRKI0 + 1 < model.rootIndex {
+                draw(orki: preRKI0 + 1, nrki: model.rootIndex, ort: 1, nrt: 0, pnP: pP, in: &pnPs)
+            }
         }
         let nP = model.currentKeyframe.nextPosition
         if !nP.isEmpty {
             let nextRKI0 = model.rootIndex(atRootInter: model.rootInterIndex + 1)
             let nextRKI1 = model.rootIndex(atRootInter: model.rootInterIndex + 2)
             draw(orki: model.rootIndex, nrki: nextRKI0, ort: 0, nrt: 1, pnP: nP, in: &pnPs)
-            draw(orki: nextRKI0, nrki: nextRKI1, ort: 1, nrt: 0, pnP: nP, in: &pnPs)
+            if nextRKI0 + 1 < nextRKI1 {
+                draw(orki: nextRKI0 + 1, nrki: nextRKI1, ort: 1, nrt: 0, pnP: nP, in: &pnPs)
+            }
         }
         
         let nlw = max(lw * 0.5, lw * scale), blw = lw * 4, nblw = lw * 2
@@ -3728,7 +3737,6 @@ final class SheetView: BindableView, @unchecked Sendable {
         case .insertDraftNotes(let nivs):
             stop()
             insertDraftNode(nivs)
-            scoreView.updateDraftNotes()
             if isMakeRect {
                 let rect = nivs.reduce(into: Rect?.none) {
                     $0 += scoreView.transformedDraftNoteFrame(at: $1.index)
@@ -3742,11 +3750,9 @@ final class SheetView: BindableView, @unchecked Sendable {
                     $0 += scoreView.transformedDraftNoteFrame(at: $1)
                 }
                 removeDraftNotesNode(at: noteIndexes)
-                scoreView.updateDraftNotes()
                 return (rect, [])
             } else {
                 removeDraftNotesNode(at: noteIndexes)
-                scoreView.updateDraftNotes()
             }
         case .insertContents(let civs):
             stop()

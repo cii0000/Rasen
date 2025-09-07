@@ -372,14 +372,14 @@ extension Rendnote {
         }
         let rendableDurSec = min(secRange.length + Waveclip.releaseSec, 1000)
         let sampleCount = max(1, Int((rendableDurSec * sampleRate).rounded(.up)))
-        return reverb.isEmpty ?
+        return (isStereoNoise && pitbend.isFullNoise) || reverb.isEmpty ?
         sampleCount :
         sampleCount + reverb.count(sampleRate: sampleRate) - 1
     }
     func releaseCount(sampleRate: Double) -> Int {
         let rendableDurSec = min(Waveclip.releaseSec, 1000)
         let sampleCount = max(1, Int((rendableDurSec * sampleRate).rounded(.up)))
-        return reverb.isEmpty ?
+        return (isStereoNoise && pitbend.isFullNoise) || reverb.isEmpty ?
         sampleCount : sampleCount + reverb.count(sampleRate: sampleRate) - 1
     }
     func releasedRange(sampleRate: Double, startSec: Double) -> Range<Int> {
@@ -428,6 +428,7 @@ extension Rendnote {
         }
     }
     func notewave(from sampless: [[Double]], stereo: Stereo? = nil, sampleRate: Double) -> Notewave {
+        let isReverb = !(isStereoNoise && pitbend.isFullNoise)
         let rSampleRate = 1 / sampleRate
         var nSampless: [[Double]]
         let stereoScale = Volm.volm(fromAmp: 1 / 2.0.squareRoot())
@@ -508,7 +509,7 @@ extension Rendnote {
         }
         
         var notewave = Notewave(noStereoSampless: sampless, sampless: nSampless, isLoop: isLoop)
-        if !reverb.isEmpty {
+        if isReverb && !reverb.isEmpty {
             let sampleCount = notewave.sampleCount
             notewave.sampless = [vDSP.apply(fir: reverb.fir(sampleRate: sampleRate, channel: 0),
                                             in: notewave.sampless[0]),

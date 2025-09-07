@@ -1024,10 +1024,10 @@ extension Pit {
 
 struct Reverb: Hashable, Codable, Sendable {
     var earlySec = 0.02
-    var earlyVolm = 0.95
-    var lateSec = 0.1
+    var earlyVolm = 0.75
+    var lateSec = 0.08
     var lateVolm = 0.5
-    var releaseSec = 0.1
+    var releaseSec = 0.5
     var seedID = UUID(index: 2)
 }
 extension Reverb: Protobuf {
@@ -1096,6 +1096,8 @@ extension Reverb {
         let scale = 100.0
         let siMin = Double(xi).squareRoot().clipped(min: 10, max: 5000.squareRoot(), newMin: 1, newMax: scale)
         
+        var pan = false
+        let ft1 = random.nextT()
         func update(i: Int) {
             let sec = Double(i) * rSampleRate
             let nScale = lateSec == 0 ? 0 : sec.clipped(min: earlySec, max: earlyLateSec, newMin: 1, newMax: 0)
@@ -1105,11 +1107,20 @@ extension Reverb {
             
             let t1 = random.nextT()
             let nPan = t1 * 2 - 1
-            let nVolm = if nPan < 0 {
-                channel == 0 ? volm : volm * (1 + nPan)
+            let nVolm = if sec >= earlyLateSec {
+                if nPan < 0 {
+                   channel == 0 ? volm : volm * (1 + nPan)
+               } else {
+                   channel == 0 ? volm * (1 - nPan) : volm
+               }
             } else {
-                channel == 0 ? volm * (1 - nPan) : volm
+                if channel == 0 {
+                    ft1 > 0.5 ? (pan ? volm : 0) : (pan ? 0 : volm)
+                } else {
+                    ft1 > 0.5 ? (pan ? 0 : volm) : (pan ? volm : 0)
+                }
             }
+            pan = !pan
             
             let t2 = random.nextT()
             let sign = t2 > 0.5 ? 1.0 : -1.0
@@ -1117,10 +1128,10 @@ extension Reverb {
             * nScale.clipped(min: 1, max: 0, newMin: siMin, newMax: 1) / scale
         }
         
-        let x = earlySec * sampleRate
+        let x = earlySec * 0.5 * sampleRate
         let y = earlyLateSec * sampleRate
         let a = x < 1 || y < 1 ? 1 : (y - x) / (y - 1)
-        var na = 1.0, nx = x
+        var na = 1.0, nx = earlySec * sampleRate
         while nx < y && x * na > 1 {
             let i = Int(nx).clipped(min: 0, max: count - 1)
             update(i: i)
@@ -1243,11 +1254,11 @@ extension Note {
         
         var items: [Item]
     }
-    func chordResult(minBeatLength: Rational = 0, fromTempo tempo: Rational) -> ChordResult? {
+    func chordResult(minBeatLength: Rational = .init(1, 8), fromTempo tempo: Rational) -> ChordResult? {
         guard !isOneOvertone && !isFullNoise else { return nil }
         return withRendable(tempo: tempo).chordResult(minBeatLength: minBeatLength)
     }
-    private func chordResult(minBeatLength: Rational = 0) -> ChordResult? {
+    private func chordResult(minBeatLength: Rational = .init(1, 8)) -> ChordResult? {
         if pits.count >= 2 {
             var ns = [ChordResult.Item]()
             var preBeat = beatRange.start, prePitch = Int((pitch + pits[0].pitch).rounded())

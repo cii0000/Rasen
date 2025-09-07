@@ -664,7 +664,8 @@ final class PlayAction: InputKeyEventAction {
                 func topAndBottom(at ncShp: IntPoint, in aSheetView: SheetView) {
                     var nncShp = ncShp, npsvs = [WeakElement<SheetView>]()
                     nncShp.y -= 1
-                    while let aaSheetView = rootView.sheetView(at: nncShp) {
+                    while let aaSheetView = rootView.sheetView(at: nncShp),
+                          aaSheetView.model.enabledTimeline {
                         npsvs.append(.init(element: aaSheetView))
                         nncShp.y -= 1
                     }
@@ -672,7 +673,8 @@ final class PlayAction: InputKeyEventAction {
                     nncShp = ncShp
                     npsvs = []
                     nncShp.y += 1
-                    while let aaSheetView = rootView.sheetView(at: nncShp) {
+                    while let aaSheetView = rootView.sheetView(at: nncShp),
+                          aaSheetView.model.enabledTimeline {
                         npsvs.append(.init(element: aaSheetView))
                         nncShp.y += 1
                     }

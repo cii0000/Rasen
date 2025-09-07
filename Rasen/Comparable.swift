@@ -26,6 +26,11 @@ extension Comparable {
         range.lowerBound :
         (self > range.upperBound ? range.upperBound : self)
     }
+    func clipped(_ range: Range<Self>) -> Self {
+        self < range.lowerBound ?
+        range.lowerBound :
+        (self > range.upperBound ? range.upperBound : self)
+    }
 }
 extension Range {
     func intersects(_ other: Self) -> Bool {

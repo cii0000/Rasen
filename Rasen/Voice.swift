@@ -1410,7 +1410,7 @@ struct Mora: Hashable, Codable {
             phonemes.removeLast()
             
             youonFf = baseFf.withSelfA(to: phoneme)
-            youonDurSec = 0.11
+            youonDurSec = 0.09
             isβ = false
         case .β:
             phonemes.removeLast()

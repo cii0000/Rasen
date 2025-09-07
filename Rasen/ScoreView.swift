@@ -216,7 +216,7 @@ final class ScoreView: TimelineView, @unchecked Sendable {
     let pitsNode = Node(fillType: .color(.background))
     var tonesNode = Node(), reverbsNode = Node(), spectlopesNode = Node(), otherNotesNode = Node()
     let clippingNode = Node(isHidden: true, lineWidth: 4, lineType: .color(.warning))
-    var chordResults = [Note.ChordResult?]()
+    var chordResults = [Note.ChordResult?](), draftChordResults = [Note.ChordResult?]()
     
     var spectrogramNode: Node?
     var spectrogramFqType: Spectrogram.FqType?
@@ -237,8 +237,8 @@ final class ScoreView: TimelineView, @unchecked Sendable {
                                timeNode, clippingNode])
         updateClippingNode()
         updateTimeline()
-        updateScore()
         updateDraftNotes()
+        updateScore()
         
         if model.enabled {
             scoreTrackItem = .init(score: model, sampleRate: Audio.defaultSampleRate, isUpdateNotewaveDic: true)
@@ -251,8 +251,8 @@ extension ScoreView {
     
     func updateWithModel() {
         updateTimeline()
-        updateScore()
         updateDraftNotes()
+        updateScore()
     }
     func updateClippingNode() {
         var parent: Node?
@@ -323,6 +323,7 @@ extension ScoreView {
         } else {
             draftNotesNode.children = []
         }
+        draftChordResults = model.draftNotes.map { $0.chordResult(fromTempo: model.tempo) }
     }
     func updateScore() {
         updateNotes()
@@ -518,11 +519,14 @@ extension ScoreView {
     func insertDraft(_ nivs: [IndexValue<Note>]) {
         unupdateModel.draftNotes.insert(nivs)
         draftNotesNode.children.insert(nivs.map { .init(value: draftNoteNode(from: $0.value), index: $0.index) })
+        draftChordResults.insert(nivs.map { .init(value: $0.value.chordResult(fromTempo: model.tempo),
+                                             index: $0.index) })
         updateChord()
     }
     func removeDraft(at noteIs: [Int]) {
         unupdateModel.draftNotes.remove(at: noteIs)
         noteIs.reversed().forEach { draftNotesNode.remove(atChild: $0) }
+        noteIs.reversed().forEach { draftChordResults.remove(at: $0) }
         updateChord()
     }
     
@@ -688,7 +692,7 @@ extension ScoreView {
         let pitchRange = Score.pitchRange
         guard let intPitchRange = Range<Int>(pitchRange) else { return [] }
         
-        let chordResults = (chordResults + otherChordResults).compactMap() { $0 }
+        let chordResults = (chordResults + draftChordResults + otherChordResults).compactMap() { $0 }
         let trs = score.chordsResult(from: chordResults)
         
         var chordEdges = [(edge: Edge, typers: [Chord.ChordTyper])]()
@@ -716,7 +720,7 @@ extension ScoreView {
         let pitchRange = Score.pitchRange
         guard let intPitchRange = Range<Int>(pitchRange) else { return [] }
         
-        let chordResults = (chordResults + otherChordResults).compactMap() { $0 }
+        let chordResults = (chordResults + draftChordResults + otherChordResults).compactMap() { $0 }
         let trs = score.chordsResult(from: chordResults)
         
         struct PitchAndTyper: Hashable {
@@ -1275,36 +1279,39 @@ extension ScoreView {
                 return (beat, result, isOneOvertone ? 0 : result.sumTone)
             }
             let maxSumTone = ns.maxValue { $0.sumTone } ?? 0
-            var preBeatY: Double?
             for n in ns {
                 let noteX = x(atBeat: n.beat), noteY = noteY(atBeat: n.beat, from: note)
                 var stereo = n.result.stereo
                 if !isOneOvertone {
                     stereo.volm *= maxSumTone == 0 ? 0 : n.sumTone / maxSumTone
                 }
-                if (pitIsDic[n.beat]?.count ?? 0) >= 2, let preBeatY {
-                    ps.append(.init(noteX, preBeatY, halfNH, Self.color(from: stereo)))
-                    mps.append(.init(noteX, preBeatY, mainLineHalfH, .content))
+                let color = Self.color(from: stereo)
+                let evenAmp = Self.color(fromScale: n.result.tone.overtone.evenAmp)
+                if let pitIs = pitIsDic[n.beat] {
+                    for pitI in pitIs {
+                        let pitY = pitY(atPit: pitI, from: note)
+                        ps.append(.init(noteX, pitY, halfNH, color))
+                        mps.append(.init(noteX, pitY, mainLineHalfH, .content))
+                        if isEven {
+                            meps.append(.init(noteX, pitY, mainEvenLineHalfH, evenAmp))
+                        }
+                    }
+                } else {
+                    ps.append(.init(noteX, noteY, halfNH, color))
+                    mps.append(.init(noteX, noteY, mainLineHalfH, .content))
                     if isEven {
-                        meps.append(.init(noteX, preBeatY, mainEvenLineHalfH, Self.color(fromScale: n.result.tone.overtone.evenAmp)))
+                        meps.append(.init(noteX, noteY, mainEvenLineHalfH, evenAmp))
                     }
                 }
-                ps.append(.init(noteX, noteY, halfNH, Self.color(from: stereo)))
-                mps.append(.init(noteX, noteY, mainLineHalfH, .content))
-                if isEven {
-                    meps.append(.init(noteX, noteY, mainEvenLineHalfH, Self.color(fromScale: n.result.tone.overtone.evenAmp)))
-                }
-                eps.append(.init(noteX, evenY, overtoneHalfH, Self.color(fromScale: n.result.tone.overtone.evenAmp)))
-                preBeatY = noteY
+                eps.append(.init(noteX, evenY, overtoneHalfH, evenAmp))
             }
             
-            ps.append(.init(nsx + nw + releaseW, noteY(atBeat: note.beatRange.end, from: note), 0,
-                            ps.last!.color))
-            mps.append(.init(nsx + nw + releaseW, noteY(atBeat: note.beatRange.end, from: note), mainLineHalfH / 4,
-                             .content))
+            let lastNoteX = nsx + nw + releaseW
+            let lastNoteY = noteY(atBeat: note.beatRange.end, from: note)
+            ps.append(.init(lastNoteX, lastNoteY, 0, ps.last!.color))
+            mps.append(.init(lastNoteX, lastNoteY, mainLineHalfH / 4, .content))
             if isEven {
-                meps.append(.init(nsx + nw + releaseW, noteY(atBeat: note.beatRange.end, from: note), mainEvenLineHalfH / 4,
-                                  meps.last!.color))
+                meps.append(.init(lastNoteX, lastNoteY, mainEvenLineHalfH / 4, meps.last!.color))
             }
             
             var preI = 0
