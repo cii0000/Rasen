@@ -6669,6 +6669,38 @@ final class SheetView: BindableView, @unchecked Sendable {
             }
         }
     }
+    func isStraight(from selections: [Selection], atPit pitI: Int, at note: Note) -> Bool {
+        let fs = selections
+            .map { $0.rect }
+            .map { scoreView.convertFromWorld($0) }
+        if !fs.contains(where: { $0.contains(scoreView.pitPosition(atPit: pitI, from: note)) }) {
+            let pit = note.pits[pitI]
+            for (oPitI, oPit) in note.pits.enumerated() {
+                if oPitI != pitI && pit.beat == oPit.beat && pit.pitch == oPit.pitch {
+                    return true
+                }
+            }
+            if (pitI - 1 >= 0 && note.pits[pitI - 1].pitch != note.pits[pitI].pitch)
+                || (pitI + 1 < note.pits.count && note.pits[pitI + 1].pitch != note.pits[pitI].pitch) {
+                return true
+            }
+            if pitI + 2 < note.pits.count
+                && note.pits[pitI].pitch == note.pits[pitI + 1].pitch
+                && (note.pits[pitI + 1].pitch != note.pits[pitI + 2].pitch
+                    || (note.pits[pitI + 1].beat == note.pits[pitI + 2].beat
+                        && note.pits[pitI + 1].pitch == note.pits[pitI + 2].pitch)) {
+                return true
+            }
+            if pitI - 2 >= 0
+                && note.pits[pitI].pitch == note.pits[pitI - 1].pitch
+                && (note.pits[pitI - 1].pitch != note.pits[pitI - 2].pitch
+                    || (note.pits[pitI - 1].beat == note.pits[pitI - 2].beat
+                        && note.pits[pitI - 1].pitch == note.pits[pitI - 2].pitch)) {
+                return true
+            }
+        }
+        return false
+    }
     func draftNoteIndexes(from selections: [Selection]) -> [Int] {
         let fs = selections
             .map { $0.rect }

@@ -485,16 +485,19 @@ final class ColorAction: Action {
                         updatePitsWithSelection(noteI: noteI, pitI: nil, sprolI: nil, .stereo)
                         beganBeat = scoreView.beat(atX: scoreP.x)
                     case .pit(let pitI):
-                        beganVolm = score.notes[noteI].pits[pitI].stereo.volm
-                        updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .stereo)
-                        beganBeat = note.pits[pitI].beat + note.beatRange.start
-                    case .mid(let pitI):
-                        let note = score.notes[noteI]
-                        let (pitIs, beat) = pitI + 1 < note.pits.count ? ([pitI, pitI + 1], note.pits[pitI].beat.mid(note.pits[pitI + 1].beat)) : ([pitI], note.pits[pitI].beat.mid(note.beatRange.length))
-                        beganVolm = score.notes[noteI].pitResult(atBeat: Double(beat)).stereo.volm
-                        updatePitsWithSelection(noteI: noteI, pitI: pitI, pitIs: pitIs,
-                                                sprolI: nil, .stereo)
-                        beganBeat = beat + note.beatRange.start
+                        if sheetView.isStraight(from: rootView.selections,
+                                                    atPit: pitI, at: note) {
+                            let note = score.notes[noteI]
+                            let (pitIs, beat) = pitI + 1 < note.pits.count ? ([pitI, pitI + 1], note.pits[pitI].beat.mid(note.pits[pitI + 1].beat)) : ([pitI], note.pits[pitI].beat.mid(note.beatRange.length))
+                            beganVolm = score.notes[noteI].pitResult(atBeat: Double(beat)).stereo.volm
+                            updatePitsWithSelection(noteI: noteI, pitI: pitI, pitIs: pitIs,
+                                                    sprolI: nil, .stereo)
+                            beganBeat = beat + note.beatRange.start
+                        } else {
+                            beganVolm = score.notes[noteI].pits[pitI].stereo.volm
+                            updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .stereo)
+                            beganBeat = note.pits[pitI].beat + note.beatRange.start
+                        }
                     case .evenAmp(let pitI):
                         beganVolm = score.notes[noteI].pits[pitI].tone.overtone.evenAmp
                         updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .tone)
@@ -566,7 +569,7 @@ final class ColorAction: Action {
             
             if let scoreResult {
                 switch scoreResult {
-                case .note, .pit, .mid:
+                case .note, .pit:
                     var nvs = [Int: Note]()
                     for (_, v) in beganNotePits {
                         for (noteI, nv) in v.dic {
@@ -911,17 +914,20 @@ final class ColorAction: Action {
                         updatePitsWithSelection(noteI: noteI, pitI: nil, sprolI: nil, .stereo)
                         beganBeat = scoreView.beat(atX: scoreP.x)
                     case .pit(let pitI):
-                        beganStereo = note.pits[pitI].stereo
-                        updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .stereo)
-                        beganBeat = note.pits[pitI].beat + note.beatRange.start
-                    case .mid(let pitI):
-                        beganStereo = scoreView.stereo(atX: scoreP.x, at: noteI)
-                        let note = score.notes[noteI]
-                        let (pitIs, beat) = pitI + 1 < note.pits.count ? ([pitI, pitI + 1], note.pits[pitI].beat.mid(note.pits[pitI + 1].beat)) : ([pitI], note.pits[pitI].beat.mid(note.beatRange.length))
-                        beganVolm = score.notes[noteI].pitResult(atBeat: Double(beat)).stereo.volm
-                        updatePitsWithSelection(noteI: noteI, pitI: pitI, pitIs: pitIs,
-                                                sprolI: nil, .stereo)
-                        beganBeat = beat + note.beatRange.start
+                        if sheetView.isStraight(from: rootView.selections,
+                                                    atPit: pitI, at: note) {
+                            beganStereo = scoreView.stereo(atX: scoreP.x, at: noteI)
+                            let note = score.notes[noteI]
+                            let (pitIs, beat) = pitI + 1 < note.pits.count ? ([pitI, pitI + 1], note.pits[pitI].beat.mid(note.pits[pitI + 1].beat)) : ([pitI], note.pits[pitI].beat.mid(note.beatRange.length))
+                            beganVolm = score.notes[noteI].pitResult(atBeat: Double(beat)).stereo.volm
+                            updatePitsWithSelection(noteI: noteI, pitI: pitI, pitIs: pitIs,
+                                                    sprolI: nil, .stereo)
+                            beganBeat = beat + note.beatRange.start
+                        } else {
+                            beganStereo = note.pits[pitI].stereo
+                            updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .stereo)
+                            beganBeat = note.pits[pitI].beat + note.beatRange.start
+                        }
                     case .evenAmp, .oddVolm, .allEven: return
                     case .allSprol(let sprolI, let sprol):
                         let volm = sprol.volm
@@ -1301,16 +1307,19 @@ final class ColorAction: Action {
                         updatePitsWithSelection(noteI: noteI, pitI: nil, sprolI: nil, .tone)
                         beganBeat = scoreView.beat(atX: scoreP.x)
                     case .pit(let pitI):
-                        beganVolm = score.notes[noteI].pits[pitI].tone.overtone.evenAmp
-                        updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .tone)
-                        beganBeat = note.pits[pitI].beat + note.beatRange.start
-                    case .mid(let pitI):
-                        let note = score.notes[noteI]
-                        let (pitIs, beat) = pitI + 1 < note.pits.count ? ([pitI, pitI + 1], note.pits[pitI].beat.mid(note.pits[pitI + 1].beat)) : ([pitI], note.pits[pitI].beat.mid(note.beatRange.length))
-                        beganVolm = score.notes[noteI].pitResult(atBeat: Double(beat)).stereo.volm
-                        updatePitsWithSelection(noteI: noteI, pitI: pitI, pitIs: pitIs,
-                                                sprolI: nil, .stereo)
-                        beganBeat = beat + note.beatRange.start
+                        if sheetView.isStraight(from: rootView.selections,
+                                                    atPit: pitI, at: note) {
+                            let note = score.notes[noteI]
+                            let (pitIs, beat) = pitI + 1 < note.pits.count ? ([pitI, pitI + 1], note.pits[pitI].beat.mid(note.pits[pitI + 1].beat)) : ([pitI], note.pits[pitI].beat.mid(note.beatRange.length))
+                            beganVolm = score.notes[noteI].pitResult(atBeat: Double(beat)).stereo.volm
+                            updatePitsWithSelection(noteI: noteI, pitI: pitI, pitIs: pitIs,
+                                                    sprolI: nil, .stereo)
+                            beganBeat = beat + note.beatRange.start
+                        } else {
+                            beganVolm = score.notes[noteI].pits[pitI].tone.overtone.evenAmp
+                            updatePitsWithSelection(noteI: noteI, pitI: pitI, sprolI: nil, .tone)
+                            beganBeat = note.pits[pitI].beat + note.beatRange.start
+                        }
                     default: break
                     }
                     
@@ -1354,7 +1363,7 @@ final class ColorAction: Action {
             
             if let scoreResult {
                 switch scoreResult {
-                case .note, .pit, .mid:
+                case .note, .pit:
                     var nvs = [Int: Note]()
                     for (_, v) in beganNotePits {
                         for (noteI, nv) in v.dic {

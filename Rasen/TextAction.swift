@@ -708,7 +708,15 @@ final class TextAction: InputTextEventAction {
                 var note = scoreView.model.notes[noteI]
                 let key = (event.inputKeyType.name
                     .applyingTransform(.fullwidthToHalfwidth, reverse: false) ?? "").lowercased()
-                var lyric = note.pits[pitI].lyric
+                var lyric = note.pits[pitI].lyric, pitI = pitI
+                let oPit = note.pits[pitI]
+                for (nPitI, pit) in note.pits.enumerated().reversed() {
+                    if pit.beat == oPit.beat && pit.pitch == oPit.pitch {
+                        lyric = pit.lyric
+                        pitI = nPitI
+                        break
+                    }
+                }
                 if event.inputKeyType == .delete, !lyric.isEmpty {
                     lyric.removeLast()
                 } else if event.inputKeyType.isText {
@@ -735,7 +743,8 @@ final class TextAction: InputTextEventAction {
             }
             if let (noteI, pitI) = scoreView.noteAndPitI(at: scoreP, scale: rootView.screenToWorldScale) {
                 appendLyric(atPit: pitI, atNote: noteI)
-            } else if let noteI = scoreView.noteIndex(at: scoreP, scale: rootView.screenToWorldScale) {
+            } else if let noteI = scoreView.noteIndex(at: scoreP, scale: rootView.screenToWorldScale),
+                      event.inputKeyType.isText {
                 var pit = scoreView.splittedPit(at: scoreP, at: noteI,
                                                 beatInterval: rootView.currentBeatInterval,
                                                 pitchInterval: rootView.currentPitchInterval)
@@ -743,10 +752,11 @@ final class TextAction: InputTextEventAction {
                 let pitI = scoreView.insertablePitIndex(atBeat: pit.beat, at: noteI)
                 var note = scoreView.model.notes[noteI]
                 note.pits.insert(pit, at: pitI)
+                note.pits.insert(pit, at: pitI + 1)
                 sheetView.newUndoGroup()
                 sheetView.replace([IndexValue(value: note, index: noteI)])
-                appendLyric(atPit: pitI, atNote: noteI, isNewUndoGroup: false)
-            } else {
+                appendLyric(atPit: pitI + 1, atNote: noteI, isNewUndoGroup: false)
+            } else if event.inputKeyType.isText {
                 let beat = scoreView.beat(atX: scoreP.x, interval: rootView.currentBeatInterval)
                 let pitch = scoreView.pitch(atY: scoreP.y, interval: rootView.currentPitchInterval)
                 sheetView.newUndoGroup()

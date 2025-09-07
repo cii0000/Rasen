@@ -1449,11 +1449,14 @@ extension Note {
         pits.allSatisfy { $0.tone.spectlope.isFullNoise }
     }
     
+    var containsLyric: Bool {
+        pits.contains(where: { !$0.lyric.isEmpty })
+    }
     var isSimpleLyric: Bool {
-        isDefaultTone && pits.contains(where: { !$0.lyric.isEmpty })
+        isDefaultTone && containsLyric
     }
     var isRendableFromLyric: Bool {
-        !isDefaultTone && pits.contains(where: { !$0.lyric.isEmpty })
+        !isDefaultTone && containsLyric
     }
     func withRendable(tempo: Rational) -> Self {
         guard isSimpleLyric else { return self }

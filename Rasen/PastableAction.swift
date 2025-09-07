@@ -970,7 +970,7 @@ final class PastableAction: Action {
                                 lineType: .color(.selected))
                 selectingLineNode.children = [node]
                 Pasteboard.shared.copiedObjects = [.normalizationValue(note.spectlopeHeight)]
-            case .note, .startBeat, .endBeat, .mid:
+            case .note, .startBeat, .endBeat:
                 let scoreView = sheetView.scoreView
                 let score = scoreView.model
                 let scoreP = scoreView.convertFromWorld(p)
@@ -1451,7 +1451,7 @@ final class PastableAction: Action {
                     Pasteboard.shared.copiedObjects = [.normalizationValue(note.spectlopeHeight)]
                     return true
                 }
-            case .note, .startBeat, .endBeat, .mid:
+            case .note, .startBeat, .endBeat:
                 let scoreP = scoreView.convertFromWorld(p)
                 
                 let pitchInterval = rootView.currentPitchInterval
@@ -2911,6 +2911,14 @@ final class PastableAction: Action {
                         if note.pits[pitI].stereo != stereo {
                             note.pits[pitI].stereo = stereo
                             
+                            if sheetView.isStraight(from: rootView.selections,
+                                                        atPit: pitI, at: note),
+                               pitI + 1 < note.pits.count,
+                                note.pits[pitI + 1].stereo != stereo {
+                                
+                                note.pits[pitI + 1].stereo = stereo
+                            }
+                            
                             sheetView.newUndoGroup()
                             sheetView.replace(note, at: noteI)
                             
@@ -2968,14 +2976,16 @@ final class PastableAction: Action {
                             
                             sheetView.updatePlaying()
                         }
-                    case .pit(let pitI), .mid(let pitI), .sprol(let pitI, _, _):
+                    case .pit(let pitI), .sprol(let pitI, _, _):
                         var note = scoreView.model.notes[noteI]
                         var isChanged = false
                         if note.pits[pitI].tone != tone {
                             note.pits[pitI].tone = tone
                             isChanged = true
                         }
-                        if case .mid = result, pitI + 1 < note.pits.count,
+                        if sheetView.isStraight(from: rootView.selections,
+                                                    atPit: pitI, at: note),
+                           pitI + 1 < note.pits.count,
                             note.pits[pitI + 1].tone != tone {
                             
                             note.pits[pitI + 1].tone = tone

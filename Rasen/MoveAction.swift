@@ -540,7 +540,7 @@ final class MoveScoreAction: DragEventAction {
     enum SlideType {
         case keyBeats, allBeat, endBeat, loopDurBeat, isShownSpectrogram, scale,
              startNoteBeat, endNoteBeat, note,
-             pit, mid,
+             pit, strightPit,
              even, sprol, spectlopeHeight
     }
     
@@ -564,6 +564,7 @@ final class MoveScoreAction: DragEventAction {
     private var beganScoreOption: ScoreOption?
     private var beganNotes = [Int: Note]()
     private var beganNote: Note?, beganPit: Pit?, beganBeat = Rational(0)
+    private var preStrightPitI, nextStrightPitI: Int?
     private var beganNotePits = [Int: (note: Note, pit: Pit, pits: [Int: Pit])]()
     private var beganSprolPitch = 0.0, beganSpectlopeY = 0.0
     private var beganNoteSprols = [UUID: (nid: UUID, dic: [Int: (note: Note, pits: [Int: (pit: Pit, sprolIs: Set<Int>)])])]()
@@ -682,8 +683,9 @@ final class MoveScoreAction: DragEventAction {
                     }
                     
                     switch result {
-                    case .pit(let pitI), .mid(let pitI), .lyric(let pitI):
-                        type = if case .mid = result { .mid } else { .pit }
+                    case .pit(let pitI), .lyric(let pitI):
+                        type = sheetView.isStraight(from: rootView.selections,
+                                                        atPit: pitI, at: note) ? .strightPit : .pit
                         
                         let pit = note.pits[pitI]
                         self.pitI = pitI
@@ -696,17 +698,26 @@ final class MoveScoreAction: DragEventAction {
                         beganBeatX = scoreView.x(atBeat: note.beatRange.start + pit.beat)
                         beganPitchY = scoreView.y(fromPitch: note.pitch + pit.pitch)
                         
-                        var playerBeat = beganBeat
+                        let playerBeat = beganBeat
                         
                         var noteAndPitIs: [Int: [Int]]
                         if case .lyric = result {
                             let note = score.notes[noteI]
                             noteAndPitIs = [noteI: note.lyricRange(at: pitI)?.map { $0 } ?? [pitI]]
-                        } else if case .mid = result {
+                        } else if type == .strightPit {
                             let note = score.notes[noteI]
-                            let (pitIs, beat) = pitI + 1 < note.pits.count ? ([pitI, pitI + 1], note.pits[pitI].beat.mid(note.pits[pitI + 1].beat)) : ([pitI], note.pits[pitI].beat.mid(note.beatRange.length))
+                            var pitIs = [pitI]
+                            if pitI > 0 && (note.pits[pitI - 1].beat == note.pits[pitI].beat
+                                            || note.pits[pitI - 1].pitch == note.pits[pitI].pitch) {
+                                pitIs.append(pitI - 1)
+                                preStrightPitI = pitI - 1
+                            }
+                            if pitI + 1 < note.pits.count && (note.pits[pitI + 1].pitch == note.pits[pitI].pitch
+                                                              || note.pits[pitI + 1].beat == note.pits[pitI].beat) {
+                                pitIs.append(pitI + 1)
+                                nextStrightPitI = pitI + 1
+                            }
                             noteAndPitIs = [noteI: pitIs]
-                            playerBeat = note.beatRange.start + beat
                         } else if rootView.isSelect(at: p) {
                             noteAndPitIs = sheetView.noteAndPitIndexes(from: rootView.selections,
                                                                        enabledAllPits: false)
@@ -1282,7 +1293,7 @@ final class MoveScoreAction: DragEventAction {
                     let isShownSpectrogram = scoreView.isShownSpectrogram(at: scoreP)
                     scoreView.isShownSpectrogram = isShownSpectrogram
                     
-                case .pit, .mid:
+                case .pit, .strightPit:
                     if let noteI, noteI < score.notes.count {
                         let beatInterval = rootView.currentBeatInterval
                         let pitchInterval = rootView.currentPitchInterval
@@ -1309,6 +1320,22 @@ final class MoveScoreAction: DragEventAction {
                                         .clipped(min: preBeat, max: nextBeat)
                                     note.pits[pitI].pitch = (dPitch + beganPit.pitch)
                                         .interval(scale: rootView.currentPitchInterval)
+                                    
+                                    if type == .strightPit && pitI == preStrightPitI,
+                                        pitI + 1 < note.pits.count {
+                                        if beganNote?.pits[pitI + 1].beat == beganPit.beat {
+                                            note.pits[pitI].pitch = beganPit.pitch
+                                        } else if beganNote?.pits[pitI + 1].pitch == beganPit.pitch {
+                                            note.pits[pitI].beat = beganPit.beat
+                                        }
+                                    }
+                                    if type == .strightPit && pitI == nextStrightPitI, pitI > 0 {
+                                        if beganNote?.pits[pitI - 1].pitch == beganPit.pitch {
+                                            note.pits[pitI].beat = beganPit.beat
+                                        } else if beganNote?.pits[pitI - 1].beat == beganPit.beat {
+                                            note.pits[pitI].pitch = beganPit.pitch
+                                        }
+                                    }
                                 }
                                 if nv.pits[0] != nil {
                                     let dBeat = note.pits.first!.beat
@@ -1342,19 +1369,8 @@ final class MoveScoreAction: DragEventAction {
                             octaveNode?.children = scoreView.octaveNode(noteIs: [noteI]).children
                             
                             if pitch != oldPitch {
-                                let note = scoreView[noteI]
-                                
-                                let beat = if let pitI {
-                                    type == .mid && pitI + 1 < note.pits.count ?
-                                    note.pits[pitI].beat.mid(note.pits[pitI + 1].beat) :
-                                    note.pits[pitI].beat.mid(note.beatRange.length)
-                                } else {
-                                    nsBeat
-                                }
-                                
-                                let pBeat = beat + note.beatRange.start
                                 notePlayer?.notes = playerBeatNoteIndexes.map {
-                                    scoreView.rendableNormarizedPitResult(atBeat: pBeat, at: $0)
+                                    scoreView.rendableNormarizedPitResult(atBeat: nsBeat, at: $0)
                                 }
                                 
                                 oldPitch = pitch

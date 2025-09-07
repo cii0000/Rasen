@@ -1187,7 +1187,8 @@ extension ScoreView {
         let isFullNoise = note.isFullNoise
         let mainLineHalfH = noteMainH(from: note) / 2
         let mainEvenLineHalfH = mainLineHalfH * 0.375
-        var mainEvenLineColors, stereoLineColors: [Color], knobPRCs: [(p: Point, r: Double, color: Color)]
+        let mainEvenLineColors, stereoLineColors: [Color]
+        let knobPRCs: [(p: Point, r: Double, color: Color)]
         var toneFrames = [Rect]()
         var tonePanelKnobPRCs: [(p: Point, r: Double, color: Color)]
         
@@ -1359,19 +1360,6 @@ extension ScoreView {
                                         (note.beatRange.start + $0.beat) % Sheet.beatInterval == 0
                                         && (note.pitch + $0.pitch).isInteger ? knobR : knobR / 2,
                                         $0.tone.baseColor()) }
-            knobPRCs += note.pits.enumerated().compactMap {
-                let nextBeat = $0.offset + 1 < note.pits.count ?
-                note.pits[$0.offset + 1].beat : note.beatRange.length
-                let nextPitch = note.pits[min($0.offset + 1,  note.pits.count - 1)].pitch
-                guard !($0.element.beat == nextBeat
-                        && $0.element.pitch == nextPitch) else { return nil }
-                let beat = $0.element.beat.mid(nextBeat)
-                let pitch = $0.element.beat == nextBeat ?
-                Double(note.pitch + $0.element.pitch.mid(nextPitch)) :
-                Double(note.pitch) + note.pitResult(atBeat: Double(beat)).pitch.doubleValue
-                return (.init(x(atBeat: note.beatRange.start + beat), y(fromPitch: pitch)),
-                        knobR / 2, Color.octave)
-            }
             
             stereoLinePath = .init(triangleStrip(ps, isSnap: true))
             stereoLineColors = colors(ps)
@@ -1938,7 +1926,6 @@ extension ScoreView {
         case note
         case startBeat
         case endBeat
-        case mid(pitI: Int)
         case pit(pitI: Int)
         case lyric(pitI: Int)
         case even(pitI: Int)
@@ -2037,6 +2024,7 @@ extension ScoreView {
             let nw = nex - nsx
             let nMaxDSq = note.pits.count == 1 && nw / 4 < maxD ? (nw / 4).squared : maxDSq
             var prePitP: Point?
+            let isRendableFromLyric = note.isRendableFromLyric
             for pitI in note.pits.count.range {
                 let pitP = pitPosition(atPit: pitI, from: note)
                 let dSq = pitP.distanceSquared(p)
@@ -2063,7 +2051,7 @@ extension ScoreView {
                 }
                 
                 let pit = note.pits[pitI]
-                if !pit.lyric.isEmpty && pit.lyric != "[" && pit.lyric != "]" {
+                if isRendableFromLyric && !pit.lyric.isEmpty && pit.lyric != "[" && pit.lyric != "]" {
                     let pitP = pitPosition(atPit: pitI, from: note) + Point(0, -8)
 
                     let dSq = pitP.distanceSquared(p)
@@ -2092,42 +2080,6 @@ extension ScoreView {
                         minDSq = dSq
                         minResult = (noteI, .endBeat)
                         isPit = true
-                    }
-                }
-            }
-            
-            if note.pits.count > 1 {
-                note.pits.enumerated().forEach {
-                    let nextBeat = $0.offset + 1 < note.pits.count ?
-                    note.pits[$0.offset + 1].beat : note.beatRange.length
-                    let nextPitch = note.pits[min($0.offset + 1,  note.pits.count - 1)].pitch
-                    let beat = $0.element.beat.mid(nextBeat)
-                    let pitch = $0.element.beat == nextBeat ?
-                    Double(note.pitch + $0.element.pitch.mid(nextPitch)) :
-                    Double(note.pitch) + note.pitResult(atBeat: Double(beat)).pitch.doubleValue
-                    let pitP = Point(x(atBeat: note.beatRange.start + beat),
-                                     y(fromPitch: pitch))
-                    let dSq = pitP.distanceSquared(p)
-                    if dSq <= minDSq && dSq < nMaxDSq {
-                        let pdSq = pointline.minDistanceSquared(at: p)
-                        if prePitP == pitP && pitP.x < p.x {
-                            pds[pitP] = pdSq
-                            minDSq = dSq
-                            minResult = (noteI, .mid(pitI: $0.offset))
-                            isPit = true
-                        } else if let minPDSq = pds[pitP] {
-                            if pdSq < minPDSq {
-                                pds[pitP] = pdSq
-                                minDSq = dSq
-                                minResult = (noteI, .mid(pitI: $0.offset))
-                                isPit = true
-                            }
-                        } else {
-                            pds[pitP] = pdSq
-                            minDSq = dSq
-                            minResult = (noteI, .mid(pitI: $0.offset))
-                            isPit = true
-                        }
                     }
                 }
             }
@@ -2220,7 +2172,6 @@ extension ScoreView {
     
     enum ColorHitResult {
         case note
-        case mid(pitI: Int)
         case pit(pitI: Int)
         case allEven
         case evenAmp(pitI: Int)
@@ -2344,39 +2295,6 @@ extension ScoreView {
                     }
                 }
                 prePitP = pitP
-            }
-            
-            if note.pits.count > 1 {
-                note.pits.enumerated().forEach {
-                    let nextBeat = $0.offset + 1 < note.pits.count ?
-                    note.pits[$0.offset + 1].beat : note.beatRange.length
-                    let nextPitch = note.pits[min($0.offset + 1,  note.pits.count - 1)].pitch
-                    let beat = $0.element.beat.mid(nextBeat)
-                    let pitch = $0.element.beat == nextBeat ?
-                    Double(note.pitch + $0.element.pitch.mid(nextPitch)) :
-                    Double(note.pitch) + note.pitResult(atBeat: Double(beat)).pitch.doubleValue
-                    let pitP = Point(x(atBeat: note.beatRange.start + beat),
-                                     y(fromPitch: pitch))
-                    let dSq = pitP.distanceSquared(p)
-                    if dSq <= minDSq && dSq < nMaxDSq {
-                        let pdSq = pointline.minDistanceSquared(at: p)
-                        if prePitP == pitP && pitP.x < p.x {
-                            pds[pitP] = pdSq
-                            minDSq = dSq
-                            minResult = (noteI, .mid(pitI: $0.offset))
-                        } else if let minPDSq = pds[pitP] {
-                            if pdSq < minPDSq {
-                                pds[pitP] = pdSq
-                                minDSq = dSq
-                                minResult = (noteI, .mid(pitI: $0.offset))
-                            }
-                        } else {
-                            pds[pitP] = pdSq
-                            minDSq = dSq
-                            minResult = (noteI, .mid(pitI: $0.offset))
-                        }
-                    }
-                }
             }
             
             let hnh = pitchHeight / 2
