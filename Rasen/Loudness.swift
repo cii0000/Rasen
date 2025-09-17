@@ -224,7 +224,7 @@ struct Loudness {
             self.string = str
         }
     }
-    func integratedLoudnessDb(data: [[Double]]) throws -> Double {
+    func lufs(from data: [[Double]]) throws -> Double {
         var inputData = data
         if inputData.count > 5 || inputData.isEmpty {
             throw ValueError("Audio must have five channels or less.")
@@ -291,32 +291,6 @@ struct Loudness {
         let n1 = (0 ..< numChannels).sum { i in G[i] * zAvgGated1[i] }
         let lufs = -0.691 + 10 * .log10(n1)
         return lufs
-    }
-    
-    static func currentPeak(data: [[Double]]) -> Double {
-        data.map { cs in (cs.map { abs($0) }).max()! }.max()!
-    }
-    static func normalizePeakScale(data: [[Double]],
-                                   target: Double) -> Double {
-        let currentPeak = currentPeak(data: data)
-        return (10 ** (target / 20)) / currentPeak
-    }
-    static func normalizePeak(data: [[Double]],
-                              target: Double) -> [[Double]] {
-        let gain = normalizePeakScale(data: data, target: target)
-        return data.map { cs in cs.map { $0 * gain } }
-    }
-    static func normalizeLoudnessScale(inputLoudness: Double,
-                                       targetLoudness: Double) -> Double {
-        let deltaLoudness = targetLoudness - inputLoudness
-        return 10 ** (deltaLoudness / 20)
-    }
-    static func normalizeLoudness(data: [[Double]],
-                                  inputLoudness: Double,
-                                  targetLoudness: Double) -> [[Double]] {
-        let gain = normalizeLoudnessScale(inputLoudness: inputLoudness,
-                                          targetLoudness: targetLoudness)
-        return data.map { cs in cs.map { $0 * gain } }
     }
 }
 extension Loudness {

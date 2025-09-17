@@ -174,11 +174,10 @@ struct Content: Hashable, Codable {
         self.timeOption = timeOption
     }
     
-    mutating func normalizeVolm() {
-        if type == .sound, let lufs = integratedLoudness, lufs > -14 {
-            let gain = Loudness.normalizeLoudnessScale(inputLoudness: lufs,
-                                                       targetLoudness: -14)
-            stereo.volm = Volm.volm(fromAmp: Volm.amp(fromVolm: stereo.volm) * gain)
+    mutating func normalizeVolm(limitLufs: Double = Audio.limitLufs) {
+        if type == .sound, let lufs = lufs, lufs > limitLufs {
+            let scale = PCMBuffer.normalizeScale(inputDb: lufs, targetDb: limitLufs)
+            stereo.volm = Volm.volm(fromAmp: Volm.amp(fromVolm: stereo.volm) * scale)
         }
     }
 }
@@ -235,8 +234,8 @@ extension Content {
     var pcmBuffer: PCMBuffer? {
         try? .from(url: url)
     }
-    var integratedLoudness: Double? {
-        pcmBuffer?.integratedLoudness
+    var lufs: Double? {
+        pcmBuffer?.lufs
     }
     
     func isEqualFile(_ other: Self) -> Bool {

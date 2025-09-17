@@ -661,49 +661,7 @@ final class PlayAction: InputKeyEventAction {
                     }
                 }
                 
-                func topAndBottom(at ncShp: IntPoint, in aSheetView: SheetView) {
-                    var nncShp = ncShp, npsvs = [WeakElement<SheetView>]()
-                    nncShp.y -= 1
-                    while let aaSheetView = rootView.sheetView(at: nncShp),
-                          aaSheetView.model.enabledTimeline {
-                        npsvs.append(.init(element: aaSheetView))
-                        nncShp.y -= 1
-                    }
-                    aSheetView.bottomSheetViews = npsvs.reversed()
-                    nncShp = ncShp
-                    npsvs = []
-                    nncShp.y += 1
-                    while let aaSheetView = rootView.sheetView(at: nncShp),
-                          aaSheetView.model.enabledTimeline {
-                        npsvs.append(.init(element: aaSheetView))
-                        nncShp.y += 1
-                    }
-                    aSheetView.topSheetViews = npsvs
-                }
-                
-                let shps = rootView.groupSheetPositions(at: cShp)
-                for cShp in shps {
-                    guard let cSheetView = rootView.sheetView(at: cShp) else { continue }
-                    
-                    topAndBottom(at: cShp, in: cSheetView)
-                    
-                    var ncShp = cShp, psvs = [WeakElement<SheetView>]()
-                    while let preShp = rootView.nearestVerticalSheetPosition(at: ncShp, deltaX: -1) {
-                        guard let ncSheetView = rootView.sheetView(at: preShp) else { break }
-                        psvs.append(.init(element: ncSheetView))
-                        ncShp = preShp
-                    }
-                    cSheetView.previousSheetViews = psvs.reversed()
-                    
-                    ncShp = cShp
-                    var nsvs = [WeakElement<SheetView>]()
-                    while let nextShp = rootView.nearestVerticalSheetPosition(at: ncShp, deltaX: 1) {
-                        guard let ncSheetView = rootView.sheetView(at: nextShp) else { break }
-                        nsvs.append(.init(element: ncSheetView))
-                        ncShp = nextShp
-                    }
-                    cSheetView.nextSheetViews = nsvs
-                }
+                rootView.updateFromAroundWithTimeline(at: cShp)
                 
                 let scale = rootView.screenToWorldScale
                 let sheetP = cSheetView.convertFromWorld(p)

@@ -1937,6 +1937,33 @@ final class SheetView: BindableView, @unchecked Sendable {
         }
     }
     
+    func seqTrack(sampleRate: Double) -> Sequencer.Track {
+        var seqTrack = sequencerTrack
+        bottomSheetViews.forEach {
+            if let aSeqTrack = $0.element?.sequencerTrack {
+                seqTrack += aSeqTrack
+            }
+        }
+        topSheetViews.forEach {
+            if let aSeqTrack = $0.element?.sequencerTrack {
+                seqTrack += aSeqTrack
+            }
+        }
+        let bottomEndSec = bottomSheetViews.reduce(Rational(0)) {
+            max($0, $1.element?.model.allEndSec ?? 0)
+        }
+        let topEndSec = topSheetViews.reduce(Rational(0)) {
+            max($0, $1.element?.model.allEndSec ?? 0)
+        }
+        let mainDurSec = max(model.allEndSec, bottomEndSec, topEndSec,
+                             seqTrack.durSec)
+        seqTrack.scoreTrackItems.append(.init(rendnotes: [],
+                                              sampleRate: sampleRate,
+                                              startSec: 0,
+                                              durSec: mainDurSec))
+        return seqTrack
+    }
+    
     private var playingTimer: (any DispatchSourceTimer)?,
                 playingOldKeyframeIndex: Int?
     private var playingCaptions = [Caption](),
@@ -2026,33 +2053,13 @@ final class SheetView: BindableView, @unchecked Sendable {
             var seqTracks = [Sequencer.Track]()
             var deltaSec: Rational = 0
             
+            let sampleRate = Audio.defaultSampleRate
             var minFrameRate = model.mainFrameRate
             
             for weakElement in previousSheetViews {
                 guard let sheetView = weakElement.element else { continue }
-                var seqTrack = sheetView.sequencerTrack
-                sheetView.bottomSheetViews.forEach {
-                    if let aSeqTrack = $0.element?.sequencerTrack {
-                        seqTrack += aSeqTrack
-                    }
-                }
-                sheetView.topSheetViews.forEach {
-                    if let aSeqTrack = $0.element?.sequencerTrack {
-                        seqTrack += aSeqTrack
-                    }
-                }
-                let bottomEndSec = sheetView.bottomSheetViews.reduce(Rational(0)) {
-                    max($0, $1.element?.model.allEndSec ?? 0)
-                }
-                let topEndSec = sheetView.topSheetViews.reduce(Rational(0)) {
-                    max($0, $1.element?.model.allEndSec ?? 0)
-                }
-                let mainDurSec = max(sheetView.model.allEndSec, bottomEndSec, topEndSec,
-                                     seqTrack.durSec)
-                sheetView.mainDurSec = mainDurSec
-                seqTrack.scoreTrackItems.append(.init(rendnotes: [], sampleRate: Audio.defaultSampleRate,
-                                                      startSec: 0,
-                                                      durSec: mainDurSec))
+                let seqTrack = sheetView.seqTrack(sampleRate: sampleRate)
+                sheetView.mainDurSec = seqTrack.durSec
                 seqTracks.append(seqTrack)
                 deltaSec += seqTrack.durSec
                 
@@ -2060,30 +2067,8 @@ final class SheetView: BindableView, @unchecked Sendable {
             }
             firstDeltaSec = deltaSec
             
-            var seqTrack = sequencerTrack
-            bottomSheetViews.forEach {
-                if let aSeqTrack = $0.element?.sequencerTrack {
-                    seqTrack += aSeqTrack
-                }
-            }
-            topSheetViews.forEach {
-                if let aSeqTrack = $0.element?.sequencerTrack {
-                    seqTrack += aSeqTrack
-                }
-            }
-            let bottomEndSec = bottomSheetViews.reduce(Rational(0)) {
-                max($0, $1.element?.model.allEndSec ?? 0)
-            }
-            let topEndSec = topSheetViews.reduce(Rational(0)) {
-                max($0, $1.element?.model.allEndSec ?? 0)
-            }
-            
-            let mainDurSec = max(model.allEndSec, bottomEndSec, topEndSec,
-                                 seqTrack.durSec)
-            self.mainDurSec = mainDurSec
-            seqTrack.scoreTrackItems.append(.init(rendnotes: [], sampleRate: Audio.defaultSampleRate,
-                                                  startSec: 0,
-                                                  durSec: mainDurSec))
+            let seqTrack = seqTrack(sampleRate: sampleRate)
+            self.mainDurSec = seqTrack.durSec
             seqTracks.append(seqTrack)
             
             if model.enabledMusic {
@@ -2096,29 +2081,8 @@ final class SheetView: BindableView, @unchecked Sendable {
             
             for weakElement in nextSheetViews {
                 guard let sheetView = weakElement.element else { continue }
-                var seqTrack = sheetView.sequencerTrack
-                sheetView.bottomSheetViews.forEach {
-                    if let aSeqTrack = $0.element?.sequencerTrack {
-                        seqTrack += aSeqTrack
-                    }
-                }
-                sheetView.topSheetViews.forEach {
-                    if let aSeqTrack = $0.element?.sequencerTrack {
-                        seqTrack += aSeqTrack
-                    }
-                }
-                let bottomEndSec = sheetView.bottomSheetViews.reduce(Rational(0)) {
-                    max($0, $1.element?.model.allEndSec ?? 0)
-                }
-                let topEndSec = sheetView.topSheetViews.reduce(Rational(0)) {
-                    max($0, $1.element?.model.allEndSec ?? 0)
-                }
-                let mainDurSec = max(sheetView.model.allEndSec, bottomEndSec, topEndSec,
-                                     seqTrack.durSec)
-                sheetView.mainDurSec = mainDurSec
-                seqTrack.scoreTrackItems.append(.init(rendnotes: [], sampleRate: Audio.defaultSampleRate,
-                                                      startSec: 0,
-                                                      durSec: mainDurSec))
+                let seqTrack = sheetView.seqTrack(sampleRate: sampleRate)
+                sheetView.mainDurSec = seqTrack.durSec
                 seqTracks.append(seqTrack)
                 
                 minFrameRate = min(minFrameRate, sheetView.model.mainFrameRate)

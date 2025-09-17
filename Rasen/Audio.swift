@@ -21,6 +21,24 @@ import Accelerate.vecLib.vDSP
 //#elseif os(linux) && os(windows)
 //#endif
 
+extension vDSP {
+    static func add(in dst: inout [Double], from src: [Double], startI: Int) {
+        guard startI < dst.count else { return }
+        
+        let count = min(src.count, dst.count - startI)
+        guard count > 0 else { return }
+        
+        dst.withUnsafeMutableBufferPointer { dstPtr in
+            src.withUnsafeBufferPointer { srcPtr in
+                vDSP_vaddD(dstPtr.baseAddress!.advanced(by: startI), 1,
+                           srcPtr.baseAddress!, 1,
+                           dstPtr.baseAddress!.advanced(by: startI), 1,
+                           vDSP_Length(count))
+            }
+        }
+    }
+}
+
 struct Biquad {
     private var filter: vDSP.Biquad<Double>
     init?(coefficients: [Double],
@@ -221,8 +239,11 @@ extension PCMTrackItem {
         pcmBuffer.format.sampleRate
     }
     
-    var lufs: Double {
-        pcmBuffer.integratedLoudness
+    var lufs: Double? {
+        pcmBuffer.lufs
+    }
+    var peakDb: Double {
+        pcmBuffer.peakDb
     }
     
     mutating func change(from timeOption: ContentTimeOption) {
@@ -464,10 +485,10 @@ struct ScoreTrackItem {
     
     fileprivate(set) var notewaveDic = [UUID: Notewave]()
     fileprivate(set) var isChanged = false
-    fileprivate(set) var lufs = 0.0
-    fileprivate(set) var sampless = [[Double]](), sampleStartI = 0
+    fileprivate(set) var sampless = [[Double]](), normarizedSampless = [[Double]](),
+                         sampleStartI = 0
     var sampleCount: Int {
-        sampless.isEmpty ? 0 : sampless[0].count
+        normarizedSampless.isEmpty ? 0 : normarizedSampless[0].count
     }
 }
 extension ScoreTrackItem {
@@ -491,6 +512,13 @@ extension ScoreTrackItem {
     
     func notewave(from rendnote: Rendnote) -> Notewave? {
         notewaveDic[rendnote.id]
+    }
+    
+    var lufs: Double? {
+        PCMBuffer.lufs(sampless: sampless, sampleRate: sampleRate)
+    }
+    var peakDb: Double {
+        PCMBuffer.peakDb(sampless: sampless)
     }
     
     mutating func changeTempo(with score: Score) {
@@ -588,12 +616,13 @@ extension ScoreTrackItem {
             isChanged = false
         }
     }
-    mutating func updateSamples(targetLoudnessDb: Double = -14) {
+    mutating func updateSamples(limitLufs: Double = Audio.limitLufs) {
         guard isEnabledSamples else { return }
         let ranges = rendnotes.map { $0.releasedRange(sampleRate: sampleRate, startSec: startSec) }
         let startI = ranges.minValue { $0.start } ?? 0
         let endI = ranges.maxValue { $0.end } ?? 0
         let count = endI - startI
+        
         var sampless = [[Double](repeating: 0, count: count),
                         [Double](repeating: 0, count: count)]
         for (rendnote, range) in zip(rendnotes, ranges) {
@@ -604,18 +633,16 @@ extension ScoreTrackItem {
                 sampless[1][i - startI] += notewave.sampless[1][i - range.start]
             }
         }
+        self.sampless = sampless
         
-        sampless = PCMBuffer.compress(sampless: sampless, sampleRate: sampleRate)
-        
-        let lufs = (try? Loudness(sampleRate: sampleRate).integratedLoudnessDb(data: sampless)) ?? targetLoudnessDb
-        self.lufs = lufs
-        if lufs > targetLoudnessDb {
-            let gain = Loudness.normalizeLoudnessScale(inputLoudness: lufs, targetLoudness: targetLoudnessDb)
-            vDSP.multiply(gain, sampless[0], result: &sampless[0])
-            vDSP.multiply(gain, sampless[1], result: &sampless[1])
+        var normarizedSampless = PCMBuffer.compress(sampless: sampless, sampleRate: sampleRate)
+        if let nSampless = PCMBuffer.normalizedLoudness(sampless: normarizedSampless,
+                                                        limitLufs: limitLufs,
+                                                        sampleRate: sampleRate) {
+            normarizedSampless = nSampless
         }
         
-        self.sampless = sampless
+        self.normarizedSampless = sampless
         self.sampleStartI = -startI
     }
 }
@@ -875,7 +902,7 @@ final class ScoreNoder: ObjectHashable {
                                 let mi = i - startI
                                 if mi >= 0 && mi < sampleCount {
                                     updateF(i: i, ui: ni + frameStartI, mi: mi, ni: ni,
-                                            sampless: scoreTrackItem.sampless,
+                                            sampless: scoreTrackItem.normarizedSampless,
                                             isPremultipliedEnvelope: true,
                                             allAttackStartSec: allAttackStartSec,
                                             allReleaseStartSec: allReleaseStartSec,
@@ -985,6 +1012,35 @@ final class Sequencer {
         var isEmpty: Bool {
             durSec == 0 || (scoreTrackItems.allSatisfy { $0.isEmpty } && pcmTrackItems.isEmpty)
         }
+    }
+    static func sampless(from tracks: [Track], sampleRate: Double) -> [[Double]] {
+        var allDurSec = tracks.sum { Double($0.durSec) }
+        let count = Int((allDurSec * sampleRate).rounded(.up))
+        
+        var sampless = [[Double]](repeating: .init(repeating: 0, count: count), count: 2)
+        allDurSec = 0.0
+        for track in tracks {
+            let durSec = track.durSec
+            guard durSec > 0 else { continue }
+            for scoreTrackItem in track.scoreTrackItems {
+                guard scoreTrackItem.durSec > 0 else { continue }
+                var scoreTrackItem = scoreTrackItem
+                scoreTrackItem.startSec = allDurSec
+                
+                let startI = Int((allDurSec * sampleRate).rounded(.down))
+                for (ci, samples) in scoreTrackItem.sampless.enumerated() {
+                    vDSP.add(in: &sampless[ci], from: samples, startI: startI)
+                }
+            }
+            
+            //pcm
+            
+            allDurSec += Double(durSec)
+        }
+        
+        PCMBuffer.useWaveclip(sampless: &sampless, sampleRate: sampleRate)
+        
+        return sampless
     }
     
     enum RenderType {
@@ -1282,7 +1338,7 @@ extension Sequencer {
     func buffer(sampleRate: Double,
                 headroomAmp: Double = Audio.headroomAmp,
                 enabledUseWaveclip: Bool = true,
-                targetLoudnessDb: Double? = -14,
+                limitLufs: Double? = Audio.limitLufs,
                 isCompress: Bool = true,
                 progressHandler: (Double, inout Bool) -> ()) throws -> AVAudioPCMBuffer? {
         let oldHeadroomAmp = clippingAudioUnit.headroomAmp
@@ -1349,13 +1405,8 @@ extension Sequencer {
         if enabledUseWaveclip {
             allBuffer.useWaveclip()
         }
-        if let targetLoudnessDb {
-            let lufs = allBuffer.integratedLoudness
-            if lufs > targetLoudnessDb {
-                let gain = Loudness.normalizeLoudnessScale(inputLoudness: lufs,
-                                                           targetLoudness: targetLoudnessDb)
-                allBuffer *= Float(gain)
-            }
+        if let limitLufs {
+            allBuffer.normalizeLoudness(limitLufs: limitLufs)
         }
         if isCompress {
             allBuffer.compress(targetAmp: Float(headroomAmp))
@@ -1594,6 +1645,27 @@ extension AVAudioPCMBuffer {
             }
         }
     }
+    static func useWaveclip(sampless: inout [[Double]], sampleRate: Double) {
+        let rSampleRate = 1 / sampleRate
+        let frameCount = sampless[0].count, channelCount = sampless.count
+        guard frameCount > 0 else { return }
+        for ci in 0 ..< channelCount {
+            let enabledAttack = abs(sampless[ci][0]) > Waveclip.minDoubleAmp
+            let enabledRelease = abs(sampless[ci][frameCount - 1]) > Waveclip.minDoubleAmp
+            if enabledAttack || enabledRelease {
+                for i in 0 ..< frameCount {
+                    let aSec = Double(i) * rSampleRate
+                    if enabledAttack && aSec < Waveclip.attackSec {
+                        sampless[ci][i] *= aSec * Waveclip.rAttackSec
+                    }
+                    let rSec = Double(frameCount - 1 - i) * rSampleRate
+                    if enabledRelease && rSec < Waveclip.releaseSec {
+                        sampless[ci][i] *= rSec * Waveclip.rReleaseSec
+                    }
+                }
+            }
+        }
+    }
     func clip(amp: Float) {
         for ci in 0 ..< channelCount {
             enumerated(channelIndex: ci) { i, v in
@@ -1603,7 +1675,7 @@ extension AVAudioPCMBuffer {
             }
         }
     }
-    var doubleData: [[Double]] {
+    var doubleSampless: [[Double]] {
         get {
             var ns = Array(repeating: Array(repeating: 0.0,
                                             count: frameCount),
@@ -1641,28 +1713,50 @@ extension AVAudioPCMBuffer {
         }
     }
     
-    var samplePeakDb: Double {
-        var peak = 0.0
+    static func normalizeScale(inputDb: Double, targetDb: Double) -> Double {
+        10 ** ((targetDb - inputDb) / 20)
+    }
+    
+    var peakAmp: Double {
+        var peakAmp: Float = 0.0
         for ci in 0 ..< channelCount {
             enumerated(channelIndex: ci) { _, v in
-                peak = max(abs(Double(v)), peak)
+                peakAmp = max(abs(v), peakAmp)
             }
         }
-        return Volm.db(fromAmp: peak)
+        return Double(peakAmp)
     }
-    var  integratedLoudness: Double {
-        let loudness = Loudness(sampleRate: sampleRate)
-        return (try? loudness.integratedLoudnessDb(data: doubleData)) ?? 0
+    var peakDb: Double {
+        Volm.db(fromAmp: peakAmp)
     }
-    func normalizePeak(target: Double) {
-        let gain = Loudness.normalizePeakScale(data: doubleData,
-                                               target: target)
-        self *= Float(gain)
+    
+    static func peakAmp(sampless: [[Double]]) -> Double {
+        sampless.map { cs in (cs.map { abs($0) }).max()! }.max()!
     }
-    func normalizeLoudness(targetLoudness: Double) {
-        let gain = Loudness.normalizeLoudnessScale(inputLoudness: integratedLoudness,
-                                                   targetLoudness: targetLoudness)
-        self *= Float(gain)
+    static func peakDb(sampless: [[Double]]) -> Double {
+        Volm.db(fromAmp: peakAmp(sampless: sampless))
+    }
+    
+    var lufs: Double? {
+        try? Loudness(sampleRate: sampleRate).lufs(from: doubleSampless)
+    }
+    func normalizeLoudness(limitLufs: Double) {
+        if let lufs = lufs, lufs > limitLufs {
+            self *= Float(Self.normalizeScale(inputDb: lufs, targetDb: limitLufs))
+        }
+    }
+    
+    static func lufs(sampless: [[Double]], sampleRate: Double) -> Double? {
+        try? Loudness(sampleRate: sampleRate).lufs(from: sampless)
+    }
+    static func normalizedLoudness(sampless: [[Double]], limitLufs: Double,
+                                   sampleRate: Double) -> [[Double]]? {
+        let lufs = (try? Loudness(sampleRate: sampleRate).lufs(from: sampless)) ?? limitLufs
+        if lufs > limitLufs {
+            let scale = PCMBuffer.normalizeScale(inputDb: lufs, targetDb: limitLufs)
+            return sampless.count.range.map { vDSP.multiply(scale, sampless[$0]) }
+        }
+        return nil
     }
     
     static func *= (lhs: PCMBuffer, rhs: Float) {

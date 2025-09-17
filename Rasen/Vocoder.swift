@@ -104,7 +104,7 @@ extension vDSP {
 }
 
 struct Waveclip {
-    static let minAmp: Float = 0.00001
+    static let minAmp: Float = 0.00001, minDoubleAmp = 0.00001
     static let attackSec = 0.015625, releaseSec = 0.015625
     static let rAttackSec = 1 / attackSec, rReleaseSec = 1 / releaseSec
 }

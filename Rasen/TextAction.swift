@@ -238,8 +238,12 @@ final class LookUpAction: InputKeyEventAction {
             let scoreP = scoreView.convertFromWorld(p)
             if scoreView.containsTimeline(scoreP, scale: rootView.screenToWorldScale) {
                 scoreView.scoreTrackItem?.updateNotewaveDic()
-                let lufs = scoreView.scoreTrackItem?.lufs ?? 0
-                rootView.show("Score".localized + "\n\t\("Loudness".localized): \(lufs) LUFS", at: p)
+                let lufs = scoreView.scoreTrackItem?.lufs
+                let peakDb = scoreView.scoreTrackItem?.peakDb
+                rootView.show("Score".localized
+                              + "\n\t\("Loudness".localized): \(lufs?.string(digitsCount: 2) ?? "N/A") LUFS"
+                              + "\n\t\("Sample Peak".localized): \(peakDb?.string(digitsCount: 2) ?? "N/A") dB",
+                              at: p)
             } else {
                 let pitchInterval = rootView.currentPitchInterval
                 let pitch = Pitch(value: scoreView.pitch(atY: scoreP.y, interval: pitchInterval))
@@ -266,11 +270,14 @@ final class LookUpAction: InputKeyEventAction {
             let contentView = sheetView.contentsView.elementViews[ci]
             let content = contentView.model
             let fileSize = content.url.fileSize ?? 0
-            let lufs = contentView.pcmTrackItem?.lufs ?? 0
+            let lufs = contentView.pcmTrackItem?.lufs
+            let peakDb = contentView.pcmTrackItem?.peakDb
             let string = IOResult.fileSizeNameFrom(fileSize: fileSize)
             rootView.show(content.type.displayName
-                          + "\n\t\("Loudness".localized): \(lufs) LUFS"
-                          + "\n\t\("File Size".localized): \(string)", at: p)            
+                          + "\n\t\("Loudness".localized): \(lufs?.string(digitsCount: 2) ?? "N/A") LUFS"
+                          + "\n\t\("Sample Peak".localized): \(peakDb?.string(digitsCount: 2) ?? "N/A") dB"
+                          + "\n\t\("File Size".localized): \(string)",
+                          at: p)
         } else if !rootView.isDefaultUUColor(at: p),
                   let sheetView = rootView.sheetView(at: p),
                   let plane = sheetView.plane(at: sheetView.convertFromWorld(p)) {
@@ -279,7 +286,19 @@ final class LookUpAction: InputKeyEventAction {
         } else if let sheetView = rootView.sheetView(at: p) {
             let bounds = sheetView.model.boundsTuple(at: sheetView.convertFromWorld(p),
                                                      in: rootView.sheetFrame(with: rootView.sheetPosition(at: p)).bounds).bounds.integral
-            rootView.show("Background".localized + "\n\t\("Size".localized): \(Self.sizeString(from: bounds.size))", at: p)
+            
+            let sampless = rootView.currentSampless(at: rootView.sheetPosition(at: p))
+            if !sampless.isEmpty {
+                let lufs = PCMBuffer.lufs(sampless: sampless, sampleRate: Audio.defaultSampleRate)
+                let peakDb = PCMBuffer.peakDb(sampless: sampless)
+                rootView.show("Background".localized
+                              + "\n\t\("Loudness".localized): \(lufs?.string(digitsCount: 2) ?? "N/A") LUFS"
+                              + "\n\t\("Sample Peak".localized): \(peakDb.string(digitsCount: 2)) dB"
+                              + "\n\t\("Size".localized): \(Self.sizeString(from: bounds.size))",
+                              at: p)
+            } else {
+                rootView.show("Background".localized + "\n\t\("Size".localized): \(Self.sizeString(from: bounds.size))", at: p)
+            }
         } else {
             rootView.show("Background".localized, at: p)
         }

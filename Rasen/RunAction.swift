@@ -171,35 +171,6 @@ final class RunAction: InputKeyEventAction {
                         view.node.append(child: sNode)
                         return
                     }
-                } else if text.string == "getLoudness =" {
-                    if let sheetView = rootView.sheetView(at: p) {
-                        let maxD = rootView.worldKnobEditDistance
-                        var minD = Double.infinity, minContentView: SheetContentView?
-                        for contentView in sheetView.contentsView.elementViews {
-                            let d = contentView.mainLineDistance(contentView.convertFromWorld(p))
-                            if d < minD && d < maxD {
-                                minD = d
-                                minContentView = contentView
-                            }
-                        }
-                        
-                        if let contentView = minContentView {
-                            if let buffer = contentView.pcmBuffer {
-                                let lufs = buffer.integratedLoudness
-                                let db = buffer.samplePeakDb
-                                rootView.show("Sound".localized
-                                              + "\n\t\("Loudness".localized): \(lufs.string(digitsCount: 4)) LUFS"
-                                              + "\n\t\("Sample Peak".localized): \(db.string(digitsCount: 4)) dB",
-                                              at: p)
-                                return
-                            }
-                        } else if let buffer = sheetView.model.pcmBuffer {
-                            let lufs = buffer.integratedLoudness
-                            let db = buffer.samplePeakDb
-                            rootView.show("Sheet".localized + "\n\t\("Loudness".localized): \(lufs.string(digitsCount: 4)) LUFS" + "\n\t\("Sample Peak".localized): \(db.string(digitsCount: 4)) dB", at: p)
-                            return
-                        }
-                    }
                 } else if text.string == "exportIconImages =" {
                     Task { @MainActor in
                         let result = await URL.export(message: "message",

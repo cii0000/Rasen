@@ -2338,6 +2338,7 @@ struct Audio: Hashable, Codable {
     static let headroomVolm = Volm.volm(fromDb: -headroomDb)
     static let headroomAmp = Volm.amp(fromVolm: headroomVolm)
     static let floatHeadroomAmp = Float(headroomAmp)
+    static let limitLufs = -14.0
     
     var pcmData = Data()
 }

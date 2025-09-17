@@ -3104,6 +3104,75 @@ final class RootView: View, @unchecked Sendable {
         }
     }
     
+    func updateFromAroundWithTimeline(at cShp: IntPoint) {
+        func topAndBottom(at ncShp: IntPoint, in aSheetView: SheetView) {
+            var nncShp = ncShp, npsvs = [WeakElement<SheetView>]()
+            nncShp.y -= 1
+            while let aaSheetView = sheetView(at: nncShp),
+                  aaSheetView.model.enabledTimeline {
+                npsvs.append(.init(element: aaSheetView))
+                nncShp.y -= 1
+            }
+            aSheetView.bottomSheetViews = npsvs.reversed()
+            nncShp = ncShp
+            npsvs = []
+            nncShp.y += 1
+            while let aaSheetView = sheetView(at: nncShp),
+                  aaSheetView.model.enabledTimeline {
+                npsvs.append(.init(element: aaSheetView))
+                nncShp.y += 1
+            }
+            aSheetView.topSheetViews = npsvs
+        }
+        
+        let shps = groupSheetPositions(at: cShp)
+        for cShp in shps {
+            guard let cSheetView = sheetView(at: cShp) else { continue }
+            
+            topAndBottom(at: cShp, in: cSheetView)
+            
+            var ncShp = cShp, psvs = [WeakElement<SheetView>]()
+            while let preShp = nearestVerticalSheetPosition(at: ncShp, deltaX: -1) {
+                guard let ncSheetView = sheetView(at: preShp) else { break }
+                psvs.append(.init(element: ncSheetView))
+                ncShp = preShp
+            }
+            cSheetView.previousSheetViews = psvs.reversed()
+            
+            ncShp = cShp
+            var nsvs = [WeakElement<SheetView>]()
+            while let nextShp = nearestVerticalSheetPosition(at: ncShp, deltaX: 1) {
+                guard let ncSheetView = sheetView(at: nextShp) else { break }
+                nsvs.append(.init(element: ncSheetView))
+                ncShp = nextShp
+            }
+            cSheetView.nextSheetViews = nsvs
+        }
+    }
+    func currentSampless(at shp: IntPoint,
+                         sampleRate: Double = Audio.defaultSampleRate) -> [[Double]] {
+        guard let sheetView = sheetViewValue(at: shp)?.sheetView else { return [] }
+        
+        updateFromAroundWithTimeline(at: shp)
+        
+        var seqTracks = [Sequencer.Track]()
+        
+        sheetView.previousSheetViews.forEach {
+            guard let seqTrack = $0.element?.seqTrack(sampleRate: sampleRate) else { return }
+            seqTracks.append(seqTrack)
+        }
+        
+        let seqTrack = sheetView.seqTrack(sampleRate: sampleRate)
+        seqTracks.append(seqTrack)
+        
+        sheetView.nextSheetViews.forEach {
+            guard let seqTrack = $0.element?.seqTrack(sampleRate: sampleRate) else { return }
+            seqTracks.append(seqTrack)
+        }
+        
+        return Sequencer.sampless(from: seqTracks, sampleRate: sampleRate)
+    }
+    
     var worldKnobEditDistance: Double {
         Sheet.knobEditDistance * screenToWorldScale
     }
