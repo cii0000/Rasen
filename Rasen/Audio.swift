@@ -417,14 +417,31 @@ final class PCMNoder: ObjectHashable {
     }
 }
 
-private final class NotewaveBox {
-    var notewave: Notewave
+private final class LockedNotewaves: @unchecked Sendable {
+    private var notewaves: [Int: Notewave] = [:]
+    private let lock = NSLock()
     
-    init(_ notewave: Notewave = .init()) {
-        self.notewave = notewave
+    init(_ notewaves: [Int: Notewave]) {
+        self.notewaves = notewaves
+    }
+    
+    subscript(i: Int) -> Notewave? {
+        get {
+            lock.withLock { notewaves[i] }
+        }
+        set {
+            lock.withLock { notewaves[i] = newValue }
+        }
+    }
+    var wrapped: [Int: Notewave] {
+        get {
+            lock.withLock { notewaves }
+        }
+        set {
+            lock.withLock { notewaves = newValue }
+        }
     }
 }
-extension UnsafeMutableBufferPointer: @retroactive @unchecked Sendable where Element: NotewaveBox {}
 
 struct ScoreTrackItem {
     var rendnotes = [Rendnote]() {
@@ -544,28 +561,25 @@ extension ScoreTrackItem {
                 let threadCount = 8
                 let nThreadCount = min(nwrrs.count, threadCount)
                 
-                var notewaveBoxs = nwrrs.count.range.map { _ in NotewaveBox() }
+                let lockedNotewaves = LockedNotewaves(nwrrs.count.range.reduce(into: .init()) { $0[$1] = .init() })
                 let dMod = nwrrs.count % threadCount
                 let dCount = nwrrs.count / threadCount
-                notewaveBoxs.withUnsafeMutableBufferPointer { aNotewavesPtr in
-                    let notewavesPtr = aNotewavesPtr, nwrrs = nwrrs
-                    if nThreadCount == nwrrs.count {
-                        DispatchQueue.concurrentPerform(iterations: nThreadCount) { threadI in
-                            notewavesPtr[threadI] = .init(nwrrs[threadI].1.notewave(sampleRate: sampleRate))
-                        }
-                    } else {
-                        DispatchQueue.concurrentPerform(iterations: nThreadCount) { threadI in
-                            for i in (threadI < dMod ? dCount + 1 : dCount).range {
-                                let j = threadI < dMod ?
-                                (dCount + 1) * threadI + i :
-                                (dCount + 1) * dMod + dCount * (threadI - dMod) + i
-                                notewavesPtr[j] = .init(nwrrs[j].1.notewave(sampleRate: sampleRate))
-                            }
+                if nThreadCount == nwrrs.count {
+                    DispatchQueue.concurrentPerform(iterations: nThreadCount) { threadI in
+                        lockedNotewaves[threadI] = nwrrs[threadI].1.notewave(sampleRate: sampleRate)
+                    }
+                } else {
+                    DispatchQueue.concurrentPerform(iterations: nThreadCount) { threadI in
+                        for i in (threadI < dMod ? dCount + 1 : dCount).range {
+                            let j = threadI < dMod ?
+                            (dCount + 1) * threadI + i :
+                            (dCount + 1) * dMod + dCount * (threadI - dMod) + i
+                            lockedNotewaves[j] = nwrrs[j].1.notewave(sampleRate: sampleRate)
                         }
                     }
                 }
-                for (i, notewaveBox) in notewaveBoxs.enumerated() {
-                    notewaveDic[nwrrs[i].0] = notewaveBox.notewave
+                for (i, notewave) in lockedNotewaves.wrapped.sorted(by: { $0.key < $1.key }) {
+                    notewaveDic[nwrrs[i].0] = notewave
                 }
             }
         }
