@@ -131,26 +131,31 @@ extension Note {
             if lyric.isEmpty { return (i, isNext) }
             
             let previousPhoneme: Phoneme?, previousFormantFilter: FormantFilter?, previousID: UUID?
+            let previousPitch: Rational?
             if let preI = i.range.reversed().first(where: { !pits[$0].lyric.isEmpty }) {
                 previousPhoneme = Phoneme.phonemes(fromHiragana: pits[preI].lyric,
                                                    nextPhoneme: currentPhonemes.first).last
                 previousFormantFilter = .init(spectlope: pits[preI].tone.spectlope)
                 previousID = pits[preI].tone.id
+                previousPitch = pits[i - 1].pitch
             } else if i > 0 {
                 previousPhoneme = .a
                 previousFormantFilter = FormantFilter().withSelfA(to: .a)
                 previousID = .init()
+                previousPitch = pits[i - 1].pitch
             } else {
                 previousPhoneme = nil
                 previousFormantFilter = nil
                 previousID = nil
+                previousPitch = nil
             }
             
             var ni = i
             if var mora = Mora(hiragana: lyric,
                                previousPhoneme: previousPhoneme,
                                previousFormantFilter: previousFormantFilter, previousID: previousID,
-                               nextPhoneme: nextPhonemes.first) {
+                               nextPhoneme: nextPhonemes.first, previousPitch: previousPitch,
+                               pitch: pits[i].pitch) {
                 let beat = pits[i].beat
                 let fBeat = Score.beat(fromSec: mora.keyFormantFilters.first?.sec ?? 0,
                                        tempo: tempo, interval: beatInterval) + beat
@@ -566,15 +571,15 @@ extension Formant: MonoInterpolatable {
 }
 
 struct FormantFilter: Hashable, Codable {
-    var formants: [Formant] = [.init(sdVolm: 0.7, sdNoise: 0,
+    var formants: [Formant] = [.init(sdVolm: 0.7 * 0.9, sdNoise: 0,
                                      sdPitch: 9.1, sPitch: 67.3, ePitch: 74.0, edPitch: 6.3,
-                                     volm: 0.9, noise: 0.13,
-                                     edVolm: 0.5, edNoise: 0.18),
-                               .init(sdVolm: 0.5, sdNoise: 0.13,
+                                     volm: 0.9 * 0.9, noise: 0.13,
+                                     edVolm: 0.5 * 0.9, edNoise: 0.18),
+                               .init(sdVolm: 0.5 * 0.9, sdNoise: 0.13,
                                      sdPitch: 5.7, sPitch: 79.5, ePitch: 81.2, edPitch: 5.2,
-                                     volm: 0.9, noise: 0.3,
-                                     edVolm: 0.33, edNoise: 0.26),
-                               .init(sdVolm: 0.3, sdNoise: 0.23,
+                                     volm: 0.9 * 0.9, noise: 0.3,
+                                     edVolm: 0.33 * 0.9, edNoise: 0.26),
+                               .init(sdVolm: 0.3 * 0.9, sdNoise: 0.23,
                                      sdPitch: 1.6, sPitch: 94, ePitch: 96, edPitch: 1.1,
                                      volm: 1, noise: 0.35,
                                      edVolm: 0.33, edNoise: 0.69),
@@ -584,11 +589,11 @@ struct FormantFilter: Hashable, Codable {
                                      edVolm: 0, edNoise: 1),
                                .init(sdVolm: 0, sdNoise: 1,
                                      sdPitch: 0.8, sPitch: 107.4, ePitch: 109.1, edPitch: 0.9,
-                                     volm: 0.3, noise: 0.61,
-                                     edVolm: 0.1, edNoise: 1),
-                               .init(sdVolm: 0.1, sdNoise: 1,
+                                     volm: 0.3 * 0.9, noise: 0.61,
+                                     edVolm: 0.1 * 0.9, edNoise: 1),
+                               .init(sdVolm: 0.1 * 0.9, sdNoise: 1,
                                      sdPitch: 0.6, sPitch: 113.2, ePitch: 114.8, edPitch: 0.8,
-                                     volm: 0.2, noise: 0.93,
+                                     volm: 0.2 * 0.9, noise: 0.93,
                                      edVolm: 0, edNoise: 1)]
 }
 extension FormantFilter {
@@ -1045,7 +1050,11 @@ extension FormantFilter {
             case .oBreath: .ho
             default: fatalError()
             }
-            return withSelfA(to: nPhoneme).applyNoise(nPhoneme).toNoise().toBreath()
+            var n = withSelfA(to: nPhoneme).toNoise().toBreath()
+            n[1].formMultiplyVolm(0.85)
+            n[2].formMultiplyVolm(0.5)
+            n[3].formMultiplyVolm(0.5)
+            return n
         default: return self
         }
     }
@@ -1353,7 +1362,7 @@ struct KeyFormantFilter: Hashable, Codable {
 struct Mora: Hashable, Codable {
     var keyFormantFilters: [KeyFormantFilter]
     
-    init?(hiragana: String, previousPhoneme: Phoneme?, previousFormantFilter: FormantFilter?, previousID: UUID?, nextPhoneme: Phoneme?) {
+    init?(hiragana: String, previousPhoneme: Phoneme?, previousFormantFilter: FormantFilter?, previousID: UUID?, nextPhoneme: Phoneme?, previousPitch: Rational?, pitch: Rational) {
         var phonemes = Phoneme.phonemes(fromHiragana: hiragana, nextPhoneme: nextPhoneme)
         guard !phonemes.isEmpty else { return nil }
         
@@ -1432,14 +1441,12 @@ struct Mora: Hashable, Codable {
                     kffs.append(.init(preFf, durSec: 0.12, id: id))
                     centerI = kffs.count
                 } else if youonFf == nil {
-                    kffs.append(.init(preFf, durSec: 0.04, id: id))
-                    var ff0 = FormantFilter.linear(preFf, vowelFf, t: 0.25)
-                    ff0[1].formMultiplyVolm(0.75)
-                    kffs.append(.init(ff0, durSec: 0.04))
+                    kffs.append(.init(preFf, durSec: 0.08, id: id))
                     centerI = kffs.count
                     var ff1 = FormantFilter.linear(preFf, vowelFf, t: 0.75)
                     ff1[1].formMultiplyVolm(0.75)
-                    kffs.append(.init(ff1, durSec: 0.04))
+                    let pitch = previousPitch != nil ? -(pitch - previousPitch!) / 8 : 0
+                    kffs.append(.init(ff1, durSec: 0.06, pitch: pitch))
                 } else {
                     kffs.append(.init(preFf, durSec: isβ ? 0.05 : 0.1, id: id))
                     centerI = kffs.count

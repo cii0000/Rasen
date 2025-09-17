@@ -1028,8 +1028,8 @@ extension ScoreView {
                     let lyricText = Text(string: pit.lyric, size: fHeight)
                     let typesetter = lyricText.typesetter
                     let lh = fHeight * 2
-                    lyricLinePathlines.append(.init(Rect(x: p.x - 0.25, y: p.y - lh,
-                                                         width: 0.5, height: lh)))
+                    lyricLinePathlines.append(.init(Rect(x: p.x - 0.125, y: p.y - lh,
+                                                         width: 0.25, height: lh)))
                     let isEnabledLyric = !Phoneme.phonemes(fromHiragana: pit.lyric,
                                                            nextPhoneme: nil).isEmpty
                     return .init(attitude: .init(position: .init(p.x + 1,
@@ -2025,12 +2025,12 @@ extension ScoreView {
             let nMaxDSq = note.pits.count == 1 && nw / 4 < maxD ? (nw / 4).squared : maxDSq
             var prePitP: Point?
             let isRendableFromLyric = note.isRendableFromLyric
-            for pitI in note.pits.count.range {
+            for (pitI, pit) in note.pits.enumerated() {
                 let pitP = pitPosition(atPit: pitI, from: note)
                 let dSq = pitP.distanceSquared(p)
                 if dSq <= minDSq && dSq < nMaxDSq {
                     let pdSq = pointline.minDistanceSquared(at: p)
-                    if prePitP == pitP && pitP.x < p.x {
+                    if prePitP == pitP {
                         pds[pitP] = pdSq
                         minDSq = dSq
                         minResult = (noteI, .pit(pitI: pitI))
@@ -2050,7 +2050,6 @@ extension ScoreView {
                     }
                 }
                 
-                let pit = note.pits[pitI]
                 if isRendableFromLyric && !pit.lyric.isEmpty && pit.lyric != "[" && pit.lyric != "]" {
                     let pitP = pitPosition(atPit: pitI, from: note) + Point(0, -8)
 
@@ -2278,7 +2277,7 @@ extension ScoreView {
                 let dSq = pitP.distanceSquared(p)
                 if dSq <= minDSq && dSq < nMaxDSq {
                     let pdSq = pointline.minDistanceSquared(at: p)
-                    if prePitP == pitP && pitP.x < p.x {
+                    if prePitP == pitP {
                         pds[pitP] = pdSq
                         minDSq = dSq
                         minResult = (noteI, .pit(pitI: pitI))
@@ -2479,7 +2478,7 @@ extension ScoreView {
             for pitI in note.pits.count.range {
                 let pitP = pitPosition(atPit: pitI, from: note)
                 let ds = pitP.distanceSquared(p)
-                if ds < minDS && ds < maxDS {
+                if ds <= minDS && ds < maxDS {
                     minNoteI = noteI
                     minPitI = pitI
                     minDS = ds

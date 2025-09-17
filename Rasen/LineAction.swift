@@ -890,7 +890,7 @@ final class LineAction: Action {
     private var noteSheetView: SheetView?, oldPitch = Rational(0), firstTone = Tone(),
                 firstReverb = Reverb(),
                 firstSpectlopeHeight = Sheet.spectlopeHeight,
-                beganScore: Score?, beganPitch = Rational(), octaveNode: Node?, oldBeat = Rational(0),
+                beganScore: Score?, beganPitch = Rational(), octaveNode: Node?, oldBeat = Rational(0), noteMaxPressure = 0.0, noteOldVolm: Double?,
                 noteI: Int?, noteStartBeat: Rational?, notePlayer: NotePlayer?
     
     private var beganEvent: DragEvent?
@@ -946,6 +946,14 @@ final class LineAction: Action {
                 let beat = scoreView.beat(atX: inP.x, interval: beatInterval)
                 let beatRange = beat ..< beat
                 let isMinNoise = pitch == Score.minPitch, isMaxNoise = pitch == Score.maxPitch
+                
+                noteMaxPressure = event.pressure
+                let volm = if noteMaxPressure > 0.25 {
+                    0.5
+                } else {
+                    0.25
+                }
+                
                 firstTone = isMinNoise ?
                 Tone.minNoise() :
                 (isMaxNoise ? Tone.maxNoise() : (isStraight ? Tone.empty() : Tone()))
@@ -955,7 +963,9 @@ final class LineAction: Action {
                 Sheet.spectlopeHeight.mid(Sheet.maxSpectlopeHeight) :
                 Sheet.spectlopeHeight
                 let note = Note(beatRange: beatRange, pitch: pitch,
-                                pits: .init([.init(beat: 0, pitch: 0, tone: firstTone)]),
+                                pits: .init([.init(beat: 0, pitch: 0,
+                                                   stereo: .init(volm: volm),
+                                                   tone: firstTone)]),
                                 spectlopeHeight: firstSpectlopeHeight)
                 
                 noteI = count
@@ -998,6 +1008,13 @@ final class LineAction: Action {
             if let sheetView = noteSheetView,
                 let nsBeat = noteStartBeat, let noteI {
                 
+                noteMaxPressure = max(noteMaxPressure, event.pressure)
+                let volm = if noteMaxPressure > 0.25 {
+                    0.5
+                } else {
+                    0.25
+                }
+                
                 let pitchInterval = rootView.currentPitchInterval
                 let beatInterval = rootView.currentBeatInterval
                 let scoreView = sheetView.scoreView
@@ -1008,10 +1025,12 @@ final class LineAction: Action {
                 let beat = scoreView.beat(atX: sheetP.x, interval: beatInterval)
                 let beatRange = beat > nsBeat ? nsBeat ..< beat : beat ..< nsBeat
                 let note = Note(beatRange: beatRange, pitch: pitch,
-                                pits: [.init(beat: 0, pitch: 0, tone: firstTone)],
+                                pits: [.init(beat: 0, pitch: 0,
+                                             stereo: .init(volm: volm),
+                                             tone: firstTone)],
                                 spectlopeHeight: firstSpectlopeHeight)
-                let isNote = oldPitch != pitch
-                
+                let isNote = oldPitch != pitch || volm != noteOldVolm
+                noteOldVolm = volm
                 if isNote {
                     notePlayer?.notes = [note.firstPitResult]
                     self.oldPitch = pitch

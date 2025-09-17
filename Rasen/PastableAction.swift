@@ -2961,13 +2961,17 @@ final class PastableAction: Action {
                         var note = scoreView.model.notes[noteI]
                         let oldNote = note
                         
-                        let beat: Rational = scoreView.beat(atX: scoreView.convertFromWorld(p).x)
-                        let oldTone = scoreView.pitResult(atBeat: beat, at: noteI).tone
-                        let dSpectlope = tone.spectlope / oldTone.spectlope
-                        
-                        for (pitI, _) in note.pits.enumerated() {
-                            note.pits[pitI].tone.spectlope *= dSpectlope
-                            note.pits[pitI].tone.spectlope.clip()
+                        if note.pits.count == 1 {
+                            note.pits[0].tone = tone
+                        } else {
+                            let beat: Rational = scoreView.beat(atX: scoreView.convertFromWorld(p).x)
+                            let oldTone = scoreView.pitResult(atBeat: beat, at: noteI).tone
+                            let dSpectlope = tone.spectlope / oldTone.spectlope
+                            
+                            for (pitI, _) in note.pits.enumerated() {
+                                note.pits[pitI].tone.spectlope *= dSpectlope
+                                note.pits[pitI].tone.spectlope.clip()
+                            }
                         }
                         
                         if note != oldNote {

@@ -449,13 +449,13 @@ extension Sprol {
 
 struct Spectlope: Hashable, Codable {
     static func defaultSprols(isRandom: Bool = false) -> [Sprol] {
-        [Sprol(pitch: 12 * 0, volm: 0, noise: 0),
-         Sprol(pitch: 12 * 1.25, volm: 0.5, noise: 0),
-         Sprol(pitch: 12 * 2.25, volm: !isRandom ? 1 : .random(in: 0.5 ... 1), noise: 0),
-         Sprol(pitch: 12 * 6, volm: 0.5, noise: 0),
-         Sprol(pitch: 12 * 7, volm: 0.5, noise: 0),
-         Sprol(pitch: 12 * 7.25, volm: !isRandom ? 0.6 : .random(in: 0.5 ... 0.8), noise: 0),
-         Sprol(pitch: 12 * 8.15, volm: !isRandom ? 0.6 : .random(in: 0.5 ... 0.8), noise: 0),
+        [Sprol(pitch: 12 * 0.75, volm: 0, noise: 0),
+         Sprol(pitch: 12 * 2, volm: 0.75, noise: 0),
+         Sprol(pitch: 12 * 3, volm: !isRandom ? 1 : .random(in: 0.5 ... 1), noise: 0),
+         Sprol(pitch: 12 * 7, volm: 0.4, noise: 0),
+         Sprol(pitch: 12 * 7.25, volm: !isRandom ? 0.5 : .random(in: 0.5 ... 0.8), noise: 0),
+         Sprol(pitch: 12 * 8.15, volm: !isRandom ? 0.5 : .random(in: 0.5 ... 0.8), noise: 0),
+         Sprol(pitch: 12 * 8.75, volm: 0.125, noise: 0),
          Sprol(pitch: 12 * 10, volm: 0, noise: 0)]
     }
     
@@ -1005,6 +1005,9 @@ extension Pit {
     
     func isEqualWithoutBeat(_ other: Self) -> Bool {
         pitch == other.pitch && stereo == other.stereo && tone == other.tone && lyric == other.lyric
+    }
+    func isEqualBeatAndPitch(_ other: Self) -> Bool {
+        beat == other.beat && pitch == other.pitch
     }
     var isLyric: Bool {
         !lyric.isEmpty && lyric != "[" && lyric != "]"

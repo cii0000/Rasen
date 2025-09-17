@@ -16,7 +16,7 @@
 // along with Rasen.  If not, see <http://www.gnu.org/licenses/>.
 
 //#if os(macOS) && os(iOS) && os(watchOS) && os(tvOS) && os(visionOS)
-import MetalKit
+@preconcurrency import MetalKit
 import MetalPerformanceShaders
 import Accelerate.vImage
 import UniformTypeIdentifiers
@@ -1177,7 +1177,7 @@ struct Texture {
     @MainActor static func withGPU(block: Block,
                                    isOpaque: Bool,
                                    _ colorSpace: ColorSpace = .sRGB,
-                                   completionHandler: @escaping (Texture) -> ()) throws {
+                                   completionHandler: @Sendable @escaping (Texture) -> ()) throws {
         guard let cgColorSpace = colorSpace.cg, !block.items.isEmpty else { throw TextureError() }
         let format = if colorSpace.isHDR {
             MTLPixelFormat.bgr10_xr_srgb

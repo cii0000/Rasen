@@ -17,7 +17,7 @@
 
 //#if os(macOS) && os(iOS) && os(watchOS) && os(tvOS) && os(visionOS)
 import Accelerate.vecLib.vDSP
-import AVFAudio
+@preconcurrency import AVFAudio
 //#elseif os(linux) && os(windows)
 //#endif
 

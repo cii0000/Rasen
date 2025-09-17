@@ -1429,7 +1429,7 @@ extension O: CustomStringConvertible {
         return displayString()
     }
     var name: String {
-        return displayString(fromLength: 12, isFirstAndLastBrackets: false)
+        return displayString(fromLength: 100, isFirstAndLastBrackets: false)
     }
     static func removeFirstAndLastBrackets(_ s: String) -> String {
         if s.count > 2 && s.first == "(" && s.last == ")" {
@@ -1457,7 +1457,8 @@ extension O: CustomStringConvertible {
     func displayString(fromLength l: Int = 1000,
                        isFirstAndLastBrackets: Bool = true) -> String {
         var s = asString
-        if isFirstAndLastBrackets {
+        if case .error = self {
+        } else if isFirstAndLastBrackets {
             s = O.removeFirstAndLastBrackets(s)
         }
         let cs = "...C\(s.count - l)"
@@ -1664,6 +1665,7 @@ extension O {
             case .rational(let b): return O(Double(a) ** Double(b))
             case .double(let b): return O(Double(a) ** b)
             case .array(let b): return .init(ao ** b)
+            case .dic(let b): return .init(b.mapValues { ao ** $0 })
             case .range(let b): return .init(ao ** b)
             case .error: return bo
             default: break
@@ -1678,6 +1680,7 @@ extension O {
             case .rational(let b): return O(Double(a) ** Double(b))
             case .double(let b): return O(Double(a) ** b)
             case .array(let b): return .init(ao ** b)
+            case .dic(let b): return .init(b.mapValues { ao ** $0 })
             case .range(let b): return .init(ao ** b)
             case .error: return bo
             default: break
@@ -1692,6 +1695,7 @@ extension O {
             case .rational(let b): return O(Double(a) ** Double(b))
             case .double(let b): return O(Double(a) ** b)
             case .array(let b): return .init(ao ** b)
+            case .dic(let b): return .init(b.mapValues { ao ** $0 })
             case .range(let b): return .init(ao ** b)
             case .error: return bo
             default: break
@@ -1706,6 +1710,7 @@ extension O {
             case .rational(let b): return O(a ** Double(b))
             case .double(let b): return O(a ** b)
             case .array(let b): return .init(ao ** b)
+            case .dic(let b): return .init(b.mapValues { ao ** $0 })
             case .range(let b): return .init(ao ** b)
             case .error: return bo
             default: break
@@ -1733,6 +1738,7 @@ extension O {
             case .rational(let b): return O(.apow(Double(a), Double(b)))
             case .double(let b): return O(.apow(Double(a), b))
             case .array(let b): return .init(.apow(ao, b))
+            case .dic(let b): return .init(b.mapValues { .apow(ao, $0) })
             case .range(let b): return .init(.apow(ao, b))
             case .error: return bo
             default: break
@@ -1744,6 +1750,7 @@ extension O {
             case .rational(let b): return O(.apow(Double(a), Double(b)))
             case .double(let b): return O(.apow(Double(a), b))
             case .array(let b): return .init(.apow(ao, b))
+            case .dic(let b): return .init(b.mapValues { .apow(ao, $0) })
             case .range(let b): return .init(.apow(ao, b))
             case .error: return bo
             default: break
@@ -1755,6 +1762,7 @@ extension O {
             case .rational(let b): return O(.apow(Double(a), Double(b)))
             case .double(let b): return O(.apow(Double(a), b))
             case .array(let b): return .init(.apow(ao, b))
+            case .dic(let b): return .init(b.mapValues { .apow(ao, $0) })
             case .range(let b): return .init(.apow(ao, b))
             case .error: return bo
             default: break
@@ -1766,6 +1774,7 @@ extension O {
             case .rational(let b): return O(.apow(a, Double(b)))
             case .double(let b): return O(.apow(a, b))
             case .array(let b): return .init(.apow(ao, b))
+            case .dic(let b): return .init(b.mapValues { .apow(ao, $0) })
             case .range(let b): return .init(.apow(ao, b))
             case .error: return bo
             default: break
@@ -1794,6 +1803,7 @@ extension O {
                 }
                 return O(Double(a) * b)
             case .array(let b): return .init(ao * b)
+            case .dic(let b): return .init(b.mapValues { ao * $0 })
             case .range(let b): return .init(ao * b)
             case .error: return bo
             default: break
@@ -1809,6 +1819,7 @@ extension O {
                 }
                 return O(Double(a) * b)
             case .array(let b): return .init(ao * b)
+            case .dic(let b): return .init(b.mapValues { ao * $0 })
             case .range(let b): return .init(ao * b)
             case .error: return bo
             default: break
@@ -1824,6 +1835,7 @@ extension O {
                 }
                 return O(Double(a) * b)
             case .array(let b): return .init(ao * b)
+            case .dic(let b): return .init(b.mapValues { ao * $0 })
             case .range(let b): return .init(ao * b)
             case .error: return bo
             default: break
@@ -1851,6 +1863,7 @@ extension O {
                 }
                 return O(a * b)
             case .array(let b): return .init(ao * b)
+            case .dic(let b): return .init(b.mapValues { ao * $0 })
             case .range(let b): return .init(ao * b)
             case .error: return bo
             default: break
@@ -1895,6 +1908,11 @@ extension O {
                 return O(OArray(ns, dimension: a.dimension, nextCount: p))
             case .error: return bo
             default: break
+            }
+        case .dic(let a):
+            switch bo {
+            case .error: return bo
+            default: return O(a.mapValues { $0 * bo })
             }
         case .error: return ao
         default:
@@ -1941,6 +1959,7 @@ extension O {
                     O(Rational.overDiv(Rational(a), b))
             case .double(let b): return O(Double(a) / b)
             case .array(let b): return .init(ao / b)
+            case .dic(let b): return .init(b.mapValues { ao / $0 })
             case .range(let b): return .init(ao / b)
             case .error: return bo
             default: break
@@ -1961,6 +1980,7 @@ extension O {
                     O(Rational.overDiv(Rational(a), b))
             case .double(let b): return O(Double(a) / b)
             case .array(let b): return .init(ao / b)
+            case .dic(let b): return .init(b.mapValues { ao / $0 })
             case .range(let b): return .init(ao / b)
             case .error: return bo
             default: break
@@ -1981,6 +2001,7 @@ extension O {
                     O(Rational.overDiv(a, b))
             case .double(let b): return O(Double(a) / b)
             case .array(let b): return .init(ao / b)
+            case .dic(let b): return .init(b.mapValues { ao / $0 })
             case .range(let b): return .init(ao / b)
             case .error: return bo
             default: break
@@ -1996,9 +2017,15 @@ extension O {
                 }
                 return O(a / b)
             case .array(let b): return .init(ao / b)
+            case .dic(let b): return .init(b.mapValues { ao / $0 })
             case .range(let b): return .init(ao / b)
             case .error: return bo
             default: break
+            }
+        case .dic(let a):
+            switch bo {
+            case .error: return bo
+            default: return O(a.mapValues { $0 / bo })
             }
         case .error: return ao
         default:
@@ -2039,6 +2066,7 @@ extension O {
             case .rational(let b): return O(Rational.overMod(Rational(a), b))
             case .double(let b): return O(Double(a).truncatingRemainder(dividingBy: b))
             case .array(let b): return .init(ao % b)
+            case .dic(let b): return .init(b.mapValues { ao % $0 })
             case .range(let b): return .init(ao % b)
             case .error: return bo
             default: break
@@ -2050,6 +2078,7 @@ extension O {
             case .rational(let b): return O(Rational.overMod(Rational(a), b))
             case .double(let b): return O(Double(a).truncatingRemainder(dividingBy: b))
             case .array(let b): return .init(ao % b)
+            case .dic(let b): return .init(b.mapValues { ao % $0 })
             case .range(let b): return .init(ao % b)
             case .error: return bo
             default: break
@@ -2061,6 +2090,7 @@ extension O {
             case .rational(let b): return O(Rational.overMod(a, b))
             case .double(let b): return O(Double(a).truncatingRemainder(dividingBy: b))
             case .array(let b): return .init(ao % b)
+            case .dic(let b): return .init(b.mapValues { ao % $0 })
             case .range(let b): return .init(ao % b)
             case .error: return bo
             default: break
@@ -2076,6 +2106,7 @@ extension O {
                 }
                 return O(a.truncatingRemainder(dividingBy: b))
             case .array(let b): return .init(ao % b)
+            case .dic(let b): return .init(b.mapValues { ao % $0 })
             case .range(let b): return .init(ao % b)
             case .error: return bo
             default: break
@@ -2100,6 +2131,11 @@ extension O {
                 }
             case .error: return bo
             default: break
+            }
+        case .dic(let a):
+            switch bo {
+            case .error: return bo
+            default: return O(a.mapValues { $0 % bo })
             }
         case .error: return ao
         default:
@@ -2244,6 +2280,7 @@ extension O {
             case .rational(let b): return O(Rational.overDiff(Rational(a), b))
             case .double(let b): return O(Double(a) - b)
             case .array(let b): return .init(ao - b)
+            case .dic(let b): return .init(b.mapValues { ao - $0 })
             case .range(let b): return .init(ao - b)
             case .error: return bo
             default: break
@@ -2255,6 +2292,7 @@ extension O {
             case .rational(let b): return O(Rational.overDiff(Rational(a), b))
             case .double(let b): return O(Double(a) - b)
             case .array(let b): return .init(ao - b)
+            case .dic(let b): return .init(b.mapValues { ao - $0 })
             case .range(let b): return .init(ao - b)
             case .error: return bo
             default: break
@@ -2266,6 +2304,7 @@ extension O {
             case .rational(let b): return O(Rational.overDiff(a, b))
             case .double(let b): return O(Double(a) - b)
             case .array(let b): return .init(ao - b)
+            case .dic(let b): return .init(b.mapValues { ao - $0 })
             case .range(let b): return .init(ao - b)
             case .error: return bo
             default: break
@@ -2283,6 +2322,7 @@ extension O {
                 }
                 return O(a - b)
             case .array(let b): return .init(ao - b)
+            case .dic(let b): return .init(b.mapValues { ao - $0 })
             case .range(let b): return .init(ao - b)
             case .error: return bo
             default: break

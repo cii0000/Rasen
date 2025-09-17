@@ -6675,28 +6675,23 @@ final class SheetView: BindableView, @unchecked Sendable {
             .map { scoreView.convertFromWorld($0) }
         if !fs.contains(where: { $0.contains(scoreView.pitPosition(atPit: pitI, from: note)) }) {
             let pit = note.pits[pitI]
-            for (oPitI, oPit) in note.pits.enumerated() {
-                if oPitI != pitI && pit.beat == oPit.beat && pit.pitch == oPit.pitch {
+            if pitI - 1 >= 0 {
+                if pit.beat == note.pits[pitI - 1].beat {
+                    return true
+                }
+                if pitI == note.pits.count - 1 && pitI - 2 >= 0
+                    && note.pits[pitI - 1].beat == note.pits[pitI - 2].beat {
                     return true
                 }
             }
-            if (pitI - 1 >= 0 && note.pits[pitI - 1].pitch != note.pits[pitI].pitch)
-                || (pitI + 1 < note.pits.count && note.pits[pitI + 1].pitch != note.pits[pitI].pitch) {
-                return true
-            }
-            if pitI + 2 < note.pits.count
-                && note.pits[pitI].pitch == note.pits[pitI + 1].pitch
-                && (note.pits[pitI + 1].pitch != note.pits[pitI + 2].pitch
-                    || (note.pits[pitI + 1].beat == note.pits[pitI + 2].beat
-                        && note.pits[pitI + 1].pitch == note.pits[pitI + 2].pitch)) {
-                return true
-            }
-            if pitI - 2 >= 0
-                && note.pits[pitI].pitch == note.pits[pitI - 1].pitch
-                && (note.pits[pitI - 1].pitch != note.pits[pitI - 2].pitch
-                    || (note.pits[pitI - 1].beat == note.pits[pitI - 2].beat
-                        && note.pits[pitI - 1].pitch == note.pits[pitI - 2].pitch)) {
-                return true
+            if pitI + 1 < note.pits.count {
+                if pit.beat == note.pits[pitI + 1].beat {
+                    return true
+                }
+                if pitI == 0 && pitI + 2 < note.pits.count
+                    && note.pits[pitI + 1].beat == note.pits[pitI + 2].beat {
+                    return true
+                }
             }
         }
         return false
