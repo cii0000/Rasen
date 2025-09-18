@@ -1817,6 +1817,9 @@ extension Animation: BeatRangeType {
     var mainBeat: Rational {
         rootBeat.loop(0 ..< localDurBeat) + beatRange.start
     }
+    var mainSec: Rational {
+        sec(fromBeat: mainBeat)
+    }
     
     var endLoopDurBeat: Rational {
         get {
@@ -1828,6 +1831,10 @@ extension Animation: BeatRangeType {
     }
     var loopDurSec: Rational {
         sec(fromBeat: loopDurBeat)
+    }
+    
+    var allSecRange: Range<Rational> {
+        secRange(fromBeat: beatRange.start ..< endLoopDurBeat)
     }
     
     var localDurBeat: Rational {
@@ -2593,7 +2600,7 @@ extension Sheet {
     var allEndSec: Rational {
         max(animationEndSec, musicEndSec)
     }
-    var allSecTimeRange: Range<Rational> { 0 ..< allEndSec }
+    var allSecRange: Range<Rational> { 0 ..< allEndSec }
     
     var mainFrame: Rect? {
         guard enabledAnimation else { return nil }

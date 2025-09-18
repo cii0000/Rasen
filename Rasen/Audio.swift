@@ -485,10 +485,9 @@ struct ScoreTrackItem {
     
     fileprivate(set) var notewaveDic = [UUID: Notewave]()
     fileprivate(set) var isChanged = false
-    fileprivate(set) var sampless = [[Double]](), normarizedSampless = [[Double]](),
-                         sampleStartI = 0
+    fileprivate(set) var sampless = [[Double]](), sampleStartI = 0
     var sampleCount: Int {
-        normarizedSampless.isEmpty ? 0 : normarizedSampless[0].count
+        sampless.isEmpty ? 0 : sampless[0].count
     }
 }
 extension ScoreTrackItem {
@@ -634,15 +633,6 @@ extension ScoreTrackItem {
             }
         }
         self.sampless = sampless
-        
-        var normarizedSampless = PCMBuffer.compress(sampless: sampless, sampleRate: sampleRate)
-        if let nSampless = PCMBuffer.normalizedLoudness(sampless: normarizedSampless,
-                                                        limitLufs: limitLufs,
-                                                        sampleRate: sampleRate) {
-            normarizedSampless = nSampless
-        }
-        
-        self.normarizedSampless = sampless
         self.sampleStartI = -startI
     }
 }
@@ -902,7 +892,7 @@ final class ScoreNoder: ObjectHashable {
                                 let mi = i - startI
                                 if mi >= 0 && mi < sampleCount {
                                     updateF(i: i, ui: ni + frameStartI, mi: mi, ni: ni,
-                                            sampless: scoreTrackItem.normarizedSampless,
+                                            sampless: scoreTrackItem.sampless,
                                             isPremultipliedEnvelope: true,
                                             allAttackStartSec: allAttackStartSec,
                                             allReleaseStartSec: allReleaseStartSec,
@@ -969,6 +959,10 @@ final class ScoreNoder: ObjectHashable {
         }
         try? node.auAudioUnit.outputBusses[0].setFormat(format)
     }
+}
+
+struct PlayingLoudness: Hashable {
+    var lufs: Double, isPeak: Bool
 }
 
 final class Sequencer {
@@ -1047,7 +1041,8 @@ final class Sequencer {
         case normal, loop, loopNote
     }
     
-    convenience init?(audiotracks: [Audiotrack], clipHandler: (@Sendable (Float) -> ())? = nil,
+    convenience init?(audiotracks: [Audiotrack],
+                      lufsHandler: (@Sendable (PlayingLoudness) -> ())? = nil,
                       type: RenderType,
                       sampleRate: Double = Audio.defaultSampleRate) {
         let audiotracks = audiotracks.filter { !$0.isEmpty }
@@ -1072,10 +1067,11 @@ final class Sequencer {
             tracks.append(track)
         }
         
-        self.init(tracks: tracks, type: type, clipHandler: clipHandler)
+        self.init(tracks: tracks, type: type, lufsHandler: lufsHandler)
     }
     
-    init?(tracks: [Track], type: RenderType, clipHandler: (@Sendable (Float) -> ())? = nil) {
+    init?(tracks: [Track], type: RenderType,
+          lufsHandler: (@Sendable (PlayingLoudness) -> ())? = nil) {
         self.type = type
         
         let engine = AVAudioEngine()
@@ -1120,19 +1116,15 @@ final class Sequencer {
         self.scoreNoders = scoreNoders
         self.pcmNoders = pcmNoders
         
-        if let clipHandler {
-            mixerNode.installTap(onBus: 0, bufferSize: 512, format: nil) { @Sendable buffer, time in
+        if let lufsHandler {
+            mixerNode.installTap(onBus: 0, bufferSize: 16384,
+                                 format: mixerNode.outputFormat(forBus: 0)) { @Sendable buffer, time in
                 guard !buffer.isEmpty else { return }
-                var peak: Float = 0.0
-                for i in 0 ..< buffer.channelCount {
-                    buffer.enumerated(channelIndex: i) { _, v in
-                        let av = abs(v)
-                        if av > peak {
-                            peak = av
-                        }
-                    }
-                }
-                clipHandler(peak)
+                let sampless = buffer.doubleSampless
+                let lufs = PCMBuffer.lufs(sampless: sampless,
+                                          sampleRate: buffer.sampleRate) ?? -.infinity
+                let peakAmp = PCMBuffer.peakAmp(sampless: sampless)
+                lufsHandler(.init(lufs: lufs, isPeak: peakAmp > Audio.headroomAmp))
             }
         }
         

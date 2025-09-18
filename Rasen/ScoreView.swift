@@ -154,26 +154,6 @@ final class ScoreView: TimelineView, @unchecked Sendable {
         }
     }
     
-    let currentPeakVolmNode = Node(lineWidth: 1.25, lineType: .color(.background))
-    let timeNode = Node(lineWidth: 2, lineType: .color(.content))
-    
-    var peakVolm = 0.0 {
-        didSet {
-            guard option.enabled, peakVolm != oldValue else { return }
-            updateFromPeakVolm()
-        }
-    }
-    func updateFromPeakVolm() {
-        let frame = mainFrame
-        currentPeakVolmNode.path = Path([Point(), Point(0, frame.maxY - timelineFrame.minY)])
-        if peakVolm < Audio.headroomVolm {
-            currentPeakVolmNode.lineType = .color(Color(lightness: (1 - peakVolm) * 100))
-//            currentPeakVolmNode.lineType = .color(.background)
-        } else {
-            currentPeakVolmNode.lineType = .color(.warning)
-        }
-    }
-    
     var bounds = Sheet.defaultBounds {
         didSet {
             guard bounds != oldValue else { return }
@@ -227,14 +207,12 @@ final class ScoreView: TimelineView, @unchecked Sendable {
         self.binder = binder
         self.keyPath = keyPath
         
-        timeNode.children = [currentPeakVolmNode]
-        
         node = Node(children: [spectlopesNode, timelineBorderNode, timelineFullEditBorderNode,
                                timelineSubBorderNode,
                                chordNode,
                                timelineContentNode,
                                draftNotesNode, otherNotesNode, notesNode, pitsNode, tonesNode,
-                               timeNode, clippingNode])
+                               clippingNode])
         updateClippingNode()
         updateTimeline()
         updateDraftNotes()
@@ -1803,24 +1781,6 @@ extension ScoreView {
             Color(red: pan * Spectrogram.editRedRatio, green: 0, blue: 0, opacity: 1 - l)
         } else {
             Color(red: 0, green: -pan * Spectrogram.editGreenRatio, blue: 0, opacity: 1 - l)
-        }
-    }
-    
-    func updateTimeNode(atSec sec: Rational) {
-        if model.enabled {
-            let frame = mainFrame
-            let x = self.x(atSec: sec)
-            if x >= frame.minX && x < frame.maxX {
-                timeNode.path = Path([Point(), Point(0, frame.maxY - timelineFrame.minY)])
-                timeNode.attitude.position = Point(x, timelineFrame.minY)
-                updateFromPeakVolm()
-            } else {
-                timeNode.path = Path()
-                currentPeakVolmNode.path = Path()
-            }
-        } else if !timeNode.path.isEmpty {
-            timeNode.path = Path()
-            currentPeakVolmNode.path = Path()
         }
     }
     

@@ -281,7 +281,7 @@ final class AnimationView: TimelineView, @unchecked Sendable {
     var keyPath: BinderKeyPath
     let node = Node()
     let previousNextNode = Node()
-    let timeNode = Node()
+    let captionNode = Node()
     let timelineNode = Node()
     let boundsNode = Node(lineWidth: 1, lineType: .color(.content))
     let clippingNode = Node(isHidden: true, lineWidth: 4, lineType: .color(.warning))
@@ -1345,7 +1345,7 @@ final class SheetView: BindableView, @unchecked Sendable {
                                textsView.node,
                                bordersView.node,
                                animationView.timelineNode,
-                               animationView.timeNode])
+                               animationView.captionNode])
         
         updateBackground()
         updateWithKeyframeIndex()
@@ -1449,58 +1449,6 @@ final class SheetView: BindableView, @unchecked Sendable {
         }
     }
     
-    func timeSliderRect(atSec sec: Rational) -> Rect {
-        if model.enabledAnimation {
-            let beat = model.animation.beat(fromSec: sec)
-            let btx = animationView.x(atBeat: beat)
-            let knobW = 2.0, knobH = animationView.timelineBounds?.height ?? 0
-            let tlY = animationView.transformedPaddingTimelineBounds?.midY ?? 0
-            return Rect(x: btx - knobW / 2, y: tlY - knobH / 2,
-                        width: knobW, height: knobH)
-        } else {
-            let beat = model.score.beat(fromSec: sec)
-            let btx = scoreView.x(atBeat: beat)
-            let knobW = 2.0, knobH = scoreView.timelineFrame.height
-            let tlY = scoreView.timelineY + scoreView.timelineCenterY
-            return Rect(x: btx - knobW / 2, y: tlY - knobH / 2,
-                        width: knobW, height: knobH)
-        }
-    }
-    
-    func allTimeSliderRect(atSec sec: Rational, at index: Int) -> Rect {
-        if index == 0 {
-            let beat = model.animation.beat(fromSec: sec)
-            let btx = animationView.x(atBeat: beat)
-            let knobW = 2.0, knobH = 6.0
-            return Rect(x: btx - knobW / 2, y: 0,
-                        width: knobW, height: knobH)
-        } else if index < 0 {
-            let allDurSec = model.allEndSec
-            let bt = allDurSec == 0 ? 0 : Double(sec / allDurSec).clipped(min: 0, max: 1)
-            let knobW = 2.0, knobH = 6.0
-            return Rect(x: bounds.width / 2 * bt,
-                        y: 0,
-                        width: knobW, height: knobH)
-        } else {
-            let allDurSec = model.allEndSec
-            let bt = allDurSec == 0 ? 0 : Double(sec / allDurSec).clipped(min: 0, max: 1)
-            let knobW = 2.0, knobH = 6.0
-            return Rect(x: bounds.midX + bounds.width / 2 * bt,
-                        y: 0,
-                        width: knobW, height: knobH)
-        }
-    }
-    
-    func otherTimeSliderRect(atBeat beat: Rational,
-                             from sheetView: SheetView) -> Rect {
-        let btx = animationView.x(atBeat: beat)
-        let knobW = 2.0, knobH = animationView.paddingTimelineBounds?.height ?? 0
-        let nb = bounds.insetBy(dx: Sheet.textPadding.width, dy: 0)
-        let tlY = nb.minY
-        return Rect(x: btx - knobW / 2, y: tlY - knobH / 2,
-                    width: knobW, height: knobH)
-    }
-    
     func sec(at p: Point, scale: Double, interval: Rational) -> Rational {
         if let (_, view) = contentIndexAndView(at: p, scale: scale) {
             view.sec(atX: p.x, interval: interval)
@@ -1518,46 +1466,6 @@ final class SheetView: BindableView, @unchecked Sendable {
         animationView.interporatedTimelineNodes(fromColor: ids)
     }
     
-    func currentSelectiongTimeNode(indexInterval: Double) -> Node {
-        Self.selectingTimeNode(duration: model.animation.currentDurBeat,
-                               time: model.animation.localBeat,
-                               isKey: model.animation.currentKeyframe.isKey,
-                               indexInterval: indexInterval,
-                               frameRate: Rational(frameRate),
-                               enabledSelect: model.enabledAnimation)
-    }
-    static func selectingTimeNode(duration: Rational, time: Rational, isKey: Bool,
-                                  indexInterval: Double,
-                                  frameRate: Rational,
-                                  enabledSelect: Bool) -> Node {
-        var nodes = [Node]()
-        
-        func appendDot(lineWidth: Double, atX x: Double) {
-            let np = Point(x, 0)
-            nodes.append(Node(path: Path(circleRadius: 1 + lineWidth,
-                                         position: np),
-                              fillType: .color(.background)))
-            nodes.append(Node(path: Path(circleRadius: lineWidth,
-                                         position: np),
-                              fillType: .color(.content)))
-        }
-        if enabledSelect {
-            appendDot(lineWidth: 1, atX: -indexInterval)
-            appendDot(lineWidth: 2, atX: 0)
-            appendDot(lineWidth: 1, atX: indexInterval)
-        } else {
-            appendDot(lineWidth: 2, atX: 0)
-        }
-        
-        let timeNodes = Self.timeNodes(duration: duration,
-                                       time: time, isKey: isKey, frameRate: frameRate)
-        return Node(children: nodes + timeNodes)
-    }
-    
-    var isHiddenOtherTimeNode = true
-    func showOtherTimeNodeFromMainBeat() {
-        showOtherTimeNode(atBeat: animationView.model.mainBeat)
-    }
     func containsScoreNoder(from ids: Set<UUID>) -> Bool {
         if let scoreTrackItem = scoreView.scoreTrackItem {
             ids.contains(scoreTrackItem.id)
@@ -1572,105 +1480,7 @@ final class SheetView: BindableView, @unchecked Sendable {
             false
         }
     }
-    func showOtherTimeNode(atBeat beat: Rational, isEnabledMovie: Bool = false) {
-        if isHiddenOtherTimeNode {
-            let ids = playingOtherTimelineIDs
-            let sec = animationView.model.sec(fromBeat: beat)
-            
-            scoreView.timeNode.path = Path()
-            if ids.isEmpty || containsScoreNoder(from: ids) {
-                scoreView.timeNode.lineType = .color(.content)
-                scoreView.updateTimeNode(atSec: sec)
-                scoreView.peakVolm = 0
-                scoreView.timeNode.lineWidth = isPlaying ? 2 : 1
-                scoreView.timeNode.isHidden = false
-            } else {
-                scoreView.timeNode.isHidden = true
-            }
-            
-            for contentView in contentsView.elementViews {
-                if isEnabledMovie && contentView.model.type == .movie {
-                    contentView.timeNode?.lineType = .color(.content)
-                    contentView.updateTimeNode(atSec: sec)
-                    contentView.timeNode?.lineWidth = 2
-                    contentView.timeNode?.isHidden = false
-                    continue
-                }
-                
-                contentView.timeNode?.path = Path()
-                guard contentView.model.type != .movie,
-                      ids.isEmpty || containsPCMTrackItem(from: ids, in: contentView) else {
-                    contentView.timeNode?.isHidden = true
-                    continue
-                }
-                contentView.timeNode?.lineType = .color(.content)
-                contentView.updateTimeNode(atSec: sec)
-                contentView.peakVolm = 0
-                contentView.timeNode?.lineWidth = isPlaying ? 2 : 1
-                contentView.timeNode?.isHidden = false
-            }
-            for textView in textsView.elementViews {
-                textView.timeNode?.path = Path()
-                guard ids.isEmpty || ids.contains(textView.id) else {
-                    textView.timeNode?.isHidden = true
-                    continue
-                }
-                textView.timeNode?.lineType = .color(.content)
-                textView.updateTimeNode(atSec: sec)
-                textView.peakVolm = 0
-                textView.timeNode?.lineWidth = isPlaying ? 2 : 1
-                textView.timeNode?.isHidden = false
-            }
-            isHiddenOtherTimeNode = false
-        } else {
-            updateOtherTimeNode(atBeat: beat, isEnabledMovie: isEnabledMovie)
-        }
-    }
-    private func updateOtherTimeNode(atBeat beat: Rational, isEnabledMovie: Bool = false) {
-        let ids = playingOtherTimelineIDs
-        let sec = model.animation.sec(fromBeat: beat)
-        if ids.isEmpty || containsScoreNoder(from: ids) {
-            scoreView.updateTimeNode(atSec: sec)
-        }
-        for contentView in contentsView.elementViews {
-            if isEnabledMovie && contentView.model.type == .movie {
-                contentView.updateTimeNode(atSec: sec)
-                continue
-            }
-            
-            guard contentView.model.type != .movie,
-                  ids.isEmpty || containsPCMTrackItem(from: ids, in: contentView) else { continue }
-            contentView.updateTimeNode(atSec: sec)
-        }
-        for textView in textsView.elementViews {
-            guard ids.isEmpty || ids.contains(textView.id) else { continue }
-            textView.updateTimeNode(atSec: sec)
-        }
-    }
-    func hideOtherTimeNode() {
-        if !isHiddenOtherTimeNode {
-            scoreView.timeNode.path = Path()
-            scoreView.currentPeakVolmNode.path = Path()
-            scoreView.timeNode.isHidden = true
-            
-            for contentView in contentsView.elementViews {
-                contentView.timeNode?.path = Path()
-                contentView.timeNode?.isHidden = true
-            }
-            for textView in textsView.elementViews {
-                textView.timeNode?.path = Path()
-                textView.timeNode?.isHidden = true
-            }
-            isHiddenOtherTimeNode = true
-        }
-    }
     
-    func timeNodes(from animationView: AnimationView) -> [Node] {
-        Self.timeNodes(duration: animationView.model.currentDurBeat,
-                       time: animationView.model.localBeat,
-                       isKey: animationView.model.currentKeyframe.isKey,
-                       frameRate: Rational(animationView.frameRate))
-    }
     func currentKeyframeString() -> String {
         Animation.timeString(fromTime: model.animation.currentKeyframe.beat + model.animation.beatRange.start,
                              frameRate: Rational(frameRate))
@@ -1974,12 +1784,13 @@ final class SheetView: BindableView, @unchecked Sendable {
     var bottomSheetViews = [WeakElement<SheetView>]()
     var topSheetViews = [WeakElement<SheetView>]()
     private var bottomNodes = [Node](), centerNode: Node?, topNodes = [Node]()
-    private var timeNode: Node?, musicBackgroundNode: Node?
+    private var timeNode: Node?, volumeNode: Node?, musicBackgroundNode: Node?
+    private var volumeColor = Color.background
     private(set) var sequencer: Sequencer?
     private var firstSec: Rational?
     private var willPlaySec: Rational?, playingOtherTimelineIDs = Set<UUID>()
     private var playingFrameRate: Rational = 24, firstDeltaSec: Rational = 0
-    private var waringClock: SuspendingClock.Instant?, beganPlaySec: SuspendingClock.Instant?
+    private var beganPlaySec: SuspendingClock.Instant?
     private var audioPauseTask: Task<(), any Error>?
     private var mainDurSec: Rational = 0
     let frameRate = Keyframe.defaultFrameRate
@@ -2000,24 +1811,12 @@ final class SheetView: BindableView, @unchecked Sendable {
             ?? model.animation.sec(fromBeat: model.animation.mainBeat)
             self.playingSec = playingSec
             
-//            playingOldKeyframeIndex = model.index
-//            if let topSheetView = topSheetView {
-//                playingOldTopKeyframeIndex = topSheetView.model.index(atTime: rt)
-//            }
-//            if let bottomSheetView = bottomSheetView {
-//                playingOldBottomKeyframeIndex = bottomSheetView.model.index(atTime: rt)
-//            }
-//            loopingCount = 0
-//            loopCount = model.loopCount
-            
             playingOldKeyframeIndex = nil
             bottomSheetViews.forEach { $0.element?.playingOldKeyframeIndex = nil }
             topSheetViews.forEach { $0.element?.playingOldKeyframeIndex = nil }
             bottomNodes = bottomSheetViews.count.range.map { _ in Node() }
             centerNode = nil
             topNodes = topSheetViews.count.range.map { _ in Node() }
-            
-            showOtherTimeNode(atBeat: model.animation.mainBeat)
             
             playingSheetIndex = 0
             playingCaption = nil
@@ -2031,24 +1830,13 @@ final class SheetView: BindableView, @unchecked Sendable {
             if let caption = caption {
                 let nodes = caption.nodes(in: model.mainFrame ?? bounds)
                 playingCaptionNodes = nodes
-                animationView.timeNode.children = nodes
+                animationView.captionNode.children = nodes
             } else {
                 playingCaptionNodes = []
-                animationView.timeNode.children = []
+                animationView.captionNode.children = []
             }
             
-            timeNode?.removeFromParent()
-            if let parentNode = node.parent {
-                let rect0 = parentNode.convert(allTimeSliderRect(atSec: playingSec,
-                                                              at: playingSheetIndex),
-                                               from: node)
-                let rect1 = parentNode.convert(timeSliderRect(atSec: playingSec),
-                                               from: node)
-                let timeNode = Node(children: [Node(path: Path(rect0), fillType: .color(.content)),
-                                               Node(path: Path(rect1), fillType: .color(.content))])
-                parentNode.append(child: timeNode)
-                self.timeNode = timeNode
-            }
+            setupTimeNodes(isVolume: true)
             
             var seqTracks = [Sequencer.Track]()
             var deltaSec: Rational = 0
@@ -2103,22 +1891,10 @@ final class SheetView: BindableView, @unchecked Sendable {
                 if sequencer != nil {
                     sequencer?.update(seqTracks)
                 } else {
-                    let sequencer = Sequencer(tracks: seqTracks, type: .loop) { [weak self] (peak) in
+                    let sequencer = Sequencer(tracks: seqTracks, type: .loop) { [weak self] pl in
                         DispatchQueue.main.async { [weak self] in
-                            guard let self else { return }
-                            if (self.waringClock == nil || self.waringClock!.duration(to: .now).sec > 1 / 10)
-                                && !self.isHiddenOtherTimeNode {
-                                
-                                let peakVolm = Volm.volm(fromAmp: Double(peak))
-                                for textView in self.textsView.elementViews {
-                                    textView.peakVolm = peakVolm
-                                }
-                                for contentView in self.contentsView.elementViews {
-                                    contentView.peakVolm = peakVolm
-                                }
-                                self.scoreView.peakVolm = peakVolm
-                                self.waringClock = .now
-                            }
+                            guard let self, self.isPlaying else { return }
+                            self.updateTimeNodes(from: pl)
                         }
                     }
                     self.sequencer = sequencer
@@ -2130,13 +1906,6 @@ final class SheetView: BindableView, @unchecked Sendable {
             sequencer?.startSec = Double(deltaSec)
             sequencer?.play()
             
-//            playingCaptions = model.captions
-            
-//                linesView.node.isHidden = true
-//                planesView.node.isHidden = true
-//                draftLinesView.node.isHidden = true
-//                draftPlanesView.node.isHidden = true
-            
             playingFrameRate = Rational(60)
             beganPlaySec = .now
             let timeInterval = Double(1 / playingFrameRate)
@@ -2147,7 +1916,6 @@ final class SheetView: BindableView, @unchecked Sendable {
                 }
             }
         } else {
-//            loopingCount = 0
             playingSheetIndex = 0
             playingSec = nil
             playingOldKeyframeIndex = nil
@@ -2157,33 +1925,23 @@ final class SheetView: BindableView, @unchecked Sendable {
             centerNode = nil
             topNodes = []
             musicBackgroundNode = nil
-//            playingCaptions = []
-//            playingCaption = nil
-//            linesView.node.isHidden = false
-//            planesView.node.isHidden = false
-//            draftLinesView.node.isHidden = false
-//            draftPlanesView.node.isHidden = false
+            
             updateWithKeyframeIndex()
-//            previousSheetView = nil
-//            nextSheetView = nil
-//            animationView.previousNextNode.children = []
-            animationView.timeNode.children = []
+            
+            animationView.captionNode.children = []
             playingCaption = nil
             playingCaptionNodes = []
-//            previousNextNode.removeFromParent()
             
             playingSecRange = nil
             firstSec = nil
             
-            timeNode?.removeFromParent()
+            endTimeNodes()
             
             contentsView.elementViews.forEach {
                 if $0.model.type == .movie, let sec = $0.model.rootSec {
                     $0.updateMovie(atSec: sec)
                 }
             }
-            
-            hideOtherTimeNode()
             
             updatePreviousNext()
         
@@ -2196,7 +1954,6 @@ final class SheetView: BindableView, @unchecked Sendable {
                     sequencer?.pause()
                 }
             }
-            
 //            sequencer?.endEngine()
 //            sequencer = nil
         }
@@ -2205,15 +1962,6 @@ final class SheetView: BindableView, @unchecked Sendable {
         didSet {
             guard playingSec != oldValue, let playingSec else { return }
             let sheetView = playingSheetView
-            
-            let playingBeat = sheetView.model.animation
-                .beat(fromSec: Double(playingSec), beatRate: 60)
-            
-            if sheetView == self {
-                showOtherTimeNode(atBeat: playingBeat, isEnabledMovie: true)
-            } else {
-                hideOtherTimeNode()
-            }
             
             var children = [Node]()
             
@@ -2284,30 +2032,23 @@ final class SheetView: BindableView, @unchecked Sendable {
                 animationView.node.children = children
             }
             
+            let playingBeat = sheetView.model.animation.beat(fromSec: playingSec)
             let caption = sheetView.model.caption(atBeat: playingBeat)
             if caption != playingCaption {
                 playingCaption = caption
                 if let caption = caption {
                     let nodes = caption.nodes(in: sheetView.model.mainFrame ?? sheetView.bounds)
                     playingCaptionNodes = nodes
-                    animationView.timeNode.children = nodes
+                    animationView.captionNode.children = nodes
                 } else {
                     playingCaptionNodes = []
-                    animationView.timeNode.children = playingCaptionNodes
+                    animationView.captionNode.children = playingCaptionNodes
                 }
             } else {
-                animationView.timeNode.children = playingCaptionNodes
+                animationView.captionNode.children = playingCaptionNodes
             }
             
-            if let parentNode = sheetView.node.parent {
-                let rect0 = parentNode.convert(allTimeSliderRect(atSec: playingSec,
-                                                              at: playingSheetIndex),
-                                               from: node)
-                let rect1 = parentNode.convert(sheetView.timeSliderRect(atSec: playingSec),
-                                               from: sheetView.node)
-                timeNode?.children = [Node(path: Path(rect0), fillType: .color(.content)),
-                                      Node(path: Path(rect1), fillType: .color(.content))]
-            }
+            updateTimeNodes()
             
             sheetView.contentsView.elementViews.forEach {
                 if $0.model.type == .movie, let timeOption = $0.model.timeOption {
@@ -2316,6 +2057,144 @@ final class SheetView: BindableView, @unchecked Sendable {
             }
         }
     }
+    func setupTimeNodes(isVolume: Bool) {
+        endTimeNodes()
+        if let parentNode = node.parent {
+            let timeNode = Node()
+            parentNode.append(child: timeNode)
+            self.timeNode = timeNode
+            
+            if isVolume {
+                let volumeNode = Node()
+                parentNode.append(child: volumeNode)
+                self.volumeNode = volumeNode
+            }
+            
+            updateTimeNodes()
+            if isVolume {
+                updateTimeNodes(from: .init(lufs: -.infinity, isPeak: false))
+            }
+        }
+    }
+    func endTimeNodes() {
+        timeNode?.removeFromParent()
+        volumeNode?.removeFromParent()
+        timeNode?.children = []
+        volumeNode?.children = []
+    }
+    func updateTimeNodes() {
+        if let playingSec {
+            updateTimeNodes(fromSec: playingSec)
+        }
+    }
+    func updateTimeNodesWithMainSec() {
+        updateTimeNodes(fromSec: animationView.model.mainSec)
+    }
+    func updateTimeNodes(fromSec playingSec: Rational) {
+        let sheetView = playingSheetView
+        if let parentNode = sheetView.node.parent {
+            var timeRects0 = [Rect](), timeRects1 = [Rect](), volumeRects1 = [Rect]()
+            func update(from sheetView: SheetView) {
+                let knobW = isPlaying ? 2.0 : 1.0, volmW = 1.25
+                if !(!isPlaying && sheetView == self), sheetView.model.enabledAnimation && sheetView.animationView.model.allSecRange.contains(playingSec) {
+                    
+                    let btx = sheetView.animationView.x(atSec: playingSec)
+                    let knobH = sheetView.animationView.timelineBounds?.height ?? 0
+                    let tlY = sheetView.animationView.transformedPaddingTimelineBounds?.midY ?? 0
+                    timeRects0.append(parentNode.convert(Rect(x: btx - knobW / 2, y: tlY - knobH / 2,
+                                                              width: knobW, height: knobH),
+                                                         from: sheetView.node))
+                }
+                timeRects0 += sheetView.textsView.elementViews.compactMap {
+                    guard $0.timeOption?.secRange.contains(playingSec) ?? false,
+                          let f = $0.transformedTimelineFrame else { return nil }
+                    let btx = $0.x(atSec: playingSec) + $0.origin.x
+                    return .init(x: btx - knobW / 2, y: f.minY, width: knobW, height: f.height)
+                }.map { parentNode.convert($0, from: sheetView.node) }
+                
+                var oTimeRects1 = [Rect]()
+                let scoreView = sheetView.scoreView
+                if scoreView.option.enabled {
+                    if scoreView.model.allSecRange.contains(playingSec) {
+                        let btx = scoreView.x(atSec: playingSec) + scoreView.origin.x
+                        let h = scoreView.mainFrame.maxY - scoreView.timelineFrame.minY
+                        oTimeRects1.append(Rect(x: btx - knobW / 2,
+                                                y: scoreView.timelineY - scoreView.timelineFrame.height / 2,
+                                                width: knobW, height: h))
+                    }
+                }
+                oTimeRects1 += sheetView.contentsView.elementViews.compactMap {
+                    guard $0.timeOption?.secRange.contains(playingSec) ?? false,
+                          let f = $0.transformedTimelineFrame else { return nil }
+                    let h = $0.isShownSpectrogram ?
+                    f.height + SheetContentView.spectrogramHeight + Sheet.timelineMargin : f.height
+                    let btx = $0.x(atSec: playingSec) + $0.origin.x
+                    return .init(x: btx - knobW / 2, y: f.minY, width: knobW, height: h)
+                }
+                
+                timeRects1 += oTimeRects1.map { parentNode.convert($0, from: sheetView.node) }
+                volumeRects1 += oTimeRects1.map { $0.inset(by: (knobW - volmW) / 2) }
+                    .map { parentNode.convert($0, from: sheetView.node) }
+            }
+            update(from: sheetView)
+            sheetView.bottomSheetViews.forEach {
+                guard let sheetView = $0.element else { return }
+                update(from: sheetView)
+            }
+            sheetView.topSheetViews.forEach {
+                guard let sheetView = $0.element else { return }
+                update(from: sheetView)
+            }
+            
+            let rects0 = isPlaying ? [parentNode.convert(allTimeSliderRect(atSec: playingSec,
+                                                                           at: playingSheetIndex),
+                                                         from: node)] : []
+            timeNode?.children
+            = rects0.map { Node(path: Path($0), fillType: .color(.content)) }
+            + timeRects0.map { Node(path: Path($0), fillType: .color(.content)) }
+            + timeRects1.map { Node(path: Path($0), fillType: .color(.content)) }
+            volumeNode?.children = volumeRects1.map { Node(path: Path($0), fillType: .color(volumeColor)) }
+        } else {
+            timeNode?.children = []
+            volumeNode?.children = []
+        }
+    }
+    private func updateTimeNodes(from pl: PlayingLoudness) {
+        volumeColor = if pl.isPeak {
+            .warning
+        } else if pl.lufs > -14 {
+            .linear(.content, .loudnessWarning,
+                    t: pl.lufs.clipped(min: -14, max: -9, newMin: 0, newMax: 1))
+        } else {
+            Color(white: pl.lufs.clipped(min: -19, max: -14, newMin: 1, newMax: 0))
+        }
+        
+        volumeNode?.children.forEach { $0.fillType = .color(volumeColor) }
+    }
+    private func allTimeSliderRect(atSec sec: Rational, at index: Int) -> Rect {
+        if index == 0 {
+            let beat = model.animation.beat(fromSec: sec)
+            let btx = animationView.x(atBeat: beat)
+            let knobW = 2.0, knobH = 6.0
+            return Rect(x: btx - knobW / 2, y: 0,
+                        width: knobW, height: knobH)
+        } else if index < 0 {
+            let allDurSec = model.allEndSec
+            let bt = allDurSec == 0 ? 0 : Double(sec / allDurSec).clipped(min: 0, max: 1)
+            let knobW = 2.0, knobH = 6.0
+            return Rect(x: bounds.width / 2 * bt,
+                        y: 0,
+                        width: knobW, height: knobH)
+        } else {
+            let allDurSec = model.allEndSec
+            let bt = allDurSec == 0 ? 0 : Double(sec / allDurSec).clipped(min: 0, max: 1)
+            let knobW = 2.0, knobH = 6.0
+            return Rect(x: bounds.midX + bounds.width / 2 * bt,
+                        y: 0,
+                        width: knobW, height: knobH)
+        }
+    }
+    
     var playingSheetView: SheetView {
         if playingSheetIndex < 0, -playingSheetIndex <= previousSheetViews.count,
             let sheetView = previousSheetViews[previousSheetViews.count - (-playingSheetIndex - 1) - 1].element {
@@ -2476,11 +2355,6 @@ final class SheetView: BindableView, @unchecked Sendable {
     func updateCaption() {
         guard isPlaying else { return }
         
-        let timeSliders = !model.enabledAnimation ?
-        [] :
-        [Node(path: Path(timeSliderRect(atSec: firstSec ?? model.animation.localSec)),
-                  fillType: .color(.content))]
-        
         guard let playingSec else { return }
         
         let sheetView = playingSheetView
@@ -2492,10 +2366,10 @@ final class SheetView: BindableView, @unchecked Sendable {
         if let caption = caption {
             let nodes = caption.nodes(in: model.mainFrame ?? bounds)
             playingCaptionNodes = nodes
-            animationView.timeNode.children = timeSliders + nodes
+            animationView.captionNode.children = nodes
         } else {
             playingCaptionNodes = []
-            animationView.timeNode.children = timeSliders
+            animationView.captionNode.children = []
         }
     }
     

@@ -62,7 +62,9 @@ final class GoPreviousAction: InputKeyEventAction {
                 
                 if contentIndex == nil {
                     move(from: sheetView, at: p)
-                    sheetView.showOtherTimeNodeFromMainBeat()
+                    rootView.updateFromAroundWithTimeline(at: rootView.sheetPosition(at: p))
+                    sheetView.setupTimeNodes(isVolume: false)
+                    sheetView.updateTimeNodesWithMainSec()
                     sheetView.animationView.shownInterTypeKeyframeIndex = sheetView.animationView.model.index
                 }
             }
@@ -74,12 +76,12 @@ final class GoPreviousAction: InputKeyEventAction {
             if event.isRepeat, let sheetView {
                 if let contentView {
                     contentView.movePreviousInterKeyframe()
-                    sheetView.showOtherTimeNodeFromMainBeat()
+                    sheetView.updateTimeNodesWithMainSec()
                     
                     rootView.cursor = .circle(string: contentView.currentTimeString(isInter: true))
                 } else {
                     move(from: sheetView, at: p)
-                    sheetView.showOtherTimeNodeFromMainBeat()
+                    sheetView.updateTimeNodesWithMainSec()
                     sheetView.animationView.shownInterTypeKeyframeIndex = sheetView.animationView.model.index
                     
                     rootView.cursor = .circle(string: sheetView.currentKeyframeString())
@@ -87,10 +89,9 @@ final class GoPreviousAction: InputKeyEventAction {
             }
         case .ended:
             if let sheetView {
-                sheetView.hideOtherTimeNode()
+                sheetView.endTimeNodes()
                 sheetView.animationView.shownInterTypeKeyframeIndex = nil
             }
-            sheetView?.hideOtherTimeNode()
             
             rootView.cursor = rootView.defaultCursor
         }
@@ -147,7 +148,9 @@ final class GoNextAction: InputKeyEventAction {
                 
                 if contentIndex == nil {
                     move(from: sheetView, at: p)
-                    sheetView.showOtherTimeNodeFromMainBeat()
+                    rootView.updateFromAroundWithTimeline(at: rootView.sheetPosition(at: p))
+                    sheetView.setupTimeNodes(isVolume: false)
+                    sheetView.updateTimeNodesWithMainSec()
                     sheetView.animationView.shownInterTypeKeyframeIndex = sheetView.animationView.model.index
                 }
             }
@@ -159,12 +162,12 @@ final class GoNextAction: InputKeyEventAction {
             if event.isRepeat, let sheetView {
                 if let contentView {
                     contentView.moveNextInterKeyframe()
-                    sheetView.showOtherTimeNodeFromMainBeat()
+                    sheetView.updateTimeNodesWithMainSec()
                     
                     rootView.cursor = .circle(string: contentView.currentTimeString(isInter: true))
                 } else {
                     move(from: sheetView, at: p)
-                    sheetView.showOtherTimeNodeFromMainBeat()
+                    sheetView.updateTimeNodesWithMainSec()
                     sheetView.animationView.shownInterTypeKeyframeIndex = sheetView.animationView.model.index
                     
                     rootView.cursor = rootView.cursor(from: sheetView.currentKeyframeString())
@@ -172,7 +175,7 @@ final class GoNextAction: InputKeyEventAction {
             }
         case .ended:
             if let sheetView {
-                sheetView.hideOtherTimeNode()
+                sheetView.endTimeNodes()
                 sheetView.animationView.shownInterTypeKeyframeIndex = nil
             }
             
@@ -230,7 +233,9 @@ final class GoPreviousFrameAction: InputKeyEventAction {
                 
                 if contentIndex == nil {
                     move(from: sheetView, at: p)
-                    sheetView.showOtherTimeNodeFromMainBeat()
+                    rootView.updateFromAroundWithTimeline(at: rootView.sheetPosition(at: p))
+                    sheetView.setupTimeNodes(isVolume: false)
+                    sheetView.updateTimeNodesWithMainSec()
                     sheetView.animationView.shownInterTypeKeyframeIndex = sheetView.animationView.model.index
                 }
             }
@@ -242,12 +247,12 @@ final class GoPreviousFrameAction: InputKeyEventAction {
             if event.isRepeat, let sheetView {
                 if let contentView {
                     contentView.movePreviousKeyframe()
-                    sheetView.showOtherTimeNodeFromMainBeat()
+                    sheetView.updateTimeNodesWithMainSec()
                     
                     rootView.cursor = .circle(string: contentView.currentTimeString(isInter: false))
                 } else {
                     move(from: sheetView, at: p)
-                    sheetView.showOtherTimeNodeFromMainBeat()
+                    sheetView.updateTimeNodesWithMainSec()
                     sheetView.animationView.shownInterTypeKeyframeIndex = sheetView.animationView.model.index
                     
                     rootView.cursor = rootView.cursor(from: sheetView.currentKeyframeString())
@@ -255,7 +260,7 @@ final class GoPreviousFrameAction: InputKeyEventAction {
             }
         case .ended:
             if let sheetView {
-                sheetView.hideOtherTimeNode()
+                sheetView.endTimeNodes()
                 sheetView.animationView.shownInterTypeKeyframeIndex = nil
             }
             
@@ -314,7 +319,9 @@ final class GoNextFrameAction: InputKeyEventAction {
                 
                 if contentIndex == nil {
                     move(from: sheetView, at: p)
-                    sheetView.showOtherTimeNodeFromMainBeat()
+                    rootView.updateFromAroundWithTimeline(at: rootView.sheetPosition(at: p))
+                    sheetView.setupTimeNodes(isVolume: false)
+                    sheetView.updateTimeNodesWithMainSec()
                     sheetView.animationView.shownInterTypeKeyframeIndex = sheetView.animationView.model.index
                 }
             }
@@ -326,12 +333,12 @@ final class GoNextFrameAction: InputKeyEventAction {
             if event.isRepeat, let sheetView {
                 if let contentView {
                     contentView.moveNextKeyframe()
-                    sheetView.showOtherTimeNodeFromMainBeat()
+                    sheetView.updateTimeNodesWithMainSec()
                     
                     rootView.cursor = .circle(string: contentView.currentTimeString(isInter: false))
                 } else {
                     move(from: sheetView, at: p)
-                    sheetView.showOtherTimeNodeFromMainBeat()
+                    sheetView.updateTimeNodesWithMainSec()
                     sheetView.animationView.shownInterTypeKeyframeIndex = sheetView.animationView.model.index
                     
                     rootView.cursor = rootView.cursor(from: sheetView.currentKeyframeString())
@@ -339,7 +346,7 @@ final class GoNextFrameAction: InputKeyEventAction {
             }
         case .ended:
             if let sheetView {
-                sheetView.hideOtherTimeNode()
+                sheetView.endTimeNodes()
                 sheetView.animationView.shownInterTypeKeyframeIndex = nil
             }
             
@@ -446,7 +453,8 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
                 rootView.cursor = rootView.cursor(from: Animation.timeString(fromTime: 0, frameRate: 0))
             }
             
-            sheetView?.showOtherTimeNodeFromMainBeat()
+            rootView.updateFromAroundWithTimeline(at: rootView.sheetPosition(at: p))
+            sheetView?.setupTimeNodes(isVolume: false)
         case .changed:
             if let sheetView {
                 if let contentView {
@@ -537,8 +545,8 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
                                     sheetView.stop()
                                 }
                                 sheetView.rootBeat = nRootBeat
+                                sheetView.updateTimeNodesWithMainSec()
                                 if oldRKI != sheetView.rootKeyframeIndex {
-                                    sheetView.showOtherTimeNodeFromMainBeat()
                                     isChangedRootI = true
                                 }
                             }
@@ -556,8 +564,8 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
                                     sheetView.stop()
                                 }
                                 sheetView.rootBeat = nRootBeat
+                                sheetView.updateTimeNodesWithMainSec()
                                 if oldRKI != sheetView.rootKeyframeIndex {
-                                    sheetView.showOtherTimeNodeFromMainBeat()
                                     isChangedRootI = true
                                 }
                             }
@@ -596,7 +604,7 @@ final class SelectFrameAction: SwipeEventAction, DragEventAction {
                 let animationView = sheetView.animationView
                 animationView.shownInterTypeKeyframeIndex = nil
                 
-                sheetView.hideOtherTimeNode()
+                sheetView.endTimeNodes()
             }
         }
         

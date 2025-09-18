@@ -44,24 +44,6 @@ final class ContentView<T: BinderProtocol>: SpectrgramView, @unchecked Sendable 
     let timelineNode = Node()
     var spectrogramNode: Node?, spectrogramDeltaX = 0.0
     var spectrogramFqType: Spectrogram.FqType?
-    var timeNode: Node?, currentPeakVolmNode: Node?
-    var peakVolm = 0.0 {
-        didSet {
-            guard peakVolm != oldValue else { return }
-            updateFromPeakVolm()
-        }
-    }
-    func updateFromPeakVolm() {
-        guard model.type != .movie, let node = currentPeakVolmNode, let frame = timelineFrame else { return }
-        let y = isShownSpectrogram ? frame.height + Self.spectrogramHeight + Sheet.timelineMargin : frame.height
-        node.path = Path([Point(), Point(0, y)])
-        if peakVolm < Audio.headroomVolm {
-            node.lineType = .color(Color(lightness: (1 - peakVolm) * 100))
-//            currentPeakVolmNode.lineType = .color(.background)
-        } else {
-            node.lineType = .color(.warning)
-        }
-    }
     
     var pcmTrackItem: PCMTrackItem?
     var volms = [Double]()
@@ -141,13 +123,6 @@ extension ContentView {
         if model.timeOption != nil {
             timelineNode.children = self.timelineNode(with: model)
             
-            let timeNode = Node(lineWidth: 2, lineType: .color(.content))
-            let volmNode = Node(lineWidth: 1.25, lineType: .color(.background))
-            timeNode.append(child: volmNode)
-            timelineNode.children.append(timeNode)
-            self.timeNode = timeNode
-            self.currentPeakVolmNode = volmNode
-            
             if model.type == .movie || model.type == .image {
                 node.path = .init(Rect(origin: .init(0, Sheet.timelineHalfHeight + Sheet.timelineMargin),
                                        size: model.size))
@@ -155,8 +130,6 @@ extension ContentView {
             node.attitude.position = model.origin
         } else if !timelineNode.children.isEmpty {
             timelineNode.children = []
-            self.timeNode = nil
-            self.currentPeakVolmNode = nil
             if model.type == .movie || model.type == .image {
                 node.path = .init(Rect(size: model.size))
             }
@@ -624,23 +597,6 @@ extension ContentView {
             return y.clipped(min: 0, max: h,
                              newMin: Spectrogram.minPitch,
                              newMax: Spectrogram.maxPitch)
-        }
-    }
-    
-    func updateTimeNode(atSec sec: Rational) {
-        if let timeNode = timeNode, let frame = timelineFrame {
-            let x = self.x(atSec: sec)
-            if x >= frame.minX && x < frame.maxX {
-                timeNode.path = Path([Point(), Point(0, isShownSpectrogram ? frame.height + Self.spectrogramHeight + Sheet.timelineMargin : frame.height)])
-                timeNode.attitude.position = Point(x, frame.minY)
-                updateFromPeakVolm()
-            } else {
-                timeNode.path = Path()
-                currentPeakVolmNode?.path = Path()
-            }
-        } else {
-            timeNode?.path = Path()
-            currentPeakVolmNode?.path = Path()
         }
     }
     

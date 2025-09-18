@@ -72,6 +72,8 @@ final class TextView<T: BinderProtocol>: TimelineView, @unchecked Sendable {
         }
     }
     
+    let timelineNode = Node()
+    
     let markedRangeNode = Node(lineWidth: 1, lineType: .color(.content))
     let replacedRangeNode = Node(lineWidth: 2, lineType: .color(.content))
     let cursorNode = Node(isHidden: true,
@@ -89,25 +91,6 @@ final class TextView<T: BinderProtocol>: TimelineView, @unchecked Sendable {
     }
     
     let id = UUID()
-    
-    let timelineNode = Node()
-    var timeNode: Node?, currentPeakVolmNode: Node?
-    var peakVolm = 0.0 {
-        didSet {
-            guard peakVolm != oldValue else { return }
-            updateFromPeakVolm()
-        }
-    }
-    func updateFromPeakVolm() {
-        guard let node = currentPeakVolmNode, let frame = timelineFrame else { return }
-        let y = frame.height * peakVolm
-        node.path = Path([Point(), Point(0, y)])
-        if peakVolm < Audio.headroomVolm {
-            node.lineType = .color(.background)
-        } else {
-            node.lineType = .color(.warning)
-        }
-    }
     
     init(binder: Binder, keyPath: BinderKeyPath) {
         self.binder = binder
@@ -179,17 +162,8 @@ extension TextView {
     func updateTimeline() {
         if let timeOption = model.timeOption {
             timelineNode.children = self.timelineNode(timeOption, from: typesetter)
-            
-            let timeNode = Node(lineWidth: 3, lineType: .color(.content))
-            let volmNode = Node(lineWidth: 1, lineType: .color(.background))
-            timeNode.append(child: volmNode)
-            timelineNode.children.append(timeNode)
-            self.timeNode = timeNode
-            self.currentPeakVolmNode = volmNode
         } else if !timelineNode.children.isEmpty {
             timelineNode.children = []
-            self.timeNode = nil
-            self.currentPeakVolmNode = nil
         }
     }
     
@@ -300,20 +274,6 @@ extension TextView {
         }
         
         return nodes
-    }
-    
-    func updateTimeNode(atSec sec: Rational) {
-        if let frame = timelineFrame, let timeNode {
-            let x = self.x(atSec: sec)
-            if x >= frame.minX && x < frame.maxX {
-                timeNode.path = Path([Point(), Point(0, frame.height)])
-                timeNode.attitude.position = Point(x, frame.minY)
-            } else {
-                timeNode.path = Path()
-            }
-        } else {
-            timeNode?.path = Path()
-        }
     }
     
     func containsTimeline(_ p : Point, scale: Double) -> Bool {
