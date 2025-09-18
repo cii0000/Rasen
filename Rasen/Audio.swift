@@ -961,10 +961,6 @@ final class ScoreNoder: ObjectHashable {
     }
 }
 
-struct PlayingLoudness: Hashable {
-    var lufs: Double, isPeak: Bool
-}
-
 final class Sequencer {
     private(set) var scoreNoders: Set<ScoreNoder>
     private(set) var pcmNoders: Set<PCMNoder>
@@ -1042,7 +1038,7 @@ final class Sequencer {
     }
     
     convenience init?(audiotracks: [Audiotrack],
-                      lufsHandler: (@Sendable (PlayingLoudness) -> ())? = nil,
+                      tapHandler: (@Sendable ([[Double]], Double) -> ())? = nil,
                       type: RenderType,
                       sampleRate: Double = Audio.defaultSampleRate) {
         let audiotracks = audiotracks.filter { !$0.isEmpty }
@@ -1067,11 +1063,11 @@ final class Sequencer {
             tracks.append(track)
         }
         
-        self.init(tracks: tracks, type: type, lufsHandler: lufsHandler)
+        self.init(tracks: tracks, type: type, tapHandler: tapHandler)
     }
     
     init?(tracks: [Track], type: RenderType,
-          lufsHandler: (@Sendable (PlayingLoudness) -> ())? = nil) {
+          tapHandler: (@Sendable ([[Double]], Double) -> ())? = nil) {
         self.type = type
         
         let engine = AVAudioEngine()
@@ -1116,15 +1112,11 @@ final class Sequencer {
         self.scoreNoders = scoreNoders
         self.pcmNoders = pcmNoders
         
-        if let lufsHandler {
-            mixerNode.installTap(onBus: 0, bufferSize: 16384,
+        if let tapHandler {
+            mixerNode.installTap(onBus: 0, bufferSize: 1024,
                                  format: mixerNode.outputFormat(forBus: 0)) { @Sendable buffer, time in
                 guard !buffer.isEmpty else { return }
-                let sampless = buffer.doubleSampless
-                let lufs = PCMBuffer.lufs(sampless: sampless,
-                                          sampleRate: buffer.sampleRate) ?? -.infinity
-                let peakAmp = PCMBuffer.peakAmp(sampless: sampless)
-                lufsHandler(.init(lufs: lufs, isPeak: peakAmp > Audio.headroomAmp))
+                tapHandler(buffer.doubleSampless, buffer.sampleRate)
             }
         }
         

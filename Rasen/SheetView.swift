@@ -1887,14 +1887,17 @@ final class SheetView: BindableView, @unchecked Sendable {
                 }
             }
             
+            allSampless = [[Double]](repeating: .init(repeating: 0, count: Self.tapSampleCount),
+                                     count: 2)
+            
             if seqTracks.contains(where: { !$0.isEmpty }) {
                 if sequencer != nil {
                     sequencer?.update(seqTracks)
                 } else {
-                    let sequencer = Sequencer(tracks: seqTracks, type: .loop) { [weak self] pl in
+                    let sequencer = Sequencer(tracks: seqTracks, type: .loop) { [weak self] (sampless, sampleRate) in
                         DispatchQueue.main.async { [weak self] in
                             guard let self, self.isPlaying else { return }
-                            self.updateTimeNodes(from: pl)
+                            self.updateTimeNodes(from: sampless, sampleRate: sampleRate)
                         }
                     }
                     self.sequencer = sequencer
@@ -1936,6 +1939,8 @@ final class SheetView: BindableView, @unchecked Sendable {
             firstSec = nil
             
             endTimeNodes()
+            
+            allSampless = []
             
             contentsView.elementViews.forEach {
                 if $0.model.type == .movie, let sec = $0.model.rootSec {
@@ -2072,7 +2077,7 @@ final class SheetView: BindableView, @unchecked Sendable {
             
             updateTimeNodes()
             if isVolume {
-                updateTimeNodes(from: .init(lufs: -.infinity, isPeak: false))
+                updateTimeNodes(from: nil, sampleRate: Audio.defaultSampleRate)
             }
         }
     }
@@ -2159,14 +2164,43 @@ final class SheetView: BindableView, @unchecked Sendable {
             volumeNode?.children = []
         }
     }
-    private func updateTimeNodes(from pl: PlayingLoudness) {
-        volumeColor = if pl.isPeak {
+    
+    static let tapSampleCount = 16384
+    private var allSampless = [[Double]](repeating: .init(repeating: 0, count: tapSampleCount),
+                                         count: 2)
+    private func updateTimeNodes(from sampless: [[Double]]?, sampleRate: Double) {
+        guard let sampless else {
+            volumeColor = .background
+            volumeNode?.children.forEach { $0.fillType = .color(volumeColor) }
+            return
+        }
+        
+        for ci in 0 ..< min(sampless.count, allSampless.count) {
+            if allSampless[ci].count < sampless[ci].count {
+                allSampless[ci] = Array(sampless[ci][(sampless[ci].count - allSampless[ci].count)...])
+            } else {
+                let di = allSampless[ci].count - sampless[ci].count
+                for i in 0 ..< di {
+                    allSampless[ci][i] = allSampless[ci][i + sampless[ci].count]
+                }
+                for i in di ..< allSampless[ci].count {
+                    allSampless[ci][i] = sampless[ci][i - di]
+                }
+            }
+        }
+        
+        let lufs = PCMBuffer.lufs(sampless: allSampless,
+                                  sampleRate: sampleRate) ?? -.infinity
+        let peakAmp = PCMBuffer.peakAmp(sampless: sampless)
+        let isPeak = peakAmp > Audio.headroomAmp
+        
+        volumeColor = if isPeak {
             .warning
-        } else if pl.lufs > -14 {
+        } else if lufs > -14 {
             .linear(.content, .loudnessWarning,
-                    t: pl.lufs.clipped(min: -14, max: -9, newMin: 0, newMax: 1))
+                    t: lufs.clipped(min: -14, max: -9, newMin: 0, newMax: 1))
         } else {
-            Color(white: pl.lufs.clipped(min: -19, max: -14, newMin: 1, newMax: 0))
+            Color(white: lufs.clipped(min: -19, max: -14, newMin: 1, newMax: 0))
         }
         
         volumeNode?.children.forEach { $0.fillType = .color(volumeColor) }
