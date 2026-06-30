@@ -242,6 +242,7 @@ final class RootAction: Action {
             if gesture != .selectTime {
                 stopInputKeyEvent()
             }
+            stopDragEvent()
             stopSubDragEvent()
             dragAction = self.dragAction(with: gesture)
             dragAction?.flow(with: event)
@@ -342,6 +343,7 @@ final class RootAction: Action {
             if gesture == .runOrClose {
                 textAction.moveEndInputKey()
             }
+            stopInputKeyEvent()
             stopDragEvent()
             stopSubDragEvent()
             inputKeyAction = self.inputKeyAction(with: gesture)

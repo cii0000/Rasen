@@ -609,7 +609,7 @@ final class LineAction: Action {
                      firstSnapLines: [Line], lastSnapLines: [Line],
                      clipBounds: Rect) -> Line {
         var nLine = Line(), nLineTimes = [Double]()
-        var tempPs = [Point]()
+        var tempPs = [Point](), tempJointPs = [Point](), preJointP = Point()
         var oldC = Line.Control(point: .init()), oldTime = 0.0, oldFirstChangedTime: Double?
         var snapDP: Point?, isStopRevisionFirstPressure = false
         var tempPresures = [(time: Double, pressure: Double)]()
@@ -638,6 +638,8 @@ final class LineAction: Action {
                 oldC = fc
                 oldTime = event.time
                 tempPs = [fc.point]
+                tempJointPs = [fc.point]
+                preJointP = fc.point
             case .changed:
                 var p = RootView.roundedPoint(from: event.p, scale: event.worldToScreenScale)
                 let pressure = enabledPressure && event.isTablet ?
@@ -663,6 +665,10 @@ final class LineAction: Action {
                 guard p != oldC.point && event.time > oldTime
                         && nLine.controls.count >= 4 else { break }
                 tempPs.append(p)
+                tempJointPs.append(p)
+                if tempJointPs.count > 8 {
+                    tempJointPs.removeFirst()
+                }
                 
                 if enabledPressure {
                     func revisionFirstPressure() {
@@ -719,23 +725,28 @@ final class LineAction: Action {
                 let maxDSq = (event.time - firstChangedTime < 0.04 ? 3.0 : 0.75).squared
                 
                 func jointControl(angle: Double = 0.75 * (.pi / 2)) -> Line.Control? {
-                    guard tempPs.count >= 3 else { return nil }
-                    let p0 = tempPs.first!, p2 = tempPs.last!
-                    guard p0.distanceSquared(p2) > (5 * event.screenToWorldScale).squared else { return nil }
-                    var maxDr = 0.0, np1 = tempPs[1]
-                    for i in 1 ..< tempPs.count - 1 {
-                        let p1 = tempPs[i]
+                    guard tempJointPs.count >= 6 else { return nil }
+                    let p0 = tempJointPs.first!, p2 = tempJointPs.last!
+                    var maxDr = 0.0, np1: Point?
+                    for i in 1 ..< tempJointPs.count - 1 {
+                        let p1 = tempJointPs[i]
                         guard p0 != p1 && p1 != p2 else { continue }
                         let dr = abs(Point.differenceAngle(p0, p1, p2))
-                        if dr > maxDr {
+                        if dr > maxDr && dr > angle {
                             maxDr = dr
                             np1 = p1
                         }
                     }
-                    return if maxDr > angle {
-                        .init(point: np1, pressure: lastC.pressure)
+                    if let np1 {
+                        if np1.distanceSquared(preJointP)
+                            < (10 * event.screenToWorldScale).squared {
+                           return nil
+                        } else {
+                            preJointP = np1
+                        }
+                        return .init(point: np1, pressure: lastC.pressure)
                     } else {
-                        nil
+                        return nil
                     }
                 }
                 
@@ -747,21 +758,19 @@ final class LineAction: Action {
                 }
                 
                 if var jointC = jointControl() {
-                    if event.time - firstChangedTime < 0.04 {
-                        jointC.weight = 0.5
-                        
-                        nLine.controls = [jointC, jointC, jointC, jointC]
-                        nLineTimes = [event.time, event.time, event.time, event.time]
-                    } else {
-                        jointC.weight = 0
-                        nLine.controls.insert(jointC, at: nLine.controls.count - 2)
-                        jointC.weight = 1
-                        nLine.controls.insert(jointC, at: nLine.controls.count - 2)
-                        nLineTimes.insert(event.time, at: nLineTimes.count - 2)
-                        nLineTimes.insert(event.time, at: nLineTimes.count - 2)
-                    }
+                    jointC.weight = 1
+                    nLine.controls[nLine.controls.count - 3].weight = 0.5
+                    nLine.controls[nLine.controls.count - 2] = jointC
+                    
+                    jointC.weight = 0.5
+                    nLine.controls[nLine.controls.count - 1] = jointC
+                    nLine.controls.append(jointC)
+                    nLineTimes.append(event.time)
+                    nLine.controls.append(jointC)
+                    nLineTimes.append(event.time)
                     
                     tempPs = [p]
+                    tempJointPs = [p]
                 } else if isAppend(maxDSq: maxDSq) {
                     nLine.controls[nLine.controls.count - 3].weight = 0.5
                     let prp = nLine.controls[nLine.controls.count - 1]
@@ -793,34 +802,24 @@ final class LineAction: Action {
                 nLineTimes.removeLast()
                 
                 func lastCut() {
-                    if nLine.controls.count >= 3 {
-                        var oldC = nLine.controls.first!
-                        let allLength = nLine.controls.reduce(0.0) {
-                            let n = $0 + $1.point.distance(oldC.point)
-                            oldC = $1
-                            return n
-                        }
-                        oldC = nLine.controls.last!
-                        var length = 0.0
-                        for i in (2 ..< nLine.controls.count).reversed() {
-                            let p0 = nLine.controls[i].point,
-                                p1 = nLine.controls[i - 1].point,
-                                p2 = nLine.controls[i - 2].point
-                            length += p1.distance(oldC.point)
-                            oldC = nLine.controls[i]
-                            if event.time - nLineTimes[i] > 0.1
-                                || length * event.worldToScreenScale > 6
-                                || length / allLength > 0.05 {
-                                break
-                            }
-                            let dr = abs(Point.differenceAngle(p0, p1, p2))
-                            if dr > .pi * 0.75 {
-                                let nCount = nLine.controls.count - i
-                                nLine.controls.removeLast(nCount)
-                                nLineTimes.removeLast(nCount)
-                                break
-                            }
-                        }
+                    guard let ji = nLine.controls.lastIndex(where: { $0.weight == 1 }),
+                          ji < nLine.controls.count - 1 else { return }
+                    let allLength = nLine.pointsLength
+                    
+                    var length = 0.0
+                    for i in ji + 1 ..< nLine.controls.count - 1 {
+                        length += nLine.controls[i].point.distance(nLine.controls[i + 1].point)
+                    }
+                    if event.time - nLineTimes[ji] < 0.2
+                        && length * event.worldToScreenScale < 10
+                        && length / allLength < 0.1 {
+                        
+                        let nCount = nLine.controls.count - (ji + 1)
+                        nLine.controls.removeLast(nCount)
+                        nLineTimes.removeLast(nCount)
+                    
+                        nLine.controls[.last].weight = 0.5
+                        nLine.controls[.last].point = nLine.controls[ji].point
                     }
                 }
                 lastCut()

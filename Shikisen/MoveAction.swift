@@ -2339,7 +2339,7 @@ final class MoveSheetAction: DragEventAction {
     }
 
     enum MoveType {
-        case move, scale, scaleLeft, scaleRight, scaleTop, scaleBottom, rotate
+        case move, warp, scale, scaleLeft, scaleRight, scaleTop, scaleBottom, rotate
     }
     
     private var sheetView: SheetView?, type = MoveType.move, oldP = Point(), typeRect = Rect()
@@ -2424,13 +2424,27 @@ final class MoveSheetAction: DragEventAction {
                         }
                     }
                 }
+                
+                if type == .move {
+                    if let (lineView, _) = sheetView.lineTuple(at: sheetP,
+                                                                scale: rootView.screenToWorldScale) {
+                        let line = lineView.model
+                        let d = line.minDistanceSquared(at: sheetP).squareRoot()
+                        if d > 20 * rootView.screenToWorldScale,
+                           let rect = sheetView.selectedFrame(scale: rootView.screenToWorldScale) {
+                            
+                            typeRect = sheetView.convertToWorld(rect)
+                            type = .warp
+                        }
+                    }
+                }
             }
         case .changed:
             if let sheetView {
                 let dp = p - oldP
                 let transform: Transform, v: Double
                 switch type {
-                case .move:
+                case .move, .warp:
                     v = 0
                     transform = .init(translation: dp)
                 case .scale:
@@ -2470,9 +2484,18 @@ final class MoveSheetAction: DragEventAction {
                     .rotated(by: v)
                     .translated(by: typeRect.centerPoint - sheetOrigin)
                 }
-                for (li, oldLine) in zip(lineIs, oldLines) {
-                    sheetView.linesView.elementViews[li].model = oldLine * transform
+                if type == .warp {
+                    for (li, oldLine) in zip(lineIs, oldLines) {
+                        sheetView.linesView.elementViews[li].model
+                        = oldLine.warpedWith(deltaPoint: dp, at: sheetView.convertFromWorld(oldP),
+                                             maxD: max(typeRect.width, typeRect.height))
+                    }
+                } else {
+                    for (li, oldLine) in zip(lineIs, oldLines) {
+                        sheetView.linesView.elementViews[li].model = oldLine * transform
+                    }
                 }
+                
                 for (pi, oldPlane) in zip(planeIs, oldPlanes) {
                     sheetView.planesView.elementViews[pi].model = oldPlane * transform
                 }

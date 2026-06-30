@@ -1701,7 +1701,7 @@ final class ChangeColorAction: Action {
             var uuColor = beganMainUUColor
             if r < snappableDistance {
                 if let lastTintSnapTime = lastTintSnapTime {
-                    if event.time - lastTintSnapTime > 1 {
+                    if event.time - lastTintSnapTime > 0.5 {
                         isSnappedTint = false
                         dr = r
                     }

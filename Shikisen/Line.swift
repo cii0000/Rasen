@@ -960,6 +960,15 @@ extension Line {
         }
     }
     
+    func warpedWith(deltaPoint dp: Point, at p: Point, maxD: Double) -> Line {
+        let cs = controls.map {
+            let t = $0.point.distance(p).clipped(min: maxD, max: 0, newMin: 0, newMax: 1)
+            var c = $0
+            c.point += dp * t
+            return c
+        }
+        return Line(controls: cs, size: size, interID: interID, uuColor: uuColor)
+    }
     func warpedWith(deltaPoint dp: Point, at pi: Int) -> Line {
         var oldP = firstPoint
         var cs = controls
@@ -1808,12 +1817,10 @@ extension Line {
         return edges
     }
     var pointsLength: Double {
+        guard controls.count > 0 else { return 0 }
         var length = 0.0
-        if var oldPoint = controls.first?.point {
-            for control in controls {
-                length += (control.point - oldPoint).length()
-                oldPoint = control.point
-            }
+        for i in 1 ..< controls.count {
+            length += controls[i - 1].point.distance(controls[i].point)
         }
         return length
     }
