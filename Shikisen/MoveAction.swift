@@ -100,10 +100,10 @@ final class MoveAction: DragEventAction {
             
             oldTime = event.time
         case .changed:
-            if event.time - oldTime <= 1 / 70 {
+            if event.time - oldTime <= 1 / 70.0 {
                 return
             } else {
-                oldTime = oldTime + ((event.time - oldTime) / (1 / 70)).rounded(.down) * 1 / 70
+                oldTime = oldTime + ((event.time - oldTime) / (1 / 70.0)).rounded(.down) * 1 / 70.0
             }
         case .ended: break
         }
@@ -2550,30 +2550,6 @@ final class MoveSheetAction: DragEventAction {
                     }
                     if isContents {
                         sheetView.capture(old: zip(oldContents, contentIs).map { .init(value: $0.0, index: $0.1) })
-                    }
-                    if isLines {
-                        let lis = lineIs.filter { !sheetView.model.picture.lines[$0].intersects(sheetView.bounds) }
-                        if !lis.isEmpty {
-                            sheetView.removeLines(at: lis)
-                        }
-                    }
-                    if isPlanes {
-                        let pis = planeIs.filter { !sheetView.model.picture.planes[$0].path.intersects(sheetView.bounds) }
-                        if !pis.isEmpty {
-                            sheetView.removePlanes(at: pis)
-                        }
-                    }
-                    if isTexts {
-                        let tis = textIs.filter { !(sheetView.model.texts[$0].frame?.intersects(sheetView.bounds) ?? true) }
-                        if !tis.isEmpty {
-                            sheetView.removeTexts(at: tis)
-                        }
-                    }
-                    if isContents {
-                        let cis = contentIs.filter { !(sheetView.model.contents[$0].imageFrame?.intersects(sheetView.bounds) ?? true) }
-                        if !cis.isEmpty {
-                            sheetView.removeContents(at: cis)
-                        }
                     }
                     
                     if !sheetView.selection.isEmpty, sheetView.selection.lastPosition != nil {

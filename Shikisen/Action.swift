@@ -644,7 +644,7 @@ final class RotateAction: RotateEventAction {
         
         switch event.phase {
         case .began:
-            cursorTimer = DispatchSource.scheduledTimer(withTimeInterval: 1 / 60) { [weak self] in
+            cursorTimer = DispatchSource.scheduledTimer(withTimeInterval: 1 / 60.0) { [weak self] in
                 DispatchQueue.main.async { [weak self] in
                     guard let self, !(self.cursorTimer?.isCancelled ?? true) else { return }
                     let rootView = self.rootView
@@ -790,7 +790,7 @@ final class SelectAction: Action {
         }
         if let beganEvent {
             guard event.screenPoint.distance(beganEvent.screenPoint) >= 20
-                    || event.time - beganEvent.time >= 0.33 else {
+                    || event.time - beganEvent.time >= 0.2 else {
                 if event.phase == .ended {
                     rootAction.inputKey(with: .init(screenPoint: event.screenPoint,
                                                     time: event.time,
@@ -1624,7 +1624,7 @@ final class FillAction: Action {
                 rootView.updateSelectedFrame()
             } else if let sheetView = rootView.sheetViewWithSelectedKeyframe(at: p) {
                 let kis = sheetView.animationView.selectedIs.sorted()
-                isChanged = sheetView.fillAll(withClipping: nil,
+                isChanged = sheetView.fillAll(withClipping: sheetView.model.mainFrame,
                                                 selectedKeyframeIs: kis, isOutClip: false)
                 rootView.updateSelectedFrame()
             } else if let sheetView = rootView.sheetView(at: p), sheetView.model.score.enabled {

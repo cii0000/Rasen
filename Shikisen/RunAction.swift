@@ -366,7 +366,7 @@ extension RunAction {
     }
     func nodePoint(from text: Text) -> Point {
         let size = text.typesetter.typoBounds?.size ?? Size()
-        let padding = runTypobute.font.size * 2 * 2 / 3
+        let padding = runTypobute.font.size * 2 * 2 / 3.0
         return Point(text.origin.x + padding + size.width, text.origin.y)
     }
     
@@ -487,7 +487,7 @@ extension RunAction {
                   isNewUndoGroup: Bool = true,
                   in sheetView: SheetView, _ shp: IntPoint) {
         let size = text.typesetter.typoBounds?.size ?? Size()
-        let padding = runTypobute.font.size * 2 * 2 / 3
+        let padding = runTypobute.font.size * 2 * 2 / 3.0
         let p = Point(text.origin.x + padding + size.width,
                       text.origin.y + runTypobute.font.size * 1.5)
         let nt = Text(string: String(format: "%.4f s", t),

@@ -1467,7 +1467,7 @@ extension Note {
             }
         }
         
-        let sec = beat * 60 / 120
+        let sec = beat * 60 / 120.0
         let pitbend = pitbend(fromTempo: 120)
         return .init(overtone: pitbend.overtone(atSec: sec),
                      spectlope: pitbend.spectlope(atSec: sec),

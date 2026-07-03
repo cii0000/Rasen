@@ -832,9 +832,9 @@ extension LAB {
     // JIS Z 8781-4:2013. 測色－第４部：ＣＩＥ １９７６ Ｌ＊ａ＊ｂ＊色空間.
     init(_ xyz: Double3, whitePoint: Double3) {
         func f(_ t: Double) -> Double {
-            t > 216 / 24389 ?
-                t ** (1 / 3) :
-                (841 / 108) * t + 4 / 29
+            t > 216 / 24389.0 ?
+                t ** (1 / 3.0) :
+                (841 / 108.0) * t + 4 / 29.0
         }
         let n = xyz / whitePoint
         let fy = f(n.y)
@@ -844,9 +844,9 @@ extension LAB {
     }
     func xyz(withWhitePoint whitePoint: Double3) -> Double3 {
         func f(_ t: Double) -> Double {
-            t > 6 / 29 ?
+            t > 6 / 29.0 ?
                 t * t * t :
-                (108 / 841) * (t - 4 / 29)
+            (108 / 841.0) * (t - 4 / 29.0)
         }
         let fl = (l + 16) / 116
         return whitePoint * Double3(f(fl + a / 500),

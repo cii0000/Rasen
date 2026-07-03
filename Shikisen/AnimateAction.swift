@@ -448,7 +448,7 @@ final class SelectTimeAction: SwipeEventAction, DragEventAction {
         
         switch event.phase {
         case .began:
-            cursorTimer = DispatchSource.scheduledTimer(withTimeInterval: 1 / 30) { [weak self] in
+            cursorTimer = DispatchSource.scheduledTimer(withTimeInterval: 1 / 30.0) { [weak self] in
                 DispatchQueue.main.async { [weak self] in
                     guard let self, !(self.cursorTimer?.isCancelled ?? true) else { return }
                     if let contentView = self.contentView {

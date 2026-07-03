@@ -620,6 +620,10 @@ final class Node: @unchecked Sendable {
     }
 }
 extension Node {
+    func updateAllDatas() {
+        updateDatas()
+        children.forEach { $0.updateAllDatas() }
+    }
     func updateDatas() {
         if linePathDataUpdateType == .update {
             updateLinePathData()

@@ -391,8 +391,8 @@ extension ContentView {
                                       fillType: .color(.content)))
             } else if localBeatRange.start > 0 {
                 let ssx = x(atBeat: localBeatRange.start + timeOption.beatRange.start)
-                contentPathlines.append(Pathline(Rect(x: ssx - 1 / 4, y: centerY - 3,
-                                                      width: 1 / 2, height: 6)))
+                contentPathlines.append(Pathline(Rect(x: ssx - 1 / 4.0, y: centerY - 3,
+                                                      width: 1 / 2.0, height: 6)))
             }
         }
         
@@ -410,8 +410,8 @@ extension ContentView {
                                       fillType: .color(.content)))
             } else if localBeatRange.end < timeOption.beatRange.length {
                 let ssx = x(atBeat: localBeatRange.end + timeOption.beatRange.start)
-                contentPathlines.append(Pathline(Rect(x: ssx - 1 / 4, y: centerY - 3,
-                                                      width: 1 / 2, height: 6)))
+                contentPathlines.append(Pathline(Rect(x: ssx - 1 / 4.0, y: centerY - 3,
+                                                      width: 1 / 2.0, height: 6)))
             }
         }
         

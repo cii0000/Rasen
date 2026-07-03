@@ -540,7 +540,7 @@ final class ChangeColorAction: Action {
                 isEditingLightness = true
             }
         case .changed:
-            guard let sheetView, event.time - preEventTime >= 1 / 60 else { return }
+            guard let sheetView, event.time - preEventTime >= 1 / 60.0 else { return }
             preEventTime = event.time
             
             let wp = rootView.convertScreenToWorld(event.screenPoint)
@@ -1002,7 +1002,7 @@ final class ChangeColorAction: Action {
                 }
             }
         case .changed:
-            guard let sheetView, event.time - preEventTime >= 1 / 60 else { return }
+            guard let sheetView, event.time - preEventTime >= 1 / 60.0 else { return }
             preEventTime = event.time
             
             if scoreResult?.isSprol ?? false {
@@ -1320,7 +1320,7 @@ final class ChangeColorAction: Action {
                 isEditingLightness = true
             }
         case .changed:
-            guard let sheetView, event.time - preEventTime >= 1 / 60 else { return }
+            guard let sheetView, event.time - preEventTime >= 1 / 60.0 else { return }
             preEventTime = event.time
             
             let lightnessP = lightnessNode.convertFromWorld(p)

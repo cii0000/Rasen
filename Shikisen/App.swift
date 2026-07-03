@@ -608,6 +608,10 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         depthStencilPixelFormat = .stencil8
         clearColor = rootView.backgroundColor.mtl
         
+        if let layer = layer as? CAMetalLayer {
+            layer.presentsWithTransaction = false
+        }
+        
         if ColorSpace.default.isHDR {
             colorPixelFormat = Renderer.shared.hdrPixelFormat
             colorspace = Renderer.shared.hdrColorSpace
@@ -2234,7 +2238,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     
     func endPinch(with event: TouchEvent, enabledMomentum: Bool = true,
-                  timeInterval: Double = 1 / 60) {
+                  timeInterval: Double = 1 / 60.0) {
         guard isBeganPinch else { return }
         self.oldPinchDistance = nil
         isBeganPinch = false
@@ -2310,7 +2314,7 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     }
     
     func endScroll(with event: TouchEvent, enabledMomentum: Bool = true,
-                   timeInterval: Double = 1 / 60) {
+                   timeInterval: Double = 1 / 60.0) {
         guard isBeganScroll else { return }
         self.oldScrollPosition = nil
         isBeganScroll = false
@@ -2620,6 +2624,9 @@ extension SubMTKView {
     func render() {
         guard let commandBuffer
                 = Renderer.shared.commandQueue.makeCommandBuffer() else { return }
+        
+        rootView.node.updateAllDatas()
+        
         guard let renderPassDescriptor = currentRenderPassDescriptor,
               let drawable = currentDrawable else {
             commandBuffer.commit()
@@ -3060,6 +3067,12 @@ extension URL {
     }
 }
 
+extension Event {
+    static func disableMouseCoalescing() {
+        NSEvent.isMouseCoalescingEnabled = false
+    }
+}
+
 struct Sleep {
     static func start(atTime t: Double = 0.06) {
         usleep(useconds_t(1000000 * t))
@@ -3352,7 +3365,7 @@ final class SubNSButton: NSButton {
         
         let padding: CGFloat = 9.0
         let dd: CGFloat = 4.0
-        let d = sqrt(3) * dd * 3 / 5
+        let d = sqrt(3) * dd * 3 / 5.0
         let path = CGMutablePath()
         switch iconType {
         case .lookUp: break
@@ -3391,12 +3404,12 @@ final class SubNSButton: NSButton {
             path.addLine(to: NSPoint(x: padding + d,
                                      y: bounds.height / 2 + dd))
         case .zoom:
-            path.move(to: NSPoint(x: bounds.width / 2 - dd * 5 / 2,
-                                  y: bounds.height - padding - d * 5 / 2))
+            path.move(to: NSPoint(x: bounds.width / 2 - dd * 5 / 2.0,
+                                  y: bounds.height - padding - d * 5 / 2.0))
             path.addLine(to: NSPoint(x: bounds.width / 2,
                                      y: bounds.height - padding))
-            path.addLine(to: NSPoint(x: bounds.width / 2 + dd * 5 / 2,
-                                     y: bounds.height - padding - d * 5 / 2))
+            path.addLine(to: NSPoint(x: bounds.width / 2 + dd * 5 / 2.0,
+                                     y: bounds.height - padding - d * 5 / 2.0))
             path.move(to: NSPoint(x: bounds.width / 2,
                                   y: bounds.height - padding))
             path.addLine(to: NSPoint(x: bounds.width / 2,
@@ -4145,7 +4158,7 @@ struct Cursor {
         let ph = 0.0
         let ah = tSize.height + ph
         let bcp = Point(d + r, d + r + ah)
-        let lPath = Path([bcp.movedWith(distance: r, angle: .pi * 3 / 4),
+        let lPath = Path([bcp.movedWith(distance: r, angle: .pi * 3 / 4.0),
                           bcp.movedWith(distance: r, angle: -.pi / 4)], isClosed: false)
         
         func node(color: Color, outlineColor: Color) -> Node {

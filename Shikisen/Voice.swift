@@ -1653,8 +1653,8 @@ struct Mora: Hashable, Codable {
                 ff0[4].fillVolm(onsetFf[4].edVolm)
                 
                 kffs.append(.init(ff0, durSec: onsetDurSec, pitch: pitch))
-                kffs.append(.init(onsetFf, durSec: paddingSec * 2 / 3, pitch: pitch))
-                kffs.append(.init(.linear(onsetFf, nextFf, t: 2 / 3), durSec: paddingSec / 3, pitch: -pitch / 8))
+                kffs.append(.init(onsetFf, durSec: paddingSec * 2 / 3.0, pitch: pitch))
+                kffs.append(.init(.linear(onsetFf, nextFf, t: 2 / 3.0), durSec: paddingSec / 3, pitch: -pitch / 8))
                 centerI = kffs.count
                 if let youonFf {
                     kffs.append(.init(youonFf, durSec: youonDurSec))
@@ -1877,8 +1877,8 @@ struct Mora: Hashable, Codable {
                 }
                 kffs.append(.init(nFf, durSec: onsetDurSec, pitch: pitch))
                 kffs.append(.init(nFf, durSec: paddingSec * 2 / 3, pitch: pitch))
-                kffs.append(.init(.linear(nFf, nextFf, t: 2 / 3), durSec: paddingSec / 6, pitch: pitch / 2))
-                kffs.append(.init(.linear(nFf, nextFf, t: 5 / 6), durSec: paddingSec / 6, pitch: -pitch / 2))
+                kffs.append(.init(.linear(nFf, nextFf, t: 2 / 3.0), durSec: paddingSec / 6, pitch: pitch / 2))
+                kffs.append(.init(.linear(nFf, nextFf, t: 5 / 6.0), durSec: paddingSec / 6, pitch: -pitch / 2))
                 centerI = kffs.count
                 if let youonFf {
                     kffs.append(.init(youonFf, durSec: youonDurSec))

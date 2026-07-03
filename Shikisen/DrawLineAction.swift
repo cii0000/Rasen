@@ -539,7 +539,7 @@ final class LineAction: Action {
                                  minPressure: Double = 0.5,
                                  targetPressure: Double = 0.325,
                                  revisonMinPressure: Double = 0.1875) -> Double {
-        ((pressure / targetPressure) * tiltAngle.clipped(min: .pi * 0.25, max: .pi * 0.3,
+        ((pressure / targetPressure) * tiltAngle.clipped(min: .pi * 0.3, max: .pi * 0.35,
                                                          newMin: 1, newMax: 0))
         .clipped(min: minPressure, max: 1, newMin: revisonMinPressure, newMax: 1)
     }
@@ -739,7 +739,7 @@ final class LineAction: Action {
                     }
                     if let np1 {
                         if np1.distanceSquared(preJointP)
-                            < (10 * event.screenToWorldScale).squared {
+                            < (5 * event.screenToWorldScale).squared {
                            return nil
                         } else {
                             preJointP = np1
@@ -975,6 +975,8 @@ final class LineAction: Action {
         case .began:
             rootView.cursor = rootView.defaultCursor
             
+            DragEvent.disableMouseCoalescing()
+            
             updateClipBoundsAndIndexRange(at: p)
             let tempLineNode = Node(attitude: Attitude(position: centerOrigin),
                                     path: Path(),
@@ -1031,7 +1033,7 @@ final class LineAction: Action {
                 updateStraightNode()
             }
             
-            drawLineTimer = DispatchSource.scheduledTimer(withTimeInterval: 1 / 60) { [weak self] in
+            drawLineTimer = DispatchSource.scheduledTimer(withTimeInterval: 1 / 120.0) { [weak self] in
                 DispatchQueue.main.async { [weak self] in
                     guard let self, !(self.drawLineTimer?.isCancelled ?? true) else { return }
                     guard self.drawLineEvents.count != self.oldDrawLineEventsCount else { return }
@@ -1263,7 +1265,7 @@ final class LineAction: Action {
             snapLines = rootView.sheetView(at: centerSHP)?
                 .model.picture.lines ?? []
             
-            drawLineTimer = DispatchSource.scheduledTimer(withTimeInterval: 1 / 60) { [weak self] in
+            drawLineTimer = DispatchSource.scheduledTimer(withTimeInterval: 1 / 60.0) { [weak self] in
                 DispatchQueue.main.async { [weak self] in
                     guard let self, !(self.drawLineTimer?.isCancelled ?? true) else { return }
                     guard self.drawLineEvents.count != self.oldDrawLineEventsCount else { return }

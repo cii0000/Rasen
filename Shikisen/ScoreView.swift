@@ -757,7 +757,7 @@ extension ScoreView {
                 } else {
                     borderPathlines.append(.init(rect))
                     borderPathlines.append(.init(cPitch.mod(12) == 0 ?
-                                                    Rect(x: sx - Sheet.textPadding.width / 2 - scaleCW / 2, y: py - plw * 2 / 2, width: scaleCW, height: plw * 2) :
+                                                 Rect(x: sx - Sheet.textPadding.width / 2 - scaleCW / 2, y: py - plw * 2 / 2.0, width: scaleCW, height: plw * 2) :
                                                 scaleRect))
                 }
             }
@@ -1593,7 +1593,7 @@ extension ScoreView {
                     
                     let topY = noteY
                     if currentY - topY < Sheet.tonePadding / 2
-                        || currentY - topY > Sheet.tonePadding * 3 / 2
+                        || currentY - topY > Sheet.tonePadding * 3 / 2.0
                         || (pitIsDic[nBeat]?.count ?? 0) >= 2 {
                         
                         currentY = Double.linear(topY + Sheet.tonePadding, toneMaxY, t: t)
@@ -2840,7 +2840,7 @@ extension ScoreView {
                 
                 let topY = noteY
                 if currentY - topY < Sheet.tonePadding / 2
-                    || currentY - topY > Sheet.tonePadding * 3 / 2
+                    || currentY - topY > Sheet.tonePadding * 3 / 2.0
                     || (pitIsDic[nBeat]?.count ?? 0) >= 2 {
                     
                     currentY = Double.linear(topY + Sheet.tonePadding, toneMaxY, t: t)
