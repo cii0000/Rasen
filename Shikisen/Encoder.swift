@@ -594,65 +594,6 @@ extension Movie {
         try await session.export(to: outputURL, as: .mp4)
         try FileManager.default.removeItem(at: url)
     }
-    
-    static func normalizedLoudness(from inputURL: URL, to outputURL: URL,
-                                   limitLufs: Double = Audio.limitLufs) async throws {
-        let pcmBuffer = try PCMBuffer.from(url: inputURL)
-        guard let lufs = pcmBuffer.lufs, lufs > limitLufs else { throw Self.exportError }
-        let scale = PCMBuffer.normalizeScale(inputDb: lufs, targetDb: limitLufs)
-        
-        let asset = AVURLAsset(url: inputURL)
-        
-        guard let audioTrack = try await asset
-            .loadTracks(withMediaType: .audio).first else { throw Self.exportError }
-        let timeRange = CMTimeRange(start: .zero, duration: try await asset.load(.duration))
-        
-        let mixComposition = AVMutableComposition()
-        guard let compositionAudioTrack
-                = mixComposition.addMutableTrack(withMediaType: .audio,
-                                                 preferredTrackID: kCMPersistentTrackID_Invalid)
-        else { throw Self.exportError }
-        
-        let audioMix = AVMutableAudioMix()
-        let inputParameters = AVMutableAudioMixInputParameters(track: compositionAudioTrack)
-        inputParameters.setVolume(Float(scale), at: .zero)
-        audioMix.inputParameters = [inputParameters]
-        
-        try compositionAudioTrack.insertTimeRange(timeRange, of: audioTrack, at: .zero)
-        
-        let videoTracks = try await asset.loadTracks(withMediaType: .video)
-        if !videoTracks.isEmpty {
-            let videoTrack = videoTracks[0]
-            
-            guard let compositionVideoTrack
-                    = mixComposition.addMutableTrack(withMediaType: .video,
-                                                     preferredTrackID: kCMPersistentTrackID_Invalid)
-            else { throw Self.exportError }
-            try compositionVideoTrack.insertTimeRange(timeRange, of: videoTrack, at: .zero)
-            
-            guard let exportSession = AVAssetExportSession(asset: mixComposition,
-                                                           presetName: AVAssetExportPresetHighestQuality)
-            else { throw Self.exportError }
-            
-            try? FileManager.default.removeItem(at: outputURL)
-            
-            exportSession.outputURL = outputURL
-            exportSession.outputFileType = .mp4
-            exportSession.audioMix = audioMix
-            try await exportSession.export(to: outputURL, as: .mp4)
-        } else {
-            guard let exportSession = AVAssetExportSession(asset: mixComposition,
-                                                           presetName: AVAssetExportPresetAppleM4A)
-            else { throw Self.exportError }
-            
-            try? FileManager.default.removeItem(at: outputURL)
-            
-            exportSession.outputURL = outputURL
-            exportSession.outputFileType = .m4a
-            exportSession.audioMix = audioMix
-            try await exportSession.export(to: outputURL, as: .m4a)
-        }
-    }
 }
 
 final class MoviePlayer {

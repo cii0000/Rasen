@@ -1710,7 +1710,7 @@ final class IOAction: Action {
                 end()
             }
         } else {
-            let progressPanel = ProgressPanel(message: "Exporting Document".localized)
+            let progressPanel = ProgressPanel(message: isHistory ? "Exporting Document with History".localized : "Exporting Document".localized)
             rootView.node.show(progressPanel)
             let task = Task.detached(priority: .high) {
                 do {
@@ -1764,44 +1764,6 @@ final class ToMP4MovieAction: InputKeyEventAction {
                     Task {
                         do {
                             try await Movie.toMP4(from: fromURL, to: toURL)
-                        } catch {
-                            rootView.node.show(error)
-                        }
-                    }
-                case .cancel: break
-                }
-            case .cancel: break
-            }
-        }
-    }
-}
-
-final class NormalizedLoudnessAction: InputKeyEventAction {
-    let rootAction: RootAction, rootView: RootView
-    
-    init(_ rootAction: RootAction) {
-        self.rootAction = rootAction
-        rootView = rootAction.rootView
-    }
-    
-    func flow(with event: InputKeyEvent) {
-        Task { @MainActor in
-            let result = await URL.load(prompt: "Import".localized,
-                                        fileTypes: [Movie.FileType.mp4, Movie.FileType.mov,
-                                                    Content.FileType.m4a])
-            switch result {
-            case .complete(let ioResult0s):
-                let result = await URL.export(name: "",
-                                              fileType: ioResult0s[0].url.pathExtension == "m4a" ?
-                                              Content.FileType.m4a : Movie.FileType.mp4,
-                                              fileSizeHandler: { return nil })
-                switch result {
-                case .complete(let ioResult1):
-                    let fromURL = ioResult0s[0].url
-                    let toURL = ioResult1.url
-                    Task {
-                        do {
-                            try await Movie.normalizedLoudness(from: fromURL, to: toURL)
                         } catch {
                             rootView.node.show(error)
                         }

@@ -473,102 +473,79 @@ extension Line: Interpolatable {
     }
     private static func interpolate(_ lines: [Line],
                                     handler: ([Line]) -> (Line)) -> Line {
-        struct SplitedLine {
-            var l0, l1: Line, t: Double
-        }
-        enum FeatureLine {
-            case line(Line)
-            case splited(SplitedLine)
+        let tss: [(li: Int, ci: Int, t: Double)] = lines.enumerated().flatMap { (li, line) in
+            guard line.controls.count >= 3 else { return [(li: Int, ci: Int, t: Double)]() }
+            let allD = line.length()
             
-            init(_ line: Line) {
-                guard line.count >= 3 else {
-                    self = .line(line)
-                    return
-                }
-                let maxLD = line.length() * 0.25
-                let edge = Edge(line.firstPoint, line.lastPoint)
-                var maxD = 0.0, minI = 1
-                for i in 1 ..< (line.count - 1) {
-                    let d = edge.distanceSquared(from: line.controls[i].point)
+            let ll = LinearLine(line.firstPoint, line.lastPoint)
+            var maxD = 0.0, centerI: Int?
+            if line.firstPoint != line.lastPoint {
+                (0 ... line.maxBezierIndex).forEach { ci in
+                    let d = ll.distance(from: line.bezier(at: ci).position(withT: 0.5))
                     if d > maxD {
                         maxD = d
-                        minI = i
+                        centerI = ci
                     }
                 }
-                let minP = line.controls[minI].point
-                let np = edge.nearestPoint(from: minP)
-                let b = Bezier(p0: edge.p0, cp: 2 * minP - np, p1: edge.p1)
-                maxD = 0.0
-                for i in 1 ..< (line.count - 1) {
-                    let p = line.controls[i].point
-                    let d = b.minDistanceSquared(from: p)
-                    if d > maxD {
-                        maxD = d
-                    }
+                
+                if maxD / line.firstPoint.distance(line.lastPoint) < 0.1 {
+                    centerI = nil
                 }
-                if maxD > maxLD {
-                    let liv = LineIndexValue(index: minI - 1, t: 0.5)
-                    let lr0 = LineRange(startIndexValue: line.firstIndexValue,
-                                       endIndexValue: liv)
-                    let lr1 = LineRange(startIndexValue: liv,
-                                        endIndexValue: line.lastIndexValue)
-                    let l0 = line.splited(with: lr0)
-                    let l1 = line.splited(with: lr1)
-                    let t = line.length(with: lr0) / line.length()
-                    self = .splited(SplitedLine(l0: l0, l1: l1, t: t))
+            }
+            
+            return (0 ... line.maxBezierIndex).map { ci in
+                let t = allD == 0 ?
+                0 :
+                line.length(with: .init(startIndexValue: line.firstIndexValue,
+                                        endIndexValue: .init(index: ci, t: 0.5))) / allD
+                let nt = if let centerI {
+                    ci < centerI ?
+                    Double(ci).clipped(min: 0, max: .init(centerI), newMin: 0, newMax: 0.5) :
+                    Double(ci).clipped(min: .init(centerI), max: .init(line.maxBezierIndex), newMin: 0.5, newMax: 1)
                 } else {
-                    self = .line(line)
+                    1.0
                 }
+                return (li, ci, t * nt)
             }
         }
-        struct FLine {
-            var lines = [Line]()
-        }
+        let vs = tss.sorted { $0.t < $1.t }
         
-        var lss = lines.map { _ in FLine() }
-        func split(lines: [Line]) {
-            let fls = lines.map { FeatureLine($0) }
-            var ls = [(i: Int, l: Line)](), keys = [Interpolation<Double>.Key]()
-            for (i, fl) in fls.enumerated() {
-                switch fl {
-                case .line(let line):
-                    ls.append((i, line))
-                case .splited(let sl):
-                    keys.append(Interpolation.Key(value: sl.t, time: Double(i)))
-                }
-            }
-            if keys.isEmpty {
-                ls.forEach {
-                    lss[$0.i].lines.append($0.l)
-                }
-            } else {
-                var nsls = [SplitedLine]()
-                let ip = Interpolation(keys: keys, duration: .infinity)
-                for (i, fl) in fls.enumerated() {
-                    switch fl {
-                    case .line(let line):
-                        let t = ip.monoValue(withTime: Double(i)) ?? 0.5
-                        let (l0, l1) = line.splited(t: t)
-                        nsls.append(SplitedLine(l0: l0, l1: l1, t: t))
-                    case .splited(let sl):
-                        nsls.append(sl)
+        var splitLTss = lines.map { _ in [Double]() }
+        var filledLss = lines.map { $0.controls.map { _ in false } }
+        for (vi, v) in vs.enumerated() {
+            guard !filledLss[v.li][v.ci] else { continue }
+            filledLss[v.li][v.ci] = true
+            var filledLIs = Array(repeating: false, count: lines.count)
+            if vi + 1 < vs.count {
+                for nv in vs[(vi + 1)...] {
+                    if nv.li != v.li {
+                        if v.t.distance(nv.t) > 0.05 { break }
+                        if !filledLIs[nv.li] {
+                            filledLss[nv.li][nv.ci] = true
+                            filledLIs[nv.li] = true
+                        }
+                    } else {
+                        break
                     }
                 }
-                let ls0 = nsls.map { $0.l0 }
-                let ls1 = nsls.map { $0.l1 }
-                split(lines: ls0)
-                split(lines: ls1)
+            }
+            for (li, isFilled) in filledLIs.enumerated() {
+                guard v.li != li, !isFilled else { continue }
+                splitLTss[li].append(v.t)
             }
         }
         
-//        if lines.allSatisfy({ lines[0].controls.count == $0.controls.count }) {
-            lss = lines.map { FLine(lines: [$0]) }
-//        } else {
-//            split(lines: lines)
-//        }
+        let nLines = zip(lines, splitLTss).map { line, splitLTs in
+            var line = line
+            for t in splitLTs {
+                line.split(t: t)
+            }
+            return line
+        }
         
-        let lines = (0 ..< lss[0].lines.count).map { i in handler(lss.map { $0.lines[i] }) }
-        return Line(lines: lines)
+//        print(lines.map { $0.count }, nLines.map { $0.count })
+        
+        return handler(nLines)
     }
     init(lines: [Line]) {
         if lines.count == 1 {
@@ -1085,6 +1062,22 @@ extension Line {
                                   pressure: Double.linear(c1.pressure, cpr1, t: t))
             controls.insert(lc, at: i + 2)
         }
+    }
+    mutating func split(t: Double) {
+        let l = length() * t
+        var allD = 0.0, liv: LineIndexValue?
+        for (bi, b) in bezierSequence.enumerated() {
+            let d = b.length()
+            if l < d + allD {
+                let dl = l - allD
+                let t = (b.t(withLength: dl) ?? 1).clipped(min: 0, max: 1)
+                liv = LineIndexValue(index: bi, t: t)
+                break
+            }
+            allD += d
+        }
+        let nliv = liv ?? LineIndexValue(index: maxBezierIndex, t: 0.99)
+        split(t: nliv.t, at: nliv.index)
     }
     
     func splited(t: Double) -> (l0: Line, l1: Line) {
