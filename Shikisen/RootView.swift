@@ -3183,6 +3183,7 @@ final class RootView: View, @unchecked Sendable {
     }
     func madeColorOwner(at p: Point,
                         enabledLine: Bool = true,
+                        enabledAlwaysAnimation: Bool = false,
                         removingUUColor: UUColor? = Line.defaultUUColor) -> [SheetColorOwner] {
         guard let sheetView = madeSheetView(at: p) else {
             return []
@@ -3190,6 +3191,7 @@ final class RootView: View, @unchecked Sendable {
         let sheetP = sheetView.convertFromWorld(p)
         return [sheetView.sheetColorOwner(at: sheetP,
                                           enabledLine: enabledLine,
+                                          enabledAlwaysAnimation: enabledAlwaysAnimation,
                                           removingUUColor: removingUUColor,
                                           scale: screenToWorldScale).value]
     }
@@ -3246,12 +3248,13 @@ final class RootView: View, @unchecked Sendable {
             return []
         }
     }
-    func colorOwners(at p: Point) -> [SheetColorOwner] {
+    func colorOwners(at p: Point, enabledAlwaysAnimation: Bool = false) -> [SheetColorOwner] {
         guard let sheetView = readSheetView(at: p) else {
             return []
         }
         let sheetP = sheetView.convertFromWorld(p)
         return [sheetView.sheetColorOwner(at: sheetP,
+                                          enabledAlwaysAnimation: enabledAlwaysAnimation,
                                           scale: screenToWorldScale).value]
     }
     func isDefaultUUColor(at p: Point) -> Bool {

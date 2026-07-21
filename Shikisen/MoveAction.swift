@@ -2525,6 +2525,14 @@ final class MoveSheetAction: DragEventAction {
                                                           isArrow: true)
                         oldStr = str
                     }
+                } else if type == .move {
+                    
+                    let str = "(\(dp.x.string(digitsCount: 2)) \(dp.y.string(digitsCount: 2)))"
+                    if str != oldStr {
+                        rootView.cursor = rootView.cursor(from: str,
+                                                          isArrow: true)
+                        oldStr = str
+                    }
                 }
             }
         case .ended:

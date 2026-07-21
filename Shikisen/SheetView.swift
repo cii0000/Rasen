@@ -283,8 +283,7 @@ final class KeyframeView: BindableView, @unchecked Sendable {
         }
         if !draftPlanesView.model.isEmpty {
             draftPlanesView.elementViews.forEach {
-                $0.node.fillType = .color(Sheet.draftPlaneColor(from: $0.model.uuColor.value,
-                                                                fillColor: .background))
+                $0.node.fillType = .color($0.model.uuColor.value.with(opacity: 0.075))
             }
         }
     }
@@ -587,6 +586,18 @@ final class AnimationView: TimelineView, @unchecked Sendable {
     }
     func goPrevious() {
         binder[keyPath: keyPath].goPrevious()
+        updateWithKeyframeIndex()
+        updateTimeline()
+    }
+    func goNextKey() {
+        binder[keyPath: keyPath].rootInterIndex
+        = binder[keyPath: keyPath].rootInterIndex.addingReportingOverflow(1).partialValue
+        updateWithKeyframeIndex()
+        updateTimeline()
+    }
+    func goPreviousKey() {
+        binder[keyPath: keyPath].rootInterIndex
+        = binder[keyPath: keyPath].rootInterIndex.subtractingReportingOverflow(1).partialValue
         updateWithKeyframeIndex()
         updateTimeline()
     }
@@ -2195,6 +2206,18 @@ final class SheetView: View, @unchecked Sendable {
         }
         animationView.goPrevious()
     }
+    func goNextKey() {
+        if isPlaying {
+            stop()
+        }
+        animationView.goNextKey()
+    }
+    func goPreviousKey() {
+        if isPlaying {
+            stop()
+        }
+        animationView.goPreviousKey()
+    }
     func goNextFrame() {
         if isPlaying {
             stop()
@@ -3163,6 +3186,7 @@ final class SheetView: View, @unchecked Sendable {
     }
     func sheetColorOwner(at p: Point,
                          enabledLine: Bool = true, enabledLinePlane: Bool = true,
+                         enabledAlwaysAnimation: Bool = false,
                          removingUUColor: UUColor? = Line.defaultUUColor,
                          scale: Double) -> (isLine: Bool, value: SheetColorOwner) {
         if enabledLine,
@@ -3196,13 +3220,12 @@ final class SheetView: View, @unchecked Sendable {
                 return (true, SheetColorOwner(sheetView: self, colorValue: cv))
             }
         } else {
-            return (false, sheetColorOwnerFromPlane(at: p, scale: scale))
+            return (false, sheetColorOwnerFromPlane(at: p, enabledAlwaysAnimation: enabledAlwaysAnimation, scale: scale))
         }
     }
     func sheetColorOwnerFromAnimation(with uuColor: UUColor,
                                       isLine: Bool = false) -> SheetColorOwner {
-        let planeValue: [IndexValue<[Int]>] = !isLine ? [] :
-        animationView.selectedIs.compactMap {
+        let planeValue: [IndexValue<[Int]>] = animationView.selectedIs.compactMap {
             let pis = animationView.elementViews[$0].planesView.elementViews.enumerated().filter { $0.element.model.uuColor == uuColor }
                 .map { $0.offset }
             if pis.isEmpty {
@@ -3211,7 +3234,8 @@ final class SheetView: View, @unchecked Sendable {
                 return IndexValue(value: pis, index: $0)
             }
         }
-        let lineValue: [IndexValue<[Int]>] = animationView.selectedIs.compactMap {
+        let lineValue: [IndexValue<[Int]>] = !isLine ? [] :
+        animationView.selectedIs.compactMap {
             let lis = animationView.elementViews[$0].linesView.elementViews.enumerated().filter { $0.element.model.uuColor == uuColor }
                 .map { $0.offset }
             if lis.isEmpty {
@@ -3229,10 +3253,11 @@ final class SheetView: View, @unchecked Sendable {
         return SheetColorOwner(sheetView: self, colorValue: cv)
     }
     func sheetColorOwnerFromPlane(at p: Point,
+                                  enabledAlwaysAnimation: Bool = false,
                                   scale: Double) -> SheetColorOwner {
         if let pi = planesView.firstIndex(at: p) {
             if model.enabledAnimation {
-                if containsSelectedKeyframe(p, scale: scale) {
+                if containsSelectedKeyframe(p, scale: scale) || (enabledAlwaysAnimation && animationView.selectedIs.contains(model.animation.index)) {
                     let uuColor = model.picture.planes[pi].uuColor
                     return sheetColorOwnerFromAnimation(with: uuColor)
                 } else {
@@ -4323,10 +4348,8 @@ final class SheetView: View, @unchecked Sendable {
         draftPlanesView.model = planes
         
         if !planes.isEmpty {
-            let fillColor = model.backgroundUUColor.value
             draftPlanesView.elementViews.forEach {
-                $0.node.fillType = .color(Sheet.draftPlaneColor(from: $0.model.uuColor.value,
-                                                           fillColor: fillColor))
+                $0.node.fillType = .color($0.model.uuColor.value.with(opacity: 0.075))
             }
         }
     }
@@ -4342,12 +4365,10 @@ final class SheetView: View, @unchecked Sendable {
     private func updateDraftPlanes(from pivs: [Int],
                                   atKeyframeIndex ki: Int) {
         if !pivs.isEmpty {
-            let fillColor = model.backgroundUUColor.value
             let draftPlanesView = animationView.elementViews[ki].draftPlanesView
             pivs.forEach {
                 let planeView = draftPlanesView.elementViews[$0]
-                planeView.node.fillType = .color(Sheet.draftPlaneColor(from: planeView.model.uuColor.value,
-                                                             fillColor: fillColor))
+                planeView.node.fillType = .color(planeView.model.uuColor.value.with(opacity: 0.075))
             }
         }
     }

@@ -20,7 +20,35 @@ import struct Foundation.URL
 import struct Foundation.Data
 import Dispatch
 
-final class GoPreviousAction: InputKeyEventAction {
+final class GoPreviousFrameAction: InputKeyEventAction {
+    let action: GoPreviousAction
+    
+    init(_ rootAction: RootAction) {
+        action = .init(rootAction)
+    }
+    
+    func flow(with event: InputKeyEvent) {
+        action.goPrevious(with: event, isKey: false)
+    }
+    func updateNode() {
+        action.updateNode()
+    }
+}
+final class GoPreviousKeyframeAction: InputKeyEventAction {
+    let action: GoPreviousAction
+    
+    init(_ rootAction: RootAction) {
+        action = .init(rootAction)
+    }
+    
+    func flow(with event: InputKeyEvent) {
+        action.goPrevious(with: event, isKey: true)
+    }
+    func updateNode() {
+        action.updateNode()
+    }
+}
+final class GoPreviousAction: Action {
     let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
@@ -39,7 +67,7 @@ final class GoPreviousAction: InputKeyEventAction {
     
     private var scoreView: ScoreView?
     
-    func flow(with event: InputKeyEvent) {
+    func goPrevious(with event: InputKeyEvent, isKey: Bool) {
         guard isEditingSheet else {
             rootAction.keepOut(with: event)
             return
@@ -67,7 +95,7 @@ final class GoPreviousAction: InputKeyEventAction {
                 }
                 
                 if contentIndex == nil {
-                    goPrevious(from: sheetView, at: p)
+                    goPrevious(from: sheetView, isKey: isKey, at: p)
                     rootView.updateFromAroundWithTimeline(at: rootView.sheetPosition(at: p))
                     sheetView.setupTimeNodes()
                     sheetView.updateTimeNodesWithMainSec()
@@ -89,7 +117,7 @@ final class GoPreviousAction: InputKeyEventAction {
                     
                     rootView.cursor = .circle(string: contentView.currentTimeString(isInter: true))
                 } else {
-                    goPrevious(from: sheetView, at: p)
+                    goPrevious(from: sheetView, isKey: isKey, at: p)
                     sheetView.updateTimeNodesWithMainSec()
                     sheetView.animationView.shownInterTypeKeyframeIndex = sheetView.animationView.model.index
                     
@@ -106,14 +134,46 @@ final class GoPreviousAction: InputKeyEventAction {
         }
     }
     
-    func goPrevious(from sheetView: SheetView?, at sp: Point) {
-        sheetView?.goPrevious()
+    func goPrevious(from sheetView: SheetView?, isKey: Bool, at sp: Point) {
+        if isKey {
+            sheetView?.goPreviousKey()
+        } else {
+            sheetView?.goPrevious()
+        }
         rootAction.updateActionNode()
         rootView.updateSelectedFrame()
     }
 }
 
-final class GoNextAction: InputKeyEventAction {
+final class GoNextFrameAction: InputKeyEventAction {
+    let action: GoNextAction
+    
+    init(_ rootAction: RootAction) {
+        action = .init(rootAction)
+    }
+    
+    func flow(with event: InputKeyEvent) {
+        action.goNext(with: event, isKey: false)
+    }
+    func updateNode() {
+        action.updateNode()
+    }
+}
+final class GoNextKeyframeAction: InputKeyEventAction {
+    let action: GoNextAction
+    
+    init(_ rootAction: RootAction) {
+        action = .init(rootAction)
+    }
+    
+    func flow(with event: InputKeyEvent) {
+        action.goNext(with: event, isKey: true)
+    }
+    func updateNode() {
+        action.updateNode()
+    }
+}
+final class GoNextAction: Action {
     let rootAction: RootAction, rootView: RootView
     let isEditingSheet: Bool
     
@@ -132,7 +192,7 @@ final class GoNextAction: InputKeyEventAction {
     
     private var scoreView: ScoreView?
     
-    func flow(with event: InputKeyEvent) {
+    func goNext(with event: InputKeyEvent, isKey: Bool) {
         guard isEditingSheet else {
             rootAction.keepOut(with: event)
             return
@@ -160,7 +220,7 @@ final class GoNextAction: InputKeyEventAction {
                 }
                 
                 if contentIndex == nil {
-                    goNext(from: sheetView, at: p)
+                    goNext(from: sheetView, isKey: isKey, at: p)
                     rootView.updateFromAroundWithTimeline(at: rootView.sheetPosition(at: p))
                     sheetView.setupTimeNodes()
                     sheetView.updateTimeNodesWithMainSec()
@@ -182,7 +242,7 @@ final class GoNextAction: InputKeyEventAction {
                     
                     rootView.cursor = .circle(string: contentView.currentTimeString(isInter: true))
                 } else {
-                    goNext(from: sheetView, at: p)
+                    goNext(from: sheetView, isKey: isKey, at: p)
                     sheetView.updateTimeNodesWithMainSec()
                     sheetView.animationView.shownInterTypeKeyframeIndex = sheetView.animationView.model.index
                     
@@ -199,8 +259,12 @@ final class GoNextAction: InputKeyEventAction {
         }
     }
     
-    func goNext(from sheetView: SheetView?, at sp: Point) {
-        sheetView?.goNext()
+    func goNext(from sheetView: SheetView?, isKey: Bool, at sp: Point) {
+        if isKey {
+            sheetView?.goNextKey()
+        } else {
+            sheetView?.goNext()
+        }
         rootAction.updateActionNode()
         rootView.updateSelectedFrame()
     }

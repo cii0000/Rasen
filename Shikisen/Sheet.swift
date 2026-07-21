@@ -2922,10 +2922,10 @@ extension Sheet {
         Sheet.draftLinesColor(from: backgroundUUColor.value)
     }
     static func draftLinesColor(from fillColor: Color) -> Color {
-        Color.rgbLinear(fillColor, .draft, t: 0.15)
+        Color.rgbLinear(fillColor, .draft, t: 0.125)
     }
     static func draftPlaneColor(from color: Color, fillColor: Color) -> Color {
-        Color.rgbLinear(fillColor, color, t: 0.05)
+        Color.rgbLinear(fillColor, color, t: 0.075)
     }
     
     func node(isBorder: Bool, isBackground: Bool = true,

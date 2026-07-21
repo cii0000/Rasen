@@ -374,6 +374,8 @@ extension Gesture {
     static let keySelectTime = Self(modifier: [.control, .command], .drag)
     static let goPrevious = Self(modifier: [.control], .z)
     static let goNext = Self(modifier: [.control], .x)
+    static let goPreviousKeyframe = Self(modifier: [.control, .option], .z)
+    static let goNextKeyframe = Self(modifier: [.control, .option], .x)
     static let play = Self(.fourFingersTap)
     static let keyPlay = Self(modifier: [.control], .c)
     
