@@ -281,7 +281,7 @@ final class SelectTimeAction: SwipeEventAction, DragEventAction {
     }
     
     private let indexInterval = 5.0, animationIndexInterval = 0.5
-    private let correction = 3.5
+    private let correction = 2.5
     
     enum MoveType {
         case keyframe, frame, time

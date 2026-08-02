@@ -1325,6 +1325,11 @@ final class RootView: View, @unchecked Sendable {
         }
     }
     
+    func containsFromFinding(_ uuColor: UUColor) -> Bool {
+        guard let uuid = UUID(uuidString: finding.string) else { return false }
+        return uuColor.id == uuid
+    }
+    
     func replaceTempo(fromTempo tempo: Rational, in shps: [IntPoint]) {
         let shps = Array(Set(shps))
         @Sendable func make(_ sheetView: SheetView) -> Bool {
@@ -1980,17 +1985,21 @@ final class RootView: View, @unchecked Sendable {
     }
     func floodSheetPositionFromVertical(at shp: IntPoint, handler: (IntPoint) -> (Bool)) {
         if !handler(shp) { return }
-        var dShp = shp, uShp = shp
+        var uShp = shp
         uShp.y += 1
-        dShp.y -= 1
         while true {
             if sheetID(at: uShp) != nil {
                 if !handler(uShp) { return }
             } else { break }
+            uShp.y += 1
+        }
+        
+        var dShp = shp
+        dShp.y -= 1
+        while true {
             if sheetID(at: dShp) != nil {
                 if !handler(dShp) { return }
             } else { break }
-            uShp.y += 1
             dShp.y -= 1
         }
     }
@@ -3293,7 +3302,6 @@ final class RootView: View, @unchecked Sendable {
         let shps = groupSheetPositions(at: cShp)
         for cShp in shps {
             guard let cSheetView = sheetView(at: cShp) else { continue }
-            
             topAndBottom(at: cShp, in: cSheetView)
             
             var ncShp = cShp, psvs = [WeakElement<SheetView>]()

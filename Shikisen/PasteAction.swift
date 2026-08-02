@@ -1819,7 +1819,7 @@ final class APasteAction: Action {
             sheetView.removeBorder(at: i)
             return true
          } else if !rootView.isDefaultUUColor(at: p) {
-            let colorOwners = rootView.colorOwners(at: p, enabledAlwaysAnimation: true)
+            let colorOwners = rootView.colorOwners(at: p, enabledAlwaysAnimation: rootView.containsFromFinding(rootView.uuColor(at: p)))
             if !colorOwners.isEmpty {
                 Pasteboard.shared.copiedObjects = [.uuColor(rootView.uuColor(at: p))]
                 var nug = Set<SheetView>()
@@ -2456,7 +2456,7 @@ final class APasteAction: Action {
                 }
             } else if let _ = rootView.madeSheetView(at: shp) {
                 let colorOwners = rootView.madeColorOwner(at: p, enabledLine: false,
-                                                          enabledAlwaysAnimation: true,
+                                                          enabledAlwaysAnimation: rootView.containsFromFinding(rootView.uuColor(at: p)),
                                                           removingUUColor: uuColor)
                 colorOwners.forEach {
                     if $0.uuColor != uuColor {
@@ -3172,6 +3172,7 @@ final class APasteAction: Action {
                 rootView.updateSelectedFrame()
             } else if let _ = rootView.madeSheetView(at: shp) {
                 let colorOwners = rootView.madeColorOwner(at: p, enabledLine: false,
+                                                          enabledAlwaysAnimation: rootView.containsFromFinding(rootView.uuColor(at: p)),
                                                           removingUUColor: uuColor)
                 colorOwners.forEach {
                     if $0.uuColor != uuColor {

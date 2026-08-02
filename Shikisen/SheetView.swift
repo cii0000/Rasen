@@ -3225,7 +3225,7 @@ final class SheetView: View, @unchecked Sendable {
     }
     func sheetColorOwnerFromAnimation(with uuColor: UUColor,
                                       isLine: Bool = false) -> SheetColorOwner {
-        let planeValue: [IndexValue<[Int]>] = animationView.selectedIs.compactMap {
+        let planeValue: [IndexValue<[Int]>] = animationView.model.keyframes.count.range.compactMap {
             let pis = animationView.elementViews[$0].planesView.elementViews.enumerated().filter { $0.element.model.uuColor == uuColor }
                 .map { $0.offset }
             if pis.isEmpty {
@@ -3235,7 +3235,7 @@ final class SheetView: View, @unchecked Sendable {
             }
         }
         let lineValue: [IndexValue<[Int]>] = !isLine ? [] :
-        animationView.selectedIs.compactMap {
+        animationView.model.keyframes.count.range.compactMap {
             let lis = animationView.elementViews[$0].linesView.elementViews.enumerated().filter { $0.element.model.uuColor == uuColor }
                 .map { $0.offset }
             if lis.isEmpty {
@@ -3257,7 +3257,7 @@ final class SheetView: View, @unchecked Sendable {
                                   scale: Double) -> SheetColorOwner {
         if let pi = planesView.firstIndex(at: p) {
             if model.enabledAnimation {
-                if containsSelectedKeyframe(p, scale: scale) || (enabledAlwaysAnimation && animationView.selectedIs.contains(model.animation.index)) {
+                if containsSelectedKeyframe(p, scale: scale) || enabledAlwaysAnimation {
                     let uuColor = model.picture.planes[pi].uuColor
                     return sheetColorOwnerFromAnimation(with: uuColor)
                 } else {

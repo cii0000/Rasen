@@ -539,15 +539,125 @@ final class SubMTKView: MTKView, MTKViewDelegate,
     static let enabledAnimationKey = "enabledAnimation"
     static let isHiddenActionListKey = "isHiddenActionList"
     static let isShownTrackpadAlternativeKey = "isShownTrackpadAlternative"
+    
     private(set) var rootAction: RootAction
     private(set) var rootView: RootView
     let renderstate = Renderstate.sampleCount4!
     
-    var isShownDebug = false
-    var isShownClock = false
-    private var updateDebugCount = 0
-    private let debugNode = Node(attitude: Attitude(position: Point(5, 5)),
-                                 fillType: .color(.content))
+    let hudNode = Node()
+    
+    private func updateHUD() {
+        if isShownClock, let clockNode {
+            let sb = rootView.screenBounds
+            let size = clockNode.path.bounds?.size ?? .init()
+            let dx = if !isHiddenActionList, let actionNode,
+               let b = actionNode.bounds, size.height >= (sb.height - b.height) / 2 {
+                
+                sb.height < b.maxY && b.maxY > 0 ?
+                -b.width * (sb.height / b.maxY) : -b.width
+            } else {
+                0.0
+            }
+            clockNode.attitude.position = Point(sb.width - size.width + dx, sb.height - size.height)
+        }
+        if !isHiddenActionList, let actionNode {
+            if let b = actionNode.bounds {
+                let sb = rootView.screenBounds
+                if sb.height < b.maxY, b.maxY > 0 {
+                    let scale = sb.height / b.maxY
+                    let x = sb.maxX - b.maxX * scale
+                    let y = 0.0
+                    actionNode.attitude.scale = .init(square: scale)
+                    actionNode.attitude.position = Point(x, y)
+                } else {
+                    let x = sb.maxX - b.maxX
+                    let y = sb.midY - b.midY
+                    actionNode.attitude.scale = .init(square: 1)
+                    actionNode.attitude.position = Point(x, y)
+                }
+            }
+        }
+    }
+    
+    private var clockNode: Node?, clockTextNode: Node?, clockTimer: Timer?
+    var isShownClock = false {
+        didSet {
+            guard isShownClock != oldValue else { return }
+            if isShownClock {
+                showClock()
+            } else {
+                clockNode?.removeFromParent()
+                clockNode = nil
+            }
+        }
+    }
+    private func showClock() {
+        func textNode(with string: String, color: Color = .content,
+                              fontSize: Double = 14,
+                              imagePadding: Double = 3.0) -> (size: Size, node: Node)? {
+            let typesetter = Text(string: string, size: fontSize).typesetter
+            let paddingSize = Size(square: imagePadding)
+            guard let b = typesetter.typoBounds else { return nil }
+            let nb = b.outset(by: paddingSize).integral
+            let backColor = Color(lightness: color.lightness, opacity: 0)
+            guard let texture = typesetter.texture(with: nb, fillColor: color,
+                                                   backgroundColor: backColor) else { return nil }
+            return (b.integral.size, Node(path: Path(nb), fillType: .texture(texture)))
+        }
+        let fontSize = 14.0
+        let padding = fontSize / 2, lineWidth = 1.0, cornerRadius = 8.0
+        let margin = fontSize / 2 + 1.0
+        
+        var children = [Node](), w = 0.0, h = 0.0
+        if let v = textNode(with: "\(Date().defaultString)", fontSize: fontSize) {
+            children.append(v.node)
+            w = v.size.width + padding * 2
+            h = v.size.height + padding * 2
+            v.node.attitude.position = .init(x: padding, y: fontSize / 2 + padding)
+            clockTextNode = v.node
+        }
+        
+        let f = Rect(x: 0, y: 0, width: w, height: h)
+        let node = Node(children: children,
+                             attitude: Attitude(position: Point()),
+                             path: Path(f, cornerRadius: cornerRadius),
+                             lineWidth: lineWidth, lineType: .color(.subBorder),
+                             fillType: .color(.transparentDisabled))
+        let clockNode = Node(children: [node], path: Path(f.inset(by: -margin)))
+        hudNode.append(child: clockNode)
+        
+        self.clockNode = clockNode
+        
+        let nowDate = Date()
+        let nextSec = ceil(nowDate.timeIntervalSince1970)
+        let delay = nextSec - nowDate.timeIntervalSince1970
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            self?.updateTime()
+            
+            self?.clockTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+                Task { @MainActor in
+                    self?.updateTime()
+                }
+            }
+        }
+    }
+    private func updateTime(fontSize: Double = 14, imagePadding: Double = 3,
+                            color: Color = .content) {
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.setLocalizedDateFormatFromTemplate("MMMMdEEE HHmmss")
+        let dateStr = formatter.string(from: Date())
+        let typesetter = Text(string: dateStr, size: fontSize).typesetter
+        let paddingSize = Size(square: imagePadding)
+        guard let b = typesetter.typoBounds else { return }
+        let nb = b.outset(by: paddingSize).integral
+        let backColor = Color(lightness: color.lightness, opacity: 0)
+        guard let texture = typesetter.texture(with: nb, fillColor: color,
+                                               backgroundColor: backColor) else { return }
+        clockTextNode?.fillType = .texture(texture)
+        update()
+    }
     
     private var actionNode: Node?
     var isHiddenActionList = true {
@@ -567,28 +677,14 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         actionNode.attitude.position = Point(w, h)
         return actionNode
     }
-    private func updateActionNodePosition(in actionNode: Node) {
-        if let b = actionNode.bounds {
-            let sb = rootView.screenBounds
-            if sb.height < b.maxY, b.maxY > 0 {
-                let scale = sb.height / b.maxY
-                let x = sb.maxX - b.maxX * scale
-                let y = 0.0
-                actionNode.attitude.scale = .init(square: scale)
-                actionNode.attitude.position = Point(x, y)
-            } else {
-                let x = sb.maxX - b.maxX
-                let y = sb.midY - b.midY
-                actionNode.attitude.scale = .init(square: 1)
-                actionNode.attitude.position = Point(x, y)
-            }
-        }
-    }
     private func updateActionList() {
         if isHiddenActionList {
+            actionNode?.removeFromParent()
             actionNode = nil
         } else if actionNode == nil {
-            actionNode = makeActionNode()
+            let actionNode = makeActionNode()
+            hudNode.append(child: actionNode)
+            self.actionNode = actionNode
         }
         update()
     }
@@ -1113,11 +1209,8 @@ final class SubMTKView: MTKView, MTKViewDelegate,
         rootView.screenBounds = bounds.my
         rootView.drawableSize = size.my
         
-        if !isHiddenActionList {
-            if let actionNode {
-                updateActionNodePosition(in: actionNode)
-            }
-        }
+        updateHUD()
+        
         if isShownTrackpadAlternative {
             updateTrackpadAlternativePositions()
         }
@@ -2642,12 +2735,8 @@ extension SubMTKView {
             let wtsScale = rootView.worldToScreenScale
             rootView.node.draw(with: wtvTransform, scale: wtsScale, in: ctx)
             
-            if isShownDebug || isShownClock {
-                drawDebugNode(in: ctx)
-            }
-            if !isHiddenActionList {
-                let t = rootView.screenToViewportTransform
-                actionNode?.draw(with: t, scale: 1, in: ctx)
+            if !hudNode.children.isEmpty {
+                hudNode.draw(with: rootView.screenToViewportTransform, scale: 1, in: ctx)
             }
             
             ctx.encoder.endEncoding()
@@ -2655,21 +2744,6 @@ extension SubMTKView {
         
         commandBuffer.present(drawable)
         commandBuffer.commit()
-    }
-    func drawDebugNode(in context: Context) {
-        updateDebugCount += 1
-        if updateDebugCount >= 10 {
-            updateDebugCount = 0
-            let size = Renderer.shared.device.currentAllocatedSize
-            let debugGPUSize = Int(Double(size) / (1024 * 1024))
-            let maxSize = Renderer.shared.device.recommendedMaxWorkingSetSize
-            let debugMaxGPUSize = Int(Double(maxSize) / (1024 * 1024))
-            let string0 = isShownClock ? "\(Date().defaultString)" : ""
-            let string1 = isShownDebug ? "GPU Memory: \(debugGPUSize) / \(debugMaxGPUSize) MB" : ""
-            debugNode.path = Text(string: string0 + (isShownClock && isShownDebug ? " " : "") + string1).typesetter.path()
-        }
-        let t = rootView.screenToViewportTransform
-        debugNode.draw(with: t, scale: 1, in: context)
     }
 }
 extension SubMTKView: @preconcurrency NodeOwner {}
