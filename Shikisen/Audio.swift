@@ -400,16 +400,16 @@ final class PCMNoder: ObjectHashable {
             
             let enabledWaveclip = self.enabledWaveclip
             let rSampleRate = 1 / sampleRate
-            let oFrameCount = pcmBuffer.sampleCount
-            for ci in 0 ..< min(outputBLP.count, pcmBuffer.channelCount) {
-                let oFrames = data[ci], nFrames = outputBLP[ci].mData!.assumingMemoryBound(to: Float.self)
+            let oFrameCount = pcmBuffer.sampleCount, cCount = pcmBuffer.channelCount
+            for ci in 0 ..< min(outputBLP.count, cCount) {
+                let oFrames = data[ci], outputAmps = outputBLP[ci].mData!.assumingMemoryBound(to: Float.self)
                 var i = loopedFrameStartI
                 for ni in 0 ..< frameCount {
                     if loopedContentRange.contains(i) {
                         let oi = i - loopedContentRange.start + timeOption.contentLocalStartI
                         let ooi = oi * pcmBuffer.stride
                         guard ooi >= 0 && ooi < oFrameCount else {
-                            nFrames[ni] = 0
+                            outputAmps[ni] = 0
                             continue
                         }
                         let sec = Double(i) * rSampleRate
@@ -422,12 +422,23 @@ final class PCMNoder: ObjectHashable {
                             .scale(atSec: Double(ni + frameStartI) * rSampleRate,
                                  attackStartSec: playingAttackStartSec, releaseStartSec: playingReleaseStartSec)
                         
-                        nFrames[ni] = oFrames[ooi] * Float(amp * playingWaveclipAmp)
+                        outputAmps[ni] = oFrames[ooi] * Float(amp * playingWaveclipAmp)
                     }
                     
                     i += 1
                     if i >= maxCount {
                         i -= maxCount
+                    }
+                }
+                
+                if cCount > 0, outputBLP.count > cCount {
+                    let outputAmpss = outputBLP.count.range.map {
+                        outputBLP[$0].mData!.assumingMemoryBound(to: Float.self)
+                    }
+                    for ci in cCount ..< outputBLP.count {
+                        for ni in 0 ..< frameCount {
+                            outputAmpss[ci][ni] = outputAmpss[cCount - 1][ni]
+                        }
                     }
                 }
             }
@@ -1102,6 +1113,7 @@ final class Sequencer {
             }
         }
         
+        // Caution: If you detach the limiter node, there is a possibility of loud noise
         let limiterNode = AVAudioUnitEffect.limiter()
         engine.attach(limiterNode)
         self.limiterNode = limiterNode
@@ -2113,31 +2125,6 @@ final class ClippingAudioUnit: AUAudioUnit {
             }
             guard !outputBLP.isEmpty else { return noErr }
             
-            if let headroomAmp = self.headroomAmp {
-                for ci in 0 ..< outputBLP.count {
-                    let inputFrames = inputBLP[ci].mData!.assumingMemoryBound(to: Float.self)
-                    let outputFrames = outputBLP[ci].mData!.assumingMemoryBound(to: Float.self)
-                    for i in 0 ..< Int(frameCount) {
-                        outputFrames[i] = inputFrames[i]
-                        if outputFrames[i].isNaN {
-                            outputFrames[i] = 0
-                        } else if outputFrames[i] < -headroomAmp {
-                            outputFrames[i] = -headroomAmp
-                        } else if outputFrames[i] > headroomAmp {
-                            outputFrames[i] = headroomAmp
-                        }
-                    }
-                }
-            } else {
-                for ci in 0 ..< outputBLP.count {
-                    let inputFrames = inputBLP[ci].mData!.assumingMemoryBound(to: Float.self)
-                    let outputFrames = outputBLP[ci].mData!.assumingMemoryBound(to: Float.self)
-                    for i in 0 ..< Int(frameCount) {
-                        outputFrames[i] = inputFrames[i]
-                    }
-                }
-            }
-            
             if self.enabledAttack,
                (timestamp.pointee.mFlags.contains(.sampleTimeValid)
                 || timestamp.pointee.mFlags.contains(.sampleHostTimeValid))
@@ -2149,6 +2136,22 @@ final class ClippingAudioUnit: AUAudioUnit {
                         for i in 0 ..< Int(frameCount) {
                             outputFrames[i] *= .init(i) / .init(frameCount)
                         }
+                    }
+                }
+            }
+            
+            let headroomAmp = ((try? self.headroomAmp?.notNaN()) ?? 4).clipped(min: 0, max: 4)
+            for ci in 0 ..< outputBLP.count {
+                let inputFrames = inputBLP[ci].mData!.assumingMemoryBound(to: Float.self)
+                let outputFrames = outputBLP[ci].mData!.assumingMemoryBound(to: Float.self)
+                for i in 0 ..< Int(frameCount) {
+                    outputFrames[i] = inputFrames[i]
+                    if outputFrames[i].isNaN {
+                        outputFrames[i] = 0
+                    } else if outputFrames[i] < -headroomAmp {
+                        outputFrames[i] = -headroomAmp
+                    } else if outputFrames[i] > headroomAmp {
+                        outputFrames[i] = headroomAmp
                     }
                 }
             }

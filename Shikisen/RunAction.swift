@@ -162,7 +162,7 @@ final class RunAction: InputKeyEventAction {
                                     var isStop = false
                                     for (j, size) in sizes.enumerated() {
                                         let node = sheet.node(isBorder: false, in: bounds)
-                                        let image = node.renderedAntialiasFillImage(in: bounds, to: Size(square: size), .sRGB)
+                                        let image = node.image(in: bounds, to: Size(square: size), .sRGB)
                                         let subIOResult = ioResult.sub(name: "\(size).png")
                                         try image?.write(.png, to: subIOResult.url)
                                         try subIOResult.setAttributes()

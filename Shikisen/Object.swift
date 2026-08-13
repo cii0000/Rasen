@@ -159,11 +159,27 @@ extension OSheet {
         append(undo: undoItem, redo: redoItem)
         set(redoItem)
     }
+    
     mutating func append(_ planes: [Plane]) {
         let undoItem = SheetUndoItem.removeLastPlanes(count: planes.count)
         let redoItem = SheetUndoItem.appendPlanes(planes)
         append(undo: undoItem, redo: redoItem)
         set(redoItem)
+    }
+    mutating func replace(_ pivs: [IndexValue<Plane>]) {
+        let ivs = pivs.map { $0.index }
+        let opivs = pivs
+            .map { IndexValue(value: value.picture.planes[$0.index],
+                              index: $0.index) }
+        let undoItem0 = SheetUndoItem.insertPlanes(opivs)
+        let redoItem0 = SheetUndoItem.removePlanes(planeIndexes: ivs)
+        append(undo: undoItem0, redo: redoItem0)
+        
+        let undoItem1 = SheetUndoItem.removePlanes(planeIndexes: ivs)
+        let redoItem1 = SheetUndoItem.insertPlanes(pivs)
+        append(undo: undoItem1, redo: redoItem1)
+        
+        pivs.forEach { value.picture.planes[$0.index] = $0.value }
     }
     mutating func removePlanes(at planeIndexes: [Int]) {
         let pivs = planeIndexes.map {
@@ -174,6 +190,7 @@ extension OSheet {
         append(undo: undoItem, redo: redoItem)
         set(redoItem)
     }
+    
     mutating func append(_ text: Text) {
         let undoItem = SheetUndoItem.removeTexts(textIndexes: [value.texts.count])
         let redoItem = SheetUndoItem
@@ -222,6 +239,7 @@ extension OSheet {
         append(undo: undoItem, redo: redoItem)
         set(redoItem)
     }
+    
     mutating func removeAll() {
         if !value.picture.lines.isEmpty {
             removeLines(at: Array(0 ..< value.picture.lines.count))
@@ -229,6 +247,24 @@ extension OSheet {
         if !value.texts.isEmpty {
             removeTexts(at: Array(0 ..< value.texts.count))
         }
+    }
+    mutating func set(_ uuColor: UUColor, atPlane pi: Int) {
+        let ocv = ColorValue(uuColor: value.picture.planes[pi].uuColor,
+                             planeIndexes: [pi], lineIndexes: [],
+                             isBackground: false,
+                             planeAnimationIndexes: [],
+                             lineAnimationIndexes: [],
+                             animationColors: [])
+        let cv = ColorValue(uuColor: uuColor,
+                            planeIndexes: [pi], lineIndexes: [],
+                            isBackground: false,
+                            planeAnimationIndexes: [],
+                            lineAnimationIndexes: [],
+                            animationColors: [])
+        let undoItem = SheetUndoItem.changedColors(ocv)
+        let redoItem = SheetUndoItem.changedColors(cv)
+        append(undo: undoItem, redo: redoItem)
+        set(redoItem)
     }
     mutating func set(backgroundUUColor: UUColor) {
         let ocv = ColorValue(uuColor: value.backgroundUUColor,
@@ -1270,6 +1306,7 @@ extension O {
         self = .array(OArray(texts.map { O($0) }))
     }
     static let linesName = "lines"
+    static let planesName = "planes"
     static let textsName = "texts"
     init(_ sheet: Sheet) {
         self = O([O(O.linesName): O(sheet.picture.lines),
@@ -1559,6 +1596,187 @@ extension O: CustomStringConvertible {
         } else {
             return s
         }
+    }
+}
+
+protocol OInitializable {
+    init?(_ o: O)
+}
+protocol ORepresentable {
+    var asO: O { get }
+}
+typealias OConvertible = OInitializable & ORepresentable
+
+extension Array: OConvertible where Element: OConvertible {
+    init?(_ o: O) {
+        switch o {
+        case .array(let a):
+            var n = Self(capacity: a.count)
+            for eo in a {
+                guard let e = Element(eo) else { return nil }
+                n.append(e)
+            }
+            self = n
+        default: return nil
+        }
+    }
+    var asO: O {
+        O(OArray(map { $0.asO }))
+    }
+}
+extension Point: OConvertible {
+    init?(_ o: O) {
+        switch o {
+        case .array(let a):
+            if a.count == 2,
+                let x = try? a[0].asDouble?.notNaN(),
+                let y = try? a[1].asDouble?.notNaN() {
+                self.init(x, y)
+            } else {
+                return nil
+            }
+        default: return nil
+        }
+    }
+    var asO: O {
+        .init(self)
+    }
+}
+extension Polygon: OConvertible {
+    init?(_ o: O) {
+        switch o {
+        case .array(let a):
+            var ps = [Point](capacity: a.count)
+            for i in 0 ..< a.count {
+                guard let p = Point(a[i]) else { return nil }
+                ps.append(p)
+            }
+            self.init(points: ps)
+        default: return nil
+        }
+    }
+    var asO: O {
+        .init(OArray(points.map { $0.asO }))
+    }
+}
+extension Topolygon: OConvertible {
+    init?(_ o: O) {
+        switch o {
+        case .dic(let dic):
+            guard let polygonO = dic[O("polygon")], let polygon = Polygon(polygonO),
+                  let holePolygonsO = dic[O("holePolygons")], let holePolygons = [Polygon](holePolygonsO)
+             else { return nil }
+            self.init(polygon: polygon, holePolygons: holePolygons)
+        default: return nil
+        }
+    }
+    var asO: O {
+        .init([O("polygon"): polygon.asO,
+               O("holePolygons"): O(OArray(holePolygons.map { $0.asO }))])
+    }
+}
+extension ColorSpace: OConvertible {
+    init?(_ o: O) {
+        switch o.asString {
+        case "sRGB": self = .sRGB
+        case "sRGBLinear": self = .sRGBLinear
+        case "sRGBHDR": self = .sRGBHDR
+        case "sRGBHDRLinear": self = .sRGBHDRLinear
+        case "p3": self = .p3
+        case "p3Linear": self = .p3Linear
+        case "p3HDR": self = .p3HDR
+        case "p3HDRLinear": self = .p3HDRLinear
+        default: return nil
+        }
+    }
+    var asO: O {
+        switch self {
+        case .sRGB: .init("sRGB")
+        case .sRGBLinear: .init("sRGBLinear")
+        case .sRGBHDR: .init("sRGBHDR")
+        case .sRGBHDRLinear: .init("sRGBHDRLinear")
+        case .p3: .init("p3")
+        case .p3Linear: .init("p3Linear")
+        case .p3HDR: .init("p3HDR")
+        case .p3HDRLinear: .init("p3HDRLinear")
+        }
+    }
+}
+extension UUID: OConvertible {
+    init?(_ o: O) {
+        self.init(uuidString: o.asString)
+    }
+    var asO: O {
+        .init(self.uuidString)
+    }
+}
+extension RGBA: OConvertible {
+    init?(_ o: O) {
+        switch o {
+        case .array(let a):
+            if a.count == 4,
+                let r = try? a[0].asDouble?.notInfiniteAndNAN(),
+                let g = try? a[1].asDouble?.notInfiniteAndNAN(),
+                let b = try? a[2].asDouble?.notInfiniteAndNAN(),
+                let a = try? a[3].asDouble?.notNaN().clipped(min: 0, max: 1) {
+                
+                self.init(Float(r), Float(g), Float(b), Float(a))
+            } else {
+                return nil
+            }
+        default: return nil
+        }
+    }
+    var asO: O {
+        .init(OArray([O(Double(r)), O(Double(g)), O(Double(b)), O(Double(a))]))
+    }
+}
+extension UUColor: OConvertible {
+    init?(_ o: O) {
+        switch o {
+        case .dic(let dic):
+            guard let lightnessO = dic[O("lightness")],
+                  let lightness = try? lightnessO.asDouble?.notNaN()
+                    .clipped(min: Color.minLightness, max: Color.whiteLightness),
+                  let hueO = dic[O("hue")],
+                    let hue = try? hueO.asDouble?.notInfiniteAndNAN().loopedRotation,
+                  let chromaO = dic[O("chroma")],
+                  let chroma = try? chromaO.asDouble?.notNaN()
+                    .clipped(min: Color.minChroma, max: Color.maxChroma),
+                  let opacityO = dic[O("opacity")],
+                  let opacity = try? opacityO.asDouble?.notNaN().clipped(min: 0, max: 1),
+                  let colorSpaceO = dic[O("colorSpace")], let colorSpace = ColorSpace(colorSpaceO),
+                  let idO = dic[O("id")], let id = UUID(idO)
+             else { return nil }
+            
+            self.init(.init(lightness: lightness, nearestChroma: chroma,
+                            hue: hue, opacity: opacity, colorSpace), id: id)
+        default: return nil
+        }
+    }
+    var asO: O {
+        .init([O("lightness"): O(value.lightness),
+               O("hue"): O(value.hue),
+               O("chroma"): O(value.chroma),
+               O("opacity"): O(value.opacity),
+               O("colorSpace"): value.colorSpace.asO,
+               O("id"): id.asO])
+    }
+}
+extension Plane: OConvertible {
+    init?(_ o: O) {
+        switch o {
+        case .dic(let dic):
+            guard let topolygonO = dic[O("topolygon")], let topolygon = Topolygon(topolygonO),
+                  let uuColorO = dic[O("uuColor")], let uuColor = UUColor(uuColorO)
+             else { return nil }
+            self.init(topolygon: topolygon, uuColor: uuColor)
+        default: return nil
+        }
+    }
+    var asO: O {
+        .init([O("topolygon"): topolygon.asO,
+               O("uuColor"): uuColor.asO])
     }
 }
 
@@ -3585,6 +3803,20 @@ extension O {
                                 }
                                 break iosLoop
                             }
+                        } else if cStr == "rgba" {
+                            if let rgba = RGBA(bo) {
+                                var nColor = ss.value.backgroundUUColor
+                                nColor.value = Color(rgba, nColor.value.colorSpace)
+                                if ss.value.backgroundUUColor != nColor {
+                                    ss.set(backgroundUUColor: nColor)
+                                }
+                                if oss.isEmpty {
+                                    return O(ss)
+                                } else {
+                                    oss[.last].i = O(ss)
+                                }
+                                break iosLoop
+                            }
                         }
                     }
                 } else if str == linesName {
@@ -3687,6 +3919,54 @@ extension O {
                                     break iosLoop
                                 }
                             default: break
+                            }
+                        }
+                    }
+                } else if str == planesName {
+                    if let pi = ios[i + 1].asInt, pi < ss.value.picture.planes.count {
+                        if i + 1 == ios.count - 1 {
+                            if let plane = Plane(bo) {
+                                ss.replace([IndexValue(value: plane, index: pi)])
+                                if oss.isEmpty {
+                                    return O(ss)
+                                } else {
+                                    oss[.last].i = O(ss)
+                                }
+                                break iosLoop
+                            }
+                        } else if i + 3 == ios.count - 1,
+                                  case .string(let colorStr) = ios[i + 2], colorStr == "color",
+                                  case .string(let cStr) = ios[i + 3] {
+                            if cStr == "opacity" {
+                                if let v = bo.asDouble {
+                                    let v = ((try? v.notNaN()) ?? 0)
+                                        .clipped(min: 0, max: 1)
+                                    var nColor = ss.value.picture.planes[pi].uuColor
+                                    if v != nColor.value.opacity {
+                                        nColor.value.opacity = v
+                                        ss.set(nColor, atPlane: pi)
+                                    }
+                                    if oss.isEmpty {
+                                        return O(ss)
+                                    } else {
+                                        oss[.last].i = O(ss)
+                                    }
+                                    break iosLoop
+                                }
+                            } else if cStr == "rgba" {
+                                if let rgba = RGBA(bo) {
+                                    var nColor = ss.value.picture.planes[pi].uuColor
+                                    nColor.value = Color(rgba, nColor.value.colorSpace)
+                                    if ss.value.backgroundUUColor != nColor {
+                                        ss.set(nColor, atPlane: pi)
+                                    }
+                                    if oss.isEmpty {
+                                        return O(ss)
+                                    } else {
+                                        oss[.last].i = O(ss)
+                                    }
+                                    break iosLoop
+                                }
                             }
                         }
                     }

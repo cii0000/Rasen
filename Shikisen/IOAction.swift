@@ -838,7 +838,7 @@ final class IOAction: Action {
                     let nSize = size.width > size.height ?
                     size.snapped(height: 1080).rounded(.down) :
                     size.snapped(max: Size(width: 1200, height: 1920).rounded(.down))
-                    let image = node.renderedAntialiasFillImage(in: renderings[0].bounds, to: nSize, colorSpace)
+                    let image = node.image(in: renderings[0].bounds, to: nSize, colorSpace)
                     return image?.data(.png)?.count ?? 0
                 } else {
                     return nil
@@ -848,7 +848,7 @@ final class IOAction: Action {
                     let nSize = size.width > size.height ?
                     size.snapped(height: 2160).rounded(.down) :
                     size.snapped(max: Size(width: 2160, height: 3840)).rounded(.down)
-                    let image = node.renderedAntialiasFillImage(in: renderings[0].bounds, to: nSize, colorSpace)
+                    let image = node.image(in: renderings[0].bounds, to: nSize, colorSpace)
                     return image?.data(.png)?.count ?? 0
                 } else {
                     return nil
@@ -956,7 +956,7 @@ final class IOAction: Action {
                 try ioResult.remove()
                 
                 if let node = renderings[0].renderableMainSheetNode() {
-                    let image = node.renderedAntialiasFillImage(in: renderings[0].bounds, to: size, colorSpace)
+                    let image = node.image(in: renderings[0].bounds, to: size, colorSpace)
                     try image?.write(.png, to: ioResult.url)
                 }
                 
@@ -976,7 +976,7 @@ final class IOAction: Action {
                     var isStop = false
                     for (j, rendering) in renderings.enumerated() {
                         if let node = rendering.renderableMainSheetNode() {
-                            let image = node.renderedAntialiasFillImage(in: rendering.bounds, to: size, colorSpace)
+                            let image = node.image(in: rendering.bounds, to: size, colorSpace)
                             let subIOResult = ioResult.sub(name: "\(j).png")
                             try image?.write(.png, to: subIOResult.url)
                             try subIOResult.setAttributes()
@@ -1103,7 +1103,7 @@ final class IOAction: Action {
                                               in: rendering.bounds)
                         let durBeat = sheet.animation.rendableKeyframeDurBeat(at: i)
                         let durSec = sheet.animation.sec(fromBeat: durBeat)
-                        if let image = node.renderedAntialiasFillImage(in: rendering.bounds, to: size, colorSpace) {
+                        if let image = node.image(in: rendering.bounds, to: size, colorSpace) {
                             images.append((image, durSec))
                         }
                         sec += durSec
@@ -1114,7 +1114,7 @@ final class IOAction: Action {
                 } else {
                     let ot = t
                     if let node = renderings[0].renderableMainSheetNode(),
-                       let image = node.renderedAntialiasFillImage(in: renderings[0].bounds, to: size,
+                       let image = node.image(in: renderings[0].bounds, to: size,
                                                                    colorSpace) {
                         images.append((image, Keyframe.defaultDurBeat))
                         t = ot + 1 / Double(allC)
@@ -1182,6 +1182,7 @@ final class IOAction: Action {
                     var sheetOrigin: Point
                     var sheetBounds: Rect
                     var renderBounds: Rect
+                    var backgroundColor: Color
                     
                     func frameRange(frameRate: Int) -> Range<Int> {
                         Animation.frame(fromSec: secRange.start, frameRate: frameRate)
@@ -1229,7 +1230,8 @@ final class IOAction: Action {
                         tracks.append(.init(captions: captions, sheets: sheets,
                                             secRange: allDurSec ..< (allDurSec + maxEndSec),
                                             sheetOrigin: origin, sheetBounds: sheetBounds,
-                                            renderBounds: b))
+                                            renderBounds: b,
+                                            backgroundColor: sheet.backgroundUUColor.value))
                     } else {
                         maxEndSec = Animation.sec(fromBeat: Keyframe.defaultDurBeat,
                                                   tempo: Music.defaultTempo)
@@ -1239,7 +1241,8 @@ final class IOAction: Action {
                                             secRange: allDurSec ..< (allDurSec + maxEndSec),
                                             sheetOrigin: origin,
                                             sheetBounds: rendering.bounds,
-                                            renderBounds: rendering.bounds))
+                                            renderBounds: rendering.bounds,
+                                            backgroundColor: .background))
                     }
                     durSecs[i] = maxEndSec
                     allDurSec += maxEndSec
@@ -1248,7 +1251,7 @@ final class IOAction: Action {
                     if isStop { break }
                 }
                 
-                let frameRate = Sheet.frameRate(from: tracks.flatMap { $0.sheets.map { $0.sheet }})
+                let frameRate = Sheet.standardFrameRate(from: tracks.flatMap { $0.sheets.map { $0.sheet }})
                 let movie = try Movie(url: ioResult.url, renderSize: size,
                                       isAlphaChannel: isAlphaChannel,
                                       isLinearPCM: is4K, colorSpace, frameRate: frameRate)
@@ -1304,9 +1307,9 @@ final class IOAction: Action {
                     let image: Image?
                     if isChanged {
                         let node = CPUNode(children: children + [.init(children: captionNodes)], attitude: .init(position: track.sheetOrigin),
-                                           path: Path(track.sheetBounds))
-                        image = node.renderedAntialiasFillImage(in: track.renderBounds,
-                                                                to: size, colorSpace)
+                                           path: Path(track.sheetBounds),
+                                           fillType: .color(track.backgroundColor))
+                        image = node.image(in: track.renderBounds, to: size, colorSpace)
                         oldImage = image
                     } else {
                         image = oldImage

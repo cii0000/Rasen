@@ -23,16 +23,18 @@ final class LineView<T: BinderProtocol>: BindableView, @unchecked Sendable {
     typealias Binder = T
     let binder: Binder
     var keyPath: BinderKeyPath
-    let node: Node
+    let node: Node//, pointNode = Node(isHidden: true, isEnableCloneChildren: false)
     fileprivate var captureColor: Color?
     
     init(binder: Binder, keyPath: BinderKeyPath) {
         self.binder = binder
         self.keyPath = keyPath
         
-        node = Node(path: Path(binder[keyPath: keyPath]),
+        node = Node(//children: [pointNode],
+                    path: Path(binder[keyPath: keyPath]),
                     lineWidth: binder[keyPath: keyPath].size,
                     lineType: .color(binder[keyPath: keyPath].uuColor.value))
+//        pointNode.children = pointNodes()
     }
     
     func updateWithModel() {
@@ -52,6 +54,28 @@ final class LineView<T: BinderProtocol>: BindableView, @unchecked Sendable {
             updateColor()
         }
     }
+    var isHiddenPoints = true {
+        didSet {
+            guard isHiddenPoints != oldValue else { return }
+//            pointNode.isHidden = isHiddenPoints
+        }
+    }
+    
+    func pointNodes() -> [Node] {
+        if case .line(let line) = node.path.pathlines.first?.elements.first,
+           case .color(let color) = node.lineType {
+            let pointColor: Color = color.lightness < 50 ? .background : .content
+            return line.mainControlSequence.map {
+                let pointNode = Node.point.clone
+                pointNode.attitude.position = $0.point
+                pointNode.fillType = .color(pointColor)
+                return pointNode
+            }
+        } else {
+            return []
+        }
+    }
+    
     func updateColor() {
         let uuColor = model.uuColor
         node.lineType = .color(isSelected && !isHiddenSelected ?
@@ -60,9 +84,16 @@ final class LineView<T: BinderProtocol>: BindableView, @unchecked Sendable {
                                     .linear(.selected, uuColor.value,
                                             t: uuColor.value.lightness / 100 * 0.5)) :
                                 uuColor.value)
+        
+//        if case .color(let color) = node.lineType {
+//            let pointColor: Color = color.lightness < 50 ? .background : .content
+//            pointNode.children.forEach { $0.fillType = .color(pointColor) }
+//        }
     }
     func updatePath() {
         node.path = Path(model)
+        
+//        pointNode.children = pointNodes()
     }
     var uuColor: UUColor {
         get { model.uuColor }
@@ -259,7 +290,7 @@ final class KeyframeView: BindableView, @unchecked Sendable {
         draftPlanesView = ArrayView(binder: binder,
                                     keyPath: keyPath.appending(path: \Model.draftPicture.planes))
         
-        draftLinesView.node.isClippingChildren = true
+        draftLinesView.node.isClippingChildrenLines = true
         draftLinesView.node.path = .init(Sheet.defaultBounds)
         draftLinesView.node.fillType = .color(.draftLine)
         
@@ -283,7 +314,7 @@ final class KeyframeView: BindableView, @unchecked Sendable {
         }
         if !draftPlanesView.model.isEmpty {
             draftPlanesView.elementViews.forEach {
-                $0.node.fillType = .color($0.model.uuColor.value.with(opacity: 0.075))
+                $0.node.fillType = .color($0.model.uuColor.value.with(opacity: $0.model.uuColor.value.opacity * 0.075))
             }
         }
     }
@@ -698,6 +729,12 @@ final class AnimationView: TimelineView, @unchecked Sendable {
             if let node = timelineNode.children.first(where: { $0.name == "secondGrid" }) {
                 node.isHidden = editGrid != .second
             }
+            
+            elementViews.forEach {
+                $0.linesView.elementViews.forEach {
+                    $0.isHiddenPoints = editGrid != .full
+                }
+            }
         }
     }
     
@@ -1007,7 +1044,7 @@ final class AnimationView: TimelineView, @unchecked Sendable {
                 Node(path: Path([$0.firstPoint, $0.firstPoint + dp]),
                      lineWidth: $0.size * 0.25, lineType: .color(.background))
             } : [])
-            return Node(children: nodes, isClippingChildren: true,
+            return Node(children: nodes, isClippingChildrenLines: true,
                         path: .init(bounds), fillType: .color(color))
         }
         
@@ -2195,40 +2232,28 @@ final class SheetView: View, @unchecked Sendable {
     }
     
     func goNext() {
-        if isPlaying {
-            stop()
-        }
+        stop()
         animationView.goNext()
     }
     func goPrevious() {
-        if isPlaying {
-            stop()
-        }
+        stop()
         animationView.goPrevious()
     }
     func goNextKey() {
-        if isPlaying {
-            stop()
-        }
+        stop()
         animationView.goNextKey()
     }
     func goPreviousKey() {
-        if isPlaying {
-            stop()
-        }
+        stop()
         animationView.goPreviousKey()
     }
     func goNextFrame() {
-        if isPlaying {
-            stop()
-        }
+        stop()
         let deltaTime = Rational(1, animationView.frameRate)
         self.rootBeat = Rational.saftyAdd(rootBeat, deltaTime)
     }
     func goPreviousFrame() {
-        if isPlaying {
-            stop()
-        }
+        stop()
         let deltaTime = Rational(-1, animationView.frameRate)
         self.rootBeat = Rational.saftyAdd(rootBeat, deltaTime)
     }
@@ -3184,6 +3209,13 @@ final class SheetView: View, @unchecked Sendable {
             return nil
         }
     }
+    func planeTuple(at p: Point) -> (pi: Int, plane: Plane)? {
+        if let pi = planesView.firstIndex(at: p) {
+            return (pi, model.picture.planes[pi])
+        } else {
+            return nil
+        }
+    }
     func sheetColorOwner(at p: Point,
                          enabledLine: Bool = true, enabledLinePlane: Bool = true,
                          enabledAlwaysAnimation: Bool = false,
@@ -3422,6 +3454,7 @@ final class SheetView: View, @unchecked Sendable {
         case .appendLine(let line):
             stop()
             let lineView = appendNode(line)
+            lineView.isHiddenPoints = animationView.editGrid != .full
             animationView.updateTimelineAtCurrentKeyframe()
             if isMakeRect {
                 return (lineView.node.bounds, [])
@@ -3429,6 +3462,10 @@ final class SheetView: View, @unchecked Sendable {
         case .appendLines(let lines):
             stop()
             appendNode(lines)
+            for lineView in linesView.elementViews[(linesView.elementViews.count - lines.count)...] {
+                lineView.isHiddenPoints = animationView.editGrid != .full
+            }
+            
             animationView.updateTimelineAtCurrentKeyframe()
             if isMakeRect {
                 let rect = linesView.elementViews[(linesView.elementViews.count - lines.count)...]
@@ -3468,6 +3505,10 @@ final class SheetView: View, @unchecked Sendable {
         case .insertLines(let livs):
             stop()
             insertNode(livs)
+            for liv in livs {
+                let lineView = linesView.elementViews[liv.index]
+                lineView.isHiddenPoints = animationView.editGrid != .full
+            }
             
             animationView.updateTimelineAtCurrentKeyframe()
             if isMakeRect {
@@ -3560,6 +3601,9 @@ final class SheetView: View, @unchecked Sendable {
             if isReverse {
                 if linesView.model.isEmpty && planesView.model.isEmpty {
                     setNode(draftLinesView.model)
+                    linesView.elementViews.forEach {
+                        $0.isHiddenPoints = animationView.editGrid != .full
+                    }
                     setDraftNode([Line]())
                     setNode(draftPlanesView.model)
                     setDraftNode([Plane]())
@@ -3835,6 +3879,11 @@ final class SheetView: View, @unchecked Sendable {
                 var rect: Rect?, nodes = [Node]()
                 for kv in kvs {
                     animationView.elementViews[kv.index].linesView.insert(kv.value)
+                    for k in kv.value {
+                        let lineView = animationView.elementViews[kv.index].linesView
+                            .elementViews[k.index]
+                        lineView.isHiddenPoints = animationView.editGrid != .full
+                    }
                     
                     rect += kv.value.reduce(into: Rect?.none) {
                         let node = animationView.elementViews[kv.index].linesView
@@ -4349,7 +4398,7 @@ final class SheetView: View, @unchecked Sendable {
         
         if !planes.isEmpty {
             draftPlanesView.elementViews.forEach {
-                $0.node.fillType = .color($0.model.uuColor.value.with(opacity: 0.075))
+                $0.node.fillType = .color($0.model.uuColor.value.with(opacity: $0.model.uuColor.value.opacity * 0.075))
             }
         }
     }
@@ -4368,7 +4417,7 @@ final class SheetView: View, @unchecked Sendable {
             let draftPlanesView = animationView.elementViews[ki].draftPlanesView
             pivs.forEach {
                 let planeView = draftPlanesView.elementViews[$0]
-                planeView.node.fillType = .color(planeView.model.uuColor.value.with(opacity: 0.075))
+                planeView.node.fillType = .color(planeView.model.uuColor.value.with(opacity: planeView.model.uuColor.value.opacity * 0.075))
             }
         }
     }

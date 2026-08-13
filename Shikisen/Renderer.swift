@@ -794,7 +794,7 @@ extension Node {
             default:
                 typesetter.draw(in: b, fillColor: .content, in: ctx)
             }
-        } else if !isClippingChildren && !path.isEmpty {
+        } else if !isClippingChildrenLines && !path.isEmpty {
             if let fillType = fillType {
                 switch fillType {
                 case .color(let color):
@@ -915,7 +915,7 @@ extension Node {
                 }
             }
         }
-        if isClippingChildren {
+        if isClippingChildrenLines {
             if !path.isEmpty {
                 if let fillType = fillType {
                     switch fillType {
@@ -1318,11 +1318,13 @@ struct CPUNode {
     var fillType: Node.FillType?
     var isCPUFillAntialias = true
     var isDrawLineAntialias = false
+    var isClippingChildrenLines = false
     
     init(children: [Self] = [Self](), isHidden: Bool = false, attitude: Attitude = Attitude(),
          path: Path = Path(),
          lineWidth: Double = 0.0, lineType: Node.LineType? = nil, fillType: Node.FillType? = nil,
-         isCPUFillAntialias: Bool = true, isDrawLineAntialias: Bool = false) {
+         isCPUFillAntialias: Bool = true, isDrawLineAntialias: Bool = false,
+         isClippingChildrenLines: Bool = false) {
         
         self.children = children
         self.isHidden = isHidden
@@ -1336,12 +1338,14 @@ struct CPUNode {
         self.fillType = fillType
         self.isCPUFillAntialias = isCPUFillAntialias
         self.isDrawLineAntialias = isDrawLineAntialias
+        self.isClippingChildrenLines = isClippingChildrenLines
     }
     init(children: [Self] = [Self](), isHidden: Bool = false, attitude: Attitude = Attitude(),
          localTransform: Transform = .identity, isIdentityFromLocal: Bool = true,
          path: Path = Path(),
          lineWidth: Double = 0.0, lineType: Node.LineType? = nil, fillType: Node.FillType? = nil,
-         isCPUFillAntialias: Bool = true, isDrawLineAntialias: Bool = false) {
+         isCPUFillAntialias: Bool = true, isDrawLineAntialias: Bool = false,
+         isClippingChildrenLines: Bool = false) {
         
         self.children = children
         self.isHidden = isHidden
@@ -1354,6 +1358,7 @@ struct CPUNode {
         self.fillType = fillType
         self.isCPUFillAntialias = isCPUFillAntialias
         self.isDrawLineAntialias = isDrawLineAntialias
+        self.isClippingChildrenLines = isClippingChildrenLines
     }
 }
 extension Node {
@@ -1394,7 +1399,7 @@ extension CPUNode {
         
         let ctx = pdf.ctx
         ctx.saveGState()
-       
+        
         ctx.setFillColor(backgroundColor.cg)
         ctx.fill(toBounds.cg)
         
@@ -1403,22 +1408,31 @@ extension CPUNode {
         
         ctx.restoreGState()
     }
-    
-    func renderedAntialiasFillImage(in bounds: Rect, to size: Size,
-                                    isBackgroundColor: Bool = true,
-                                    _ colorSpace: ColorSpace) -> Image? {
-        let backgroundColor: Color? = if !isBackgroundColor {
-            nil
-        } else if case .color(let color) = fillType {
+}
+extension CPUNode {
+    func image(to size: Size? = nil,
+               backgroundColor: Color? = nil, _ colorSpace: ColorSpace) -> Image? {
+        guard let bounds else { return nil }
+        return image(in: bounds, to: size ?? bounds.size,
+                     backgroundColor: backgroundColor, colorSpace)
+    }
+    func image(in bounds: Rect, to size: Size,
+               backgroundColor: Color? = .background, _ colorSpace: ColorSpace) -> Image? {
+        let backgroundColor: Color? = if case .color(let color) = fillType {
             color
         } else {
-            Color.background
+            backgroundColor
         }
+        
         guard children.contains(where: { $0.fillType != nil }) else {
             if children.contains(where: { $0.children.contains(where: { $0.fillType != nil }) }) {
                 var nImage: Image?
                 children.forEach {
-                    guard let nnImage = $0.renderedAntialiasFillImage(in: bounds, to: size, isBackgroundColor: nImage == nil, colorSpace) else { return }
+                    guard let nnImage = $0.image(in: bounds, to: size,
+                                                 backgroundColor: nImage == nil ?
+                                                 backgroundColor ?? .background :
+                                                    nil,
+                                                 colorSpace) else { return }
                     if nImage == nil {
                         nImage = nnImage
                     } else {
@@ -1427,9 +1441,11 @@ extension CPUNode {
                 }
                 return nImage
             } else {
-                return image(in: bounds, size: size, backgroundColor: backgroundColor, .sRGB)
+                return image(in: bounds, size: size, backgroundColor: backgroundColor, .sRGB,
+                             isDrawFillAntialias: false)
             }
         }
+        
         guard let oImage = image(in: bounds, size: size * 2, backgroundColor: backgroundColor,
                                  colorSpace, isAntialias: false,
                                  isDrawFillAntialias: true)?
@@ -1438,57 +1454,23 @@ extension CPUNode {
                                  isDrawFillAntialias: false) else { return nil }
         return oImage.drawn(nImage, in: Rect(size: size))
     }
-    func imageInBounds(size: Size? = nil,
-                       backgroundColor: Color? = nil,
-                       _ colorSpace: ColorSpace,
-                       isAntialias: Bool = true,
-                       isGray: Bool = false) -> Image? {
-        guard let bounds = bounds else { return nil }
-        return image(in: bounds, size: size ?? bounds.size,
-                     backgroundColor: backgroundColor, colorSpace,
-                     isAntialias: isAntialias, isGray: isGray)
-    }
-    func image(in bounds: Rect,
-               size: Size,
-               backgroundColor: Color? = nil, _ colorSpace: ColorSpace,
-               isAntialias: Bool = true,
-               isGray: Bool = false, isDrawFillAntialias: Bool? = false) -> Image? {
+    private func image(in bounds: Rect, size: Size,
+                       backgroundColor: Color? = nil, _ colorSpace: ColorSpace,
+                       isAntialias: Bool = true, isDrawFillAntialias: Bool?) -> Image? {
         let transform = Transform(translation: -bounds.origin)
             * Transform(scaleX: size.width / bounds.width,
                         y: size.height / bounds.height)
-        return image(size: size, transform: transform,
-                     backgroundColor: backgroundColor, colorSpace,
-                     isAntialias: isAntialias, isGray: isGray, isDrawFillAntialias: isDrawFillAntialias)
-    }
-    func image(size: Size, transform: Transform,
-               backgroundColor: Color? = nil, _ colorSpace: ColorSpace,
-               isAntialias: Bool = true,
-               isGray: Bool = false, isDrawFillAntialias: Bool? = false) -> Image? {
         let ctx = context(size: size, transform: transform, backgroundColor: backgroundColor,
-                          colorSpace, isAntialias: isAntialias, isGray: isGray,
+                          colorSpace, isAntialias: isAntialias,
                           isDrawFillAntialias: isDrawFillAntialias)
         guard let cgImage = ctx?.makeImage() else { return nil }
         return Image(cgImage: cgImage)
     }
-    func bitmap<Value: FixedWidthInteger & UnsignedInteger>(size: Size,
-                                                            backgroundColor: Color? = nil,
-                                                            _ colorSpace: ColorSpace,
-                                                            isAntialias: Bool = true,
-                                                            isGray: Bool = false) -> Bitmap<Value>? {
-        guard let bounds = bounds else { return nil }
-        let transform = Transform(translation: -bounds.origin)
-            * Transform(scaleX: size.width / bounds.width,
-                        y: size.height / bounds.height)
-        guard let ctx = context(size: size, transform: transform,
-                                backgroundColor: backgroundColor, colorSpace,
-                                isAntialias: isAntialias, isGray: isGray) else { return nil }
-        return .init(ctx)
-    }
     private func context(size: Size, transform: Transform,
                          backgroundColor: Color? = nil, _ colorSpace: ColorSpace,
                          isAntialias: Bool = true,
-                         isGray: Bool = false, isDrawFillAntialias: Bool? = false) -> CGContext? {
-        guard let space = isGray ? CGColorSpaceCreateDeviceGray() : colorSpace.cg else { return nil }
+                         isDrawFillAntialias: Bool? = false) -> CGContext? {
+        guard let space = colorSpace.cg else { return nil }
         let ctx: CGContext
         if colorSpace.isHDR {
             let bitmapInfo = CGBitmapInfo(rawValue: (CGBitmapInfo.floatComponents.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue))
@@ -1498,8 +1480,9 @@ extension CPUNode {
                                       bitmapInfo: bitmapInfo.rawValue) else { return nil }
             ctx = actx
         } else {
-            let bitmapInfo = CGBitmapInfo(rawValue: isGray ? CGImageAlphaInfo.none.rawValue : (backgroundColor?.opacity == 1 ?
-                                            CGImageAlphaInfo.noneSkipLast.rawValue : CGImageAlphaInfo.premultipliedLast.rawValue))
+            let bitmapInfo = CGBitmapInfo(rawValue: backgroundColor?.opacity == 1 ?
+                                            CGImageAlphaInfo.noneSkipLast.rawValue :
+                                            CGImageAlphaInfo.premultipliedLast.rawValue)
             guard let actx = CGContext(data: nil,
                                       width: Int(size.width), height: Int(size.height),
                                       bitsPerComponent: 8, bytesPerRow: 0, space: space,
@@ -1522,29 +1505,13 @@ extension CPUNode {
         ctx.restoreGState()
         return ctx
     }
-    func renderInBounds(size: Size? = nil, in ctx: CGContext) {
-        guard let bounds = bounds else { return }
-        render(in: bounds, size: size ?? bounds.size, in: ctx)
-    }
-    func render(in bounds: Rect, size: Size, in ctx: CGContext) {
-        let transform = Transform(translation: -bounds.origin)
-            * Transform(scaleX: size.width / bounds.width,
-                        y: size.height / bounds.height)
-        render(transform: transform, in: ctx)
-    }
-    func render(transform: Transform, in ctx: CGContext, isDrawFillAntialias: Bool? = false) {
-        let nt = localTransform.inverted() * transform
-        ctx.saveGState()
-        ctx.concatenate(nt.cg)
-        render(in: ctx, isDrawFillAntialias: isDrawFillAntialias)
-        ctx.restoreGState()
-    }
-    func render(in ctx: CGContext, isDrawFillAntialias: Bool? = false) {
+    private func render(in ctx: CGContext, isDrawFillAntialias: Bool? = false) {
         guard !isHidden else { return }
         if !isIdentityFromLocal {
             ctx.saveGState()
             ctx.concatenate(localTransform.cg)
         }
+        
         if let typesetter = path.typesetter, let b = bounds {
             if !(isDrawFillAntialias ?? false) {
                 switch lineType {
@@ -1565,7 +1532,7 @@ extension CPUNode {
                     typesetter.draw(in: b, fillColor: .content, in: ctx)
                 }
             }
-        } else if !path.isEmpty {
+        } else if !path.isEmpty && !isClippingChildrenLines {
             if isDrawFillAntialias ?? true, let fillType {
                 switch fillType {
                 case .color(let color):
@@ -1687,7 +1654,26 @@ extension CPUNode {
                 }
             }
         }
-        children.forEach { $0.render(in: ctx, isDrawFillAntialias: isDrawFillAntialias) }
+        
+        if isClippingChildrenLines, let b = path.bounds?.cg,
+            case .color(let color) = fillType {
+            ctx.saveGState()
+            ctx.beginTransparencyLayer(in: b, auxiliaryInfo: nil)
+            ctx.setAlpha(color.opacity)
+            let nColor = color.with(opacity: 1)
+            var children = children
+            for i in children.count.range {
+                if children[i].lineType != nil {
+                    children[i].lineType = .color(nColor)
+                }
+            }
+            children.forEach { $0.render(in: ctx, isDrawFillAntialias: isDrawFillAntialias) }
+            ctx.endTransparencyLayer()
+            ctx.restoreGState()
+        } else {
+            children.forEach { $0.render(in: ctx, isDrawFillAntialias: isDrawFillAntialias) }
+        }
+        
         if !isIdentityFromLocal {
             ctx.restoreGState()
         }

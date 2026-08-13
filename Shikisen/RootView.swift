@@ -2958,9 +2958,9 @@ final class RootView: View, @unchecked Sendable {
         }
         return nil
     }
-    func mainFrame(at p: Point) -> (mainFrame: Rect, sheetView: SheetView?)? {
+    func mainFrame(at p: Point, distance: Double = 10) -> (mainFrame: Rect, sheetView: SheetView?)? {
         guard isEditingSheet else { return nil }
-        let d = 10 * screenToWorldScale
+        let d = max(distance * screenToWorldScale, Sheet.mainFrameLineWidth / 2)
         let shp = sheetPosition(at: p)
         let dSq = d * d
         guard let sheetView = sheetView(at: shp) else {

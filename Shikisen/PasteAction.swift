@@ -1176,7 +1176,8 @@ final class APasteAction: Action {
             selectingLineNode.lineWidth = rootView.worldLineWidth
             selectingLineNode.path = Path([Pathline([edge.p0, edge.p1])])
             return true
-        } else if let (mainFrame, sheetView) = rootView.mainFrame(at: p) {
+        } else if let (mainFrame, sheetView)
+                    = rootView.mainFrame(at: p, distance: rootView.isDefaultUUColor(at: p) ? 10 : 0) {
             if isSendPasteboard {
                 Pasteboard.shared.copiedObjects = [.rect(mainFrame)]
             }
@@ -1798,7 +1799,9 @@ final class APasteAction: Action {
                 sheetView.set(option)
                 return true
             }
-        } else if let (mainFrame, sheetView) = rootView.mainFrame(at: p), let sheetView {
+        } else if let (mainFrame, sheetView)
+                    = rootView.mainFrame(at: p, distance: rootView.isDefaultUUColor(at: p) ? 10 : 0),
+                  let sheetView {
             Pasteboard.shared.copiedObjects = [.rect(mainFrame)]
             
             if mainFrame != Sheet.defaultBounds {

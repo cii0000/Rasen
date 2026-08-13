@@ -412,8 +412,7 @@ final class SubNSApplication: NSApplication {
     }
     
     func menuWillOpen(_ menu: NSMenu) {
-        if menu == editMenu {
-            //hidden auto added menus
+        if menu == editMenu { //hidden auto added menus
             if let i = menu.items.lastIndex(where: { $0.isSeparatorItem }) {
                 menu.items[i...].forEach { $0.isHidden = true }
             }

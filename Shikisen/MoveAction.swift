@@ -2385,7 +2385,7 @@ final class MoveSheetAction: DragEventAction {
                     self.sheetView = sheetView
                     sheetView.hideSelected()
                     
-                    if containsSelectedFrame || containsSelectedLastLine,
+                    if containsSelectedFrame,
                         let rect = sheetView.selectedFrame(scale: rootView.screenToWorldScale) {
                         
                         typeRect = sheetView.convertToWorld(rect)

@@ -226,10 +226,10 @@ final class LookUpAction: InputKeyEventAction {
         } else if let (_, _, _, _) = rootView.border(at: p) {
             rootView.show("Border".localized, at: p)
         } else if let sheetView = rootView.sheetView(at: p),
-                  let lineView = sheetView.lineTuple(at: sheetView.convertFromWorld(p),
+                  let (lineView, li) = sheetView.lineTuple(at: sheetView.convertFromWorld(p),
                                                      enabledPlane: true,
-                                                     scale: 1 / rootView.worldToScreenScale)?.lineView {
-            rootView.show((lineView.model.controls.count == 2 ? "Straight Line".localized : "Line".localized) + "\n\t\("Length".localized):  \(lineView.model.length().string(digitsCount: 4))", at: p)
+                                                     scale: 1 / rootView.worldToScreenScale) {
+            rootView.show((lineView.model.controls.count == 2 ? "Straight Line".localized : "Line".localized) + "\n\t\("Length".localized):  \(lineView.model.length().string(digitsCount: 4))\n\t\("Index".localized): \(li)", at: p)
         } else if let sheetView = rootView.sheetView(at: p),
                   let (textView, _, i, _) = sheetView.textTuple(at: sheetView.convertFromWorld(p), scale: rootView.screenToWorldScale) {
             
@@ -338,9 +338,9 @@ final class LookUpAction: InputKeyEventAction {
             rootView.show(str, at: p)
         } else if !rootView.isDefaultUUColor(at: p),
                   let sheetView = rootView.sheetView(at: p),
-                  let plane = sheetView.plane(at: sheetView.convertFromWorld(p)) {
+                  let (pi, plane) = sheetView.planeTuple(at: sheetView.convertFromWorld(p)) {
             let rgba = plane.uuColor.value.rgba
-            rootView.show("Color".localized + "\n\t\("Area".localized):  \(plane.topolygon.area.string(digitsCount: 4))\n\tsRGB: \(rgba.r) \(rgba.g) \(rgba.b)", at: p)
+            rootView.show("Color".localized + "\n\t\("Area".localized):  \(plane.topolygon.area.string(digitsCount: 4))\n\tsRGB: \(rgba.r) \(rgba.g) \(rgba.b)\n\t\("Index".localized): \(pi)", at: p)
         } else if let sheetView = rootView.sheetView(at: p) {
             let b = rootView.sheetFrame(with: rootView.sheetPosition(at: p)).bounds
             var sampless = rootView.currentSampless(at: rootView.sheetPosition(at: p))

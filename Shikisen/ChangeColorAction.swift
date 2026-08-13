@@ -94,9 +94,6 @@ final class ChangeColorAction: Action {
         panNode.attitude = attitude.with(position: panWorldPosition)
     }
     
-    var isDrawPoints = true
-    var pointNodes = [Node]()
-    
     let colorPointNode = Node(path: Path(circleRadius: 4.5), lineWidth: 1,
                               lineType: .color(.background),
                               fillType: .color(.content))
@@ -242,19 +239,6 @@ final class ChangeColorAction: Action {
             colorOwners.forEach { $0.hideSelected() }
         } else {
             self.colorOwners = []
-        }
-    }
-    func updateTintPointNodes(with event: DragEvent) {
-        let p = rootView.convertScreenToWorld(event.screenPoint)
-        
-        if isDrawPoints {
-            pointNodes = rootView.colors(at: p).map {
-                let cp = $0.tint.rectangular
-                return Node(path: .init(circleRadius: 1.5, position: cp),
-                            lineWidth: 0.5,
-                            lineType: .color(.background),
-                            fillType: .color(.content))
-            }
         }
     }
     
@@ -1552,7 +1536,7 @@ final class ChangeColorAction: Action {
         }
     }
     
-    let tintR = 135.0
+    let tintR = 100.0, maxTint = 128.0, tintPadding = 20.0
     let snappableDistance = 3.0
     let tintNode = Node(lineWidth: 2)
     let tintBorderNode = Node(lineWidth: 3.25, lineType: .color(.background))
@@ -1567,20 +1551,10 @@ final class ChangeColorAction: Action {
                 tintBorderNode.lineType = .color(tintLightness > 50 ? .content : .background)
                 rootView.node.append(child: tintBorderNode)
                 rootView.node.append(child: tintNode)
-                if isDrawPoints {
-                    pointNodes.forEach {
-                        tintNode.append(child: $0)
-                    }
-                }
                 tintNode.append(child: tintOutlineNode)
                 tintNode.append(child: tintLineNode)
                 tintNode.append(child: colorPointNode)
             } else {
-                if isDrawPoints {
-                    pointNodes.forEach {
-                        $0.removeFromParent()
-                    }
-                }
                 colorPointNode.removeFromParent()
                 tintNode.removeFromParent()
                 tintLineNode.removeFromParent()
@@ -1588,14 +1562,17 @@ final class ChangeColorAction: Action {
             }
         }
     }
-    func updateTintNode(radius r: Double = 128, splitCount: Int = 360) {
+    func updateTintNode(unsafetyChroma: Double = 128, splitCount: Int = 360) {
         let rsc = 1 / Double(splitCount)
         var points = [Point](), colors = [Color]()
         for i in 0 ..< splitCount {
             let hue = Double(i) * rsc * .pi2
-            let color = Color(lightness: tintLightness, unsafetyChroma: r, hue: hue)
+            let color = Color(lightness: tintLightness,
+                              unsafetyChroma: unsafetyChroma,
+                              hue: hue)
             var tint = color.tint
-            tint.r *= tintR / 128
+            tint.r *= tintR / maxTint
+            tint.r += tintPadding
             let p = tint.rectangular
             colors.append(color)
             points.append(p)
@@ -1617,15 +1594,6 @@ final class ChangeColorAction: Action {
         let sfp = rootView.convertWorldToScreen(beganTintPosition)
         return rootView.convertScreenToWorld(sfp - oldEditingTintPosition)
     }
-    var isSnappedTint = true {
-        didSet {
-            guard isSnappedTint != oldValue else { return }
-            if isSnappedTint {
-                Feedback.performAlignment()
-            }
-            colorPointNode.fillType = .color(isSnappedTint ? .selected : .content)
-        }
-    }
     var oldEditingTintPosition = Point()
     var editingTintPosition = Point() {
         didSet {
@@ -1634,11 +1602,14 @@ final class ChangeColorAction: Action {
         }
     }
     func updateTintLinePath() {
-        let path = Path([Pathline([Point(), editingTintPosition])])
+        let path = Path([Pathline([Point().movedWith(distance: tintPadding,
+                                                     angle: editingTintPosition.angle()),
+                                   editingTintPosition]),
+                        Pathline(circleRadius: tintPadding)])
         tintLineNode.path = path
         tintOutlineNode.path = path
     }
-    var lastTintSnapTime: Double?, dr = 0.0
+    var lastTintSnapTime: Double?
     func adjustTint(with event: DragEvent) {
         guard isEditingSheet else {
             rootAction.keepOut(with: event)
@@ -1674,55 +1645,25 @@ final class ChangeColorAction: Action {
             
             updateNode()
             updateOwners(with: event)
-            if isDrawPoints {
-                updateTintPointNodes(with: event)
-            }
             fsp = sp
             tintLightness = beganMainUUColor.value.lightness
-            oldEditingTintPosition = PolarPoint(beganMainUUColor.value.chroma,
+            oldEditingTintPosition = PolarPoint(beganMainUUColor.value.chroma * tintR / maxTint + tintPadding,
                                               beganMainUUColor.value.hue).rectangular
             editingTintPosition = oldEditingTintPosition
             beganTintPosition = p
             editingMainUUColor = beganMainUUColor
             isEditingTint = true
-            
-            let tintP = tintNode.convertFromWorld(p)
-            let fTintP = Point()
-            let r = fTintP.distance(tintP)
-            if r < snappableDistance {
-                lastTintSnapTime = event.time + 1
-                isSnappedTint = false
-            }
         case .changed:
             let tintP = tintNode.convertFromWorld(p)
             let fTintP = Point()
             let r = fTintP.distance(tintP)
             let theta = fTintP.angle(tintP)
             var uuColor = beganMainUUColor
-            if r < snappableDistance {
-                if let lastTintSnapTime = lastTintSnapTime {
-                    if event.time - lastTintSnapTime > 0.5 {
-                        isSnappedTint = false
-                        dr = r
-                    }
-                } else {
-                    if !isSnappedTint {
-                        lastTintSnapTime = event.time
-                    }
-                    isSnappedTint = true
-                }
-            } else {
-                lastTintSnapTime = nil
-                isSnappedTint = false
-            }
-            uuColor.value.chroma = max(isSnappedTint ? 0 : (r - dr) * 128 / tintR, 0)
+            uuColor.value.chroma = max((r - tintPadding) * maxTint / tintR, 0)
             uuColor.value.hue = theta
             if beganMainUUColor.value == .empty && beganMainUUColor.id == .two {
                 uuColor.value.opacity = 1
             }
-            let polarPoint = Point(uuColor.value.a, uuColor.value.b).polar
-            uuColor.value.hue = polarPoint.theta
-            uuColor.value.chroma = min(polarPoint.r, Color.maxChroma)
             editingMainUUColor = uuColor
             
             let da = uuColor.value.a - beganMainUUColor.value.a
@@ -1740,7 +1681,7 @@ final class ChangeColorAction: Action {
                 }
             }
             
-            editingTintPosition = PolarPoint(uuColor.value.chroma * tintR / 128,
+            editingTintPosition = PolarPoint(uuColor.value.chroma * tintR / maxTint + tintPadding,
                                              uuColor.value.hue).rectangular
         case .ended:
             capture()

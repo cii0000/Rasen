@@ -334,76 +334,54 @@ extension Line: Codable {
 }
 extension Line: Interpolatable {
     static func linear(_ f0: Line, _ f1: Line, t: Double) -> Line {
-        return interpolate([f0, f1]) { fs in
-            let f0 = fs[0], f1 = fs[1]
-            let count = max(f0.controls.count, f1.controls.count)
-            let size = Double.linear(f0.size, f1.size, t: t)
-            let l0 = f0.with(count: count)
-            let l1 = f1.with(count: count)
-            let controls = [Control].linear(l0.controls, l1.controls, t: t)
-            let uuColor = f0.uuColor == f1.uuColor ?
-            f0.uuColor :
-            UUColor.linear(f0.uuColor, f1.uuColor, t: t)
-            return Line(controls: controls, size: size, interID: f0.interID,
-                        uuColor: uuColor)
-        }
+        let fs = interpolatable([f0, f1])
+        let f0 = fs[0], f1 = fs[1]
+        let size = Double.linear(f0.size, f1.size, t: t)
+        let controls = [Control].linear(f0.controls, f1.controls, t: t)
+        let uuColor = f0.uuColor == f1.uuColor ?
+        f0.uuColor :
+        UUColor.linear(f0.uuColor, f1.uuColor, t: t)
+        return Line(controls: controls, size: size, interID: f0.interID,
+                    uuColor: uuColor)
     }
     static func firstSpline(_ f1: Line,
                             _ f2: Line, _ f3: Line, t: Double) -> Line {
-        return interpolate([f1, f2, f3]) { fs in
-            let f1 = fs[0], f2 = fs[1], f3 = fs[2]
-            let count = max(f1.controls.count, f2.controls.count, f3.controls.count)
-            let size = Double.firstSpline(f1.size, f2.size, f3.size, t: t)
-            let l1 = f1.with(count: count)
-            let l2 = f2.with(count: count)
-            let l3 = f3.with(count: count)
-            let controls = [Control].firstSpline(l1.controls,
-                                                 l2.controls, l3.controls, t: t)
-            let uuColor = f1.uuColor == f2.uuColor && f2.uuColor == f3.uuColor ?
-            f1.uuColor :
-            UUColor.firstSpline(f1.uuColor, f2.uuColor, f3.uuColor, t: t)
-            return Line(controls: controls, size: size, interID: f1.interID,
-                        uuColor: uuColor)
-        }
+        let fs = interpolatable([f1, f2, f3])
+        let f1 = fs[0], f2 = fs[1], f3 = fs[2]
+        let size = Double.firstSpline(f1.size, f2.size, f3.size, t: t)
+        let controls = [Control].firstSpline(f1.controls,
+                                             f2.controls, f3.controls, t: t)
+        let uuColor = f1.uuColor == f2.uuColor && f2.uuColor == f3.uuColor ?
+        f1.uuColor :
+        UUColor.firstSpline(f1.uuColor, f2.uuColor, f3.uuColor, t: t)
+        return Line(controls: controls, size: size, interID: f1.interID,
+                    uuColor: uuColor)
     }
     static func spline(_ f0: Line, _ f1: Line,
                        _ f2: Line, _ f3: Line, t: Double) -> Line {
-        return interpolate([f0, f1, f2, f3]) { fs in
-            let f0 = fs[0], f1 = fs[1], f2 = fs[2], f3 = fs[3]
-            let count = max(f0.controls.count, f1.controls.count,
-                            f2.controls.count, f3.controls.count)
-            let size = Double.spline(f0.size, f1.size, f2.size, f3.size, t: t)
-            let l0 = f0.with(count: count)
-            let l1 = f1.with(count: count)
-            let l2 = f2.with(count: count)
-            let l3 = f3.with(count: count)
-            let controls = [Control].spline(l0.controls, l1.controls,
-                                            l2.controls, l3.controls, t: t)
-            let uuColor = f0.uuColor == f1.uuColor && f1.uuColor == f2.uuColor && f2.uuColor == f3.uuColor ?
-            f1.uuColor :
-            UUColor.spline(f0.uuColor, f1.uuColor, f2.uuColor, f3.uuColor, t: t)
-            return Line(controls: controls, size: size, interID: f1.interID,
-                        uuColor: uuColor)
-        }
-        
+        let fs = interpolatable([f0, f1, f2, f3])
+        let f0 = fs[0], f1 = fs[1], f2 = fs[2], f3 = fs[3]
+        let size = Double.spline(f0.size, f1.size, f2.size, f3.size, t: t)
+        let controls = [Control].spline(f0.controls, f1.controls,
+                                        f2.controls, f3.controls, t: t)
+        let uuColor = f0.uuColor == f1.uuColor && f1.uuColor == f2.uuColor && f2.uuColor == f3.uuColor ?
+        f1.uuColor :
+        UUColor.spline(f0.uuColor, f1.uuColor, f2.uuColor, f3.uuColor, t: t)
+        return Line(controls: controls, size: size, interID: f1.interID,
+                    uuColor: uuColor)
     }
     static func lastSpline(_ f0: Line, _ f1: Line,
                            _ f2: Line, t: Double) -> Line {
-        return interpolate([f0, f1, f2]) { fs in
-            let f0 = fs[0], f1 = fs[1], f2 = fs[2]
-            let count = max(f0.controls.count, f1.controls.count, f2.controls.count)
-            let size = Double.lastSpline(f0.size, f1.size, f2.size, t: t)
-            let l0 = f0.with(count: count)
-            let l1 = f1.with(count: count)
-            let l2 = f2.with(count: count)
-            let controls = [Control].lastSpline(l0.controls, l1.controls,
-                                                l2.controls, t: t)
-            let uuColor = f0.uuColor == f1.uuColor && f1.uuColor == f2.uuColor ?
-            f1.uuColor :
-            UUColor.lastSpline(f0.uuColor, f1.uuColor, f2.uuColor, t: t)
-            return Line(controls: controls, size: size, interID: f1.interID,
-                        uuColor: uuColor)
-        }
+        let fs = interpolatable([f0, f1, f2])
+        let f0 = fs[0], f1 = fs[1], f2 = fs[2]
+        let size = Double.lastSpline(f0.size, f1.size, f2.size, t: t)
+        let controls = [Control].lastSpline(f0.controls, f1.controls,
+                                            f2.controls, t: t)
+        let uuColor = f0.uuColor == f1.uuColor && f1.uuColor == f2.uuColor ?
+        f1.uuColor :
+        UUColor.lastSpline(f0.uuColor, f1.uuColor, f2.uuColor, t: t)
+        return Line(controls: controls, size: size, interID: f1.interID,
+                    uuColor: uuColor)
     }
     
     private func control(at i: Int, maxCount: Int) -> Control {
@@ -471,8 +449,7 @@ extension Line: Interpolatable {
         }
         return line
     }
-    private static func interpolate(_ lines: [Line],
-                                    handler: ([Line]) -> (Line)) -> Line {
+    private static func interpolatable(_ lines: [Line]) -> [Line] {
         let tss: [(li: Int, ci: Int, t: Double)] = lines.enumerated().flatMap { (li, line) in
             guard line.controls.count >= 3 else { return [(li: Int, ci: Int, t: Double)]() }
             let allD = line.length()
@@ -543,9 +520,8 @@ extension Line: Interpolatable {
             return line
         }
         
-//        print(lines.map { $0.count }, nLines.map { $0.count })
-        
-        return handler(nLines)
+        let count = nLines.maxValue { $0.controls.count } ?? 0
+        return nLines.map { $0.with(count: count) }
     }
     init(lines: [Line]) {
         if lines.count == 1 {
@@ -571,58 +547,41 @@ extension Line: Interpolatable {
 extension Line: MonoInterpolatable {
     static func firstMonospline(_ f1: Line, _ f2: Line,
                                 _ f3: Line, with ms: Monospline) -> Line {
-        return interpolate([f1, f2, f3]) { fs in
-            let f1 = fs[0], f2 = fs[1], f3 = fs[2]
-            let count = max(f1.controls.count, f2.controls.count, f3.controls.count)
-            let size = Double.firstMonospline(f1.size, f2.size, f3.size, with: ms)
-            let l1 = f1.with(count: count)
-            let l2 = f2.with(count: count)
-            let l3 = f3.with(count: count)
-            let controls = [Control].firstMonospline(l1.controls,
-                                                     l2.controls, l3.controls, with: ms)
-            let uuColor =  f1.uuColor == f2.uuColor && f2.uuColor == f3.uuColor ?
-            f1.uuColor :
-            UUColor.firstMonospline(f1.uuColor, f2.uuColor, f3.uuColor, with: ms)
-            return Line(controls: controls, size: size, interID: f1.interID, uuColor: uuColor)
-        }
+        let fs = interpolatable([f1, f2, f3])
+        let f1 = fs[0], f2 = fs[1], f3 = fs[2]
+        let size = Double.firstMonospline(f1.size, f2.size, f3.size, with: ms)
+        let controls = [Control].firstMonospline(f1.controls,
+                                                 f2.controls, f3.controls, with: ms)
+        let uuColor =  f1.uuColor == f2.uuColor && f2.uuColor == f3.uuColor ?
+        f1.uuColor :
+        UUColor.firstMonospline(f1.uuColor, f2.uuColor, f3.uuColor, with: ms)
+        return Line(controls: controls, size: size, interID: f1.interID, uuColor: uuColor)
     }
     static func monospline(_ f0: Line, _ f1: Line, _ f2: Line, _ f3: Line,
                            with ms: Monospline) -> Line {
-        return interpolate([f0, f1, f2, f3]) { fs in
-            let f0 = fs[0], f1 = fs[1], f2 = fs[2], f3 = fs[3]
-            let count = max(f0.controls.count, f1.controls.count,
-                            f2.controls.count, f3.controls.count)
-            let size = Double.monospline(f0.size, f1.size, f2.size, f3.size, with: ms)
-            let l0 = f0.with(count: count)
-            let l1 = f1.with(count: count)
-            let l2 = f2.with(count: count)
-            let l3 = f3.with(count: count)
-            let controls = [Control].monospline(l0.controls, l1.controls,
-                                                l2.controls, l3.controls, with: ms)
-            let uuColor =  f0.uuColor == f1.uuColor && f1.uuColor == f2.uuColor && f2.uuColor == f3.uuColor ?
-            f1.uuColor :
-            UUColor.monospline(f0.uuColor, f1.uuColor, f2.uuColor, f3.uuColor, with: ms)
-            return Line(controls: controls, size: size,
-                        interID: f1.interID, uuColor: uuColor)
-        }
+        let fs = interpolatable([f0, f1, f2, f3])
+        let f0 = fs[0], f1 = fs[1], f2 = fs[2], f3 = fs[3]
+        let size = Double.monospline(f0.size, f1.size, f2.size, f3.size, with: ms)
+        let controls = [Control].monospline(f0.controls, f1.controls,
+                                            f2.controls, f3.controls, with: ms)
+        let uuColor =  f0.uuColor == f1.uuColor && f1.uuColor == f2.uuColor && f2.uuColor == f3.uuColor ?
+        f1.uuColor :
+        UUColor.monospline(f0.uuColor, f1.uuColor, f2.uuColor, f3.uuColor, with: ms)
+        return Line(controls: controls, size: size,
+                    interID: f1.interID, uuColor: uuColor)
     }
     static func lastMonospline(_ f0: Line, _ f1: Line,
                                _ f2: Line, with ms: Monospline) -> Line {
-        return interpolate([f0, f1, f2]) { fs in
-            let f0 = fs[0], f1 = fs[1], f2 = fs[2]
-            let count = max(f0.controls.count, f1.controls.count, f2.controls.count)
-            let size = Double.lastMonospline(f0.size, f1.size, f2.size, with: ms)
-            let l0 = f0.with(count: count)
-            let l1 = f1.with(count: count)
-            let l2 = f2.with(count: count)
-            let controls = [Control].lastMonospline(l0.controls, l1.controls,
-                                                    l2.controls, with: ms)
-            let uuColor = f0.uuColor == f1.uuColor && f1.uuColor == f2.uuColor ?
-            f1.uuColor :
-            UUColor.lastMonospline(f0.uuColor, f1.uuColor, f2.uuColor, with: ms)
-            return Line(controls: controls, size: size,
-                        interID: f1.interID, uuColor: uuColor)
-        }
+        let fs = interpolatable([f0, f1, f2])
+        let f0 = fs[0], f1 = fs[1], f2 = fs[2]
+        let size = Double.lastMonospline(f0.size, f1.size, f2.size, with: ms)
+        let controls = [Control].lastMonospline(f0.controls, f1.controls,
+                                                f2.controls, with: ms)
+        let uuColor = f0.uuColor == f1.uuColor && f1.uuColor == f2.uuColor ?
+        f1.uuColor :
+        UUColor.lastMonospline(f0.uuColor, f1.uuColor, f2.uuColor, with: ms)
+        return Line(controls: controls, size: size,
+                    interID: f1.interID, uuColor: uuColor)
     }
 }
 
@@ -1995,7 +1954,7 @@ extension Line {
         }
         let scale = max(controls.maxValue { abs($0.point.x) } ?? 0,
                         controls.maxValue { abs($0.point.y) } ?? 0)
-        guard scale > 0 else { return self }
+        guard scale > 0 else { return n }
         let rScale = 1 / scale
         n.controls = n.controls.map {
             var n = $0
@@ -2006,13 +1965,13 @@ extension Line {
         return n
     }
     func noCrossLine(_ otherLine: Self) -> Self {
-        let count = max(controls.count, otherLine.controls.count)
-        guard count > 1 else { return self }
-        let l0 = with(count: count).normalized()
-        let l1 = otherLine.with(count: count).normalized()
-        let l1r = l1.reversed()
-        let l0l1d = count.range.sum { l0.controls[$0].distance(l1.controls[$0]) }
-        let l0l1rd = count.range.sum { l0.controls[$0].distance(l1r.controls[$0]) }
+        let nl0 = normalized(), nl1 = otherLine.normalized()
+        let ls = Line.interpolatable([nl0, nl1])
+        let l0 = ls[0], l1 = ls[1]
+        let lrs = Line.interpolatable([nl0, nl1.reversed()])
+        let l0r = lrs[0], l1r = lrs[1]
+        let l0l1d = zip(l0.controls, l1.controls).sum { $0.distance($1) }
+        let l0l1rd = zip(l0r.controls, l1r.controls).sum { $0.distance($1) }
         return l0l1d < l0l1rd ? self : reversed()
     }
     

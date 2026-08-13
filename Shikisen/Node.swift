@@ -407,7 +407,8 @@ final class Node: @unchecked Sendable {
         }
     }
     
-    var isClippingChildren = false
+    var isClippingChildrenLines = false
+    var isEnableCloneChildren = true
     
     var isCPUFillAntialias = true
     
@@ -481,7 +482,8 @@ final class Node: @unchecked Sendable {
     
     init(name: String = "",
          children: [Node] = [],
-         isHidden: Bool = false, isClippingChildren: Bool = false,
+         isHidden: Bool = false, isClippingChildrenLines: Bool = false,
+         isEnableCloneChildren: Bool = true,
          attitude: Attitude = Attitude(),
          path: Path = Path(),
          lineWidth: Double = 0, lineType: LineType? = nil,
@@ -490,7 +492,8 @@ final class Node: @unchecked Sendable {
         self.name = name
         backingChildren = children
         self.isHidden = isHidden
-        self.isClippingChildren = isClippingChildren
+        self.isClippingChildrenLines = isClippingChildrenLines
+        self.isEnableCloneChildren = isEnableCloneChildren
         self.aPath = path
         self.attitude = attitude
         self.localTransform = attitude.transform
@@ -522,7 +525,7 @@ final class Node: @unchecked Sendable {
     }
     
     private init(name: String, backingChildren: [Node],
-                 isHidden: Bool, isClippingChildren: Bool, attitude: Attitude,
+                 isHidden: Bool, isClippingChildrenLines: Bool, attitude: Attitude,
                  localTransform: Transform, isIdentityFromLocal: Bool, localScale: Double,
                  worldTransform: Transform, path: Path,
                  lineWidth : Double,
@@ -542,7 +545,7 @@ final class Node: @unchecked Sendable {
         self.name = name
         self.backingChildren = backingChildren
         self.isHidden = isHidden
-        self.isClippingChildren = isClippingChildren
+        self.isClippingChildrenLines = isClippingChildrenLines
         self.attitude = attitude
         self.localTransform = localTransform
         self.isIdentityFromLocal = isIdentityFromLocal
@@ -584,9 +587,9 @@ final class Node: @unchecked Sendable {
     }
     var clone: Node {
         Node(name: name,
-             backingChildren: backingChildren.map { $0.clone },
+             backingChildren: isEnableCloneChildren ? backingChildren.map { $0.clone } : [],
              isHidden: isHidden,
-             isClippingChildren: isClippingChildren,
+             isClippingChildrenLines: isClippingChildrenLines,
              attitude: attitude,
              localTransform: localTransform,
              isIdentityFromLocal: isIdentityFromLocal,
@@ -750,7 +753,7 @@ extension Node {
             return
         }
         
-        if !isClippingChildren, let fillPathBuffer = fillPathBuffer {
+        if !isClippingChildrenLines, let fillPathBuffer = fillPathBuffer {
             if path.isPolygon {
                 if let fillColorBuffer = fillColorBuffer {
                     if isFillOpaque {
@@ -868,7 +871,7 @@ extension Node {
             }
         }
         
-        if isClippingChildren {
+        if isClippingChildrenLines {
             ctx.setStencilPipeline()
             ctx.setReplaceDepthStencil()
             ctx.setStencilReferenceValue(0)
@@ -951,6 +954,22 @@ extension Node {
             ctx.clip(owner.viewportBounds)
         }
     }
+}
+extension Node {
+    static let point: Node = {
+        let ps: [Point] = [.init().movedWith(distance: 0.125, angle: .pi),
+                           .init().movedWith(distance: 0.125, angle: -3 * .pi / 4),
+                           .init().movedWith(distance: 0.125, angle: 3 * .pi / 4),
+                           .init().movedWith(distance: 0.125, angle: -.pi / 2),
+                           .init().movedWith(distance: 0.125, angle: .pi / 2),
+                           .init().movedWith(distance: 0.125, angle: -.pi / 4),
+                           .init().movedWith(distance: 0.125, angle: .pi / 4),
+                           .init().movedWith(distance: 0.125, angle: 0)]
+        let node = Node(path: Path(TriangleStrip(points: ps)),
+                        fillType: .color(.content))
+        node.updateDatas()
+        return node
+    } ()
 }
 
 extension Node {

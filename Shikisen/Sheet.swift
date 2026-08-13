@@ -2918,16 +2918,6 @@ extension Sheet {
         return str
     }
     
-    func draftLinesColor() -> Color {
-        Sheet.draftLinesColor(from: backgroundUUColor.value)
-    }
-    static func draftLinesColor(from fillColor: Color) -> Color {
-        Color.rgbLinear(fillColor, .draft, t: 0.125)
-    }
-    static func draftPlaneColor(from color: Color, fillColor: Color) -> Color {
-        Color.rgbLinear(fillColor, color, t: 0.075)
-    }
-    
     func node(isBorder: Bool, isBackground: Bool = true,
               attitude: Attitude = .init(),
               in bounds: Rect) -> CPUNode {
@@ -2979,23 +2969,22 @@ extension Sheet {
         let textNodes = texts.map { $0.cpuNode }
         let borderNodes = isBorder ? borders.map { $0.cpuNode(with: bounds) } : []
         
-        let draftLineNodes: [CPUNode]
-        if !draftPicture.lines.isEmpty {
-            let lineColor = draftLinesColor()
-            draftLineNodes = draftPicture.lines.map { $0.cpuNode(from: lineColor,
-                                                                 isDrawLineAntialias: true) }
-        } else {
-            draftLineNodes = []
-        }
-        
-        let draftPlaneNodes: [CPUNode]
-        if !draftPicture.planes.isEmpty {
-            let fillColor = backgroundUUColor.value
-            draftPlaneNodes = draftPicture.planes.map {
-                $0.cpuNode(from: Sheet.draftPlaneColor(from: $0.uuColor.value, fillColor: fillColor))
+        let draftPlaneNodes: [CPUNode] = if !draftPicture.planes.isEmpty {
+            draftPicture.planes.map {
+                $0.cpuNode(from: $0.uuColor.value.with(opacity: $0.uuColor.value.opacity * 0.075))
             }
         } else {
-            draftPlaneNodes = []
+            []
+        }
+        
+        let draftLineNodes: [CPUNode] = if !draftPicture.lines.isEmpty {
+            [CPUNode(children: draftPicture.lines.map { $0.cpuNode(from: .background,
+                                                                   isDrawLineAntialias: true) },
+                     path: .init(bounds),
+                     fillType: .color(.draftLine),
+                     isClippingChildrenLines: true)]
+        } else {
+            []
         }
         
         let children0 = draftPlaneNodes + draftLineNodes

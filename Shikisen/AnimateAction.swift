@@ -281,7 +281,7 @@ final class SelectTimeAction: SwipeEventAction, DragEventAction {
     }
     
     private let indexInterval = 5.0, animationIndexInterval = 0.5
-    private let correction = 2.5
+    private let correction = 2.0
     
     enum MoveType {
         case keyframe, frame, time
@@ -417,10 +417,10 @@ final class SelectTimeAction: SwipeEventAction, DragEventAction {
                                             node.lineType = .color(.background)
                                             return node
                                         }
-                                        let node = Node(children: [Node(children: dNodes, isClippingChildren: true,
-                                                                        path: .init(bounds), fillType: .color(.draft.with(opacity: 0.25))),
-                                                                   Node(children: nodes, isClippingChildren: true,
-                                                                               path: .init(bounds), fillType: .color(Color(white: 0, opacity: 0.25)))])
+                                        let node = Node(children: [Node(children: dNodes, isClippingChildrenLines: true,
+                                                                        path: .init(bounds), fillType: .color(.draft.with(opacity: 0.125))),
+                                                                   Node(children: nodes, isClippingChildrenLines: true,
+                                                                               path: .init(bounds), fillType: .color(Color(white: 0, opacity: 0.125)))])
                                         
                                         otherChildren.append(node)
                                         

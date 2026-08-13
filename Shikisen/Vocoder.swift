@@ -550,7 +550,7 @@ extension Rendnote {
         
         notewave.sampless.forEach { samples in
             if samples.contains(where: { $0.isNaN || $0.isInfinite }) {
-                print(samples.contains(where: { $0.isInfinite }) ? "inf" : "nan")
+                fatalError(samples.contains(where: { $0.isInfinite }) ? "inf" : "nan")
             }
         }
         
