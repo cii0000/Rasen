@@ -1658,6 +1658,8 @@ final class FillAction: Action {
                     
                     sheetView.newUndoGroup()
                     sheetView.replace(nivs)
+                    
+                    isChanged = true
                 }
             } else {
                 let (_, sheetView, frame, isAll) = rootView.sheetViewAndFrame(at: p)

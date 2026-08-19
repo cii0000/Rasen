@@ -506,10 +506,10 @@ struct Spectlope: Hashable, Codable {
     static func defaultSprols(isRandom: Bool = false) -> [Sprol] {
         [Sprol(pitch: 12 * 0.75, volm: 0, noise: 0),
          Sprol(pitch: 12 * 2, volm: 0.75, noise: 0),
-         Sprol(pitch: 12 * 3, volm: !isRandom ? 1 : .random(in: 0.95 ... 1), noise: 0),
+         Sprol(pitch: 12 * 3, volm: !isRandom ? 1 : .random(in: 0.975 ... 1), noise: 0),
          Sprol(pitch: 12 * 7, volm: 0.4, noise: 0),
-         Sprol(pitch: 12 * 7.25, volm: !isRandom ? 0.5 : .random(in: 0.5 ... 0.55), noise: 0),
-         Sprol(pitch: 12 * 8.15, volm: !isRandom ? 0.5 : .random(in: 0.5 ... 0.55), noise: 0),
+         Sprol(pitch: 12 * 7.25, volm: !isRandom ? 0.5 : .random(in: 0.5 ... 0.525), noise: 0),
+         Sprol(pitch: 12 * 8.15, volm: !isRandom ? 0.5 : .random(in: 0.5 ... 0.525), noise: 0),
          Sprol(pitch: 12 * 8.75, volm: 0.125, noise: 0),
          Sprol(pitch: 12 * 10, volm: 0, noise: 0)]
     }

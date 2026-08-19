@@ -1536,7 +1536,7 @@ final class ChangeColorAction: Action {
         }
     }
     
-    let tintR = 100.0, maxTint = 128.0, tintPadding = 20.0
+    let tintR = 100.0, maxTint = 128.0, tintPadding = 5.0
     let snappableDistance = 3.0
     let tintNode = Node(lineWidth: 2)
     let tintBorderNode = Node(lineWidth: 3.25, lineType: .color(.background))
@@ -1602,10 +1602,12 @@ final class ChangeColorAction: Action {
         }
     }
     func updateTintLinePath() {
-        let path = Path([Pathline([Point().movedWith(distance: tintPadding,
-                                                     angle: editingTintPosition.angle()),
-                                   editingTintPosition]),
-                        Pathline(circleRadius: tintPadding)])
+        let path = editingMainUUColor.value.chroma == 0 ?
+        Path([Pathline(circleRadius: tintPadding)]) :
+        Path([Pathline([Point().movedWith(distance: tintPadding,
+                                          angle: editingTintPosition.angle()),
+                        editingTintPosition]),
+              Pathline(circleRadius: tintPadding)])
         tintLineNode.path = path
         tintOutlineNode.path = path
     }
@@ -1647,7 +1649,7 @@ final class ChangeColorAction: Action {
             updateOwners(with: event)
             fsp = sp
             tintLightness = beganMainUUColor.value.lightness
-            oldEditingTintPosition = PolarPoint(beganMainUUColor.value.chroma * tintR / maxTint + tintPadding,
+            oldEditingTintPosition = beganMainUUColor.value.chroma == 0 ? .init() : PolarPoint(beganMainUUColor.value.chroma * tintR / maxTint + tintPadding,
                                               beganMainUUColor.value.hue).rectangular
             editingTintPosition = oldEditingTintPosition
             beganTintPosition = p
@@ -1681,7 +1683,7 @@ final class ChangeColorAction: Action {
                 }
             }
             
-            editingTintPosition = PolarPoint(uuColor.value.chroma * tintR / maxTint + tintPadding,
+            editingTintPosition = uuColor.value.chroma == 0 ? .init() : PolarPoint(uuColor.value.chroma * tintR / maxTint + tintPadding,
                                              uuColor.value.hue).rectangular
         case .ended:
             capture()

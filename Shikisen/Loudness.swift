@@ -350,70 +350,64 @@ struct Loudness {
         return lufs
     }
 }
-extension Loudness {
-    private struct Item {
+
+struct LoudnessCurve {
+    // Referenced definition:
+    // ISO 226:2003. Acoustics — Normal equal-loudness-level contours.
+    static let phons40 = Self(items: [.init(1, 10.5, 1.25),
+                                      .init(2, 3.5, 1.2),
+                                      .init(3, 7.3, 1.1),
+                                      .init(5, 11.2, 1),
+                                      .init(6, 3, 1.05),
+                                      .init(6, 5, 0.975),
+                                      .init(7, 7, 0.85),
+                                      .init(7, 11, 0.75),
+                                      .init(9, 1, 0.85),
+                                      .init(9, 7, 0.9),
+                                      .init(9, 10, 0.85)])
+    
+    // change to critical band
+    static let clearPhons40 = Self(items: [.init(0, 0, 1),
+                                           .init(4, 0, 1),
+                                           .init(7, 8, 0.7),
+                                           .init(10, 0, 0.25)])
+    
+    struct Item {
         var pitch: Double, volm: Double
         
+        init(_ pitch12: Double, _ pitch12d: Double, _ volm: Double) {
+            self.pitch = pitch12 * 12 + pitch12d
+            self.volm = volm
+        }
         init(_ pitch: Double, _ volm: Double) {
             self.pitch = pitch
             self.volm = volm
         }
     }
+    var items: [Item]
     
-    // Referenced definition:
-    // ISO 226:2003. Acoustics — Normal equal-loudness-level contours.
-    private static let pitchVolm40Phons = [Item(22.5, 1.25),
-                                           Item(27.5, 1.2),
-                                           Item(43.3, 1.1),
-                                           Item(71.2, 1),
-                                           Item(75.0, 1.05),
-                                           Item(77.0, 0.975),
-                                           Item(91.0, 0.85),
-                                           Item(95.0, 0.75),
-                                           Item(109.0, 0.85),
-                                           Item(115.0, 0.9),
-                                           Item(118.0, 0.85)]
-    
-    static func volm40Phon(fromPitch pitch: Double) -> Double {
-        var prePitchVolm = pitchVolm40Phons.first!
-        if pitch < prePitchVolm.pitch {
-            return prePitchVolm.volm
+    func volm(fromPitch pitch: Double) -> Double {
+        var item = items.first!
+        if pitch < item.pitch {
+            return item.volm
         }
-        for i in 1 ..< pitchVolm40Phons.count {
-            let pitchVolum = pitchVolm40Phons[i]
+        for i in 1 ..< items.count {
+            let pitchVolum = items[i]
             if pitch < pitchVolum.pitch {
-                let t = (pitch - prePitchVolm.pitch) / (pitchVolum.pitch - prePitchVolm.pitch)
-                return .linear(prePitchVolm.volm, pitchVolum.volm, t: t)
+                let t = (pitch - item.pitch) / (pitchVolum.pitch - item.pitch)
+                return .linear(item.volm, pitchVolum.volm, t: t)
             }
-            prePitchVolm = pitchVolum
+            item = pitchVolum
         }
-        return prePitchVolm.volm
+        return item.volm
     }
-    static func reverseVolm40Phon(fromPitch pitch: Double) -> Double {
-        1 / volm40Phon(fromPitch: pitch)
+    func reverseVolm(fromPitch pitch: Double) -> Double {
+        1 / volm(fromPitch: pitch)
     }
     
-    // change to critical band
-    private static let pitchClearVolm40Phons = [Item(0, 1),
-                                                Item(48, 1),
-                                                Item(92, 0.75),
-                                                Item(120, 0.25)]
-    static func clearVolm40Phon(fromPitch pitch: Double) -> Double {
-        var prePitchVolm = pitchClearVolm40Phons.first!
-        if pitch < prePitchVolm.pitch {
-            return prePitchVolm.volm
-        }
-        for i in 1 ..< pitchClearVolm40Phons.count {
-            let pitchVolum = pitchClearVolm40Phons[i]
-            if pitch < pitchVolum.pitch {
-                let t = (pitch - prePitchVolm.pitch) / (pitchVolum.pitch - prePitchVolm.pitch)
-                return .linear(prePitchVolm.volm, pitchVolum.volm, t: t)
-            }
-            prePitchVolm = pitchVolum
-        }
-        return prePitchVolm.volm
-    }
-    static func reverseClearVolm40Phon(fromPitch pitch: Double) -> Double {
-        1 / clearVolm40Phon(fromPitch: pitch)
+    static func * (lhs: Self, rhs: Double) -> Self {
+        .init(items: lhs.items.map {
+            .init($0.pitch, $0.volm * rhs)
+        })
     }
 }

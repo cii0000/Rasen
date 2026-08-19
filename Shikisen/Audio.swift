@@ -2018,6 +2018,74 @@ extension AVAudioPCMBuffer {
     }
 }
 
+final class EQ {
+    var setup: vDSP_biquadm_Setup, channelCount, sectionCount: Int
+    
+    init?(fqs: [Double] = [31.25, 62.5, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0],
+          dbs: [Double] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          bandwidthOctaves: Double = 1.0,
+          channelCount: Int,
+          sampleRate: Double) {
+        
+        let sectionCount = fqs.count
+        
+        var coefficients = [Double](capacity: 5 * sectionCount * channelCount)
+        for bandI in 0 ..< sectionCount {
+            let A = 10.0 ** (dbs[bandI] / 40.0)
+            let omega = 2.0 * .pi * fqs[bandI] / sampleRate
+            let sinOmega = Double.sin(omega), cosOmega = Double.cos(omega)
+            let alpha = sinOmega * .sinh(.log(2.0) / 2.0 * bandwidthOctaves * omega / sinOmega)
+            let a0 = 1.0 + alpha / A
+            let b0 = (1.0 + alpha * A) / a0
+            let b1 = (-2.0 * cosOmega) / a0
+            let b2 = (1.0 - alpha * A) / a0
+            let a1 = (-2.0 * cosOmega) / a0
+            let a2 = (1.0 - alpha / A) / a0
+            for _ in channelCount.range {
+                coefficients += [b0, b1, b2, a1, a2]
+            }
+        }
+        
+        guard let setup = coefficients.withUnsafeBufferPointer({
+            vDSP_biquadm_CreateSetup($0.baseAddress!,
+                                     vDSP_Length(sectionCount),
+                                     vDSP_Length(channelCount))
+        }) else {
+            return nil
+        }
+        
+        self.setup = setup
+        self.channelCount = channelCount
+        self.sectionCount = sectionCount
+    }
+    deinit {
+        vDSP_biquadm_DestroySetup(setup)
+    }
+    
+    func apply(_ bufferList: UnsafeMutableAudioBufferListPointer,
+               frameCount: AVAudioFrameCount) {
+        guard frameCount > 0, bufferList.count >= channelCount else { return }
+        var inputPointers = [UnsafePointer<Float>](capacity: channelCount)
+        var outputPointers = [UnsafeMutablePointer<Float>](capacity: channelCount)
+        for channel in 0 ..< channelCount {
+            guard let mData = bufferList[channel].mData else { return }
+            let ptr = mData.assumingMemoryBound(to: Float.self)
+            inputPointers.append(ptr)
+            outputPointers.append(ptr)
+        }
+        inputPointers.withUnsafeMutableBufferPointer { input in
+            outputPointers.withUnsafeMutableBufferPointer { output in
+                vDSP_biquadm(setup, input.baseAddress!, 1, output.baseAddress!, 1,
+                             vDSP_Length(frameCount))
+            }
+        }
+    }
+    
+    func reset() {
+        vDSP_biquadm_ResetState(setup)
+    }
+}
+
 extension AVAudioUnitEffect {
     static func limiter() -> AVAudioUnitEffect {
         let cacd = AudioComponentDescription(componentType: kAudioUnitType_Effect,
@@ -2054,7 +2122,8 @@ final class ClippingAudioUnit: AUAudioUnit {
     }
     
     private var pcmBuffer: AVAudioPCMBuffer?
-
+    private var eq: EQ?
+    
     var headroomAmp: Float? = Float(Audio.floatHeadroomAmp)
     var enabledAttack = true
     
@@ -2074,6 +2143,8 @@ final class ClippingAudioUnit: AUAudioUnit {
                                    frameCapacity: maxFramesToRender) else { throw SError() }
         self.pcmBuffer = pcmBuffer
 
+//        eq = EQ(channelCount: 2, sampleRate: format.sampleRate)
+        
         try super.init(componentDescription: componentDescription, options: options)
 
         self.maximumFramesToRender = maxFramesToRender
@@ -2089,8 +2160,10 @@ final class ClippingAudioUnit: AUAudioUnit {
     override func deallocateRenderResources() {
         super.deallocateRenderResources()
         self.pcmBuffer = nil
+        
+        eq?.reset()
     }
-
+    
     public override var canProcessInPlace: Bool { true }
 
     override var internalRenderBlock: AUInternalRenderBlock {
@@ -2125,6 +2198,14 @@ final class ClippingAudioUnit: AUAudioUnit {
             }
             guard !outputBLP.isEmpty else { return noErr }
             
+            for ci in 0 ..< outputBLP.count {
+                let inputFrames = inputBLP[ci].mData!.assumingMemoryBound(to: Float.self)
+                let outputFrames = outputBLP[ci].mData!.assumingMemoryBound(to: Float.self)
+                for i in 0 ..< Int(frameCount) {
+                    outputFrames[i] = inputFrames[i]
+                }
+            }
+            
             if self.enabledAttack,
                (timestamp.pointee.mFlags.contains(.sampleTimeValid)
                 || timestamp.pointee.mFlags.contains(.sampleHostTimeValid))
@@ -2140,12 +2221,12 @@ final class ClippingAudioUnit: AUAudioUnit {
                 }
             }
             
+            eq?.apply(outputBLP, frameCount: frameCount)
+            
             let headroomAmp = ((try? self.headroomAmp?.notNaN()) ?? 4).clipped(min: 0, max: 4)
             for ci in 0 ..< outputBLP.count {
-                let inputFrames = inputBLP[ci].mData!.assumingMemoryBound(to: Float.self)
                 let outputFrames = outputBLP[ci].mData!.assumingMemoryBound(to: Float.self)
                 for i in 0 ..< Int(frameCount) {
-                    outputFrames[i] = inputFrames[i]
                     if outputFrames[i].isNaN {
                         outputFrames[i] = 0
                     } else if outputFrames[i] < -headroomAmp {

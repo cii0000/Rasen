@@ -243,6 +243,9 @@ final class LookUpAction: InputKeyEventAction {
         } else if let sheetView = rootView.sheetView(at: p),
                   let noteI = sheetView.scoreView.noteIndex(at: sheetView.scoreView.convertFromWorld(p),
                                                             scale: rootView.screenToWorldScale) {
+            let note = sheetView.scoreView.model.notes[noteI]
+            let idStr = note.pits.count == 1 ? note.pits[0].tone.id.uuidString : ""
+            
             let scoreView = sheetView.scoreView
             let y = scoreView.noteY(atX: sheetView.scoreView.convertFromWorld(p).x, at: noteI)
             let scoreP = scoreView.convertFromWorld(p)
@@ -251,7 +254,7 @@ final class LookUpAction: InputKeyEventAction {
             let fq = pitch.fq
             let fqStr = "\("Note".localized) \(pitch.displayString()) (\(fq.string(digitsCount: 2)) Hz)"
             + "\n" + Animation.timeString(fromTime: beat,
-                                          frameRate: Rational(Keyframe.defaultFrameRate)) + " beat"
+                                          frameRate: Rational(Keyframe.defaultFrameRate)) + " beat" + (idStr.isEmpty ? "" : "\n\tID: \(idStr)")
             rootView.show(fqStr, at: p)
         } else if let sheetView = rootView.sheetView(at: p),
                   sheetView.scoreView.contains(sheetView.scoreView.convertFromWorld(p),
@@ -866,7 +869,7 @@ final class InputTextAction: InputTextEventAction {
                 sheetView.newUndoGroup()
                 sheetView.unselect()
                 rootView.unselectAllAndNewUndoGroupIfNeeded()
-                sheetView.append(Note(beatRange: beat ..< beat + .init(1, 2), pitch: pitch, pits: [.init()]))
+                sheetView.append(Note(beatRange: beat ..< beat + .init(1, 2), pitch: pitch, pits: [.init(stereo: .init(volm: 0.453125 * 1.25, pan: 0, id: .two))]))
                 appendLyric(atPit: 0, atNote: scoreView.model.notes.count - 1, isNewUndoGroup: false)
             } else {
                 rootView.cursor = .block
@@ -1231,11 +1234,8 @@ final class InputTextAction: InputTextEventAction {
         
         guard let range = textView.selectedRange(at: textView.convertFromWorld(p)) else { return }
         
-        let minP = textView.typesetter
-            .characterPosition(at: range.lowerBound)
         var removedText = textView.model
         removedText.string = String(removedText.string[range])
-        removedText.origin += minP
         let ssValue = SheetValue(texts: [removedText], isSelected: false)
         
         let removeRange: Range<String.Index>

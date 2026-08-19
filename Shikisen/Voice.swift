@@ -579,30 +579,56 @@ extension Formant: MonoInterpolatable {
 
 struct FormantFilter: Hashable, Codable {
     /// f0: 4.03
-    var formants: [Formant] = [.init(sdVolm: 0.5 * 0.8, sdNoise: 0,
+    var formants: [Formant] = [.init(sdVolm: 0.5 * 0.8 * 0.75, sdNoise: 0,
                                      sdPitch: 9.1, sPitch: 67.8, ePitch: 74.5, edPitch: 6.3,
-                                     volm: 0.9 * 0.8, noise: 0.13,
-                                     edVolm: 0.5 * 0.8, edNoise: 0.18),
-                               .init(sdVolm: 0.5 * 0.85, sdNoise: 0.13,
-                                     sdPitch: 5.7, sPitch: 80, ePitch: 81.7, edPitch: 5.0,
-                                     volm: 0.9 * 0.85, noise: 0.3,
-                                     edVolm: 0.33 * 0.85, edNoise: 0.26),
-                               .init(sdVolm: 0.2, sdNoise: 0.23,
+                                     volm: 0.9 * 0.8 * 0.75, noise: 0.13,
+                                     edVolm: 0.5 * 0.8 * 0.75, edNoise: 0.18),
+                               .init(sdVolm: 0.5 * 0.85 * 0.75, sdNoise: 0.13,
+                                     sdPitch: 5.7, sPitch: 80, ePitch: 81.7, edPitch: 5.2,
+                                     volm: 0.9 * 0.85 * 0.75, noise: 0.3,
+                                     edVolm: 0.33 * 0.85 * 0.75, edNoise: 0.26),
+                               .init(sdVolm: 0.3 * 0.9 * 0.75, sdNoise: 0.23,
                                      sdPitch: 1.6, sPitch: 94.5, ePitch: 96.5, edPitch: 1.1,
                                      volm: 1, noise: 0.35,
-                                     edVolm: 0.2, edNoise: 0.69),
-                               .init(sdVolm: 0.2, sdNoise: 0.69,
+                                     edVolm: 0.33, edNoise: 0.69),
+                               .init(sdVolm: 0.4, sdNoise: 0.69,
+                                     sdPitch: 0.5, sPitch: 99, ePitch: 100.7, edPitch: 1.2,
+                                     volm: 0.825, noise: 0.39,
+                                     edVolm: 0, edNoise: 1),
+                               .init(sdVolm: 0, sdNoise: 1,
+                                     sdPitch: 0.8, sPitch: 107.9, ePitch: 109.6, edPitch: 0.9,
+                                     volm: 0.3 * 0.9 * 0.875, noise: 0.61,
+                                     edVolm: 0.1 * 0.9 * 0.875, edNoise: 1),
+                               .init(sdVolm: 0.1 * 0.9 * 0.875, sdNoise: 1,
+                                     sdPitch: 0.6, sPitch: 113.7, ePitch: 115.3, edPitch: 0.8,
+                                     volm: 0.2 * 0.9 * 0.875, noise: 0.93,
+                                     edVolm: 0, edNoise: 1)]
+    
+    /// f0: 4.00
+    static let low = Self(formants: [.init(sdVolm: 0.5 * 0.8 * 0.75, sdNoise: 0,
+                                     sdPitch: 9.1, sPitch: 67.8, ePitch: 74.5, edPitch: 6.3,
+                                     volm: 0.9 * 0.8 * 0.75, noise: 0.13,
+                                     edVolm: 0.5 * 0.8 * 0.75, edNoise: 0.18),
+                               .init(sdVolm: 0.5 * 0.85 * 0.75, sdNoise: 0.13,
+                                     sdPitch: 5.7, sPitch: 80, ePitch: 81.7, edPitch: 5.0,
+                                     volm: 0.9 * 0.85 * 0.75, noise: 0.3,
+                                     edVolm: 0.33 * 0.85 * 0.75, edNoise: 0.26),
+                               .init(sdVolm: 0.2 * 0.75, sdNoise: 0.23,
+                                     sdPitch: 1.6, sPitch: 94.5, ePitch: 96.5, edPitch: 1.1,
+                                     volm: 1, noise: 0.35,
+                                     edVolm: 0.2 * 0.75, edNoise: 0.69),
+                               .init(sdVolm: 0.2 * 0.75, sdNoise: 0.69,
                                      sdPitch: 0.5, sPitch: 99, ePitch: 100.7, edPitch: 1.2,
                                      volm: 0.75, noise: 0.425,
                                      edVolm: 0, edNoise: 1),
                                .init(sdVolm: 0, sdNoise: 1,
                                      sdPitch: 0.8, sPitch: 107.9, ePitch: 109.6, edPitch: 0.9,
-                                     volm: 0.3 * 0.9, noise: 0.65,
-                                     edVolm: 0.1 * 0.9, edNoise: 1),
-                               .init(sdVolm: 0.1 * 0.9, sdNoise: 1,
-                                     sdPitch: 0.6, sPitch: 113.7, ePitch: 115.3, edPitch: 0.8,
-                                     volm: 0.2 * 0.9, noise: 0.95,
-                                     edVolm: 0, edNoise: 1)]
+                                     volm: 0.3 * 0.9 * 0.85, noise: 0.65,
+                                     edVolm: 0.1 * 0.9 * 0.85, edNoise: 1),
+                               .init(sdVolm: 0.1 * 0.9 * 0.85, sdNoise: 1,
+                                     sdPitch: 0.6 * 0.85, sPitch: 113.7, ePitch: 115.3, edPitch: 0.8,
+                                     volm: 0.2 * 0.9 * 0.85, noise: 0.95,
+                                     edVolm: 0, edNoise: 1)])
 }
 extension FormantFilter {
     init(spectlope: Spectlope) {
@@ -619,6 +645,9 @@ extension FormantFilter {
         
         var n = self
         
+        if f0Pitch <= 49 {
+            n = Self.low
+        }
         if f0Pitch < 51 {
             n.formants[0].pitch += f0Pitch.clipped(min: 39, max: 51, newMin: -3, newMax: 0)
             n.formants[1].pitch += f0Pitch.clipped(min: 39, max: 51, newMin: -3, newMax: 0)
@@ -1044,7 +1073,7 @@ extension FormantFilter {
             n[2].pitch += 1
             n = phoneme.isDakuon ? n.toDakuon() : n.toVoiceless()
             return n
-        case .ɕ, .dʒ, .tɕ, .tj, .dj:
+        case .ɕ, .ɕSmall, .dʒ, .tɕ, .tɕSmall, .tj, .dj:
             var n = self
             n[0].pitch -= 20
             n[1].pitch += 7
@@ -1161,7 +1190,7 @@ extension FormantFilter {
                 n = n.multiplyAllVolm(0.925)
             }
             return .linear(self, n.multiplyAllVolm(0.85), t: opacity)
-        case .ɕ, .dʒ, .tɕ, .ɕRes, .tɕRes:
+        case .ɕ, .ɕSmall, .dʒ, .tɕ, .tɕSmall, .ɕRes, .tɕRes:
             var n = toNoise(from: 2)
             if phoneme.isDakuon {
                 n[0].fillAllVolm(0.6)
@@ -1181,8 +1210,10 @@ extension FormantFilter {
             n.formFillEsVolm(0.6, at: 4)
             n[5].fillVolm(0.45)
             n[5].edVolm = 0
-            if phoneme == .tɕ || phoneme == .tɕRes {
-                n = n.multiplyAllVolm(0.925)
+            if phoneme == .tɕ || phoneme == .tɕSmall || phoneme == .tɕRes {
+                n = n.multiplyAllVolm(phoneme == .tɕSmall ? 0.85 : 0.925)
+            } else if phoneme == .ɕSmall {
+                n = n.multiplyAllVolm(0.8)
             }
             return .linear(self, n, t: opacity)
         case .ha, .he, .ho:
@@ -1532,7 +1563,7 @@ struct Mora: Hashable, Codable {
                 onsetDurSec = 0.01
                 pitch = -2
                 paddingSec = 0.05
-            case .sa, .ɕ, .sβ, .se, .so, .ɕRes, .sβRes:
+            case .sa, .ɕ, .ɕSmall, .sβ, .se, .so, .ɕRes, .sβRes:
                 onsetDurSec = 0.065 * onsetScale
                 pitch = -3
                 paddingSec = 0.05
@@ -1564,7 +1595,7 @@ struct Mora: Hashable, Codable {
                 onsetDurSec = 0.01
                 pitch = -3
                 paddingSec = 0.03
-            case .tɕ, .tɕRes:
+            case .tɕ, .tɕSmall, .tɕRes:
                 onsetDurSec = 0.05 * onsetScale
                 pitch = -3
                 paddingSec = 0.05
@@ -1739,7 +1770,7 @@ struct Mora: Hashable, Codable {
                     kffs.append(.init(youonFf, durSec: youonDurSec))
                 }
                 kffs.append(.init(vowelFf, durSec: 0))
-            case .sa, .ɕ, .sβ, .se, .so, .ɕRes, .sβRes:
+            case .sa, .ɕ, .ɕSmall, .sβ, .se, .so, .ɕRes, .sβRes:
                 let nextFf = oph.isVowelReduction ? nextFf.multiplyAllVolm(0.03125) : nextFf
                 let vowelFf = oph.isVowelReduction ? vowelFf.multiplyAllVolm(0.03125) : vowelFf
                 
@@ -1799,12 +1830,12 @@ struct Mora: Hashable, Codable {
                     kffs.append(.init(.linear(ff0, nextFf, t: 0.5), durSec: 0.025, pitch: -pitch / 8))
                 }
                 kffs.append(.init(vowelFf, durSec: 0))
-            case .ta, .tj, .tβ, .te, .to, .tɕ, .ts, .tɕRes, .tsRes:
+            case .ta, .tj, .tβ, .te, .to, .tɕ, .tɕSmall, .ts, .tɕRes, .tsRes:
                 let nextFf = oph.isVowelReduction ? nextFf.multiplyAllVolm(0.03125) : nextFf
                 let vowelFf = oph.isVowelReduction ? vowelFf.multiplyAllVolm(0.03125) : vowelFf
                 
                 let offSec = switch oph {
-                case .tɕ, .ts: 0.02
+                case .tɕ, .tɕSmall, .ts: 0.02
                 default: 0.035
                 }
                 let onsetLastDurSec = 0.02
@@ -1938,9 +1969,9 @@ enum Phoneme: String, Hashable, Codable, CaseIterable {
          p, pj, b, bj,
          ka, kj, kβ, ke, ko,
          ga, gj, gβ, ge, go,
-         sa, ɕ, sβ, se, so,
+         sa, ɕ, ɕSmall, sβ, se, so,
          dza, dʒ, dzβ, dze, dzo,
-         ta, tj, tβ, te, to, tɕ, ts,
+         ta, tj, tβ, te, to, tɕ, tɕSmall, ts,
          da, dj, dβ, de, `do`,
          ŋ, ã, ĩ, ɯ̃, ẽ, õ,
          çRes = "ç/", ɸRes = "ɸ/",
@@ -1975,8 +2006,8 @@ extension Phoneme {
     var isHaretsu: Bool {
         switch self {
         case .ka, .kj, .kβ, .ke, .ko, .kjRes, .kβRes,
-                .sa, .ɕ, .sβ, .se, .so, .ɕRes, .sβRes,
-                .ta, .tj, .tβ, .te, .to, .tɕ, .ts, .tɕRes, .tsRes,
+                .sa, .ɕ, .ɕSmall, .sβ, .se, .so, .ɕRes, .sβRes,
+                .ta, .tj, .tβ, .te, .to, .tɕ, .tɕSmall, .ts, .tɕRes, .tsRes,
                 .ha, .ç, .ɸ, .he, .ho, .çRes, .ɸRes,
                 .p, .pj, .pjRes, .pβRes: true
         default: false
@@ -2015,7 +2046,7 @@ extension Phoneme {
     }
     var isS: Bool {
         switch self {
-        case .sa, .ɕ, .sβ, .se, .so, .ɕRes, .sβRes: true
+        case .sa, .ɕ, .ɕSmall, .sβ, .se, .so, .ɕRes, .sβRes: true
         default: false
         }
     }
@@ -2068,6 +2099,7 @@ extension Phoneme {
         case "ぐぉ", "gwo": [.gβ, .β, .o]
         case "さ", "sa": [.sa, .a]
         case "し", "si", "shi": [.ɕ, .i]
+        case "-し", "-si", "-shi": [.ɕSmall, .i]
         case "す", "su": [.sβ, .ɯ]
         case "せ", "se": [.se, .e]
         case "そ", "so": [.so, .o]
@@ -2094,6 +2126,7 @@ extension Phoneme {
         case "ずぉ", "づぉ", "zwo", "dwo": [.dzβ, .β, .o]
         case "た", "ta": [.ta, .a]
         case "ち", "ti", "chi": [.tɕ, .i]
+        case "-ち", "-ti", "-chi": [.tɕSmall, .i]
         case "つ", "tu", "tsu": [.ts, .ɯ]
         case "て", "te": [.te, .e]
         case "と", "to": [.to, .o]
@@ -2217,11 +2250,11 @@ extension Phoneme {
         case "ん", "n":
             switch nextPhoneme {
             case .p, .pj, .pjRes, .pβRes, .b, .bj, .m, .mj: [.m]
-            case .ta, .tj, .tɕ, .tβ, .ts, .te, .to, .tɕRes, .tsRes,
+            case .ta, .tj, .tɕ, .tɕSmall, .tβ, .ts, .te, .to, .tɕRes, .tsRes,
                     .dza, .dʒ, .dzβ, .dze, .dzo, .n, .nj, .ɾ, .ɾj, .da, .dj, .dβ, .de, .do: [.n]
             case .ka, .kj, .kβ, .ke, .ko, .kjRes, .kβRes, .ga, .gj, .gβ, .ge, .go, .ŋ: [.ŋ]
             case .a, .sa, .ha, .haBreath, .aBreath, .ã: [.ã]
-            case .i, .j, .ja, .ɕ, .ɕRes, .ç, .çRes, .hiBreath, .iBreath, .ĩ: [.ĩ]
+            case .i, .j, .ja, .ɕ, .ɕSmall, .ɕRes, .ç, .çRes, .hiBreath, .iBreath, .ĩ: [.ĩ]
             case .ɯ, .β, .sβ, .sβRes, .ɸ, .ɸRes, .hɯBreath, .ɯBreath, .sokuon, .ɯ̃: [.ɯ̃]
             case .e, .se, .he, .heBreath, .eBreath, .ẽ: [.ẽ]
             case .o, .so, .ho, .hoBreath, .oBreath, .õ: [.õ]

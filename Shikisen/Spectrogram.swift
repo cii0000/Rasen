@@ -766,7 +766,7 @@ struct Spectrogram {
             let fq = Double.linear(Self.minLinearFq, Self.maxLinearFq,
                                    t: Double($0) / Double(volmCount))
             let pitch = Pitch.pitch(fromFq: fq)
-            return Loudness.reverseVolm40Phon(fromPitch: pitch)
+            return LoudnessCurve.phons40.reverseVolm(fromPitch: pitch)
         }
         
         var chSecVolms: [[[Double]]]
@@ -827,7 +827,7 @@ struct Spectrogram {
                     let fq = Double.linear(Self.minLinearFq, Self.maxLinearFq,
                                            t: Double($0) / Double(volmCount2))
                     let pitch = Pitch.pitch(fromFq: fq)
-                    return Loudness.reverseVolm40Phon(fromPitch: pitch)
+                    return LoudnessCurve.phons40.reverseVolm(fromPitch: pitch)
                 }
                 
                 let filterBank2 = FilterBank(sampleCount: volmCount2,

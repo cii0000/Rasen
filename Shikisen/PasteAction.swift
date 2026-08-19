@@ -1347,7 +1347,7 @@ final class APasteAction: Action {
                     
                     let sb = sheetView.bounds.inset(by: Sheet.textPadding)
                     let origin: Point?
-                    if let textFrame = text.frame, !sb.contains(textFrame) {
+                    if let textFrame = text.frame, !sb.intersects(textFrame) {
                         let nFrame = sb.clipped(textFrame)
                         origin = text.origin + nFrame.origin - textFrame.origin
                     } else {

@@ -27,6 +27,13 @@ import Accelerate.vecLib.vDSP
 struct Random: Hashable, Codable {
     private var s0, s1, s2, s3: UInt64
     
+    static func next(seed: UInt64, count: Int) -> UInt64 {
+        var seed = seed
+        for _ in count.range {
+            _ = Random.next(seed: &seed)
+        }
+        return seed
+    }
     static func next(seed: inout UInt64) -> UInt64 {
         seed &+= 0x9e3779b97f4a7c15
         var z = seed
@@ -105,7 +112,7 @@ extension vDSP {
 
 struct Waveclip {
     static let `default` = Self.init()
-    static let small = Self.init(attackSec: 0, releaseSec: 0.015625 / 4)
+    static let small = Self.init(attackSec: 0, releaseSec: 0.015625 / 2)
     
     var attackSec: Double {
         didSet {
@@ -370,6 +377,7 @@ struct Rendnote {
     var deltaPhase = 0.0
     var isStereoNoise = true
     var isRelease = false
+    var loudnessCurve: LoudnessCurve?
     let id = UUID()
 }
 extension Rendnote {
@@ -462,16 +470,8 @@ extension Rendnote {
             return samples
         }
         if isStereoNoise && pitbend.isFullNoise {
-            var noiseSeed2 = noiseSeed0
-            _ = Random.next(seed: &noiseSeed2)
-            _ = Random.next(seed: &noiseSeed2)
-            _ = Random.next(seed: &noiseSeed2)
-            _ = Random.next(seed: &noiseSeed2)
-            var noiseSeed3 = noiseSeed1
-            _ = Random.next(seed: &noiseSeed3)
-            _ = Random.next(seed: &noiseSeed3)
-            _ = Random.next(seed: &noiseSeed3)
-            _ = Random.next(seed: &noiseSeed3)
+            let noiseSeed2 = Random.next(seed: noiseSeed0, count: 4)
+            let noiseSeed3 = Random.next(seed: noiseSeed1, count: 4)
             let samples0 = nSamples(noiseSeed0: noiseSeed0, noiseSeed1: noiseSeed1)
             let samples1 = nSamples(noiseSeed0: noiseSeed2, noiseSeed1: noiseSeed3)
             let scale = 2.0 / .sqrt(2)
@@ -572,7 +572,7 @@ extension Rendnote {
         let cutPitch = Pitch.pitch(fromFq: cutFq)
         let rootPitch = Pitch.pitch(fromFq: rootFq)
         let startPhase = isFitPhase ? (secRange.start.isInfinite ? 0.0 : (secRange.start * firstFq * .pi2)) : 0
-        let firstClearVolm = Loudness.clearVolm40Phon(fromPitch: Pitch.pitch(fromFq: firstFq))
+        let firstClearVolm = LoudnessCurve.clearPhons40.volm(fromPitch: Pitch.pitch(fromFq: firstFq))
         
         let isOneSin = pitbend.isOneOvertone
         if isOneSin {
@@ -581,7 +581,8 @@ extension Rendnote {
                 let a = firstFq * pi2rs
                 var samples = sampleCount.range.map { Double.sin(Double($0) * a + startPhase) }
                 let pitch = Pitch.pitch(fromFq: firstFq)
-                let amp = Volm.amp(fromVolm: Loudness.volm40Phon(fromPitch: pitch))
+                let amp = Volm.amp(fromVolm: LoudnessCurve.phons40.volm(fromPitch: pitch))
+                * (loudnessCurve?.volm(fromPitch: pitch) ?? 1)
                 vDSP.multiply(amp * rScale * firstClearVolm, samples, result: &samples)
                 return samples
             } else {
@@ -590,8 +591,9 @@ extension Rendnote {
                     let sec = Double($0) * rSampleRate
                     let fq = (rootFq * pitbend.fqScale(atSec: sec)).clipped(min: Score.minFq, max: cutFq)
                     let pitch = Pitch.pitch(fromFq: fq)
-                    let amp = Volm.amp(fromVolm: Loudness.volm40Phon(fromPitch: pitch))
-                    let v = amp * rScale * Double.sin(phase) * Loudness.clearVolm40Phon(fromPitch: pitch)
+                    let amp = Volm.amp(fromVolm: LoudnessCurve.phons40.volm(fromPitch: pitch))
+                    * (loudnessCurve?.volm(fromPitch: pitch) ?? 1)
+                    let v = amp * rScale * Double.sin(phase) * LoudnessCurve.clearPhons40.volm(fromPitch: pitch)
                     phase += fq * pi2rs
                     return v
                 }
@@ -607,18 +609,19 @@ extension Rendnote {
                             oddScale: Double, evenScale: Double) -> (spectrum: [Double], mainSpectrum: [Double]) {
             var sign = true, mainSpectrum = [Double](capacity: halfStftCount)
             return ((1 ... halfStftCount).map { fqi in
-                let nfq = Double(fqi) / Double(halfStftCount) * maxFq
-                guard nfq > 0 && nfq < cutFq else {
+                let nFq = Double(fqi) / Double(halfStftCount) * maxFq
+                guard nFq > 0 && nFq < cutFq else {
                     mainSpectrum.append(0)
                     return 0
                 }
-                let pitch = Pitch.pitch(fromFq: nfq)
-                let loudnessVolm = Loudness.volm40Phon(fromPitch: pitch)
+                let pitch = Pitch.pitch(fromFq: nFq)
+                let loudnessVolm = LoudnessCurve.phons40.volm(fromPitch: pitch)
                 let noiseVolm = spectlope.sprol(atPitch: pitch).noiseVolm
-                let cutScale = cutStartFq < nfq ? nfq.clipped(min: cutStartFq, max: cutFq, newMin: 1, newMax: 0) : 1
+                let cutScale = cutStartFq < nFq ? nFq.clipped(min: cutStartFq, max: cutFq, newMin: 1, newMax: 0) : 1
                 let overtoneScale = sign ? oddScale : evenScale
                 let a = sqfas[fqi] * cutScale * overtoneScale
                 let amp = Volm.amp(fromVolm: loudnessVolm * noiseVolm) * a
+                * (loudnessCurve?.volm(fromPitch: pitch) ?? 1)
                 mainSpectrum.append(Volm.amp(fromVolm: noiseVolm) * a)
                 sign = !sign
                 return amp
@@ -659,7 +662,7 @@ extension Rendnote {
                 let spectrum = (1 ... sinCount).map { n in
                     let nFq = firstFq * Double(n)
                     let pitch = Pitch.pitch(fromFq: nFq)
-                    let loudnessVolm = Loudness.volm40Phon(fromPitch: pitch)
+                    let loudnessVolm = LoudnessCurve.phons40.volm(fromPitch: pitch)
                     let mainScale = (pitch - prePitch).clipped(min: 0, max: 2, newMin: 3, newMax: 1)
                     let spectlopeVolm = spectlope.overtonesVolm(atPitch: pitch)
                     let cutScale = nFq.clipped(min: cutStartFq, max: cutFq, newMin: 1, newMax: 0)
@@ -667,6 +670,7 @@ extension Rendnote {
                     let sqfa = Double(n) ** sqfa
                     let a = Volm.amp(fromVolm: spectlopeVolm) * overtoneScale / sqfa * cutScale
                     let amp = Volm.amp(fromVolm: loudnessVolm) * a
+                    * (loudnessCurve?.volm(fromPitch: pitch) ?? 1)
                     mainSpectrum.append(a * mainScale)
                     sign = !sign
                     prePitch = pitch
@@ -899,7 +903,7 @@ extension Rendnote {
                     var spectrum = (1 ... maxSinCount).map { n in
                         let fq = frame.fq * Double(n)
                         let pitch = Pitch.pitch(fromFq: fq)
-                        let loudnessVolm = Loudness.volm40Phon(fromPitch: pitch)
+                        let loudnessVolm = LoudnessCurve.phons40.volm(fromPitch: pitch)
                         let mainScale = (pitch - prePitch).clipped(min: 0, max: 2, newMin: 3, newMax: 1)
                         
                         let spectlopeVolm = spectlope.overtonesVolm(atPitch: pitch)
@@ -912,6 +916,7 @@ extension Rendnote {
                         let oa = overtoneScale * rsqfas[n]
                         let a = Volm.amp(fromVolm: spectlopeVolm) * oa
                         let amp = Volm.amp(fromVolm: loudnessVolm) * a
+                        * (loudnessCurve?.volm(fromPitch: pitch) ?? 1)
                         mainSpectrum.append(a * (fq > cutStartFq ? (fq < cutFq ? cutScales[Int(fq) - intCutStartFq] : 0) : 1) * mainScale)
                         
                         let maxSpectlopeVolm = maxSpectlope.volm(atPitch: pitch)
@@ -920,7 +925,7 @@ extension Rendnote {
                     }
                     let rms = (rmsV / 2).squareRoot()
                     let scale = rms == 0 ? 0 : 1 / rms
-                    let clearVolm = Loudness.clearVolm40Phon(fromPitch: Pitch.pitch(fromFq: frame.fq))
+                    let clearVolm = LoudnessCurve.clearPhons40.volm(fromPitch: Pitch.pitch(fromFq: frame.fq))
                     vDSP.multiply(scale * clearVolm, spectrum, result: &spectrum)
                     vDSP.multiply(scale, mainSpectrum, result: &mainSpectrum)
                     
