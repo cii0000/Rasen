@@ -1681,6 +1681,41 @@ extension AVAudioPCMBuffer {
             }
         }
     }
+    var floatSampless: [[Float]] {
+        get {
+            var ns = [[Float]](repeating: Array(repeating: 0.0, count: sampleCount), count: channelCount)
+            if format.commonFormat == .pcmFormatFloat64 {
+                for ci in 0 ..< channelCount {
+                    enumeratedDouble() { i, v in
+                        ns[ci][i] = Float(v)
+                    }
+                }
+                return ns
+            } else {
+                for ci in 0 ..< channelCount {
+                    enumerated(atChannel: ci) { i, v in
+                        ns[ci][i] = v
+                    }
+                }
+                return ns
+            }
+        }
+        set {
+            if format.commonFormat == .pcmFormatFloat64 {
+                for ci in 0 ..< channelCount {
+                    enumeratedDouble() { i, v in
+                        self[i] = Double(newValue[ci][i])
+                    }
+                }
+            } else {
+                for ci in 0 ..< channelCount {
+                    enumerated(atChannel: ci) { i, v in
+                        self[ci, i] = newValue[ci][i]
+                    }
+                }
+            }
+        }
+    }
     var doubleSampless: [[Double]] {
         get {
             var ns = Array(repeating: Array(repeating: 0.0,
@@ -2122,7 +2157,6 @@ final class ClippingAudioUnit: AUAudioUnit {
     }
     
     private var pcmBuffer: AVAudioPCMBuffer?
-    private var eq: EQ?
     
     var headroomAmp: Float? = Float(Audio.floatHeadroomAmp)
     var enabledAttack = true
@@ -2142,8 +2176,6 @@ final class ClippingAudioUnit: AUAudioUnit {
                 = AVAudioPCMBuffer(pcmFormat: format,
                                    frameCapacity: maxFramesToRender) else { throw SError() }
         self.pcmBuffer = pcmBuffer
-
-//        eq = EQ(channelCount: 2, sampleRate: format.sampleRate)
         
         try super.init(componentDescription: componentDescription, options: options)
 
@@ -2160,8 +2192,6 @@ final class ClippingAudioUnit: AUAudioUnit {
     override func deallocateRenderResources() {
         super.deallocateRenderResources()
         self.pcmBuffer = nil
-        
-        eq?.reset()
     }
     
     public override var canProcessInPlace: Bool { true }
@@ -2220,8 +2250,6 @@ final class ClippingAudioUnit: AUAudioUnit {
                     }
                 }
             }
-            
-            eq?.apply(outputBLP, frameCount: frameCount)
             
             let headroomAmp = ((try? self.headroomAmp?.notNaN()) ?? 4).clipped(min: 0, max: 4)
             for ci in 0 ..< outputBLP.count {

@@ -1256,29 +1256,27 @@ extension MTLTexture {
         }
         let nl = 2 ** mipmapLevel
         let nw = width / nl, nh = height / nl
-        let bytesSize = nw * nh * 4
-        guard let bytes = malloc(bytesSize) else {
+        let bytesPerRow = nw * 4
+        
+        var data = [UInt8](repeating: 0, count: bytesPerRow * height)
+        data.withUnsafeMutableBytes { buffer in
+            getBytes(buffer.baseAddress!,
+                     bytesPerRow: bytesPerRow,
+                     from: MTLRegionMake2D(0, 0, nw, nh),
+                     mipmapLevel: mipmapLevel)
+        }
+        guard let provider = CGDataProvider(data: Data(data) as CFData) else {
             throw Texture.TextureError()
         }
-        defer {
-            free(bytes)
-        }
-        let bytesPerRow = nw * 4
-        let region = MTLRegionMake2D(0, 0, nw, nh)
-        getBytes(bytes, bytesPerRow: bytesPerRow, from: region, mipmapLevel: mipmapLevel)
         
         let bitmapInfo = pixelFormat != .bgra8Unorm && pixelFormat != .bgra8Unorm_srgb ?
             CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue) :
             CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedFirst.rawValue
                             | CGBitmapInfo.byteOrder32Little.rawValue)
-        guard let provider = CGDataProvider(dataInfo: nil, data: bytes, size: bytesSize,
-                                            releaseData: { _, _, _ in }) else {
-            throw Texture.TextureError()
-        }
         guard let cgImage = CGImage(width: nw, height: nh,
                                     bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: bytesPerRow,
                                     space: colorSpace, bitmapInfo: bitmapInfo, provider: provider,
-                                    decode: nil, shouldInterpolate: true,
+                                    decode: nil, shouldInterpolate: false,
                                     intent: .defaultIntent) else {
             throw Texture.TextureError()
         }

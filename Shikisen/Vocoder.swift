@@ -330,7 +330,7 @@ struct RendnoteManager {
             let pitbend = note.pitbend(fromTempo: score.tempo)
             let sSec = Double(score.sec(fromBeat: note.beatRange.start))
             let eSec = Double(score.sec(fromBeat: note.beatRange.end))
-            let isSmall = (!note.isFullNoise && eSec - sSec < Waveclip.default.attackSec) || (note.pits.count >= 2 && note.pits[0].pitch.distance(note.pits[1].pitch) > 24)
+            let isSmall = note.isSmallAttack(fromTempo: score.tempo)
             
             let nDeltaPhase = deltaPhase
             deltaPhase += Double(score.sec(fromBeat: note.beatRange.length))
@@ -467,6 +467,7 @@ extension Rendnote {
                                                  releaseStartSec: releaseStartSec)
                 }
             }
+            
             return samples
         }
         if isStereoNoise && pitbend.isFullNoise {
@@ -547,6 +548,8 @@ extension Rendnote {
         let notewave = Notewave(noStereoSampless: sampless.map { vDSP.doubleToFloat($0) },
                                 sampless: nnSampless.map { vDSP.doubleToFloat($0) },
                                 isLoop: isLoop)
+        
+        
         
         notewave.sampless.forEach { samples in
             if samples.contains(where: { $0.isNaN || $0.isInfinite }) {

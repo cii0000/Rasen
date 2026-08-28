@@ -37,12 +37,12 @@ import SwiftProtobuf
 // incompatible with the version of SwiftProtobuf to which you are linking.
 // Please ensure that you are building against the same version of the API
 // that was used to generate this file.
-fileprivate struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
+fileprivate nonisolated struct _GeneratedWithProtocGenSwiftVersion: SwiftProtobuf.ProtobufAPIVersionCheck {
   struct _2: SwiftProtobuf.ProtobufAPIVersion_2 {}
   typealias Version = _2
 }
 
-enum PBColorSpace: SwiftProtobuf.Enum, Swift.CaseIterable {
+nonisolated enum PBColorSpace: SwiftProtobuf.Enum, Swift.CaseIterable {
   typealias RawValue = Int
   case sRgb // = 0
   case sRgblinear // = 4
@@ -100,7 +100,7 @@ enum PBColorSpace: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-enum PBInterType: SwiftProtobuf.Enum, Swift.CaseIterable {
+nonisolated enum PBInterType: SwiftProtobuf.Enum, Swift.CaseIterable {
   typealias RawValue = Int
   case none // = 0
   case key // = 1
@@ -138,7 +138,7 @@ enum PBInterType: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-enum PBOrientation: SwiftProtobuf.Enum, Swift.CaseIterable {
+nonisolated enum PBOrientation: SwiftProtobuf.Enum, Swift.CaseIterable {
   typealias RawValue = Int
   case horizontal // = 0
   case vertical // = 1
@@ -172,7 +172,7 @@ enum PBOrientation: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-enum PBPreviousNext: SwiftProtobuf.Enum, Swift.CaseIterable {
+nonisolated enum PBPreviousNext: SwiftProtobuf.Enum, Swift.CaseIterable {
   typealias RawValue = Int
   case off // = 0
   case previous // = 1
@@ -214,7 +214,7 @@ enum PBPreviousNext: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-enum PBRectCorner: SwiftProtobuf.Enum, Swift.CaseIterable {
+nonisolated enum PBRectCorner: SwiftProtobuf.Enum, Swift.CaseIterable {
   typealias RawValue = Int
   case minXminY // = 0
   case minXmaxY // = 1
@@ -256,7 +256,7 @@ enum PBRectCorner: SwiftProtobuf.Enum, Swift.CaseIterable {
 
 }
 
-struct PBRational: Sendable {
+nonisolated struct PBRational: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -270,7 +270,7 @@ struct PBRational: Sendable {
   init() {}
 }
 
-struct PBIntRange: Sendable {
+nonisolated struct PBIntRange: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -284,7 +284,7 @@ struct PBIntRange: Sendable {
   init() {}
 }
 
-struct PBRationalRange: Sendable {
+nonisolated struct PBRationalRange: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -315,7 +315,7 @@ struct PBRationalRange: Sendable {
   fileprivate var _upperBound: PBRational? = nil
 }
 
-struct PBIntPoint: Sendable {
+nonisolated struct PBIntPoint: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -329,7 +329,7 @@ struct PBIntPoint: Sendable {
   init() {}
 }
 
-struct PBPoint: Sendable {
+nonisolated struct PBPoint: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -343,7 +343,7 @@ struct PBPoint: Sendable {
   init() {}
 }
 
-struct PBSize: Sendable {
+nonisolated struct PBSize: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -357,7 +357,7 @@ struct PBSize: Sendable {
   init() {}
 }
 
-struct PBRect: Sendable {
+nonisolated struct PBRect: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -388,7 +388,7 @@ struct PBRect: Sendable {
   fileprivate var _size: PBSize? = nil
 }
 
-struct PBAttitude: Sendable {
+nonisolated struct PBAttitude: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -421,7 +421,7 @@ struct PBAttitude: Sendable {
   fileprivate var _scale: PBSize? = nil
 }
 
-struct PBLCHA: Sendable {
+nonisolated struct PBLCHA: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -439,7 +439,7 @@ struct PBLCHA: Sendable {
   init() {}
 }
 
-struct PBRGBA: Sendable {
+nonisolated struct PBRGBA: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -457,7 +457,7 @@ struct PBRGBA: Sendable {
   init() {}
 }
 
-struct PBColor: Sendable {
+nonisolated struct PBColor: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -490,7 +490,7 @@ struct PBColor: Sendable {
   fileprivate var _rgba: PBRGBA? = nil
 }
 
-struct PBUUID: Sendable {
+nonisolated struct PBUUID: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -504,7 +504,7 @@ struct PBUUID: Sendable {
   init() {}
 }
 
-struct PBUUColor: Sendable {
+nonisolated struct PBUUColor: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -535,7 +535,7 @@ struct PBUUColor: Sendable {
   fileprivate var _id: PBUUID? = nil
 }
 
-struct PBInterOption: Sendable {
+nonisolated struct PBInterOption: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -558,7 +558,7 @@ struct PBInterOption: Sendable {
   fileprivate var _id: PBUUID? = nil
 }
 
-struct PBLine: @unchecked Sendable {
+nonisolated struct PBLine: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -607,12 +607,12 @@ struct PBLine: @unchecked Sendable {
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  enum OneOf_UuColorOptional: Equatable, Sendable {
+  nonisolated enum OneOf_UuColorOptional: Equatable, Sendable {
     case uuColor(PBUUColor)
 
   }
 
-  struct PBControl: Sendable {
+  nonisolated struct PBControl: Sendable {
     // SwiftProtobuf.Message conformance is added in an extension below. See the
     // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
     // methods supported on all messages.
@@ -642,7 +642,7 @@ struct PBLine: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-struct PBPolygon: Sendable {
+nonisolated struct PBPolygon: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -656,7 +656,7 @@ struct PBPolygon: Sendable {
   init() {}
 }
 
-struct PBTopolygon: Sendable {
+nonisolated struct PBTopolygon: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -679,7 +679,7 @@ struct PBTopolygon: Sendable {
   fileprivate var _polygon: PBPolygon? = nil
 }
 
-struct PBPlane: Sendable {
+nonisolated struct PBPlane: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -720,7 +720,7 @@ struct PBPlane: Sendable {
   fileprivate var _uuColor: PBUUColor? = nil
 }
 
-struct PBPicture: Sendable {
+nonisolated struct PBPicture: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -734,7 +734,7 @@ struct PBPicture: Sendable {
   init() {}
 }
 
-struct PBDate: Sendable {
+nonisolated struct PBDate: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -746,7 +746,7 @@ struct PBDate: Sendable {
   init() {}
 }
 
-struct PBContentTimeOption: Sendable {
+nonisolated struct PBContentTimeOption: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -787,7 +787,7 @@ struct PBContentTimeOption: Sendable {
   fileprivate var _tempo: PBRational? = nil
 }
 
-struct PBImage: Sendable {
+nonisolated struct PBImage: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -799,7 +799,7 @@ struct PBImage: Sendable {
   init() {}
 }
 
-struct PBStereo: Sendable {
+nonisolated struct PBStereo: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -826,7 +826,7 @@ struct PBStereo: Sendable {
   fileprivate var _id: PBUUID? = nil
 }
 
-struct PBContent: @unchecked Sendable {
+nonisolated struct PBContent: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -924,7 +924,7 @@ struct PBContent: @unchecked Sendable {
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  enum OneOf_ContentTimeOptionOptional: Equatable, Sendable {
+  nonisolated enum OneOf_ContentTimeOptionOptional: Equatable, Sendable {
     case timeOption(PBContentTimeOption)
 
   }
@@ -934,7 +934,7 @@ struct PBContent: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-struct PBOvertone: Sendable {
+nonisolated struct PBOvertone: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -948,7 +948,7 @@ struct PBOvertone: Sendable {
   init() {}
 }
 
-struct PBSprol: Sendable {
+nonisolated struct PBSprol: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -964,7 +964,7 @@ struct PBSprol: Sendable {
   init() {}
 }
 
-struct PBSpectlope: Sendable {
+nonisolated struct PBSpectlope: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -976,7 +976,7 @@ struct PBSpectlope: Sendable {
   init() {}
 }
 
-struct PBTone: Sendable {
+nonisolated struct PBTone: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1017,7 +1017,7 @@ struct PBTone: Sendable {
   fileprivate var _id: PBUUID? = nil
 }
 
-struct PBPit: Sendable {
+nonisolated struct PBPit: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1070,7 +1070,7 @@ struct PBPit: Sendable {
   fileprivate var _tone: PBTone? = nil
 }
 
-struct PBPitbend: Sendable {
+nonisolated struct PBPitbend: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1082,7 +1082,7 @@ struct PBPitbend: Sendable {
   init() {}
 }
 
-struct PBReverb: Sendable {
+nonisolated struct PBReverb: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1113,7 +1113,7 @@ struct PBReverb: Sendable {
   fileprivate var _seedID: PBUUID? = nil
 }
 
-struct PBNote: Sendable {
+nonisolated struct PBNote: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1168,7 +1168,7 @@ struct PBNote: Sendable {
   fileprivate var _id: PBUUID? = nil
 }
 
-struct PBScoreOption: Sendable {
+nonisolated struct PBScoreOption: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1219,7 +1219,7 @@ struct PBScoreOption: Sendable {
   fileprivate var _tempo: PBRational? = nil
 }
 
-struct PBScore: @unchecked Sendable {
+nonisolated struct PBScore: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1302,7 +1302,7 @@ struct PBScore: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-struct PBAudio: Sendable {
+nonisolated struct PBAudio: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1314,7 +1314,7 @@ struct PBAudio: Sendable {
   init() {}
 }
 
-struct PBLocale: Sendable {
+nonisolated struct PBLocale: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1326,7 +1326,7 @@ struct PBLocale: Sendable {
   init() {}
 }
 
-struct PBTextTimeOption: Sendable {
+nonisolated struct PBTextTimeOption: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1357,7 +1357,7 @@ struct PBTextTimeOption: Sendable {
   fileprivate var _tempo: PBRational? = nil
 }
 
-struct PBText: Sendable {
+nonisolated struct PBText: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1400,7 +1400,7 @@ struct PBText: Sendable {
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  enum OneOf_TimeOptionOptional: Equatable, Sendable {
+  nonisolated enum OneOf_TimeOptionOptional: Equatable, Sendable {
     case timeOption(PBTextTimeOption)
 
   }
@@ -1411,7 +1411,7 @@ struct PBText: Sendable {
   fileprivate var _locale: PBLocale? = nil
 }
 
-struct PBBorder: Sendable {
+nonisolated struct PBBorder: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1425,7 +1425,7 @@ struct PBBorder: Sendable {
   init() {}
 }
 
-struct PBIntPointStringDic: Sendable {
+nonisolated struct PBIntPointStringDic: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1437,7 +1437,7 @@ struct PBIntPointStringDic: Sendable {
   init() {}
 }
 
-struct PBStringIntPointDicElement: Sendable {
+nonisolated struct PBStringIntPointDicElement: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1460,7 +1460,7 @@ struct PBStringIntPointDicElement: Sendable {
   fileprivate var _key: PBIntPoint? = nil
 }
 
-struct PBStringIntPointDic: Sendable {
+nonisolated struct PBStringIntPointDic: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1472,7 +1472,7 @@ struct PBStringIntPointDic: Sendable {
   init() {}
 }
 
-struct PBKeyframe: Sendable {
+nonisolated struct PBKeyframe: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1523,7 +1523,7 @@ struct PBKeyframe: Sendable {
   fileprivate var _id: PBUUID? = nil
 }
 
-struct PBKeyframeKey: Sendable {
+nonisolated struct PBKeyframeKey: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1562,7 +1562,7 @@ struct PBKeyframeKey: Sendable {
   fileprivate var _id: PBUUID? = nil
 }
 
-struct PBAnimationZipper: Sendable {
+nonisolated struct PBAnimationZipper: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1582,7 +1582,7 @@ struct PBAnimationZipper: Sendable {
   init() {}
 }
 
-struct PBAnimationOption: Sendable {
+nonisolated struct PBAnimationOption: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1629,7 +1629,7 @@ struct PBAnimationOption: Sendable {
   fileprivate var _tempo: PBRational? = nil
 }
 
-struct PBAnimation: @unchecked Sendable {
+nonisolated struct PBAnimation: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1711,7 +1711,7 @@ struct PBAnimation: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-struct PBSheetOption: Sendable {
+nonisolated struct PBSheetOption: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1732,7 +1732,7 @@ struct PBSheetOption: Sendable {
   fileprivate var _mainFrame: PBRect? = nil
 }
 
-struct PBKeyframeSelection: Sendable {
+nonisolated struct PBKeyframeSelection: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1746,7 +1746,7 @@ struct PBKeyframeSelection: Sendable {
   init() {}
 }
 
-struct PBPitSelection: Sendable {
+nonisolated struct PBPitSelection: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1758,7 +1758,7 @@ struct PBPitSelection: Sendable {
   init() {}
 }
 
-struct PBNoteSelection: Sendable {
+nonisolated struct PBNoteSelection: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1770,7 +1770,7 @@ struct PBNoteSelection: Sendable {
   init() {}
 }
 
-struct PBTextSelection: Sendable {
+nonisolated struct PBTextSelection: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1782,7 +1782,7 @@ struct PBTextSelection: Sendable {
   init() {}
 }
 
-struct PBSheetSelection: Sendable {
+nonisolated struct PBSheetSelection: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1807,7 +1807,7 @@ struct PBSheetSelection: Sendable {
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  enum OneOf_LastPositionOptional: Equatable, Sendable {
+  nonisolated enum OneOf_LastPositionOptional: Equatable, Sendable {
     case lastPosition(PBPoint)
 
   }
@@ -1815,7 +1815,7 @@ struct PBSheetSelection: Sendable {
   init() {}
 }
 
-struct PBSheet: @unchecked Sendable {
+nonisolated struct PBSheet: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1905,7 +1905,7 @@ struct PBSheet: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-struct PBWorldSelection: Sendable {
+nonisolated struct PBWorldSelection: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1931,7 +1931,7 @@ struct PBWorldSelection: Sendable {
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  enum OneOf_LastPositionOptional: Equatable, Sendable {
+  nonisolated enum OneOf_LastPositionOptional: Equatable, Sendable {
     case lastPosition(PBPoint)
 
   }
@@ -1941,7 +1941,7 @@ struct PBWorldSelection: Sendable {
   fileprivate var _sheetIds: PBUUIDArray? = nil
 }
 
-struct PBWorld: Sendable {
+nonisolated struct PBWorld: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1972,7 +1972,7 @@ struct PBWorld: Sendable {
   fileprivate var _selection: PBWorldSelection? = nil
 }
 
-struct PBCornerRectValue: Sendable {
+nonisolated struct PBCornerRectValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -1995,7 +1995,7 @@ struct PBCornerRectValue: Sendable {
   fileprivate var _rect: PBRect? = nil
 }
 
-struct PBCornerRectValueArray: Sendable {
+nonisolated struct PBCornerRectValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2007,7 +2007,7 @@ struct PBCornerRectValueArray: Sendable {
   init() {}
 }
 
-struct PBFinding: Sendable {
+nonisolated struct PBFinding: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2023,6 +2023,8 @@ struct PBFinding: Sendable {
 
   var string: String = String()
 
+  var isLine: Bool = false
+
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
   init() {}
@@ -2030,7 +2032,7 @@ struct PBFinding: Sendable {
   fileprivate var _worldPosition: PBPoint? = nil
 }
 
-struct PBKeyframeOption: Sendable {
+nonisolated struct PBKeyframeOption: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2071,7 +2073,7 @@ struct PBKeyframeOption: Sendable {
   fileprivate var _nextPosition: PBPoint? = nil
 }
 
-struct PBIntIndexValue: Sendable {
+nonisolated struct PBIntIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2085,7 +2087,7 @@ struct PBIntIndexValue: Sendable {
   init() {}
 }
 
-struct PBLineIndexValue: Sendable {
+nonisolated struct PBLineIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2108,7 +2110,7 @@ struct PBLineIndexValue: Sendable {
   fileprivate var _value: PBLine? = nil
 }
 
-struct PBInterOptionIndexValue: Sendable {
+nonisolated struct PBInterOptionIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2131,7 +2133,7 @@ struct PBInterOptionIndexValue: Sendable {
   fileprivate var _value: PBInterOption? = nil
 }
 
-struct PBPlaneIndexValue: @unchecked Sendable {
+nonisolated struct PBPlaneIndexValue: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2157,7 +2159,7 @@ struct PBPlaneIndexValue: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-struct PBTextIndexValue: Sendable {
+nonisolated struct PBTextIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2180,7 +2182,7 @@ struct PBTextIndexValue: Sendable {
   fileprivate var _value: PBText? = nil
 }
 
-struct PBNoteIndexValue: Sendable {
+nonisolated struct PBNoteIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2203,7 +2205,7 @@ struct PBNoteIndexValue: Sendable {
   fileprivate var _value: PBNote? = nil
 }
 
-struct PBContentIndexValue: Sendable {
+nonisolated struct PBContentIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2226,7 +2228,7 @@ struct PBContentIndexValue: Sendable {
   fileprivate var _value: PBContent? = nil
 }
 
-struct PBBorderIndexValue: Sendable {
+nonisolated struct PBBorderIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2249,7 +2251,7 @@ struct PBBorderIndexValue: Sendable {
   fileprivate var _value: PBBorder? = nil
 }
 
-struct PBKeyframeIndexValue: Sendable {
+nonisolated struct PBKeyframeIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2272,7 +2274,7 @@ struct PBKeyframeIndexValue: Sendable {
   fileprivate var _value: PBKeyframe? = nil
 }
 
-struct PBKeyframeOptionIndexValue: Sendable {
+nonisolated struct PBKeyframeOptionIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2295,7 +2297,7 @@ struct PBKeyframeOptionIndexValue: Sendable {
   fileprivate var _value: PBKeyframeOption? = nil
 }
 
-struct PBColorValue: @unchecked Sendable {
+nonisolated struct PBColorValue: @unchecked Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2354,7 +2356,7 @@ struct PBColorValue: @unchecked Sendable {
   fileprivate var _storage = _StorageClass.defaultInstance
 }
 
-struct PBPlaneValue: Sendable {
+nonisolated struct PBPlaneValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2370,7 +2372,7 @@ struct PBPlaneValue: Sendable {
   init() {}
 }
 
-struct PBTextValue: Sendable {
+nonisolated struct PBTextValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2418,17 +2420,17 @@ struct PBTextValue: Sendable {
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  enum OneOf_OriginOptional: Equatable, Sendable {
+  nonisolated enum OneOf_OriginOptional: Equatable, Sendable {
     case origin(PBPoint)
 
   }
 
-  enum OneOf_SizeOptional: Equatable, Sendable {
+  nonisolated enum OneOf_SizeOptional: Equatable, Sendable {
     case size(Double)
 
   }
 
-  enum OneOf_WidthCountOptional: Equatable, Sendable {
+  nonisolated enum OneOf_WidthCountOptional: Equatable, Sendable {
     case widthCount(Double)
 
   }
@@ -2438,7 +2440,7 @@ struct PBTextValue: Sendable {
   fileprivate var _replacedRange: PBIntRange? = nil
 }
 
-struct PBTextValueIndexValue: Sendable {
+nonisolated struct PBTextValueIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2461,7 +2463,7 @@ struct PBTextValueIndexValue: Sendable {
   fileprivate var _value: PBTextValue? = nil
 }
 
-struct PBSheetValue: Sendable {
+nonisolated struct PBSheetValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2508,7 +2510,7 @@ struct PBSheetValue: Sendable {
   fileprivate var _id: PBUUID? = nil
 }
 
-struct PBInt64Array: Sendable {
+nonisolated struct PBInt64Array: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2520,7 +2522,7 @@ struct PBInt64Array: Sendable {
   init() {}
 }
 
-struct PBIntArrayIndexValue: Sendable {
+nonisolated struct PBIntArrayIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2543,7 +2545,7 @@ struct PBIntArrayIndexValue: Sendable {
   fileprivate var _value: PBInt64Array? = nil
 }
 
-struct PBIntArrayIndexValueArray: Sendable {
+nonisolated struct PBIntArrayIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2555,7 +2557,7 @@ struct PBIntArrayIndexValueArray: Sendable {
   init() {}
 }
 
-struct PBLineArray: Sendable {
+nonisolated struct PBLineArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2567,7 +2569,7 @@ struct PBLineArray: Sendable {
   init() {}
 }
 
-struct PBPlaneArray: Sendable {
+nonisolated struct PBPlaneArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2579,7 +2581,7 @@ struct PBPlaneArray: Sendable {
   init() {}
 }
 
-struct PBUUIDArray: Sendable {
+nonisolated struct PBUUIDArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2591,7 +2593,7 @@ struct PBUUIDArray: Sendable {
   init() {}
 }
 
-struct PBIntPointArray: Sendable {
+nonisolated struct PBIntPointArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2603,7 +2605,7 @@ struct PBIntPointArray: Sendable {
   init() {}
 }
 
-struct PBIntIndexValueArray: Sendable {
+nonisolated struct PBIntIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2615,7 +2617,7 @@ struct PBIntIndexValueArray: Sendable {
   init() {}
 }
 
-struct PBLineIndexValueArray: Sendable {
+nonisolated struct PBLineIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2627,7 +2629,7 @@ struct PBLineIndexValueArray: Sendable {
   init() {}
 }
 
-struct PBLineIndexValueArrayIndexValue: Sendable {
+nonisolated struct PBLineIndexValueArrayIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2641,7 +2643,7 @@ struct PBLineIndexValueArrayIndexValue: Sendable {
   init() {}
 }
 
-struct PBLineIndexValueArrayIndexValueArray: Sendable {
+nonisolated struct PBLineIndexValueArrayIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2653,7 +2655,7 @@ struct PBLineIndexValueArrayIndexValueArray: Sendable {
   init() {}
 }
 
-struct PBPlaneIndexValueArrayIndexValue: Sendable {
+nonisolated struct PBPlaneIndexValueArrayIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2667,7 +2669,7 @@ struct PBPlaneIndexValueArrayIndexValue: Sendable {
   init() {}
 }
 
-struct PBPlaneIndexValueArrayIndexValueArray: Sendable {
+nonisolated struct PBPlaneIndexValueArrayIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2679,7 +2681,7 @@ struct PBPlaneIndexValueArrayIndexValueArray: Sendable {
   init() {}
 }
 
-struct PBInterOptionIndexValueArray: Sendable {
+nonisolated struct PBInterOptionIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2691,7 +2693,7 @@ struct PBInterOptionIndexValueArray: Sendable {
   init() {}
 }
 
-struct PBInterOptionIndexValueArrayIndexValue: Sendable {
+nonisolated struct PBInterOptionIndexValueArrayIndexValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2705,7 +2707,7 @@ struct PBInterOptionIndexValueArrayIndexValue: Sendable {
   init() {}
 }
 
-struct PBInterOptionIndexValueArrayIndexValueArray: Sendable {
+nonisolated struct PBInterOptionIndexValueArrayIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2717,7 +2719,7 @@ struct PBInterOptionIndexValueArrayIndexValueArray: Sendable {
   init() {}
 }
 
-struct PBPlaneIndexValueArray: Sendable {
+nonisolated struct PBPlaneIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2729,7 +2731,7 @@ struct PBPlaneIndexValueArray: Sendable {
   init() {}
 }
 
-struct PBNoteIndexValueArray: Sendable {
+nonisolated struct PBNoteIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2741,7 +2743,7 @@ struct PBNoteIndexValueArray: Sendable {
   init() {}
 }
 
-struct PBTextIndexValueArray: Sendable {
+nonisolated struct PBTextIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2753,7 +2755,7 @@ struct PBTextIndexValueArray: Sendable {
   init() {}
 }
 
-struct PBContentIndexValueArray: Sendable {
+nonisolated struct PBContentIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2765,7 +2767,7 @@ struct PBContentIndexValueArray: Sendable {
   init() {}
 }
 
-struct PBBorderIndexValueArray: Sendable {
+nonisolated struct PBBorderIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2777,7 +2779,7 @@ struct PBBorderIndexValueArray: Sendable {
   init() {}
 }
 
-struct PBKeyframeIndexValueArray: Sendable {
+nonisolated struct PBKeyframeIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2789,7 +2791,7 @@ struct PBKeyframeIndexValueArray: Sendable {
   init() {}
 }
 
-struct PBKeyframeOptionIndexValueArray: Sendable {
+nonisolated struct PBKeyframeOptionIndexValueArray: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -2801,7 +2803,7 @@ struct PBKeyframeOptionIndexValueArray: Sendable {
   init() {}
 }
 
-struct PBSheetUndoItem: Sendable {
+nonisolated struct PBSheetUndoItem: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3234,7 +3236,7 @@ struct PBSheetUndoItem: Sendable {
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  enum OneOf_Value: Equatable, Sendable {
+  nonisolated enum OneOf_Value: Equatable, Sendable {
     case appendLine(PBLine)
     case appendLines(PBLineArray)
     case appendPlanes(PBPlaneArray)
@@ -3294,7 +3296,7 @@ struct PBSheetUndoItem: Sendable {
   init() {}
 }
 
-struct PBWorldUndoItem: Sendable {
+nonisolated struct PBWorldUndoItem: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3327,7 +3329,7 @@ struct PBWorldUndoItem: Sendable {
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  enum OneOf_Value: Equatable, Sendable {
+  nonisolated enum OneOf_Value: Equatable, Sendable {
     case insertSheets(PBStringIntPointDic)
     case removeSheets(PBIntPointArray)
     case setSelection(PBWorldSelection)
@@ -3337,7 +3339,7 @@ struct PBWorldUndoItem: Sendable {
   init() {}
 }
 
-struct PBUndoDataValue: Sendable {
+nonisolated struct PBUndoDataValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3351,7 +3353,7 @@ struct PBUndoDataValue: Sendable {
   init() {}
 }
 
-struct PBUndoGroup: Sendable {
+nonisolated struct PBUndoGroup: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3376,7 +3378,7 @@ struct PBUndoGroup: Sendable {
   fileprivate var _date: PBDate? = nil
 }
 
-struct PBBranch: Sendable {
+nonisolated struct PBBranch: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3397,7 +3399,7 @@ struct PBBranch: Sendable {
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  enum OneOf_SelectedChildIndexOptional: Equatable, Sendable {
+  nonisolated enum OneOf_SelectedChildIndexOptional: Equatable, Sendable {
     case selectedChildIndex(Int64)
 
   }
@@ -3405,7 +3407,7 @@ struct PBBranch: Sendable {
   init() {}
 }
 
-struct PBBranchCoder: Sendable {
+nonisolated struct PBBranchCoder: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3417,7 +3419,7 @@ struct PBBranchCoder: Sendable {
   init() {}
 }
 
-struct PBHistory: Sendable {
+nonisolated struct PBHistory: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3440,7 +3442,7 @@ struct PBHistory: Sendable {
   fileprivate var _branchCoder: PBBranchCoder? = nil
 }
 
-struct PBCopiedSheetsValue: Sendable {
+nonisolated struct PBCopiedSheetsValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3473,7 +3475,7 @@ struct PBCopiedSheetsValue: Sendable {
   fileprivate var _sheetIds: PBStringIntPointDic? = nil
 }
 
-struct PBPlanesValue: Sendable {
+nonisolated struct PBPlanesValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3485,7 +3487,7 @@ struct PBPlanesValue: Sendable {
   init() {}
 }
 
-struct PBCopiedAnimation: Sendable {
+nonisolated struct PBCopiedAnimation: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3526,7 +3528,7 @@ struct PBCopiedAnimation: Sendable {
   fileprivate var _keyframeID: PBUUID? = nil
 }
 
-struct PBNotesValue: Sendable {
+nonisolated struct PBNotesValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3551,7 +3553,7 @@ struct PBNotesValue: Sendable {
   fileprivate var _deltaPitch: PBRational? = nil
 }
 
-struct PBInterOptionsValue: Sendable {
+nonisolated struct PBInterOptionsValue: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3576,7 +3578,7 @@ struct PBInterOptionsValue: Sendable {
   fileprivate var _sheetID: PBUUID? = nil
 }
 
-struct PBPastableObject: Sendable {
+nonisolated struct PBPastableObject: Sendable {
   // SwiftProtobuf.Message conformance is added in an extension below. See the
   // `Message` and `Message+*Additions` files in the SwiftProtobuf library for
   // methods supported on all messages.
@@ -3745,7 +3747,7 @@ struct PBPastableObject: Sendable {
 
   var unknownFields = SwiftProtobuf.UnknownStorage()
 
-  enum OneOf_Value: Equatable, Sendable {
+  nonisolated enum OneOf_Value: Equatable, Sendable {
     case copiedSheetsValue(PBCopiedSheetsValue)
     case sheetValue(PBSheetValue)
     case border(PBBorder)
@@ -3774,27 +3776,27 @@ struct PBPastableObject: Sendable {
 
 // MARK: - Code below here is support for the SwiftProtobuf runtime.
 
-extension PBColorSpace: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBColorSpace: SwiftProtobuf._ProtoNameProviding {
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0sRGB\0\u{1}sRGBHDR\0\u{1}p3\0\u{1}p3HDR\0\u{1}sRGBLinear\0\u{1}sRGBHDRLinear\0\u{1}p3Linear\0\u{1}p3HDRLinear\0")
 }
 
-extension PBInterType: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBInterType: SwiftProtobuf._ProtoNameProviding {
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0none\0\u{1}key\0\u{1}interpolated\0")
 }
 
-extension PBOrientation: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBOrientation: SwiftProtobuf._ProtoNameProviding {
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0horizontal\0\u{1}vertical\0")
 }
 
-extension PBPreviousNext: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBPreviousNext: SwiftProtobuf._ProtoNameProviding {
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0off\0\u{1}previous\0\u{1}next\0\u{1}previousAndNext\0")
 }
 
-extension PBRectCorner: SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBRectCorner: SwiftProtobuf._ProtoNameProviding {
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\0minXMinY\0\u{1}minXMaxY\0\u{1}maxXMinY\0\u{1}maxXMaxY\0")
 }
 
-extension PBRational: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBRational: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBRational"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}p\0\u{1}q\0")
 
@@ -3829,7 +3831,7 @@ extension PBRational: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
   }
 }
 
-extension PBIntRange: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBIntRange: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBIntRange"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}lowerBound\0\u{1}upperBound\0")
 
@@ -3864,7 +3866,7 @@ extension PBIntRange: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
   }
 }
 
-extension PBRationalRange: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBRationalRange: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBRationalRange"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}lowerBound\0\u{1}upperBound\0")
 
@@ -3903,7 +3905,7 @@ extension PBRationalRange: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
   }
 }
 
-extension PBIntPoint: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBIntPoint: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBIntPoint"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}x\0\u{1}y\0")
 
@@ -3938,7 +3940,7 @@ extension PBIntPoint: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
   }
 }
 
-extension PBPoint: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBPoint: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBPoint"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}x\0\u{1}y\0")
 
@@ -3973,7 +3975,7 @@ extension PBPoint: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
   }
 }
 
-extension PBSize: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBSize: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBSize"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}width\0\u{1}height\0")
 
@@ -4008,7 +4010,7 @@ extension PBSize: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
   }
 }
 
-extension PBRect: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBRect: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBRect"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}origin\0\u{1}size\0")
 
@@ -4047,7 +4049,7 @@ extension PBRect: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
   }
 }
 
-extension PBAttitude: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBAttitude: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBAttitude"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}position\0\u{1}scale\0\u{1}rotation\0")
 
@@ -4091,7 +4093,7 @@ extension PBAttitude: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
   }
 }
 
-extension PBLCHA: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBLCHA: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBLCHA"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}l\0\u{1}c\0\u{1}h\0\u{1}a\0")
 
@@ -4136,7 +4138,7 @@ extension PBLCHA: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
   }
 }
 
-extension PBRGBA: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBRGBA: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBRGBA"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}r\0\u{1}g\0\u{1}b\0\u{1}a\0")
 
@@ -4181,7 +4183,7 @@ extension PBRGBA: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
   }
 }
 
-extension PBColor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBColor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBColor"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}lcha\0\u{1}rgba\0\u{1}colorSpace\0")
 
@@ -4225,7 +4227,7 @@ extension PBColor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
   }
 }
 
-extension PBUUID: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBUUID: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBUUID"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0\u{1}data\0")
 
@@ -4260,7 +4262,7 @@ extension PBUUID: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
   }
 }
 
-extension PBUUColor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBUUColor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBUUColor"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0\u{1}id\0")
 
@@ -4299,7 +4301,7 @@ extension PBUUColor: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
   }
 }
 
-extension PBInterOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBInterOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBInterOption"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}id\0\u{1}interType\0")
 
@@ -4338,7 +4340,7 @@ extension PBInterOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
   }
 }
 
-extension PBLine: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBLine: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBLine"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}controls\0\u{1}size\0\u{2}\u{2}interID\0\u{2}\u{2}controlsData\0\u{1}interType\0\u{1}uuColor\0")
 
@@ -4455,7 +4457,7 @@ extension PBLine: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
   }
 }
 
-extension PBLine.PBControl: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBLine.PBControl: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = PBLine.protoMessageName + ".PBControl"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}point\0\u{1}weight\0\u{1}pressure\0")
 
@@ -4499,7 +4501,7 @@ extension PBLine.PBControl: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension PBPolygon: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBPolygon: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBPolygon"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}points\0\u{1}pointsData\0")
 
@@ -4534,7 +4536,7 @@ extension PBPolygon: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
   }
 }
 
-extension PBTopolygon: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBTopolygon: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBTopolygon"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}polygon\0\u{1}holePolygons\0")
 
@@ -4573,7 +4575,7 @@ extension PBTopolygon: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
   }
 }
 
-extension PBPlane: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBPlane: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBPlane"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\u{2}uuColor\0\u{1}polygon\0\u{1}topolygon\0")
 
@@ -4617,7 +4619,7 @@ extension PBPlane: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
   }
 }
 
-extension PBPicture: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBPicture: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBPicture"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}lines\0\u{1}planes\0")
 
@@ -4652,7 +4654,7 @@ extension PBPicture: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
   }
 }
 
-extension PBDate: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBDate: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBDate"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}timestamp\0")
 
@@ -4682,7 +4684,7 @@ extension PBDate: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
   }
 }
 
-extension PBContentTimeOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBContentTimeOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBContentTimeOption"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}beatRange\0\u{1}localStartBeat\0\u{1}tempo\0")
 
@@ -4726,7 +4728,7 @@ extension PBContentTimeOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension PBImage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBImage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBImage"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}data\0")
 
@@ -4756,7 +4758,7 @@ extension PBImage: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
   }
 }
 
-extension PBStereo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBStereo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBStereo"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}volm\0\u{1}absolutePan\0\u{1}id\0\u{1}pan\0")
 
@@ -4805,7 +4807,7 @@ extension PBStereo: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationB
   }
 }
 
-extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBContent"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}name\0\u{1}stereo\0\u{2}\u{2}size\0\u{1}origin\0\u{1}isShownSpectrogram\0\u{1}timeOption\0\u{1}id\0\u{1}directoryName\0\u{1}beat\0\u{1}durSec\0\u{1}frameRate\0")
 
@@ -4957,7 +4959,7 @@ extension PBContent: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
   }
 }
 
-extension PBOvertone: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBOvertone: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBOvertone"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}evenAmp\0\u{1}oddVolm\0")
 
@@ -4992,7 +4994,7 @@ extension PBOvertone: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
   }
 }
 
-extension PBSprol: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBSprol: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBSprol"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}pitch\0\u{1}volm\0\u{1}noise\0")
 
@@ -5032,7 +5034,7 @@ extension PBSprol: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
   }
 }
 
-extension PBSpectlope: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBSpectlope: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBSpectlope"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}sprols\0")
 
@@ -5062,7 +5064,7 @@ extension PBSpectlope: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
   }
 }
 
-extension PBTone: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBTone: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBTone"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}overtone\0\u{1}spectlope\0\u{1}id\0")
 
@@ -5106,7 +5108,7 @@ extension PBTone: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
   }
 }
 
-extension PBPit: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBPit: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBPit"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}beat\0\u{1}pitch\0\u{1}stereo\0\u{1}tone\0\u{1}lyric\0")
 
@@ -5160,7 +5162,7 @@ extension PBPit: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase
   }
 }
 
-extension PBPitbend: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBPitbend: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBPitbend"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}pits\0")
 
@@ -5190,7 +5192,7 @@ extension PBPitbend: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
   }
 }
 
-extension PBReverb: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBReverb: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBReverb"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}earlySec\0\u{1}earlyVolm\0\u{1}lateSec\0\u{1}lateVolm\0\u{1}releaseSec\0\u{1}seedID\0")
 
@@ -5249,7 +5251,7 @@ extension PBReverb: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationB
   }
 }
 
-extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBNote"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}pitch\0\u{1}pits\0\u{1}beatRange\0\u{2}\u{6}id\0\u{1}spectlopeHeight\0\u{1}f0Pitch\0")
 
@@ -5308,7 +5310,7 @@ extension PBNote: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
   }
 }
 
-extension PBScoreOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBScoreOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBScoreOption"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{2}\u{2}tempo\0\u{1}enabled\0\u{1}keyBeats\0\u{1}isShownSpectrogram\0\u{1}beatRange\0\u{1}timelineY\0\u{1}scales\0\u{1}loopDurBeat\0")
 
@@ -5377,7 +5379,7 @@ extension PBScoreOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
   }
 }
 
-extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBScore"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}notes\0\u{2}\u{2}tempo\0\u{1}enabled\0\u{1}id\0\u{1}draftNotes\0\u{1}keyBeats\0\u{1}isShownSpectrogram\0\u{1}beatRange\0\u{1}timelineY\0\u{1}scales\0\u{1}loopDurBeat\0")
 
@@ -5517,7 +5519,7 @@ extension PBScore: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
   }
 }
 
-extension PBAudio: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBAudio: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBAudio"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}pcmData\0")
 
@@ -5547,7 +5549,7 @@ extension PBAudio: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
   }
 }
 
-extension PBLocale: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBLocale: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBLocale"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}identifier\0")
 
@@ -5577,7 +5579,7 @@ extension PBLocale: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationB
   }
 }
 
-extension PBTextTimeOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBTextTimeOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBTextTimeOption"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}beatRange\0\u{1}tempo\0")
 
@@ -5616,7 +5618,7 @@ extension PBTextTimeOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension PBText: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBText: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBText"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}string\0\u{1}orientation\0\u{1}size\0\u{1}widthCount\0\u{1}origin\0\u{2}\u{2}locale\0\u{1}timeOption\0")
 
@@ -5692,7 +5694,7 @@ extension PBText: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBas
   }
 }
 
-extension PBBorder: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBBorder: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBBorder"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}location\0\u{1}orientation\0")
 
@@ -5727,7 +5729,7 @@ extension PBBorder: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationB
   }
 }
 
-extension PBIntPointStringDic: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBIntPointStringDic: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBIntPointStringDic"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0")
 
@@ -5757,7 +5759,7 @@ extension PBIntPointStringDic: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension PBStringIntPointDicElement: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBStringIntPointDicElement: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBStringIntPointDicElement"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}key\0\u{1}value\0")
 
@@ -5796,7 +5798,7 @@ extension PBStringIntPointDicElement: SwiftProtobuf.Message, SwiftProtobuf._Mess
   }
 }
 
-extension PBStringIntPointDic: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBStringIntPointDic: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBStringIntPointDic"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0")
 
@@ -5826,7 +5828,7 @@ extension PBStringIntPointDic: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension PBKeyframe: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBKeyframe: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBKeyframe"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}picture\0\u{1}draftPicture\0\u{1}beat\0\u{2}\u{4}id\0")
 
@@ -5875,7 +5877,7 @@ extension PBKeyframe: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementatio
   }
 }
 
-extension PBKeyframeKey: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBKeyframeKey: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBKeyframeKey"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}lineIs\0\u{1}planeIs\0\u{1}draftLineIs\0\u{1}draftPlaneIs\0\u{1}beat\0\u{2}\u{4}id\0")
 
@@ -5934,7 +5936,7 @@ extension PBKeyframeKey: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
   }
 }
 
-extension PBAnimationZipper: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBAnimationZipper: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBAnimationZipper"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}keys\0\u{1}lines\0\u{1}planes\0\u{1}draftLines\0\u{1}draftPlanes\0")
 
@@ -5984,7 +5986,7 @@ extension PBAnimationZipper: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension PBAnimationOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBAnimationOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBAnimationOption"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}beatRange\0\u{1}tempo\0\u{1}timelineY\0\u{1}enabled\0\u{1}loopDurBeat\0\u{1}previousNext\0")
 
@@ -6043,7 +6045,7 @@ extension PBAnimationOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension PBAnimation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBAnimation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBAnimation"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}keyframes\0\u{1}rootBeat\0\u{1}beatRange\0\u{1}tempo\0\u{1}isPlaying\0\u{1}timelineY\0\u{1}enabled\0\u{1}zipper\0\u{1}loopDurBeat\0\u{1}previousNext\0")
 
@@ -6176,7 +6178,7 @@ extension PBAnimation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
   }
 }
 
-extension PBSheetOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBSheetOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBSheetOption"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}mainFrame\0")
 
@@ -6210,7 +6212,7 @@ extension PBSheetOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
   }
 }
 
-extension PBKeyframeSelection: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBKeyframeSelection: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBKeyframeSelection"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}lineIs\0\u{1}planeIs\0")
 
@@ -6245,7 +6247,7 @@ extension PBKeyframeSelection: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension PBPitSelection: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBPitSelection: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBPitSelection"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}sprolIs\0")
 
@@ -6275,7 +6277,7 @@ extension PBPitSelection: SwiftProtobuf.Message, SwiftProtobuf._MessageImplement
   }
 }
 
-extension PBNoteSelection: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBNoteSelection: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBNoteSelection"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}pitSelections\0")
 
@@ -6305,7 +6307,7 @@ extension PBNoteSelection: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
   }
 }
 
-extension PBTextSelection: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBTextSelection: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBTextSelection"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}ranges\0")
 
@@ -6335,7 +6337,7 @@ extension PBTextSelection: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
   }
 }
 
-extension PBSheetSelection: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBSheetSelection: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBSheetSelection"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}keyframeSelections\0\u{1}noteSelections\0\u{1}textSelections\0\u{1}contentIs\0\u{1}lastPosition\0")
 
@@ -6401,7 +6403,7 @@ extension PBSheetSelection: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension PBSheet: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBSheet: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBSheet"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}picture\0\u{1}draftPicture\0\u{1}texts\0\u{1}borders\0\u{1}backgroundUUColor\0\u{1}animation\0\u{2}\u{4}score\0\u{1}contents\0\u{1}mainFrame\0\u{1}selection\0")
 
@@ -6534,7 +6536,7 @@ extension PBSheet: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
   }
 }
 
-extension PBWorldSelection: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBWorldSelection: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBWorldSelection"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}sheetIDs\0\u{1}lastPosition\0")
 
@@ -6585,7 +6587,7 @@ extension PBWorldSelection: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension PBWorld: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBWorld: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBWorld"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}sheetPositions\0\u{1}selection\0")
 
@@ -6624,7 +6626,7 @@ extension PBWorld: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBa
   }
 }
 
-extension PBCornerRectValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBCornerRectValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBCornerRectValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}rect\0\u{1}rectCorner\0")
 
@@ -6663,7 +6665,7 @@ extension PBCornerRectValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension PBCornerRectValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBCornerRectValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBCornerRectValueArray"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0")
 
@@ -6693,9 +6695,9 @@ extension PBCornerRectValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 }
 
-extension PBFinding: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBFinding: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBFinding"
-  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}worldPosition\0\u{1}string\0")
+  static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}worldPosition\0\u{1}string\0\u{1}isLine\0")
 
   mutating func decodeMessage<D: SwiftProtobuf.Decoder>(decoder: inout D) throws {
     while let fieldNumber = try decoder.nextFieldNumber() {
@@ -6705,6 +6707,7 @@ extension PBFinding: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
       switch fieldNumber {
       case 1: try { try decoder.decodeSingularMessageField(value: &self._worldPosition) }()
       case 2: try { try decoder.decodeSingularStringField(value: &self.string) }()
+      case 3: try { try decoder.decodeSingularBoolField(value: &self.isLine) }()
       default: break
       }
     }
@@ -6721,18 +6724,22 @@ extension PBFinding: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
     if !self.string.isEmpty {
       try visitor.visitSingularStringField(value: self.string, fieldNumber: 2)
     }
+    if self.isLine != false {
+      try visitor.visitSingularBoolField(value: self.isLine, fieldNumber: 3)
+    }
     try unknownFields.traverse(visitor: &visitor)
   }
 
   static func ==(lhs: PBFinding, rhs: PBFinding) -> Bool {
     if lhs._worldPosition != rhs._worldPosition {return false}
     if lhs.string != rhs.string {return false}
+    if lhs.isLine != rhs.isLine {return false}
     if lhs.unknownFields != rhs.unknownFields {return false}
     return true
   }
 }
 
-extension PBKeyframeOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBKeyframeOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBKeyframeOption"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}beat\0\u{2}\u{2}previousPosition\0\u{1}nextPosition\0")
 
@@ -6776,7 +6783,7 @@ extension PBKeyframeOption: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension PBIntIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBIntIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBIntIndexValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0\u{1}index\0")
 
@@ -6811,7 +6818,7 @@ extension PBIntIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
   }
 }
 
-extension PBLineIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBLineIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBLineIndexValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0\u{1}index\0")
 
@@ -6850,7 +6857,7 @@ extension PBLineIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension PBInterOptionIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBInterOptionIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBInterOptionIndexValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0\u{1}index\0")
 
@@ -6889,7 +6896,7 @@ extension PBInterOptionIndexValue: SwiftProtobuf.Message, SwiftProtobuf._Message
   }
 }
 
-extension PBPlaneIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBPlaneIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBPlaneIndexValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0\u{1}index\0")
 
@@ -6966,7 +6973,7 @@ extension PBPlaneIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension PBTextIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBTextIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBTextIndexValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0\u{1}index\0")
 
@@ -7005,7 +7012,7 @@ extension PBTextIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension PBNoteIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBNoteIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBNoteIndexValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0\u{1}index\0")
 
@@ -7044,7 +7051,7 @@ extension PBNoteIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImpleme
   }
 }
 
-extension PBContentIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBContentIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBContentIndexValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0\u{1}index\0")
 
@@ -7083,7 +7090,7 @@ extension PBContentIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension PBBorderIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBBorderIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBBorderIndexValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0\u{1}index\0")
 
@@ -7122,7 +7129,7 @@ extension PBBorderIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImple
   }
 }
 
-extension PBKeyframeIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBKeyframeIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBKeyframeIndexValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0\u{1}index\0")
 
@@ -7161,7 +7168,7 @@ extension PBKeyframeIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
   }
 }
 
-extension PBKeyframeOptionIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBKeyframeOptionIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBKeyframeOptionIndexValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0\u{1}index\0")
 
@@ -7200,7 +7207,7 @@ extension PBKeyframeOptionIndexValue: SwiftProtobuf.Message, SwiftProtobuf._Mess
   }
 }
 
-extension PBColorValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBColorValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBColorValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}uuColor\0\u{2}\u{2}planeIndexes\0\u{2}\u{2}isBackground\0\u{1}planeAnimationIndexes\0\u{1}animationColors\0\u{1}lineIndexes\0\u{1}lineAnimationIndexes\0")
 
@@ -7312,7 +7319,7 @@ extension PBColorValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
   }
 }
 
-extension PBPlaneValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBPlaneValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBPlaneValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}planes\0\u{1}moveIndexValues\0\u{1}index\0")
 
@@ -7352,7 +7359,7 @@ extension PBPlaneValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
   }
 }
 
-extension PBTextValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBTextValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBTextValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}string\0\u{1}replacedRange\0\u{1}origin\0\u{1}size\0\u{1}widthCount\0")
 
@@ -7432,7 +7439,7 @@ extension PBTextValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
   }
 }
 
-extension PBTextValueIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBTextValueIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBTextValueIndexValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0\u{1}index\0")
 
@@ -7471,7 +7478,7 @@ extension PBTextValueIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
   }
 }
 
-extension PBSheetValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBSheetValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBSheetValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}lines\0\u{1}planes\0\u{1}texts\0\u{1}origin\0\u{1}id\0\u{1}rootKeyframeIndex\0\u{1}keyframes\0\u{1}keyframeBeganIndex\0\u{1}contents\0\u{1}isSelected\0")
 
@@ -7550,7 +7557,7 @@ extension PBSheetValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
   }
 }
 
-extension PBInt64Array: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBInt64Array: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBInt64Array"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0")
 
@@ -7580,7 +7587,7 @@ extension PBInt64Array: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
   }
 }
 
-extension PBIntArrayIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBIntArrayIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBIntArrayIndexValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0\u{1}index\0")
 
@@ -7619,7 +7626,7 @@ extension PBIntArrayIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
   }
 }
 
-extension PBIntArrayIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBIntArrayIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBIntArrayIndexValueArray"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0")
 
@@ -7649,7 +7656,7 @@ extension PBIntArrayIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._Messa
   }
 }
 
-extension PBLineArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBLineArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBLineArray"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0")
 
@@ -7679,7 +7686,7 @@ extension PBLineArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
   }
 }
 
-extension PBPlaneArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBPlaneArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBPlaneArray"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0")
 
@@ -7709,7 +7716,7 @@ extension PBPlaneArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
   }
 }
 
-extension PBUUIDArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBUUIDArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBUUIDArray"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0")
 
@@ -7739,7 +7746,7 @@ extension PBUUIDArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
   }
 }
 
-extension PBIntPointArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBIntPointArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBIntPointArray"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0")
 
@@ -7769,7 +7776,7 @@ extension PBIntPointArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
   }
 }
 
-extension PBIntIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBIntIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBIntIndexValueArray"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0")
 
@@ -7799,7 +7806,7 @@ extension PBIntIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImp
   }
 }
 
-extension PBLineIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBLineIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBLineIndexValueArray"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0")
 
@@ -7829,7 +7836,7 @@ extension PBLineIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
   }
 }
 
-extension PBLineIndexValueArrayIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBLineIndexValueArrayIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBLineIndexValueArrayIndexValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0\u{1}index\0")
 
@@ -7864,7 +7871,7 @@ extension PBLineIndexValueArrayIndexValue: SwiftProtobuf.Message, SwiftProtobuf.
   }
 }
 
-extension PBLineIndexValueArrayIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBLineIndexValueArrayIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBLineIndexValueArrayIndexValueArray"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0")
 
@@ -7894,7 +7901,7 @@ extension PBLineIndexValueArrayIndexValueArray: SwiftProtobuf.Message, SwiftProt
   }
 }
 
-extension PBPlaneIndexValueArrayIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBPlaneIndexValueArrayIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBPlaneIndexValueArrayIndexValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0\u{1}index\0")
 
@@ -7929,7 +7936,7 @@ extension PBPlaneIndexValueArrayIndexValue: SwiftProtobuf.Message, SwiftProtobuf
   }
 }
 
-extension PBPlaneIndexValueArrayIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBPlaneIndexValueArrayIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBPlaneIndexValueArrayIndexValueArray"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0")
 
@@ -7959,7 +7966,7 @@ extension PBPlaneIndexValueArrayIndexValueArray: SwiftProtobuf.Message, SwiftPro
   }
 }
 
-extension PBInterOptionIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBInterOptionIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBInterOptionIndexValueArray"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0")
 
@@ -7989,7 +7996,7 @@ extension PBInterOptionIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._Me
   }
 }
 
-extension PBInterOptionIndexValueArrayIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBInterOptionIndexValueArrayIndexValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBInterOptionIndexValueArrayIndexValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0\u{1}index\0")
 
@@ -8024,7 +8031,7 @@ extension PBInterOptionIndexValueArrayIndexValue: SwiftProtobuf.Message, SwiftPr
   }
 }
 
-extension PBInterOptionIndexValueArrayIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBInterOptionIndexValueArrayIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBInterOptionIndexValueArrayIndexValueArray"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0")
 
@@ -8054,7 +8061,7 @@ extension PBInterOptionIndexValueArrayIndexValueArray: SwiftProtobuf.Message, Sw
   }
 }
 
-extension PBPlaneIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBPlaneIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBPlaneIndexValueArray"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0")
 
@@ -8084,7 +8091,7 @@ extension PBPlaneIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageI
   }
 }
 
-extension PBNoteIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBNoteIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBNoteIndexValueArray"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0")
 
@@ -8114,7 +8121,7 @@ extension PBNoteIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
   }
 }
 
-extension PBTextIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBTextIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBTextIndexValueArray"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0")
 
@@ -8144,7 +8151,7 @@ extension PBTextIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageIm
   }
 }
 
-extension PBContentIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBContentIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBContentIndexValueArray"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0")
 
@@ -8174,7 +8181,7 @@ extension PBContentIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._Messag
   }
 }
 
-extension PBBorderIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBBorderIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBBorderIndexValueArray"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0")
 
@@ -8204,7 +8211,7 @@ extension PBBorderIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._Message
   }
 }
 
-extension PBKeyframeIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBKeyframeIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBKeyframeIndexValueArray"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0")
 
@@ -8234,7 +8241,7 @@ extension PBKeyframeIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._Messa
   }
 }
 
-extension PBKeyframeOptionIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBKeyframeOptionIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBKeyframeOptionIndexValueArray"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}value\0")
 
@@ -8264,7 +8271,7 @@ extension PBKeyframeOptionIndexValueArray: SwiftProtobuf.Message, SwiftProtobuf.
   }
 }
 
-extension PBSheetUndoItem: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBSheetUndoItem: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBSheetUndoItem"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}appendLine\0\u{1}appendLines\0\u{1}appendPlanes\0\u{1}removeLastLines\0\u{1}removeLastPlanes\0\u{1}insertLines\0\u{1}insertPlanes\0\u{1}removeLines\0\u{1}removePlanes\0\u{1}setPlaneValue\0\u{1}changeToDraft\0\u{1}setPicture\0\u{1}insertDraftLines\0\u{1}insertDraftPlanes\0\u{1}removeDraftLines\0\u{1}removeDraftPlanes\0\u{1}setDraftPicture\0\u{1}insertTexts\0\u{1}removeTexts\0\u{1}replaceString\0\u{1}changedColors\0\u{1}insertBorders\0\u{1}removeBorders\0\u{1}setRootKeyframeIndex\0\u{1}insertKeyframes\0\u{1}removeKeyframes\0\u{1}setKeyframeOptions\0\u{1}insertKeyLines\0\u{1}replaceKeyLines\0\u{1}removeKeyLines\0\u{1}setLineIDs\0\u{2}\u{3}insertKeyPlanes\0\u{1}removeKeyPlanes\0\u{1}insertDraftKeyLines\0\u{1}removeDraftKeyLines\0\u{1}insertDraftKeyPlanes\0\u{1}removeDraftKeyPlanes\0\u{1}setAnimationOption\0\u{1}replaceKeyPlanes\0\u{1}insertNotes\0\u{1}replaceNotes\0\u{1}removeNotes\0\u{2}\u{2}insertContents\0\u{1}replaceContents\0\u{1}removeContents\0\u{1}setScoreOption\0\u{1}insertDraftNotes\0\u{1}removeDraftNotes\0\u{1}setSheetOption\0\u{1}setSelection\0\u{1}replaceLines\0\u{1}replacePlanes\0\u{1}replaceTexts\0")
 
@@ -9178,7 +9185,7 @@ extension PBSheetUndoItem: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
   }
 }
 
-extension PBWorldUndoItem: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBWorldUndoItem: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBWorldUndoItem"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}insertSheets\0\u{1}removeSheets\0\u{2}\u{2}setSelection\0")
 
@@ -9262,7 +9269,7 @@ extension PBWorldUndoItem: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
   }
 }
 
-extension PBUndoDataValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBUndoDataValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBUndoDataValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}undoItemData\0\u{1}redoItemData\0")
 
@@ -9297,7 +9304,7 @@ extension PBUndoDataValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplemen
   }
 }
 
-extension PBUndoGroup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBUndoGroup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBUndoGroup"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}values\0\u{1}isFirstReverse\0\u{1}date\0")
 
@@ -9341,7 +9348,7 @@ extension PBUndoGroup: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementati
   }
 }
 
-extension PBBranch: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBBranch: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBBranch"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}groups\0\u{1}childrenCount\0\u{1}selectedChildIndex\0")
 
@@ -9392,7 +9399,7 @@ extension PBBranch: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationB
   }
 }
 
-extension PBBranchCoder: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBBranchCoder: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBBranchCoder"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}allBranches\0")
 
@@ -9422,7 +9429,7 @@ extension PBBranchCoder: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
   }
 }
 
-extension PBHistory: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBHistory: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBHistory"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}branchCoder\0\u{1}currentVersionIndex\0")
 
@@ -9461,7 +9468,7 @@ extension PBHistory: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementation
   }
 }
 
-extension PBCopiedSheetsValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBCopiedSheetsValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBCopiedSheetsValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}deltaPoint\0\u{1}sheetIDs\0\u{1}isSelected\0")
 
@@ -9505,7 +9512,7 @@ extension PBCopiedSheetsValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension PBPlanesValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBPlanesValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBPlanesValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}planes\0")
 
@@ -9535,7 +9542,7 @@ extension PBPlanesValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementa
   }
 }
 
-extension PBCopiedAnimation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBCopiedAnimation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBCopiedAnimation"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}animation\0\u{1}sheetID\0\u{1}keyframeID\0")
 
@@ -9579,7 +9586,7 @@ extension PBCopiedAnimation: SwiftProtobuf.Message, SwiftProtobuf._MessageImplem
   }
 }
 
-extension PBNotesValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBNotesValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBNotesValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}notes\0\u{1}deltaPitch\0\u{1}isSelected\0")
 
@@ -9623,7 +9630,7 @@ extension PBNotesValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementat
   }
 }
 
-extension PBInterOptionsValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBInterOptionsValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBInterOptionsValue"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}ids\0\u{1}sheetID\0\u{1}rootKeyframeIndex\0")
 
@@ -9667,7 +9674,7 @@ extension PBInterOptionsValue: SwiftProtobuf.Message, SwiftProtobuf._MessageImpl
   }
 }
 
-extension PBPastableObject: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
+nonisolated extension PBPastableObject: SwiftProtobuf.Message, SwiftProtobuf._MessageImplementationBase, SwiftProtobuf._ProtoNameProviding {
   static let protoMessageName: String = "PBPastableObject"
   static let _protobuf_nameMap = SwiftProtobuf._NameMap(bytecode: "\0\u{1}copiedSheetsValue\0\u{1}sheetValue\0\u{1}border\0\u{1}text\0\u{1}string\0\u{1}picture\0\u{1}planesValue\0\u{1}uuColor\0\u{1}copiedAnimation\0\u{1}ids\0\u{2}\u{2}beatRange\0\u{1}normalizationValue\0\u{1}notesValue\0\u{1}tone\0\u{1}normalizationRationalValue\0\u{2}\u{5}image\0\u{1}content\0\u{2}\u{2}stereo\0\u{1}rect\0\u{1}tempo\0")
 

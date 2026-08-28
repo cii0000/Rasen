@@ -1237,6 +1237,14 @@ extension Note {
         }
     }
     
+    func isSmallAttack(fromTempo tempo: Rational) -> Bool {
+        (!isFullNoise && Double(Score.sec(fromBeat: beatRange.length, tempo: tempo)) < Waveclip.default.attackSec)
+        || (pits.count >= 2 && pits[0].beat < pits[1].beat && abs(Double(pits[1].pitch - pits[0].pitch)) / Double(pits[1].beat - pits[0].beat) > 120)
+    }
+    func attackSec(fromTempo tempo: Rational) -> Double {
+        isSmallAttack(fromTempo: tempo) ? Waveclip.small.attackSec : Waveclip.default.attackSec
+    }
+    
     func pitsEqualSpectlopeCount() -> [Pit] {
         guard let count = pits.max(by: { $0.tone.spectlope.count < $1.tone.spectlope.count })?.tone.spectlope.count else { return [] }
         return pits.map {
@@ -2113,6 +2121,9 @@ extension Score {
         set {
             loopDurBeat = max(0, newValue - beatRange.end)
         }
+    }
+    var endLoopDurSec: Rational {
+        secRange.end + loopDurSec
     }
     var loopDurSec: Rational {
         sec(fromBeat: loopDurBeat)

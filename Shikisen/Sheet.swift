@@ -1923,6 +1923,9 @@ extension Animation: BeatRangeType {
             loopDurBeat = max(0, newValue - beatRange.end)
         }
     }
+    var endLoopDurSec: Rational {
+        secRange.end + loopDurSec
+    }
     var loopDurSec: Rational {
         sec(fromBeat: loopDurBeat)
     }

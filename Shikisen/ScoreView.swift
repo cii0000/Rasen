@@ -32,6 +32,8 @@ protocol TimelineView: BindableView where Model: TempoType {
     func durBeat(atWidth w: Double) -> Double
     func sec(atX x: Double, interval: Rational) -> Rational
     func sec(atX x: Double) -> Rational
+    func sec(fromBeat beat: Double) -> Double
+    func sec(fromBeat beat: Rational) -> Rational
     var origin: Point { get }
     var frameRate: Int { get }
     func containsTimeline(_ p: Point, scale: Double) -> Bool
@@ -91,6 +93,12 @@ extension TimelineView {
     }
     func sec(atX x: Double) -> Rational {
         sec(atX: x, interval: Rational(1, frameRate))
+    }
+    func sec(fromBeat beat: Double) -> Double {
+        model.sec(fromBeat: beat)
+    }
+    func sec(fromBeat beat: Rational) -> Rational {
+        model.sec(fromBeat: beat)
     }
     
     func tempoFrames() -> [Rect] {
@@ -1155,10 +1163,11 @@ extension ScoreView {
         let nsx = x(atBeat: note.beatRange.start)
         let ny = y(fromPitch: note.firstPitch)
         let nw = width(atDurBeat: max(note.beatRange.length, EditGrid.fullEditBeatInterval))
+        let isSmall = note.isSmallAttack(fromTempo: model.tempo)
         let attackW = width(atDurSec: Waveclip.default.attackSec)
         let attackX = nsx + attackW
         let nex = nsx + nw
-        let fScale = Waveclip.default.attackSec > .init(model.sec(fromBeat: note.beatRange.length)) ? 1.25 : 0.75
+        let fScale = isSmall ? 1.25 : 0.75
         
         let spectlopeY = y(fromPitch: note.firstPitch) + Sheet.tonePadding
         let overtoneHalfH = 0.25

@@ -416,6 +416,7 @@ message PBCornerRectValueArray {
 message PBFinding {
     PBPoint worldPosition = 1;
     string string = 2;
+    bool isLine = 3;
 }
 
 message PBKeyframeOption {

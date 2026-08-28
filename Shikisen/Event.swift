@@ -400,6 +400,7 @@ extension Gesture {
     
     static let cut = Self(modifier: [.command], .x)
     static let copy = Self(modifier: [.command], .c)
+    static let copyLineColor = Self(modifier: [.command, .option], .c)
     static let paste = Self(modifier: [.command], .v)
     
     static let insert = Self(modifier: [.command], .e)

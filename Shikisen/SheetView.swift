@@ -1340,6 +1340,13 @@ final class AnimationView: TimelineView, @unchecked Sendable {
         return [Node(path: convertToWorld(Path(selectedPathlines)),
                      fillType: .color(.selected))]
     }
+    func interporatedKeyLineIs(from ids: [UUID]) -> [Int] {
+        guard !ids.isEmpty else { return [] }
+        let idSet = Set(ids)
+        return model.keyframes.enumerated().compactMap { (ki, keyframe) in
+            keyframe.picture.lines.contains(where: { idSet.contains($0.interID) }) ? ki : nil
+        }
+    }
     func interporatedTimelineNodes(fromColor ids: [UUID]) -> [Node] {
         guard !ids.isEmpty else { return [] }
         let idSet = Set(ids)
@@ -1498,7 +1505,7 @@ final class SheetView: View, @unchecked Sendable {
     var id = UUID()
     
     let node: Node
-    let opacityNode = Node(), otherNode = Node()
+    let opacityNode = Node(), otherBottomNode = Node(), otherTopNode = Node()
     let animationView: AnimationView
     var keyframeView: KeyframeView {
         animationView.elementViews[model.animation.index]
@@ -1612,8 +1619,9 @@ final class SheetView: View, @unchecked Sendable {
         bordersView = ArrayView(binder: binder,
                                 keyPath: keyPath.appending(path: \Model.borders))
         
-        node = Node(children: [opacityNode, otherNode,
+        node = Node(children: [opacityNode, otherBottomNode,
                                animationView.node,
+                               otherTopNode,
                                animationView.previousNextNode,
                                mainFrameNode,
                                contentsView.node,
@@ -2070,8 +2078,8 @@ final class SheetView: View, @unchecked Sendable {
     func timeString(fromBeat beat: Rational) -> String {
         Animation.timeString(fromTime: beat, frameRate: Rational(frameRate))
     }
-    func timeString(fromSec sec: Rational) -> String {
-        Animation.timeString(fromTime: sec, frameRate: Rational(60))
+    func timeString(fromSec sec: Rational, frameRate: Rational) -> String {
+        Animation.timeString(fromTime: sec, frameRate: frameRate)
     }
     func currentTimeString() -> String {
         Animation.timeString(fromTime: model.animation.localBeat,
@@ -2382,7 +2390,8 @@ final class SheetView: View, @unchecked Sendable {
         playingTimer = nil
         animationView.isPlaying = isPlaying
         animationView.previousNextNode.isHidden = isPlaying
-        otherNode.isHidden = isPlaying
+        otherBottomNode.isHidden = isPlaying
+        otherTopNode.isHidden = isPlaying
         if isPlaying {
             let playingSec = firstSec ?? model.animation.sec(fromBeat: model.animation.mainBeat)
             self.playingSec = playingSec
@@ -7854,16 +7863,24 @@ final class SheetColorOwner {
     
     func moveLine(with uuColor: UUColor, old oldUUColor: UUColor) {
         if oldUUColor == Line.defaultUUColor && uuColor != Line.defaultUUColor {
-            if colorValue.lineAnimationIndexes.count == 1 {
-                let v = colorValue.lineAnimationIndexes[0]
-                if v.index == sheetView.model.animation.index {
-                    let lis = colorValue.lineIndexes.filter { $0 != 0 }
+            if colorValue.lineAnimationIndexes.count >= 1 {
+                var removeKeyLines = [IndexValue<[Int]>]()
+                var insertKeyLines = [IndexValue<[IndexValue<Line>]>]()
+                for kiv in colorValue.lineAnimationIndexes {
+                    let lis = kiv.value.filter { $0 != 0 }
                     if !lis.isEmpty {
-                        let livs = sheetView.model.picture.lines[lis].enumerated()
+                        let livs = sheetView.model.animation.keyframes[kiv.index].picture.lines[lis].enumerated()
                             .map { IndexValue(value: $0.element, index: $0.offset) }
-                        sheetView.removeLines(at: lis)
-                        sheetView.insert(livs)
+                        removeKeyLines.append(.init(value: lis, index: kiv.index))
+                        insertKeyLines.append(.init(value: livs, index: kiv.index))
                     }
+                }
+                if !removeKeyLines.isEmpty || !insertKeyLines.isEmpty {
+                    sheetView.removeKeyLines(removeKeyLines)
+                    sheetView.insertKeyLines(insertKeyLines)
+                    
+                    //
+                    sheetView.doSet(.empty)
                 }
             } else {
                 let lis = colorValue.lineIndexes.filter { $0 != 0 }
@@ -7872,6 +7889,9 @@ final class SheetColorOwner {
                         .map { IndexValue(value: $0.element, index: $0.offset) }
                     sheetView.removeLines(at: lis)
                     sheetView.insert(livs)
+                    
+                    //
+                    sheetView.doSet(.empty)
                 }
             }
         }

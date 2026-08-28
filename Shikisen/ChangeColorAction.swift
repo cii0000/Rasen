@@ -332,7 +332,7 @@ final class ChangeColorAction: Action {
             rootView.cursor = .arrow
             rootAction.closeLookingUpAndStop(at: p)
             
-            whiteLightnessHeight = 200
+            whiteLightnessHeight = 400
             beganSP = sp
             preEventTime = event.time
             if let sheetView = rootView.sheetView(at: p) {

@@ -112,6 +112,7 @@
 "Keyframes" = "複数キーフレーム";
 "Beat Range" = "ビート範囲";
 "Beat" = "ビート";
+"Seconds Range" = "時間範囲";
 "Score" = "楽譜";
 "Tempo" = "テンポ";
 "Sheet" = "シート";
@@ -136,6 +137,8 @@
 "Whole Tone" = "全音階";
 "Chromatic" = "半音階";
 "Other" = "その他";
+
+"Attack" = "アタック";
 
 "Max Prime Factor" = "最大素因数";
 

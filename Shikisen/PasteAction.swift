@@ -2458,7 +2458,8 @@ final class APasteAction: Action {
                     }
                 }
             } else if let _ = rootView.madeSheetView(at: shp) {
-                let colorOwners = rootView.madeColorOwner(at: p, enabledLine: false,
+                let colorOwners = rootView.madeColorOwnerWithFindingLine(at: p)
+                ?? rootView.madeColorOwner(at: p, enabledLine: false,
                                                           enabledAlwaysAnimation: rootView.containsFromFinding(rootView.uuColor(at: p)),
                                                           removingUUColor: uuColor)
                 colorOwners.forEach {
@@ -3174,7 +3175,8 @@ final class APasteAction: Action {
                 }
                 rootView.updateSelectedFrame()
             } else if let _ = rootView.madeSheetView(at: shp) {
-                let colorOwners = rootView.madeColorOwner(at: p, enabledLine: false,
+                let colorOwners = rootView.madeColorOwnerWithFindingLine(at: p)
+                ?? rootView.madeColorOwner(at: p, enabledLine: false,
                                                           enabledAlwaysAnimation: rootView.containsFromFinding(rootView.uuColor(at: p)),
                                                           removingUUColor: uuColor)
                 colorOwners.forEach {

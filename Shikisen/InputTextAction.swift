@@ -58,6 +58,11 @@ final class FindAction: InputKeyEventAction {
                     rootView.finding = Finding(worldPosition: p, string: str)
                     isFind = true
                 }
+            } else if let (lineView, _) = sheetView.lineTuple(at: sheetP, enabledPlane: true, scale: rootView.screenToWorldScale),
+                      sheetView.animationView.interporatedKeyLineIs(from: [lineView.model.interID]).count > 1 {
+                let string = lineView.model.interID.uuidString
+                rootView.finding = Finding(worldPosition: p, string: string, isLine: true)
+                isFind = true
             } else {
                 let topOwner = sheetView.sheetColorOwner(at: sheetP, scale: rootView.screenToWorldScale).value
                 let uuColor = topOwner.uuColor
@@ -211,8 +216,14 @@ final class LookUpAction: InputKeyEventAction {
             let tempoStr = Sheet.tempoNameFromStandardFrameRate(withTempo: animation.tempo)
             let startBeatStr = sheetView.timeString(fromBeat: animation.beatRange.start)
             let endBeatStr = sheetView.timeString(fromBeat: animation.endLoopDurBeat)
+            let frameRate = Rational(Sheet.standardFrameRate(from: [sheetView.model]))
+            let startSecStr = sheetView.timeString(fromSec: animation.secRange.start,
+                                                   frameRate: frameRate)
+            let endSecStr = sheetView.timeString(fromSec: animation.endLoopDurSec,
+                                                 frameRate: frameRate)
             rootView.show("Timeline".localized
                           + "\n\t\("Beat Range".localized): \(startBeatStr) - \(endBeatStr)"
+                          + "\n\t\("Seconds Range".localized): \(startSecStr) - \(endSecStr)"
                           + "\n\t\("Tempo".localized): \(tempoStr)",
                           at: p)
         } else if let sheetView = rootView.sheetView(at: p),
@@ -254,7 +265,8 @@ final class LookUpAction: InputKeyEventAction {
             let fq = pitch.fq
             let fqStr = "\("Note".localized) \(pitch.displayString()) (\(fq.string(digitsCount: 2)) Hz)"
             + "\n" + Animation.timeString(fromTime: beat,
-                                          frameRate: Rational(Keyframe.defaultFrameRate)) + " beat" + (idStr.isEmpty ? "" : "\n\tID: \(idStr)")
+                                          frameRate: Rational(Keyframe.defaultFrameRate)) + " beat"
+            + (note.isSmallAttack(fromTempo: scoreView.model.tempo) ? "\n\("Attack".localized): \(note.attackSec(fromTempo: scoreView.model.tempo)) sec" : "") + (idStr.isEmpty ? "" : "\n\tID: \(idStr)")
             rootView.show(fqStr, at: p)
         } else if let sheetView = rootView.sheetView(at: p),
                   sheetView.scoreView.contains(sheetView.scoreView.convertFromWorld(p),
@@ -275,11 +287,18 @@ final class LookUpAction: InputKeyEventAction {
                 let tempoStr = Sheet.tempoNameFromStandardFrameRate(withTempo: scoreView.model.tempo)
                 let startBeatStr = sheetView.timeString(fromBeat: scoreView.model.beatRange.start)
                 let endBeatStr = sheetView.timeString(fromBeat: scoreView.model.endLoopDurBeat)
+                let frameRate = Rational(Sheet.standardFrameRate(from: [sheetView.model]))
+                let startSecStr = sheetView.timeString(fromSec: scoreView.model.secRange.start,
+                                                       frameRate: frameRate)
+                let endSecStr = sheetView.timeString(fromSec: scoreView.model.endLoopDurSec,
+                                                     frameRate: frameRate)
                 rootView.show("Score".localized
                               + "\n\t\("Loudness".localized): \(lufs?.string(digitsCount: 2) ?? "N/A") LUFS"
                               + "\n\t\("Sample Peak".localized): \(peakDb?.string(digitsCount: 2) ?? "N/A") dB"
                               + "\n\t\("True Peak".localized): \(truePeakDb?.string(digitsCount: 2) ?? "N/A") dBTP"
                               + "\n\t\("Beat Range".localized): \(startBeatStr) - \(endBeatStr)"
+                              
+                              + "\n\t\("Seconds Range".localized): \(startSecStr) - \(endSecStr)"
                               + "\n\t\("Tempo".localized): \(tempoStr)",
                               at: p)
             } else {
@@ -334,7 +353,13 @@ final class LookUpAction: InputKeyEventAction {
                 let tempoStr = Sheet.tempoNameFromStandardFrameRate(withTempo: timeOption.tempo)
                 let startBeatStr = sheetView.timeString(fromBeat: timeOption.beatRange.start)
                 let endBeatStr = sheetView.timeString(fromBeat: timeOption.beatRange.end)
+                let frameRate = Rational(Sheet.standardFrameRate(from: [sheetView.model]))
+                let startSecStr = sheetView.timeString(fromSec: timeOption.secRange.start,
+                                                       frameRate: frameRate)
+                let endSecStr = sheetView.timeString(fromSec: timeOption.secRange.end,
+                                                     frameRate: frameRate)
                 str +=  "\n\t\("Beat Range".localized): \(startBeatStr) - \(endBeatStr)"
+                + "\n\t\("Seconds Range".localized): \(startSecStr) - \(endSecStr)"
                 + "\n\t\("Tempo".localized): \(tempoStr)"
             }
             str += "\n\t\("File Size".localized): \(fileSizeStr)"

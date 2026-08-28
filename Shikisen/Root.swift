@@ -22,6 +22,7 @@ import struct Foundation.URL
 struct Finding {
     var worldPosition = Point()
     var string = ""
+    var isLine = false
 }
 extension Finding {
     var isEmpty: Bool { string.isEmpty }
@@ -30,6 +31,7 @@ extension Finding: Protobuf {
     init(_ pb: PBFinding) throws {
         worldPosition = try .init(pb.worldPosition)
         string = pb.string
+        
     }
     var pb: PBFinding {
         .with {

@@ -1124,7 +1124,21 @@ final class RootView: View, @unchecked Sendable {
                     }
                 }
             }
-            if let uuid = UUID(uuidString: finding.string) {
+            
+            if finding.isLine, let uuid = UUID(uuidString: finding.string) {
+                for keyframeView in nSheetView.animationView.elementViews {
+                    for lineView in keyframeView.linesView.elementViews {
+                        if lineView.model.interID == uuid {
+                            let pp = lineView.model.firstPoint
+                            let ppp = nSheetView.convertToWorld(pp)
+                            nodes.append(Node(path: Path([Pathline([p,
+                                                                    ppp])]),
+                                              lineWidth: l,
+                                              lineType: .color(.selected)))
+                        }
+                    }
+                }
+            } else if let uuid = UUID(uuidString: finding.string) {
                 for planeView in nSheetView.planesView.elementViews {
                     if planeView.model.uuColor.id == uuid {
                         if let pp = planeView.model.topolygon.polygon.points.first {
@@ -3230,6 +3244,50 @@ final class RootView: View, @unchecked Sendable {
                 .sheetColorOwner(with: uuColor) { [co] } else { [] }
             return (uuColor, colorOwners)
         }
+    }
+    func madeColorOwnerWithFindingLine(at p: Point) -> [SheetColorOwner]? {
+        if finding.isLine, let uuid = UUID(uuidString: finding.string),
+            let sheetView = sheetView(at: p) {
+            
+            let sheetP = sheetView.convertFromWorld(p)
+            if let (lineView, _) = sheetView.lineTuple(at: sheetP, scale: screenToWorldScale),
+               lineView.model.interID == uuid {
+                
+                var lais = [UUColor: [IndexValue<[Int]>]]()
+                for (ki, keyframeView) in sheetView.animationView.elementViews.enumerated() {
+                    for (li, lineView) in keyframeView.linesView.elementViews.enumerated() {
+                        if lineView.model.interID == uuid {
+                            let uuColor = lineView.model.uuColor
+                            if let ais = lais[uuColor] {
+                                var isAppendKI = false
+                                for (i, kv) in ais.enumerated() {
+                                    if kv.index == ki {
+                                        lais[uuColor]?[i].value.append(li)
+                                        isAppendKI = true
+                                        break
+                                    }
+                                }
+                                if !isAppendKI {
+                                    lais[uuColor]?.append(.init(value: [li], index: ki))
+                                }
+                            } else {
+                                lais[uuColor] = [.init(value: [li], index: ki)]
+                            }
+                        }
+                    }
+                }
+                
+                return lais.map { (uuColor, ais) in
+                    SheetColorOwner(sheetView: sheetView,
+                                    colorValue: .init(uuColor: uuColor, planeIndexes: [],
+                                                      lineIndexes: [], isBackground: false,
+                                                      planeAnimationIndexes: [],
+                                                      lineAnimationIndexes: ais,
+                                                      animationColors: []))
+                }
+            }
+        }
+        return nil
     }
     func colors(minArea: Double = 9, at p: Point) -> [Color] {
         guard let sheetView = sheetView(at: p) else {

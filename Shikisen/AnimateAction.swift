@@ -303,7 +303,8 @@ final class SelectTimeAction: SwipeEventAction, DragEventAction {
                 beganRootI = 0, beganRootBeat: Rational = 0, beganBeat = Rational(0),
                 beganSelectedFrameIndexes = [Int](), beganEventTime = 0.0, preEventTime: Double?
     private var allDX = 0.0, co = 0
-    private var snapEventTime: Double?, otherIAndNodes = [SheetView: (i: Int, node: Node)]()
+    private var snapEventTime: Double?, otherIAndNodes = [SheetView: (i: Int, isBottom: Bool,
+                                                                      node: Node)]()
     private let progressWidth = {
         let text = Text(string: "00.00", size: Font.defaultSize)
         return text.frame?.width ?? 40
@@ -397,7 +398,7 @@ final class SelectTimeAction: SwipeEventAction, DragEventAction {
                         func updateFromVertical() {
                             let allSec = animationView.model.mainSec
                             let bounds = sheetView.bounds
-                            var otherChildren = [Node]()
+                            var otherBottomChildren = [Node](), otherTopChildren = [Node]()
                             let shp = rootView.sheetPosition(at: p)
                             rootView.sheetPositionFromVertical(at: shp) { nShp in
                                 if shp != nShp,
@@ -422,18 +423,33 @@ final class SelectTimeAction: SwipeEventAction, DragEventAction {
                                                                    Node(children: nodes, isClippingChildrenLines: true,
                                                                                path: .init(bounds), fillType: .color(Color(white: 0, opacity: 0.125)))])
                                         
-                                        otherChildren.append(node)
+                                        let isBottom = nShp.y < shp.y
+                                        if isBottom {
+                                            otherBottomChildren.append(node)
+                                        } else {
+                                            otherTopChildren.append(node)
+                                        }
                                         
-                                        otherIAndNodes[oSheetView] = (i, node)
-                                    } else if let (_, node) = otherIAndNodes[oSheetView] {
-                                        otherChildren.append(node)
+                                        otherIAndNodes[oSheetView] = (i, isBottom, node)
+                                    } else if let (_, isBottom, node) = otherIAndNodes[oSheetView] {
+                                        if isBottom {
+                                            otherBottomChildren.append(node)
+                                        } else {
+                                            otherTopChildren.append(node)
+                                        }
                                     }
                                 }
                             }
-                            if !otherChildren.isEmpty {
-                                sheetView.otherNode.children = otherChildren
-                            } else if !sheetView.otherNode.children.isEmpty {
-                                sheetView.otherNode.children = []
+                            
+                            if !otherBottomChildren.isEmpty {
+                                sheetView.otherBottomNode.children = otherBottomChildren
+                            } else if !sheetView.otherBottomNode.children.isEmpty {
+                                sheetView.otherBottomNode.children = []
+                            }
+                            if !otherTopChildren.isEmpty {
+                                sheetView.otherTopNode.children = otherTopChildren
+                            } else if !sheetView.otherTopNode.children.isEmpty {
+                                sheetView.otherTopNode.children = []
                             }
                         }
                         
@@ -549,11 +565,6 @@ final class PlayAction: InputKeyEventAction {
     private var isEndStop = false
     
     func flow(with event: InputKeyEvent) {
-        guard isEditingSheet else {
-            rootAction.keepOut(with: event)
-            return
-        }
-        
         let p = rootView.convertScreenToWorld(event.screenPoint)
         switch event.phase {
         case .began:
